@@ -1,50 +1,79 @@
 """Chat completions router.
 
 POST /chat/completions — OpenAI-compatible streaming/non-streaming chat.
-
-Implementation is stubbed until services/runtime.py is wired up (guide §4.2).
 """
 
 from __future__ import annotations
 
+import logging
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-# TODO: wire up LLMRuntime once services/runtime.py is implemented (guide §4.2)
-# from potluck_local.services.runtime import LLMRuntime
+from potluck_local.services.runtime import get_runtime
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 class ChatMessage(BaseModel):
-    """A single message in the conversation."""
-
-    role: str = Field(..., description="One of: system, user, assistant")
-    content: str = Field(..., description="Message text")
+    role: Literal["system", "user", "assistant"]
+    content: str
 
 
 class ChatRequest(BaseModel):
-    """Request body for POST /chat/completions."""
-
     messages: list[ChatMessage]
-    model: str | None = Field(default=None, description="Model ID to use (optional override)")
-    stream: bool = Field(default=True, description="Stream tokens via SSE")
+    model: str | None = Field(default=None)
+    stream: bool = Field(default=True)
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(default=2048, ge=1, le=131072)
+    stop: list[str] | None = None
 
 
 @router.post("/completions")
-async def chat_completions(request: ChatRequest) -> dict[str, object]:
-    """Handle a chat completion request.
+async def chat_completions(request: ChatRequest) -> object:
+    runtime = get_runtime()
 
-    Currently returns 503 until the LLMRuntime is implemented.
+    if not runtime.is_loaded():
+        raise HTTPException(
+            status_code=503,
+            detail="No model loaded. POST /models/{slug}/load first.",
+        )
 
-    TODO: Replace stub with real inference via services/runtime.py (guide §4.2):
-        runtime = get_runtime()   # app-state singleton
-        if not runtime.is_loaded():
-            raise HTTPException(503, "No model loaded")
-        if request.stream:
-            return StreamingResponse(runtime.stream_chat(...), media_type="text/event-stream")
-        return await runtime.chat(...)
-    """
-    raise HTTPException(status_code=503, detail="No model loaded")
+    if request.model is not None and request.model != runtime.current_model_id():
+        raise HTTPException(
+            status_code=409,
+            detail=f"Requested model '{request.model}' is not loaded. Load it first.",
+        )
+
+    messages = [m.model_dump() for m in request.messages]
+    logger.info(
+        "chat_request model_id=%s message_count=%d stream=%s",
+        runtime.current_model_id(),
+        len(messages),
+        request.stream,
+    )
+
+    if request.stream:
+        return StreamingResponse(
+            runtime.stream_chat(
+                messages=messages,
+                temperature=request.temperature,
+                max_tokens=request.max_tokens,
+                stop=request.stop,
+            ),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+                "Connection": "keep-alive",
+            },
+        )
+
+    return await runtime.chat(
+        messages=messages,
+        temperature=request.temperature,
+        max_tokens=request.max_tokens,
+    )

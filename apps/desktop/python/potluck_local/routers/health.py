@@ -1,30 +1,38 @@
-"""Health check router.
+"""Health check and graceful shutdown routes."""
 
-GET /health — liveness probe used by Electron to confirm the sidecar is up.
-"""
+from __future__ import annotations
 
-from fastapi import APIRouter
+import asyncio
+import os
+import signal
+
+from fastapi import APIRouter, BackgroundTasks
 
 from potluck_local import __version__
-from potluck_local.services.runtime import LLMRuntime
+from potluck_local.services.runtime import get_runtime
 
 router = APIRouter()
-
-# Module-level runtime instance shared with other routers.
-# A singleton approach is fine here because the sidecar is a single-process
-# server serving one user.  Real DI via app state is a later refactor.
-_runtime = LLMRuntime()
 
 
 @router.get("/health")
 async def health() -> dict[str, object]:
-    """Return sidecar liveness status.
-
-    The frontend polls this on startup to know when the sidecar is ready,
-    and checks model_loaded to decide whether to enable the chat UI.
-    """
+    """Liveness probe — frontend polls this to confirm the sidecar is up."""
     return {
         "status": "ok",
         "version": __version__,
-        "model_loaded": _runtime.is_loaded(),
+        "model_loaded": get_runtime().is_loaded(),
     }
+
+
+@router.post("/shutdown")
+async def shutdown(background_tasks: BackgroundTasks) -> dict[str, str]:
+    """Ask the sidecar to shut down cleanly.
+
+    Electron posts here before sending SIGKILL so in-flight inference can finish.
+    """
+
+    def _terminate() -> None:
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    background_tasks.add_task(asyncio.get_event_loop().run_in_executor, None, _terminate)
+    return {"status": "shutting_down"}

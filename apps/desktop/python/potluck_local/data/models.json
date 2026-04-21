@@ -1,1 +1,56 @@
-{"models": []}
+{
+  "schema_version": 1,
+  "models": [
+    {
+      "slug": "qwen-2.5-3b-instruct-q4",
+      "name": "Qwen 2.5 3B Instruct",
+      "version": "1.0.0",
+      "description": "Fast, lightweight model ideal for quick questions, writing help, and everyday tasks on any hardware.",
+      "tier": "small",
+      "download_url": "https://huggingface.co/bartowski/Qwen2.5-3B-Instruct-GGUF/resolve/main/Qwen2.5-3B-Instruct-Q4_K_M.gguf",
+      "size_bytes": 2019000000,
+      "sha256": "",
+      "sha256_note": "TODO: compute on first download",
+      "min_ram_gb": 8,
+      "min_vram_gb": 3,
+      "context_window": 32768,
+      "num_layers": 36,
+      "is_featured": true,
+      "recommended_tier": "small"
+    },
+    {
+      "slug": "llama-3.1-8b-instruct-q5",
+      "name": "Llama 3.1 8B Instruct",
+      "version": "1.0.0",
+      "description": "Balanced model that handles coding, analysis, and complex multi-turn conversations well.",
+      "tier": "medium",
+      "download_url": "https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q5_K_M.gguf",
+      "size_bytes": 5732000000,
+      "sha256": "",
+      "sha256_note": "TODO: compute on first download",
+      "min_ram_gb": 16,
+      "min_vram_gb": 6,
+      "context_window": 8192,
+      "num_layers": 32,
+      "is_featured": true,
+      "recommended_tier": "medium"
+    },
+    {
+      "slug": "qwen-2.5-32b-instruct-q4",
+      "name": "Qwen 2.5 32B Instruct",
+      "version": "1.0.0",
+      "description": "Maximum-capability model for deep research, long documents, and the most demanding reasoning tasks.",
+      "tier": "large",
+      "download_url": "https://huggingface.co/bartowski/Qwen2.5-32B-Instruct-GGUF/resolve/main/Qwen2.5-32B-Instruct-Q4_K_M.gguf",
+      "size_bytes": 19850000000,
+      "sha256": "",
+      "sha256_note": "TODO: compute on first download",
+      "min_ram_gb": 32,
+      "min_vram_gb": 20,
+      "context_window": 32768,
+      "num_layers": 64,
+      "is_featured": true,
+      "recommended_tier": "large"
+    }
+  ]
+}

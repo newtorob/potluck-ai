@@ -2,40 +2,70 @@
 
 GET   /settings  — read current settings
 PATCH /settings  — merge-update settings
-
-Delegates to services/settings_manager (guide §4.4).
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+import logging
+from typing import Any
 
-from potluck_local.services.settings_manager import PotluckSettings, get_settings, save_settings
+from fastapi import APIRouter, HTTPException
 
+from potluck_local.services.settings_manager import (
+    AppSettings,
+    NetworkSettings,
+    PrivacySettings,
+    PotluckSettings,
+    RuntimeSettings,
+    get_settings,
+    save_settings,
+)
+
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Map of top-level key → sub-model type for typed nested merging.
+_SUB_MODELS: dict[str, type] = {
+    "runtime": RuntimeSettings,
+    "privacy": PrivacySettings,
+    "network": NetworkSettings,
+    "app": AppSettings,
+}
 
 
 @router.get("")
-async def read_settings() -> dict[str, object]:
-    """Return current settings as a plain dict.
-
-    Reads from ~/.potluck/config.json; returns defaults if the file is absent.
-    """
+async def read_settings() -> dict[str, Any]:
     return get_settings().model_dump()
 
 
 @router.patch("")
-async def update_settings(patch: dict[str, object]) -> dict[str, object]:
-    """Merge-update settings and persist to disk.
-
-    Accepts a partial settings dict and deep-merges it over the current state.
-
-    TODO: Validate patch against PotluckSettings sub-models and apply runtime
-          changes (e.g., reload model if context_size changes).
-    """
+async def update_settings(patch: dict[str, Any]) -> dict[str, Any]:
     current = get_settings()
-    # Merge patch into current settings using model_copy(update=...)
-    merged_data = {**current.model_dump(), **patch}
-    updated = PotluckSettings(**merged_data)
+    current_data = current.model_dump()
+
+    for key, value in patch.items():
+        if key not in PotluckSettings.model_fields:
+            continue  # silently drop unknown top-level keys
+
+        if key in _SUB_MODELS and isinstance(value, dict):
+            # Shallow-merge into the existing sub-model.
+            existing_sub = current_data.get(key, {})
+            merged_sub = {**existing_sub, **value}
+            try:
+                current_data[key] = _SUB_MODELS[key](**merged_sub).model_dump()
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Invalid value for '{key}': {exc}",
+                ) from exc
+        else:
+            current_data[key] = value
+
+    try:
+        updated = PotluckSettings(**current_data)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
     save_settings(updated)
+    logger.info("settings_updated")
     return updated.model_dump()
