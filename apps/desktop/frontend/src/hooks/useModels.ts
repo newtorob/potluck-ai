@@ -1,83 +1,68 @@
 /**
- * useModels — loads the model list from the local sidecar and exposes
- * install / delete / load actions bound to the model store.
+ * useModels — facade over modelStore.
+ *
+ * Auto-fetches on mount. Re-fetches on window visibility change (tab/focus
+ * restored) so stale installed/progress state is refreshed automatically.
+ *
+ * Exposes all actions needed by ModelLibrary, ModelCard, and the FirstRun wizard.
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect } from 'react';
 import { useModelStore } from '@/stores/modelStore';
-import { localApi } from '@/lib/localApi';
-import type { InstalledModel } from '@/types/models';
+import type { CatalogModel } from '@/stores/modelStore';
 
-interface UseModelsReturn {
-  availableModels: ReturnType<typeof useModelStore.getState>['availableModels'];
-  installedModels: InstalledModel[];
-  activeModelId: string | null;
-  isLoading: boolean;
-  loadError: string | null;
-  install: (modelId: string) => Promise<void>;
-  remove: (modelId: string) => Promise<void>;
-  activate: (modelId: string) => Promise<void>;
-  refresh: () => Promise<void>;
+export type { CatalogModel };
+
+export interface UseModelsReturn {
+  models: CatalogModel[];
+  activeModelSlug: string | null;
+  installing: Record<string, boolean>;
+  loading: Record<string, boolean>;
+  loadError: Record<string, string>;
+  isFetching: boolean;
+  fetchError: string | null;
+  fetch: () => Promise<void>;
+  install: (slug: string) => Promise<void>;
+  cancelInstall: (slug: string) => Promise<void>;
+  remove: (slug: string) => Promise<void>;
+  load: (slug: string) => Promise<void>;
+  unload: (slug: string) => Promise<void>;
 }
 
 export function useModels(): UseModelsReturn {
   const store = useModelStore();
 
-  const refresh = useCallback(async () => {
-    store.setLoading(true);
-    store.setLoadError(null);
-    try {
-      const models = await localApi.listModels();
-      const installed = models.filter((m): m is InstalledModel => m.installed);
-      store.setModels(models, installed);
-    } catch (err) {
-      store.setLoadError(err instanceof Error ? err.message : 'Failed to load models');
-    } finally {
-      store.setLoading(false);
-    }
-  }, [store]);
-
-  // Load on mount
+  // Fetch on mount
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void store.fetchModels();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const install = useCallback(
-    async (modelId: string) => {
-      await localApi.installModel(modelId);
-      void refresh();
-    },
-    [refresh],
-  );
-
-  const remove = useCallback(
-    async (modelId: string) => {
-      await localApi.deleteModel(modelId);
-      if (store.activeModelId === modelId) {
-        store.setActiveModel(null);
+  // Re-fetch when user returns to the window
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        void store.fetchModels();
       }
-      void refresh();
-    },
-    [store, refresh],
-  );
-
-  const activate = useCallback(
-    async (modelId: string) => {
-      await localApi.loadModel(modelId);
-      store.setActiveModel(modelId);
-    },
-    [store],
-  );
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
-    availableModels: store.availableModels,
-    installedModels: store.installedModels,
-    activeModelId: store.activeModelId,
-    isLoading: store.isLoading,
+    models: store.models,
+    activeModelSlug: store.activeModelSlug,
+    installing: store.installing,
+    loading: store.loading,
     loadError: store.loadError,
-    install,
-    remove,
-    activate,
-    refresh,
+    isFetching: store.isFetching,
+    fetchError: store.fetchError,
+    fetch: store.fetchModels,
+    install: store.install,
+    cancelInstall: store.cancelInstall,
+    remove: store.remove,
+    load: store.load,
+    unload: store.unload,
   };
 }

@@ -1,49 +1,131 @@
+/**
+ * SettingsView — /settings route.
+ *
+ * Tabbed interface with URL hash persistence (#account, #hardware, #privacy, #advanced).
+ * Refreshing the page restores the selected tab.
+ *
+ * Tabs:
+ *   account   — placeholder / coming soon
+ *   hardware  — runtime sliders (context, gpu_layers, threads, temperature, max_tokens)
+ *   privacy   — telemetry and history toggles
+ *   advanced  — model storage path
+ */
+
+import { useEffect, useState } from 'react';
 import { Settings } from 'lucide-react';
-import { useState } from 'react';
 import { cn } from '@/components/ui/cn';
+import { HardwarePanel } from '@/components/settings/HardwarePanel';
+import { PrivacyPanel } from '@/components/settings/PrivacyPanel';
+import { AccountPanel } from '@/components/settings/AccountPanel';
+import { ModelPathPanel } from '@/components/settings/ModelPathPanel';
+import { useSettings } from '@/hooks/useSettings';
 
-type Tab = 'account' | 'hardware' | 'privacy' | 'advanced';
+// ---------------------------------------------------------------------------
+// Tab definitions
+// ---------------------------------------------------------------------------
 
-const TABS: { id: Tab; label: string }[] = [
+type TabId = 'account' | 'hardware' | 'privacy' | 'advanced';
+
+const TABS: { id: TabId; label: string }[] = [
   { id: 'account', label: 'Account' },
   { id: 'hardware', label: 'Hardware' },
   { id: 'privacy', label: 'Privacy' },
   { id: 'advanced', label: 'Advanced' },
 ];
 
-/**
- * Settings view — top-level route for /settings.
- *
- * Placeholder scaffold with inert tab navigation. Real panels:
- *   - Account: profile info, membership status, billing portal link
- *   - Hardware: GPU layers slider, thread count, context size
- *   - Privacy: telemetry toggle, chat history toggle
- *   - Advanced: model storage path, debug logging
- *
- * State driven by useSettings hook -> localApi.getSettings / updateSettings
- */
+function isValidTab(v: string): v is TabId {
+  return TABS.some((t) => t.id === v);
+}
+
+function getTabFromHash(): TabId {
+  const hash = window.location.hash.replace('#', '');
+  return isValidTab(hash) ? hash : 'account';
+}
+
+// ---------------------------------------------------------------------------
+// SettingsView
+// ---------------------------------------------------------------------------
+
 export function SettingsView() {
-  const [activeTab, setActiveTab] = useState<Tab>('account');
+  const { settings, isLoaded, isSaving, saveError, update } = useSettings();
+  const [activeTab, setActiveTab] = useState<TabId>(getTabFromHash);
+
+  // Sync URL hash when tab changes
+  useEffect(() => {
+    history.replaceState(null, '', `#${activeTab}`);
+  }, [activeTab]);
+
+  // Handle back/forward navigation changing the hash
+  useEffect(() => {
+    const onHashChange = () => setActiveTab(getTabFromHash());
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
+    const count = TABS.length;
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const next = TABS[(idx + 1) % count];
+      if (next) {
+        setActiveTab(next.id);
+        document.getElementById(`tab-${next.id}`)?.focus();
+      }
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const prev = TABS[(idx - 1 + count) % count];
+      if (prev) {
+        setActiveTab(prev.id);
+        document.getElementById(`tab-${prev.id}`)?.focus();
+      }
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      const first = TABS[0];
+      if (first) {
+        setActiveTab(first.id);
+        document.getElementById(`tab-${first.id}`)?.focus();
+      }
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      const last = TABS[TABS.length - 1];
+      if (last) {
+        setActiveTab(last.id);
+        document.getElementById(`tab-${last.id}`)?.focus();
+      }
+    }
+  };
 
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-border px-6 py-4">
-        <Settings className="h-5 w-5 text-muted-foreground" />
+        <Settings className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
         <h1 className="text-sm font-semibold">Settings</h1>
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-1 border-b border-border px-6 pt-2">
-        {TABS.map(({ id, label }) => (
+      <div
+        role="tablist"
+        aria-label="Settings tabs"
+        className="flex gap-0 border-b border-border px-6"
+      >
+        {TABS.map(({ id, label }, idx) => (
           <button
             key={id}
+            id={`tab-${id}`}
+            role="tab"
+            type="button"
+            aria-selected={activeTab === id}
+            aria-controls={`tabpanel-${id}`}
+            tabIndex={activeTab === id ? 0 : -1}
             onClick={() => setActiveTab(id)}
+            onKeyDown={(e) => handleTabKeyDown(e, idx)}
             className={cn(
-              'px-4 py-2 text-sm font-medium transition-colors rounded-t-md',
+              'px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
               activeTab === id
-                ? 'text-foreground border-b-2 border-primary'
-                : 'text-muted-foreground hover:text-foreground',
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border',
             )}
           >
             {label}
@@ -51,28 +133,108 @@ export function SettingsView() {
         ))}
       </div>
 
-      {/* Tab content placeholder */}
-      <div className="flex-1 overflow-y-auto px-6 py-8">
-        <div className="mx-auto max-w-xl space-y-4">
-          {/* Skeleton rows */}
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="space-y-2">
-              <div className="h-3 w-1/4 animate-pulse rounded bg-muted" />
-              <div className="h-10 w-full animate-pulse rounded-lg bg-muted" />
-            </div>
-          ))}
-        </div>
+      {/* Tab content */}
+      <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="mx-auto max-w-xl">
+          {/* Account */}
+          <section
+            id="tabpanel-account"
+            role="tabpanel"
+            aria-labelledby="tab-account"
+            hidden={activeTab !== 'account'}
+          >
+            <AccountPanel />
+          </section>
 
-        {/* Empty state */}
-        <div className="mt-10 flex flex-col items-center justify-center gap-2 text-center">
-          <p className="text-sm font-medium text-muted-foreground capitalize">
-            {activeTab} settings coming soon
-          </p>
-          <p className="text-xs text-muted-foreground/60">
-            Wired to Python sidecar via localApi.getSettings — guide §4.4
-          </p>
+          {/* Hardware */}
+          <section
+            id="tabpanel-hardware"
+            role="tabpanel"
+            aria-labelledby="tab-hardware"
+            hidden={activeTab !== 'hardware'}
+          >
+            {!isLoaded ? (
+              <SettingsSkeleton />
+            ) : settings ? (
+              <HardwarePanel
+                settings={settings}
+                isSaving={isSaving}
+                saveError={saveError}
+                onUpdate={update}
+              />
+            ) : (
+              <SidecarError />
+            )}
+          </section>
+
+          {/* Privacy */}
+          <section
+            id="tabpanel-privacy"
+            role="tabpanel"
+            aria-labelledby="tab-privacy"
+            hidden={activeTab !== 'privacy'}
+          >
+            {!isLoaded ? (
+              <SettingsSkeleton />
+            ) : settings ? (
+              <PrivacyPanel
+                settings={settings}
+                isSaving={isSaving}
+                saveError={saveError}
+                onUpdate={update}
+              />
+            ) : (
+              <SidecarError />
+            )}
+          </section>
+
+          {/* Advanced */}
+          <section
+            id="tabpanel-advanced"
+            role="tabpanel"
+            aria-labelledby="tab-advanced"
+            hidden={activeTab !== 'advanced'}
+          >
+            {!isLoaded ? (
+              <SettingsSkeleton />
+            ) : settings ? (
+              <ModelPathPanel settings={settings} />
+            ) : (
+              <SidecarError />
+            )}
+          </section>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Small helpers
+// ---------------------------------------------------------------------------
+
+function SettingsSkeleton() {
+  return (
+    <div className="space-y-4" aria-label="Loading settings">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="space-y-2">
+          <div className="h-3 w-1/4 animate-pulse rounded bg-muted" />
+          <div className="h-10 w-full animate-pulse rounded-lg bg-muted" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SidecarError() {
+  return (
+    <div className="flex flex-col items-center gap-3 py-8 text-center">
+      <p className="text-sm font-medium text-muted-foreground">
+        Could not connect to the local sidecar
+      </p>
+      <p className="text-xs text-muted-foreground/70">
+        Make sure the Python backend is running, then refresh this page.
+      </p>
     </div>
   );
 }

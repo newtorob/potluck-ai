@@ -17,10 +17,12 @@ router = APIRouter()
 @router.get("/health")
 async def health() -> dict[str, object]:
     """Liveness probe — frontend polls this to confirm the sidecar is up."""
+    runtime = get_runtime()
     return {
         "status": "ok",
         "version": __version__,
-        "model_loaded": get_runtime().is_loaded(),
+        "model_loaded": runtime.is_loaded(),
+        "active_model_id": runtime.current_model_id(),
     }
 
 

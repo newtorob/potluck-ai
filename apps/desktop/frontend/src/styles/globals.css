@@ -1,3 +1,6 @@
+/* highlight.js theme — must be imported before Tailwind directives */
+@import 'highlight.js/styles/github-dark.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

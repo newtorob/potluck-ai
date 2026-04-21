@@ -1,121 +1,363 @@
 /**
- * Chat store — manages conversations and streaming state.
+ * Chat store — conversations, streaming state, and send/abort actions.
  *
- * Zustand store typed with generics. No persistence in v0 (chat history
- * is opt-in via the Python sidecar's SQLite backend, not the frontend store).
+ * All conversation data is in-memory only (v0). No disk persistence.
+ * A single empty conversation is seeded on initialization.
  *
- * Actions:
- *   addMessage      — append a complete message to the active conversation
- *   startStreaming  — mark the store as mid-stream; creates a placeholder message
- *   appendTokens    — extend the streaming placeholder with new content
- *   finishStreaming — seal the in-progress message
- *   abort           — signal the active AbortController to stop generation
- *   setActiveConversation — switch the visible conversation
- *   newConversation — create and activate a fresh conversation
+ * The `sendMessage` action is the core orchestrator:
+ *   1. Appends the user message.
+ *   2. Creates an empty assistant placeholder.
+ *   3. Opens the SSE stream via localApi.streamChat.
+ *   4. Appends tokens as they arrive.
+ *   5. Marks the stream complete (or partial on abort/error).
  */
 
 import { create } from 'zustand';
 import type { ChatMessage, Conversation } from '@/types/chat';
+import { localApi } from '@/lib/localApi';
+import { streamTokens } from '@/lib/streaming';
 
-interface ChatState {
-  conversations: Conversation[];
-  activeConversationId: string | null;
-  isStreaming: boolean;
-  abortController: AbortController | null;
+// ---------------------------------------------------------------------------
+// Extended message type with streaming metadata
+// ---------------------------------------------------------------------------
 
-  // Derived helpers
-  activeConversation: () => Conversation | null;
+export type MessageStatus = 'complete' | 'streaming' | 'partial' | 'error';
 
-  // Actions
-  newConversation: () => string;
-  setActiveConversation: (id: string) => void;
-  addMessage: (conversationId: string, message: ChatMessage) => void;
-  startStreaming: (conversationId: string, placeholderMessage: ChatMessage) => void;
-  appendTokens: (conversationId: string, messageId: string, tokens: string) => void;
-  finishStreaming: () => void;
-  abort: () => void;
+export interface AppMessage extends ChatMessage {
+  status: MessageStatus;
+  /** Only set on error messages */
+  errorText?: string;
 }
 
-function makeConversation(): Conversation {
+export interface AppConversation extends Omit<Conversation, 'messages'> {
+  modelSlug: string | null;
+  messages: AppMessage[];
+}
+
+// ---------------------------------------------------------------------------
+// State shape
+// ---------------------------------------------------------------------------
+
+interface ChatState {
+  conversations: Record<string, AppConversation>;
+  activeConversationId: string | null;
+  isStreaming: boolean;
+  streamingMessageId: string | null;
+  /** Not serialised — held only for abort() */
+  abortController: AbortController | null;
+
+  // Actions
+  createConversation: (modelSlug?: string) => string;
+  deleteConversation: (id: string) => void;
+  switchConversation: (id: string) => void;
+  renameConversation: (id: string, title: string) => void;
+  sendMessage: (content: string) => Promise<void>;
+  abort: () => void;
+  clearConversations: () => void;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function makeId(): string {
+  return crypto.randomUUID();
+}
+
+function makeConversation(modelSlug: string | null = null): AppConversation {
   const now = Date.now();
   return {
-    id: crypto.randomUUID(),
-    title: 'New conversation',
+    id: makeId(),
+    title: 'New chat',
+    modelSlug,
     messages: [],
     createdAt: now,
     updatedAt: now,
   };
 }
 
+/** Derive a conversation title from the first user message (max 40 chars). */
+function titleFromContent(content: string): string {
+  const trimmed = content.trim().replace(/\s+/g, ' ');
+  return trimmed.length > 40 ? `${trimmed.slice(0, 40)}…` : trimmed;
+}
+
+// ---------------------------------------------------------------------------
+// Seed
+// ---------------------------------------------------------------------------
+
+const seedConversation = makeConversation();
+
+// ---------------------------------------------------------------------------
+// Store
+// ---------------------------------------------------------------------------
+
 export const useChatStore = create<ChatState>()((set, get) => ({
-  conversations: [],
-  activeConversationId: null,
+  conversations: { [seedConversation.id]: seedConversation },
+  activeConversationId: seedConversation.id,
   isStreaming: false,
+  streamingMessageId: null,
   abortController: null,
 
-  activeConversation() {
-    const { conversations, activeConversationId } = get();
-    return conversations.find((c) => c.id === activeConversationId) ?? null;
-  },
-
-  newConversation() {
-    const conversation = makeConversation();
+  createConversation(modelSlug) {
+    const convo = makeConversation(modelSlug ?? null);
     set((s) => ({
-      conversations: [conversation, ...s.conversations],
-      activeConversationId: conversation.id,
+      conversations: { ...s.conversations, [convo.id]: convo },
+      activeConversationId: convo.id,
     }));
-    return conversation.id;
+    return convo.id;
   },
 
-  setActiveConversation(id) {
-    set({ activeConversationId: id });
+  deleteConversation(id) {
+    set((s) => {
+      const next = { ...s.conversations };
+      delete next[id];
+
+      const remaining = Object.keys(next);
+      let activeId = s.activeConversationId;
+
+      if (activeId === id) {
+        const firstId = remaining[0];
+        if (firstId !== undefined) {
+          // Pick the most-recently-updated remaining conversation
+          activeId = remaining.reduce((best, cid) => {
+            const bestConvo = next[best];
+            const candidate = next[cid];
+            if (!bestConvo || !candidate) return best;
+            return candidate.updatedAt > bestConvo.updatedAt ? cid : best;
+          }, firstId);
+        } else {
+          // No conversations left — create a fresh one
+          const fresh = makeConversation();
+          next[fresh.id] = fresh;
+          activeId = fresh.id;
+        }
+      }
+
+      return { conversations: next, activeConversationId: activeId };
+    });
   },
 
-  addMessage(conversationId, message) {
-    set((s) => ({
-      conversations: s.conversations.map((c) =>
-        c.id === conversationId
-          ? { ...c, messages: [...c.messages, message], updatedAt: Date.now() }
-          : c,
-      ),
-    }));
+  switchConversation(id) {
+    const { conversations } = get();
+    if (id in conversations) {
+      set({ activeConversationId: id });
+    }
   },
 
-  startStreaming(conversationId, placeholderMessage) {
+  renameConversation(id, title) {
+    set((s) => {
+      const convo = s.conversations[id];
+      if (!convo) return s;
+      return {
+        conversations: {
+          ...s.conversations,
+          [id]: { ...convo, title: title.trim() || 'New chat' },
+        },
+      };
+    });
+  },
+
+  async sendMessage(content) {
+    if (get().isStreaming) return;
+
+    const state = get();
+    const maybeId = state.activeConversationId;
+
+    // If for any reason there's no active conversation, create one
+    const conversationId: string =
+      maybeId && maybeId in state.conversations
+        ? maybeId
+        : get().createConversation();
+
+    const userMessage: AppMessage = {
+      id: makeId(),
+      role: 'user',
+      content,
+      createdAt: Date.now(),
+      status: 'complete',
+    };
+
+    // Auto-title from first user message
+    const convo = get().conversations[conversationId];
+    const isFirstMessage = convo ? convo.messages.length === 0 : true;
+
+    set((s) => {
+      const target = s.conversations[conversationId];
+      if (!target) return s;
+      const updated: AppConversation = {
+        ...target,
+        title: isFirstMessage ? titleFromContent(content) : target.title,
+        messages: [...target.messages, userMessage],
+        updatedAt: Date.now(),
+      };
+      return { conversations: { ...s.conversations, [conversationId]: updated } };
+    });
+
+    const assistantId = makeId();
+    const assistantPlaceholder: AppMessage = {
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      createdAt: Date.now(),
+      status: 'streaming',
+    };
+
     const controller = new AbortController();
-    set((s) => ({
-      isStreaming: true,
-      abortController: controller,
-      conversations: s.conversations.map((c) =>
-        c.id === conversationId
-          ? { ...c, messages: [...c.messages, placeholderMessage], updatedAt: Date.now() }
-          : c,
-      ),
-    }));
-  },
 
-  appendTokens(conversationId, messageId, tokens) {
-    set((s) => ({
-      conversations: s.conversations.map((c) =>
-        c.id === conversationId
-          ? {
-              ...c,
-              messages: c.messages.map((m) =>
-                m.id === messageId ? { ...m, content: m.content + tokens } : m,
+    set((s) => {
+      const target = s.conversations[conversationId];
+      if (!target) return s;
+      return {
+        isStreaming: true,
+        streamingMessageId: assistantId,
+        abortController: controller,
+        conversations: {
+          ...s.conversations,
+          [conversationId]: {
+            ...target,
+            messages: [...target.messages, assistantPlaceholder],
+            updatedAt: Date.now(),
+          },
+        },
+      };
+    });
+
+    // Build the message history to send (all messages including the new user msg,
+    // excluding the empty assistant placeholder)
+    const currentConvo = get().conversations[conversationId];
+    const apiMessages: ChatMessage[] = (currentConvo?.messages ?? [])
+      .filter((m) => m.id !== assistantId)
+      .map((m): ChatMessage => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt }));
+
+    try {
+      const response = await localApi.streamChat(apiMessages, {
+        abortSignal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`[localApi] ${response.status}: ${response.statusText}`);
+      }
+
+      for await (const token of streamTokens(response)) {
+        // Check abort between tokens
+        if (controller.signal.aborted) break;
+
+        set((s) => {
+          const target = s.conversations[conversationId];
+          if (!target) return s;
+          return {
+            conversations: {
+              ...s.conversations,
+              [conversationId]: {
+                ...target,
+                messages: target.messages.map((m) =>
+                  m.id === assistantId
+                    ? { ...m, content: m.content + token.content }
+                    : m,
+                ),
+                updatedAt: Date.now(),
+              },
+            },
+          };
+        });
+      }
+
+      // Mark complete unless aborted
+      if (!controller.signal.aborted) {
+        set((s) => {
+          const target = s.conversations[conversationId];
+          if (!target) return s;
+          return {
+            isStreaming: false,
+            streamingMessageId: null,
+            abortController: null,
+            conversations: {
+              ...s.conversations,
+              [conversationId]: {
+                ...target,
+                messages: target.messages.map((m) =>
+                  m.id === assistantId ? { ...m, status: 'complete' as MessageStatus } : m,
+                ),
+              },
+            },
+          };
+        });
+      }
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        // abort() already handled state cleanup — nothing to do here
+        return;
+      }
+
+      // Surface error inline as a message
+      const errorText =
+        err instanceof Error ? err.message : 'An unexpected error occurred.';
+
+      set((s) => {
+        const target = s.conversations[conversationId];
+        if (!target) return s;
+        return {
+          isStreaming: false,
+          streamingMessageId: null,
+          abortController: null,
+          conversations: {
+            ...s.conversations,
+            [conversationId]: {
+              ...target,
+              messages: target.messages.map((m) =>
+                m.id === assistantId
+                  ? {
+                      ...m,
+                      status: 'error' as MessageStatus,
+                      errorText,
+                      content: m.content,
+                    }
+                  : m,
               ),
-            }
-          : c,
-      ),
-    }));
-  },
-
-  finishStreaming() {
-    set({ isStreaming: false, abortController: null });
+            },
+          },
+        };
+      });
+    }
   },
 
   abort() {
-    const { abortController } = get();
+    const { abortController, streamingMessageId, activeConversationId } = get();
     abortController?.abort();
-    set({ isStreaming: false, abortController: null });
+
+    set((s) => {
+      const target = activeConversationId ? s.conversations[activeConversationId] : null;
+      if (!target || !streamingMessageId || !activeConversationId) {
+        return { isStreaming: false, streamingMessageId: null, abortController: null };
+      }
+      return {
+        isStreaming: false,
+        streamingMessageId: null,
+        abortController: null,
+        conversations: {
+          ...s.conversations,
+          [activeConversationId]: {
+            ...target,
+            messages: target.messages.map((m) =>
+              m.id === streamingMessageId
+                ? { ...m, status: 'partial' as MessageStatus }
+                : m,
+            ),
+          },
+        },
+      };
+    });
+  },
+
+  clearConversations() {
+    const fresh = makeConversation();
+    set({
+      conversations: { [fresh.id]: fresh },
+      activeConversationId: fresh.id,
+      isStreaming: false,
+      streamingMessageId: null,
+      abortController: null,
+    });
   },
 }));

@@ -1,107 +1,68 @@
 /**
- * useChat — primary hook for sending messages and consuming the stream.
+ * useChat — thin facade over chatStore.
  *
- * Orchestrates: chatStore state, routeInference, streamTokens parser.
- * Components should use this hook rather than calling the store or API directly.
+ * Keeps components clean by selecting only what they need and exposing
+ * a stable action API. Components should import this hook rather than
+ * reaching into useChatStore directly.
  */
 
-import { useCallback } from 'react';
 import { useChatStore } from '@/stores/chatStore';
-import { routeInference } from '@/lib/inference';
-import { streamTokens } from '@/lib/streaming';
-import { useModelStore } from '@/stores/modelStore';
-import type { ChatMessage } from '@/types/chat';
+import type { AppConversation, AppMessage } from '@/stores/chatStore';
 
-interface UseChatReturn {
-  conversations: ReturnType<typeof useChatStore.getState>['conversations'];
+export interface UseChatReturn {
+  conversations: AppConversation[];
+  activeConversation: AppConversation | null;
   activeConversationId: string | null;
+  messages: AppMessage[];
   isStreaming: boolean;
-  send: (text: string) => Promise<void>;
+  streamingMessageId: string | null;
+
+  // Actions
+  send: (content: string) => Promise<void>;
   abort: () => void;
-  newConversation: () => string;
+  createConversation: (modelSlug?: string) => string;
+  deleteConversation: (id: string) => void;
+  switchConversation: (id: string) => void;
+  renameConversation: (id: string, title: string) => void;
+  clearConversations: () => void;
 }
 
 export function useChat(): UseChatReturn {
-  const conversations = useChatStore((s) => s.conversations);
+  const conversationsMap = useChatStore((s) => s.conversations);
   const activeConversationId = useChatStore((s) => s.activeConversationId);
   const isStreaming = useChatStore((s) => s.isStreaming);
-  const addMessage = useChatStore((s) => s.addMessage);
-  const startStreaming = useChatStore((s) => s.startStreaming);
-  const appendTokens = useChatStore((s) => s.appendTokens);
-  const finishStreaming = useChatStore((s) => s.finishStreaming);
+  const streamingMessageId = useChatStore((s) => s.streamingMessageId);
+
+  const sendMessage = useChatStore((s) => s.sendMessage);
   const abort = useChatStore((s) => s.abort);
-  const newConversation = useChatStore((s) => s.newConversation);
-  const activeModelId = useModelStore((s) => s.activeModelId);
+  const createConversation = useChatStore((s) => s.createConversation);
+  const deleteConversation = useChatStore((s) => s.deleteConversation);
+  const switchConversation = useChatStore((s) => s.switchConversation);
+  const renameConversation = useChatStore((s) => s.renameConversation);
+  const clearConversations = useChatStore((s) => s.clearConversations);
 
-  const send = useCallback(
-    async (text: string) => {
-      if (isStreaming) return;
-
-      // Snapshot current state — do not close over reactive values
-      const state = useChatStore.getState();
-
-      // Ensure we have an active conversation
-      let conversationId = state.activeConversationId;
-      if (!conversationId) {
-        conversationId = newConversation();
-      }
-
-      // Add the user message
-      const userMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'user',
-        content: text,
-        createdAt: Date.now(),
-      };
-      addMessage(conversationId, userMessage);
-
-      // Create an assistant placeholder for streaming
-      const assistantMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: '',
-        createdAt: Date.now(),
-      };
-
-      // Build message history from the snapshot (before the placeholder is added)
-      const conversation = state.conversations.find((c) => c.id === conversationId);
-      const messages: ChatMessage[] = conversation
-        ? [...conversation.messages, userMessage]
-        : [userMessage];
-
-      startStreaming(conversationId, assistantMessage);
-
-      try {
-        const { response } = await routeInference(
-          messages,
-          { abortSignal: useChatStore.getState().abortController?.signal },
-          activeModelId ?? '',
-        );
-
-        for await (const token of streamTokens(response)) {
-          appendTokens(conversationId, assistantMessage.id, token.content);
-        }
-      } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
-          // User-initiated abort — not an error
-          return;
-        }
-        // TODO: surface to user via toast / inline error state
-        console.error('[useChat] inference error:', err);
-      } finally {
-        finishStreaming();
-      }
-    },
-    // Actions from Zustand are stable references — only re-create if isStreaming changes
-    [isStreaming, addMessage, startStreaming, appendTokens, finishStreaming, newConversation, activeModelId],
+  const conversations = Object.values(conversationsMap).sort(
+    (a, b) => b.updatedAt - a.updatedAt,
   );
+
+  const activeConversation =
+    activeConversationId ? (conversationsMap[activeConversationId] ?? null) : null;
+
+  const messages = activeConversation?.messages ?? [];
 
   return {
     conversations,
+    activeConversation,
     activeConversationId,
+    messages,
     isStreaming,
-    send,
+    streamingMessageId,
+    send: sendMessage,
     abort,
-    newConversation,
+    createConversation,
+    deleteConversation,
+    switchConversation,
+    renameConversation,
+    clearConversations,
   };
 }
