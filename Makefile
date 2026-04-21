@@ -1,0 +1,152 @@
+# Potluck AI — one-command dev ergonomics.
+#
+# Backend (Postgres + cloud API) runs in Docker.
+# Desktop stack (Vite + Python sidecar + Electron) runs natively on the host —
+# it needs GPU access and a real window.
+
+# Python interpreter used to create the sidecar venv.
+# Override on the command line if your default python3 is too old:
+#   PYTHON_BIN=python3.11 make setup
+# Auto-picks python3.11 if on PATH, else falls back to python3.
+PYTHON_BIN ?= $(shell command -v python3.11 2>/dev/null || command -v python3)
+
+# Docker Compose invocation. Prefers the v2 plugin (`docker compose`);
+# falls back to the legacy `docker-compose` v1 if that's all that's available.
+# Override explicitly if neither autodetects (e.g. COMPOSE="colima docker compose").
+COMPOSE ?= $(shell \
+  if docker compose version >/dev/null 2>&1; then echo "docker compose"; \
+  elif command -v docker-compose >/dev/null 2>&1; then echo "docker-compose"; \
+  fi)
+
+.PHONY: help setup check-python check-docker up down restart logs api-logs pg-logs migrate psql \
+        api-shell test-api dev desktop frontend sidecar sidecar-setup \
+        frontend-setup electron-setup ps status clean reset
+
+help: ## Show this help
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+# ---------- one-time setup ----------
+
+setup: check-python sidecar-setup frontend-setup electron-setup ## One-time: create Python venv + install node deps for the desktop stack
+	@echo "==> Setup complete."
+	@echo "   Backend:  make up"
+	@echo "   Desktop:  make desktop   (or 'make dev' for both in one terminal)"
+
+check-python: ## Verify PYTHON_BIN points to Python 3.11+
+	@if [ -z "$(PYTHON_BIN)" ]; then \
+		echo "error: no python interpreter found. install python 3.11+ (e.g. 'brew install python@3.11') or pass PYTHON_BIN=/path/to/python"; \
+		exit 1; \
+	fi
+	@PYVER=$$($(PYTHON_BIN) -c 'import sys; print("%d.%d" % sys.version_info[:2])'); \
+	MAJOR=$${PYVER%%.*}; MINOR=$${PYVER##*.}; \
+	if [ "$$MAJOR" -lt 3 ] || { [ "$$MAJOR" -eq 3 ] && [ "$$MINOR" -lt 11 ]; }; then \
+		echo "error: $(PYTHON_BIN) is Python $$PYVER; need 3.11+. try: PYTHON_BIN=python3.11 make setup"; \
+		exit 1; \
+	fi
+	@echo "==> Using $(PYTHON_BIN) ($$($(PYTHON_BIN) --version))"
+
+sidecar-setup: check-python ## Create Python venv for the sidecar and install requirements
+	@echo "==> Creating Python sidecar venv (apps/desktop/python) with $(PYTHON_BIN)"
+	@cd apps/desktop/python && $(PYTHON_BIN) -m venv .venv
+	@cd apps/desktop/python && ./.venv/bin/pip install --upgrade pip
+	@cd apps/desktop/python && ./.venv/bin/pip install -r requirements.txt
+
+frontend-setup: ## Install frontend node deps
+	@echo "==> Installing frontend deps (apps/desktop/frontend)"
+	@cd apps/desktop/frontend && pnpm install
+
+electron-setup: ## Install electron node deps
+	@echo "==> Installing electron deps (apps/desktop/electron)"
+	@cd apps/desktop/electron && pnpm install
+
+# ---------- backend (Postgres + API in Docker) ----------
+
+check-docker: ## Verify docker + a compose command are available and the daemon is running
+	@if ! command -v docker >/dev/null 2>&1; then \
+		echo "error: docker CLI not found. install Docker Desktop: brew install --cask docker"; \
+		exit 1; \
+	fi
+	@if [ -z "$(COMPOSE)" ]; then \
+		echo "error: neither 'docker compose' (v2 plugin) nor 'docker-compose' (v1) is available."; \
+		echo "       install Docker Desktop (includes the compose plugin): brew install --cask docker"; \
+		exit 1; \
+	fi
+	@if ! docker info >/dev/null 2>&1; then \
+		echo "error: docker daemon is not running. open Docker Desktop: open -a Docker"; \
+		exit 1; \
+	fi
+	@echo "==> Using '$(COMPOSE)'"
+
+up: check-docker ## Start Postgres + API in the background (runs migrations first)
+	$(COMPOSE) up -d --build
+	@echo "==> API: http://localhost:8080/health"
+	@echo "==> Postgres: localhost:5432 (potluck/potluck)"
+
+down: check-docker ## Stop the backend stack (preserves data volume)
+	$(COMPOSE) down
+
+restart: check-docker ## Rebuild + restart the API container
+	$(COMPOSE) up -d --build api
+
+logs: check-docker ## Tail all backend logs
+	$(COMPOSE) logs -f
+
+api-logs: check-docker ## Tail only the API logs
+	$(COMPOSE) logs -f api
+
+pg-logs: check-docker ## Tail only Postgres logs
+	$(COMPOSE) logs -f postgres
+
+migrate: check-docker ## Re-run Alembic migrations inside a one-shot container
+	$(COMPOSE) run --rm migrate
+
+psql: check-docker ## Open a psql shell against the dev database
+	$(COMPOSE) exec postgres psql -U potluck -d potluck
+
+api-shell: check-docker ## Open a bash shell inside the api container
+	$(COMPOSE) exec api bash
+
+test-api: check-docker ## Run pytest inside the api container
+	$(COMPOSE) exec api pytest -q
+
+ps: status ## Alias for status
+status: check-docker ## Show backend container status
+	$(COMPOSE) ps
+
+# ---------- desktop (native) ----------
+
+desktop: ## Start the full desktop stack (Vite + Python sidecar + Electron) in this terminal
+	cd apps/desktop/electron && pnpm dev
+
+frontend: ## Start only the Vite dev server (useful when iterating on UI without Electron)
+	cd apps/desktop/frontend && pnpm dev
+
+sidecar: ## Start only the Python sidecar (useful when debugging inference)
+	cd apps/desktop/python && ./.venv/bin/python -m potluck_local.app --port 8321
+
+# ---------- full-stack dev (backend + desktop in one terminal) ----------
+
+dev: ## Start backend in docker + desktop stack natively (one terminal, Ctrl-C stops desktop, backend keeps running)
+	@$(MAKE) up
+	@echo
+	@echo "==> Backend is up in the background. Starting desktop stack (Ctrl-C to stop)…"
+	@echo "   Run 'make down' when you are done to stop the backend."
+	@echo
+	@$(MAKE) desktop
+
+# ---------- cleanup ----------
+
+clean: ## Remove build artifacts (keeps the db volume)
+	-$(COMPOSE) down
+	rm -rf apps/desktop/frontend/dist
+	rm -rf apps/desktop/electron/out apps/desktop/electron/resources/python
+	rm -rf apps/desktop/python/dist apps/desktop/python/build
+
+reset: ## Full nuke: stop containers, drop db volume, wipe build artifacts (asks for confirmation)
+	@read -p "This will delete the Postgres volume and all local build artifacts. Continue? [y/N] " ans && [ $${ans:-N} = y ]
+	-$(COMPOSE) down -v
+	rm -rf apps/desktop/frontend/dist apps/desktop/frontend/node_modules
+	rm -rf apps/desktop/electron/out apps/desktop/electron/resources/python apps/desktop/electron/node_modules
+	rm -rf apps/desktop/python/.venv apps/desktop/python/dist apps/desktop/python/build
+
+.DEFAULT_GOAL := help

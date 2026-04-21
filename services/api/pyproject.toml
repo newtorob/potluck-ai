@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "potluck-api"
+version = "0.1.0"
+description = "Potluck AI cloud backend — member auth, billing, governance, model registry"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "AGPL-3.0" }
+authors = [{ name = "Potluck AI", email = "hello@trypotluck.ai" }]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["potluck_api*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true

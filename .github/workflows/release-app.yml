@@ -1,0 +1,145 @@
+name: Release - Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to rebuild (e.g. v0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-app-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build & Publish (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.version || github.ref }}
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: apps/desktop/python/requirements.txt
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install Linux runtime libraries
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1 libxkbcommon0
+
+      - name: Install Python sidecar dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r apps/desktop/python/requirements.txt
+          pip install "pyinstaller==6.12.*"
+
+      - name: Build Python sidecar (PyInstaller)
+        run: pyinstaller --onefile --name potluck-local --clean --noconfirm apps/desktop/python/potluck_local/app.py
+
+      - name: Stage sidecar binary (Unix)
+        if: matrix.platform != 'win'
+        shell: bash
+        run: |
+          mkdir -p apps/desktop/electron/resources/python
+          cp dist/potluck-local* apps/desktop/electron/resources/python/
+          ls -la apps/desktop/electron/resources/python/
+
+      - name: Stage sidecar binary (Windows)
+        if: matrix.platform == 'win'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path apps/desktop/electron/resources/python | Out-Null
+          Copy-Item -Path dist/potluck-local* -Destination apps/desktop/electron/resources/python/
+          Get-ChildItem apps/desktop/electron/resources/python/
+
+      - name: Install frontend dependencies
+        run: pnpm -C apps/desktop/frontend install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm -C apps/desktop/frontend build
+
+      - name: Install Electron dependencies
+        run: pnpm -C apps/desktop/electron install --frozen-lockfile
+
+      - name: Build & publish Electron
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS code signing + notarization
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm -C apps/desktop/electron build:${{ matrix.platform }}
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: potluck-desktop-${{ matrix.platform }}
+          path: |
+            apps/desktop/electron/out/**/*
+          retention-days: 30
+          if-no-files-found: warn
+
+  release-notes:
+    name: Release notes summary
+    needs: [release]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "tag=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## Potluck AI Desktop Release" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tag: \`${{ steps.version.outputs.tag }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Matrix build status: ${{ needs.release.result }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Installers: see the GitHub Release for this tag." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Released tag ${{ steps.version.outputs.tag }}."

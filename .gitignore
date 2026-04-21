@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.spec
+
+# Node
+node_modules/
+.pnpm-store/
+.next/
+.astro/
+.turbo/
+
+# Electron
+apps/desktop/electron/dist/
+apps/desktop/electron/out/
+apps/desktop/frontend/dist/
+apps/desktop/python/dist/
+apps/desktop/python/build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+*.mobileprovision
+
+# Logs
+*.log
+logs/
+
+# OS
+Thumbs.db
+
+# Local model weights & data (never commit)
+.potluck/
+models/*.gguf
+
+# Build artifacts
+*.dmg
+*.exe
+*.msi
+*.AppImage
+*.deb
+*.rpm
+release/

@@ -1,0 +1,120 @@
+# Local dev stack for Potluck AI.
+#
+# Runs the backend (Postgres + FastAPI cloud API). The desktop app
+# (Electron + Python sidecar + React frontend) runs natively on the host
+# because it needs GPU access and to render a native window.
+#
+# Quickstart:
+#   docker compose up -d              # starts postgres, runs migrations, starts api with --reload
+#   docker compose logs -f api        # tail api logs
+#   docker compose down               # stop everything (keeps data volume)
+#   docker compose down -v            # stop + wipe db
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: potluck-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: potluck
+      POSTGRES_PASSWORD: potluck
+      POSTGRES_DB: potluck
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U potluck -d potluck"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # One-shot: runs alembic upgrade head, then exits.
+  # `api` waits for this to finish successfully before starting.
+  migrate:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: potluck-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://potluck:potluck@postgres:5432/potluck
+      ENV: development
+      MAGIC_LINK_SECRET: dev-only-magic-link-secret-change-me-0000000000000000000000000000
+      MAGIC_LINK_EXPIRY_MINUTES: "15"
+      SESSION_EXPIRY_DAYS: "30"
+      APP_URL: http://localhost:5173
+      RESEND_API_KEY: re_dev_placeholder
+      FROM_EMAIL: dev@localhost
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_placeholder
+      STRIPE_FOUNDING_PRICE_ID: price_placeholder
+      STRIPE_DUES_PRICE_ID: price_placeholder
+      DISCOURSE_URL: http://localhost:4200
+      DISCOURSE_SSO_SECRET: dev-only-discourse-sso-secret-change-me-0000000000000000000000
+      DISCOURSE_API_KEY: dev-placeholder
+      ADMIN_EMAILS: admin@example.com
+      SENTRY_DSN: ""
+    volumes:
+      - ./services/api:/app
+    working_dir: /app
+    # Run as root in the migrate one-shot to sidestep volume-ownership friction.
+    user: root
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: potluck-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://potluck:potluck@postgres:5432/potluck
+      ENV: development
+      MAGIC_LINK_SECRET: dev-only-magic-link-secret-change-me-0000000000000000000000000000
+      MAGIC_LINK_EXPIRY_MINUTES: "15"
+      SESSION_EXPIRY_DAYS: "30"
+      APP_URL: http://localhost:5173
+      RESEND_API_KEY: re_dev_placeholder
+      FROM_EMAIL: dev@localhost
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      STRIPE_WEBHOOK_SECRET: whsec_placeholder
+      STRIPE_FOUNDING_PRICE_ID: price_placeholder
+      STRIPE_DUES_PRICE_ID: price_placeholder
+      DISCOURSE_URL: http://localhost:4200
+      DISCOURSE_SSO_SECRET: dev-only-discourse-sso-secret-change-me-0000000000000000000000
+      DISCOURSE_API_KEY: dev-placeholder
+      ADMIN_EMAILS: admin@example.com
+      SENTRY_DSN: ""
+    volumes:
+      - ./services/api:/app
+    working_dir: /app
+    # Source mount + --reload gives hot reload on code changes.
+    command:
+      [
+        "uvicorn",
+        "potluck_api.app:create_app",
+        "--factory",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8080",
+        "--reload",
+      ]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(\"http://localhost:8080/health\").status==200 else 1)'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  pgdata:

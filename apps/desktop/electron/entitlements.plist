@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS Hardened Runtime entitlements for Potluck AI.
+
+  These are required because:
+    - llama.cpp / llama-cpp-python uses JIT compilation of Metal shaders.
+    - PyInstaller-frozen binaries contain unsigned executable code.
+    - The Python sidecar binary itself is a third-party executable embedded in
+      the app bundle.
+
+  Both "entitlements" and "entitlementsInherit" in package.json point here so
+  that child processes (the sidecar) inherit the same permissions.
+
+  References:
+    https://developer.apple.com/documentation/security/hardened_runtime
+    https://developer.apple.com/documentation/bundleresources/entitlements
+-->
+<plist version="1.0">
+<dict>
+
+  <!-- Allow JIT compilation (required by Metal shader compilation in llama.cpp) -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+
+  <!-- Allow mapping writable and executable memory pages (required by PyInstaller
+       and llama-cpp-python's native extensions) -->
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+
+  <!-- Disable library validation so the frozen sidecar binary (and its bundled
+       .dylibs) can be loaded even when they are not signed by the same identity
+       as the app.
+       NOTE: Remove this entitlement once the sidecar binary and all bundled
+       dylibs are properly signed with your Apple Developer certificate. -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+
+</dict>
+</plist>

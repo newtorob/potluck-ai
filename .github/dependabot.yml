@@ -1,0 +1,79 @@
+version: 2
+
+updates:
+  # GitHub Actions workflow updates
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    target-branch: main
+    labels:
+      - dependencies
+      - github-actions
+    open-pull-requests-limit: 10
+
+  # Cloud API (FastAPI, Fly.io)
+  - package-ecosystem: pip
+    directory: /services/api
+    schedule:
+      interval: weekly
+    target-branch: main
+    labels:
+      - dependencies
+      - python
+      - api
+    open-pull-requests-limit: 10
+
+  # Desktop Python sidecar (llama-cpp-python, etc.)
+  - package-ecosystem: pip
+    directory: /apps/desktop/python
+    schedule:
+      interval: weekly
+    target-branch: main
+    labels:
+      - dependencies
+      - python
+      - desktop
+    open-pull-requests-limit: 10
+
+  # Desktop React frontend
+  - package-ecosystem: npm
+    directory: /apps/desktop/frontend
+    schedule:
+      interval: weekly
+    target-branch: main
+    labels:
+      - dependencies
+      - npm
+      - desktop
+    open-pull-requests-limit: 10
+    groups:
+      frontend-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+
+  # Desktop Electron shell
+  - package-ecosystem: npm
+    directory: /apps/desktop/electron
+    schedule:
+      interval: weekly
+    target-branch: main
+    labels:
+      - dependencies
+      - npm
+      - desktop
+    open-pull-requests-limit: 10
+
+  # Landing page (Astro)
+  - package-ecosystem: npm
+    directory: /web/landing
+    schedule:
+      interval: weekly
+    target-branch: main
+    labels:
+      - dependencies
+      - npm
+      - web
+    open-pull-requests-limit: 10

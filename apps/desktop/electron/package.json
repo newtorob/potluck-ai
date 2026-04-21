@@ -1,0 +1,86 @@
+{
+  "name": "potluck-ai-desktop",
+  "version": "0.1.0",
+  "description": "Potluck AI — member-owned local-first AI",
+  "main": "main.js",
+  "author": "Potluck AI",
+  "license": "AGPL-3.0",
+  "scripts": {
+    "dev": "concurrently --kill-others --names \"VITE,PY,ELECTRON\" --prefix-colors \"magenta,yellow,cyan\" \"pnpm --dir ../frontend dev\" \"pnpm run dev:python\" \"wait-on http-get://localhost:5173 http-get://127.0.0.1:8321/health && cross-env NODE_ENV=development electron .\"",
+    "dev:python": "node scripts/run-python-dev.js",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux",
+    "clean": "rimraf dist out resources/python"
+  },
+  "build": {
+    "appId": "ai.trypotluck.app",
+    "productName": "Potluck AI",
+    "directories": {
+      "output": "out"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "!node_modules/**/*",
+      "node_modules/electron-log/**/*",
+      "node_modules/electron-updater/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "./resources/python/",
+        "to": "python",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "entitlements.plist",
+      "entitlementsInherit": "entitlements.plist",
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] },
+        { "target": "zip", "arch": ["arm64", "x64"] }
+      ],
+      "notarize": {
+        "teamId": "YOUR_TEAM_ID"
+      }
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "signingHashAlgorithms": ["sha256"]
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Utility"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "potluck-ai",
+      "repo": "potluck"
+    }
+  },
+  "dependencies": {
+    "electron-log": "^5.0.0",
+    "electron-updater": "^6.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0",
+    "cross-env": "^7.0.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "rimraf": "^6.0.0",
+    "wait-on": "^8.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-builder",
+      "esbuild"
+    ]
+  }
+}
