@@ -10,4 +10,5 @@ aiofiles==24.1.*
 aiosqlite==0.20.*
 numpy==2.1.*
 sentence-transformers==3.3.*
+mcp==1.*
 pyinstaller==6.12.*

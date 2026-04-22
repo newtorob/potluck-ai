@@ -17,7 +17,7 @@ import { cn } from '@/components/ui/cn';
 import { HardwarePanel } from '@/components/settings/HardwarePanel';
 import { PrivacyPanel } from '@/components/settings/PrivacyPanel';
 import { AccountPanel } from '@/components/settings/AccountPanel';
-import { ModelPathPanel } from '@/components/settings/ModelPathPanel';
+import { AdvancedPanel } from '@/components/settings/AdvancedPanel';
 import { useSettings } from '@/hooks/useSettings';
 
 // ---------------------------------------------------------------------------
@@ -198,7 +198,12 @@ export function SettingsView() {
             {!isLoaded ? (
               <SettingsSkeleton />
             ) : settings ? (
-              <ModelPathPanel settings={settings} />
+              <AdvancedPanel
+                settings={settings}
+                isSaving={isSaving}
+                saveError={saveError}
+                onUpdate={update}
+              />
             ) : (
               <SidecarError />
             )}

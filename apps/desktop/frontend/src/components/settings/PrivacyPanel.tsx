@@ -8,6 +8,7 @@
 import { Shield } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import type { PotluckSettings } from '@/lib/localApi';
+import { MemorySettings } from '@/components/memory/MemorySettings';
 
 interface PrivacyPanelProps {
   settings: PotluckSettings;
@@ -117,6 +118,8 @@ export function PrivacyPanel({ settings, isSaving, saveError, onUpdate }: Privac
           onChange={(v) => update({ crash_reports_enabled: v })}
         />
       </div>
+
+      <MemorySettings settings={settings} isSaving={isSaving} onUpdate={onUpdate} />
     </div>
   );
 }

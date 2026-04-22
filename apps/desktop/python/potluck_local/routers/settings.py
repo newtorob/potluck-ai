@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException
 
 from potluck_local.services.settings_manager import (
     AppSettings,
+    MemorySettings,
     NetworkSettings,
     PrivacySettings,
     PotluckSettings,
@@ -30,6 +31,7 @@ _SUB_MODELS: dict[str, type] = {
     "privacy": PrivacySettings,
     "network": NetworkSettings,
     "app": AppSettings,
+    "memory": MemorySettings,
 }
 
 

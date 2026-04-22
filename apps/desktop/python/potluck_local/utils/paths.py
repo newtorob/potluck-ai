@@ -38,3 +38,8 @@ def config_path() -> Path:
 def db_path() -> Path:
     """~/.potluck/data/chat_history.db — optional SQLite chat store."""
     return _base() / "data" / "chat_history.db"
+
+
+def memory_db_path() -> Path:
+    """~/.potluck/data/memory.db — persistent memory and task-state store."""
+    return _base() / "data" / "memory.db"

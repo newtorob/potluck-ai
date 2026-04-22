@@ -5,6 +5,8 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { ChatView } from '@/views/ChatView';
 import { ModelLibrary } from '@/views/ModelLibrary';
+import { MemoryView } from '@/views/MemoryView';
+import { TaskStateView } from '@/views/TaskStateView';
 import { SettingsView } from '@/views/SettingsView';
 import { MembershipView } from '@/views/MembershipView';
 import { FirstRun } from '@/views/FirstRun';
@@ -98,6 +100,8 @@ export default function App() {
               <Route path="/" element={<Navigate to="/chat" replace />} />
               <Route path="/chat" element={<ChatView />} />
               <Route path="/models" element={<ModelLibrary />} />
+              <Route path="/memory" element={<MemoryView />} />
+              <Route path="/tasks" element={<TaskStateView />} />
               <Route path="/settings" element={<SettingsView />} />
               <Route path="/membership" element={<MembershipView />} />
               {/* Catch-all: redirect unknown paths to chat */}

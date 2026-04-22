@@ -1,15 +1,16 @@
 """User settings manager.
 
 Reads and writes ~/.potluck/config.json using Pydantic models.
-Full implementation per guide §4.4 — small, self-contained, no heavy deps.
+Full implementation per guide §4.4 and §9.9 — small, self-contained, no heavy deps.
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class RuntimeSettings(BaseModel):
@@ -24,6 +25,7 @@ class PrivacySettings(BaseModel):
     chat_history_enabled: bool = False
     telemetry_enabled: bool = False
     crash_reports_enabled: bool = True
+    memory_enabled: bool = True   # master kill-switch; checked alongside memory.enabled
 
 
 class NetworkSettings(BaseModel):
@@ -37,6 +39,35 @@ class AppSettings(BaseModel):
     font_size: int = 14
 
 
+class MemorySettings(BaseModel):
+    """Behavioural tuning knobs for the memory subsystem.
+
+    The master on/off switch is privacy.memory_enabled. These fields control
+    how memory behaves when it is active.
+    """
+
+    enabled: bool = True
+    auto_extract: bool = True
+    auto_retrieve: bool = True
+    extraction_frequency: Literal[
+        "end_of_conversation", "every_turn", "manual"
+    ] = "end_of_conversation"
+    max_memories: int = 1000                    # soft cap; retention job trims
+    max_retrieval: int = 20                     # memories injected per turn
+    min_confidence_for_retrieval: float = 0.5
+    retention_days: int = 365
+    categories_enabled: list[str] = Field(
+        default_factory=lambda: [
+            "preference",
+            "fact",
+            "decision",
+            "project",
+            "person",
+            "instruction",
+        ]
+    )
+
+
 class PotluckSettings(BaseModel):
     """Top-level settings model persisted to ~/.potluck/config.json."""
 
@@ -44,6 +75,7 @@ class PotluckSettings(BaseModel):
     privacy: PrivacySettings = PrivacySettings()
     network: NetworkSettings = NetworkSettings()
     app: AppSettings = AppSettings()
+    memory: MemorySettings = MemorySettings()
     models_path: str = str(Path.home() / ".potluck" / "models")
     active_model_id: str | None = None
 

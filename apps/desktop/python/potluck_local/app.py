@@ -10,6 +10,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 
 import uvicorn
@@ -17,7 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from potluck_local import __version__
-from potluck_local.routers import chat, hardware, health, models, settings
+from potluck_local.routers import chat, hardware, health, memory, models, settings, tasks
 from potluck_local.utils.logging import setup_logging
 
 
@@ -32,6 +33,13 @@ _CORS_ORIGINS: list[str] = [
 ]
 
 
+@contextlib.asynccontextmanager
+async def _lifespan(app: FastAPI):  # noqa: ARG001
+    from potluck_local.services.memory_db import init_memory_db
+    await init_memory_db()
+    yield
+
+
 def create_app() -> FastAPI:
     """Construct and return the configured FastAPI application.
 
@@ -41,6 +49,7 @@ def create_app() -> FastAPI:
     dev_mode = os.environ.get("POTLUCK_DEV", "0") == "1"
 
     app = FastAPI(
+        lifespan=_lifespan,
         title="Potluck Local",
         description="Local API sidecar for the Potluck AI desktop app. Runs on 127.0.0.1 only.",
         version=__version__,
@@ -62,6 +71,8 @@ def create_app() -> FastAPI:
     app.include_router(models.router, prefix="/models", tags=["models"])
     app.include_router(settings.router, prefix="/settings", tags=["settings"])
     app.include_router(hardware.router, prefix="/hardware", tags=["hardware"])
+    app.include_router(memory.router, prefix="/memory", tags=["memory"])
+    app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
 
     return app
 

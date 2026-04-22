@@ -14,6 +14,8 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   MessageSquare,
   Package,
+  Brain,
+  ListTodo,
   Settings,
   CreditCard,
   Plus,
@@ -40,6 +42,8 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/chat', label: 'Chat', icon: MessageSquare },
   { to: '/models', label: 'Models', icon: Package },
+  { to: '/memory', label: 'Memory', icon: Brain },
+  { to: '/tasks', label: 'Tasks', icon: ListTodo },
   { to: '/settings', label: 'Settings', icon: Settings },
   { to: '/membership', label: 'Membership', icon: CreditCard },
 ];

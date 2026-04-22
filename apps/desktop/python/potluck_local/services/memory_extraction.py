@@ -1,0 +1,285 @@
+"""Memory extraction service — LLM-based fact/preference extraction.
+
+Runs the loaded model over a conversation to produce structured Memory objects,
+storing them in the SQLite memory DB with Jaccard-based deduplication.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+import uuid
+from datetime import datetime, timezone
+from typing import Literal
+
+import aiosqlite
+from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
+
+MemoryCategory = Literal["preference", "fact", "decision", "project", "person", "instruction"]
+SourceType = Literal["extracted", "explicit", "agent_state"]
+
+_CONFIDENCE_THRESHOLD = 0.7
+_JACCARD_THRESHOLD = 0.7
+
+_EXTRACTION_PROMPT = """Analyze this conversation and extract facts, preferences, decisions, or context the user expressed.
+
+Return ONLY a JSON array. Each element must have exactly these keys:
+- "content": the memory as a clear, self-contained statement (string)
+- "category": one of "preference", "fact", "decision", "project", "person", "instruction" (string)
+- "confidence": 0.0-1.0 how confident you are this is worth remembering (number)
+
+Rules:
+- Only extract things the USER said or clearly implied
+- Make each memory self-contained without the conversation
+- Skip greetings, questions, acknowledgments, and ephemeral details
+- If nothing worth remembering was said, return []
+
+Example: [{"content": "User prefers Python over JavaScript", "category": "preference", "confidence": 0.9}]
+
+Conversation:
+{conversation}
+
+JSON array:"""
+
+
+class Memory(BaseModel):
+    id: str
+    content: str
+    category: MemoryCategory
+    confidence: float
+    source_type: SourceType
+    source_conversation_id: str | None
+    created_at: str
+    last_accessed_at: str
+    access_count: int
+    is_active: bool
+    superseded_by: str | None = None
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _jaccard(a: str, b: str) -> float:
+    """Word-level Jaccard similarity between two strings."""
+    set_a = set(a.lower().split())
+    set_b = set(b.lower().split())
+    if not set_a or not set_b:
+        return 0.0
+    return len(set_a & set_b) / len(set_a | set_b)
+
+
+def _parse_json_response(text: str) -> list[dict]:
+    """Defensively parse a JSON array from model output.
+
+    Handles markdown fences, missing outer brackets, and trailing prose.
+    """
+    # Strip markdown fences
+    text = re.sub(r"```(?:json)?", "", text).strip()
+
+    # Try direct parse first
+    try:
+        result = json.loads(text)
+        if isinstance(result, list):
+            return result
+        return []
+    except json.JSONDecodeError:
+        pass
+
+    # Find the first [ ... ] span
+    start = text.find("[")
+    end = text.rfind("]")
+    if start != -1 and end > start:
+        try:
+            result = json.loads(text[start : end + 1])
+            if isinstance(result, list):
+                return result
+        except json.JSONDecodeError:
+            pass
+
+    return []
+
+
+def _memory_enabled() -> bool:
+    """Return True if memory extraction is enabled in settings."""
+    try:
+        from potluck_local.services.settings_manager import get_settings
+        settings = get_settings()
+        return getattr(settings.privacy, "memory_enabled", True)
+    except Exception:
+        return True
+
+
+class MemoryExtractor:
+    """Extracts and persists memories from conversations via the loaded LLM."""
+
+    async def extract_from_conversation(
+        self,
+        messages: list[dict],
+        conversation_id: str,
+    ) -> list[Memory]:
+        """Extract memories from a conversation; returns only newly-inserted ones."""
+        if not _memory_enabled():
+            return []
+
+        from potluck_local.services.runtime import get_runtime
+        runtime = get_runtime()
+        if not runtime.is_loaded():
+            logger.warning("memory_extraction_skipped reason=no_model_loaded")
+            return []
+
+        conversation_text = "\n\n".join(
+            f"{m['role'].upper()}: {m.get('content', '')}"
+            for m in messages
+            if m.get("content")
+        )
+
+        prompt = _EXTRACTION_PROMPT.format(conversation=conversation_text)
+        try:
+            result = await runtime.chat(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=1024,
+            )
+        except Exception as exc:
+            logger.warning("memory_extraction_llm_error type=%s", type(exc).__name__)
+            return []
+
+        raw_text = result["choices"][0]["message"]["content"]
+        raw_items = _parse_json_response(raw_text)
+
+        inserted: list[Memory] = []
+        from potluck_local.services.memory_db import get_memory_db_path
+        db_path = get_memory_db_path()
+
+        async with aiosqlite.connect(db_path) as db:
+            await db.execute("PRAGMA foreign_keys=ON")
+            for item in raw_items:
+                if not isinstance(item, dict) or not item.get("content"):
+                    continue
+
+                content: str = str(item["content"]).strip()
+                category: str = item.get("category", "fact")
+                if category not in ("preference", "fact", "decision", "project", "person", "instruction"):
+                    category = "fact"
+                confidence: float = min(max(float(item.get("confidence", 0.7)), 0.0), 1.0)
+
+                if confidence < _CONFIDENCE_THRESHOLD:
+                    continue
+
+                # Deduplicate against existing active memories in same category
+                cursor = await db.execute(
+                    "SELECT id, content, confidence FROM memories WHERE category = ? AND is_active = 1",
+                    (category,),
+                )
+                existing_rows = await cursor.fetchall()
+
+                duplicate_id: str | None = None
+                for ex_id, ex_content, ex_conf in existing_rows:
+                    if _jaccard(content, ex_content) >= _JACCARD_THRESHOLD:
+                        duplicate_id = ex_id
+                        new_conf = min(ex_conf + 0.1, 1.0)
+                        ts = _now_iso()
+                        await db.execute(
+                            "UPDATE memories SET confidence = ?, last_accessed_at = ? WHERE id = ?",
+                            (new_conf, ts, ex_id),
+                        )
+                        break
+
+                if duplicate_id is None:
+                    mem = Memory(
+                        id=str(uuid.uuid4()),
+                        content=content,
+                        category=category,  # type: ignore[arg-type]
+                        confidence=confidence,
+                        source_type="extracted",
+                        source_conversation_id=conversation_id,
+                        created_at=_now_iso(),
+                        last_accessed_at=_now_iso(),
+                        access_count=0,
+                        is_active=True,
+                        superseded_by=None,
+                    )
+                    await db.execute(
+                        """INSERT INTO memories
+                           (id, content, category, confidence, source_type,
+                            source_conversation_id, created_at, last_accessed_at,
+                            access_count, is_active)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            mem.id, mem.content, mem.category, mem.confidence,
+                            mem.source_type, mem.source_conversation_id,
+                            mem.created_at, mem.last_accessed_at,
+                            mem.access_count, 1,
+                        ),
+                    )
+                    inserted.append(mem)
+
+            await db.commit()
+
+        logger.info(
+            "memory_extraction_done conversation_id=%s inserted=%d skipped_dupes=%d",
+            conversation_id,
+            len(inserted),
+            len(raw_items) - len(inserted),
+        )
+        return inserted
+
+    async def extract_explicit(
+        self,
+        content: str,
+        category: MemoryCategory,
+        conversation_id: str | None = None,
+        confidence: float = 1.0,
+    ) -> Memory:
+        """Persist an explicit user-stated memory. Always inserts; no deduplication."""
+        mem = Memory(
+            id=str(uuid.uuid4()),
+            content=content.strip(),
+            category=category,
+            confidence=min(max(confidence, 0.0), 1.0),
+            source_type="explicit",
+            source_conversation_id=conversation_id,
+            created_at=_now_iso(),
+            last_accessed_at=_now_iso(),
+            access_count=0,
+            is_active=True,
+            superseded_by=None,
+        )
+
+        from potluck_local.services.memory_db import get_memory_db_path
+        db_path = get_memory_db_path()
+
+        async with aiosqlite.connect(db_path) as db:
+            await db.execute("PRAGMA foreign_keys=ON")
+            await db.execute(
+                """INSERT INTO memories
+                   (id, content, category, confidence, source_type,
+                    source_conversation_id, created_at, last_accessed_at,
+                    access_count, is_active)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    mem.id, mem.content, mem.category, mem.confidence,
+                    mem.source_type, mem.source_conversation_id,
+                    mem.created_at, mem.last_accessed_at,
+                    mem.access_count, 1,
+                ),
+            )
+            await db.commit()
+
+        logger.info("memory_explicit_saved id=%s category=%s", mem.id, mem.category)
+        return mem
+
+
+_extractor: MemoryExtractor | None = None
+
+
+def get_memory_extractor() -> MemoryExtractor:
+    """Return the module-level MemoryExtractor singleton."""
+    global _extractor
+    if _extractor is None:
+        _extractor = MemoryExtractor()
+    return _extractor
