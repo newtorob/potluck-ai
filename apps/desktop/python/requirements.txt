@@ -1,4 +1,8 @@
 fastapi==0.115.*
+# Pin starlette to the range fastapi 0.115 was tested against.
+# Without this, mcp 1.x's loose `starlette>=0.27` lets pip resolve to 0.52+
+# (which ships the breaking Router-init signature) or 1.0 (which dropped on_startup entirely).
+starlette>=0.40,<0.47
 uvicorn[standard]==0.34.*
 llama-cpp-python==0.3.*
 httpx==0.28.*
