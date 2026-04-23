@@ -110,3 +110,9 @@
     @apply bg-muted-foreground/40;
   }
 }
+
+/* Agent activity feed — new-row highlight animation */
+@keyframes fadeHighlight {
+  0%   { background-color: hsl(var(--primary) / 0.18); }
+  100% { background-color: transparent; }
+}

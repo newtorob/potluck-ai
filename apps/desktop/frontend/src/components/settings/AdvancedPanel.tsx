@@ -9,10 +9,12 @@
  */
 
 import { useState, useRef, useCallback } from 'react';
-import { Brain } from 'lucide-react';
+import { Brain, FolderOpen } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { ModelPathPanel } from '@/components/settings/ModelPathPanel';
 import { McpIntegrationPanel } from '@/components/settings/McpIntegrationPanel';
+import { useProject } from '@/hooks/useProject';
+import { normaliseProjectName } from '@/lib/projectUtils';
 import type { PotluckSettings, MemorySettings } from '@/lib/localApi';
 import type { MemoryCategory } from '@/types/memory';
 
@@ -311,6 +313,66 @@ interface AdvancedPanelProps {
   onUpdate: (patch: Partial<PotluckSettings>) => Promise<void>;
 }
 
+// ---------------------------------------------------------------------------
+// Active project section
+// ---------------------------------------------------------------------------
+
+function ActiveProjectSection() {
+  const { projects, activeProject, setActive } = useProject();
+
+  const handleChange = (val: string) => {
+    if (val === '__new__') {
+      const raw = window.prompt('New project name:');
+      if (!raw) return;
+      const name = normaliseProjectName(raw);
+      if (!name) return;
+      void setActive(name);
+      return;
+    }
+    void setActive(val === '__global__' ? null : val);
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <FolderOpen className="h-4 w-4 text-primary" aria-hidden="true" />
+        <h2 className="text-sm font-semibold text-foreground">Active project</h2>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        The active project scopes memory and task views by default. Memories tagged with this
+        project (or no project) are surfaced in chat.
+      </p>
+      <div>
+        <label htmlFor="settings-active-project" className="mb-1 block text-xs font-medium text-muted-foreground">
+          Current project
+        </label>
+        <select
+          id="settings-active-project"
+          value={activeProject ?? '__global__'}
+          onChange={(e) => handleChange(e.target.value)}
+          className={cn(
+            'w-full rounded-lg border border-input bg-background px-3 py-2',
+            'text-sm text-foreground',
+            'focus:outline-none focus:ring-2 focus:ring-ring',
+          )}
+        >
+          <option value="__global__">Global (no project)</option>
+          {projects.map((p) => (
+            <option key={p.project} value={p.project}>
+              {p.project}
+            </option>
+          ))}
+          <option value="__new__">+ New project…</option>
+        </select>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main panel
+// ---------------------------------------------------------------------------
+
 export function AdvancedPanel({ settings, isSaving, saveError, onUpdate }: AdvancedPanelProps) {
   const handleMemoryUpdate = (patch: Partial<MemorySettings>) => {
     void onUpdate({ memory: { ...settings.memory, ...patch } });
@@ -323,6 +385,9 @@ export function AdvancedPanel({ settings, isSaving, saveError, onUpdate }: Advan
           {saveError}
         </p>
       )}
+
+      {/* Active project */}
+      <ActiveProjectSection />
 
       {/* Model storage path */}
       <ModelPathPanel settings={settings} />

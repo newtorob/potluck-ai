@@ -19,6 +19,7 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/components/ui/cn';
 import { useMemories } from '@/hooks/useMemories';
 import { useSettings } from '@/hooks/useSettings';
+import { useProject } from '@/hooks/useProject';
 import { MemoryCard } from '@/components/memory/MemoryCard';
 import { MemoryCategorySection } from '@/components/memory/MemoryCategorySection';
 import { MemoryFilterBar } from '@/components/memory/MemoryFilterBar';
@@ -58,6 +59,16 @@ function sortMemories(memories: Memory[], sortKey: SortKey): Memory[] {
 }
 
 // ---------------------------------------------------------------------------
+// Project filter chip type
+// ---------------------------------------------------------------------------
+
+type ProjectFilter =
+  | { kind: 'active' }      // default: show active project + globals
+  | { kind: 'all' }         // include_all=true
+  | { kind: 'global' }      // null project only
+  | { kind: 'project'; name: string }; // specific project + globals
+
+// ---------------------------------------------------------------------------
 // MemoryView
 // ---------------------------------------------------------------------------
 
@@ -68,7 +79,26 @@ const DEFAULT_FILTER: FilterState = {
 };
 
 export function MemoryView() {
-  const { memories, isFetching, fetchError, searchMemories } = useMemories();
+  const { projects, activeProject } = useProject();
+
+  // Project filter state — independent of the active project
+  const [projectFilter, setProjectFilter] = useState<ProjectFilter>({ kind: 'active' });
+
+  // Resolve what to pass to useMemories based on projectFilter
+  const resolvedProject: string | null | undefined = (() => {
+    switch (projectFilter.kind) {
+      case 'active': return activeProject;
+      case 'all': return undefined;
+      case 'global': return null;
+      case 'project': return projectFilter.name;
+    }
+  })();
+  const includeAll = projectFilter.kind === 'all';
+
+  const { memories, isFetching, fetchError, searchMemories } = useMemories({
+    project: resolvedProject,
+    include_all: includeAll,
+  });
   const { settings, update: updateSettings } = useSettings();
 
   const [showNewForm, setShowNewForm] = useState(false);
@@ -180,6 +210,14 @@ export function MemoryView() {
         </button>
       </div>
 
+      {/* Project filter chips */}
+      <ProjectFilterChips
+        projects={projects.map((p) => p.project)}
+        activeProject={activeProject}
+        filter={projectFilter}
+        onFilterChange={setProjectFilter}
+      />
+
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-2xl px-6 py-5 space-y-5">
@@ -216,7 +254,11 @@ export function MemoryView() {
 
           {/* New memory form */}
           {showNewForm && (
-            <NewMemoryForm onClose={() => setShowNewForm(false)} />
+            <NewMemoryForm
+              onClose={() => setShowNewForm(false)}
+              defaultProject={activeProject}
+              projects={projects.map((p) => p.project)}
+            />
           )}
 
           {/* Fetch error */}
@@ -295,6 +337,90 @@ export function MemoryView() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ProjectFilterChips
+// ---------------------------------------------------------------------------
+
+interface ProjectFilterChipsProps {
+  projects: string[];
+  activeProject: string | null;
+  filter: ProjectFilter;
+  onFilterChange: (f: ProjectFilter) => void;
+}
+
+function ProjectFilterChips({ projects, activeProject, filter, onFilterChange }: ProjectFilterChipsProps) {
+  // Determine if the current filter deviates from the active project default
+  const isTemporary = (() => {
+    if (filter.kind === 'active') return false;
+    if (filter.kind === 'all') return true;
+    if (filter.kind === 'global') return activeProject !== null;
+    if (filter.kind === 'project') return filter.name !== activeProject;
+    return false;
+  })();
+
+  const chips: Array<{ label: string; filter: ProjectFilter }> = [
+    { label: 'All (browse)', filter: { kind: 'all' } },
+    { label: 'Global', filter: { kind: 'global' } },
+    ...projects.map((name) => ({
+      label: name,
+      filter: { kind: 'project' as const, name },
+    })),
+  ];
+
+  const isActive = (f: ProjectFilter): boolean => {
+    if (filter.kind !== f.kind) return false;
+    if (filter.kind === 'project' && f.kind === 'project') return filter.name === f.name;
+    return true;
+  };
+
+  return (
+    <div
+      role="group"
+      aria-label="Filter memories by project"
+      className="flex flex-wrap items-center gap-1.5 border-b border-border px-6 py-2.5"
+    >
+      {/* Active-project default chip */}
+      <button
+        type="button"
+        aria-pressed={filter.kind === 'active'}
+        onClick={() => onFilterChange({ kind: 'active' })}
+        className={cn(
+          'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          filter.kind === 'active'
+            ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
+            : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground border border-transparent',
+        )}
+      >
+        {activeProject ? activeProject : 'Global'}
+        {filter.kind === 'active' && <span className="ml-1 opacity-60">(default)</span>}
+      </button>
+
+      {chips.map(({ label, filter: f }) => (
+        <button
+          key={label}
+          type="button"
+          aria-pressed={isActive(f)}
+          onClick={() => onFilterChange(f)}
+          className={cn(
+            'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            isActive(f)
+              ? 'bg-primary text-primary-foreground border border-transparent'
+              : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground border border-transparent',
+          )}
+        >
+          {label}
+        </button>
+      ))}
+
+      {isTemporary && (
+        <span className="text-[10px] text-muted-foreground/60 italic">(temporary)</span>
+      )}
     </div>
   );
 }

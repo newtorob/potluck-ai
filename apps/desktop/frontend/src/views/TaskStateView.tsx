@@ -10,7 +10,10 @@ import { useState, useRef, useEffect } from 'react';
 import { ListTodo, Plus, X } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { useTasks } from '@/hooks/useTasks';
+import { useProject } from '@/hooks/useProject';
 import { TaskCard } from '@/components/tasks/TaskCard';
+import { ProjectPill } from '@/components/memory/ProjectPill';
+import { normaliseProjectName } from '@/lib/projectUtils';
 import type { TaskStatus } from '@/types/tasks';
 
 // ---------------------------------------------------------------------------
@@ -31,15 +34,24 @@ const FILTERS: Array<{ value: FilterValue; label: string }> = [
 // New task form
 // ---------------------------------------------------------------------------
 
+type ProjectFilter =
+  | { kind: 'active' }
+  | { kind: 'all' }
+  | { kind: 'global' }
+  | { kind: 'project'; name: string };
+
 interface NewTaskFormProps {
-  onCreate: (name: string, objective: string, steps: string[]) => Promise<void>;
+  onCreate: (name: string, objective: string, steps: string[], project: string | null) => Promise<void>;
   onCancel: () => void;
+  defaultProject?: string | null;
+  projects?: string[];
 }
 
-function NewTaskForm({ onCreate, onCancel }: NewTaskFormProps) {
+function NewTaskForm({ onCreate, onCancel, defaultProject, projects = [] }: NewTaskFormProps) {
   const [taskName, setTaskName] = useState('');
   const [objective, setObjective] = useState('');
   const [stepsText, setStepsText] = useState('');
+  const [projectValue, setProjectValue] = useState<string>(defaultProject ?? '__global__');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -47,6 +59,18 @@ function NewTaskForm({ onCreate, onCancel }: NewTaskFormProps) {
   useEffect(() => {
     nameRef.current?.focus();
   }, []);
+
+  const handleProjectChange = (val: string) => {
+    if (val === '__other__') {
+      const raw = window.prompt('Project name:');
+      if (!raw) return;
+      const name = normaliseProjectName(raw);
+      if (!name) return;
+      setProjectValue(name);
+      return;
+    }
+    setProjectValue(val);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,10 +85,12 @@ function NewTaskForm({ onCreate, onCancel }: NewTaskFormProps) {
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
 
+    const project: string | null = projectValue === '__global__' ? null : projectValue;
+
     setSubmitting(true);
     setError(null);
     try {
-      await onCreate(trimName, trimObjective, steps);
+      await onCreate(trimName, trimObjective, steps, project);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create task');
       setSubmitting(false);
@@ -158,6 +184,37 @@ function NewTaskForm({ onCreate, onCancel }: NewTaskFormProps) {
         />
       </div>
 
+      {/* Project field */}
+      <div className="space-y-1">
+        <label htmlFor="task-project" className="text-xs font-medium text-foreground">
+          Project
+        </label>
+        <select
+          id="task-project"
+          value={projectValue}
+          onChange={(e) => handleProjectChange(e.target.value)}
+          disabled={submitting}
+          className={cn(
+            'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm',
+            'text-foreground focus:outline-none focus:ring-2 focus:ring-ring',
+            'disabled:opacity-50',
+          )}
+        >
+          <option value="__global__">Global (no project)</option>
+          {defaultProject && (
+            <option value={defaultProject}>{defaultProject} (active)</option>
+          )}
+          {projects
+            .filter((p) => p !== defaultProject)
+            .map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          <option value="__other__">+ Other…</option>
+        </select>
+      </div>
+
       <div className="flex gap-2 justify-end">
         <button
           type="button"
@@ -196,6 +253,20 @@ function NewTaskForm({ onCreate, onCancel }: NewTaskFormProps) {
 export function TaskStateView() {
   const [activeFilter, setActiveFilter] = useState<FilterValue>('active');
   const [showNewForm, setShowNewForm] = useState(false);
+  const [projectFilter, setProjectFilter] = useState<ProjectFilter>({ kind: 'active' });
+
+  const { projects, activeProject } = useProject();
+
+  // Resolve project params for the tasks fetch
+  const resolvedProject: string | null | undefined = (() => {
+    switch (projectFilter.kind) {
+      case 'active': return activeProject;
+      case 'all': return undefined;
+      case 'global': return null;
+      case 'project': return projectFilter.name;
+    }
+  })();
+  const includeAll = projectFilter.kind === 'all';
 
   const {
     tasks,
@@ -207,18 +278,27 @@ export function TaskStateView() {
     addError,
     deleteTask,
     setStatus,
-  } = useTasks();
+  } = useTasks({ project: resolvedProject, include_all: includeAll });
 
   // Client-side filter on top of the full list so switching tabs is instant
   const filtered = tasks
     .filter((t) => activeFilter === 'all' || t.status === activeFilter)
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
-  const handleCreate = async (name: string, objective: string, steps: string[]) => {
+  const isTemporaryProjectFilter = (() => {
+    if (projectFilter.kind === 'active') return false;
+    if (projectFilter.kind === 'all') return true;
+    if (projectFilter.kind === 'global') return activeProject !== null;
+    if (projectFilter.kind === 'project') return projectFilter.name !== activeProject;
+    return false;
+  })();
+
+  const handleCreate = async (name: string, objective: string, steps: string[], project: string | null) => {
     await createTask({
       task_name: name,
       objective,
       pending_steps: steps.length > 0 ? steps : undefined,
+      project,
     });
     setShowNewForm(false);
   };
@@ -261,7 +341,7 @@ export function TaskStateView() {
         </button>
       </div>
 
-      {/* Filter chips */}
+      {/* Status filter chips */}
       <div
         role="group"
         aria-label="Filter tasks by status"
@@ -286,6 +366,82 @@ export function TaskStateView() {
         ))}
       </div>
 
+      {/* Project filter chips */}
+      <div
+        role="group"
+        aria-label="Filter tasks by project"
+        className="flex flex-wrap items-center gap-1.5 border-b border-border px-6 py-2.5"
+      >
+        {/* Active-project default */}
+        <button
+          type="button"
+          aria-pressed={projectFilter.kind === 'active'}
+          onClick={() => setProjectFilter({ kind: 'active' })}
+          className={cn(
+            'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            projectFilter.kind === 'active'
+              ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
+              : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground border border-transparent',
+          )}
+        >
+          {activeProject ?? 'Global'}
+          {projectFilter.kind === 'active' && <span className="ml-1 opacity-60">(default)</span>}
+        </button>
+
+        <button
+          type="button"
+          aria-pressed={projectFilter.kind === 'all'}
+          onClick={() => setProjectFilter({ kind: 'all' })}
+          className={cn(
+            'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors border border-transparent',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            projectFilter.kind === 'all'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground',
+          )}
+        >
+          All (browse)
+        </button>
+
+        <button
+          type="button"
+          aria-pressed={projectFilter.kind === 'global'}
+          onClick={() => setProjectFilter({ kind: 'global' })}
+          className={cn(
+            'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors border border-transparent',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            projectFilter.kind === 'global'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground',
+          )}
+        >
+          Global
+        </button>
+
+        {projects.map((p) => (
+          <button
+            key={p.project}
+            type="button"
+            aria-pressed={projectFilter.kind === 'project' && projectFilter.name === p.project}
+            onClick={() => setProjectFilter({ kind: 'project', name: p.project })}
+            className={cn(
+              'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors border border-transparent',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              projectFilter.kind === 'project' && projectFilter.name === p.project
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground',
+            )}
+          >
+            {p.project}
+          </button>
+        ))}
+
+        {isTemporaryProjectFilter && (
+          <span className="text-[10px] text-muted-foreground/60 italic">(temporary)</span>
+        )}
+      </div>
+
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
         <div className="mx-auto max-w-2xl space-y-3">
@@ -294,6 +450,8 @@ export function TaskStateView() {
             <NewTaskForm
               onCreate={handleCreate}
               onCancel={() => setShowNewForm(false)}
+              defaultProject={activeProject}
+              projects={projects.map((p) => p.project)}
             />
           )}
 

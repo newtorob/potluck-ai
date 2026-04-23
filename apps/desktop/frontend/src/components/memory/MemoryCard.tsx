@@ -11,8 +11,10 @@ import { Pencil, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/components/ui/cn';
 import { CategoryPill } from './CategoryPill';
+import { ProjectPill } from './ProjectPill';
 import { ConfidenceBar } from './ConfidenceBar';
 import { useMemoryStore } from '@/stores/memoryStore';
+import { normaliseProjectName } from '@/lib/projectUtils';
 import type { Memory, MemoryCategory } from '@/types/memory';
 
 // ---------------------------------------------------------------------------
@@ -52,6 +54,10 @@ export function MemoryCard({ memory }: MemoryCardProps) {
   const [editContent, setEditContent] = useState(memory.content);
   const [editCategory, setEditCategory] = useState<MemoryCategory>(memory.category);
   const [editConfidence, setEditConfidence] = useState(memory.confidence);
+  // '__global__' is the sentinel for null project in the select
+  const [editProjectValue, setEditProjectValue] = useState<string>(
+    memory.project ?? '__global__',
+  );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -71,9 +77,22 @@ export function MemoryCard({ memory }: MemoryCardProps) {
     setEditContent(memory.content);
     setEditCategory(memory.category);
     setEditConfidence(memory.confidence);
+    setEditProjectValue(memory.project ?? '__global__');
     setSaveError(null);
     setEditing(true);
-  }, [memory.content, memory.category, memory.confidence]);
+  }, [memory.content, memory.category, memory.confidence, memory.project]);
+
+  const handleProjectChange = useCallback((val: string) => {
+    if (val === '__other__') {
+      const raw = window.prompt('Project name:');
+      if (!raw) return;
+      const name = normaliseProjectName(raw);
+      if (!name) return;
+      setEditProjectValue(name);
+      return;
+    }
+    setEditProjectValue(val);
+  }, []);
 
   const handleEditCancel = useCallback(() => {
     setEditing(false);
@@ -84,11 +103,13 @@ export function MemoryCard({ memory }: MemoryCardProps) {
     if (!editContent.trim()) return;
     setSaving(true);
     setSaveError(null);
+    const project: string | null = editProjectValue === '__global__' ? null : editProjectValue;
     try {
       await updateMemory(memory.id, {
         content: editContent.trim(),
         category: editCategory,
         confidence: editConfidence,
+        project,
       });
       setEditing(false);
     } catch (err) {
@@ -96,7 +117,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
     } finally {
       setSaving(false);
     }
-  }, [memory.id, editContent, editCategory, editConfidence, updateMemory]);
+  }, [memory.id, editContent, editCategory, editConfidence, editProjectValue, updateMemory]);
 
   const handleDelete = useCallback(() => {
     if (window.confirm('Delete this memory?')) {
@@ -259,6 +280,32 @@ export function MemoryCard({ memory }: MemoryCardProps) {
               />
             </div>
 
+            {/* Project select */}
+            <div>
+              <label
+                htmlFor={`memory-project-${memory.id}`}
+                className="mb-1 block text-xs font-medium text-muted-foreground"
+              >
+                Project
+              </label>
+              <select
+                id={`memory-project-${memory.id}`}
+                value={editProjectValue}
+                onChange={(e) => handleProjectChange(e.target.value)}
+                className={cn(
+                  'w-full rounded-lg border border-input bg-background px-3 py-2',
+                  'text-sm text-foreground',
+                  'focus:outline-none focus:ring-2 focus:ring-ring',
+                )}
+              >
+                <option value="__global__">Global (no project)</option>
+                {memory.project && (
+                  <option value={memory.project}>{memory.project}</option>
+                )}
+                <option value="__other__">+ Other…</option>
+              </select>
+            </div>
+
             {saveError && (
               <p className="text-xs text-destructive" role="alert">
                 {saveError}
@@ -297,9 +344,10 @@ export function MemoryCard({ memory }: MemoryCardProps) {
       ) : (
         // ---- View mode -------------------------------------------------------
         <>
-          {/* Top row: category pill */}
+          {/* Top row: category pill + project badge */}
           <div className="mb-2 flex items-center gap-2 pr-20">
             <CategoryPill category={memory.category} />
+            <ProjectPill project={memory.project} />
           </div>
 
           {/* Content */}

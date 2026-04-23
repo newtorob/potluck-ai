@@ -21,6 +21,7 @@ import type {
   MemoryUpdateInput,
   MemoryImportResult,
 } from '@/types/memory';
+import { localApi } from '@/lib/localApi';
 
 // ---------------------------------------------------------------------------
 // Fallback fetcher — used when localApi.memory isn't wired yet.
@@ -127,7 +128,13 @@ export interface MemoryState {
   lastFetchedAt: number | null;
 
   // Actions
-  fetchMemories: (opts?: { category?: MemoryCategory; limit?: number; offset?: number }) => Promise<void>;
+  fetchMemories: (opts?: {
+    category?: MemoryCategory;
+    limit?: number;
+    offset?: number;
+    project?: string | null;
+    include_all?: boolean;
+  }) => Promise<void>;
   createMemory: (input: MemoryCreateInput) => Promise<Memory>;
   updateMemory: (id: string, patch: MemoryUpdateInput) => Promise<void>;
   deleteMemory: (id: string) => Promise<void>;
@@ -152,18 +159,31 @@ export const useMemoryStore = create<MemoryState>()((set, get) => ({
   async fetchMemories(opts = {}) {
     set({ isFetching: true, fetchError: null });
     try {
-      const api = buildApi();
-      const memories = await api.list({
+      // Prefer localApi over the inline fallback fetcher when possible
+      const memories = await localApi.memory.list({
         category: opts.category,
         limit: opts.limit ?? 100,
         offset: opts.offset ?? 0,
+        project: opts.project,
+        include_all: opts.include_all,
       });
       set({ memories, isFetching: false, lastFetchedAt: Date.now() });
-    } catch (err) {
-      set({
-        isFetching: false,
-        fetchError: err instanceof Error ? err.message : 'Failed to fetch memories',
-      });
+    } catch {
+      // Fall back to the inline fetcher (build-time isolation for Agent B merge order)
+      try {
+        const api = buildApi();
+        const memories = await api.list({
+          category: opts.category,
+          limit: opts.limit ?? 100,
+          offset: opts.offset ?? 0,
+        });
+        set({ memories, isFetching: false, lastFetchedAt: Date.now() });
+      } catch (err) {
+        set({
+          isFetching: false,
+          fetchError: err instanceof Error ? err.message : 'Failed to fetch memories',
+        });
+      }
     }
   },
 

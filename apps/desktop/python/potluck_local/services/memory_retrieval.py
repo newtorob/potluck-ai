@@ -61,6 +61,7 @@ def _row_to_memory(row: dict) -> Memory:
         access_count=row["access_count"],
         is_active=bool(row["is_active"]),
         superseded_by=row.get("superseded_by"),
+        project=row.get("project"),
     )
 
 
@@ -83,6 +84,17 @@ def _extract_keywords(messages: list[dict], max_keywords: int = 15) -> list[str]
     return unique[:max_keywords]
 
 
+def _project_clause(project: str | None) -> tuple[str, list]:
+    """Return (SQL fragment, params) for project-scoped filtering.
+
+    When project is given: return rows where project = X OR project IS NULL.
+    When project is None: return only global rows (project IS NULL).
+    """
+    if project is not None:
+        return "(project = ? OR project IS NULL)", [project]
+    return "project IS NULL", []
+
+
 class MemoryRetriever:
     """Retrieves and formats memories for prompt injection."""
 
@@ -91,10 +103,18 @@ class MemoryRetriever:
         current_messages: list[dict],
         max_memories: int = 20,
         min_confidence: float = 0.5,
+        project: str | None = None,
     ) -> list[Memory]:
-        """Retrieve memories relevant to the current conversation context."""
+        """Retrieve memories relevant to the current conversation context.
+
+        project: when given, returns project-scoped + global memories.
+        When None, returns only global memories (project IS NULL).
+        """
         if not _memory_enabled():
             return []
+
+        # Normalise empty string to None
+        project = project or None
 
         from potluck_local.services.memory_db import get_memory_db_path
         db_path = get_memory_db_path()
@@ -102,19 +122,22 @@ class MemoryRetriever:
         always_budget = max(1, max_memories // 2)
         keyword_budget = max_memories - always_budget
 
+        proj_clause, proj_params = _project_clause(project)
+
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
             await db.execute("PRAGMA foreign_keys=ON")
 
             # Tier 1: always-relevant high-confidence preferences + instructions
             cursor = await db.execute(
-                """SELECT * FROM memories
+                f"""SELECT * FROM memories
                    WHERE is_active = 1
                      AND confidence >= ?
                      AND category IN ('preference', 'instruction')
+                     AND {proj_clause}
                    ORDER BY confidence DESC, last_accessed_at DESC
                    LIMIT ?""",
-                (min_confidence, always_budget),
+                [min_confidence] + proj_params + [always_budget],
             )
             always_rows = [dict(r) for r in await cursor.fetchall()]
 
@@ -122,12 +145,12 @@ class MemoryRetriever:
             keyword_rows: list[dict] = []
             keywords = _extract_keywords(current_messages)
             if keywords and keyword_budget > 0:
-                # Build parameterized OR conditions — no f-string SQL
+                # Build parameterized OR conditions — no f-string SQL injection risk
                 conditions = " OR ".join("content LIKE ?" for _ in keywords)
                 like_params = [f"%{kw}%" for kw in keywords]
 
-                # All params: like values first, then min_confidence, then limit
-                params: list = like_params + [min_confidence, keyword_budget]
+                # params order: like values, min_confidence, project params, limit
+                params: list = like_params + [min_confidence] + proj_params + [keyword_budget]
 
                 cursor = await db.execute(
                     f"""SELECT * FROM memories
@@ -135,6 +158,7 @@ class MemoryRetriever:
                           AND ({conditions})
                           AND confidence >= ?
                           AND category NOT IN ('preference', 'instruction')
+                          AND {proj_clause}
                         ORDER BY confidence DESC, last_accessed_at DESC
                         LIMIT ?""",  # noqa: S608 — conditions built safely above
                     params,
@@ -164,7 +188,7 @@ class MemoryRetriever:
                 await db.commit()
 
         memories = [_row_to_memory(r) for r in combined]
-        logger.info("memory_retrieval_done count=%d", len(memories))
+        logger.info("memory_retrieval_done count=%d project=%s", len(memories), project)
         return memories
 
     async def list_memories(
@@ -172,29 +196,45 @@ class MemoryRetriever:
         category: str | None = None,
         limit: int = 100,
         offset: int = 0,
+        project: str | None = None,
+        include_all: bool = False,
     ) -> list[Memory]:
-        """Browse active memories without updating access timestamps."""
+        """Browse active memories without updating access timestamps.
+
+        project: scope filter. Ignored when include_all=True.
+        include_all: when True, bypasses the project filter entirely (browse mode).
+        """
+        # Normalise empty string to None
+        project = project or None
+
         from potluck_local.services.memory_db import get_memory_db_path
         db_path = get_memory_db_path()
 
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
+
+            conditions = ["is_active = 1"]
+            params: list = []
+
             if category is not None:
-                cursor = await db.execute(
-                    """SELECT * FROM memories
-                       WHERE is_active = 1 AND category = ?
-                       ORDER BY confidence DESC, created_at DESC
-                       LIMIT ? OFFSET ?""",
-                    (category, limit, offset),
-                )
-            else:
-                cursor = await db.execute(
-                    """SELECT * FROM memories
-                       WHERE is_active = 1
-                       ORDER BY confidence DESC, created_at DESC
-                       LIMIT ? OFFSET ?""",
-                    (limit, offset),
-                )
+                conditions.append("category = ?")
+                params.append(category)
+
+            if not include_all:
+                proj_clause, proj_params = _project_clause(project)
+                conditions.append(proj_clause)
+                params.extend(proj_params)
+
+            where = " AND ".join(conditions)
+            params.extend([limit, offset])
+
+            cursor = await db.execute(
+                f"""SELECT * FROM memories
+                   WHERE {where}
+                   ORDER BY confidence DESC, created_at DESC
+                   LIMIT ? OFFSET ?""",
+                params,
+            )
             rows = await cursor.fetchall()
 
         return [_row_to_memory(dict(r)) for r in rows]
@@ -239,8 +279,13 @@ class MemoryRetriever:
         content: str | None = None,
         category: MemoryCategory | None = None,
         confidence: float | None = None,
+        project: str | None = ...,  # type: ignore[assignment]
     ) -> Memory | None:
-        """Partially update an active memory's mutable fields."""
+        """Partially update an active memory's mutable fields.
+
+        project uses a sentinel default (...) so callers can distinguish between
+        "not provided" and "explicitly set to None" (which clears the scope to global).
+        """
         from potluck_local.services.memory_db import get_memory_db_path
         db_path = get_memory_db_path()
 
@@ -253,13 +298,19 @@ class MemoryRetriever:
         new_confidence = (
             min(max(confidence, 0.0), 1.0) if confidence is not None else existing.confidence
         )
+        # If project was not provided (sentinel ...), keep existing value.
+        # If explicitly passed (including None), use the new value.
+        if project is ...:  # type: ignore[comparison-overlap]
+            new_project: str | None = existing.project
+        else:
+            new_project = project or None  # coerce "" -> None
 
         async with aiosqlite.connect(db_path) as db:
             await db.execute(
                 """UPDATE memories
-                   SET content = ?, category = ?, confidence = ?
+                   SET content = ?, category = ?, confidence = ?, project = ?
                    WHERE id = ?""",
-                (new_content, new_category, new_confidence, memory_id),
+                (new_content, new_category, new_confidence, new_project, memory_id),
             )
             await db.commit()
 

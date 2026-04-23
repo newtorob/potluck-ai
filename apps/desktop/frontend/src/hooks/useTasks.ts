@@ -9,18 +9,29 @@ import { useEffect, useCallback } from 'react';
 import { useTaskStore } from '@/stores/taskStore';
 import type { TaskStatus } from '@/types/tasks';
 
-export function useTasks(statusFilter?: TaskStatus) {
+interface UseTasksOptions {
+  status?: TaskStatus;
+  project?: string | null;
+  include_all?: boolean;
+}
+
+export function useTasks(opts?: UseTasksOptions | TaskStatus) {
   const store = useTaskStore();
 
+  // Accept either a plain TaskStatus string (legacy) or an options object
+  const options: UseTasksOptions =
+    typeof opts === 'string' ? { status: opts } : (opts ?? {});
+
   const refetch = useCallback(() => {
-    void store.fetchTasks(statusFilter);
-  }, [store, statusFilter]);
+    void store.fetchTasks(options);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store, options.status, options.project, options.include_all]);
 
   // Fetch on mount
   useEffect(() => {
-    void store.fetchTasks(statusFilter);
+    void store.fetchTasks(options);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
+  }, [options.status, options.project, options.include_all]);
 
   // Refetch on window focus — agent may have mutated tasks externally
   useEffect(() => {

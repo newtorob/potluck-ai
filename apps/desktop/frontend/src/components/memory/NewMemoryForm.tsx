@@ -8,6 +8,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/components/ui/cn';
 import { useMemoryStore } from '@/stores/memoryStore';
+import { normaliseProjectName } from '@/lib/projectUtils';
 import type { MemoryCategory } from '@/types/memory';
 
 const ALL_CATEGORIES: MemoryCategory[] = [
@@ -16,15 +17,39 @@ const ALL_CATEGORIES: MemoryCategory[] = [
 
 interface NewMemoryFormProps {
   onClose: () => void;
+  defaultProject?: string | null;
+  projects?: string[];
 }
 
-export function NewMemoryForm({ onClose }: NewMemoryFormProps) {
+export function NewMemoryForm({ onClose, defaultProject, projects = [] }: NewMemoryFormProps) {
   const { createMemory } = useMemoryStore();
   const [content, setContent] = useState('');
   const [category, setCategory] = useState<MemoryCategory>('fact');
   const [confidence, setConfidence] = useState(0.8);
+  // '__global__' is the sentinel for "no project"; actual project names are plain strings
+  const [projectValue, setProjectValue] = useState<string>(
+    defaultProject ?? '__global__',
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const resolvedProject: string | null = (() => {
+    if (projectValue === '__global__') return null;
+    if (projectValue === '__other__') return null; // handled via prompt
+    return projectValue;
+  })();
+
+  const handleProjectChange = (val: string) => {
+    if (val === '__other__') {
+      const raw = window.prompt('Project name:');
+      if (!raw) return;
+      const name = normaliseProjectName(raw);
+      if (!name) return;
+      setProjectValue(name);
+      return;
+    }
+    setProjectValue(val);
+  };
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -38,7 +63,7 @@ export function NewMemoryForm({ onClose }: NewMemoryFormProps) {
     setSaving(true);
     setError(null);
     try {
-      await createMemory({ content: content.trim(), category, confidence });
+      await createMemory({ content: content.trim(), category, confidence, project: resolvedProject });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create memory');
@@ -137,6 +162,39 @@ export function NewMemoryForm({ onClose }: NewMemoryFormProps) {
               aria-valuenow={Math.round(confidence * 100)}
             />
           </div>
+        </div>
+
+        {/* Project field */}
+        <div>
+          <label
+            htmlFor="new-memory-project"
+            className="mb-1 block text-xs font-medium text-muted-foreground"
+          >
+            Project
+          </label>
+          <select
+            id="new-memory-project"
+            value={projectValue}
+            onChange={(e) => handleProjectChange(e.target.value)}
+            className={cn(
+              'w-full rounded-lg border border-input bg-background px-3 py-2',
+              'text-sm text-foreground',
+              'focus:outline-none focus:ring-2 focus:ring-ring',
+            )}
+          >
+            <option value="__global__">Global (no project)</option>
+            {defaultProject && defaultProject !== '__global__' && (
+              <option value={defaultProject}>{defaultProject} (active)</option>
+            )}
+            {projects
+              .filter((p) => p !== defaultProject)
+              .map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            <option value="__other__">+ Other…</option>
+          </select>
         </div>
 
         {error && (

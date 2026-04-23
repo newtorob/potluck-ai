@@ -4,6 +4,13 @@ All four tools honour the same privacy gate as the HTTP router:
 both privacy.memory_enabled and memory.enabled must be True.
 If the gate is closed, tools return empty results and log a warning rather
 than raising errors — an agent calling blindly should degrade gracefully.
+
+Project scoping:
+All tools accept an optional `project` parameter. Pass project=None (the
+default) for global memory that applies across all projects. Pass a project
+name to scope the operation to that project. Retrieval with a project set
+returns both project-scoped AND global memories (project IS NULL), so
+standing preferences and instructions always surface.
 """
 
 from __future__ import annotations
@@ -36,7 +43,10 @@ def register_memory_tools(mcp: FastMCP) -> None:
         name="memory_search",
         description=(
             "Search persistent memory for facts, preferences, decisions, and context "
-            "relevant to a query string. Returns a ranked list of Memory objects."
+            "relevant to a query string. Returns a ranked list of Memory objects. "
+            "Pass project=None (default) to search global memory that applies across all projects. "
+            "Pass a project name to search that project's memories AND globals combined. "
+            "project=None means 'global memory, applies across all projects.'"
         ),
     )
     async def memory_search(
@@ -44,8 +54,13 @@ def register_memory_tools(mcp: FastMCP) -> None:
         category: str | None = None,
         max_results: int = 20,
         min_confidence: float = 0.5,
+        project: str | None = None,
     ) -> list[dict]:
-        """Retrieve memories relevant to query."""
+        """Retrieve memories relevant to query.
+
+        project: scope filter. None = global-only. Named project = scoped + globals.
+        project=None means 'global memory, applies across all projects.'
+        """
         if not _memory_active():
             logger.warning("memory_search_skipped reason=memory_disabled")
             return []
@@ -57,6 +72,7 @@ def register_memory_tools(mcp: FastMCP) -> None:
                 current_messages=messages,
                 max_memories=max_results,
                 min_confidence=min_confidence,
+                project=project or None,
             )
         except Exception as exc:
             logger.error("memory_search_error type=%s", type(exc).__name__)
@@ -66,14 +82,17 @@ def register_memory_tools(mcp: FastMCP) -> None:
         if category is not None:
             memories = [m for m in memories if m.category == category]
 
-        logger.info("memory_search result_count=%d", len(memories))
+        logger.info("memory_search result_count=%d project=%s", len(memories), project)
         return [m.model_dump() for m in memories]
 
     @mcp.tool(
         name="memory_save",
         description=(
             "Explicitly save a fact, preference, decision, or other context to "
-            "persistent memory. Use category to classify the memory type."
+            "persistent memory. Use category to classify the memory type. "
+            "Pass project=None (default) to save as global memory that applies across "
+            "all projects. Pass a project name to scope it to that project only. "
+            "project=None means 'global memory, applies across all projects.'"
         ),
     )
     async def memory_save(
@@ -81,8 +100,13 @@ def register_memory_tools(mcp: FastMCP) -> None:
         category: MemoryCategory,
         confidence: float = 1.0,
         conversation_id: str | None = None,
+        project: str | None = None,
     ) -> dict:
-        """Persist an explicit memory."""
+        """Persist an explicit memory.
+
+        project: scope this memory to a project. None = global memory,
+        applies across all projects.
+        """
         if not _memory_active():
             logger.warning("memory_save_skipped reason=memory_disabled")
             raise ToolError(
@@ -95,27 +119,39 @@ def register_memory_tools(mcp: FastMCP) -> None:
                 category=category,
                 conversation_id=conversation_id,
                 confidence=confidence,
+                project=project or None,
             )
         except Exception as exc:
             logger.error("memory_save_error type=%s", type(exc).__name__)
             raise ToolError(f"Failed to save memory: {exc}") from exc
 
-        logger.info("memory_saved id=%s category=%s", memory.id, memory.category)
+        logger.info("memory_saved id=%s category=%s project=%s", memory.id, memory.category, memory.project)
         return memory.model_dump()
 
     @mcp.tool(
         name="memory_list",
         description=(
-            "Browse stored memories, optionally filtered by category. "
-            "Returns up to `limit` memories ordered by confidence descending."
+            "Browse stored memories, optionally filtered by category and project. "
+            "Returns up to `limit` memories ordered by confidence descending. "
+            "Pass project=None (default) to see only global memories. "
+            "Pass a project name to see that project's memories AND globals combined. "
+            "Pass include_all=True to browse all memories regardless of project. "
+            "project=None means 'global memory, applies across all projects.'"
         ),
     )
     async def memory_list(
         category: str | None = None,
         limit: int = 100,
         offset: int = 0,
+        project: str | None = None,
+        include_all: bool = False,
     ) -> list[dict]:
-        """List active memories."""
+        """List active memories.
+
+        project: scope filter. None = global-only. Named project = scoped + globals.
+        include_all: bypass project filter entirely (browse mode).
+        project=None means 'global memory, applies across all projects.'
+        """
         if not _memory_active():
             logger.warning("memory_list_skipped reason=memory_disabled")
             return []
@@ -123,13 +159,17 @@ def register_memory_tools(mcp: FastMCP) -> None:
         retriever = get_memory_retriever()
         try:
             memories = await retriever.list_memories(
-                category=category, limit=limit, offset=offset
+                category=category,
+                limit=limit,
+                offset=offset,
+                project=project or None,
+                include_all=include_all,
             )
         except Exception as exc:
             logger.error("memory_list_error type=%s", type(exc).__name__)
             raise ToolError(f"Failed to list memories: {exc}") from exc
 
-        logger.info("memory_list count=%d", len(memories))
+        logger.info("memory_list count=%d project=%s", len(memories), project)
         return [m.model_dump() for m in memories]
 
     @mcp.tool(

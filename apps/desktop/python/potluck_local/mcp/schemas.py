@@ -50,6 +50,7 @@ class MemorySearchInput(BaseModel):
     category: str | None = None
     max_results: int = 20
     min_confidence: float = 0.5
+    project: str | None = None  # None = global memory, applies across all projects
 
 
 class MemorySaveInput(BaseModel):
@@ -57,12 +58,15 @@ class MemorySaveInput(BaseModel):
     category: MemoryCategory
     confidence: float = 1.0
     conversation_id: str | None = None
+    project: str | None = None  # None = global memory, applies across all projects
 
 
 class MemoryListInput(BaseModel):
     category: str | None = None
     limit: int = 100
     offset: int = 0
+    project: str | None = None   # None = global memory, applies across all projects
+    include_all: bool = False
 
 
 class MemoryDeleteInput(BaseModel):
@@ -80,6 +84,7 @@ class TaskCreateInput(BaseModel):
     constraints: list[str] | None = None
     pending_steps: list[str] | None = None
     conversation_id: str | None = None
+    project: str | None = None  # None = global memory, applies across all projects
 
 
 class TaskGetInput(BaseModel):
@@ -88,11 +93,13 @@ class TaskGetInput(BaseModel):
 
 class TaskListInput(BaseModel):
     status: TaskStatus | None = None
+    project: str | None = None   # None = global memory, applies across all projects
+    include_all: bool = False
 
 
 class TaskUpdateInput(BaseModel):
     task_id: str
-    patch: dict
+    patch: dict  # may include 'project' key
 
 
 class TaskCompleteStepInput(BaseModel):

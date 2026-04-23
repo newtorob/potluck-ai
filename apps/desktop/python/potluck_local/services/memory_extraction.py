@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 import aiosqlite
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,15 @@ class Memory(BaseModel):
     access_count: int
     is_active: bool
     superseded_by: str | None = None
+    project: str | None = None  # null = global memory, applies across all projects
+
+    @field_validator("project", mode="before")
+    @classmethod
+    def _coerce_empty_project(cls, v: object) -> str | None:
+        """Coerce empty string to None — both represent 'global'."""
+        if v == "":
+            return None
+        return v  # type: ignore[return-value]
 
 
 def _now_iso() -> str:
@@ -120,10 +129,18 @@ class MemoryExtractor:
         self,
         messages: list[dict],
         conversation_id: str,
+        project: str | None = None,
     ) -> list[Memory]:
-        """Extract memories from a conversation; returns only newly-inserted ones."""
+        """Extract memories from a conversation; returns only newly-inserted ones.
+
+        project: tag each new memory with this scope. None = global memory,
+        applies across all projects.
+        """
         if not _memory_enabled():
             return []
+
+        # Normalise empty string to None
+        project = project or None
 
         from potluck_local.services.runtime import get_runtime
         runtime = get_runtime()
@@ -170,7 +187,10 @@ class MemoryExtractor:
                 if confidence < _CONFIDENCE_THRESHOLD:
                     continue
 
-                # Deduplicate against existing active memories in same category
+                # Deduplicate against existing active memories in same category.
+                # Deduplication is intentionally global (across projects) — a near-
+                # identical fact in two scopes still gets a confidence bump on the
+                # existing row rather than a duplicate insert.
                 cursor = await db.execute(
                     "SELECT id, content, confidence FROM memories WHERE category = ? AND is_active = 1",
                     (category,),
@@ -202,18 +222,19 @@ class MemoryExtractor:
                         access_count=0,
                         is_active=True,
                         superseded_by=None,
+                        project=project,
                     )
                     await db.execute(
                         """INSERT INTO memories
                            (id, content, category, confidence, source_type,
                             source_conversation_id, created_at, last_accessed_at,
-                            access_count, is_active)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            access_count, is_active, project)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
                             mem.id, mem.content, mem.category, mem.confidence,
                             mem.source_type, mem.source_conversation_id,
                             mem.created_at, mem.last_accessed_at,
-                            mem.access_count, 1,
+                            mem.access_count, 1, mem.project,
                         ),
                     )
                     inserted.append(mem)
@@ -221,8 +242,9 @@ class MemoryExtractor:
             await db.commit()
 
         logger.info(
-            "memory_extraction_done conversation_id=%s inserted=%d skipped_dupes=%d",
+            "memory_extraction_done conversation_id=%s project=%s inserted=%d skipped_dupes=%d",
             conversation_id,
+            project,
             len(inserted),
             len(raw_items) - len(inserted),
         )
@@ -234,8 +256,16 @@ class MemoryExtractor:
         category: MemoryCategory,
         conversation_id: str | None = None,
         confidence: float = 1.0,
+        project: str | None = None,
     ) -> Memory:
-        """Persist an explicit user-stated memory. Always inserts; no deduplication."""
+        """Persist an explicit user-stated memory. Always inserts; no deduplication.
+
+        project: scope this memory to a named project. None = global memory,
+        applies across all projects.
+        """
+        # Normalise empty string to None
+        project = project or None
+
         mem = Memory(
             id=str(uuid.uuid4()),
             content=content.strip(),
@@ -248,6 +278,7 @@ class MemoryExtractor:
             access_count=0,
             is_active=True,
             superseded_by=None,
+            project=project,
         )
 
         from potluck_local.services.memory_db import get_memory_db_path
@@ -259,18 +290,21 @@ class MemoryExtractor:
                 """INSERT INTO memories
                    (id, content, category, confidence, source_type,
                     source_conversation_id, created_at, last_accessed_at,
-                    access_count, is_active)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    access_count, is_active, project)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     mem.id, mem.content, mem.category, mem.confidence,
                     mem.source_type, mem.source_conversation_id,
                     mem.created_at, mem.last_accessed_at,
-                    mem.access_count, 1,
+                    mem.access_count, 1, mem.project,
                 ),
             )
             await db.commit()
 
-        logger.info("memory_explicit_saved id=%s category=%s", mem.id, mem.category)
+        logger.info(
+            "memory_explicit_saved id=%s category=%s project=%s",
+            mem.id, mem.category, mem.project,
+        )
         return mem
 
 

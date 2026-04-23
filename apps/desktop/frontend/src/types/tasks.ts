@@ -28,6 +28,7 @@ export interface TaskState {
   created_at: string;
   updated_at: string;
   conversation_id: string | null;
+  project?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -41,6 +42,7 @@ export interface TaskCreateInput {
   pending_steps?: string[];
   metadata?: Record<string, unknown>;
   conversation_id?: string;
+  project?: string | null;
 }
 
 export type TaskUpdateInput = Partial<

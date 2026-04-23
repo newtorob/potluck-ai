@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Coroutine
 from pathlib import Path
+from typing import Any
 
 import aiosqlite
 
@@ -74,6 +76,8 @@ _INDICES = [
     "CREATE INDEX IF NOT EXISTS idx_memories_active ON memories(is_active, confidence DESC)",
     "CREATE INDEX IF NOT EXISTS idx_memories_accessed ON memories(last_accessed_at)",
     "CREATE INDEX IF NOT EXISTS idx_task_states_status ON task_states(status)",
+    "CREATE INDEX IF NOT EXISTS idx_memories_project ON memories(project, is_active)",
+    "CREATE INDEX IF NOT EXISTS idx_task_states_project ON task_states(project, status)",
 ]
 
 
@@ -84,6 +88,30 @@ def get_memory_db_path() -> Path:
         return Path(env_override)
     from potluck_local.utils.paths import memory_db_path
     return memory_db_path()
+
+
+def _add_column_if_missing(
+    conn: aiosqlite.Connection,
+    table: str,
+    column: str,
+    sql_type: str,
+) -> Coroutine[Any, Any, None]:
+    """Return an awaitable that adds `column` to `table` only when absent.
+
+    Uses PRAGMA table_info to check — cleaner than catching OperationalError
+    on duplicate-column, which masks real errors.
+    """
+    # We return a coroutine so callers can await it.
+    async def _run() -> None:
+        cursor = await conn.execute(f"PRAGMA table_info({table})")
+        rows = await cursor.fetchall()
+        existing = {row[1] for row in rows}  # index 1 = column name
+        if column not in existing:
+            await conn.execute(
+                f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}"
+            )
+
+    return _run()
 
 
 async def init_memory_db(db_path: Path | None = None) -> None:
@@ -97,8 +125,19 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         await db.execute(_CREATE_MEMORY_EMBEDDINGS)
         await db.execute(_CREATE_TASK_STATES)
         await db.execute(_CREATE_MEMORY_ACCESS_LOG)
+        await db.execute(_CREATE_MCP_SESSIONS)
+        await db.execute(_CREATE_MCP_TOOL_CALLS)
+
+        # Schema migrations first — indexes below may reference added columns.
+        await _add_column_if_missing(db, "memories", "project", "TEXT")
+        await _add_column_if_missing(db, "task_states", "project", "TEXT")
+
         for stmt in _INDICES:
             await db.execute(stmt)
+
+        for stmt in _OBSERVABILITY_INDICES:
+            await db.execute(stmt)
+
         await db.commit()
 
     logger.info("memory_db_ready path=%s", path)
@@ -111,3 +150,206 @@ async def reset_memory_db(db_path: Path | None = None) -> None:
         path.unlink()
         logger.info("memory_db_deleted path=%s", path)
     await init_memory_db(path)
+
+
+_CREATE_MCP_SESSIONS = """
+CREATE TABLE IF NOT EXISTS mcp_sessions (
+  id TEXT PRIMARY KEY,
+  client_name TEXT,
+  client_version TEXT,
+  transport TEXT NOT NULL,
+  pid INTEGER,
+  project TEXT,
+  model TEXT,
+  model_source TEXT,
+  peer_mcps TEXT NOT NULL DEFAULT '[]',
+  started_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  disconnected_at TEXT
+)
+"""
+
+_CREATE_MCP_TOOL_CALLS = """
+CREATE TABLE IF NOT EXISTS mcp_tool_calls (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL REFERENCES mcp_sessions(id),
+  tool_name TEXT NOT NULL,
+  args_summary TEXT,
+  result_count INTEGER,
+  duration_ms INTEGER,
+  error TEXT,
+  called_at TEXT NOT NULL
+)
+"""
+
+_OBSERVABILITY_INDICES = [
+    "CREATE INDEX IF NOT EXISTS idx_mcp_sessions_active ON mcp_sessions(disconnected_at, last_seen_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_mcp_sessions_project ON mcp_sessions(project)",
+    "CREATE INDEX IF NOT EXISTS idx_mcp_tool_calls_session ON mcp_tool_calls(session_id)",
+    "CREATE INDEX IF NOT EXISTS idx_mcp_tool_calls_called_at ON mcp_tool_calls(called_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_mcp_tool_calls_tool_name ON mcp_tool_calls(tool_name)",
+]
+
+
+async def list_sessions(
+    db_path: Path | None = None,
+    include_disconnected: bool = False,
+    limit: int = 100,
+) -> list[dict]:
+    """Return sessions with tool_call_count joined; ordered by last_seen_at desc."""
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        where = "" if include_disconnected else "WHERE s.disconnected_at IS NULL"
+        cursor = await db.execute(
+            f"""
+            SELECT
+                s.id, s.client_name, s.client_version, s.transport, s.pid,
+                s.project, s.model, s.model_source, s.peer_mcps,
+                s.started_at, s.last_seen_at, s.disconnected_at,
+                COUNT(t.id) AS tool_call_count
+            FROM mcp_sessions s
+            LEFT JOIN mcp_tool_calls t ON t.session_id = s.id
+            {where}
+            GROUP BY s.id
+            ORDER BY s.last_seen_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_session(
+    session_id: str,
+    db_path: Path | None = None,
+) -> dict | None:
+    """Return a single session row with tool_call_count, or None."""
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            SELECT
+                s.id, s.client_name, s.client_version, s.transport, s.pid,
+                s.project, s.model, s.model_source, s.peer_mcps,
+                s.started_at, s.last_seen_at, s.disconnected_at,
+                COUNT(t.id) AS tool_call_count
+            FROM mcp_sessions s
+            LEFT JOIN mcp_tool_calls t ON t.session_id = s.id
+            WHERE s.id = ?
+            GROUP BY s.id
+            """,
+            (session_id,),
+        )
+        row = await cursor.fetchone()
+    return dict(row) if row else None
+
+
+async def list_recent_tool_calls(
+    *,
+    db_path: Path | None = None,
+    limit: int = 100,
+    client: str | None = None,
+    project: str | None = None,
+    tool_name: str | None = None,
+) -> list[dict]:
+    """Return recent tool calls with optional filters; ordered called_at desc."""
+    path = db_path or get_memory_db_path()
+    conditions: list[str] = []
+    params: list[object] = []
+    if client is not None:
+        conditions.append("s.client_name = ?")
+        params.append(client)
+    if project is not None:
+        conditions.append("s.project = ?")
+        params.append(project)
+    if tool_name is not None:
+        conditions.append("t.tool_name = ?")
+        params.append(tool_name)
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    params.append(limit)
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            f"""
+            SELECT
+                t.id, t.session_id, t.tool_name, t.args_summary,
+                t.result_count, t.duration_ms, t.error, t.called_at
+            FROM mcp_tool_calls t
+            JOIN mcp_sessions s ON s.id = t.session_id
+            {where}
+            ORDER BY t.called_at DESC
+            LIMIT ?
+            """,
+            params,
+        )
+        rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def session_tool_calls(
+    session_id: str,
+    limit: int = 200,
+    db_path: Path | None = None,
+) -> list[dict]:
+    """Return tool calls for a single session; ordered called_at desc."""
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            SELECT id, session_id, tool_name, args_summary,
+                   result_count, duration_ms, error, called_at
+            FROM mcp_tool_calls
+            WHERE session_id = ?
+            ORDER BY called_at DESC
+            LIMIT ?
+            """,
+            (session_id, limit),
+        )
+        rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def list_projects(db_path: Path | None = None) -> list[dict]:
+    """Return [{project, memory_count, task_count}] for all named projects.
+
+    NULL and empty-string project values are excluded — only surfaced named
+    projects are returned. Used by GET /memory/projects.
+    """
+    path = db_path or get_memory_db_path()
+
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+
+        cursor = await db.execute(
+            """
+            SELECT project, COUNT(*) AS memory_count
+            FROM memories
+            WHERE project IS NOT NULL AND project != '' AND is_active = 1
+            GROUP BY project
+            """
+        )
+        memory_rows = {row["project"]: row["memory_count"] for row in await cursor.fetchall()}
+
+        cursor = await db.execute(
+            """
+            SELECT project, COUNT(*) AS task_count
+            FROM task_states
+            WHERE project IS NOT NULL AND project != ''
+            GROUP BY project
+            """
+        )
+        task_rows = {row["project"]: row["task_count"] for row in await cursor.fetchall()}
+
+    all_projects = sorted(set(memory_rows) | set(task_rows))
+    return [
+        {
+            "project": p,
+            "memory_count": memory_rows.get(p, 0),
+            "task_count": task_rows.get(p, 0),
+        }
+        for p in all_projects
+    ]

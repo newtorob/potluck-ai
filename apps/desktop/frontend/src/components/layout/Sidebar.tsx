@@ -16,6 +16,7 @@ import {
   Package,
   Brain,
   ListTodo,
+  Activity,
   Settings,
   CreditCard,
   Plus,
@@ -27,6 +28,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { useChat } from '@/hooks/useChat';
+import { ProjectSwitcher } from '@/components/layout/ProjectSwitcher';
 import type { AppConversation } from '@/stores/chatStore';
 
 // ---------------------------------------------------------------------------
@@ -44,6 +46,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/models', label: 'Models', icon: Package },
   { to: '/memory', label: 'Memory', icon: Brain },
   { to: '/tasks', label: 'Tasks', icon: ListTodo },
+  { to: '/agents', label: 'Agents', icon: Activity },
   { to: '/settings', label: 'Settings', icon: Settings },
   { to: '/membership', label: 'Membership', icon: CreditCard },
 ];
@@ -84,6 +87,9 @@ export function Sidebar() {
           <span className="text-sm font-semibold text-foreground select-none">Potluck</span>
         )}
       </div>
+
+      {/* Project switcher — above nav */}
+      {isChat && <ProjectSwitcher />}
 
       {/* Nav links */}
       <div className={cn('flex flex-col gap-0.5 py-3', isChat ? 'px-2' : 'items-center px-3')}>

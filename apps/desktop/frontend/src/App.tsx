@@ -7,6 +7,7 @@ import { ChatView } from '@/views/ChatView';
 import { ModelLibrary } from '@/views/ModelLibrary';
 import { MemoryView } from '@/views/MemoryView';
 import { TaskStateView } from '@/views/TaskStateView';
+import { AgentsView } from '@/views/AgentsView';
 import { SettingsView } from '@/views/SettingsView';
 import { MembershipView } from '@/views/MembershipView';
 import { FirstRun } from '@/views/FirstRun';
@@ -102,6 +103,7 @@ export default function App() {
               <Route path="/models" element={<ModelLibrary />} />
               <Route path="/memory" element={<MemoryView />} />
               <Route path="/tasks" element={<TaskStateView />} />
+              <Route path="/agents" element={<AgentsView />} />
               <Route path="/settings" element={<SettingsView />} />
               <Route path="/membership" element={<MembershipView />} />
               {/* Catch-all: redirect unknown paths to chat */}

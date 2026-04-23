@@ -1,6 +1,12 @@
 """MCP task tools — create, get, list, update, complete_step, add_error.
 
 No privacy gate — task state is workflow metadata, not personal facts.
+
+Project scoping:
+All tools that create or list tasks accept an optional `project` parameter.
+Pass project=None (the default) for global tasks that apply across all projects.
+Pass a project name to scope the task to that project. Listing with a project
+set returns both project-scoped AND global tasks.
 """
 
 from __future__ import annotations
@@ -22,7 +28,10 @@ def register_task_tools(mcp: FastMCP) -> None:
         name="task_create",
         description=(
             "Create a new agent task with an objective and optional constraints "
-            "and pending steps. Returns the created TaskState."
+            "and pending steps. Returns the created TaskState. "
+            "Pass project=None (default) to create a global task that applies across "
+            "all projects. Pass a project name to scope it to that project. "
+            "project=None means 'global memory, applies across all projects.'"
         ),
     )
     async def task_create(
@@ -31,8 +40,13 @@ def register_task_tools(mcp: FastMCP) -> None:
         constraints: list[str] | None = None,
         pending_steps: list[str] | None = None,
         conversation_id: str | None = None,
+        project: str | None = None,
     ) -> dict:
-        """Create a new task."""
+        """Create a new task.
+
+        project: scope this task to a project. None = global task,
+        applies across all projects.
+        """
         try:
             task = await get_task_manager().create_task(
                 task_name=name,
@@ -40,12 +54,13 @@ def register_task_tools(mcp: FastMCP) -> None:
                 known_constraints=constraints,
                 pending_steps=pending_steps,
                 conversation_id=conversation_id,
+                project=project or None,
             )
         except Exception as exc:
             logger.error("task_create_error type=%s", type(exc).__name__)
             raise ToolError(f"Failed to create task: {exc}") from exc
 
-        logger.info("task_created id=%s", task.id)
+        logger.info("task_created id=%s project=%s", task.id, task.project)
         return task.model_dump()
 
     @mcp.tool(
@@ -69,18 +84,35 @@ def register_task_tools(mcp: FastMCP) -> None:
         name="task_list",
         description=(
             "List all tasks. Optional status filter: "
-            "'active', 'paused', 'completed', or 'abandoned'."
+            "'active', 'paused', 'completed', or 'abandoned'. "
+            "Pass project=None (default) to see only global tasks. "
+            "Pass a project name to see that project's tasks AND globals combined. "
+            "Pass include_all=True to browse all tasks regardless of project. "
+            "project=None means 'global memory, applies across all projects.'"
         ),
     )
-    async def task_list(status: TaskStatus | None = None) -> list[dict]:
-        """List tasks with optional status filter."""
+    async def task_list(
+        status: TaskStatus | None = None,
+        project: str | None = None,
+        include_all: bool = False,
+    ) -> list[dict]:
+        """List tasks with optional status and project filter.
+
+        project: scope filter. None = global-only. Named project = scoped + globals.
+        include_all: bypass project filter entirely (browse mode).
+        project=None means 'global memory, applies across all projects.'
+        """
         try:
-            tasks = await get_task_manager().list_tasks(status=status)
+            tasks = await get_task_manager().list_tasks(
+                status=status,
+                project=project or None,
+                include_all=include_all,
+            )
         except Exception as exc:
             logger.error("task_list_error type=%s", type(exc).__name__)
             raise ToolError(f"Failed to list tasks: {exc}") from exc
 
-        logger.info("task_list count=%d status=%s", len(tasks), status)
+        logger.info("task_list count=%d status=%s project=%s", len(tasks), status, project)
         return [t.model_dump() for t in tasks]
 
     @mcp.tool(
@@ -89,11 +121,16 @@ def register_task_tools(mcp: FastMCP) -> None:
             "Partially update a task. The patch dict may contain any of: "
             "task_name, status, objective, completed_steps, pending_steps, "
             "known_constraints, context_summary, files_touched, errors_encountered, "
-            "metadata, conversation_id."
+            "metadata, conversation_id, project. "
+            "Set project=null in the patch to promote a scoped task to global. "
+            "project=None means 'global memory, applies across all projects.'"
         ),
     )
     async def task_update(task_id: str, patch: dict) -> dict:
-        """Apply a partial update to a task."""
+        """Apply a partial update to a task.
+
+        patch may include 'project' to change or clear (None = global) the project scope.
+        """
         try:
             task = await get_task_manager().update_task(task_id, patch)
         except ValueError as exc:

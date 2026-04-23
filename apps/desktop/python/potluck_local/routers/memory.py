@@ -7,6 +7,14 @@ Privacy gate: both privacy.memory_enabled AND memory.enabled must be True
 for the system to accept reads/writes.  GET /memory always returns (possibly
 empty) so the UI can detect the disabled state; POST /memory/wipe also
 bypasses the gate so users can always clear their data.
+
+Project scoping:
+- Pass project= to scope reads/writes to a named project.
+- Scoped retrieval returns rows where (project = X OR project IS NULL).
+- No project = globals only (project IS NULL).
+- include_all=true bypasses project filter (browse mode).
+- The router does NOT auto-apply settings.active_project — callers pass it
+  explicitly. Only the chat router implicitly uses active_project.
 """
 
 from __future__ import annotations
@@ -16,9 +24,9 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
-from potluck_local.services.memory_db import reset_memory_db
+from potluck_local.services.memory_db import list_projects, reset_memory_db
 from potluck_local.services.memory_extraction import (
     MemoryCategory,
     get_memory_extractor,
@@ -48,12 +56,27 @@ class CreateMemoryRequest(BaseModel):
     category: MemoryCategory
     conversation_id: str | None = None
     confidence: float = 1.0
+    project: str | None = None
+
+    @field_validator("project", mode="before")
+    @classmethod
+    def _coerce_empty_project(cls, v: object) -> str | None:
+        return None if v == "" else v  # type: ignore[return-value]
 
 
 class UpdateMemoryRequest(BaseModel):
     content: str | None = None
     category: MemoryCategory | None = None
     confidence: float | None = None
+    project: str | None = None
+    _project_set: bool = False  # sentinel — see validator
+
+    @field_validator("project", mode="before")
+    @classmethod
+    def _coerce_empty_project(cls, v: object) -> str | None:
+        return None if v == "" else v  # type: ignore[return-value]
+
+    model_config = {"extra": "ignore"}
 
 
 class SearchMemoryRequest(BaseModel):
@@ -61,11 +84,23 @@ class SearchMemoryRequest(BaseModel):
     current_messages: list[dict[str, Any]] | None = None
     max_memories: int = 20
     min_confidence: float = 0.5
+    project: str | None = None
+
+    @field_validator("project", mode="before")
+    @classmethod
+    def _coerce_empty_project(cls, v: object) -> str | None:
+        return None if v == "" else v  # type: ignore[return-value]
 
 
 class ExtractMemoryRequest(BaseModel):
     messages: list[dict[str, Any]]
     conversation_id: str
+    project: str | None = None
+
+    @field_validator("project", mode="before")
+    @classmethod
+    def _coerce_empty_project(cls, v: object) -> str | None:
+        return None if v == "" else v  # type: ignore[return-value]
 
 
 class WipeRequest(BaseModel):
@@ -81,13 +116,29 @@ class ImportRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+@router.get("/projects")
+async def list_memory_projects() -> list[dict[str, Any]]:
+    """Return distinct non-null project names with memory and task counts.
+
+    Used by the frontend project-switcher dropdown.
+    Example: [{"project": "potluck", "memory_count": 12, "task_count": 3}]
+    """
+    return await list_projects()
+
+
 @router.get("")
 async def list_memories(
     category: MemoryCategory | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
+    project: str | None = Query(default=None),
+    include_all: bool = Query(default=False),
 ) -> list[dict[str, Any]]:
     """List stored memories.
+
+    project: when given, returns scoped + global memories.
+             when absent, returns globals only.
+    include_all: bypasses project filter (browse mode).
 
     Always returns even when memory is disabled (returns empty list so the UI
     can display a 'memory is off' state without a separate API call).
@@ -97,11 +148,17 @@ async def list_memories(
 
     retriever = get_memory_retriever()
     memories = await retriever.list_memories(
-        category=category, limit=limit, offset=offset
+        category=category,
+        limit=limit,
+        offset=offset,
+        project=project or None,
+        include_all=include_all,
     )
     logger.info(
-        "memory_list category=%s limit=%d offset=%d count=%d",
+        "memory_list category=%s project=%s include_all=%s limit=%d offset=%d count=%d",
         category,
+        project,
+        include_all,
         limit,
         offset,
         len(memories),
@@ -116,14 +173,18 @@ async def export_memories() -> list[dict[str, Any]]:
         raise HTTPException(status_code=403, detail=_DISABLED_DETAIL)
 
     retriever = get_memory_retriever()
-    memories = await retriever.list_memories(limit=10_000, offset=0)
+    memories = await retriever.list_memories(limit=10_000, offset=0, include_all=True)
     logger.info("memory_export count=%d", len(memories))
     return [m.model_dump() for m in memories]
 
 
 @router.post("", status_code=201)
 async def create_memory(req: CreateMemoryRequest) -> dict[str, Any]:
-    """Explicitly store a single memory."""
+    """Explicitly store a single memory.
+
+    Pass project= to scope the memory to a named project.
+    Omit project (or pass null) for a global memory that applies across all projects.
+    """
     if not _memory_active():
         raise HTTPException(status_code=403, detail=_DISABLED_DETAIL)
 
@@ -132,19 +193,25 @@ async def create_memory(req: CreateMemoryRequest) -> dict[str, Any]:
         category=req.category,
         conversation_id=req.conversation_id,
         confidence=req.confidence,
+        project=req.project,
     )
     logger.info(
-        "memory_created id=%s category=%s confidence=%.2f",
+        "memory_created id=%s category=%s confidence=%.2f project=%s",
         memory.id,
         memory.category,
         memory.confidence,
+        memory.project,
     )
     return memory.model_dump()
 
 
 @router.post("/search")
 async def search_memories(req: SearchMemoryRequest) -> list[dict[str, Any]]:
-    """Retrieve memories relevant to a query or message list."""
+    """Retrieve memories relevant to a query or message list.
+
+    project: when given, returns scoped + global memories.
+             when absent, returns globals only.
+    """
     if not _memory_active():
         raise HTTPException(status_code=403, detail=_DISABLED_DETAIL)
 
@@ -163,24 +230,30 @@ async def search_memories(req: SearchMemoryRequest) -> list[dict[str, Any]]:
         current_messages=messages,
         max_memories=req.max_memories,
         min_confidence=req.min_confidence,
+        project=req.project,
     )
-    logger.info("memory_search result_count=%d", len(memories))
+    logger.info("memory_search result_count=%d project=%s", len(memories), req.project)
     return [m.model_dump() for m in memories]
 
 
 @router.post("/extract")
 async def extract_memories(req: ExtractMemoryRequest) -> list[dict[str, Any]]:
-    """Batch-extract memories from a completed conversation."""
+    """Batch-extract memories from a completed conversation.
+
+    project: tag extracted memories with this scope.
+    """
     if not _memory_active():
         raise HTTPException(status_code=403, detail=_DISABLED_DETAIL)
 
     memories = await get_memory_extractor().extract_from_conversation(
         messages=req.messages,
         conversation_id=req.conversation_id,
+        project=req.project,
     )
     logger.info(
-        "memory_extract conversation_id=%s extracted=%d",
+        "memory_extract conversation_id=%s project=%s extracted=%d",
         req.conversation_id,
+        req.project,
         len(memories),
     )
     return [m.model_dump() for m in memories]
@@ -222,6 +295,7 @@ async def import_memories(req: ImportRequest) -> dict[str, int]:
                 category=raw["category"],
                 conversation_id=raw.get("source_conversation_id"),
                 confidence=float(raw.get("confidence", 0.7)),
+                project=raw.get("project"),
             )
             imported += 1
         except Exception as exc:
@@ -246,22 +320,38 @@ async def get_memory(memory_id: str) -> dict[str, Any]:
 
 @router.patch("/{memory_id}")
 async def update_memory(memory_id: str, req: UpdateMemoryRequest) -> dict[str, Any]:
-    """Partially update a memory's content, category, or confidence."""
+    """Partially update a memory's content, category, confidence, or project.
+
+    Pass project=null explicitly to promote a scoped memory to global.
+    Omit project entirely to leave the existing scope unchanged.
+    """
     if not _memory_active():
         raise HTTPException(status_code=403, detail=_DISABLED_DETAIL)
 
-    patch: dict[str, Any] = req.model_dump(exclude_none=True)
-    if not patch:
+    # Determine which fields were explicitly provided in the request body.
+    raw = req.model_dump(exclude_unset=True)
+    if not raw:
         raise HTTPException(status_code=422, detail="No fields to update.")
 
-    updated = await get_memory_retriever().update_memory(
-        memory_id,
-        **patch,
-    )
+    # Build kwargs for update_memory, using sentinel for project when absent.
+    kwargs: dict[str, Any] = {}
+    if "content" in raw:
+        kwargs["content"] = raw["content"]
+    if "category" in raw:
+        kwargs["category"] = raw["category"]
+    if "confidence" in raw:
+        kwargs["confidence"] = raw["confidence"]
+
+    # Pass project only when the caller explicitly included it in the body,
+    # so we can distinguish "set to null" from "not mentioned".
+    if "project" in raw:
+        kwargs["project"] = raw["project"]
+
+    updated = await get_memory_retriever().update_memory(memory_id, **kwargs)
     if updated is None:
         raise HTTPException(status_code=404, detail="Memory not found.")
 
-    logger.info("memory_updated id=%s fields=%s", memory_id, list(patch.keys()))
+    logger.info("memory_updated id=%s fields=%s", memory_id, list(raw.keys()))
     return updated.model_dump()
 
 

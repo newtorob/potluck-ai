@@ -78,6 +78,7 @@ class PotluckSettings(BaseModel):
     memory: MemorySettings = MemorySettings()
     models_path: str = str(Path.home() / ".potluck" / "models")
     active_model_id: str | None = None
+    active_project: str | None = None
 
 
 _CONFIG_PATH = Path.home() / ".potluck" / "config.json"

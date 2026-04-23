@@ -21,7 +21,7 @@ interface TaskStoreState {
   fetchError: string | null;
 
   // Actions
-  fetchTasks: (status?: TaskStatus) => Promise<void>;
+  fetchTasks: (opts?: { status?: TaskStatus; project?: string | null; include_all?: boolean }) => Promise<void>;
   createTask: (input: TaskCreateInput) => Promise<TaskState>;
   updateTask: (id: string, patch: TaskUpdateInput) => Promise<void>;
   completeStep: (id: string, step: string) => Promise<void>;
@@ -41,10 +41,14 @@ export const useTaskStore = create<TaskStoreState>()((set, get) => ({
 
   // ---- fetchTasks ----------------------------------------------------------
 
-  async fetchTasks(status) {
+  async fetchTasks(opts) {
     set({ isFetching: true, fetchError: null });
     try {
-      const tasks = await localApi.tasks.list(status !== undefined ? { status } : {});
+      const tasks = await localApi.tasks.list({
+        status: opts?.status,
+        project: opts?.project,
+        include_all: opts?.include_all,
+      });
       set({ tasks, isFetching: false });
     } catch (err) {
       set({

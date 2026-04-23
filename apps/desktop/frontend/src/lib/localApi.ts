@@ -18,8 +18,10 @@ import type {
   MemoryImportResult,
   MemoryWipeResult,
   MemoryExportResult,
+  ProjectSummary,
 } from '@/types/memory';
 import type { TaskState, TaskStatus, TaskCreateInput, TaskUpdateInput } from '@/types/tasks';
+import type { AgentSession, SessionDetail, ToolCall } from '@/types/agents';
 
 const LOCAL_BASE =
   (import.meta.env['VITE_LOCAL_API_URL'] as string | undefined) ?? 'http://127.0.0.1:8321';
@@ -116,6 +118,7 @@ export interface PotluckSettings {
   memory: MemorySettings;
   models_path: string;
   active_model_id: string | null;
+  active_project: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -204,14 +207,28 @@ export const localApi = {
   // ---- Memory --------------------------------------------------------------
 
   memory: {
-    list(opts: { category?: MemoryCategory; limit?: number; offset?: number } = {}): Promise<Memory[]> {
+    list(opts: {
+      category?: MemoryCategory;
+      limit?: number;
+      offset?: number;
+      project?: string | null;
+      include_all?: boolean;
+    } = {}): Promise<Memory[]> {
       const params = new URLSearchParams();
       if (opts.category !== undefined) params.set('category', opts.category);
       if (opts.limit !== undefined) params.set('limit', String(opts.limit));
       if (opts.offset !== undefined) params.set('offset', String(opts.offset));
+      if (opts.project !== undefined && opts.project !== null) params.set('project', opts.project);
+      if (opts.include_all !== undefined) params.set('include_all', opts.include_all ? 'true' : 'false');
       const qs = params.toString();
       return fetch(`${LOCAL_BASE}/memory${qs ? `?${qs}` : ''}`).then((r) =>
         handleResponse<Memory[]>(r),
+      );
+    },
+
+    projects(): Promise<ProjectSummary[]> {
+      return fetch(`${LOCAL_BASE}/memory/projects`).then((r) =>
+        handleResponse<ProjectSummary[]>(r),
       );
     },
 
@@ -226,6 +243,7 @@ export const localApi = {
       category: MemoryCategory;
       conversation_id?: string;
       confidence?: number;
+      project?: string | null;
     }): Promise<Memory> {
       return fetch(`${LOCAL_BASE}/memory`, {
         method: 'POST',
@@ -236,7 +254,7 @@ export const localApi = {
 
     update(
       id: string,
-      patch: { content?: string; category?: MemoryCategory; confidence?: number },
+      patch: { content?: string; category?: MemoryCategory; confidence?: number; project?: string | null },
     ): Promise<Memory> {
       return fetch(`${LOCAL_BASE}/memory/${encodeURIComponent(id)}`, {
         method: 'PATCH',
@@ -256,6 +274,7 @@ export const localApi = {
       current_messages?: ChatMessage[];
       max_memories?: number;
       min_confidence?: number;
+      project?: string | null;
     }): Promise<Memory[]> {
       return fetch(`${LOCAL_BASE}/memory/search`, {
         method: 'POST',
@@ -298,9 +317,11 @@ export const localApi = {
   // ---- Tasks ---------------------------------------------------------------
 
   tasks: {
-    list(opts: { status?: TaskStatus } = {}): Promise<TaskState[]> {
+    list(opts: { status?: TaskStatus; project?: string | null; include_all?: boolean } = {}): Promise<TaskState[]> {
       const params = new URLSearchParams();
       if (opts.status !== undefined) params.set('status', opts.status);
+      if (opts.project !== undefined && opts.project !== null) params.set('project', opts.project);
+      if (opts.include_all !== undefined) params.set('include_all', opts.include_all ? 'true' : 'false');
       const qs = params.toString();
       return fetch(`${LOCAL_BASE}/tasks${qs ? `?${qs}` : ''}`).then((r) =>
         handleResponse<TaskState[]>(r),
@@ -349,6 +370,40 @@ export const localApi = {
       return fetch(`${LOCAL_BASE}/tasks/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       }).then((r) => handle204(r));
+    },
+  },
+
+  // ---- Agents --------------------------------------------------------------
+
+  agents: {
+    listSessions(opts: { include_disconnected?: boolean; limit?: number } = {}): Promise<AgentSession[]> {
+      const params = new URLSearchParams();
+      if (opts.include_disconnected !== undefined) {
+        params.set('include_disconnected', opts.include_disconnected ? 'true' : 'false');
+      }
+      if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+      const qs = params.toString();
+      return fetch(`${LOCAL_BASE}/agents/sessions${qs ? `?${qs}` : ''}`).then((r) =>
+        handleResponse<AgentSession[]>(r),
+      );
+    },
+
+    getSession(id: string): Promise<SessionDetail> {
+      return fetch(`${LOCAL_BASE}/agents/sessions/${encodeURIComponent(id)}`).then((r) =>
+        handleResponse<SessionDetail>(r),
+      );
+    },
+
+    activity(opts: { limit?: number; client?: string; project?: string; tool?: string } = {}): Promise<ToolCall[]> {
+      const params = new URLSearchParams();
+      if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+      if (opts.client) params.set('client', opts.client);
+      if (opts.project) params.set('project', opts.project);
+      if (opts.tool) params.set('tool', opts.tool);
+      const qs = params.toString();
+      return fetch(`${LOCAL_BASE}/agents/activity${qs ? `?${qs}` : ''}`).then((r) =>
+        handleResponse<ToolCall[]>(r),
+      );
     },
   },
 };

@@ -23,6 +23,7 @@ async def handle_context_overflow(
     messages: list[dict],
     *,
     max_context_tokens: int,
+    active_project: str | None = None,
 ) -> list[dict]:
     """Compress the conversation if it exceeds 80 % of the token budget.
 
@@ -32,6 +33,14 @@ async def handle_context_overflow(
     """
     if estimate_tokens(messages) < max_context_tokens * _OVERFLOW_THRESHOLD:
         return messages
+
+    # Read active_project from settings if not explicitly provided
+    if active_project is None:
+        try:
+            from potluck_local.services.settings_manager import get_settings
+            active_project = get_settings().active_project
+        except Exception:
+            active_project = None
 
     system_msgs = [m for m in messages if m.get("role") == "system"]
     non_system = [m for m in messages if m.get("role") != "system"]
@@ -46,7 +55,7 @@ async def handle_context_overflow(
     summary_content = await _summarise_middle(middle)
 
     # Persist active task context summary while we have the model available
-    await _persist_task_summary()
+    await _persist_task_summary(active_project=active_project)
 
     summary_msg = {
         "role": "system",
@@ -94,7 +103,7 @@ async def _summarise_middle(middle: list[dict]) -> str:
         return _PLACEHOLDER_SUMMARY
 
 
-async def _persist_task_summary() -> None:
+async def _persist_task_summary(active_project: str | None = None) -> None:
     """Update context_summary on the first active task using the loaded model."""
     from potluck_local.services.runtime import get_runtime
     from potluck_local.services.task_state import get_task_manager
@@ -105,7 +114,7 @@ async def _persist_task_summary() -> None:
 
     manager = get_task_manager()
     try:
-        active = await manager.list_tasks(status="active")
+        active = await manager.list_tasks(status="active", project=active_project)
     except Exception:
         return
 

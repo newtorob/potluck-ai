@@ -18,7 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from potluck_local import __version__
-from potluck_local.routers import chat, hardware, health, memory, models, settings, tasks
+from potluck_local.routers import agents, chat, hardware, health, memory, models, settings, tasks
 from potluck_local.utils.logging import setup_logging
 
 
@@ -73,6 +73,7 @@ def create_app() -> FastAPI:
     app.include_router(hardware.router, prefix="/hardware", tags=["hardware"])
     app.include_router(memory.router, prefix="/memory", tags=["memory"])
     app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
+    app.include_router(agents.router, prefix="/agents", tags=["agents"])
 
     return app
 

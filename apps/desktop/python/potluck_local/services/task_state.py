@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 import aiosqlite
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ TaskStatus = Literal["active", "paused", "completed", "abandoned"]
 _UPDATABLE_FIELDS = frozenset({
     "task_name", "status", "objective", "completed_steps", "pending_steps",
     "known_constraints", "context_summary", "files_touched",
-    "errors_encountered", "metadata", "conversation_id",
+    "errors_encountered", "metadata", "conversation_id", "project",
 })
 
 _JSON_FIELDS = frozenset({
@@ -56,11 +56,21 @@ class TaskState(BaseModel):
     created_at: str
     updated_at: str
     conversation_id: str | None
+    project: str | None = None  # null = global task, applies across all projects
+
+    @field_validator("project", mode="before")
+    @classmethod
+    def _coerce_empty_project(cls, v: object) -> str | None:
+        """Coerce empty string to None — both represent 'global'."""
+        if v == "":
+            return None
+        return v  # type: ignore[return-value]
 
     def to_context_string(self) -> str:
         """Format task state for injection into the model context window."""
+        project_prefix = f"Project: {self.project} · " if self.project else ""
         lines = [
-            f"\n--- Active Task: {self.task_name} ---",
+            f"\n--- Active Task: {project_prefix}{self.task_name} ---",
             f"Objective: {self.objective}",
         ]
 
@@ -121,7 +131,19 @@ def _row_to_task(row: dict) -> TaskState:
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         conversation_id=row.get("conversation_id"),
+        project=row.get("project"),
     )
+
+
+def _project_clause(project: str | None) -> tuple[str, list]:
+    """Return (SQL fragment, params) for project-scoped filtering.
+
+    When project is given: return rows where project = X OR project IS NULL.
+    When project is None: return only global rows (project IS NULL).
+    """
+    if project is not None:
+        return "(project = ? OR project IS NULL)", [project]
+    return "project IS NULL", []
 
 
 class TaskStateManager:
@@ -136,8 +158,16 @@ class TaskStateManager:
         pending_steps: list[str] | None = None,
         metadata: dict | None = None,
         conversation_id: str | None = None,
+        project: str | None = None,
     ) -> TaskState:
-        """Create and persist a new task state."""
+        """Create and persist a new task state.
+
+        project: scope this task to a named project. None = global task,
+        applies across all projects.
+        """
+        # Normalise empty string to None
+        project = project or None
+
         ts = _now_iso()
         task = TaskState(
             id=str(uuid.uuid4()),
@@ -154,6 +184,7 @@ class TaskStateManager:
             created_at=ts,
             updated_at=ts,
             conversation_id=conversation_id,
+            project=project,
         )
 
         from potluck_local.services.memory_db import get_memory_db_path
@@ -165,8 +196,8 @@ class TaskStateManager:
                 """INSERT INTO task_states
                    (id, task_name, status, objective, completed_steps, pending_steps,
                     known_constraints, context_summary, files_touched, errors_encountered,
-                    metadata, created_at, updated_at, conversation_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    metadata, created_at, updated_at, conversation_id, project)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     task.id, task.task_name, task.status, task.objective,
                     json.dumps(task.completed_steps),
@@ -177,11 +208,12 @@ class TaskStateManager:
                     json.dumps([e.model_dump() for e in task.errors_encountered]),
                     json.dumps(task.metadata),
                     task.created_at, task.updated_at, task.conversation_id,
+                    task.project,
                 ),
             )
             await db.commit()
 
-        logger.info("task_created id=%s name_len=%d", task.id, len(task.task_name))
+        logger.info("task_created id=%s name_len=%d project=%s", task.id, len(task.task_name), project)
         return task
 
     async def get_task(self, task_id: str) -> TaskState | None:
@@ -198,22 +230,43 @@ class TaskStateManager:
 
         return _row_to_task(dict(row)) if row else None
 
-    async def list_tasks(self, status: TaskStatus | None = None) -> list[TaskState]:
-        """List all tasks, optionally filtered by status."""
+    async def list_tasks(
+        self,
+        status: TaskStatus | None = None,
+        project: str | None = None,
+        include_all: bool = False,
+    ) -> list[TaskState]:
+        """List all tasks, optionally filtered by status and project.
+
+        project: scope filter. Ignored when include_all=True.
+        include_all: when True, bypasses the project filter entirely (browse mode).
+        """
+        # Normalise empty string to None
+        project = project or None
+
         from potluck_local.services.memory_db import get_memory_db_path
         db_path = get_memory_db_path()
 
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
+
+            conditions: list[str] = []
+            params: list = []
+
             if status is not None:
-                cursor = await db.execute(
-                    "SELECT * FROM task_states WHERE status = ? ORDER BY updated_at DESC",
-                    (status,),
-                )
-            else:
-                cursor = await db.execute(
-                    "SELECT * FROM task_states ORDER BY updated_at DESC"
-                )
+                conditions.append("status = ?")
+                params.append(status)
+
+            if not include_all:
+                proj_clause, proj_params = _project_clause(project)
+                conditions.append(proj_clause)
+                params.extend(proj_params)
+
+            where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+            cursor = await db.execute(
+                f"SELECT * FROM task_states {where} ORDER BY updated_at DESC",
+                params,
+            )
             rows = await cursor.fetchall()
 
         return [_row_to_task(dict(r)) for r in rows]
@@ -237,6 +290,10 @@ class TaskStateManager:
             merged[key] = val
         merged["updated_at"] = ts
 
+        # Normalise project in the merged dict
+        if "project" in merged:
+            merged["project"] = merged["project"] or None
+
         # Re-serialise errors_encountered if it came in as dicts
         raw_errors = merged.get("errors_encountered", [])
         norm_errors = [
@@ -252,7 +309,8 @@ class TaskStateManager:
                        completed_steps = ?, pending_steps = ?,
                        known_constraints = ?, context_summary = ?,
                        files_touched = ?, errors_encountered = ?,
-                       metadata = ?, updated_at = ?, conversation_id = ?
+                       metadata = ?, updated_at = ?, conversation_id = ?,
+                       project = ?
                    WHERE id = ?""",
                 (
                     merged["task_name"], merged["status"], merged["objective"],
@@ -264,6 +322,7 @@ class TaskStateManager:
                     json.dumps(norm_errors),
                     json.dumps(merged["metadata"]),
                     ts, merged.get("conversation_id"),
+                    merged.get("project"),
                     task_id,
                 ),
             )

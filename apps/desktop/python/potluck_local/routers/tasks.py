@@ -4,6 +4,12 @@ CRUD endpoints for agent task state.
 Mounted at /tasks by app.py.
 
 No privacy gate in v0 — task state is workflow metadata, not user facts.
+
+Project scoping:
+- Pass project= to scope reads/writes to a named project.
+- Scoped retrieval returns rows where (project = X OR project IS NULL).
+- No project = globals only (project IS NULL).
+- include_all=true bypasses project filter (browse mode).
 """
 
 from __future__ import annotations
@@ -13,7 +19,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from potluck_local.services.task_state import TaskStatus, get_task_manager
 
@@ -33,6 +39,12 @@ class CreateTaskRequest(BaseModel):
     pending_steps: list[str] | None = None
     metadata: dict[str, Any] | None = None
     conversation_id: str | None = None
+    project: str | None = None
+
+    @field_validator("project", mode="before")
+    @classmethod
+    def _coerce_empty_project(cls, v: object) -> str | None:
+        return None if v == "" else v  # type: ignore[return-value]
 
 
 class CompleteStepRequest(BaseModel):
@@ -52,16 +64,37 @@ class AddErrorRequest(BaseModel):
 @router.get("")
 async def list_tasks(
     status: TaskStatus | None = Query(default=None),
+    project: str | None = Query(default=None),
+    include_all: bool = Query(default=False),
 ) -> list[dict[str, Any]]:
-    """List all tasks, optionally filtered by status."""
-    tasks = await get_task_manager().list_tasks(status=status)
-    logger.info("task_list status=%s count=%d", status, len(tasks))
+    """List all tasks, optionally filtered by status and project.
+
+    project: when given, returns scoped + global tasks.
+             when absent, returns globals only.
+    include_all: bypasses project filter (browse mode).
+    """
+    tasks = await get_task_manager().list_tasks(
+        status=status,
+        project=project or None,
+        include_all=include_all,
+    )
+    logger.info(
+        "task_list status=%s project=%s include_all=%s count=%d",
+        status,
+        project,
+        include_all,
+        len(tasks),
+    )
     return [t.model_dump() for t in tasks]
 
 
 @router.post("", status_code=201)
 async def create_task(req: CreateTaskRequest) -> dict[str, Any]:
-    """Create a new task in active status."""
+    """Create a new task in active status.
+
+    Pass project= to scope the task to a named project.
+    Omit project (or pass null) for a global task that applies across all projects.
+    """
     task = await get_task_manager().create_task(
         task_name=req.task_name,
         objective=req.objective,
@@ -69,8 +102,9 @@ async def create_task(req: CreateTaskRequest) -> dict[str, Any]:
         pending_steps=req.pending_steps,
         metadata=req.metadata,
         conversation_id=req.conversation_id,
+        project=req.project,
     )
-    logger.info("task_created id=%s name=%s", task.id, task.task_name)
+    logger.info("task_created id=%s name=%s project=%s", task.id, task.task_name, task.project)
     return task.model_dump()
 
 
@@ -85,7 +119,10 @@ async def get_task(task_id: str) -> dict[str, Any]:
 
 @router.patch("/{task_id}")
 async def update_task(task_id: str, patch: dict[str, Any]) -> dict[str, Any]:
-    """Partially update a task. 400 on unknown keys."""
+    """Partially update a task. 400 on unknown keys.
+
+    patch may include 'project' to change or clear (null) the project scope.
+    """
     try:
         task = await get_task_manager().update_task(task_id, patch)
     except ValueError as exc:

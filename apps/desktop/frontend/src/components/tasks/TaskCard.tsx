@@ -26,6 +26,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
+import { ProjectPill } from '@/components/memory/ProjectPill';
 import type { TaskState, TaskStatus } from '@/types/tasks';
 
 // ---------------------------------------------------------------------------
@@ -464,6 +465,7 @@ export function TaskCard({
         <div className="flex flex-wrap items-center gap-2 min-w-0">
           <h2 className="text-sm font-semibold text-foreground truncate">{task.task_name}</h2>
           <StatusPill status={task.status} />
+          <ProjectPill project={task.project} />
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <span className="text-[11px] text-muted-foreground whitespace-nowrap">

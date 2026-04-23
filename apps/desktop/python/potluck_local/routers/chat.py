@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import uuid
 from typing import AsyncGenerator, Literal
 
@@ -38,6 +39,38 @@ from potluck_local.services.task_state import get_task_manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# ---------------------------------------------------------------------------
+# Synthetic session for potluck-chat internal calls
+# ---------------------------------------------------------------------------
+
+_chat_session_id: str | None = None
+_chat_session_lock = asyncio.Lock()
+
+
+async def _get_chat_session_id() -> str:
+    """Lazily open a synthetic 'potluck-chat' session and return its ID.
+
+    The session is created once per sidecar process and reused across all chat
+    requests.  Uses a lock to prevent a race on first creation.
+    """
+    global _chat_session_id
+    if _chat_session_id is not None:
+        return _chat_session_id
+    async with _chat_session_lock:
+        if _chat_session_id is not None:
+            return _chat_session_id
+        from potluck_local.services.agent_observability import get_observer
+
+        observer = get_observer()
+        _chat_session_id = await observer.open_session(
+            client_name="potluck-chat",
+            client_version=None,
+            transport="internal",
+            pid=os.getpid(),
+        )
+        logger.info("chat_synthetic_session_opened id=%s", _chat_session_id)
+    return _chat_session_id
 
 _DEFAULT_SYSTEM = "You are Potluck AI, a helpful local assistant."
 
@@ -81,6 +114,7 @@ async def _build_enhanced_messages(
     """
     settings = get_settings()
     conversation_id = request.conversation_id or str(uuid.uuid4())
+    active_project: str | None = settings.active_project or None
 
     raw_messages = [m.model_dump() for m in request.messages]
 
@@ -106,12 +140,14 @@ async def _build_enhanced_messages(
                 current_messages=non_system,
                 max_memories=settings.memory.max_retrieval,
                 min_confidence=settings.memory.min_confidence_for_retrieval,
+                project=active_project,
             )
             if memories:
                 memory_block = retriever.format_memories_for_prompt(memories)
                 logger.info(
-                    "chat_memory_retrieved conversation_id=%s count=%d",
+                    "chat_memory_retrieved conversation_id=%s project=%s count=%d",
                     conversation_id,
+                    active_project,
                     len(memories),
                 )
         except Exception as exc:
@@ -124,7 +160,9 @@ async def _build_enhanced_messages(
     # --- Active task context ---
     task_block = ""
     try:
-        active_tasks = await get_task_manager().list_tasks(status="active")
+        active_tasks = await get_task_manager().list_tasks(
+            status="active", project=active_project
+        )
         # Sort by updated_at descending; take top 3.
         active_tasks_sorted = sorted(
             active_tasks,
@@ -165,6 +203,7 @@ async def _build_enhanced_messages(
         enhanced_messages = await handle_context_overflow(
             enhanced_messages,
             max_context_tokens=settings.runtime.context_size,
+            active_project=active_project,
         )
     except Exception as exc:
         logger.warning(
@@ -180,8 +219,18 @@ async def _fire_extraction(
     raw_messages: list[dict],
     assistant_content: str,
     conversation_id: str,
+    active_project: str | None = None,
 ) -> None:
-    """Background coroutine: extract memories from a completed exchange."""
+    """Background coroutine: extract memories from a completed exchange.
+
+    active_project: tag extracted memories with this scope (from settings.active_project).
+    Logs an 'extract' tool call against the synthetic potluck-chat session.
+    """
+    import time as _time
+
+    start = _time.monotonic()
+    error_str: str | None = None
+    result_count: int | None = None
     try:
         full_exchange = raw_messages + [
             {"role": "assistant", "content": assistant_content}
@@ -189,18 +238,41 @@ async def _fire_extraction(
         memories = await get_memory_extractor().extract_from_conversation(
             messages=full_exchange,
             conversation_id=conversation_id,
+            project=active_project,
         )
+        result_count = len(memories)
         logger.info(
-            "chat_extraction_complete conversation_id=%s extracted=%d",
+            "chat_extraction_complete conversation_id=%s project=%s extracted=%d",
             conversation_id,
-            len(memories),
+            active_project,
+            result_count,
         )
     except Exception as exc:
+        error_str = type(exc).__name__
         logger.warning(
             "chat_extraction_failed conversation_id=%s error=%s",
             conversation_id,
-            type(exc).__name__,
+            error_str,
         )
+    finally:
+        duration_ms = int((_time.monotonic() - start) * 1000)
+        try:
+            from potluck_local.services.agent_observability import get_observer
+
+            session_id = await _get_chat_session_id()
+            observer = get_observer()
+            await observer.log_tool_call(
+                session_id=session_id,
+                tool_name="chat_extract",
+                args={"project": active_project} if active_project else {},
+                result_count=result_count,
+                duration_ms=duration_ms,
+                error=error_str,
+            )
+            if active_project:
+                await observer.update_session(session_id, project=active_project)
+        except Exception:
+            logger.debug("chat_observer_log_failed conversation_id=%s", conversation_id)
 
 
 async def _accumulating_stream(
@@ -208,6 +280,7 @@ async def _accumulating_stream(
     raw_messages: list[dict],
     conversation_id: str,
     should_extract: bool,
+    active_project: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """Wrap the upstream SSE generator, accumulate assistant text, then extract.
 
@@ -243,7 +316,7 @@ async def _accumulating_stream(
         if should_extract and accumulated:
             full_content = "".join(accumulated)
             asyncio.create_task(
-                _fire_extraction(raw_messages, full_content, conversation_id)
+                _fire_extraction(raw_messages, full_content, conversation_id, active_project)
             )
 
 
@@ -273,6 +346,7 @@ async def chat_completions(request: ChatRequest) -> object:
     raw_messages = [m.model_dump() for m in request.messages]
 
     settings = get_settings()
+    active_project: str | None = settings.active_project or None
     memory_active = settings.privacy.memory_enabled and settings.memory.enabled
     should_extract = memory_active and settings.memory.auto_extract
 
@@ -297,6 +371,7 @@ async def chat_completions(request: ChatRequest) -> object:
                 raw_messages,
                 conversation_id,
                 should_extract,
+                active_project,
             ),
             media_type="text/event-stream",
             headers={
@@ -324,7 +399,7 @@ async def chat_completions(request: ChatRequest) -> object:
             )
             if assistant_content:
                 asyncio.create_task(
-                    _fire_extraction(raw_messages, assistant_content, conversation_id)
+                    _fire_extraction(raw_messages, assistant_content, conversation_id, active_project)
                 )
         except Exception as exc:
             logger.warning(

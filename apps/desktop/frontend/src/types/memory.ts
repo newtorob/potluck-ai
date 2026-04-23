@@ -27,6 +27,17 @@ export interface Memory {
   access_count: number;
   is_active: boolean;
   superseded_by: string | null;
+  project?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Project summary — returned by GET /memory/projects
+// ---------------------------------------------------------------------------
+
+export interface ProjectSummary {
+  project: string;
+  memory_count: number;
+  task_count: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -37,6 +48,8 @@ export interface MemoryListParams {
   category?: MemoryCategory;
   limit?: number;
   offset?: number;
+  project?: string | null;
+  include_all?: boolean;
 }
 
 export interface MemoryCreateInput {
@@ -44,12 +57,14 @@ export interface MemoryCreateInput {
   category: MemoryCategory;
   conversation_id?: string;
   confidence?: number;
+  project?: string | null;
 }
 
 export interface MemoryUpdateInput {
   content?: string;
   category?: MemoryCategory;
   confidence?: number;
+  project?: string | null;
 }
 
 export interface MemorySearchInput {
@@ -57,6 +72,7 @@ export interface MemorySearchInput {
   current_messages?: Array<{ role: string; content: string }>;
   max_memories?: number;
   min_confidence?: number;
+  project?: string | null;
 }
 
 export interface MemoryImportResult {
