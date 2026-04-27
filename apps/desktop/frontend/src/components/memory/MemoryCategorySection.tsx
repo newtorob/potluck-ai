@@ -15,9 +15,13 @@ import type { Memory, MemoryCategory } from '@/types/memory';
 interface MemoryCategorySectionProps {
   category: MemoryCategory;
   memories: Memory[];
+  /** Optional: called when a card is clicked (opens related drawer) */
+  onCardClick?: (memory: Memory) => void;
+  /** Optional: registers a focusable ref for keyboard list navigation */
+  onCardRef?: (id: string, el: HTMLElement | null) => void;
 }
 
-export function MemoryCategorySection({ category, memories }: MemoryCategorySectionProps) {
+export function MemoryCategorySection({ category, memories, onCardClick, onCardRef }: MemoryCategorySectionProps) {
   const [expanded, setExpanded] = useState(true);
   const sectionId = `memory-section-${category}`;
   const headingId = `memory-heading-${category}`;
@@ -61,7 +65,23 @@ export function MemoryCategorySection({ category, memories }: MemoryCategorySect
       {expanded && (
         <div id={sectionId} role="region" aria-labelledby={headingId} className="mt-1.5 space-y-2 pl-2">
           {memories.map((memory) => (
-            <MemoryCard key={memory.id} memory={memory} />
+            <div
+              key={memory.id}
+              ref={(el) => onCardRef?.(memory.id, el)}
+              role={onCardClick ? 'button' : undefined}
+              tabIndex={onCardClick ? 0 : undefined}
+              aria-label={onCardClick ? `Memory: ${memory.content.slice(0, 60)}` : undefined}
+              className={onCardClick ? 'cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' : undefined}
+              onClick={onCardClick ? () => onCardClick(memory) : undefined}
+              onKeyDown={onCardClick ? (e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onCardClick(memory);
+                }
+              } : undefined}
+            >
+              <MemoryCard memory={memory} />
+            </div>
           ))}
         </div>
       )}

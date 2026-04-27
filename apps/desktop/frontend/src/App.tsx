@@ -6,6 +6,7 @@ import { AuthGate } from '@/components/auth/AuthGate';
 import { ChatView } from '@/views/ChatView';
 import { ModelLibrary } from '@/views/ModelLibrary';
 import { MemoryView } from '@/views/MemoryView';
+import { MemoryMapView } from '@/views/MemoryMapView';
 import { TaskStateView } from '@/views/TaskStateView';
 import { AgentsView } from '@/views/AgentsView';
 import { SettingsView } from '@/views/SettingsView';
@@ -102,6 +103,7 @@ export default function App() {
               <Route path="/chat" element={<ChatView />} />
               <Route path="/models" element={<ModelLibrary />} />
               <Route path="/memory" element={<MemoryView />} />
+              <Route path="/memory/map" element={<MemoryMapView />} />
               <Route path="/tasks" element={<TaskStateView />} />
               <Route path="/agents" element={<AgentsView />} />
               <Route path="/settings" element={<SettingsView />} />

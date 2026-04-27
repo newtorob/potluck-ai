@@ -2,30 +2,36 @@
  * MemoryView — /memory route.
  *
  * Layout:
- *   - Header: "Memory" title + count + "+ New" button
- *   - Privacy banner (yellow card) if memory_enabled === false
- *   - FilterBar: category chips, debounced search, sort dropdown
- *   - Body: MemoryCards grouped by category (accordion) when unfiltered/unsorted,
- *           flat sorted list when any filter/sort/search is active
- *   - Empty state: Brain icon with descriptive text
- *   - Footer: link to /settings#privacy
+ *   - Header: "Memory" title + count + "+ New" + "View as map" link
+ *   - Prominent search bar (h-12) with semantic/exact mode toggle + "/" hint
+ *   - Filters row: category multi-select chips, confidence range, date range
+ *   - Tag cloud (collapsible, defaults expanded)
+ *   - Body: flat search results when query is set; grouped accordion view when empty
  *
- * See implementation guide §9.10, §9.11.
+ * Keyboard shortcuts (only active when /memory is mounted, and NOT when focus
+ * is in a text input or textarea):
+ *   /      → focus search bar
+ *   Esc    → clear query + return focus to search bar (then Esc again closes if no query)
+ *   ↑ / ↓  → navigate the memory list (move focus ring)
+ *   Enter  → open related drawer for the focused memory card
  */
 
-import { useState, useMemo } from 'react';
-import { Brain, Plus, AlertTriangle } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { Brain, Plus, AlertTriangle, Search, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/components/ui/cn';
 import { useMemories } from '@/hooks/useMemories';
 import { useSettings } from '@/hooks/useSettings';
 import { useProject } from '@/hooks/useProject';
+import { useMemoryStore } from '@/stores/memoryStore';
 import { MemoryCard } from '@/components/memory/MemoryCard';
 import { MemoryCategorySection } from '@/components/memory/MemoryCategorySection';
-import { MemoryFilterBar } from '@/components/memory/MemoryFilterBar';
 import { NewMemoryForm } from '@/components/memory/NewMemoryForm';
+import { RelatedMemoriesDrawer } from '@/components/memory/RelatedMemoriesDrawer';
+import { TagCloud } from '@/components/memory/TagCloud';
+import { CATEGORY_STYLES, CATEGORY_LABELS } from '@/components/memory/CategoryPill';
 import type { Memory, MemoryCategory } from '@/types/memory';
-import type { FilterState, SortKey } from '@/components/memory/MemoryFilterBar';
+import type { SearchMode } from '@/stores/memoryStore';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -40,11 +46,18 @@ const CATEGORY_ORDER: MemoryCategory[] = [
   'person',
 ];
 
+const ALL_CATEGORIES: MemoryCategory[] = [
+  'preference', 'fact', 'decision', 'project', 'person', 'instruction',
+];
+
 // ---------------------------------------------------------------------------
-// Sorting
+// Sort key
 // ---------------------------------------------------------------------------
 
+type SortKey = 'relevance' | 'recency' | 'confidence' | 'access_count';
+
 function sortMemories(memories: Memory[], sortKey: SortKey): Memory[] {
+  if (sortKey === 'relevance') return memories; // preserve search-result order
   return [...memories].sort((a, b) => {
     switch (sortKey) {
       case 'confidence':
@@ -59,32 +72,24 @@ function sortMemories(memories: Memory[], sortKey: SortKey): Memory[] {
 }
 
 // ---------------------------------------------------------------------------
-// Project filter chip type
+// Project filter chip type (unchanged from previous implementation)
 // ---------------------------------------------------------------------------
 
 type ProjectFilter =
-  | { kind: 'active' }      // default: show active project + globals
-  | { kind: 'all' }         // include_all=true
-  | { kind: 'global' }      // null project only
-  | { kind: 'project'; name: string }; // specific project + globals
+  | { kind: 'active' }
+  | { kind: 'all' }
+  | { kind: 'global' }
+  | { kind: 'project'; name: string };
 
 // ---------------------------------------------------------------------------
 // MemoryView
 // ---------------------------------------------------------------------------
 
-const DEFAULT_FILTER: FilterState = {
-  categories: [],
-  search: '',
-  sort: 'recency',
-};
-
 export function MemoryView() {
   const { projects, activeProject } = useProject();
 
-  // Project filter state — independent of the active project
+  // Project scoping for memory list
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>({ kind: 'active' });
-
-  // Resolve what to pass to useMemories based on projectFilter
   const resolvedProject: string | null | undefined = (() => {
     switch (projectFilter.kind) {
       case 'active': return activeProject;
@@ -95,78 +100,206 @@ export function MemoryView() {
   })();
   const includeAll = projectFilter.kind === 'all';
 
-  const { memories, isFetching, fetchError, searchMemories } = useMemories({
+  const { memories, isFetching, fetchError, performSearch } = useMemories({
     project: resolvedProject,
     include_all: includeAll,
   });
+
+  // Pull search state directly from the store (avoids double-definition)
+  const searchResults = useMemoryStore((s) => s.searchResults);
+  const isSearching = useMemoryStore((s) => s.isSearching);
+  const searchMode = useMemoryStore((s) => s.searchMode);
+  const setSearchMode = useMemoryStore((s) => s.setSearchMode);
+  const clearSearch = useMemoryStore((s) => s.clearSearch);
+
   const { settings, update: updateSettings } = useSettings();
 
+  // UI state
   const [showNewForm, setShowNewForm] = useState(false);
-  const [filter, setFilter] = useState<FilterState>(DEFAULT_FILTER);
-  const [searchResults, setSearchResults] = useState<Memory[] | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
+  const [drawerMemory, setDrawerMemory] = useState<Memory | null>(null);
 
-  // Detect if memory is enabled in settings
-  // Forward-compat: the field may not exist yet if Agent B hasn't merged
+  // Filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<MemoryCategory[]>([]);
+  const [confidenceMin, setConfidenceMin] = useState(0);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('recency');
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  // Refs for keyboard-navigable memory items
+  const memoryItemRefs = useRef<Map<string, HTMLElement>>(new Map());
+
+  // ---------------------------------------------------------------------------
+  // Memory enabled detection
+  // ---------------------------------------------------------------------------
   const memoryEnabled =
     settings?.privacy &&
     'memory_enabled' in (settings.privacy as Record<string, unknown>)
       ? Boolean((settings.privacy as Record<string, unknown>)['memory_enabled'])
       : true;
 
-  // Handle search: when query is non-empty, call /memory/search and show results
-  const handleSearch = async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults(null);
-      return;
-    }
-    setIsSearching(true);
-    try {
-      const results = await searchMemories(query);
-      setSearchResults(results);
-    } finally {
-      setIsSearching(false);
-    }
-  };
+  // ---------------------------------------------------------------------------
+  // Search handling
+  // ---------------------------------------------------------------------------
 
-  const handleFilterChange = (next: FilterState) => {
-    setFilter(next);
-    // If search was cleared, clear search results too
-    if (!next.search.trim()) setSearchResults(null);
-  };
+  const handleSearchInput = useCallback(
+    (value: string) => {
+      setSearchQuery(value);
+      if (!value.trim()) {
+        clearSearch();
+        return;
+      }
+      performSearch(value, {
+        project: resolvedProject,
+        min_confidence: confidenceMin > 0 ? confidenceMin : undefined,
+      });
+    },
+    [performSearch, clearSearch, resolvedProject, confidenceMin],
+  );
 
-  // Determine displayed memories
-  const isFiltered =
-    searchResults !== null ||
-    filter.categories.length > 0 ||
-    filter.sort !== 'recency';
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    clearSearch();
+    searchInputRef.current?.focus();
+  }, [clearSearch]);
+
+  // ---------------------------------------------------------------------------
+  // Tag cloud keyword click — sets query and forces exact mode
+  // ---------------------------------------------------------------------------
+
+  const handleKeywordClick = useCallback(
+    (keyword: string) => {
+      setSearchQuery(keyword);
+      setSearchMode('exact');
+      // Trigger search immediately via store (bypass debounce since user
+      // explicitly chose this keyword)
+      void useMemoryStore.getState().performSearch(keyword, {
+        project: resolvedProject,
+      });
+    },
+    [setSearchMode, resolvedProject],
+  );
+
+  // When searchMode changes while a query is active, re-run the search
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      performSearch(searchQuery, {
+        project: resolvedProject,
+        min_confidence: confidenceMin > 0 ? confidenceMin : undefined,
+      });
+    }
+    // Only re-run when mode changes, not every time performSearch ref is created
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchMode]);
+
+  // ---------------------------------------------------------------------------
+  // Displayed memories computation
+  // ---------------------------------------------------------------------------
+
+  const hasActiveSearch = searchQuery.trim() !== '';
 
   const displayMemories = useMemo<Memory[]>(() => {
-    // Use search results if we have them
-    let base = searchResults !== null ? searchResults : memories;
+    let base = hasActiveSearch && searchResults !== null ? searchResults : memories;
 
     // Category filter
-    if (filter.categories.length > 0) {
-      base = base.filter((m) => filter.categories.includes(m.category));
+    if (selectedCategories.length > 0) {
+      base = base.filter((m) => selectedCategories.includes(m.category));
     }
 
-    // Sort
-    return sortMemories(base, filter.sort);
-  }, [memories, searchResults, filter.categories, filter.sort]);
+    // Confidence filter (client-side when no active search)
+    if (confidenceMin > 0) {
+      base = base.filter((m) => m.confidence >= confidenceMin);
+    }
 
-  // Group by category for accordion view
+    // Date range filter (client-side only)
+    if (dateFrom) {
+      const from = new Date(dateFrom).getTime();
+      base = base.filter((m) => new Date(m.created_at).getTime() >= from);
+    }
+    if (dateTo) {
+      // End of the selected day
+      const to = new Date(dateTo).getTime() + 86_400_000;
+      base = base.filter((m) => new Date(m.created_at).getTime() <= to);
+    }
+
+    return sortMemories(base, hasActiveSearch && sortKey === 'recency' ? 'relevance' : sortKey);
+  }, [memories, searchResults, hasActiveSearch, selectedCategories, confidenceMin, dateFrom, dateTo, sortKey]);
+
+  // Grouped view (used when no active search and no filters)
+  const isFiltered = hasActiveSearch || selectedCategories.length > 0 || confidenceMin > 0 || dateFrom !== '' || dateTo !== '';
+
   const grouped = useMemo<Map<MemoryCategory, Memory[]>>(() => {
     const map = new Map<MemoryCategory, Memory[]>();
     for (const cat of CATEGORY_ORDER) {
       const items = memories.filter(
-        (m) => m.category === cat && (filter.categories.length === 0 || filter.categories.includes(cat)),
+        (m) => m.category === cat && (selectedCategories.length === 0 || selectedCategories.includes(cat)),
       );
       if (items.length > 0) {
-        map.set(cat, sortMemories(items, filter.sort));
+        map.set(cat, sortMemories(items, sortKey === 'relevance' ? 'recency' : sortKey));
       }
     }
     return map;
-  }, [memories, filter.categories, filter.sort]);
+  }, [memories, selectedCategories, sortKey]);
+
+  // ---------------------------------------------------------------------------
+  // Keyboard shortcuts
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    function isEditableTarget(el: EventTarget | null): boolean {
+      if (!el || !(el instanceof HTMLElement)) return false;
+      const tag = el.tagName.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+      return el.isContentEditable;
+    }
+
+    function handleKeyDown(e: KeyboardEvent) {
+      // "/" → focus search (only when not in a text field)
+      if (e.key === '/' && !isEditableTarget(document.activeElement)) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+
+      // Esc → clear query (only when search input is focused)
+      if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
+        e.preventDefault();
+        handleClearSearch();
+        return;
+      }
+
+      // ↑ / ↓ → navigate memory list (when focus is on the list or search)
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const items = Array.from(memoryItemRefs.current.values());
+        if (items.length === 0) return;
+
+        const currentIndex = items.findIndex((el) => el === document.activeElement);
+        let nextIndex: number;
+
+        if (e.key === 'ArrowDown') {
+          nextIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + 1, items.length - 1);
+        } else {
+          nextIndex = currentIndex <= 0 ? 0 : currentIndex - 1;
+        }
+
+        const nextEl = items[nextIndex];
+        if (nextEl) {
+          e.preventDefault();
+          nextEl.focus();
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleClearSearch]);
+
+  // ---------------------------------------------------------------------------
+  // Settings helpers
+  // ---------------------------------------------------------------------------
 
   const handleEnableMemory = () => {
     if (!settings) return;
@@ -179,10 +312,20 @@ export function MemoryView() {
     });
   };
 
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  // Resolve the project string for tag cloud (undefined = global/all)
+  const tagCloudProject =
+    resolvedProject === undefined ? undefined : (resolvedProject ?? undefined);
+
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-6 py-4">
+      {/* ------------------------------------------------------------------ */}
+      {/* Header                                                              */}
+      {/* ------------------------------------------------------------------ */}
+      <div className="flex items-center justify-between border-b border-border px-6 py-3">
         <div className="flex items-center gap-3">
           <Brain className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
           <h1 className="text-sm font-semibold">Memory</h1>
@@ -193,24 +336,38 @@ export function MemoryView() {
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowNewForm((v) => !v)}
-          aria-label="Add new memory"
-          aria-expanded={showNewForm}
-          className={cn(
-            'flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5',
-            'text-xs font-medium text-primary-foreground',
-            'hover:bg-primary/90 transition-colors',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-          )}
-        >
-          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-          New
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/memory/map"
+            className={cn(
+              'text-xs text-muted-foreground hover:text-foreground transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded',
+            )}
+          >
+            View as map
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => setShowNewForm((v) => !v)}
+            aria-label="Add new memory"
+            aria-expanded={showNewForm}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5',
+              'text-xs font-medium text-primary-foreground',
+              'hover:bg-primary/90 transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            )}
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            New
+          </button>
+        </div>
       </div>
 
-      {/* Project filter chips */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Project filter chips                                                */}
+      {/* ------------------------------------------------------------------ */}
       <ProjectFilterChips
         projects={projects.map((p) => p.project)}
         activeProject={activeProject}
@@ -218,9 +375,11 @@ export function MemoryView() {
         onFilterChange={setProjectFilter}
       />
 
-      {/* Scrollable body */}
+      {/* ------------------------------------------------------------------ */}
+      {/* Scrollable body                                                     */}
+      {/* ------------------------------------------------------------------ */}
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-2xl px-6 py-5 space-y-5">
+        <div className="mx-auto max-w-2xl px-6 py-5 space-y-4">
           {/* Privacy disabled banner */}
           {!memoryEnabled && (
             <div
@@ -263,15 +422,249 @@ export function MemoryView() {
 
           {/* Fetch error */}
           {fetchError && (
-            <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+            <p
+              className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+              role="alert"
+            >
               {fetchError}
             </p>
           )}
 
-          {/* Loading skeleton */}
-          {isFetching && memories.length === 0 && (
-            <MemorySkeleton />
-          )}
+          {/* ---------------------------------------------------------------- */}
+          {/* Prominent search bar                                             */}
+          {/* ---------------------------------------------------------------- */}
+          <div className="space-y-3">
+            <div className="relative flex items-center">
+              {/* Search icon */}
+              <Search
+                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+
+              {/* Input */}
+              <input
+                ref={searchInputRef}
+                type="search"
+                value={searchQuery}
+                onChange={(e) => handleSearchInput(e.target.value)}
+                placeholder="Search memories…"
+                aria-label="Search memories"
+                className={cn(
+                  'h-12 w-full rounded-xl border border-input bg-card pl-10 pr-36',
+                  'text-sm text-foreground placeholder:text-muted-foreground',
+                  'focus:outline-none focus:ring-2 focus:ring-ring',
+                  'transition-shadow',
+                )}
+              />
+
+              {/* Right-side controls */}
+              <div className="absolute right-3 flex items-center gap-2">
+                {/* Clear button */}
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    aria-label="Clear search"
+                    className={cn(
+                      'text-muted-foreground hover:text-foreground transition-colors',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded',
+                    )}
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                )}
+
+                {/* Semantic / Exact toggle */}
+                <div
+                  role="group"
+                  aria-label="Search mode"
+                  className="flex rounded-lg border border-border bg-muted p-0.5 text-xs"
+                >
+                  <ModeToggleButton
+                    active={searchMode === 'semantic'}
+                    onClick={() => setSearchMode('semantic')}
+                    label="Semantic"
+                  />
+                  <ModeToggleButton
+                    active={searchMode === 'exact'}
+                    onClick={() => setSearchMode('exact')}
+                    label="Exact"
+                  />
+                </div>
+
+                {/* "/" hint badge */}
+                {!searchQuery && (
+                  <kbd
+                    aria-hidden="true"
+                    className="hidden rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline-flex"
+                  >
+                    /
+                  </kbd>
+                )}
+              </div>
+            </div>
+
+            {/* Sort dropdown */}
+            <div className="flex items-center justify-end">
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
+                aria-label="Sort memories by"
+                className={cn(
+                  'rounded-lg border border-input bg-background px-3 py-1.5',
+                  'text-xs text-foreground',
+                  'focus:outline-none focus:ring-2 focus:ring-ring',
+                )}
+              >
+                {hasActiveSearch && (
+                  <option value="relevance">Relevance</option>
+                )}
+                <option value="recency">Recent</option>
+                <option value="confidence">Confidence</option>
+                <option value="access_count">Access count</option>
+              </select>
+            </div>
+          </div>
+
+          {/* ---------------------------------------------------------------- */}
+          {/* Filters row                                                      */}
+          {/* ---------------------------------------------------------------- */}
+          <div className="space-y-2">
+            {/* Category chips */}
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter by category">
+              {ALL_CATEGORIES.map((cat) => {
+                const active = selectedCategories.includes(cat);
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() =>
+                      setSelectedCategories((prev) =>
+                        active ? prev.filter((c) => c !== cat) : [...prev, cat],
+                      )
+                    }
+                    className={cn(
+                      'rounded-full border px-2.5 py-0.5 text-xs font-medium transition-all',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      active
+                        ? CATEGORY_STYLES[cat]
+                        : 'border-border text-muted-foreground hover:border-border/80 hover:text-foreground',
+                    )}
+                  >
+                    {CATEGORY_LABELS[cat]}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* "More filters" disclosure */}
+            <button
+              type="button"
+              onClick={() => setShowMoreFilters((v) => !v)}
+              aria-expanded={showMoreFilters}
+              className={cn(
+                'text-xs text-muted-foreground hover:text-foreground transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded',
+              )}
+            >
+              {showMoreFilters ? '▴ Fewer filters' : '▾ More filters'}
+            </button>
+
+            {showMoreFilters && (
+              <div className="space-y-3 rounded-xl border border-border bg-card px-4 py-3">
+                {/* Confidence range */}
+                <div>
+                  <label className="mb-1 flex items-center justify-between text-xs font-medium text-muted-foreground">
+                    <span>Min confidence</span>
+                    <span className="tabular-nums">{Math.round(confidenceMin * 100)}%</span>
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={confidenceMin}
+                    onChange={(e) => setConfidenceMin(Number(e.target.value))}
+                    className="w-full accent-primary"
+                    aria-label="Minimum confidence threshold"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(confidenceMin * 100)}
+                  />
+                </div>
+
+                {/* Date range */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                      From
+                    </label>
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      aria-label="Filter memories created from date"
+                      className={cn(
+                        'w-full rounded-lg border border-input bg-background px-3 py-1.5',
+                        'text-xs text-foreground',
+                        'focus:outline-none focus:ring-2 focus:ring-ring',
+                      )}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                      To
+                    </label>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      aria-label="Filter memories created to date"
+                      className={cn(
+                        'w-full rounded-lg border border-input bg-background px-3 py-1.5',
+                        'text-xs text-foreground',
+                        'focus:outline-none focus:ring-2 focus:ring-ring',
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Reset filters */}
+                {(confidenceMin > 0 || dateFrom || dateTo) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfidenceMin(0);
+                      setDateFrom('');
+                      setDateTo('');
+                    }}
+                    className={cn(
+                      'text-xs text-muted-foreground hover:text-foreground transition-colors',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded',
+                    )}
+                  >
+                    Reset filters
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ---------------------------------------------------------------- */}
+          {/* Tag cloud                                                        */}
+          {/* ---------------------------------------------------------------- */}
+          <TagCloud
+            activeProject={tagCloudProject}
+            onKeywordClick={handleKeywordClick}
+          />
+
+          {/* ---------------------------------------------------------------- */}
+          {/* Memory list                                                      */}
+          {/* ---------------------------------------------------------------- */}
+
+          {/* Loading skeleton (initial fetch) */}
+          {isFetching && memories.length === 0 && <MemorySkeleton />}
 
           {/* Search loading indicator */}
           {isSearching && (
@@ -280,44 +673,54 @@ export function MemoryView() {
             </p>
           )}
 
-          {/* Filter bar */}
-          {!isFetching && (memories.length > 0 || searchResults !== null) && (
-            <MemoryFilterBar
-              value={filter}
-              onChange={handleFilterChange}
-              onSearch={(q) => void handleSearch(q)}
-            />
+          {/* Empty state (no memories at all) */}
+          {!isFetching && memories.length === 0 && !fetchError && <MemoryEmptyState />}
+
+          {/* Flat search / filtered results */}
+          {!isFetching && isFiltered && (
+            <>
+              {displayMemories.length > 0 ? (
+                <div className="space-y-2" role="list" aria-label="Memory search results">
+                  {displayMemories.map((memory, index) => (
+                    <MemoryCardWrapper
+                      key={memory.id}
+                      memory={memory}
+                      index={index}
+                      onOpen={setDrawerMemory}
+                      registerRef={(el) => {
+                        if (el) {
+                          memoryItemRefs.current.set(memory.id, el);
+                        } else {
+                          memoryItemRefs.current.delete(memory.id);
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-sm text-muted-foreground">
+                  No memories match your filter.
+                </p>
+              )}
+            </>
           )}
 
-          {/* Empty state */}
-          {!isFetching && memories.length === 0 && !fetchError && (
-            <MemoryEmptyState />
-          )}
-
-          {/* Search / filtered flat list */}
-          {!isFetching && isFiltered && displayMemories.length > 0 && (
-            <div className="space-y-2">
-              {displayMemories.map((memory) => (
-                <MemoryCard key={memory.id} memory={memory} />
-              ))}
-            </div>
-          )}
-
-          {/* Search empty state */}
-          {!isFetching && isFiltered && displayMemories.length === 0 && memories.length > 0 && (
-            <p className="text-center text-sm text-muted-foreground">
-              No memories match your filter.
-            </p>
-          )}
-
-          {/* Grouped accordion view (default) */}
+          {/* Grouped accordion view (default — no search, no filters) */}
           {!isFetching && !isFiltered && grouped.size > 0 && (
             <div className="space-y-3">
               {CATEGORY_ORDER.filter((cat) => grouped.has(cat)).map((cat) => (
-                <MemoryCategorySection
+                <MemoryCategorySectionWrapper
                   key={cat}
                   category={cat}
                   memories={grouped.get(cat) ?? []}
+                  onOpenDrawer={setDrawerMemory}
+                  registerRef={(id, el) => {
+                    if (el) {
+                      memoryItemRefs.current.set(id, el);
+                    } else {
+                      memoryItemRefs.current.delete(id);
+                    }
+                  }}
                 />
               ))}
             </div>
@@ -337,12 +740,113 @@ export function MemoryView() {
           </div>
         </div>
       </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Related memories drawer                                            */}
+      {/* ------------------------------------------------------------------ */}
+      {drawerMemory && (
+        <RelatedMemoriesDrawer
+          sourceMemory={drawerMemory}
+          onClose={() => setDrawerMemory(null)}
+        />
+      )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// ProjectFilterChips
+// ModeToggleButton
+// ---------------------------------------------------------------------------
+
+interface ModeToggleButtonProps {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}
+
+function ModeToggleButton({ active, onClick, label }: ModeToggleButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'rounded-md px-2 py-0.5 text-xs font-medium transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        active
+          ? 'bg-background text-foreground shadow-sm'
+          : 'text-muted-foreground hover:text-foreground',
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MemoryCardWrapper — makes a card keyboard-navigable and opens drawer on click
+// ---------------------------------------------------------------------------
+
+interface MemoryCardWrapperProps {
+  memory: Memory;
+  index: number;
+  onOpen: (memory: Memory) => void;
+  registerRef: (el: HTMLElement | null) => void;
+}
+
+function MemoryCardWrapper({ memory, onOpen, registerRef }: MemoryCardWrapperProps) {
+  return (
+    <div
+      ref={registerRef}
+      role="listitem"
+      tabIndex={0}
+      aria-label={`Memory: ${memory.content.slice(0, 60)}`}
+      className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+      onClick={() => onOpen(memory)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          onOpen(memory);
+        }
+      }}
+    >
+      <MemoryCard memory={memory} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MemoryCategorySectionWrapper — makes grouped items open the drawer
+// ---------------------------------------------------------------------------
+
+interface MemoryCategorySectionWrapperProps {
+  category: MemoryCategory;
+  memories: Memory[];
+  onOpenDrawer: (memory: Memory) => void;
+  registerRef: (id: string, el: HTMLElement | null) => void;
+}
+
+function MemoryCategorySectionWrapper({
+  category,
+  memories,
+  onOpenDrawer,
+  registerRef,
+}: MemoryCategorySectionWrapperProps) {
+  // Wrap each card in the grouped section with a click/keyboard handler
+  return (
+    <div>
+      <MemoryCategorySection
+        category={category}
+        memories={memories}
+        onCardClick={onOpenDrawer}
+        onCardRef={registerRef}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ProjectFilterChips (unchanged from previous implementation)
 // ---------------------------------------------------------------------------
 
 interface ProjectFilterChipsProps {
@@ -353,7 +857,6 @@ interface ProjectFilterChipsProps {
 }
 
 function ProjectFilterChips({ projects, activeProject, filter, onFilterChange }: ProjectFilterChipsProps) {
-  // Determine if the current filter deviates from the active project default
   const isTemporary = (() => {
     if (filter.kind === 'active') return false;
     if (filter.kind === 'all') return true;
@@ -383,7 +886,6 @@ function ProjectFilterChips({ projects, activeProject, filter, onFilterChange }:
       aria-label="Filter memories by project"
       className="flex flex-wrap items-center gap-1.5 border-b border-border px-6 py-2.5"
     >
-      {/* Active-project default chip */}
       <button
         type="button"
         aria-pressed={filter.kind === 'active'}

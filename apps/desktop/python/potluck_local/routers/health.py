@@ -23,6 +23,7 @@ async def health() -> dict[str, object]:
         "version": __version__,
         "model_loaded": runtime.is_loaded(),
         "active_model_id": runtime.current_model_id(),
+        "n_ctx_loaded": runtime.loaded_n_ctx(),
     }
 
 

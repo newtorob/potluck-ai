@@ -1,15 +1,19 @@
-"""Memory retrieval service — keyword-based retrieval with confidence/recency scoring.
+"""Memory retrieval service — keyword-based and semantic retrieval.
 
 Retrieves relevant memories for context injection before each model call.
+Also provides semantic search, related-memory lookup, and keyword frequency.
 """
 
 from __future__ import annotations
 
 import logging
+import re
+from collections import Counter
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import aiosqlite
+import numpy as np
 
 if TYPE_CHECKING:
     pass
@@ -93,6 +97,217 @@ def _project_clause(project: str | None) -> tuple[str, list]:
     if project is not None:
         return "(project = ? OR project IS NULL)", [project]
     return "project IS NULL", []
+
+
+from pydantic import BaseModel
+
+
+class KeywordFrequency(BaseModel):
+    keyword: str
+    count: int
+    memory_ids: list[str]  # up to 20 representative memory IDs
+
+
+# ---------------------------------------------------------------------------
+# Module-level semantic / keyword helpers
+# ---------------------------------------------------------------------------
+
+
+async def semantic_search(
+    query: str,
+    project: str | None = None,
+    limit: int = 20,
+    min_confidence: float = 0.0,
+) -> list[tuple[Memory, float]]:
+    """Embed the query and return top-K memories by cosine similarity.
+
+    Returns [] (not raises) if the embedder is unavailable — callers should
+    fall back to keyword search in that case.
+    """
+    from potluck_local.services.embeddings import get_embedder
+    from potluck_local.services.memory_db import (
+        get_memory_db_path,
+        load_all_embeddings,
+    )
+
+    embedder = get_embedder()
+    query_vec = await embedder.embed(query)
+    if query_vec is None:
+        return []
+
+    project = project or None
+    pairs = await load_all_embeddings(project=project)
+    if not pairs:
+        return []
+
+    memory_ids = [p[0] for p in pairs]
+    matrix = np.stack([p[1] for p in pairs], axis=0)  # (n, DIM)
+
+    # All vectors are L2-normalised at insert time, so dot product == cosine sim.
+    scores = matrix @ query_vec  # (n,)
+    top_indices = np.argsort(scores)[::-1][:limit]
+
+    # Fetch memory rows for the top IDs
+    top_ids = [memory_ids[i] for i in top_indices]
+    top_scores = [float(scores[i]) for i in top_indices]
+
+    db_path = get_memory_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        placeholders = ",".join("?" for _ in top_ids)
+        cursor = await db.execute(
+            f"SELECT * FROM memories WHERE id IN ({placeholders}) AND is_active = 1",  # noqa: S608
+            top_ids,
+        )
+        rows = {row["id"]: dict(row) for row in await cursor.fetchall()}
+
+    results: list[tuple[Memory, float]] = []
+    for mid, sim in zip(top_ids, top_scores):
+        row = rows.get(mid)
+        if row is None:
+            continue
+        mem = _row_to_memory(row)
+        if mem.confidence < min_confidence:
+            continue
+        results.append((mem, sim))
+
+    logger.info("semantic_search query_len=%d results=%d project=%s", len(query), len(results), project)
+    return results
+
+
+async def get_related(
+    memory_id: str,
+    limit: int = 8,
+) -> list[tuple[Memory, float]]:
+    """Return the most similar active memories to a given memory (excludes self).
+
+    Uses the target memory's stored embedding.  Returns [] if no embedding exists.
+    """
+    from potluck_local.services.memory_db import (
+        get_embedding,
+        get_memory_db_path,
+        load_all_embeddings,
+    )
+
+    embed_result = await get_embedding(memory_id)
+    if embed_result is None:
+        return []
+
+    target_vec, _ = embed_result
+
+    # Load all embeddings globally (no project filter for related)
+    pairs = await load_all_embeddings(project=None)
+    # Also load project-scoped ones but avoid double-counting — load_all_embeddings
+    # returns project=None scope; for related we want the broadest set, so we
+    # re-fetch without project filtering by reading the table directly.
+    db_path = get_memory_db_path()
+    import aiosqlite as _aiosqlite
+    async with _aiosqlite.connect(db_path) as db:
+        db.row_factory = _aiosqlite.Row
+        cursor = await db.execute(
+            """SELECT e.memory_id, e.embedding
+               FROM memory_embeddings e
+               JOIN memories m ON m.id = e.memory_id
+               WHERE m.is_active = 1 AND e.memory_id != ?""",
+            (memory_id,),
+        )
+        rows = await cursor.fetchall()
+
+    if not rows:
+        return []
+
+    candidate_ids = [row["memory_id"] for row in rows]
+    matrix = np.stack(
+        [np.frombuffer(row["embedding"], dtype=np.float32).reshape(-1) for row in rows],
+        axis=0,
+    )
+
+    scores = matrix @ target_vec
+    top_indices = np.argsort(scores)[::-1][:limit]
+    top_ids = [candidate_ids[i] for i in top_indices]
+    top_scores = [float(scores[i]) for i in top_indices]
+
+    async with _aiosqlite.connect(db_path) as db:
+        db.row_factory = _aiosqlite.Row
+        placeholders = ",".join("?" for _ in top_ids)
+        cursor = await db.execute(
+            f"SELECT * FROM memories WHERE id IN ({placeholders}) AND is_active = 1",  # noqa: S608
+            top_ids,
+        )
+        id_to_row = {row["id"]: dict(row) for row in await cursor.fetchall()}
+
+    results: list[tuple[Memory, float]] = []
+    for mid, sim in zip(top_ids, top_scores):
+        row = id_to_row.get(mid)
+        if row is None:
+            continue
+        results.append((_row_to_memory(row), sim))
+
+    return results
+
+
+async def get_keywords(
+    project: str | None = None,
+    limit: int = 100,
+    min_count: int = 2,
+) -> list[KeywordFrequency]:
+    """Compute term frequency over active memory content.
+
+    Filters stopwords (same list as _extract_keywords) and tokens shorter
+    than 3 characters.  Returns top-K by count descending.
+    """
+    from potluck_local.services.memory_db import get_memory_db_path
+
+    project = project or None
+    db_path = get_memory_db_path()
+
+    if project is not None:
+        proj_clause = "(project = ? OR project IS NULL)"
+        proj_params: list = [project]
+    else:
+        proj_clause = "project IS NULL"
+        proj_params = []
+
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            f"SELECT id, content FROM memories WHERE is_active = 1 AND {proj_clause}",
+            proj_params,
+        )
+        rows = await cursor.fetchall()
+
+    # tokenise: split on non-word chars, lowercase, filter
+    token_memories: dict[str, list[str]] = {}  # token → memory IDs that contain it
+    for row in rows:
+        mid = row["id"]
+        tokens = re.split(r"\W+", row["content"].lower())
+        for tok in tokens:
+            if len(tok) < 3:
+                continue
+            if tok in _STOPWORDS:
+                continue
+            if tok not in token_memories:
+                token_memories[tok] = []
+            # Append the memory ID once per memory (not per occurrence)
+            if not token_memories[tok] or token_memories[tok][-1] != mid:
+                token_memories[tok].append(mid)
+
+    # Build count from number of distinct memories containing each token
+    counts: Counter[str] = Counter({tok: len(mids) for tok, mids in token_memories.items()})
+
+    results: list[KeywordFrequency] = []
+    for keyword, count in counts.most_common(limit):
+        if count < min_count:
+            break
+        results.append(
+            KeywordFrequency(
+                keyword=keyword,
+                count=count,
+                memory_ids=token_memories[keyword][:20],
+            )
+        )
+
+    return results
 
 
 class MemoryRetriever:
@@ -270,6 +485,8 @@ class MemoryRetriever:
 
         if affected:
             logger.info("memory_soft_deleted id=%s", memory_id)
+            from potluck_local.services.memory_clustering import get_cluster_cache
+            await get_cluster_cache().invalidate_all()
         return affected
 
     async def update_memory(
@@ -313,6 +530,9 @@ class MemoryRetriever:
                 (new_content, new_category, new_confidence, new_project, memory_id),
             )
             await db.commit()
+
+        from potluck_local.services.memory_clustering import get_cluster_cache
+        await get_cluster_cache().invalidate_all()
 
         return await self.get_memory(memory_id)
 

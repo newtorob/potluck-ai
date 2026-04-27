@@ -35,8 +35,14 @@ _CORS_ORIGINS: list[str] = [
 
 @contextlib.asynccontextmanager
 async def _lifespan(app: FastAPI):  # noqa: ARG001
+    import asyncio
     from potluck_local.services.memory_db import init_memory_db
+    from potluck_local.services.embedding_backfill import run_embedding_backfill
+
     await init_memory_db()
+    # Fire-and-forget: backfill embeddings for any memories that don't have them.
+    # Runs to completion in the background; never blocks startup or the event loop.
+    asyncio.create_task(run_embedding_backfill())
     yield
 
 

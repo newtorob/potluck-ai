@@ -313,6 +313,108 @@ async def session_tool_calls(
     return [dict(r) for r in rows]
 
 
+async def save_embedding(
+    memory_id: str,
+    vector: "np.ndarray",
+    model_name: str,
+    db_path: Path | None = None,
+) -> None:
+    """Persist a float32 embedding vector for a memory row.
+
+    Uses INSERT OR REPLACE so re-embedding with a new model version overwrites
+    the old row cleanly.
+    """
+    import numpy as np  # local import — numpy is a dep but not needed at module load
+
+    path = db_path or get_memory_db_path()
+    blob = np.array(vector, dtype=np.float32).tobytes()
+    async with aiosqlite.connect(path) as db:
+        await db.execute("PRAGMA foreign_keys=ON")
+        await db.execute(
+            """INSERT OR REPLACE INTO memory_embeddings (memory_id, embedding, model_used)
+               VALUES (?, ?, ?)""",
+            (memory_id, blob, model_name),
+        )
+        await db.commit()
+
+
+async def get_embedding(
+    memory_id: str,
+    db_path: Path | None = None,
+) -> "tuple[np.ndarray, str] | None":
+    """Return (vector, model_name) for a memory, or None if not yet embedded."""
+    import numpy as np
+
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT embedding, model_used FROM memory_embeddings WHERE memory_id = ?",
+            (memory_id,),
+        )
+        row = await cursor.fetchone()
+
+    if row is None:
+        return None
+    vec = np.frombuffer(row["embedding"], dtype=np.float32).reshape(-1)
+    return vec, row["model_used"]
+
+
+async def load_all_embeddings(
+    project: str | None = None,
+    db_path: Path | None = None,
+) -> "list[tuple[str, np.ndarray]]":
+    """Return [(memory_id, vector)] for all active memories that have embeddings.
+
+    project filter: when project is given, loads embeddings for memories where
+    project = X OR project IS NULL (same scoping as retrieval).
+    When project is None, loads embeddings for global memories only (project IS NULL).
+    """
+    import numpy as np
+
+    path = db_path or get_memory_db_path()
+
+    if project is not None:
+        proj_clause = "(m.project = ? OR m.project IS NULL)"
+        proj_params: list = [project]
+    else:
+        proj_clause = "m.project IS NULL"
+        proj_params = []
+
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            f"""SELECT e.memory_id, e.embedding
+                FROM memory_embeddings e
+                JOIN memories m ON m.id = e.memory_id
+                WHERE m.is_active = 1
+                  AND {proj_clause}""",
+            proj_params,
+        )
+        rows = await cursor.fetchall()
+
+    result: list[tuple[str, np.ndarray]] = []
+    for row in rows:
+        vec = np.frombuffer(row["embedding"], dtype=np.float32).reshape(-1)
+        result.append((row["memory_id"], vec))
+    return result
+
+
+async def memories_missing_embeddings(
+    db_path: Path | None = None,
+) -> list[str]:
+    """Return IDs of active memories that have no entry in memory_embeddings."""
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        cursor = await db.execute(
+            """SELECT m.id FROM memories m
+               LEFT JOIN memory_embeddings e ON e.memory_id = m.id
+               WHERE m.is_active = 1 AND e.memory_id IS NULL"""
+        )
+        rows = await cursor.fetchall()
+    return [row[0] for row in rows]
+
+
 async def list_projects(db_path: Path | None = None) -> list[dict]:
     """Return [{project, memory_count, task_count}] for all named projects.
 

@@ -6,6 +6,7 @@ storing them in the SQLite memory DB with Jaccard-based deduplication.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -120,6 +121,29 @@ def _memory_enabled() -> bool:
         return getattr(settings.privacy, "memory_enabled", True)
     except Exception:
         return True
+
+
+def _fire_embed(memory_id: str, content: str) -> None:
+    """Schedule an embedding generation as a fire-and-forget asyncio task.
+
+    Safe to call from any async context.  If the event loop isn't running
+    (shouldn't happen in production) this is a no-op.
+    """
+    async def _embed_and_save() -> None:
+        try:
+            from potluck_local.services.embeddings import get_embedder
+            from potluck_local.services.memory_db import save_embedding
+            from potluck_local.services.memory_clustering import get_cluster_cache
+
+            embedder = get_embedder()
+            vec = await embedder.embed(content)
+            if vec is not None:
+                await save_embedding(memory_id, vec, embedder.MODEL_NAME)
+                await get_cluster_cache().invalidate_all()
+        except Exception as exc:
+            logger.warning("embed_on_insert_failed id=%s reason=%s", memory_id, exc)
+
+    asyncio.create_task(_embed_and_save())
 
 
 class MemoryExtractor:
@@ -241,6 +265,10 @@ class MemoryExtractor:
 
             await db.commit()
 
+        # Fire-and-forget embedding generation for each new memory.
+        for mem in inserted:
+            _fire_embed(mem.id, mem.content)
+
         logger.info(
             "memory_extraction_done conversation_id=%s project=%s inserted=%d skipped_dupes=%d",
             conversation_id,
@@ -300,6 +328,9 @@ class MemoryExtractor:
                 ),
             )
             await db.commit()
+
+        # Fire-and-forget embedding generation.
+        _fire_embed(mem.id, mem.content)
 
         logger.info(
             "memory_explicit_saved id=%s category=%s project=%s",

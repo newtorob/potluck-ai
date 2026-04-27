@@ -87,3 +87,42 @@ export interface MemoryWipeResult {
 export interface MemoryExportResult {
   memories: Memory[];
 }
+
+// ---------------------------------------------------------------------------
+// Semantic search / related memories
+// ---------------------------------------------------------------------------
+
+export interface RelatedMemory {
+  memory: Memory;
+  similarity: number; // 0-1
+}
+
+// ---------------------------------------------------------------------------
+// Keyword frequency — from GET /memory/keywords
+// ---------------------------------------------------------------------------
+
+export interface KeywordFrequency {
+  keyword: string;
+  count: number;
+  memory_ids: string[];
+}
+
+// ---------------------------------------------------------------------------
+// UMAP cluster types — from GET /memory/clusters
+// ---------------------------------------------------------------------------
+
+export interface ClusterPoint {
+  id: string;
+  content_preview: string;
+  category: MemoryCategory;
+  project: string | null;
+  confidence: number; // 0-1
+  x: number;
+  y: number;
+}
+
+export interface ClusterResponse {
+  points: ClusterPoint[];
+  generated_at: string; // ISO-8601 UTC
+  n_memories: number;
+}

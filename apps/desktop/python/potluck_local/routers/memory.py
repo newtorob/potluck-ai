@@ -26,12 +26,20 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 
+from potluck_local.services.memory_clustering import ClusterResponse, compute_clusters
 from potluck_local.services.memory_db import list_projects, reset_memory_db
 from potluck_local.services.memory_extraction import (
+    Memory,
     MemoryCategory,
     get_memory_extractor,
 )
-from potluck_local.services.memory_retrieval import get_memory_retriever
+from potluck_local.services.memory_retrieval import (
+    KeywordFrequency,
+    get_keywords,
+    get_memory_retriever,
+    get_related,
+    semantic_search,
+)
 from potluck_local.services.settings_manager import get_settings
 
 logger = logging.getLogger(__name__)
@@ -85,11 +93,17 @@ class SearchMemoryRequest(BaseModel):
     max_memories: int = 20
     min_confidence: float = 0.5
     project: str | None = None
+    semantic: bool | None = None  # None = auto-detect based on query length
 
     @field_validator("project", mode="before")
     @classmethod
     def _coerce_empty_project(cls, v: object) -> str | None:
         return None if v == "" else v  # type: ignore[return-value]
+
+
+class RelatedMemory(BaseModel):
+    memory: Memory
+    similarity: float
 
 
 class ExtractMemoryRequest(BaseModel):
@@ -209,6 +223,9 @@ async def create_memory(req: CreateMemoryRequest) -> dict[str, Any]:
 async def search_memories(req: SearchMemoryRequest) -> list[dict[str, Any]]:
     """Retrieve memories relevant to a query or message list.
 
+    When semantic=True (or when query has >2 words and semantic is not set),
+    uses cosine-similarity embedding search.  Otherwise uses keyword LIKE matching.
+
     project: when given, returns scoped + global memories.
              when absent, returns globals only.
     """
@@ -225,6 +242,31 @@ async def search_memories(req: SearchMemoryRequest) -> list[dict[str, Any]]:
             detail="Provide at least one of 'query' or 'current_messages'.",
         )
 
+    # Determine whether to use semantic search.
+    use_semantic = req.semantic
+    if use_semantic is None and req.query is not None:
+        use_semantic = len(req.query.split()) > 2
+    else:
+        use_semantic = bool(use_semantic)
+
+    if use_semantic and req.query is not None:
+        pairs = await semantic_search(
+            query=req.query,
+            project=req.project,
+            limit=req.max_memories,
+            min_confidence=req.min_confidence,
+        )
+        if pairs:
+            logger.info(
+                "memory_search mode=semantic result_count=%d project=%s",
+                len(pairs),
+                req.project,
+            )
+            return [m.model_dump() for m, _ in pairs]
+        # Fall through to keyword search if semantic returns nothing
+        # (e.g. embedder unavailable).
+        logger.info("memory_search mode=semantic_fallback_to_keyword project=%s", req.project)
+
     retriever = get_memory_retriever()
     memories = await retriever.get_relevant_memories(
         current_messages=messages,
@@ -232,7 +274,11 @@ async def search_memories(req: SearchMemoryRequest) -> list[dict[str, Any]]:
         min_confidence=req.min_confidence,
         project=req.project,
     )
-    logger.info("memory_search result_count=%d project=%s", len(memories), req.project)
+    logger.info(
+        "memory_search mode=keyword result_count=%d project=%s",
+        len(memories),
+        req.project,
+    )
     return [m.model_dump() for m in memories]
 
 
@@ -304,6 +350,71 @@ async def import_memories(req: ImportRequest) -> dict[str, int]:
 
     logger.info("memory_import imported=%d skipped=%d", imported, skipped)
     return {"imported": imported, "skipped": skipped}
+
+
+@router.get("/keywords")
+async def memory_keywords(
+    limit: int = Query(default=100, ge=1, le=500),
+    project: str | None = Query(default=None),
+    min_count: int = Query(default=2, ge=1),
+) -> list[dict[str, Any]]:
+    """Return keyword frequencies computed over active memory content.
+
+    Filters stopwords and tokens shorter than 3 characters.
+    Returns top-K by count, including up to 20 representative memory IDs per keyword.
+    """
+    if not _memory_active():
+        raise HTTPException(status_code=403, detail=_DISABLED_DETAIL)
+
+    kws = await get_keywords(
+        project=project or None,
+        limit=limit,
+        min_count=min_count,
+    )
+    return [k.model_dump() for k in kws]
+
+
+@router.get("/clusters")
+async def memory_clusters(
+    project: str | None = Query(default=None),
+) -> dict[str, Any]:
+    """Return a 2D UMAP projection of all active memories' embeddings.
+
+    Results are cached; cache invalidates on any memory write/delete/update.
+    If fewer than 8 memories have embeddings, falls back to PCA (numpy only).
+    Returns degraded=true when the embedding model is unavailable.
+    """
+    if not _memory_active():
+        raise HTTPException(status_code=403, detail=_DISABLED_DETAIL)
+
+    resp = await compute_clusters(project=project or None)
+    return resp.model_dump()
+
+
+@router.get("/{memory_id}/related")
+async def related_memories(
+    memory_id: str,
+    limit: int = Query(default=8, ge=1, le=50),
+) -> list[dict[str, Any]]:
+    """Return the most similar active memories to a given memory.
+
+    Uses the stored embedding for cosine top-K.  Excludes the memory itself
+    and soft-deleted rows.  Returns [] with degraded=true payload when the
+    embedder is unavailable.
+    """
+    if not _memory_active():
+        raise HTTPException(status_code=403, detail=_DISABLED_DETAIL)
+
+    # Verify the source memory exists.
+    memory = await get_memory_retriever().get_memory(memory_id)
+    if memory is None:
+        raise HTTPException(status_code=404, detail="Memory not found.")
+
+    pairs = await get_related(memory_id=memory_id, limit=limit)
+    return [
+        RelatedMemory(memory=mem, similarity=sim).model_dump()
+        for mem, sim in pairs
+    ]
 
 
 @router.get("/{memory_id}")

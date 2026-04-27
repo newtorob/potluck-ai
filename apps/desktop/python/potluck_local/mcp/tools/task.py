@@ -27,11 +27,15 @@ def register_task_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         name="task_create",
         description=(
-            "Create a new agent task with an objective and optional constraints "
-            "and pending steps. Returns the created TaskState. "
-            "Pass project=None (default) to create a global task that applies across "
-            "all projects. Pass a project name to scope it to that project. "
-            "project=None means 'global memory, applies across all projects.'"
+            "CALL THIS WHEN you start any multi-step work that might span sessions: "
+            "refactors, debugging investigations, feature builds, anything with more "
+            "than ~3 distinct steps the user might want to resume tomorrow. Creates a "
+            "persistent TaskState the user (and a future session) can pick up from.\n\n"
+            "Provide a clear objective and break the work into pending_steps up front. "
+            "If you discover constraints (must use X, must not break Y), record them in "
+            "constraints. The task survives until you mark it completed/abandoned.\n\n"
+            "Scope: pass a project name (e.g. 'strake') to keep it from cluttering "
+            "other projects. Use project=None only for genuinely cross-project tasks."
         ),
     )
     async def task_create(
@@ -83,12 +87,14 @@ def register_task_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         name="task_list",
         description=(
-            "List all tasks. Optional status filter: "
-            "'active', 'paused', 'completed', or 'abandoned'. "
-            "Pass project=None (default) to see only global tasks. "
-            "Pass a project name to see that project's tasks AND globals combined. "
-            "Pass include_all=True to browse all tasks regardless of project. "
-            "project=None means 'global memory, applies across all projects.'"
+            "CALL THIS AT SESSION START to see what the user already has in flight. "
+            "Filter status='active' to find resumable work. If a task here matches what "
+            "the user is asking about, pick up where it left off rather than starting "
+            "fresh — the steps and constraints already captured are usually right.\n\n"
+            "Also useful when the user asks 'what was I doing' or 'where did we leave "
+            "off'. Cheap; safe to call freely.\n\n"
+            "Scope: project=None for global, project='strake' (etc.) for scoped+global, "
+            "include_all=True for everything."
         ),
     )
     async def task_list(
@@ -145,8 +151,11 @@ def register_task_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         name="task_complete_step",
         description=(
-            "Move a step from the pending_steps list to completed_steps. "
-            "No-op if the step is not in pending (step is still appended to completed)."
+            "CALL THIS EVERY TIME you finish a step in an active task. Keeps the user's "
+            "task state honest so a future session can resume cleanly. Don't batch — "
+            "call as you go.\n\n"
+            "Moves a step from pending_steps to completed_steps. Idempotent if the "
+            "exact step text is no longer in pending (still appended to completed)."
         ),
     )
     async def task_complete_step(task_id: str, step: str) -> dict:

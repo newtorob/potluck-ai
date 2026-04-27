@@ -19,6 +19,9 @@ import type {
   MemoryWipeResult,
   MemoryExportResult,
   ProjectSummary,
+  RelatedMemory,
+  KeywordFrequency,
+  ClusterResponse,
 } from '@/types/memory';
 import type { TaskState, TaskStatus, TaskCreateInput, TaskUpdateInput } from '@/types/tasks';
 import type { AgentSession, SessionDetail, ToolCall } from '@/types/agents';
@@ -66,6 +69,8 @@ export interface HealthResponse {
   status: 'ok';
   model_loaded: boolean;
   active_model_id: string | null;
+  /** Context window actually loaded into the runtime. Null when no model is loaded. */
+  n_ctx_loaded?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -275,12 +280,35 @@ export const localApi = {
       max_memories?: number;
       min_confidence?: number;
       project?: string | null;
+      semantic?: boolean;
     }): Promise<Memory[]> {
       return fetch(`${LOCAL_BASE}/memory/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       }).then((r) => handleResponse<Memory[]>(r));
+    },
+
+    related(id: string, limit = 8): Promise<RelatedMemory[]> {
+      const params = new URLSearchParams({ limit: String(limit) });
+      return fetch(
+        `${LOCAL_BASE}/memory/${encodeURIComponent(id)}/related?${params.toString()}`,
+      ).then((r) => handleResponse<RelatedMemory[]>(r));
+    },
+
+    keywords(opts: {
+      limit?: number;
+      project?: string;
+      min_count?: number;
+    } = {}): Promise<KeywordFrequency[]> {
+      const params = new URLSearchParams();
+      if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+      if (opts.project !== undefined && opts.project !== '') params.set('project', opts.project);
+      if (opts.min_count !== undefined) params.set('min_count', String(opts.min_count));
+      const qs = params.toString();
+      return fetch(`${LOCAL_BASE}/memory/keywords${qs ? `?${qs}` : ''}`).then((r) =>
+        handleResponse<KeywordFrequency[]>(r),
+      );
     },
 
     extract(body: { messages: ChatMessage[]; conversation_id: string }): Promise<Memory[]> {
@@ -311,6 +339,15 @@ export const localApi = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       }).then((r) => handleResponse<MemoryImportResult>(r));
+    },
+
+    clusters(opts: { project?: string } = {}): Promise<ClusterResponse> {
+      const params = new URLSearchParams();
+      if (opts.project !== undefined && opts.project !== '') params.set('project', opts.project);
+      const qs = params.toString();
+      return fetch(`${LOCAL_BASE}/memory/clusters${qs ? `?${qs}` : ''}`).then((r) =>
+        handleResponse<ClusterResponse>(r),
+      );
     },
   },
 

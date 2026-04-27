@@ -24,6 +24,12 @@ import type {
 import { localApi } from '@/lib/localApi';
 
 // ---------------------------------------------------------------------------
+// Search mode type
+// ---------------------------------------------------------------------------
+
+export type SearchMode = 'semantic' | 'exact';
+
+// ---------------------------------------------------------------------------
 // Fallback fetcher — used when localApi.memory isn't wired yet.
 // Agent B will add localApi.memory; once that lands, this is the dead code
 // path. We keep it so the build compiles regardless of merge order.
@@ -127,6 +133,11 @@ export interface MemoryState {
   wipeError: string | null;
   lastFetchedAt: number | null;
 
+  // Search state
+  searchMode: SearchMode;
+  searchResults: Memory[] | null;
+  isSearching: boolean;
+
   // Actions
   fetchMemories: (opts?: {
     category?: MemoryCategory;
@@ -143,6 +154,11 @@ export interface MemoryState {
   exportToFile: () => Promise<void>;
   importFromFile: (file: File) => Promise<MemoryImportResult>;
   searchMemories: (query: string) => Promise<Memory[]>;
+
+  // New search actions
+  setSearchMode: (mode: SearchMode) => void;
+  performSearch: (query: string, opts?: { project?: string | null; min_confidence?: number }) => Promise<void>;
+  clearSearch: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -155,6 +171,11 @@ export const useMemoryStore = create<MemoryState>()((set, get) => ({
   fetchError: null,
   wipeError: null,
   lastFetchedAt: null,
+
+  // Search state
+  searchMode: 'semantic',
+  searchResults: null,
+  isSearching: false,
 
   async fetchMemories(opts = {}) {
     set({ isFetching: true, fetchError: null });
@@ -295,5 +316,33 @@ export const useMemoryStore = create<MemoryState>()((set, get) => ({
   async searchMemories(query) {
     const api = buildApi();
     return api.search({ query, max_memories: 50 });
+  },
+
+  setSearchMode(mode) {
+    set({ searchMode: mode });
+  },
+
+  async performSearch(query, opts = {}) {
+    if (!query.trim()) {
+      set({ searchResults: null, isSearching: false });
+      return;
+    }
+    set({ isSearching: true });
+    try {
+      const results = await localApi.memory.search({
+        query,
+        semantic: get().searchMode === 'semantic',
+        max_memories: 100,
+        project: opts.project,
+        min_confidence: opts.min_confidence,
+      });
+      set({ searchResults: results, isSearching: false });
+    } catch {
+      set({ searchResults: [], isSearching: false });
+    }
+  },
+
+  clearSearch() {
+    set({ searchResults: null, isSearching: false });
   },
 }));

@@ -22,6 +22,7 @@ class LLMRuntime:
         self._model = None
         self._model_path: str | None = None
         self._model_id: str | None = None
+        self._loaded_n_ctx: int | None = None
         self._load_lock = threading.Lock()
         self._inference_lock = asyncio.Lock()
 
@@ -30,6 +31,10 @@ class LLMRuntime:
 
     def current_model_id(self) -> str | None:
         return self._model_id
+
+    def loaded_n_ctx(self) -> int | None:
+        """Return the n_ctx the currently loaded model was initialised with, or None."""
+        return self._loaded_n_ctx
 
     def load_model(
         self,
@@ -60,6 +65,7 @@ class LLMRuntime:
             self._model = model
             self._model_path = model_path
             self._model_id = Path(model_path).parent.name
+            self._loaded_n_ctx = n_ctx
 
             logger.info(
                 "model_loaded model_id=%s n_ctx=%d n_gpu_layers=%d n_threads=%s load_time=%.2fs",
@@ -92,6 +98,7 @@ class LLMRuntime:
             self._model = None
             self._model_path = None
             self._model_id = None
+            self._loaded_n_ctx = None
             logger.info("model_unloaded model_id=%s", model_id)
 
     async def stream_chat(

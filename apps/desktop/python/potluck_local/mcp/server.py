@@ -401,9 +401,21 @@ def _build_mcp(host: str = _LOOPBACK, port: int = _DEFAULT_TCP_PORT) -> FastMCP:
     mcp = FastMCP(
         name="potluck",
         instructions=(
-            "Potluck is a local-first persistent memory and task-state layer. "
-            "Use memory tools to store and retrieve facts, preferences, decisions, "
-            "and context across sessions. Use task tools to track agent workflows."
+            "Potluck is the user's persistent memory and task-state layer. "
+            "It outlives any single session and stores their preferences, project facts, "
+            "decisions, and in-flight work.\n\n"
+            "DEFAULT BEHAVIOR — do this without being asked:\n"
+            "1. At the start of every new session, call `memory_search` with a query "
+            "describing the topic you're about to work on. Always check for relevant "
+            "context before answering project, preference, or 'how should I' questions.\n"
+            "2. At session start, also call `task_list` (status='active') to see what "
+            "the user has in flight. If a relevant task exists, pick up where it left off.\n"
+            "3. When the user states a preference, decision, fact about their project, "
+            "or hardware/tooling choice, call `memory_save` to persist it. Do not ask "
+            "permission for obviously durable facts; do ask before saving anything ambiguous.\n"
+            "4. When you start a multi-step task on the user's behalf, call `task_create`. "
+            "When you finish a step, call `task_complete_step`.\n\n"
+            "Calls cost ~50ms and frequently change the right answer. When in doubt, search."
         ),
         host=host,
         port=port,

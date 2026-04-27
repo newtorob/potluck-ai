@@ -42,11 +42,16 @@ def register_memory_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         name="memory_search",
         description=(
-            "Search persistent memory for facts, preferences, decisions, and context "
-            "relevant to a query string. Returns a ranked list of Memory objects. "
-            "Pass project=None (default) to search global memory that applies across all projects. "
-            "Pass a project name to search that project's memories AND globals combined. "
-            "project=None means 'global memory, applies across all projects.'"
+            "CALL THIS BEFORE answering any question about the user's project, "
+            "preferences, hardware, code conventions, prior decisions, or 'how should I' "
+            "questions. Surfaces ranked memories from previous sessions that the user "
+            "explicitly saved or that were extracted from prior conversations. "
+            "Cost is ~50ms; the result frequently changes the right answer.\n\n"
+            "Always run this at session start with a short topic query like "
+            "\"current project context\" to load whatever the user has saved. "
+            "If you find nothing, that's fine — proceed normally.\n\n"
+            "Scope: pass project=None (default) for global-only. Pass a project name "
+            "(e.g. 'potluck', 'strake') to combine that project's memories with globals."
         ),
     )
     async def memory_search(
@@ -88,11 +93,19 @@ def register_memory_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         name="memory_save",
         description=(
-            "Explicitly save a fact, preference, decision, or other context to "
-            "persistent memory. Use category to classify the memory type. "
-            "Pass project=None (default) to save as global memory that applies across "
-            "all projects. Pass a project name to scope it to that project only. "
-            "project=None means 'global memory, applies across all projects.'"
+            "CALL THIS WHEN the user states a preference, makes a decision, mentions "
+            "a project fact, names a tool/library choice, or provides any context that "
+            "should outlive this session. Persists a memory that future sessions will "
+            "surface via memory_search.\n\n"
+            "Pick category honestly: 'preference' (what they like/dislike), "
+            "'fact' (objective info), 'decision' (a choice with reasoning), "
+            "'project' (project-specific context), 'person' (someone they mention), "
+            "'instruction' (a directive about how to work).\n\n"
+            "Save proactively for clearly durable facts. Ask first for anything "
+            "ambiguous or that might be temporary. Do not save chitchat or one-off "
+            "questions.\n\n"
+            "Scope: pass project=None for global memory (applies everywhere) or a "
+            "project name (e.g. 'potluck') to scope to that project only."
         ),
     )
     async def memory_save(
@@ -131,12 +144,12 @@ def register_memory_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         name="memory_list",
         description=(
-            "Browse stored memories, optionally filtered by category and project. "
-            "Returns up to `limit` memories ordered by confidence descending. "
-            "Pass project=None (default) to see only global memories. "
-            "Pass a project name to see that project's memories AND globals combined. "
-            "Pass include_all=True to browse all memories regardless of project. "
-            "project=None means 'global memory, applies across all projects.'"
+            "Browse all stored memories — use this when the user asks 'what do you "
+            "know about X' or wants a full audit of what's saved. Prefer memory_search "
+            "for finding specific context relevant to a query; memory_list is for "
+            "enumeration.\n\n"
+            "Scope: project=None for global-only, a project name for scoped+global, "
+            "include_all=True for everything regardless of scope (browse mode)."
         ),
     )
     async def memory_list(

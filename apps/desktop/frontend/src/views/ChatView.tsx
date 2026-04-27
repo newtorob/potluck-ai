@@ -8,7 +8,7 @@
  *   Empty state: centered card with model name + 3 example-prompt pills
  */
 
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Thermometer, Hash, Layers } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
@@ -16,8 +16,8 @@ import { MessageList } from '@/components/chat/MessageList';
 import { Composer } from '@/components/chat/Composer';
 import { ModelSelector } from '@/components/chat/ModelSelector';
 import { useChat } from '@/hooks/useChat';
-import { localApi } from '@/lib/localApi';
-import type { PotluckSettings } from '@/lib/localApi';
+import { useSettings } from '@/hooks/useSettings';
+import { useHealth } from '@/hooks/useHealth';
 
 // ---------------------------------------------------------------------------
 // Example prompts for empty state
@@ -42,42 +42,17 @@ export function ChatView() {
     abort,
   } = useChat();
 
-  const [settings, setSettings] = useState<PotluckSettings | null>(null);
-  const [modelLoaded, setModelLoaded] = useState(false);
-
-  // Fetch settings for the info row (temperature, max_tokens, context)
-  useEffect(() => {
-    let cancelled = false;
-    void localApi.getSettings().then((s) => { if (!cancelled) setSettings(s); }).catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
-
-  // Track whether a model is currently loaded
-  useEffect(() => {
-    let cancelled = false;
-    const check = async () => {
-      try {
-        const health = await localApi.health();
-        if (!cancelled) setModelLoaded(health.model_loaded);
-      } catch {
-        if (!cancelled) setModelLoaded(false);
-      }
-    };
-    void check();
-    const interval = setInterval(() => void check(), 30_000);
-    const onFocus = () => void check();
-    window.addEventListener('focus', onFocus);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-      window.removeEventListener('focus', onFocus);
-    };
-  }, []);
+  const { settings, isLoaded: settingsLoaded } = useSettings();
+  const { modelLoaded, nCtxLoaded } = useHealth();
 
   const isEmpty = messages.length === 0;
 
   async function handleSend(content: string) {
     await send(content);
+  }
+
+  function goToHardwareSettings() {
+    navigate('/settings#hardware');
   }
 
   return (
@@ -89,22 +64,53 @@ export function ChatView() {
         <div className="flex items-center gap-3">
           <ModelSelector disabled={isStreaming} />
 
-          {settings && (
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <InfoChip
-                icon={<Thermometer className="h-3 w-3" />}
-                label={`Temp ${settings.runtime.temperature}`}
-              />
-              <InfoChip
-                icon={<Hash className="h-3 w-3" />}
-                label={`Max ${settings.runtime.max_tokens}`}
-              />
-              <InfoChip
-                icon={<Layers className="h-3 w-3" />}
-                label={`Ctx ${settings.runtime.context_size}`}
-              />
-            </div>
-          )}
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            {/* Temp chip */}
+            <InfoChip
+              icon={<Thermometer className="h-3 w-3" />}
+              aria-label="Edit temperature in settings"
+              onClick={goToHardwareSettings}
+            >
+              {!settingsLoaded || !settings ? (
+                <span className="inline-block h-3 w-6 animate-pulse rounded bg-muted" aria-hidden="true" />
+              ) : (
+                `Temp ${settings.runtime.temperature.toFixed(1)}`
+              )}
+            </InfoChip>
+
+            {/* Max tokens chip */}
+            <InfoChip
+              icon={<Hash className="h-3 w-3" />}
+              aria-label="Edit max output tokens in settings"
+              onClick={goToHardwareSettings}
+            >
+              {!settingsLoaded || !settings ? (
+                <span className="inline-block h-3 w-8 animate-pulse rounded bg-muted" aria-hidden="true" />
+              ) : (
+                `Max ${settings.runtime.max_tokens.toLocaleString()}`
+              )}
+            </InfoChip>
+
+            {/* Context size chip */}
+            <InfoChip
+              icon={<Layers className="h-3 w-3" />}
+              aria-label="Edit context size in settings"
+              onClick={goToHardwareSettings}
+            >
+              {!settingsLoaded || !settings ? (
+                <span className="inline-block h-3 w-8 animate-pulse rounded bg-muted" aria-hidden="true" />
+              ) : nCtxLoaded != null ? (
+                `Ctx ${nCtxLoaded.toLocaleString()}`
+              ) : (
+                <span
+                  className="italic opacity-50"
+                  title="Applies when a model is loaded"
+                >
+                  {`Ctx ${settings.runtime.context_size.toLocaleString()}`}
+                </span>
+              )}
+            </InfoChip>
+          </div>
         </div>
       </header>
 
@@ -138,12 +144,30 @@ export function ChatView() {
 // InfoChip
 // ---------------------------------------------------------------------------
 
-function InfoChip({ icon, label }: { icon: ReactNode; label: string }) {
+interface InfoChipProps {
+  icon: ReactNode;
+  children: ReactNode;
+  'aria-label': string;
+  onClick: () => void;
+}
+
+function InfoChip({ icon, children, 'aria-label': ariaLabel, onClick }: InfoChipProps) {
   return (
-    <span className="flex items-center gap-1">
+    <button
+      type="button"
+      role="button"
+      aria-label={ariaLabel}
+      onClick={onClick}
+      className={cn(
+        'flex items-center gap-1',
+        'rounded px-1.5 py-0.5 transition-colors',
+        'cursor-pointer hover:bg-accent hover:text-accent-foreground',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+      )}
+    >
       {icon}
-      {label}
-    </span>
+      {children}
+    </button>
   );
 }
 
