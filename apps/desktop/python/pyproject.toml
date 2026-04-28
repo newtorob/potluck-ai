@@ -12,6 +12,7 @@ license = { text = "AGPL-3.0" }
 
 [project.scripts]
 potluck-mcp = "potluck_local.mcp.server:main"
+potluck-contributor = "potluck_local.contributor.client:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

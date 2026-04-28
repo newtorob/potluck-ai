@@ -10,6 +10,9 @@ psutil==6.1.*
 GPUtil==1.4.*
 pydantic==2.10.*
 pydantic-settings==2.7.*
+platformdirs==4.*
+websockets==13.*
+cryptography==44.*
 aiofiles==24.1.*
 aiosqlite==0.20.*
 numpy==2.1.*
