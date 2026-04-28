@@ -8,5 +8,3 @@ from potluck_api.models.model_registry import ModelRegistryEntry  # noqa: F401
 from potluck_api.models.proposal import Proposal  # noqa: F401
 from potluck_api.models.vote import Vote  # noqa: F401
 from potluck_api.models.audit import AuditLog  # noqa: F401
-from potluck_api.models.peer import Peer  # noqa: F401
-from potluck_api.models.credit import ComputeCredit  # noqa: F401

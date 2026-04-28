@@ -116,5 +116,71 @@ services:
       retries: 10
       start_period: 10s
 
+  # Coordinator one-shot: runs alembic upgrade head against the coordinator's
+  # own version table (alembic_version_coordinator), then exits. The
+  # coordinator service waits for this to finish successfully before starting.
+  coordinator-migrate:
+    build:
+      context: ./services/coordinator
+      dockerfile: Dockerfile
+    container_name: potluck-coordinator-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+      # Run AFTER the api's migrate finishes — it drops the v0 peers +
+      # compute_credits stubs in 0008. Running in parallel races with that
+      # drop and the coordinator's create.
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql+asyncpg://potluck:potluck@postgres:5432/potluck
+      ENV: development
+      SENTRY_DSN: ""
+    volumes:
+      - ./services/coordinator:/app
+    working_dir: /app
+    user: root
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
+  coordinator:
+    build:
+      context: ./services/coordinator
+      dockerfile: Dockerfile
+    container_name: potluck-coordinator
+    depends_on:
+      postgres:
+        condition: service_healthy
+      coordinator-migrate:
+        condition: service_completed_successfully
+    # Bind 0.0.0.0 so other LAN machines can hit the coordinator during
+    # cross-machine peer-handshake testing (Phase G m1).
+    ports:
+      - "0.0.0.0:8400:8400"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://potluck:potluck@postgres:5432/potluck
+      ENV: development
+      SENTRY_DSN: ""
+    volumes:
+      - ./services/coordinator:/app
+    working_dir: /app
+    command:
+      [
+        "uvicorn",
+        "coordinator.app:create_app",
+        "--factory",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8400",
+        "--reload",
+      ]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(\"http://localhost:8400/health\").status==200 else 1)'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
 volumes:
   pgdata:
