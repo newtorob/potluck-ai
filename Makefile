@@ -18,8 +18,8 @@ COMPOSE ?= $(shell \
   elif command -v docker-compose >/dev/null 2>&1; then echo "docker-compose"; \
   fi)
 
-.PHONY: help setup check-python check-docker up down restart logs api-logs pg-logs migrate psql \
-        api-shell test-api dev desktop frontend sidecar sidecar-setup \
+.PHONY: help setup check-python check-docker up down restart logs api-logs pg-logs coord-logs migrate psql \
+        api-shell coord-shell test-api dev desktop frontend sidecar sidecar-setup coordinator coordinator-setup \
         frontend-setup electron-setup ps status clean reset
 
 help: ## Show this help
@@ -77,10 +77,11 @@ check-docker: ## Verify docker + a compose command are available and the daemon 
 	fi
 	@echo "==> Using '$(COMPOSE)'"
 
-up: check-docker ## Start Postgres + API in the background (runs migrations first)
+up: check-docker ## Start Postgres + API + Coordinator in the background (runs migrations first)
 	$(COMPOSE) up -d --build
-	@echo "==> API: http://localhost:8080/health"
-	@echo "==> Postgres: localhost:5432 (potluck/potluck)"
+	@echo "==> API:         http://localhost:8080/health"
+	@echo "==> Coordinator: http://localhost:8400/health (LAN-reachable on this host's IP)"
+	@echo "==> Postgres:    localhost:5432 (potluck/potluck)"
 
 down: check-docker ## Stop the backend stack (preserves data volume)
 	$(COMPOSE) down
@@ -94,6 +95,9 @@ logs: check-docker ## Tail all backend logs
 api-logs: check-docker ## Tail only the API logs
 	$(COMPOSE) logs -f api
 
+coord-logs: check-docker ## Tail only the Coordinator logs
+	$(COMPOSE) logs -f coordinator
+
 pg-logs: check-docker ## Tail only Postgres logs
 	$(COMPOSE) logs -f postgres
 
@@ -105,6 +109,9 @@ psql: check-docker ## Open a psql shell against the dev database
 
 api-shell: check-docker ## Open a bash shell inside the api container
 	$(COMPOSE) exec api bash
+
+coord-shell: check-docker ## Open a bash shell inside the coordinator container
+	$(COMPOSE) exec coordinator bash
 
 test-api: check-docker ## Run pytest inside the api container
 	$(COMPOSE) exec api pytest -q
@@ -123,6 +130,20 @@ frontend: ## Start only the Vite dev server (useful when iterating on UI without
 
 sidecar: ## Start only the Python sidecar (useful when debugging inference)
 	cd apps/desktop/python && ./.venv/bin/python -m potluck_local.app --port 8321
+
+# ---------- coordinator (Phase G control plane, native run) ----------
+
+coordinator-setup: check-python ## Create Python venv for the coordinator and install dev requirements
+	@echo "==> Creating Python coordinator venv (services/coordinator) with $(PYTHON_BIN)"
+	@cd services/coordinator && $(PYTHON_BIN) -m venv .venv
+	@cd services/coordinator && ./.venv/bin/pip install --upgrade pip
+	@cd services/coordinator && ./.venv/bin/pip install -r requirements-dev.txt
+
+coordinator: ## Start the coordinator natively against docker-composed Postgres (binds 0.0.0.0:8400)
+	cd services/coordinator && \
+	  DATABASE_URL=postgresql+asyncpg://potluck:potluck@localhost:5432/potluck \
+	  ENV=development \
+	  ./.venv/bin/uvicorn coordinator.app:create_app --factory --host 0.0.0.0 --port 8400 --reload
 
 # ---------- full-stack dev (backend + desktop in one terminal) ----------
 

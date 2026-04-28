@@ -1,0 +1,16 @@
+# Slim dependencies for running ONLY the contributor sidecar
+# (potluck_local.contributor). Excludes llama-cpp-python, sentence-transformers,
+# and the full local-inference stack — the contributor doesn't need them yet.
+#
+# Use this on the LAN-test machines (Mac2, Linux box, Windows media server)
+# instead of the full requirements.txt:
+#
+#   pip install -r requirements-contributor.txt
+#   pip install -e .
+#   ./.venv/bin/potluck-contributor
+
+pydantic==2.10.*
+pydantic-settings==2.7.*
+platformdirs==4.*
+websockets==13.*
+cryptography==44.*
