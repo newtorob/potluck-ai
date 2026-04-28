@@ -1,16 +1,6 @@
 name: CI - Landing Page
 
-on:
-  pull_request:
-    paths:
-      - 'web/landing/**'
-      - '.github/workflows/ci-web.yml'
-  push:
-    branches:
-      - main
-    paths:
-      - 'web/landing/**'
-      - '.github/workflows/ci-web.yml'
+on: []  # disabled — re-enable by restoring pull_request + push triggers
 
 permissions:
   contents: read

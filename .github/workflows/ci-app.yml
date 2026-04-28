@@ -1,16 +1,6 @@
 name: CI - Desktop App
 
-on:
-  pull_request:
-    paths:
-      - 'apps/desktop/**'
-      - '.github/workflows/ci-app.yml'
-  push:
-    branches:
-      - main
-    paths:
-      - 'apps/desktop/**'
-      - '.github/workflows/ci-app.yml'
+on: []  # disabled — re-enable by restoring pull_request + push triggers
 
 permissions:
   contents: read

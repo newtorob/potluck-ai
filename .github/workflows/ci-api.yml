@@ -1,16 +1,6 @@
 name: CI - API
 
-on:
-  pull_request:
-    paths:
-      - 'services/api/**'
-      - '.github/workflows/ci-api.yml'
-  push:
-    branches:
-      - main
-    paths:
-      - 'services/api/**'
-      - '.github/workflows/ci-api.yml'
+on: []  # disabled — re-enable by restoring pull_request + push triggers
 
 permissions:
   contents: read

@@ -1,15 +1,6 @@
 name: Release - Desktop App
 
-on:
-  push:
-    tags:
-      - 'v*.*.*'
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version tag to rebuild (e.g. v0.1.0)'
-        required: true
-        type: string
+on: []  # disabled — re-enable by restoring push tags + workflow_dispatch triggers
 
 permissions:
   contents: write
