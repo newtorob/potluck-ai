@@ -220,6 +220,15 @@ def main(argv: list[str] | None = None) -> None:
         )
         sys.exit(2)
 
+    if "REPLACE_WITH" in settings.coordinator_url:
+        logger.error(
+            "POTLUCK_COORDINATOR_URL still contains the placeholder. "
+            "Edit your .env (or the env var) with the dev Mac's actual "
+            "LAN/Tailscale IP. Got: %s",
+            settings.coordinator_url,
+        )
+        sys.exit(2)
+
     priv = ensure_keypair(settings.key_dir)
     pub_b64 = public_key_b64(priv.public_key())
     logger.info(
