@@ -64,8 +64,23 @@ class MemorySettings(BaseModel):
             "project",
             "person",
             "instruction",
+            "reference",
         ]
     )
+
+
+class VaultSettings(BaseModel):
+    """Vault ingestion configuration.
+
+    A vault is any folder of markdown notes the user wants ingested into the
+    memory store as 'reference' memories. Per-heading chunks become graph
+    nodes, retrievable by connected agents via the memory_search MCP tool.
+    """
+
+    folder: str | None = None
+    last_scan_at: str | None = None
+    file_count: int = 0
+    chunk_count: int = 0
 
 
 class PotluckSettings(BaseModel):
@@ -76,6 +91,7 @@ class PotluckSettings(BaseModel):
     network: NetworkSettings = NetworkSettings()
     app: AppSettings = AppSettings()
     memory: MemorySettings = MemorySettings()
+    vault: VaultSettings = VaultSettings()
     models_path: str = str(Path.home() / ".potluck" / "models")
     active_model_id: str | None = None
     active_project: str | None = None

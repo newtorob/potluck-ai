@@ -8,14 +8,17 @@
 
 import type { MemoryCategory } from '@/types/memory';
 
-/** Solid hex colors for canvas rendering (graph nodes and UMAP points). */
+/** Solid hex colors for canvas rendering (graph nodes and UMAP points).
+ *  Saturated palette tuned for an Obsidian-style graph on a black canvas —
+ *  high chroma so additive-blend glow halos read as luminous, not muddy. */
 export const CATEGORY_COLORS: Record<MemoryCategory, string> = {
-  preference: '#60a5fa', // blue-400
-  fact: '#34d399', // emerald-400
-  decision: '#a78bfa', // violet-400
-  project: '#fbbf24', // amber-400
-  person: '#f472b6', // pink-400
-  instruction: '#f87171', // red-400
+  preference: '#22d3ee', // cyan-400
+  fact: '#84cc16', // lime-500
+  decision: '#a855f7', // violet-500
+  project: '#f59e0b', // amber-500
+  person: '#ec4899', // pink-500
+  instruction: '#ef4444', // red-500
+  reference: '#14b8a6', // teal-500 — ingested vault / docs / code symbols
 };
 
 const CATEGORY_LABELS: Record<MemoryCategory, string> = {
@@ -25,6 +28,7 @@ const CATEGORY_LABELS: Record<MemoryCategory, string> = {
   project: 'Project',
   person: 'Person',
   instruction: 'Instruction',
+  reference: 'Reference',
 };
 
 const ORDERED_CATEGORIES: MemoryCategory[] = [
@@ -34,6 +38,7 @@ const ORDERED_CATEGORIES: MemoryCategory[] = [
   'project',
   'person',
   'instruction',
+  'reference',
 ];
 
 interface CategoryLegendProps {

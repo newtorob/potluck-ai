@@ -18,18 +18,20 @@ import { HardwarePanel } from '@/components/settings/HardwarePanel';
 import { PrivacyPanel } from '@/components/settings/PrivacyPanel';
 import { AccountPanel } from '@/components/settings/AccountPanel';
 import { AdvancedPanel } from '@/components/settings/AdvancedPanel';
+import { VaultPanel } from '@/components/settings/VaultPanel';
 import { useSettings } from '@/hooks/useSettings';
 
 // ---------------------------------------------------------------------------
 // Tab definitions
 // ---------------------------------------------------------------------------
 
-type TabId = 'account' | 'hardware' | 'privacy' | 'advanced';
+type TabId = 'account' | 'hardware' | 'privacy' | 'vault' | 'advanced';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'account', label: 'Account' },
   { id: 'hardware', label: 'Hardware' },
   { id: 'privacy', label: 'Privacy' },
+  { id: 'vault', label: 'Vault' },
   { id: 'advanced', label: 'Advanced' },
 ];
 
@@ -178,6 +180,27 @@ export function SettingsView() {
               <SettingsSkeleton />
             ) : settings ? (
               <PrivacyPanel
+                settings={settings}
+                isSaving={isSaving}
+                saveError={saveError}
+                onUpdate={update}
+              />
+            ) : (
+              <SidecarError />
+            )}
+          </section>
+
+          {/* Vault */}
+          <section
+            id="tabpanel-vault"
+            role="tabpanel"
+            aria-labelledby="tab-vault"
+            hidden={activeTab !== 'vault'}
+          >
+            {!isLoaded ? (
+              <SettingsSkeleton />
+            ) : settings ? (
+              <VaultPanel
                 settings={settings}
                 isSaving={isSaving}
                 saveError={saveError}

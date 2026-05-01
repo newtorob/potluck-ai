@@ -16,7 +16,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, GitFork, ScatterChart } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { useProject } from '@/hooks/useProject';
-import { MemoryGraph } from '@/components/memory/MemoryGraph';
+import { MemoryGraph, type SourceFilter } from '@/components/memory/MemoryGraph';
 import { MemoryClusters } from '@/components/memory/MemoryClusters';
 import { CategoryLegend } from '@/components/memory/CategoryLegend';
 
@@ -36,6 +36,7 @@ export function MemoryMapView() {
   // Local project selection — defaults to the global active project
   const [localProject, setLocalProject] = useState<string | null>(globalActive);
   const [activeTab, setActiveTab] = useState<ActiveTab>('graph');
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
 
   // Increment to force MemoryClusters to refetch without unmounting
   const [clusterRefreshKey, setClusterRefreshKey] = useState(0);
@@ -115,6 +116,34 @@ export function MemoryMapView() {
           </button>
         </div>
 
+        {/* Source filter — graph view only */}
+        {activeTab === 'graph' && (
+          <div
+            role="radiogroup"
+            aria-label="Source filter"
+            className="flex rounded-lg border border-border bg-muted p-0.5"
+          >
+            {(['all', 'memories', 'vault'] as const).map((src) => (
+              <button
+                key={src}
+                type="button"
+                role="radio"
+                aria-checked={sourceFilter === src}
+                onClick={() => setSourceFilter(src)}
+                className={cn(
+                  'rounded-md px-2.5 py-1 text-xs font-medium transition-colors capitalize',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  sourceFilter === src
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {src}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Spacer */}
         <div className="flex-1" />
 
@@ -164,7 +193,7 @@ export function MemoryMapView() {
       {/* ----------------------------------------------------------------- */}
       <main className="relative min-h-0 flex-1" role="tabpanel">
         {activeTab === 'graph' ? (
-          <MemoryGraph activeProject={localProject} />
+          <MemoryGraph activeProject={localProject} sourceFilter={sourceFilter} />
         ) : (
           <MemoryClusters
             activeProject={localProject}

@@ -11,9 +11,10 @@ export type MemoryCategory =
   | 'decision'
   | 'project'
   | 'person'
-  | 'instruction';
+  | 'instruction'
+  | 'reference';
 
-export type MemorySourceType = 'extracted' | 'explicit' | 'agent_state';
+export type MemorySourceType = 'extracted' | 'explicit' | 'agent_state' | 'vault';
 
 export interface Memory {
   id: string;

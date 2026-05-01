@@ -115,15 +115,42 @@ export interface MemorySettings {
   categories_enabled: MemoryCategory[];
 }
 
+export interface VaultSettings {
+  folder: string | null;
+  last_scan_at: string | null;
+  file_count: number;
+  chunk_count: number;
+}
+
 export interface PotluckSettings {
   runtime: RuntimeSettings;
   privacy: PrivacySettings;
   network: NetworkSettings;
   app: AppSettingsShape;
   memory: MemorySettings;
+  vault: VaultSettings;
   models_path: string;
   active_model_id: string | null;
   active_project: string | null;
+}
+
+export interface VaultStatus {
+  folder: string | null;
+  last_scan_at: string | null;
+  file_count: number;
+  chunk_count: number;
+}
+
+export interface VaultRescanResult {
+  files_scanned: number;
+  files_added: number;
+  files_updated: number;
+  files_removed: number;
+  chunks_inserted: number;
+  chunks_deleted: number;
+  file_count: number;
+  chunk_count: number;
+  last_scan_at: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -440,6 +467,28 @@ export const localApi = {
       const qs = params.toString();
       return fetch(`${LOCAL_BASE}/agents/activity${qs ? `?${qs}` : ''}`).then((r) =>
         handleResponse<ToolCall[]>(r),
+      );
+    },
+  },
+
+  // ---- Vault ---------------------------------------------------------------
+
+  vault: {
+    status(): Promise<VaultStatus> {
+      return fetch(`${LOCAL_BASE}/vault/status`).then((r) =>
+        handleResponse<VaultStatus>(r),
+      );
+    },
+
+    rescan(): Promise<VaultRescanResult> {
+      return fetch(`${LOCAL_BASE}/vault/rescan`, { method: 'POST' }).then((r) =>
+        handleResponse<VaultRescanResult>(r),
+      );
+    },
+
+    disconnect(): Promise<{ reaped_chunks: number }> {
+      return fetch(`${LOCAL_BASE}/vault`, { method: 'DELETE' }).then((r) =>
+        handleResponse<{ reaped_chunks: number }>(r),
       );
     },
   },

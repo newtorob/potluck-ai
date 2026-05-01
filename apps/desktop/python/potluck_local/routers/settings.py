@@ -18,6 +18,7 @@ from potluck_local.services.settings_manager import (
     PrivacySettings,
     PotluckSettings,
     RuntimeSettings,
+    VaultSettings,
     get_settings,
     save_settings,
 )
@@ -32,6 +33,7 @@ _SUB_MODELS: dict[str, type] = {
     "network": NetworkSettings,
     "app": AppSettings,
     "memory": MemorySettings,
+    "vault": VaultSettings,
 }
 
 

@@ -19,7 +19,15 @@ from pydantic import BaseModel, field_validator
 
 logger = logging.getLogger(__name__)
 
-MemoryCategory = Literal["preference", "fact", "decision", "project", "person", "instruction"]
+MemoryCategory = Literal[
+    "preference",
+    "fact",
+    "decision",
+    "project",
+    "person",
+    "instruction",
+    "reference",  # ingested external content (vault notes, docs, code symbols)
+]
 SourceType = Literal["extracted", "explicit", "agent_state"]
 
 _CONFIDENCE_THRESHOLD = 0.7

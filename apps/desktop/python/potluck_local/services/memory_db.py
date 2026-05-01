@@ -71,6 +71,15 @@ CREATE TABLE IF NOT EXISTS memory_access_log (
 )
 """
 
+_CREATE_VAULT_FILES = """
+CREATE TABLE IF NOT EXISTS vault_files (
+    file_path TEXT PRIMARY KEY,
+    content_sha TEXT NOT NULL,
+    chunk_count INTEGER NOT NULL DEFAULT 0,
+    last_ingested_at TEXT NOT NULL
+)
+"""
+
 _INDICES = [
     "CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category)",
     "CREATE INDEX IF NOT EXISTS idx_memories_active ON memories(is_active, confidence DESC)",
@@ -78,6 +87,8 @@ _INDICES = [
     "CREATE INDEX IF NOT EXISTS idx_task_states_status ON task_states(status)",
     "CREATE INDEX IF NOT EXISTS idx_memories_project ON memories(project, is_active)",
     "CREATE INDEX IF NOT EXISTS idx_task_states_project ON task_states(project, status)",
+    "CREATE INDEX IF NOT EXISTS idx_memories_source_type ON memories(source_type, is_active)",
+    "CREATE INDEX IF NOT EXISTS idx_memories_source_ref ON memories(source_ref)",
 ]
 
 
@@ -127,10 +138,14 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         await db.execute(_CREATE_MEMORY_ACCESS_LOG)
         await db.execute(_CREATE_MCP_SESSIONS)
         await db.execute(_CREATE_MCP_TOOL_CALLS)
+        await db.execute(_CREATE_VAULT_FILES)
 
         # Schema migrations first — indexes below may reference added columns.
         await _add_column_if_missing(db, "memories", "project", "TEXT")
         await _add_column_if_missing(db, "task_states", "project", "TEXT")
+        # source_ref carries the originating identifier for ingested content,
+        # e.g. "vault:/path/to/notes.md#heading-anchor" for vault chunks.
+        await _add_column_if_missing(db, "memories", "source_ref", "TEXT")
 
         for stmt in _INDICES:
             await db.execute(stmt)

@@ -49,8 +49,10 @@ const ForceGraph2D = lazy(() => import('react-force-graph-2d').then((mod) => ({ 
 const RELATED_BATCH_LIMIT = 200; // max memories we call /related for
 const SIMILARITY_THRESHOLD = 0.6;
 const RELATED_LIMIT = 12;
-const NODE_RADIUS_MIN = 4;
-const NODE_RADIUS_MAX = 14;
+// Wide spread between leaves and hubs gives the Obsidian starburst look —
+// a leaf is a tiny dot, a hub with 20+ neighbours is large and glowy.
+const NODE_RADIUS_MIN = 2;
+const NODE_RADIUS_MAX = 18;
 
 // ---------------------------------------------------------------------------
 // Graph types
@@ -62,6 +64,7 @@ interface GraphNode {
   category: Memory['category'];
   access_count: number;
   content: string;
+  degree: number;
 }
 
 interface GraphLink {
@@ -80,24 +83,31 @@ interface GraphData {
 // ---------------------------------------------------------------------------
 
 function nodeRadius(node: GraphNode): number {
-  // access_count typically 1-50+; clamp to a reasonable range
-  const normalized = Math.min(node.access_count / 20, 1);
-  return NODE_RADIUS_MIN + (NODE_RADIUS_MAX - NODE_RADIUS_MIN) * Math.sqrt(normalized);
+  // Degree is the primary driver — Obsidian's vault graph is fundamentally
+  // "what links to what." Access_count is a secondary nudge so a heavily-used
+  // memory with few links still reads above pure leaves.
+  const degreeNorm = Math.min(node.degree / 20, 1);
+  const accessNorm = Math.min(node.access_count / 30, 1);
+  const combined = degreeNorm * 0.8 + accessNorm * 0.2;
+  return NODE_RADIUS_MIN + (NODE_RADIUS_MAX - NODE_RADIUS_MIN) * Math.sqrt(combined);
 }
 
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
+export type SourceFilter = 'all' | 'memories' | 'vault';
+
 interface MemoryGraphProps {
   activeProject: string | null;
+  sourceFilter?: SourceFilter;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function MemoryGraph({ activeProject }: MemoryGraphProps) {
+export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraphProps) {
   const navigate = useNavigate();
 
   // Ref for the force-graph instance (gives us zoomToFit, centerAt)
@@ -118,15 +128,10 @@ export function MemoryGraph({ activeProject }: MemoryGraphProps) {
   // Hover tooltip
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
 
-  // Background color matching CSS var --background (dark mode default)
-  // We read the computed value once so the canvas matches the page.
-  const [bgColor, setBgColor] = useState('#16181f');
-  useEffect(() => {
-    const style = getComputedStyle(document.documentElement);
-    const hsl = style.getPropertyValue('--background').trim();
-    // hsl is in form "224 16% 10%" — convert to CSS hsl() string
-    if (hsl) setBgColor(`hsl(${hsl})`);
-  }, []);
+  // Pure black canvas — Obsidian-style. The graph deliberately breaks from the
+  // app's --background HSL so additive-blend halos read as luminous against
+  // true black rather than washing out against the dark-grey app chrome.
+  const bgColor = '#000000';
 
   // ---------------------------------------------------------------------------
   // Resize observer
@@ -160,7 +165,7 @@ export function MemoryGraph({ activeProject }: MemoryGraphProps) {
 
       try {
         setLoadingMessage('Loading memories…');
-        const memories = await localApi.memory.list({
+        const allMemories = await localApi.memory.list({
           include_all: true,
           limit: 1000,
           project: activeProject ?? undefined,
@@ -168,19 +173,29 @@ export function MemoryGraph({ activeProject }: MemoryGraphProps) {
 
         if (cancelled) return;
 
+        // Apply source-type filter at the node-set boundary. Edges to filtered-
+        // out nodes are dropped automatically by the nodeIds.has() check below.
+        const memories = allMemories.filter((m) => {
+          if (sourceFilter === 'all') return true;
+          if (sourceFilter === 'vault') return m.source_type === 'vault';
+          // 'memories' = everything except vault
+          return m.source_type !== 'vault';
+        });
+
         if (memories.length === 0) {
           setGraphData({ nodes: [], links: [] });
           setIsLoading(false);
           return;
         }
 
-        // Build node list
+        // Build node list — degree=0 initially, filled in once edges resolve
         const nodes: GraphNode[] = memories.map((m) => ({
           id: m.id,
           label: m.content.slice(0, 60),
           category: m.category,
           access_count: m.access_count,
           content: m.content,
+          degree: 0,
         }));
 
         // Sort by recency (most recent first) and take the budget for related calls
@@ -238,7 +253,19 @@ export function MemoryGraph({ activeProject }: MemoryGraphProps) {
 
         if (cancelled) return;
 
-        setGraphData({ nodes, links: Array.from(edgeMap.values()) });
+        const links = Array.from(edgeMap.values());
+
+        // Compute degree per node so radius reflects connectivity (Obsidian-style hubs).
+        const degreeMap = new Map<string, number>();
+        for (const l of links) {
+          degreeMap.set(l.source, (degreeMap.get(l.source) ?? 0) + 1);
+          degreeMap.set(l.target, (degreeMap.get(l.target) ?? 0) + 1);
+        }
+        for (const n of nodes) {
+          n.degree = degreeMap.get(n.id) ?? 0;
+        }
+
+        setGraphData({ nodes, links });
       } catch (err: unknown) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Failed to build graph');
@@ -249,7 +276,7 @@ export function MemoryGraph({ activeProject }: MemoryGraphProps) {
 
     void build();
     return () => { cancelled = true; };
-  }, [activeProject]);
+  }, [activeProject, sourceFilter]);
 
   // ---------------------------------------------------------------------------
   // zoomToFit after graph data loads
@@ -257,6 +284,26 @@ export function MemoryGraph({ activeProject }: MemoryGraphProps) {
 
   useEffect(() => {
     if (graphData.nodes.length > 0 && graphRef.current) {
+      // Tune the d3-force simulation toward Obsidian-style starbursts:
+      //   - Charge proportional to node radius — hubs push leaves out, leaves
+      //     barely repel each other, so a hub with N leaves fans them into a
+      //     halo instead of forming a tight ball.
+      //   - Short link distance keeps each starburst compact.
+      //   - Light centering pulls disconnected clusters into one canvas instead
+      //     of letting them drift to the edges.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const charge = graphRef.current?.d3Force('charge');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      charge?.strength((n: GraphNode) => -10 - nodeRadius(n) * 4);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const link = graphRef.current?.d3Force('link');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      link?.distance(28);
+
+      // Reheat the sim so the new params actually take effect.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      graphRef.current?.d3ReheatSimulation?.();
+
       // Give the sim a moment to stabilize before fitting
       const t = setTimeout(() => {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
@@ -291,12 +338,31 @@ export function MemoryGraph({ activeProject }: MemoryGraphProps) {
       const color = CATEGORY_COLORS[g.category] ?? '#888';
       const isHovered = hoveredNode?.id === g.id;
 
+      // Additive blending — overlapping halos brighten rather than occlude,
+      // which is what gives Obsidian's vault graph its luminous feel.
+      const prevComposite = ctx.globalCompositeOperation;
+      ctx.globalCompositeOperation = 'lighter';
+
+      // Halo: a soft outer disc at low alpha. Scales with node radius so
+      // hubs glow more than leaves.
+      const haloRadius = r * (isHovered ? 4 : 3);
+      const grad = ctx.createRadialGradient(x, y, r * 0.5, x, y, haloRadius);
+      grad.addColorStop(0, color);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.beginPath();
-      ctx.arc(x, y, isHovered ? r + 2 : r, 0, Math.PI * 2);
-      ctx.fillStyle = color;
-      ctx.globalAlpha = isHovered ? 1 : 0.8;
+      ctx.arc(x, y, haloRadius, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.globalAlpha = isHovered ? 0.45 : 0.28;
       ctx.fill();
+
+      // Core dot — solid, full saturation.
       ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.arc(x, y, isHovered ? r + 1.5 : r, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+
+      ctx.globalCompositeOperation = prevComposite;
 
       if (isHovered) {
         ctx.strokeStyle = '#fff';
@@ -450,9 +516,9 @@ export function MemoryGraph({ activeProject }: MemoryGraphProps) {
             }}
             linkWidth={(link: Record<string, unknown>) => {
               const l = link as unknown as GraphLink;
-              return Math.max(0.5, l.similarity * 3);
+              return Math.max(0.3, l.similarity * 1.4);
             }}
-            linkColor={() => 'rgba(148,163,184,0.25)'}
+            linkColor={() => 'rgba(180,190,210,0.12)'}
             onNodeHover={handleNodeHover}
             onNodeClick={handleNodeClick}
             enableNodeDrag={true}

@@ -18,8 +18,9 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Brain, Plus, AlertTriangle, Search, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { cn } from '@/components/ui/cn';
+import { localApi } from '@/lib/localApi';
 import { useMemories } from '@/hooks/useMemories';
 import { useSettings } from '@/hooks/useSettings';
 import { useProject } from '@/hooks/useProject';
@@ -130,6 +131,54 @@ export function MemoryView() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   // Refs for keyboard-navigable memory items
   const memoryItemRefs = useRef<Map<string, HTMLElement>>(new Map());
+
+  // ---------------------------------------------------------------------------
+  // ?focus={id} URL param — set by MemoryGraph when a node is clicked.
+  // Opens the related-memories drawer for the target memory and scrolls its
+  // card into view. If the memory isn't in the current filtered list (e.g.
+  // user clicked a graph node from a different project scope), fetch it by id
+  // and open the drawer anyway so the click never feels dead.
+  // ---------------------------------------------------------------------------
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusId = searchParams.get('focus');
+  // Track which focusId we've already handled so re-renders don't re-open the
+  // drawer after the user closes it.
+  const handledFocusRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!focusId || handledFocusRef.current === focusId) return;
+    if (isFetching) return; // wait for the list to load before resolving
+
+    handledFocusRef.current = focusId;
+
+    const found = memories.find((m) => m.id === focusId);
+    if (found) {
+      setDrawerMemory(found);
+      requestAnimationFrame(() => {
+        memoryItemRefs.current.get(focusId)?.scrollIntoView({
+          block: 'center',
+          behavior: 'smooth',
+        });
+      });
+    } else {
+      // Memory exists but lives outside the current project filter — fetch it
+      // directly so the drawer still opens. Failure is silent; the click-from-
+      // graph isn't critical enough to surface an error toast.
+      void localApi.memory.get(focusId).then(setDrawerMemory).catch(() => {
+        /* swallow */
+      });
+    }
+
+    // Strip the param so a manual refresh doesn't re-trigger after dismiss.
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('focus');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [focusId, isFetching, memories, setSearchParams]);
 
   // ---------------------------------------------------------------------------
   // Memory enabled detection
