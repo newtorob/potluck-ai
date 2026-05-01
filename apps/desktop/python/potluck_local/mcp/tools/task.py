@@ -9,8 +9,6 @@ Pass a project name to scope the task to that project. Listing with a project
 set returns both project-scoped AND global tasks.
 """
 
-from __future__ import annotations
-
 import logging
 
 from mcp.server.fastmcp import FastMCP

@@ -5,8 +5,6 @@ which other MCP servers it has configured.  They write through AgentObserver
 and never touch memory content — no privacy gate needed.
 """
 
-from __future__ import annotations
-
 import logging
 
 from mcp.server.fastmcp import FastMCP

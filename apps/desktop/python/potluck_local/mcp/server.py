@@ -24,8 +24,6 @@ Observability:
   errors recorded.  Session closed on graceful shutdown.
 """
 
-from __future__ import annotations
-
 import argparse
 import asyncio
 import contextvars

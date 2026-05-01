@@ -13,8 +13,6 @@ returns both project-scoped AND global memories (project IS NULL), so
 standing preferences and instructions always surface.
 """
 
-from __future__ import annotations
-
 import logging
 
 from mcp.server.fastmcp import FastMCP
