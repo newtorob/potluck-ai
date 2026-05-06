@@ -6,28 +6,35 @@
 .DESCRIPTION
     Run once per Windows machine after `git clone`. Idempotent - safe to re-run.
 
+    Auto-detects whether to use the Mac's LAN IP or its Tailscale IP based on
+    what's reachable from this box. No need to hand-edit the URL per machine.
+
     What it does:
-      1. Checks Tailscale + Python 3.11 + Git are present
-      2. Verifies the coordinator is reachable from this box
+      1. Checks Python 3.11 + Git are present
+      2. Probes both candidate coordinator hosts (LAN first, Tailscale fallback);
+         picks whichever responds and writes that into .env
       3. Runs scripts\install-contributor.py to create the venv + install deps
       4. Writes apps\desktop\python\.env with the dev smoke-test values
       5. Drops Start-PotluckContributor.cmd on the user's Desktop
          (double-click it to launch the sidecar; close the window to stop)
 
 .NOTES
-    Hardcoded for Rob's tailnet. Edit the four values under HARDCODED CONFIG
-    if the Mac's Tailscale IP changes or you rotate the dev seed.
+    Hardcoded for Rob's network. Edit CandidateHosts at the top if the Mac's
+    LAN or Tailscale IP changes, or rotate the dev seed.
 #>
 
 param(
-    [switch]$SkipReachabilityCheck,
     [switch]$NoDesktopShortcut
 )
 
-# ---------- HARDCODED CONFIG (edit if tailnet/keys change) -------------------
+# ---------- HARDCODED CONFIG (edit if IPs / keys change) ---------------------
 
-$CoordinatorUrl  = "ws://100.101.102.103:8400/peers/connect"
-$CoordinatorHttp = "http://100.101.102.103:8400"
+# In probe order - first one to answer /transparency/fleet wins.
+$CandidateHosts = @(
+    "192.168.4.76",     # dev Mac LAN IP
+    "100.101.102.103"      # dev Mac Tailscale IP
+)
+$CoordinatorPort = "8400"
 $BinaryHash      = "59b74f2ea0e8b6f23f3672336f90c97435b1dfa13ef7aabc1994b61c54c7d65a"
 $MemberId        = "00000000-0000-0000-0000-000000000001"
 
@@ -45,20 +52,7 @@ $SidecarDir = Join-Path $RepoRoot "apps\desktop\python"
 $VenvPython = Join-Path $SidecarDir ".venv\Scripts\python.exe"
 $EnvFile    = Join-Path $SidecarDir ".env"
 
-# ---------- 1. Tailscale -----------------------------------------------------
-
-Step "Checking Tailscale"
-$tailscaleCmd = Get-Command tailscale -ErrorAction SilentlyContinue
-if (-not $tailscaleCmd) {
-    Fail "tailscale CLI not on PATH. Install Tailscale (https://tailscale.com/download/windows), sign in to the same account as the Mac, then re-run this script."
-}
-$tsStatus = & tailscale status 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Fail "tailscale status failed. Open the Tailscale app and sign in, then re-run."
-}
-Pass "tailscale is up"
-
-# ---------- 2. Python 3.11 ---------------------------------------------------
+# ---------- 1. Python 3.11 ---------------------------------------------------
 
 Step "Checking Python 3.11"
 $pythonExe = $null
@@ -79,7 +73,7 @@ if (-not $pythonExe) {
 }
 Pass "found Python 3.11 via '$pythonExe'"
 
-# ---------- 3. Git -----------------------------------------------------------
+# ---------- 2. Git -----------------------------------------------------------
 
 Step "Checking git"
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
@@ -87,35 +81,50 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
 }
 Pass "git is present"
 
-# ---------- 4. Coordinator reachability --------------------------------------
+# ---------- 3. Coordinator probe ---------------------------------------------
 
-if (-not $SkipReachabilityCheck) {
-    Step "Verifying coordinator reachability ($CoordinatorHttp)"
+Step "Probing coordinator endpoints"
+$CoordinatorHost = $null
+foreach ($host_ in $CandidateHosts) {
+    $url = "http://${host_}:${CoordinatorPort}/transparency/fleet"
     try {
-        $resp = Invoke-WebRequest -Uri "$CoordinatorHttp/transparency/fleet" -TimeoutSec 5 -UseBasicParsing
-        if ($resp.StatusCode -ne 200) {
-            Fail "coordinator returned HTTP $($resp.StatusCode). Is it running on the Mac?"
+        $resp = Invoke-WebRequest -Uri $url -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
+        if ($resp.StatusCode -eq 200) {
+            $CoordinatorHost = $host_
+            Pass "reachable on $host_"
+            break
+        } else {
+            Warn "$host_ returned HTTP $($resp.StatusCode)"
         }
-        Pass "coordinator is reachable"
     } catch {
-        Write-Host "    diagnostic: $($_.Exception.Message)" -ForegroundColor Yellow
-        Fail @"
-Coordinator unreachable from this box.
-
-Common causes (check in order):
-  1. Tailscale isn't actually up on this box: 'tailscale status'
-  2. Mac end isn't on the same tailnet (different account)
-  3. Coordinator container stopped on the Mac: 'docker ps' on Mac
-  4. Mullvad/other VPN killswitch blackholing tailnet traffic on this box
-
-Re-run with -SkipReachabilityCheck to bypass this check (not recommended).
-"@
+        Warn "no answer on $host_"
     }
-} else {
-    Warn "Skipping reachability check (per -SkipReachabilityCheck)"
 }
 
-# ---------- 5. Install via cross-platform installer --------------------------
+if (-not $CoordinatorHost) {
+    $tailscaleHint = ""
+    if (-not (Get-Command tailscale -ErrorAction SilentlyContinue)) {
+        $tailscaleHint = "`n  - Tailscale isn't installed on this box. If the dev Mac isn't on your LAN,`n    install Tailscale (https://tailscale.com/download/windows) and sign in to`n    the same account as the Mac, then re-run this script."
+    }
+    Fail @"
+Coordinator unreachable on any candidate host.
+
+Tried: $($CandidateHosts -join ', ')
+
+Common causes:
+  - Coordinator container stopped on the dev Mac: check 'docker ps' there.
+  - Dev Mac IPs changed. On the dev Mac:
+      LAN:       'ipconfig getifaddr en0'
+      Tailscale: 'tailscale ip -4'
+    Edit `$CandidateHosts at the top of this script with the new value(s).
+  - Windows Defender Firewall blocking outbound 8400 (rare; usually outbound
+    is open by default).$tailscaleHint
+"@
+}
+
+$CoordinatorUrl = "ws://${CoordinatorHost}:${CoordinatorPort}/peers/connect"
+
+# ---------- 4. Install via cross-platform installer --------------------------
 
 Step "Running scripts\install-contributor.py (creates venv + installs deps)"
 $installer = Join-Path $RepoRoot "scripts\install-contributor.py"
@@ -134,7 +143,7 @@ if (-not (Test-Path $VenvPython)) {
 }
 Pass "venv ready at $VenvPython"
 
-# ---------- 6. Write .env ----------------------------------------------------
+# ---------- 5. Write .env ----------------------------------------------------
 
 Step "Writing $EnvFile"
 $envContent = @"
@@ -145,9 +154,9 @@ POTLUCK_MEMBER_ID=$MemberId
 "@
 # UTF-8 without BOM so pydantic-settings reads it cleanly
 [System.IO.File]::WriteAllText($EnvFile, $envContent, [System.Text.UTF8Encoding]::new($false))
-Pass "wrote .env (3 vars)"
+Pass "wrote .env (host=$CoordinatorHost)"
 
-# ---------- 7. Smoke-launch + verify -----------------------------------------
+# ---------- 6. Smoke-launch + verify -----------------------------------------
 
 Step "Smoke-launching sidecar (15s, then auto-kill)"
 $smokeJob = Start-Job -ScriptBlock {
@@ -173,7 +182,7 @@ if ($smokeOutput -match "session_opened") {
     Warn "If those lines look healthy (e.g. 'connecting' but no error), the handshake just hadn't completed in the timeout - try the launcher and watch live."
 }
 
-# ---------- 8. Desktop double-click launcher ---------------------------------
+# ---------- 7. Desktop double-click launcher ---------------------------------
 
 if (-not $NoDesktopShortcut) {
     Step "Creating Start-PotluckContributor.cmd on Desktop"
@@ -188,7 +197,7 @@ if (-not $NoDesktopShortcut) {
     }
 }
 
-# ---------- 9. Done ----------------------------------------------------------
+# ---------- 8. Done ----------------------------------------------------------
 
 Write-Host ""
 Step "Setup complete"
