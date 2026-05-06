@@ -38,9 +38,43 @@ ENV_FILE="$SIDECAR_DIR/.env"
 # ---------- 1. Tailscale ------------------------------------------------------
 
 step "Checking Tailscale"
-command -v tailscale >/dev/null || fail "tailscale missing — install per https://tailscale.com/download/linux, then 'sudo tailscale up' and sign in to the SAME account as the Mac."
+
+# Need curl + sudo for the install path. We check curl in step 2 too, but for
+# the install branch we need it earlier.
+if ! command -v tailscale >/dev/null; then
+    if ! command -v curl >/dev/null; then
+        fail "tailscale missing AND curl missing. Install curl first ('apt install curl'), then re-run."
+    fi
+    if ! command -v sudo >/dev/null; then
+        fail "tailscale missing and 'sudo' not available. Install Tailscale manually per https://tailscale.com/download/linux."
+    fi
+    warn "tailscale not installed — running the official install script (requires sudo)"
+    if ! curl -fsSL https://tailscale.com/install.sh | sudo sh; then
+        fail "tailscale install failed. Try the manual steps at https://tailscale.com/download/linux."
+    fi
+    if ! command -v tailscale >/dev/null; then
+        fail "tailscale install reported success but the CLI still isn't on PATH. Open a new shell and re-run."
+    fi
+    pass "tailscale CLI installed"
+fi
+
+# CLI is present; now check it's actually up + signed in.
 if ! tailscale status >/dev/null 2>&1; then
-    fail "tailscale status failed — run 'sudo tailscale up' and sign in."
+    warn "tailscale is installed but not connected — running 'sudo tailscale up'"
+    cat <<EOF
+    A browser-auth URL will print below. Copy it, paste it into a browser
+    on any device, and sign in to the SAME Tailscale account that your
+    dev Mac uses (Google / Microsoft / GitHub / etc. — must match the
+    provider, not just the email). When auth completes, this script
+    continues automatically.
+
+EOF
+    if ! sudo tailscale up; then
+        fail "'sudo tailscale up' failed. Check the output above and re-run."
+    fi
+    if ! tailscale status >/dev/null 2>&1; then
+        fail "tailscale still not up after 'tailscale up'. Run 'sudo tailscale up' manually and re-run this script."
+    fi
 fi
 pass "tailscale is up"
 
