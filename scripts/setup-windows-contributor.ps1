@@ -88,7 +88,10 @@ $CoordinatorHost = $null
 foreach ($host_ in $CandidateHosts) {
     $url = "http://${host_}:${CoordinatorPort}/transparency/fleet"
     try {
-        $resp = Invoke-WebRequest -Uri $url -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
+        # 10s timeout: PS 5.1's first Invoke-WebRequest in a fresh process can
+        # spend 5+ seconds on .NET init + system-proxy auto-detection before
+        # the actual network call begins. 3s isn't enough; 10s leaves headroom.
+        $resp = Invoke-WebRequest -Uri $url -TimeoutSec 10 -UseBasicParsing -ErrorAction Stop
         if ($resp.StatusCode -eq 200) {
             $CoordinatorHost = $host_
             Pass "reachable on $host_"
@@ -97,7 +100,8 @@ foreach ($host_ in $CandidateHosts) {
             Warn "$host_ returned HTTP $($resp.StatusCode)"
         }
     } catch {
-        Warn "no answer on $host_"
+        # Surface the exception message so future failures aren't opaque.
+        Warn "no answer on ${host_}: $($_.Exception.Message)"
     }
 }
 
