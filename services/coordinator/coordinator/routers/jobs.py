@@ -30,7 +30,7 @@ from coordinator.schemas.peer import (
 )
 from coordinator.services.peer_registry import (
     complete_job,
-    pick_peer,
+    pick_peer_for_model,
     register_job,
 )
 
@@ -83,13 +83,22 @@ async def dispatch_job(
     JOB_TIMEOUT_S elapses). Good enough for the m3 stub smoke test.
     Streaming endpoints come in a follow-up.
     """
-    # ---- 1. Pick a peer ---- #
-    peer_conn = await pick_peer()
+    # ---- 1. Pick a peer that actually serves this model ---- #
+    peer_conn = await pick_peer_for_model(db, req.model_slug)
     if peer_conn is None:
-        raise HTTPException(
-            status_code=503,
-            detail="No contributor peers connected. Bring at least one online and retry.",
-        )
+        # Distinguish "nobody online" from "nobody online serves this model"
+        # so the caller knows whether to wait or pick a different slug.
+        from coordinator.services.peer_registry import online_peer_count
+        online = await online_peer_count()
+        if online == 0:
+            detail = "No contributor peers connected. Bring at least one online and retry."
+        else:
+            detail = (
+                f"No online peer serves model '{req.model_slug}'. "
+                f"{online} peer(s) online but none advertise that capability. "
+                f"Either pick a different model_slug or wait for an eligible peer to connect."
+            )
+        raise HTTPException(status_code=503, detail=detail)
 
     # ---- 2. Create the Job DB row ---- #
     job = Job(

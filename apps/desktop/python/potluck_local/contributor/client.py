@@ -36,6 +36,7 @@ from potluck_local.contributor.keys import ensure_keypair, public_key_b64
 from potluck_local.contributor.schemas import (
     AcceptMessage,
     AttestationPayload,
+    CapabilityEntry,
     ChallengeMessage,
     HeartbeatMessage,
     JobAssignedMessage,
@@ -89,6 +90,71 @@ def detect_hardware_summary() -> dict[str, object]:
     return summary
 
 
+def _quantization_from_slug(slug: str) -> str:
+    """Best-effort quantization extraction from a model slug.
+
+    Recognises common patterns:
+      - "qwen2.5:3b-instruct-q4_K_M" -> "q4_K_M"
+      - "qwen-2.5-3b-instruct-q4"    -> "q4"
+      - "llama-3.1-8b-instruct-q5_k_m" -> "q5_k_m"
+    Returns "unknown" if no quant tag is recognisable.
+    """
+    import re
+    m = re.search(r"\b(q\d+(?:_[a-zA-Z0-9]+)*|f16|f32|bf16)\b", slug, re.IGNORECASE)
+    return m.group(1) if m else "unknown"
+
+
+async def _build_capabilities(settings: Settings) -> list[CapabilityEntry]:
+    """Enumerate the models this peer is willing to serve, for the
+    coordinator's peer_capabilities table.
+
+    Per backend:
+      - inference_enabled=False: empty list (peer is stub-echo only).
+      - llama-cpp: a single entry derived from settings.model_slug.
+      - Ollama: query /api/tags and emit one entry per installed model.
+        That way a peer that has both qwen2.5:3b AND llama3.1:8b pulled
+        can serve jobs targeting either, with no manual config needed.
+    """
+    if not settings.inference_enabled:
+        return []
+
+    if settings.inference_backend == "ollama":
+        # Hit /api/tags to discover what models Ollama actually has.
+        # If Ollama is down at handshake time, we surface an empty list
+        # rather than failing the handshake - the peer can still join
+        # the network as stub-echo; capabilities refresh on reconnect.
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                r = await client.get(f"{settings.ollama_url.rstrip('/')}/api/tags")
+                r.raise_for_status()
+                models = r.json().get("models", [])
+            entries: list[CapabilityEntry] = []
+            for m in models:
+                name = m.get("name", "")
+                if not name:
+                    continue
+                entries.append(CapabilityEntry(
+                    model_slug=name,
+                    quantization=_quantization_from_slug(name),
+                ))
+            return entries
+        except Exception as exc:
+            logger.warning(
+                "ollama_capabilities_probe_failed reason=%s; advertising no capabilities",
+                exc,
+            )
+            return []
+
+    # llama-cpp backend (default)
+    if settings.model_slug:
+        return [CapabilityEntry(
+            model_slug=settings.model_slug,
+            quantization=_quantization_from_slug(settings.model_slug),
+        )]
+    return []
+
+
 async def _do_handshake(
     ws: websockets.WebSocketClientProtocol,
     settings: Settings,
@@ -103,6 +169,7 @@ async def _do_handshake(
 
     # 2) sign + send attest
     sig = priv.sign(nonce_bytes)
+    capabilities = await _build_capabilities(settings)
     attest = AttestationPayload(
         member_id=settings.member_id,
         peer_public_key=public_key_b64(priv.public_key()),
@@ -112,7 +179,14 @@ async def _do_handshake(
         hostname=socket.gethostname(),
         hardware_summary=detect_hardware_summary(),
         nonce_signature=base64.urlsafe_b64encode(sig).rstrip(b"=").decode("ascii"),
+        capabilities=capabilities,
     )
+    if capabilities:
+        logger.info(
+            "advertising_capabilities backend=%s slugs=%s",
+            settings.inference_backend,
+            [c.model_slug for c in capabilities],
+        )
     await ws.send(attest.model_dump_json())
 
     # 3) receive accept or reject

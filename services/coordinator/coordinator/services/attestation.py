@@ -13,11 +13,11 @@ from typing import Any
 import structlog
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from coordinator.models import ContributorRelease, Peer, PeerHeartbeat
+from coordinator.models import ContributorRelease, Peer, PeerCapability, PeerHeartbeat
 from coordinator.schemas.peer import AttestationPayload
 
 logger = structlog.get_logger(__name__)
@@ -146,5 +146,24 @@ async def verify_attestation(
         )
     )
     await db.execute(hb_stmt)
+
+    # Refresh peer_capabilities. Capabilities can change between sessions
+    # (peer pulled a new model, swapped models, dropped to stub-only) so
+    # we delete-and-replace rather than merge.
+    await db.execute(
+        delete(PeerCapability).where(PeerCapability.peer_id == peer.id)
+    )
+    for cap in payload.capabilities:
+        db.add(PeerCapability(
+            peer_id=peer.id,
+            model_slug=cap.model_slug,
+            quantization=cap.quantization,
+        ))
+    if payload.capabilities:
+        logger.info(
+            "peer_capabilities_registered",
+            peer_id=str(peer.id),
+            model_slugs=[c.model_slug for c in payload.capabilities],
+        )
 
     return peer

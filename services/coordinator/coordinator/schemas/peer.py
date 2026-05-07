@@ -40,6 +40,16 @@ class RejectMessage(BaseModel):
 # ---- Peer → Server ---------------------------------------------------- #
 
 
+class CapabilityEntry(BaseModel):
+    """One model the peer is willing to serve. Coordinator uses these to
+    route jobs only to peers that actually have the requested model
+    loaded (or pullable from local storage). Empty list = peer accepts
+    no inference jobs (stub-echo only)."""
+
+    model_slug: str  # canonical name, e.g. "qwen2.5:3b-instruct-q4_K_M"
+    quantization: str = "unknown"  # e.g. "q4_K_M", "q5_K_M", "f16"
+
+
 class AttestationPayload(BaseModel):
     """The peer's response to the server's challenge.
 
@@ -52,6 +62,11 @@ class AttestationPayload(BaseModel):
       - `binary_hash` — SHA256 of the contributor release artifact the peer
         is running. Coordinator looks this up in `contributor_releases` and
         rejects unknown hashes.
+    Capability advertisement (m3 step #18):
+      - `capabilities` — list of (model_slug, quantization) the peer can
+        serve. Coordinator uses this to populate peer_capabilities and
+        route jobs by model. Default empty for backwards compat with
+        stub-echo peers that don't run inference.
     """
 
     type: Literal["attest"] = "attest"
@@ -63,6 +78,7 @@ class AttestationPayload(BaseModel):
     hostname: str | None = None
     hardware_summary: dict[str, Any] = Field(default_factory=dict)
     nonce_signature: str  # base64url, no padding
+    capabilities: list[CapabilityEntry] = Field(default_factory=list)
 
 
 class HeartbeatMessage(BaseModel):

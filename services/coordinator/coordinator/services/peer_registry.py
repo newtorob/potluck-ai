@@ -72,20 +72,65 @@ async def unregister_peer(peer_id: uuid.UUID) -> None:
 
 
 async def pick_peer() -> PeerConnection | None:
-    """Pick any connected peer for stub-mode dispatch. Capability-aware
-    selection lands in step 6 of the m3 plan.
+    """Pick any connected peer regardless of capability. Used by stub-only
+    code paths and for the legacy fallback when no model_slug is given.
 
-    For now we pick the MOST RECENTLY connected peer. Rationale: during
-    rolling contributor upgrades, newly-connected peers are running the
-    newest code and are most likely to handle new message types correctly.
-    Older long-lived connections might be running stale code that
-    silently drops job_assigned. This is a stop-gap until capability
-    registration ships and we can filter by supported message versions.
+    For real inference dispatch use `pick_peer_for_model(slug)` instead -
+    it filters by what the peer actually advertises in peer_capabilities,
+    which is what you want once contributors run different models.
+
+    Most-recently-connected wins (helps during rolling upgrades; new code
+    is more likely to handle new message types).
     """
     async with _lock:
         if not _peers:
             return None
         return next(reversed(_peers.values()))
+
+
+async def pick_peer_for_model(
+    db,  # AsyncSession; typed loosely to avoid sqlalchemy at module load
+    model_slug: str,
+) -> PeerConnection | None:
+    """Pick a connected peer that advertises the requested model_slug.
+
+    Joins the in-memory peer registry (only currently-connected WS
+    sessions) against peer_capabilities (which the coordinator populated
+    at attestation time). Most-recently-connected eligible peer wins -
+    same rolling-upgrade rationale as pick_peer().
+
+    Returns None if no online peer serves this model.
+    """
+    from sqlalchemy import select
+    from coordinator.models import PeerCapability
+
+    async with _lock:
+        if not _peers:
+            return None
+        online_ids = list(_peers.keys())
+
+    # Read peer_capabilities outside the asyncio lock - DB I/O can take
+    # tens of ms and we don't want to serialize on it.
+    rows = (await db.execute(
+        select(PeerCapability.peer_id).where(
+            PeerCapability.model_slug == model_slug,
+            PeerCapability.peer_id.in_(online_ids),
+        )
+    )).all()
+    eligible_ids = {row[0] for row in rows}
+
+    if not eligible_ids:
+        return None
+
+    # Re-acquire the lock to read the connection map (might have changed,
+    # but the peer_id->PeerConnection mapping is stable for the lifetime
+    # of any given session).
+    async with _lock:
+        # Walk in reverse (most-recent-first) and return the first eligible.
+        for peer_id in reversed(_peers.keys()):
+            if peer_id in eligible_ids:
+                return _peers[peer_id]
+    return None
 
 
 async def online_peer_count() -> int:

@@ -37,6 +37,13 @@ class RejectMessage(BaseModel):
 # ---- Peer → Server ---------------------------------------------------- #
 
 
+class CapabilityEntry(BaseModel):
+    """One model this peer can serve. Mirrors coordinator/schemas/peer.py."""
+
+    model_slug: str
+    quantization: str = "unknown"
+
+
 class AttestationPayload(BaseModel):
     type: Literal["attest"] = "attest"
     member_id: uuid.UUID
@@ -47,6 +54,10 @@ class AttestationPayload(BaseModel):
     hostname: str | None = None
     hardware_summary: dict[str, Any] = Field(default_factory=dict)
     nonce_signature: str
+    # Capabilities (m3 step #18). Empty list = stub-echo peer that doesn't
+    # serve real inference; non-empty = list of models the coordinator can
+    # route here.
+    capabilities: list[CapabilityEntry] = Field(default_factory=list)
 
 
 class HeartbeatMessage(BaseModel):
