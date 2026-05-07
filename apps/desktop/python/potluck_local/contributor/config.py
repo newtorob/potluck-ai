@@ -50,6 +50,19 @@ class Settings(BaseSettings):
     # Where to load + persist the per-peer Ed25519 key.
     key_dir: Path = _default_key_dir()
 
+    # ---- Inference (m3) ---- #
+    #
+    # Set inference_enabled=True + model_slug + model_path on peers that
+    # actually have a GPU + GGUF and should serve real jobs. When False
+    # (the default), the peer accepts JobAssignedMessages but responds
+    # with a stub-echo handler. Useful for protocol smoke testing without
+    # needing a model on every machine.
+    inference_enabled: bool = False
+    model_slug: str | None = None  # e.g. "qwen-2.5-3b-instruct-q4"
+    model_path: Path | None = None  # absolute path to the GGUF file
+    n_gpu_layers: int = -1  # -1 = offload all (Metal/CUDA); 0 = CPU only
+    n_ctx: int = 4096
+
 
 @functools.lru_cache(maxsize=1)
 def get_settings() -> Settings:

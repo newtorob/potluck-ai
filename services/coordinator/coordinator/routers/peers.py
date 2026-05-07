@@ -22,9 +22,18 @@ from coordinator.schemas.peer import (
     AttestationPayload,
     ChallengeMessage,
     HeartbeatMessage,
+    JobCompleteMessage,
+    JobErrorMessage,
+    JobTokenMessage,
     RejectMessage,
 )
 from coordinator.services.attestation import AttestationError, verify_attestation
+from coordinator.services.peer_registry import (
+    PeerConnection,
+    get_job,
+    register_peer,
+    unregister_peer,
+)
 from coordinator.services.peer_state import apply_heartbeat
 
 logger = structlog.get_logger(__name__)
@@ -144,9 +153,17 @@ async def peer_connect(
         client_version=payload.client_version,
     )
 
+    # Register the connection so the job dispatch endpoint can find it.
+    await register_peer(
+        PeerConnection(
+            peer_id=peer.id,
+            session_id=session_id,
+            ws=ws,
+            member_id=peer.member_id,
+        )
+    )
+
     # ---- post-handshake message loop ----
-    # Currently only heartbeat is dispatched; future m3+ adds job lifecycle
-    # messages.
     binary_hash = payload.binary_hash
     client_version = payload.client_version
 
@@ -191,6 +208,63 @@ async def peer_connect(
                     session_id=str(session_id),
                     current_jobs=hb.current_jobs,
                 )
+            elif msg_type == "job_token":
+                try:
+                    tok = JobTokenMessage.model_validate(msg)
+                except ValidationError:
+                    logger.warning("peer_job_token_invalid", peer_id=str(peer.id))
+                    continue
+                buf = await get_job(tok.job_id)
+                if buf is None:
+                    # Token for a job we don't know about (cancelled? leak?).
+                    logger.debug(
+                        "peer_job_token_orphan",
+                        peer_id=str(peer.id),
+                        job_id=str(tok.job_id),
+                    )
+                    continue
+                buf.tokens.append(tok.token_text)
+            elif msg_type == "job_complete":
+                try:
+                    cmp = JobCompleteMessage.model_validate(msg)
+                except ValidationError:
+                    logger.warning("peer_job_complete_invalid", peer_id=str(peer.id))
+                    continue
+                buf = await get_job(cmp.job_id)
+                if buf is None:
+                    continue
+                buf.output_tokens = cmp.output_tokens
+                buf.duration_ms = cmp.duration_ms
+                buf.finish_reason = cmp.finish_reason
+                # Import here to avoid circular import at module load time.
+                from coordinator.services.peer_registry import complete_job
+                await complete_job(cmp.job_id)
+                logger.info(
+                    "peer_job_complete",
+                    peer_id=str(peer.id),
+                    job_id=str(cmp.job_id),
+                    output_tokens=cmp.output_tokens,
+                    duration_ms=cmp.duration_ms,
+                )
+            elif msg_type == "job_error":
+                try:
+                    err = JobErrorMessage.model_validate(msg)
+                except ValidationError:
+                    logger.warning("peer_job_error_invalid", peer_id=str(peer.id))
+                    continue
+                buf = await get_job(err.job_id)
+                if buf is None:
+                    continue
+                buf.error_category = err.error_category
+                buf.error_message = err.error_message
+                from coordinator.services.peer_registry import complete_job
+                await complete_job(err.job_id)
+                logger.info(
+                    "peer_job_error",
+                    peer_id=str(peer.id),
+                    job_id=str(err.job_id),
+                    error_category=err.error_category,
+                )
             else:
                 logger.debug(
                     "peer_message_unhandled",
@@ -204,3 +278,5 @@ async def peer_connect(
             peer_id=str(peer.id),
             session_id=str(session_id),
         )
+    finally:
+        await unregister_peer(peer.id)

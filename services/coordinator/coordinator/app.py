@@ -9,7 +9,7 @@ from fastapi import FastAPI
 
 from coordinator.config import get_settings
 from coordinator.db.database import close_db, init_db
-from coordinator.routers import health, peers, transparency
+from coordinator.routers import health, jobs, peers, transparency
 
 logger = structlog.get_logger(__name__)
 
@@ -54,5 +54,6 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(peers.router)
     app.include_router(transparency.router)
+    app.include_router(jobs.router, prefix="/jobs")
 
     return app
