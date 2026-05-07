@@ -229,7 +229,29 @@ except Exception as e:
 
 function Install-Ollama {
     Step "Checking Ollama install"
+
+    # PATH only refreshes for new shells, so Get-Command may miss an
+    # Ollama installed in this same session. Probe the standard install
+    # locations too, and prepend to PATH if found - lets a re-run in the
+    # SAME shell skip the winget step instead of trying to re-install.
     $ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
+    if (-not $ollamaCmd) {
+        $candidatePaths = @(
+            "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe",
+            "$env:ProgramFiles\Ollama\ollama.exe"
+        )
+        foreach ($p in $candidatePaths) {
+            if (Test-Path $p) {
+                $env:PATH = (Split-Path -Parent $p) + ";$env:PATH"
+                $ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
+                if ($ollamaCmd) {
+                    Pass "found Ollama at $p (added to PATH for this session)"
+                    break
+                }
+            }
+        }
+    }
+
     if (-not $ollamaCmd) {
         Step "Installing Ollama (winget install Ollama.Ollama)"
         $wingetCmd = Get-Command winget -ErrorAction SilentlyContinue
