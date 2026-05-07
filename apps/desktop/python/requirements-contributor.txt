@@ -14,3 +14,7 @@ pydantic-settings==2.7.*
 platformdirs==4.*
 websockets==13.*
 cryptography==44.*
+# httpx for the Ollama inference backend (m3+). Small async HTTP client.
+# Always-present so the Ollama backend works without a separate install
+# step; llama-cpp-python is still optional/installed on demand.
+httpx==0.27.*

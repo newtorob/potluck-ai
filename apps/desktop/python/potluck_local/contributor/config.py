@@ -52,15 +52,34 @@ class Settings(BaseSettings):
 
     # ---- Inference (m3) ---- #
     #
-    # Set inference_enabled=True + model_slug + model_path on peers that
-    # actually have a GPU + GGUF and should serve real jobs. When False
-    # (the default), the peer accepts JobAssignedMessages but responds
-    # with a stub-echo handler. Useful for protocol smoke testing without
-    # needing a model on every machine.
+    # Set inference_enabled=True on peers that should serve real jobs.
+    # When False (the default), the peer accepts JobAssignedMessages but
+    # responds with a stub-echo handler. Useful for protocol smoke
+    # testing without needing a model on every machine.
+    #
+    # Two backends:
+    #   - "llama-cpp" (default): in-process via llama-cpp-python. Best for
+    #     NVIDIA (CUDA wheels) and Apple Silicon (Metal). Requires
+    #     model_path pointing at a GGUF file.
+    #   - "ollama": HTTP roundtrip to a local Ollama daemon. Best for AMD
+    #     and Intel GPUs on Windows where llama-cpp-python's prebuilt
+    #     wheels don't cover GPU acceleration. model_slug must be the
+    #     Ollama-native model name (e.g. "qwen2.5:3b-instruct-q4_K_M").
     inference_enabled: bool = False
-    model_slug: str | None = None  # e.g. "qwen-2.5-3b-instruct-q4"
-    model_path: Path | None = None  # absolute path to the GGUF file
+    inference_backend: str = "llama-cpp"  # "llama-cpp" or "ollama"
+    model_slug: str | None = None  # what the coordinator routes by
+
+    # llama-cpp-only: path to the GGUF file + GPU layer config.
+    model_path: Path | None = None
     n_gpu_layers: int = -1  # -1 = offload all (Metal/CUDA); 0 = CPU only
+
+    # Ollama-only: where the local daemon listens. MUST be loopback —
+    # _validate_loopback in inference.py refuses any other host as a
+    # privacy-invariant guard.
+    ollama_url: str = "http://127.0.0.1:11434"
+
+    # Shared: context window. llama-cpp passes to Llama(n_ctx=...);
+    # Ollama passes via options.num_ctx.
     n_ctx: int = 4096
 
 

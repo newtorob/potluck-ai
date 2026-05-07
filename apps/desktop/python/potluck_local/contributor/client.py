@@ -187,22 +187,36 @@ async def _handle_real_job(
         )
         return
 
-    if settings.model_path is None:
-        err = JobErrorMessage(
-            job_id=job.job_id,
-            error_category="model_not_loaded",
-            error_message="model_path not configured on this peer",
-        )
-        await ws.send(err.model_dump_json())
-        return
-
     # Lazy import so peers without inference enabled don't pay the
     # import cost at startup (and so a missing llama_cpp install doesn't
     # break the stub-echo path on smaller machines).
-    from potluck_local.contributor.inference import get_engine
+    from potluck_local.contributor.inference import (
+        get_llamacpp_engine,
+        get_ollama_engine,
+    )
 
     try:
-        engine = get_engine(model_path=settings.model_path, model_slug=settings.model_slug)
+        if settings.inference_backend == "ollama":
+            engine = get_ollama_engine(
+                base_url=settings.ollama_url,
+                model_slug=settings.model_slug,
+                n_ctx=settings.n_ctx,
+            )
+        else:
+            if settings.model_path is None:
+                err = JobErrorMessage(
+                    job_id=job.job_id,
+                    error_category="model_not_loaded",
+                    error_message="model_path not configured for llama-cpp backend",
+                )
+                await ws.send(err.model_dump_json())
+                return
+            engine = get_llamacpp_engine(
+                model_path=settings.model_path,
+                model_slug=settings.model_slug,
+                n_ctx=settings.n_ctx,
+                n_gpu_layers=settings.n_gpu_layers,
+            )
     except Exception as exc:
         logger.exception("real_job_engine_init_failed job_id=%s", job.job_id)
         err = JobErrorMessage(

@@ -1,28 +1,38 @@
-"""Real-inference job handler for the contributor sidecar (Phase G m3).
+"""Real-inference job handlers for the contributor sidecar (Phase G m3).
 
-Wraps llama-cpp-python's Llama with lazy loading + an async-friendly
-streaming surface. The streaming surface bridges Llama's blocking
-generator (a synchronous iterator yielding completion chunks) to an
-asyncio AsyncIterator the WebSocket message loop can iterate cleanly.
+Two backends, same interface:
+
+  - LlamaCppInferenceEngine: in-process inference via llama-cpp-python.
+    Best for NVIDIA (CUDA wheels) and Apple Silicon (Metal). Lowest
+    latency, no extra runtime dependency. The default.
+
+  - OllamaInferenceEngine: HTTP roundtrip to a local Ollama daemon. Best
+    for AMD and Intel GPUs on Windows where llama-cpp-python's prebuilt
+    wheels don't cover GPU acceleration. Ollama handles GPU detection +
+    Vulkan/ROCm/CUDA wrangling internally; we just send prompts to it.
+
+Both backends expose `stream_completion(...) -> AsyncIterator[str]`.
+The contributor's job dispatcher (client.py:_handle_real_job) doesn't
+care which one it's talking to.
 
 Privacy invariant (memory 42a7e671 + 1fc85a49):
     Prompt content and generated tokens MUST NOT be written to disk,
     logs, or telemetry. Counter-only stats (token counts, durations) are
-    fine. The Llama instance keeps the prompt in process memory only as
-    long as inference is running; after the generator is exhausted the
-    memory is freed by GC.
-
-Single-model-per-peer for m3. Multi-model LRU loading is a follow-up;
-for now a peer registers exactly one model_slug at attestation time and
-declines jobs requesting any other slug.
+    fine. The Ollama HTTP client uses 127.0.0.1 only — never sends
+    prompts off-machine even if Ollama is configured with a remote URL.
+    (We refuse to construct an OllamaInferenceEngine with a non-loopback
+    URL; see _validate_loopback below.)
 """
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import threading
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import Protocol
+from urllib.parse import urlparse
 
 logger = logging.getLogger("potluck.contributor.inference")
 
@@ -30,7 +40,29 @@ logger = logging.getLogger("potluck.contributor.inference")
 _DONE = object()
 
 
-class InferenceEngine:
+class InferenceBackend(Protocol):
+    """The interface both engines satisfy. Used only for static typing
+    + documentation; we don't enforce at runtime."""
+
+    model_slug: str
+
+    async def stream_completion(
+        self,
+        prompt: str,
+        max_tokens: int = 512,
+        temperature: float = 0.7,
+        top_p: float | None = 0.95,
+        top_k: int | None = None,
+        repeat_penalty: float | None = None,
+        stop_sequences: list[str] | None = None,
+        seed: int | None = None,
+    ) -> AsyncIterator[str]: ...
+
+
+# ---- llama-cpp-python backend -------------------------------------------- #
+
+
+class LlamaCppInferenceEngine:
     """Lazy-loading wrapper around a single llama-cpp-python Llama instance.
 
     Thread safety: Llama is not thread-safe across calls. We serialize
@@ -65,16 +97,13 @@ class InferenceEngine:
                     f"model_path does not exist: {self.model_path}"
                 )
 
-            # Llama.__init__ is blocking and slow (model load from disk to
-            # VRAM). Run it in a thread so we don't freeze the heartbeat
-            # task during cold-load.
             logger.info(
-                "loading_model slug=%s path=%s n_ctx=%d n_gpu_layers=%d",
+                "loading_model backend=llama-cpp slug=%s path=%s n_ctx=%d n_gpu_layers=%d",
                 self.model_slug, self.model_path, self.n_ctx, self.n_gpu_layers,
             )
             loop = asyncio.get_event_loop()
             self._llama = await loop.run_in_executor(None, self._load_sync)
-            logger.info("model_loaded slug=%s", self.model_slug)
+            logger.info("model_loaded backend=llama-cpp slug=%s", self.model_slug)
 
     def _load_sync(self):
         from llama_cpp import Llama
@@ -96,13 +125,6 @@ class InferenceEngine:
         stop_sequences: list[str] | None = None,
         seed: int | None = None,
     ) -> AsyncIterator[str]:
-        """Yield generated tokens as they arrive from the model.
-
-        Bridges Llama's sync streaming generator (called in a worker
-        thread) to an async iterator via a thread-safe queue. The producer
-        thread runs the generator and pushes each chunk onto an asyncio
-        queue; this coroutine consumes them in the asyncio event loop.
-        """
         await self._ensure_loaded()
 
         async with self._inference_lock:
@@ -131,8 +153,6 @@ class InferenceEngine:
                         completion_kwargs["seed"] = seed
 
                     for chunk in self._llama.create_completion(**completion_kwargs):
-                        # chunk shape: {"choices": [{"text": "...", "index": 0,
-                        # "finish_reason": null|"stop"|"length"}], ...}
                         choice = chunk["choices"][0]
                         text = choice.get("text", "")
                         if text:
@@ -144,8 +164,6 @@ class InferenceEngine:
                 finally:
                     asyncio.run_coroutine_threadsafe(queue.put(_DONE), loop).result()
 
-            # Run the producer in a daemon thread — daemon so an unclean
-            # shutdown doesn't hang waiting for it.
             producer = threading.Thread(target=_produce, daemon=True)
             producer.start()
 
@@ -159,14 +177,170 @@ class InferenceEngine:
                 raise error_box[0]
 
 
-_engine: InferenceEngine | None = None
+# ---- Ollama backend ------------------------------------------------------ #
 
 
-def get_engine(model_path: Path, model_slug: str) -> InferenceEngine:
-    """Module-level singleton. Re-creating the engine on every job would
-    re-load the model from disk every time, which is unworkable for
-    multi-GB GGUFs. m3 ships one engine per peer; multi-model LRU is m4."""
+def _validate_loopback(url: str) -> None:
+    """Refuse to talk to a remote Ollama. The whole privacy story rests on
+    inference happening on the contributor peer's own machine; an Ollama
+    URL pointing at someone else's host means our prompt is leaving this
+    box, which violates the manifesto promise. Loopback only."""
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        raise ValueError(
+            f"Ollama URL must be loopback-only (127.0.0.1 / localhost), got {host!r}. "
+            "This is a hard privacy invariant: the in-memory-only rule from manifesto "
+            "10.3 means prompts must not leave the peer process to a third party."
+        )
+
+
+class OllamaInferenceEngine:
+    """Streams completion from a local Ollama daemon (default port 11434).
+
+    Maps Potluck's SamplingParams to Ollama's options. The model_slug is
+    the Ollama-native model name (e.g. "qwen2.5:3b-instruct-q4_K_M");
+    callers are responsible for passing the slug Ollama recognises.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        model_slug: str,
+        n_ctx: int = 4096,
+    ) -> None:
+        _validate_loopback(base_url)
+        self.base_url = base_url.rstrip("/")
+        self.model_slug = model_slug
+        self.n_ctx = n_ctx
+        self._verified = False
+        self._verify_lock = asyncio.Lock()
+
+    async def _ensure_model_available(self) -> None:
+        """Lightweight liveness check: hit GET /api/tags and confirm our
+        model_slug is in the installed list. Done once per engine
+        lifetime so we don't pay the round-trip on every job."""
+        if self._verified:
+            return
+        async with self._verify_lock:
+            if self._verified:
+                return
+            import httpx
+            logger.info(
+                "checking_ollama backend=ollama url=%s slug=%s",
+                self.base_url, self.model_slug,
+            )
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                r = await client.get(f"{self.base_url}/api/tags")
+                r.raise_for_status()
+                tags = r.json().get("models", [])
+                names = {m.get("name", "") for m in tags}
+                if self.model_slug not in names:
+                    raise FileNotFoundError(
+                        f"Ollama doesn't have '{self.model_slug}' installed. "
+                        f"Run 'ollama pull {self.model_slug}' on this peer. "
+                        f"Models present: {sorted(names) or '(none)'}"
+                    )
+            self._verified = True
+            logger.info("ollama_ready slug=%s", self.model_slug)
+
+    async def stream_completion(
+        self,
+        prompt: str,
+        max_tokens: int = 512,
+        temperature: float = 0.7,
+        top_p: float | None = 0.95,
+        top_k: int | None = None,
+        repeat_penalty: float | None = None,
+        stop_sequences: list[str] | None = None,
+        seed: int | None = None,
+    ) -> AsyncIterator[str]:
+        await self._ensure_model_available()
+
+        # Map Potluck SamplingParams -> Ollama options.
+        # Reference: https://github.com/ollama/ollama/blob/main/docs/api.md
+        options: dict = {
+            "num_predict": max_tokens,
+            "temperature": temperature,
+            "num_ctx": self.n_ctx,
+        }
+        if top_p is not None:
+            options["top_p"] = top_p
+        if top_k is not None:
+            options["top_k"] = top_k
+        if repeat_penalty is not None:
+            options["repeat_penalty"] = repeat_penalty
+        if stop_sequences:
+            options["stop"] = stop_sequences
+        if seed is not None:
+            options["seed"] = seed
+
+        body = {
+            "model": self.model_slug,
+            "prompt": prompt,
+            "stream": True,
+            "options": options,
+        }
+
+        import httpx
+        # No client-level timeout for the streaming response itself; the
+        # coordinator's per-job 120s wall-clock catches stalls. We DO use
+        # a connect timeout so a dead Ollama doesn't hang the request
+        # forever.
+        timeout = httpx.Timeout(connect=5.0, read=None, write=10.0, pool=5.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            async with client.stream(
+                "POST", f"{self.base_url}/api/generate", json=body
+            ) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        chunk = json.loads(line)
+                    except json.JSONDecodeError:
+                        # Ollama occasionally emits keepalive blanks; ignore.
+                        continue
+                    text = chunk.get("response", "")
+                    if text:
+                        yield text
+                    if chunk.get("done"):
+                        break
+
+
+# ---- Engine factory ------------------------------------------------------ #
+
+
+_engine: InferenceBackend | None = None
+
+
+def get_llamacpp_engine(model_path: Path, model_slug: str, n_ctx: int = 4096, n_gpu_layers: int = -1) -> LlamaCppInferenceEngine:
+    """Module-level singleton for llama-cpp. Re-creating per job would
+    re-load the GGUF every time."""
     global _engine
-    if _engine is None or _engine.model_slug != model_slug:
-        _engine = InferenceEngine(model_path=model_path, model_slug=model_slug)
+    if not isinstance(_engine, LlamaCppInferenceEngine) or _engine.model_slug != model_slug:
+        _engine = LlamaCppInferenceEngine(
+            model_path=model_path,
+            model_slug=model_slug,
+            n_ctx=n_ctx,
+            n_gpu_layers=n_gpu_layers,
+        )
     return _engine
+
+
+def get_ollama_engine(base_url: str, model_slug: str, n_ctx: int = 4096) -> OllamaInferenceEngine:
+    """Module-level singleton for Ollama. Cached so we don't re-verify
+    model presence on every job."""
+    global _engine
+    if not isinstance(_engine, OllamaInferenceEngine) or _engine.model_slug != model_slug or _engine.base_url != base_url.rstrip("/"):
+        _engine = OllamaInferenceEngine(
+            base_url=base_url,
+            model_slug=model_slug,
+            n_ctx=n_ctx,
+        )
+    return _engine
+
+
+# Backward compat: old call site in earlier client.py revisions.
+def get_engine(model_path: Path, model_slug: str) -> LlamaCppInferenceEngine:
+    return get_llamacpp_engine(model_path=model_path, model_slug=model_slug)
