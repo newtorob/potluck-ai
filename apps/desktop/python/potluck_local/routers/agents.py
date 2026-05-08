@@ -18,7 +18,7 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from potluck_local.services.memory_db import (
     delete_disconnected_sessions,
@@ -97,12 +97,16 @@ async def get_session_detail(session_id: str) -> dict:
     return session
 
 
-@router.delete("/sessions/{session_id}", status_code=204)
-async def delete_session_endpoint(session_id: str) -> None:
+@router.delete("/sessions/{session_id}", status_code=204, response_class=Response)
+async def delete_session_endpoint(session_id: str) -> Response:
     """Delete one session row + its tool calls. Used to clear stale or
     accidentally-created rows from the /agents view. The agent (Claude
     Code / Cursor / etc.) is unaffected; if it's still running it will
-    re-register on its next MCP call."""
+    re-register on its next MCP call.
+
+    response_class=Response is required by FastAPI's strict-204 assertion
+    (default JSONResponse allows a body; status 204 forbids one).
+    """
     try:
         existed = await delete_session(session_id)
     except Exception as exc:
@@ -110,6 +114,7 @@ async def delete_session_endpoint(session_id: str) -> None:
         raise HTTPException(status_code=500, detail="Database error") from exc
     if not existed:
         raise HTTPException(status_code=404, detail=f"Session {session_id!r} not found")
+    return Response(status_code=204)
 
 
 @router.delete("/sessions", status_code=200)
