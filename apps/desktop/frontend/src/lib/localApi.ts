@@ -469,6 +469,18 @@ export const localApi = {
         handleResponse<ToolCall[]>(r),
       );
     },
+
+    deleteSession(id: string): Promise<void> {
+      return fetch(`${LOCAL_BASE}/agents/sessions/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }).then((r) => handle204(r));
+    },
+
+    clearDisconnected(): Promise<{ removed: number }> {
+      return fetch(`${LOCAL_BASE}/agents/sessions`, { method: 'DELETE' }).then((r) =>
+        handleResponse<{ removed: number }>(r),
+      );
+    },
   },
 
   // ---- Vault ---------------------------------------------------------------

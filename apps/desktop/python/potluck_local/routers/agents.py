@@ -21,6 +21,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from potluck_local.services.memory_db import (
+    delete_disconnected_sessions,
+    delete_session,
     get_session,
     list_recent_tool_calls,
     list_sessions,
@@ -93,6 +95,33 @@ async def get_session_detail(session_id: str) -> dict:
 
     session["recent_tool_calls"] = [_deserialize_tool_call(c) for c in calls]
     return session
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+async def delete_session_endpoint(session_id: str) -> None:
+    """Delete one session row + its tool calls. Used to clear stale or
+    accidentally-created rows from the /agents view. The agent (Claude
+    Code / Cursor / etc.) is unaffected; if it's still running it will
+    re-register on its next MCP call."""
+    try:
+        existed = await delete_session(session_id)
+    except Exception as exc:
+        logger.error("agents_session_delete_error id=%s type=%s", session_id, type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Database error") from exc
+    if not existed:
+        raise HTTPException(status_code=404, detail=f"Session {session_id!r} not found")
+
+
+@router.delete("/sessions", status_code=200)
+async def clear_disconnected_sessions() -> dict:
+    """Delete every disconnected session + its tool calls. Active sessions
+    (disconnected_at IS NULL) are left alone."""
+    try:
+        removed = await delete_disconnected_sessions()
+    except Exception as exc:
+        logger.error("agents_clear_disconnected_error type=%s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Database error") from exc
+    return {"removed": removed}
 
 
 @router.get("/activity")

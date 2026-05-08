@@ -16,7 +16,9 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Activity } from 'lucide-react';
+import { Activity, Trash2 } from 'lucide-react';
+import { cn } from '@/components/ui/cn';
+import { localApi } from '@/lib/localApi';
 import { useAgents } from '@/hooks/useAgents';
 import { AgentSessionCard } from '@/components/agents/AgentSessionCard';
 import { ActivityFeed } from '@/components/agents/ActivityFeed';
@@ -53,9 +55,52 @@ export function AgentsView() {
     setFilter,
     clearFilter,
     selectSession,
+    fetchSessions,
   } = useAgents();
 
   const [showDisconnected, setShowDisconnected] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+
+  // ---- Delete handlers ------------------------------------------------------
+  // Per-session delete: called from a trash icon on each AgentSessionCard.
+  // Bulk clear-disconnected: called from the header chip when there's at
+  // least one disconnected session in view.
+  // Both refresh the sessions list after the API call so the UI reflects
+  // the database immediately, without waiting for the 5s poll cycle.
+  const handleDeleteSession = useCallback(
+    async (id: string) => {
+      if (!confirm('Delete this session row? The agent itself is unaffected and will re-register if it makes another call.')) return;
+      try {
+        await localApi.agents.deleteSession(id);
+        if (id === selectedSessionId) selectSession(null);
+        await fetchSessions();
+      } catch (err) {
+        console.error('failed to delete session', err);
+      }
+    },
+    [fetchSessions, selectedSessionId, selectSession],
+  );
+
+  const handleClearDisconnected = useCallback(
+    async () => {
+      const disconnected = sessions.filter((s) => s.disconnected_at !== null);
+      if (disconnected.length === 0) return;
+      if (!confirm(`Remove ${disconnected.length} disconnected session row${disconnected.length === 1 ? '' : 's'}? Active sessions are not touched.`)) return;
+      setIsClearing(true);
+      try {
+        await localApi.agents.clearDisconnected();
+        if (selectedSessionId !== null && disconnected.some((s) => s.id === selectedSessionId)) {
+          selectSession(null);
+        }
+        await fetchSessions();
+      } catch (err) {
+        console.error('failed to clear disconnected sessions', err);
+      } finally {
+        setIsClearing(false);
+      }
+    },
+    [sessions, fetchSessions, selectedSessionId, selectSession],
+  );
 
   // Track IDs of calls that arrived in the last fetch cycle so we can flash them
   const prevActivityIdsRef = useRef<Set<string>>(new Set());
@@ -157,16 +202,36 @@ export function AgentsView() {
             </span>
 
             {disconnectedSessions.length > 0 && (
-              <label className="flex cursor-pointer items-center gap-1.5 select-none">
-                <input
-                  type="checkbox"
-                  checked={showDisconnected}
-                  onChange={(e) => setShowDisconnected(e.target.checked)}
-                  className="h-3.5 w-3.5 rounded border-input accent-primary"
-                  aria-label="Show disconnected sessions"
-                />
-                <span className="text-xs text-muted-foreground">Show disconnected</span>
-              </label>
+              <>
+                <label className="flex cursor-pointer items-center gap-1.5 select-none">
+                  <input
+                    type="checkbox"
+                    checked={showDisconnected}
+                    onChange={(e) => setShowDisconnected(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border-input accent-primary"
+                    aria-label="Show disconnected sessions"
+                  />
+                  <span className="text-xs text-muted-foreground">Show disconnected</span>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => void handleClearDisconnected()}
+                  disabled={isClearing}
+                  className={cn(
+                    'flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-xs',
+                    'text-muted-foreground hover:text-destructive hover:border-destructive/30 hover:bg-destructive/5',
+                    'transition-colors duration-fast',
+                    'disabled:cursor-not-allowed disabled:opacity-50',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  )}
+                  aria-label="Clear all disconnected sessions"
+                  title="Remove disconnected session rows"
+                >
+                  <Trash2 className="h-3 w-3" aria-hidden="true" />
+                  <span>{isClearing ? 'Clearing…' : `Clear ${disconnectedSessions.length} disconnected`}</span>
+                </button>
+              </>
             )}
           </div>
         </AgentsHeader>
@@ -205,6 +270,7 @@ export function AgentsView() {
                       }
                       isSelected={session.id === selectedSessionId}
                       onSelect={handleSelectSession}
+                      onDelete={(id) => void handleDeleteSession(id)}
                     />
                   </div>
                 ))}

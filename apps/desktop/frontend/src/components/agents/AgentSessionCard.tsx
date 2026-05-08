@@ -10,6 +10,7 @@
  */
 
 import { useMemo } from 'react';
+import { Trash2 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { ProjectPill } from '@/components/memory/ProjectPill';
 import { Sparkline } from '@/components/agents/Sparkline';
@@ -154,6 +155,9 @@ interface AgentSessionCardProps {
   recentToolCalls?: ToolCall[];
   isSelected?: boolean;
   onSelect: (id: string) => void;
+  /** When provided, a delete-button affordance appears on hover. Called with
+   *  the session id; the parent owns the API call + list refresh. */
+  onDelete?: (id: string) => void;
 }
 
 export function AgentSessionCard({
@@ -161,6 +165,7 @@ export function AgentSessionCard({
   recentToolCalls = [],
   isSelected = false,
   onSelect,
+  onDelete,
 }: AgentSessionCardProps) {
   const status = getSessionStatus(session);
   const sparkValues = useMemo(() => buildSparklineValues(recentToolCalls), [recentToolCalls]);
@@ -171,14 +176,18 @@ export function AgentSessionCard({
       ? `Disconnected at ${shortTime(session.disconnected_at)}`
       : connectedDuration(session.started_at);
 
+  // Wrap in a relative div so the absolutely-positioned trash button can
+  // live as a sibling of the main button (avoids the nested-button HTML
+  // invalidity while still letting `group-hover:` reveal the trash icon).
   return (
+    <div className="group relative">
     <button
       type="button"
       onClick={() => onSelect(session.id)}
       aria-label={`Agent session: ${clientLabel}${session.project ? `, project ${session.project}` : ''}`}
       aria-pressed={isSelected}
       className={cn(
-        'group relative flex w-full flex-col gap-2 rounded-xl border bg-card p-4 text-left',
+        'relative flex w-full flex-col gap-2 rounded-xl border bg-card p-4 text-left',
         // Hover: hairline lifts + ember-tinted bg. Selected: ember inset ring
         // (uses the design-system "ember-inset" shadow token).
         'transition-all duration-fast',
@@ -229,5 +238,26 @@ export function AgentSessionCard({
       {/* Row 5: footer */}
       <p className="text-[11px] text-muted-foreground/70">{footer}</p>
     </button>
+    {onDelete && (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(session.id);
+        }}
+        aria-label="Delete this session"
+        title="Delete session"
+        className={cn(
+          'absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md',
+          'text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10',
+          'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+          'transition-opacity duration-fast',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        )}
+      >
+        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+    )}
+    </div>
   );
 }

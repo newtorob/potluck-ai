@@ -328,6 +328,59 @@ async def session_tool_calls(
     return [dict(r) for r in rows]
 
 
+async def delete_session(
+    session_id: str,
+    db_path: Path | None = None,
+) -> bool:
+    """Delete one mcp_sessions row + all its mcp_tool_calls.
+
+    Returns True if a row was deleted, False if the id wasn't found.
+    Tool calls are deleted first because the FK on mcp_tool_calls.session_id
+    is non-cascading (and PRAGMA foreign_keys=ON would otherwise reject the
+    parent delete).
+    """
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        await db.execute("PRAGMA foreign_keys=ON")
+        await db.execute(
+            "DELETE FROM mcp_tool_calls WHERE session_id = ?", (session_id,)
+        )
+        cursor = await db.execute(
+            "DELETE FROM mcp_sessions WHERE id = ?", (session_id,)
+        )
+        deleted = cursor.rowcount > 0
+        await db.commit()
+    return deleted
+
+
+async def delete_disconnected_sessions(
+    db_path: Path | None = None,
+) -> int:
+    """Delete every mcp_sessions row whose disconnected_at is set, plus all
+    of their tool_calls. Returns the number of session rows removed.
+
+    Does not touch active sessions (disconnected_at IS NULL); the user may
+    have agents that are momentarily silent but still meant to be there.
+    """
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        await db.execute("PRAGMA foreign_keys=ON")
+        await db.execute(
+            """
+            DELETE FROM mcp_tool_calls
+            WHERE session_id IN (
+                SELECT id FROM mcp_sessions WHERE disconnected_at IS NOT NULL
+            )
+            """
+        )
+        cursor = await db.execute(
+            "DELETE FROM mcp_sessions WHERE disconnected_at IS NOT NULL"
+        )
+        removed = cursor.rowcount
+        await db.commit()
+    return removed
+
+
 async def save_embedding(
     memory_id: str,
     vector: "np.ndarray",
