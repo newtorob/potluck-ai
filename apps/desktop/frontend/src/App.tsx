@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { TitleBar } from '@/components/layout/TitleBar';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { StatusBar } from '@/components/layout/StatusBar';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { ChatView } from '@/views/ChatView';
 import { ModelLibrary } from '@/views/ModelLibrary';
@@ -13,6 +14,7 @@ import { SettingsView } from '@/views/SettingsView';
 import { MembershipView } from '@/views/MembershipView';
 import { FirstRun } from '@/views/FirstRun';
 import { useModelStore } from '@/stores/modelStore';
+import { useTheme } from '@/hooks/useTheme';
 
 /**
  * Root application shell.
@@ -42,6 +44,10 @@ import { useModelStore } from '@/stores/modelStore';
 const ONBOARDING_KEY = 'potluck.onboarding_completed';
 
 export default function App() {
+  // Initialise theme from localStorage on mount so <html class> matches
+  // user preference before paint (avoids cream-flash on dark startup).
+  useTheme();
+
   // Read model state directly from the store at the shell level.
   // useModels() is not used here to avoid triggering its auto-fetch inside the
   // conditional FirstRun branch, which could cause duplicated requests.
@@ -87,7 +93,12 @@ export default function App() {
     );
   }
 
-  // Normal app shell
+  // Normal app shell:
+  //   TitleBar (mac drag region)
+  //   ┌──────────────────────────────────┐
+  //   │ Sidebar │ main (Routes)          │
+  //   └──────────────────────────────────┘
+  //   StatusBar (persistent "alive" strip)
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
       {/* Mac-only drag region — zero height on other platforms */}
@@ -114,6 +125,9 @@ export default function App() {
           </main>
         </AuthGate>
       </div>
+
+      {/* Persistent bottom status strip — model loaded, sidecar, network mode */}
+      <StatusBar />
     </div>
   );
 }

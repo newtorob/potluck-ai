@@ -9,7 +9,6 @@
  */
 
 import { useState, useRef, useCallback } from 'react';
-import { Brain, FolderOpen } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { ModelPathPanel } from '@/components/settings/ModelPathPanel';
 import { McpIntegrationPanel } from '@/components/settings/McpIntegrationPanel';
@@ -144,10 +143,7 @@ function MemoryTuningSection({ memory, isSaving, onUpdate }: MemoryTuningProps) 
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-5">
-      <div className="flex items-center gap-2">
-        <Brain className="h-4 w-4 text-primary" aria-hidden="true" />
-        <h2 className="text-sm font-semibold text-foreground">Memory tuning</h2>
-      </div>
+      <h2 className="font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>Memory tuning</h2>
 
       {/* Toggles */}
       <div>
@@ -334,10 +330,7 @@ function ActiveProjectSection() {
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-      <div className="flex items-center gap-2">
-        <FolderOpen className="h-4 w-4 text-primary" aria-hidden="true" />
-        <h2 className="text-sm font-semibold text-foreground">Active project</h2>
-      </div>
+      <h2 className="font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>Active project</h2>
       <p className="text-xs text-muted-foreground">
         The active project scopes memory and task views by default. Memories tagged with this
         project (or no project) are surfaced in chat.

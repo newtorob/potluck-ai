@@ -129,8 +129,8 @@ function InlineToast({ message, className }: InlineToastProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5',
-        'text-xs font-medium text-emerald-400',
+        'inline-flex items-center gap-1 rounded-full bg-sage/15 px-2 py-0.5',
+        'text-xs font-medium text-sage',
         className,
       )}
       role="status"

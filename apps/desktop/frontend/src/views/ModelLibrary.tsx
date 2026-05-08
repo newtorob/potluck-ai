@@ -5,12 +5,13 @@
  * progress, install/load/unload/delete actions, and a hardware summary badge.
  */
 
-import { Package, Settings, AlertCircle, RefreshCw } from 'lucide-react';
+import { Settings, AlertCircle, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/components/ui/cn';
 import { ModelCard } from '@/components/models/ModelCard';
 import { useModels } from '@/hooks/useModels';
 import { useHardware } from '@/hooks/useHardware';
+import { ViewHeader } from '@/components/layout/ViewHeader';
 import type { ModelTier } from '@/stores/modelStore';
 
 // ---------------------------------------------------------------------------
@@ -54,13 +55,13 @@ function HardwareBadge() {
 
 function SkeletonCard() {
   return (
-    <div className="animate-pulse rounded-xl border border-border bg-card p-5 space-y-3">
-      <div className="h-4 w-2/3 rounded bg-muted" />
-      <div className="h-3 w-full rounded bg-muted" />
-      <div className="h-3 w-4/5 rounded bg-muted" />
+    <div className="animate-fade-in rounded-xl border border-border/60 bg-card p-5 space-y-3 shadow-hearth-sm">
+      <div className="h-4 w-2/3 animate-hearth-pulse rounded bg-muted" />
+      <div className="h-3 w-full animate-hearth-pulse rounded bg-muted/70" />
+      <div className="h-3 w-4/5 animate-hearth-pulse rounded bg-muted/70" />
       <div className="flex items-center justify-between pt-2">
-        <div className="h-3 w-16 rounded bg-muted" />
-        <div className="h-8 w-20 rounded-lg bg-muted" />
+        <div className="h-3 w-16 animate-hearth-pulse rounded bg-muted/70" />
+        <div className="h-8 w-20 animate-hearth-pulse rounded-lg bg-muted" />
       </div>
     </div>
   );
@@ -91,35 +92,33 @@ export function ModelLibrary() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex flex-col gap-2 border-b border-border px-6 py-4">
-        <div className="flex items-center gap-3">
-          <Package className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-          <h1 className="text-sm font-semibold">Models</h1>
-
-          {isFetching && (
+      <ViewHeader
+        title="Models"
+        count={models.length}
+        actions={
+          isFetching ? (
             <RefreshCw
-              className="ml-auto h-3.5 w-3.5 animate-spin text-muted-foreground"
+              className="h-3.5 w-3.5 animate-spin text-muted-foreground"
               aria-label="Refreshing model list"
             />
-          )}
-          {!isFetching && (
+          ) : (
             <button
               type="button"
               onClick={() => void fetch()}
               className={cn(
-                'ml-auto rounded-md p-1 text-muted-foreground hover:text-foreground',
+                'rounded-md p-1 text-muted-foreground hover:text-foreground',
                 'hover:bg-accent transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               )}
               aria-label="Refresh model list"
+              title="Refresh"
             >
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
-          )}
-        </div>
-        <HardwareBadge />
-      </div>
+          )
+        }
+        subnav={<HardwareBadge />}
+      />
 
       {/* Error banner */}
       {fetchError && (

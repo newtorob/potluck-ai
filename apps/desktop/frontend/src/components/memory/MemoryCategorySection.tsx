@@ -28,7 +28,8 @@ export function MemoryCategorySection({ category, memories, onCardClick, onCardR
 
   return (
     <section aria-labelledby={headingId}>
-      {/* Accordion header */}
+      {/* Accordion header — editorial small-caps style. The serif italic
+          label sets the section as a chapter, not a row. */}
       <button
         type="button"
         id={headingId}
@@ -36,34 +37,45 @@ export function MemoryCategorySection({ category, memories, onCardClick, onCardR
         aria-controls={sectionId}
         onClick={() => setExpanded((v) => !v)}
         className={cn(
-          'flex w-full items-center gap-2 rounded-lg px-2 py-1.5',
-          'text-left transition-colors hover:bg-muted/50',
+          'group/header flex w-full items-center gap-2 rounded-lg px-2 py-1.5',
+          'text-left transition-colors duration-fast hover:bg-muted/50',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         )}
       >
         <ChevronRight
           className={cn(
-            'h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-150',
+            'h-3.5 w-3.5 shrink-0 text-muted-foreground/70 transition-transform duration-base ease-out-soft',
+            'group-hover/header:text-muted-foreground',
             expanded && 'rotate-90',
           )}
           aria-hidden="true"
         />
         <span
           className={cn(
-            'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium',
-            CATEGORY_STYLES[category],
+            'font-serif text-[12px] italic text-foreground/85',
           )}
+          style={{ letterSpacing: '0.02em' }}
         >
           {CATEGORY_LABELS[category]}
         </span>
-        <span className="text-xs text-muted-foreground">
-          {memories.length} {memories.length === 1 ? 'memory' : 'memories'}
+        <span
+          className={cn(
+            'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium tabular-nums',
+            CATEGORY_STYLES[category],
+          )}
+        >
+          {memories.length}
         </span>
       </button>
 
-      {/* Accordion body */}
+      {/* Accordion body — fade-in on expand */}
       {expanded && (
-        <div id={sectionId} role="region" aria-labelledby={headingId} className="mt-1.5 space-y-2 pl-2">
+        <div
+          id={sectionId}
+          role="region"
+          aria-labelledby={headingId}
+          className="mt-1.5 space-y-2 pl-2 animate-fade-in"
+        >
           {memories.map((memory) => (
             <div
               key={memory.id}

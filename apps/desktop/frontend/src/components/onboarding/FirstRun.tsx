@@ -190,24 +190,24 @@ export function FirstRun({ models }: FirstRunProps) {
     >
       {/* Exit confirm overlay */}
       {showExitConfirm && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-lg space-y-4">
-            <p className="text-sm font-semibold text-foreground">Skip setup?</p>
-            <p className="text-xs text-muted-foreground">
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-popover p-6 shadow-hearth-lg space-y-4 animate-fade-in-up">
+            <p className="font-serif text-base text-foreground">Skip setup?</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
               You can install a model later from the Models page.
             </p>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={handleConfirmExit}
-                className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors duration-fast shadow-hearth-sm"
               >
                 Skip for now
               </button>
               <button
                 type="button"
                 onClick={() => setShowExitConfirm(false)}
-                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                className="flex-1 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors duration-fast"
               >
                 Continue setup
               </button>
@@ -217,7 +217,7 @@ export function FirstRun({ models }: FirstRunProps) {
       )}
 
       {/* Wizard card */}
-      <div className="relative w-full max-w-lg rounded-2xl border border-border bg-card shadow-xl">
+      <div className="relative w-full max-w-lg rounded-2xl border border-border bg-card shadow-hearth-lg animate-fade-in-up">
         {/* Close button */}
         <button
           type="button"
@@ -234,36 +234,37 @@ export function FirstRun({ models }: FirstRunProps) {
 
         {/* Step indicator */}
         <div className="flex items-center justify-center gap-2 border-b border-border px-6 py-4">
-          {STEP_ORDER.map((s, i) => (
-            <div key={s} className="flex items-center gap-2">
-              <div
-                className={cn(
-                  'flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium transition-colors',
-                  s === step
-                    ? 'bg-primary text-primary-foreground'
-                    : STEP_ORDER.indexOf(step) > i
-                      ? 'bg-primary/20 text-primary'
-                      : 'bg-muted text-muted-foreground',
-                )}
-                aria-label={`Step ${i + 1}: ${STEP_LABELS[s]}`}
-                aria-current={s === step ? 'step' : undefined}
-              >
-                {STEP_ORDER.indexOf(step) > i ? (
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                ) : (
-                  i + 1
-                )}
-              </div>
-              {i < STEP_ORDER.length - 1 && (
+          {STEP_ORDER.map((s, i) => {
+            const isCurrent = s === step;
+            const isComplete = STEP_ORDER.indexOf(step) > i;
+            return (
+              <div key={s} className="flex items-center gap-2">
                 <div
                   className={cn(
-                    'h-px w-6 transition-colors',
-                    STEP_ORDER.indexOf(step) > i ? 'bg-primary/40' : 'bg-border',
+                    'flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-medium tabular-nums',
+                    'transition-all duration-base ease-out-soft',
+                    isCurrent
+                      ? 'bg-primary text-primary-foreground shadow-hearth-sm ring-2 ring-primary/30'
+                      : isComplete
+                        ? 'bg-primary/15 text-primary ring-1 ring-primary/25'
+                        : 'bg-muted text-muted-foreground/70',
                   )}
-                />
-              )}
-            </div>
-          ))}
+                  aria-label={`Step ${i + 1}: ${STEP_LABELS[s]}`}
+                  aria-current={isCurrent ? 'step' : undefined}
+                >
+                  {isComplete ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
+                </div>
+                {i < STEP_ORDER.length - 1 && (
+                  <div
+                    className={cn(
+                      'h-px w-6 transition-colors duration-base',
+                      isComplete ? 'bg-primary/40' : 'bg-border/70',
+                    )}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Step content */}
@@ -292,7 +293,11 @@ export function FirstRun({ models }: FirstRunProps) {
           <button
             type="button"
             onClick={handleSkip}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className={cn(
+              'text-xs text-muted-foreground/80 hover:text-foreground',
+              'transition-colors duration-fast rounded-sm',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+            )}
           >
             {step === 'ready' ? '' : 'Skip — I\'ll pick later'}
           </button>
@@ -372,20 +377,25 @@ export function FirstRun({ models }: FirstRunProps) {
 
 function WelcomeStep() {
   return (
-    <div className="space-y-4 text-center">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-        <Sparkles className="h-8 w-8 text-primary" />
+    <div className="space-y-5 text-center animate-fade-in-up">
+      {/* Ember-tinted square with a soft glow halo — telegraphs warmth + alive */}
+      <div className="relative mx-auto h-16 w-16">
+        <div className="absolute inset-0 rounded-2xl bg-primary/15 blur-xl" aria-hidden="true" />
+        <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20">
+          <Sparkles className="h-7 w-7 text-primary" aria-hidden="true" />
+        </div>
       </div>
-      <div className="space-y-2">
-        <h1 className="text-xl font-bold text-foreground">Welcome to Potluck AI</h1>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Potluck AI is a member-owned cooperative that runs open-source AI models entirely on
-          your device. Your prompts never leave your machine. No subscriptions to corporate AI
-          labs, no data harvesting — just fast, private inference you own and control.
+      <div className="space-y-3">
+        <h1 className="font-serif text-3xl tracking-display leading-tight text-foreground">
+          Welcome to Potluck AI
+        </h1>
+        <p className="text-sm text-muted-foreground leading-relaxed reading-measure mx-auto">
+          A member-owned cooperative that runs open-source AI models entirely on your device. Your
+          prompts never leave your machine — no subscriptions to corporate labs, no data harvesting,
+          just fast private inference you own and control.
         </p>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          This short setup will detect your hardware and install a model suited to your machine.
-          The whole process takes 2–10 minutes depending on your internet connection.
+        <p className="text-xs italic text-muted-foreground/80 leading-relaxed">
+          This setup detects your hardware and installs a model — about 2–10 minutes.
         </p>
       </div>
     </div>
@@ -402,10 +412,12 @@ function HardwareStep({
   error: string | null;
 }) {
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold text-foreground">Your hardware</h2>
-        <p className="text-sm text-muted-foreground">
+    <div className="space-y-4 animate-fade-in">
+      <div className="space-y-1.5">
+        <h2 className="font-serif text-2xl tracking-display leading-tight text-foreground">
+          Your hardware
+        </h2>
+        <p className="text-sm leading-relaxed text-muted-foreground">
           We detected your system specs and selected the best model tier for your machine.
         </p>
       </div>
@@ -432,14 +444,17 @@ function PickStep({
   downloadComplete: boolean | undefined;
 }) {
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold text-foreground">Choose your first model</h2>
-        <p className="text-sm text-muted-foreground">
+    <div className="space-y-4 animate-fade-in">
+      <div className="space-y-1.5">
+        <h2 className="font-serif text-2xl tracking-display leading-tight text-foreground">
+          Choose your first model
+        </h2>
+        <p className="text-sm leading-relaxed text-muted-foreground">
           Select a tier. You can install additional models later from the Models page.
           {downloadComplete && (
-            <span className="ml-1 font-medium text-emerald-600 dark:text-emerald-400">
-              Download complete!
+            <span className="ml-1 inline-flex items-center gap-1 font-medium text-sage">
+              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+              Download complete
             </span>
           )}
         </p>
@@ -458,23 +473,41 @@ function PickStep({
 
 function LoadingStep({ error }: { error: string | null }) {
   return (
-    <div className="flex flex-col items-center gap-4 py-6 text-center">
+    <div className="flex flex-col items-center gap-5 py-6 text-center animate-fade-in">
       {error ? (
         <>
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10">
-            <X className="h-7 w-7 text-destructive" />
+          <div className="relative h-14 w-14">
+            <div
+              className="absolute inset-0 rounded-2xl bg-destructive/15 blur-xl"
+              aria-hidden="true"
+            />
+            <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive/10 ring-1 ring-destructive/25">
+              <X className="h-7 w-7 text-destructive" aria-hidden="true" />
+            </div>
           </div>
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-foreground">Failed to load model</p>
-            <p className="text-xs text-destructive">{error}</p>
+          <div className="space-y-1.5 reading-measure">
+            <p className="font-serif text-xl tracking-display text-foreground">
+              Failed to load model
+            </p>
+            <p className="text-xs leading-relaxed text-destructive">{error}</p>
           </div>
         </>
       ) : (
         <>
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-foreground">Loading model into memory</p>
-            <p className="text-xs text-muted-foreground">
+          <div className="relative h-14 w-14">
+            <div
+              className="absolute inset-0 rounded-full bg-primary/15 blur-xl animate-hearth-pulse"
+              aria-hidden="true"
+            />
+            <div className="relative flex h-14 w-14 items-center justify-center">
+              <Loader2 className="h-9 w-9 animate-spin text-primary" aria-hidden="true" />
+            </div>
+          </div>
+          <div className="space-y-1.5 reading-measure">
+            <p className="font-serif text-xl tracking-display text-foreground">
+              Loading model into memory
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
               This takes 5–30 seconds depending on model size and your hardware. Just once per
               session.
             </p>
@@ -487,15 +520,19 @@ function LoadingStep({ error }: { error: string | null }) {
 
 function ReadyStep() {
   return (
-    <div className="flex flex-col items-center gap-4 py-4 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10">
-        <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+    <div className="flex flex-col items-center gap-4 py-4 text-center animate-fade-in-up">
+      {/* Sage halo for the "alive and ready" terminal state */}
+      <div className="relative h-16 w-16">
+        <div className="absolute inset-0 rounded-full bg-sage/25 blur-xl animate-hearth-pulse" aria-hidden="true" />
+        <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-sage/15 ring-1 ring-sage/30">
+          <CheckCircle2 className="h-8 w-8 text-sage" aria-hidden="true" />
+        </div>
       </div>
-      <div className="space-y-1.5">
-        <h2 className="text-xl font-bold text-foreground">You're all set</h2>
-        <p className="text-sm text-muted-foreground">
-          Your model is loaded and ready. All inference runs locally — your conversations
-          stay on this device.
+      <div className="space-y-2">
+        <h2 className="font-serif text-2xl tracking-display text-foreground">You're all set</h2>
+        <p className="text-sm leading-relaxed text-muted-foreground reading-measure mx-auto">
+          Your model is loaded and ready. All inference runs locally — your conversations stay on
+          this device.
         </p>
       </div>
     </div>
@@ -521,10 +558,12 @@ function PrimaryButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors',
-        'bg-primary text-primary-foreground hover:bg-primary/90',
-        'disabled:opacity-50 disabled:cursor-not-allowed',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        'flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium',
+        'bg-primary text-primary-foreground shadow-hearth-sm',
+        'hover:bg-primary/90 active:scale-[0.98]',
+        'transition-all duration-fast',
+        'disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card',
       )}
     >
       {children}

@@ -1,20 +1,40 @@
 /**
  * CategoryPill — color-coded label for a MemoryCategory.
  *
- * Colors chosen to be distinct in both light and dark modes
- * using the Tailwind palette with opacity variants.
+ * Each category gets a token-driven color pair: a darker swatch for the
+ * light theme (AA contrast on cream) and a lighter swatch for dark.
+ * The hue stays stable across themes so a "fact" always reads green-ish,
+ * a "decision" always reads ember, etc. — themable without re-learning.
+ *
+ * Border uses the same hue at low opacity to keep the pill quiet.
  */
 
 import { cn } from '@/components/ui/cn';
 import type { MemoryCategory } from '@/types/memory';
 
 const CATEGORY_STYLES: Record<MemoryCategory, string> = {
-  preference: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
-  fact: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
-  decision: 'bg-violet-500/15 text-violet-400 border-violet-500/20',
-  project: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
-  person: 'bg-pink-500/15 text-pink-400 border-pink-500/20',
-  instruction: 'bg-red-500/15 text-red-400 border-red-500/20',
+  // Hue 200-ish: cool blue → maps to "preference" (calm + recurring)
+  preference:
+    'bg-sky-500/10 text-sky-700 border-sky-500/20 ' +
+    'dark:bg-sky-500/12 dark:text-sky-300 dark:border-sky-500/20',
+  // Sage → "fact" (alive + grounded). Sage token is theme-aware already.
+  fact:
+    'bg-sage/12 text-sage border-sage/25 ' +
+    'dark:bg-sage/14 dark:text-sage dark:border-sage/30',
+  // Ember → "decision" (the most active, owned-by-user category)
+  decision:
+    'bg-primary/10 text-primary border-primary/25 ' +
+    'dark:bg-primary/12 dark:text-primary dark:border-primary/30',
+  // Warm amber → "project" (the "you said this is for X" tag)
+  project:
+    'bg-amber-500/12 text-amber-800 border-amber-500/25 ' +
+    'dark:bg-amber-500/12 dark:text-amber-300 dark:border-amber-500/25',
+  // Rose → "person" (warm, human)
+  person:
+    'bg-rose-500/10 text-rose-700 border-rose-500/20 ' +
+    'dark:bg-rose-500/12 dark:text-rose-300 dark:border-rose-500/25',
+  // Neutral → "instruction" (the most rule-like, lowest emotional weight)
+  instruction: 'bg-muted text-muted-foreground border-border/60',
 };
 
 const CATEGORY_LABELS: Record<MemoryCategory, string> = {

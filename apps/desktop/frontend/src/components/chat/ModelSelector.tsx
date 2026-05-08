@@ -126,7 +126,7 @@ export function ModelSelector({ disabled = false }: ModelSelectorProps) {
           <Circle
             className={cn(
               'h-2.5 w-2.5 fill-current',
-              loadedSlug ? 'text-emerald-500' : 'text-muted-foreground',
+              loadedSlug ? 'text-sage' : 'text-muted-foreground',
             )}
             aria-hidden="true"
           />
@@ -178,7 +178,7 @@ export function ModelSelector({ disabled = false }: ModelSelectorProps) {
                       <Circle
                         className={cn(
                           'h-2 w-2 shrink-0 fill-current',
-                          isActive ? 'text-emerald-500' : 'text-transparent',
+                          isActive ? 'text-sage' : 'text-transparent',
                         )}
                         aria-hidden="true"
                       />

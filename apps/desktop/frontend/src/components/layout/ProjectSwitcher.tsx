@@ -133,7 +133,7 @@ export function ProjectSwitcher({ compact = false }: ProjectSwitcherProps) {
           'text-xs font-medium transition-colors',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           activeProject
-            ? 'bg-violet-500/15 text-violet-400 hover:bg-violet-500/20'
+            ? 'bg-primary/10 text-primary hover:bg-primary/15'
             : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',
         )}
       >

@@ -17,11 +17,12 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Activity } from 'lucide-react';
-import { cn } from '@/components/ui/cn';
 import { useAgents } from '@/hooks/useAgents';
 import { AgentSessionCard } from '@/components/agents/AgentSessionCard';
 import { ActivityFeed } from '@/components/agents/ActivityFeed';
 import { SessionDetailDrawer } from '@/components/agents/SessionDetailDrawer';
+import { ViewHeader } from '@/components/layout/ViewHeader';
+import { EmptyState } from '@/components/layout/EmptyState';
 import type { AgentSession } from '@/types/agents';
 
 // ---------------------------------------------------------------------------
@@ -119,17 +120,17 @@ export function AgentsView() {
   if (!isFetching && !hasEverHadSessions) {
     return (
       <div className="flex h-full flex-col">
-        <ViewHeader isFetching={isFetching} />
-        <div className="flex flex-1 items-center justify-center p-8 text-center">
-          <div className="max-w-sm space-y-3">
-            <Activity className="mx-auto h-12 w-12 text-muted-foreground/30" aria-hidden="true" />
-            <h2 className="text-sm font-semibold text-foreground">No agent sessions yet</h2>
-            <p className="text-xs text-muted-foreground leading-relaxed">
+        <AgentsHeader isFetching={isFetching} />
+        <EmptyState
+          icon={Activity}
+          title="No agent sessions yet"
+          description={
+            <>
               Configure Potluck as an MCP server in Claude Code, Cursor, Zed, or Windsurf — see{' '}
               <span className="font-medium text-foreground">Settings → Advanced → External agents (MCP)</span>.
-            </p>
-          </div>
-        </div>
+            </>
+          }
+        />
       </div>
     );
   }
@@ -143,8 +144,7 @@ export function AgentsView() {
       {/* Main content */}
       <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
         {/* Header */}
-        <ViewHeader isFetching={isFetching}>
-          {/* Stats + toggle */}
+        <AgentsHeader isFetching={isFetching}>
           <div className="flex items-center gap-4">
             <span className="text-xs text-muted-foreground">
               <span className="font-medium text-foreground">{activeSessions.length}</span> active
@@ -169,14 +169,14 @@ export function AgentsView() {
               </label>
             )}
           </div>
-        </ViewHeader>
+        </AgentsHeader>
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-8">
           {/* ACTIVE NOW section */}
           <section aria-label="Active sessions">
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Active Now
+            <h2 className="mb-3 font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>
+              Active now
             </h2>
 
             {visibleSessions.length === 0 ? (
@@ -236,29 +236,31 @@ export function AgentsView() {
 }
 
 // ---------------------------------------------------------------------------
-// ViewHeader
+// AgentsHeader — local helper that wraps the shared ViewHeader to surface
+// the spinner-while-fetching affordance the original local helper provided.
 // ---------------------------------------------------------------------------
 
-interface ViewHeaderProps {
+interface AgentsHeaderProps {
   isFetching: boolean;
   children?: React.ReactNode;
 }
 
-function ViewHeader({ isFetching, children }: ViewHeaderProps) {
+function AgentsHeader({ isFetching, children }: AgentsHeaderProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-4">
-      <div className="flex items-center gap-3">
-        <Activity className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-        <h1 className="text-sm font-semibold">Agents</h1>
-        {isFetching && (
-          <div
-            className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent"
-            role="status"
-            aria-label="Loading agent data"
-          />
-        )}
-      </div>
-      {children !== undefined && <div>{children}</div>}
-    </div>
+    <ViewHeader
+      title={
+        <span className="flex items-center gap-3">
+          Agents
+          {isFetching && (
+            <span
+              className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent"
+              role="status"
+              aria-label="Loading agent data"
+            />
+          )}
+        </span>
+      }
+      tools={children}
+    />
   );
 }

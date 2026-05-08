@@ -98,7 +98,7 @@ export function TagCloud({ activeProject, onKeywordClick }: TagCloudProps) {
         ) : (
           <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
         )}
-        <span className="text-xs font-medium text-foreground">Keywords</span>
+        <span className="font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>Keywords</span>
         {keywords.length > 0 && (
           <span className="text-[10px] text-muted-foreground">{keywords.length}</span>
         )}

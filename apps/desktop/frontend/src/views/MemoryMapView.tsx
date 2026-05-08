@@ -91,7 +91,7 @@ export function MemoryMapView() {
               'flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               activeTab === 'graph'
-                ? 'bg-background text-foreground shadow-sm'
+                ? 'bg-background text-foreground shadow-hearth-sm'
                 : 'text-muted-foreground hover:text-foreground',
             )}
           >
@@ -107,7 +107,7 @@ export function MemoryMapView() {
               'flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               activeTab === 'clusters'
-                ? 'bg-background text-foreground shadow-sm'
+                ? 'bg-background text-foreground shadow-hearth-sm'
                 : 'text-muted-foreground hover:text-foreground',
             )}
           >

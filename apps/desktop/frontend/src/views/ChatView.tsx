@@ -18,6 +18,7 @@ import { ModelSelector } from '@/components/chat/ModelSelector';
 import { useChat } from '@/hooks/useChat';
 import { useSettings } from '@/hooks/useSettings';
 import { useHealth } from '@/hooks/useHealth';
+import { ViewHeader } from '@/components/layout/ViewHeader';
 
 // ---------------------------------------------------------------------------
 // Example prompts for empty state
@@ -62,61 +63,61 @@ export function ChatView() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* ------------------------------------------------------------------ */}
-      {/* Top bar                                                             */}
+      {/* Top bar — unified ViewHeader with model selector + parameter chips */}
       {/* ------------------------------------------------------------------ */}
-      <header className="flex shrink-0 flex-col border-b border-border bg-background px-4 py-2.5 sm:px-6">
-        <div className="flex items-center gap-3">
-          <ModelSelector disabled={isStreaming} />
+      <ViewHeader
+        title="Chat"
+        tools={
+          <>
+            <ModelSelector disabled={isStreaming} />
 
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            {/* Temp chip */}
-            <InfoChip
-              icon={<Thermometer className="h-3 w-3" />}
-              aria-label="Edit temperature in settings"
-              onClick={goToHardwareSettings}
-            >
-              {!settingsLoaded || !settings ? (
-                <span className="inline-block h-3 w-6 animate-pulse rounded bg-muted" aria-hidden="true" />
-              ) : (
-                `Temp ${settings.runtime.temperature.toFixed(1)}`
-              )}
-            </InfoChip>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <InfoChip
+                icon={<Thermometer className="h-3 w-3" />}
+                aria-label="Edit temperature in settings"
+                onClick={goToHardwareSettings}
+              >
+                {!settingsLoaded || !settings ? (
+                  <span className="inline-block h-3 w-6 animate-hearth-pulse rounded bg-muted" aria-hidden="true" />
+                ) : (
+                  `Temp ${settings.runtime.temperature.toFixed(1)}`
+                )}
+              </InfoChip>
 
-            {/* Max tokens chip */}
-            <InfoChip
-              icon={<Hash className="h-3 w-3" />}
-              aria-label="Edit max output tokens in settings"
-              onClick={goToHardwareSettings}
-            >
-              {!settingsLoaded || !settings ? (
-                <span className="inline-block h-3 w-8 animate-pulse rounded bg-muted" aria-hidden="true" />
-              ) : (
-                `Max ${settings.runtime.max_tokens.toLocaleString()}`
-              )}
-            </InfoChip>
+              <InfoChip
+                icon={<Hash className="h-3 w-3" />}
+                aria-label="Edit max output tokens in settings"
+                onClick={goToHardwareSettings}
+              >
+                {!settingsLoaded || !settings ? (
+                  <span className="inline-block h-3 w-8 animate-hearth-pulse rounded bg-muted" aria-hidden="true" />
+                ) : (
+                  `Max ${settings.runtime.max_tokens.toLocaleString()}`
+                )}
+              </InfoChip>
 
-            {/* Context size chip */}
-            <InfoChip
-              icon={<Layers className="h-3 w-3" />}
-              aria-label="Edit context size in settings"
-              onClick={goToHardwareSettings}
-            >
-              {!settingsLoaded || !settings ? (
-                <span className="inline-block h-3 w-8 animate-pulse rounded bg-muted" aria-hidden="true" />
-              ) : nCtxLoaded != null ? (
-                `Ctx ${nCtxLoaded.toLocaleString()}`
-              ) : (
-                <span
-                  className="italic opacity-50"
-                  title="Applies when a model is loaded"
-                >
-                  {`Ctx ${settings.runtime.context_size.toLocaleString()}`}
-                </span>
-              )}
-            </InfoChip>
-          </div>
-        </div>
-      </header>
+              <InfoChip
+                icon={<Layers className="h-3 w-3" />}
+                aria-label="Edit context size in settings"
+                onClick={goToHardwareSettings}
+              >
+                {!settingsLoaded || !settings ? (
+                  <span className="inline-block h-3 w-8 animate-hearth-pulse rounded bg-muted" aria-hidden="true" />
+                ) : nCtxLoaded != null ? (
+                  `Ctx ${nCtxLoaded.toLocaleString()}`
+                ) : (
+                  <span
+                    className="italic opacity-50"
+                    title="Applies when a model is loaded"
+                  >
+                    {`Ctx ${settings.runtime.context_size.toLocaleString()}`}
+                  </span>
+                )}
+              </InfoChip>
+            </div>
+          </>
+        }
+      />
 
       {/* ------------------------------------------------------------------ */}
       {/* Main content                                                        */}
@@ -163,8 +164,9 @@ function InfoChip({ icon, children, 'aria-label': ariaLabel, onClick }: InfoChip
       aria-label={ariaLabel}
       onClick={onClick}
       className={cn(
-        'flex items-center gap-1',
-        'rounded px-1.5 py-0.5 transition-colors',
+        'flex items-center gap-1 tabular-nums',
+        'rounded px-1.5 py-0.5',
+        'transition-colors duration-fast',
         'cursor-pointer hover:bg-accent hover:text-accent-foreground',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
       )}
@@ -191,21 +193,28 @@ function EmptyState({ modelLoaded, onSelectPrompt, onGoToModels }: EmptyStatePro
       {/* Centered greeting. The serif heading is the moment the new
           aesthetic announces itself — Direction-B "warm + handcrafted"
           versus the previous default-shadcn cold sans heading. */}
-      <div className="relative z-10 flex flex-col items-center gap-4 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20">
-          <span
-            className="font-serif text-3xl leading-none text-primary select-none"
-            style={{ transform: 'translateY(1px)' }}
+      <div className="relative z-10 flex flex-col items-center gap-4 text-center animate-fade-in-up">
+        {/* P-mark with ember halo — matches FirstRun and Membership */}
+        <div className="relative h-14 w-14">
+          <div
+            className="absolute inset-0 rounded-2xl bg-primary/15 blur-xl"
             aria-hidden="true"
-          >
-            P
-          </span>
+          />
+          <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20">
+            <span
+              className="font-serif text-3xl leading-none text-primary select-none"
+              style={{ transform: 'translateY(1px)' }}
+              aria-hidden="true"
+            >
+              P
+            </span>
+          </div>
         </div>
         <div className="max-w-md">
           <h2 className="font-serif text-3xl leading-tight tracking-display text-foreground">
             {modelLoaded ? 'What can I help you with?' : 'No model loaded yet'}
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground reading-measure mx-auto">
             {modelLoaded
               ? 'Ask anything. The conversation runs on your machine; nothing leaves it.'
               : 'Pick a model to load locally and we’ll be ready.'}
@@ -219,7 +228,8 @@ function EmptyState({ modelLoaded, onSelectPrompt, onGoToModels }: EmptyStatePro
           onClick={onGoToModels}
           className={cn(
             'relative z-10 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground',
-            'shadow-sm hover:bg-primary/90 transition-colors',
+            'shadow-hearth-sm hover:bg-primary/90 active:scale-[0.98]',
+            'transition-all duration-fast',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
           )}
         >
@@ -228,22 +238,31 @@ function EmptyState({ modelLoaded, onSelectPrompt, onGoToModels }: EmptyStatePro
       )}
 
       {modelLoaded && (
-        <div className="relative z-10 flex w-full max-w-2xl flex-col gap-2">
-          {EXAMPLE_PROMPTS.map((prompt) => (
+        <div
+          className="relative z-10 flex w-full max-w-2xl flex-col gap-2"
+          role="list"
+          aria-label="Example prompts"
+        >
+          {EXAMPLE_PROMPTS.map((prompt, idx) => (
             <button
               key={prompt}
               type="button"
+              role="listitem"
               onClick={() => onSelectPrompt(prompt)}
+              style={{ animationDelay: `${idx * 60}ms` }}
               className={cn(
                 'group flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3',
-                'text-left text-[15px] text-foreground/90 transition-colors',
-                'hover:border-primary/30 hover:bg-card hover:text-foreground',
+                'text-left text-[15px] text-foreground/90',
+                'shadow-hearth-sm',
+                'transition-all duration-fast',
+                'hover:border-primary/35 hover:bg-card hover:text-foreground hover:shadow-hearth',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                'animate-fade-in-up',
               )}
             >
               <span>{prompt}</span>
               <span
-                className="font-serif italic text-sm text-muted-foreground/70 group-hover:text-primary transition-colors"
+                className="font-serif italic text-sm text-muted-foreground/70 group-hover:text-primary transition-colors duration-fast"
                 aria-hidden="true"
               >
                 ask &rarr;

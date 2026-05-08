@@ -1,11 +1,16 @@
 /**
  * Composer — auto-growing textarea with send/stop controls.
  *
- * - Enter → send; Shift+Enter → newline; Cmd/Ctrl+Enter → send
+ * - Enter → send; Shift+Enter → newline; Cmd/Ctrl+Enter → also sends
  * - Esc → abort streaming
  * - Textarea grows up to ~12 lines then scrolls
  * - Send button disabled when empty or no model is loaded
  * - During streaming: send morphs into a stop button
+ * - Slash-key (/) focus shortcut from anywhere on the chat view
+ *
+ * Hearth chrome: lifted card surface, ember focus ring on focus-within,
+ * subdued helper hint with keyboard glyphs. The composer is the most-
+ * touched control in the app — it earns its visual weight.
  */
 
 import {
@@ -31,6 +36,7 @@ const MAX_HEIGHT_PX = 240;
 
 export function Composer({ onSend, onStop, isStreaming, modelLoaded }: ComposerProps) {
   const [value, setValue] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea
@@ -41,19 +47,34 @@ export function Composer({ onSend, onStop, isStreaming, modelLoaded }: ComposerP
     el.style.height = `${Math.min(el.scrollHeight, MAX_HEIGHT_PX)}px`;
   }, [value]);
 
-  // Re-focus after streaming ends
+  // Re-focus after streaming ends so the user can type the next prompt
   useEffect(() => {
     if (!isStreaming) {
       textareaRef.current?.focus();
     }
   }, [isStreaming]);
 
+  // Slash-key focus shortcut (skip if user is already typing into a field)
+  useEffect(() => {
+    function handler(e: globalThis.KeyboardEvent) {
+      if (e.key !== '/') return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      if (isStreaming || !modelLoaded) return;
+      e.preventDefault();
+      textareaRef.current?.focus();
+    }
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isStreaming, modelLoaded]);
+
   const submit = useCallback(() => {
     const trimmed = value.trim();
     if (!trimmed || isStreaming || !modelLoaded) return;
     onSend(trimmed);
     setValue('');
-    // Reset height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -83,19 +104,20 @@ export function Composer({ onSend, onStop, isStreaming, modelLoaded }: ComposerP
   const placeholder = !modelLoaded
     ? 'Load a model to start chatting…'
     : isStreaming
-    ? 'Generating…'
-    : 'Message (Enter to send, Shift+Enter for newline)';
+      ? 'Generating…'
+      : 'Ask anything. Press / to focus, Enter to send, Shift+Enter for a newline.';
 
   return (
-    {/* Slight elevation off pure background — card/40 reads as "lifted
-        but not loud" against the warm-charcoal canvas, anchoring the
-        composer to the page instead of floating in a void. */}
     <div className="border-t border-border bg-card/40 px-4 py-3 sm:px-6">
+      {/* Lifted card surface — anchors the composer to the page instead
+          of floating in a void. focus-within drives the ember ring. */}
       <div
         className={cn(
           'mx-auto flex max-w-3xl items-end gap-2 rounded-xl border border-input bg-card',
-          'px-3 py-2 shadow-sm transition-shadow',
-          'focus-within:ring-2 focus-within:ring-ring',
+          'px-3 py-2.5 transition-shadow duration-base',
+          isFocused
+            ? 'shadow-hearth border-primary/30'
+            : 'shadow-hearth-sm hover:border-border',
         )}
       >
         <textarea
@@ -103,14 +125,16 @@ export function Composer({ onSend, onStop, isStreaming, modelLoaded }: ComposerP
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
           rows={1}
           disabled={isStreaming || !modelLoaded}
           placeholder={placeholder}
           aria-label="Chat message"
           aria-multiline="true"
           className={cn(
-            'flex-1 resize-none bg-transparent text-sm text-foreground',
-            'placeholder:text-muted-foreground',
+            'flex-1 resize-none bg-transparent text-[15px] leading-6 text-foreground',
+            'placeholder:text-muted-foreground/70',
             'focus:outline-none',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             'overflow-y-auto',
@@ -122,12 +146,13 @@ export function Composer({ onSend, onStop, isStreaming, modelLoaded }: ComposerP
           <button
             type="button"
             onClick={onStop}
-            aria-label="Stop generation"
+            aria-label="Stop generation (Esc)"
+            title="Stop (Esc)"
             className={cn(
-              'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
               'bg-destructive text-destructive-foreground',
-              'hover:bg-destructive/90 transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'hover:bg-destructive/90 transition-colors duration-fast',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card',
             )}
           >
             <Square className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
@@ -138,22 +163,75 @@ export function Composer({ onSend, onStop, isStreaming, modelLoaded }: ComposerP
             onClick={submit}
             disabled={!canSend}
             aria-label="Send message"
+            title="Send (Enter)"
             className={cn(
-              'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all duration-fast',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card',
               canSend
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                ? 'bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 shadow-hearth-sm'
                 : 'bg-muted text-muted-foreground cursor-not-allowed',
             )}
           >
-            <Send className="h-3.5 w-3.5" aria-hidden="true" />
+            <Send className="h-4 w-4" aria-hidden="true" />
           </button>
         )}
       </div>
 
-      <p className="mx-auto mt-1.5 max-w-3xl text-center text-[11px] text-muted-foreground/60">
-        Runs locally — your messages never leave this device.
-      </p>
+      <ComposerHint isStreaming={isStreaming} modelLoaded={modelLoaded} />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ComposerHint — small line of editorial copy under the composer
+// ---------------------------------------------------------------------------
+
+interface ComposerHintProps {
+  isStreaming: boolean;
+  modelLoaded: boolean;
+}
+
+function ComposerHint({ isStreaming, modelLoaded }: ComposerHintProps) {
+  // The hint switches voice depending on state. Always-local promise is the
+  // anchor; the streaming and "no model" states get their own honest line.
+  let body: React.ReactNode;
+  if (!modelLoaded) {
+    body = (
+      <>
+        Pick a model in <span className="font-medium text-muted-foreground">Models</span> and
+        we’re ready.
+      </>
+    );
+  } else if (isStreaming) {
+    body = (
+      <>
+        Press <Kbd>Esc</Kbd> to stop generating.
+      </>
+    );
+  } else {
+    body = (
+      <>
+        Runs locally — your messages never leave this device.
+      </>
+    );
+  }
+
+  return (
+    <p className="mx-auto mt-2 flex max-w-3xl items-center justify-center gap-1.5 text-[11px] text-muted-foreground/60">
+      {body}
+    </p>
+  );
+}
+
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd
+      className={cn(
+        'inline-flex h-4 min-w-[1rem] items-center justify-center rounded border border-border/70',
+        'bg-muted px-1 font-mono text-[10px] font-medium text-muted-foreground',
+      )}
+    >
+      {children}
+    </kbd>
   );
 }

@@ -10,9 +10,9 @@ interface ConfidenceBarProps {
 }
 
 function confidenceColor(value: number): string {
-  if (value >= 0.8) return 'bg-emerald-500';
-  if (value >= 0.5) return 'bg-amber-500';
-  return 'bg-red-500';
+  if (value >= 0.8) return 'bg-sage';
+  if (value >= 0.5) return 'bg-amber-500/70';
+  return 'bg-destructive/60';
 }
 
 export function ConfidenceBar({ value, className }: ConfidenceBarProps) {
@@ -25,9 +25,13 @@ export function ConfidenceBar({ value, className }: ConfidenceBarProps) {
       title={`Confidence: ${pct}%`}
       aria-label={`Confidence ${pct}%`}
     >
-      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+      <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted/80">
         <div
-          className={cn('h-full rounded-full transition-all duration-300', confidenceColor(clamped))}
+          className={cn(
+            'h-full rounded-full',
+            'transition-all duration-slow ease-out-soft',
+            confidenceColor(clamped),
+          )}
           style={{ width: `${pct}%` }}
           role="progressbar"
           aria-valuenow={pct}

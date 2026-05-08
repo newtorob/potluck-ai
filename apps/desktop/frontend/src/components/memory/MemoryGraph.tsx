@@ -407,57 +407,70 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden">
       {/* Loading / error / empty overlays — container stays mounted so the
-          ResizeObserver never loses its target. */}
+          ResizeObserver never loses its target. The graph canvas is pure
+          black (Obsidian-style); these overlays sit ON the black, so they
+          use a paper-tinted muted color for sufficient contrast. */}
       {isLoading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-20">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-20 animate-fade-in">
           <div
             className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent"
             role="status"
             aria-label="Building graph"
           />
-          <p className="text-xs text-muted-foreground">{loadingMessage}</p>
+          <p className="text-xs text-paper/70 tabular-nums">{loadingMessage}</p>
         </div>
       )}
 
       {error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-20">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-20 animate-fade-in">
           <AlertCircle className="h-8 w-8 text-destructive" aria-hidden="true" />
           <p className="text-sm text-destructive">{error}</p>
         </div>
       )}
 
       {showEmptyState && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center z-20">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
-            <span className="text-2xl" aria-hidden="true">🧠</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center z-20 animate-fade-in-up">
+          {/* Sage-tinted halo placeholder — telegraphs "alive but empty" */}
+          <div className="relative flex h-16 w-16 items-center justify-center">
+            <div className="absolute inset-0 rounded-2xl bg-sage/20 blur-xl" aria-hidden="true" />
+            <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-sage/30 bg-sage/10">
+              <span className="text-2xl" aria-hidden="true">🧠</span>
+            </div>
           </div>
-          <p className="text-sm font-medium text-foreground">No memories to graph</p>
-          <p className="text-xs text-muted-foreground">
-            Add some memories and switch back to see the graph.
+          <p className="text-sm font-serif italic text-paper">No memories to graph yet</p>
+          <p className="max-w-xs text-xs text-paper/60 leading-relaxed">
+            As Potluck remembers things across conversations, they'll appear here as nodes — connected by what they have in common.
           </p>
         </div>
       )}
 
-      {/* Truncation notice */}
+      {/* Truncation notice — paper-tinted on the black canvas */}
       {showGraph && truncated && (
         <div
-          className="absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-400"
+          className={cn(
+            'absolute left-1/2 top-3 z-10 -translate-x-1/2 animate-fade-in',
+            'rounded-full border border-paper/15 bg-black/60 px-3 py-1 backdrop-blur-md',
+            'text-[11px] text-paper/70 tabular-nums',
+          )}
           role="status"
         >
           Showing edges for the {RELATED_BATCH_LIMIT} most-recently-accessed memories
         </div>
       )}
 
-      {/* Recenter button */}
+      {/* Recenter button — frosted on the black canvas */}
       {showGraph && (
         <button
           type="button"
           onClick={handleRecenter}
           aria-label="Recenter graph"
+          title="Recenter (fit to view)"
           className={cn(
-            'absolute bottom-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-lg',
-            'bg-background/80 border border-border text-muted-foreground backdrop-blur-sm',
-            'hover:bg-accent hover:text-foreground transition-colors',
+            'absolute bottom-4 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-lg',
+            'border border-paper/15 bg-black/50 text-paper/80 backdrop-blur-md',
+            'transition-all duration-fast',
+            'hover:bg-black/70 hover:text-paper hover:border-paper/30',
+            'active:scale-95',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           )}
         >
@@ -465,26 +478,46 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
         </button>
       )}
 
-      {/* Hover tooltip */}
+      {/* Hover tooltip — frosted, always-on-black; uses the popover token
+          shadow for elevation discipline. Animates in subtly. */}
       {showGraph && hoveredNode && (
         <div
           className={cn(
-            'pointer-events-none absolute left-4 bottom-4 z-10 max-w-[260px]',
-            'rounded-lg border border-border bg-popover px-3 py-2 shadow-lg',
+            'pointer-events-none absolute left-4 bottom-4 z-10 max-w-[280px]',
+            'rounded-xl border border-paper/15 bg-black/70 backdrop-blur-md',
+            'px-3.5 py-2.5 shadow-hearth-lg',
+            'animate-fade-in',
           )}
           role="tooltip"
         >
-          <div className="mb-1 flex items-center gap-1.5">
-            <span
-              className="h-2 w-2 shrink-0 rounded-full"
-              style={{ backgroundColor: CATEGORY_COLORS[hoveredNode.category] }}
-              aria-hidden="true"
-            />
-            <span className="text-[11px] capitalize text-muted-foreground">
+          <div className="mb-1.5 flex items-center gap-1.5">
+            {/* Glowing dot — matches the node's color, halos for the
+                alive-on-black feel that defines this canvas */}
+            <span className="relative inline-flex h-2 w-2 shrink-0">
+              <span
+                className="absolute inset-0 rounded-full opacity-50 blur-sm"
+                style={{ backgroundColor: CATEGORY_COLORS[hoveredNode.category] }}
+                aria-hidden="true"
+              />
+              <span
+                className="relative h-2 w-2 rounded-full"
+                style={{ backgroundColor: CATEGORY_COLORS[hoveredNode.category] }}
+                aria-hidden="true"
+              />
+            </span>
+            <span className="text-[10px] font-medium uppercase tracking-wider text-paper/60">
               {hoveredNode.category}
             </span>
+            {hoveredNode.degree > 0 && (
+              <>
+                <span className="text-paper/30" aria-hidden="true">·</span>
+                <span className="text-[10px] text-paper/50 tabular-nums">
+                  {hoveredNode.degree} {hoveredNode.degree === 1 ? 'link' : 'links'}
+                </span>
+              </>
+            )}
           </div>
-          <p className="line-clamp-4 text-xs text-foreground">{hoveredNode.content}</p>
+          <p className="line-clamp-4 text-[13px] leading-relaxed text-paper/95">{hoveredNode.content}</p>
         </div>
       )}
 

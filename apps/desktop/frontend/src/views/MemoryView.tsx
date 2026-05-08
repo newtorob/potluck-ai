@@ -31,6 +31,8 @@ import { NewMemoryForm } from '@/components/memory/NewMemoryForm';
 import { RelatedMemoriesDrawer } from '@/components/memory/RelatedMemoriesDrawer';
 import { TagCloud } from '@/components/memory/TagCloud';
 import { CATEGORY_STYLES, CATEGORY_LABELS } from '@/components/memory/CategoryPill';
+import { ViewHeader } from '@/components/layout/ViewHeader';
+import { EmptyState } from '@/components/layout/EmptyState';
 import type { Memory, MemoryCategory } from '@/types/memory';
 import type { SearchMode } from '@/stores/memoryStore';
 
@@ -372,56 +374,48 @@ export function MemoryView() {
   return (
     <div className="flex h-full flex-col">
       {/* ------------------------------------------------------------------ */}
-      {/* Header                                                              */}
+      {/* Unified header — title + count + actions + project subnav          */}
       {/* ------------------------------------------------------------------ */}
-      <div className="flex items-center justify-between border-b border-border px-6 py-3">
-        <div className="flex items-center gap-3">
-          <Brain className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-          <h1 className="text-sm font-semibold">Memory</h1>
-          {memories.length > 0 && (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-              {memories.length}
-            </span>
-          )}
-        </div>
+      <ViewHeader
+        title="Memory"
+        count={memories.length}
+        actions={
+          <>
+            <Link
+              to="/memory/map"
+              className={cn(
+                'text-xs text-muted-foreground hover:text-foreground transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded',
+              )}
+            >
+              View as map
+            </Link>
 
-        <div className="flex items-center gap-2">
-          <Link
-            to="/memory/map"
-            className={cn(
-              'text-xs text-muted-foreground hover:text-foreground transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded',
-            )}
-          >
-            View as map
-          </Link>
-
-          <button
-            type="button"
-            onClick={() => setShowNewForm((v) => !v)}
-            aria-label="Add new memory"
-            aria-expanded={showNewForm}
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5',
-              'text-xs font-medium text-primary-foreground',
-              'hover:bg-primary/90 transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-            )}
-          >
-            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-            New
-          </button>
-        </div>
-      </div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Project filter chips                                                */}
-      {/* ------------------------------------------------------------------ */}
-      <ProjectFilterChips
-        projects={projects.map((p) => p.project)}
-        activeProject={activeProject}
-        filter={projectFilter}
-        onFilterChange={setProjectFilter}
+            <button
+              type="button"
+              onClick={() => setShowNewForm((v) => !v)}
+              aria-label="Add new memory"
+              aria-expanded={showNewForm}
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5',
+                'text-xs font-medium text-primary-foreground',
+                'hover:bg-primary/90 transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              )}
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              New
+            </button>
+          </>
+        }
+        subnav={
+          <ProjectFilterChips
+            projects={projects.map((p) => p.project)}
+            activeProject={activeProject}
+            filter={projectFilter}
+            onFilterChange={setProjectFilter}
+          />
+        }
       />
 
       {/* ------------------------------------------------------------------ */}
@@ -429,16 +423,16 @@ export function MemoryView() {
       {/* ------------------------------------------------------------------ */}
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-2xl px-6 py-5 space-y-4">
-          {/* Privacy disabled banner */}
+          {/* Privacy disabled banner — Hearth-coherent (ember tint, not generic amber) */}
           {!memoryEnabled && (
             <div
               className={cn(
-                'flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10',
-                'px-4 py-3',
+                'animate-fade-in-up flex items-start gap-3 rounded-xl border border-primary/25 bg-primary/8',
+                'px-4 py-3 shadow-hearth-sm',
               )}
               role="alert"
             >
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" aria-hidden="true" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-foreground">Memory is disabled</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
@@ -450,8 +444,8 @@ export function MemoryView() {
                 type="button"
                 onClick={handleEnableMemory}
                 className={cn(
-                  'shrink-0 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white',
-                  'hover:bg-amber-400 transition-colors',
+                  'shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground',
+                  'hover:bg-primary/90 transition-colors duration-fast shadow-hearth-sm',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 )}
               >
@@ -490,7 +484,7 @@ export function MemoryView() {
                 aria-hidden="true"
               />
 
-              {/* Input */}
+              {/* Input — Hearth shadow at rest, ember ring on focus */}
               <input
                 ref={searchInputRef}
                 type="search"
@@ -500,9 +494,10 @@ export function MemoryView() {
                 aria-label="Search memories"
                 className={cn(
                   'h-12 w-full rounded-xl border border-input bg-card pl-10 pr-36',
-                  'text-sm text-foreground placeholder:text-muted-foreground',
-                  'focus:outline-none focus:ring-2 focus:ring-ring',
-                  'transition-shadow',
+                  'text-[15px] text-foreground placeholder:text-muted-foreground/80',
+                  'shadow-hearth-sm',
+                  'focus:outline-none focus:border-primary/40 focus:shadow-hearth focus:ring-2 focus:ring-ring/50',
+                  'transition-all duration-base',
                 )}
               />
 
@@ -843,14 +838,23 @@ interface MemoryCardWrapperProps {
   registerRef: (el: HTMLElement | null) => void;
 }
 
-function MemoryCardWrapper({ memory, onOpen, registerRef }: MemoryCardWrapperProps) {
+function MemoryCardWrapper({ memory, index, onOpen, registerRef }: MemoryCardWrapperProps) {
+  // Stagger fade-in across the first ~12 cards so the list lands in a wave
+  // rather than a sudden snap. After that we cap it — too long a stagger
+  // would feel sluggish.
+  const delay = Math.min(index, 12) * 24;
   return (
     <div
       ref={registerRef}
       role="listitem"
       tabIndex={0}
       aria-label={`Memory: ${memory.content.slice(0, 60)}`}
-      className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+      className={cn(
+        'cursor-pointer rounded-xl',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'animate-fade-in-up',
+      )}
+      style={{ animationDelay: `${delay}ms` }}
       onClick={() => onOpen(memory)}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
@@ -933,7 +937,7 @@ function ProjectFilterChips({ projects, activeProject, filter, onFilterChange }:
     <div
       role="group"
       aria-label="Filter memories by project"
-      className="flex flex-wrap items-center gap-1.5 border-b border-border px-6 py-2.5"
+      className="flex flex-wrap items-center gap-1.5"
     >
       <button
         type="button"
@@ -943,7 +947,7 @@ function ProjectFilterChips({ projects, activeProject, filter, onFilterChange }:
           'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           filter.kind === 'active'
-            ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
+            ? 'bg-primary/15 text-primary border border-primary/25'
             : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground border border-transparent',
         )}
       >
@@ -982,17 +986,12 @@ function ProjectFilterChips({ projects, activeProject, filter, onFilterChange }:
 
 function MemoryEmptyState() {
   return (
-    <div className="flex flex-col items-center gap-4 py-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
-        <Brain className="h-7 w-7 text-muted-foreground" aria-hidden="true" />
-      </div>
-      <div>
-        <p className="text-sm font-medium text-foreground">No memories yet</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Memories will be extracted from your conversations automatically.
-        </p>
-      </div>
-    </div>
+    <EmptyState
+      icon={Brain}
+      title="No memories yet"
+      description="Memories will appear here as Potluck learns from your conversations — facts, preferences, decisions, names. Nothing leaves your machine."
+      align="top"
+    />
   );
 }
 
@@ -1002,12 +1001,20 @@ function MemoryEmptyState() {
 
 function MemorySkeleton() {
   return (
-    <div className="space-y-3" aria-label="Loading memories">
+    <div className="space-y-3 animate-fade-in" aria-label="Loading memories" aria-live="polite">
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="rounded-xl border border-border bg-card px-4 py-3 space-y-2">
-          <div className="h-3 w-1/4 animate-pulse rounded-full bg-muted" />
-          <div className="h-3 w-3/4 animate-pulse rounded bg-muted" />
-          <div className="h-3 w-1/2 animate-pulse rounded bg-muted" />
+        <div
+          key={i}
+          className="rounded-xl border border-border/60 bg-card px-4 py-3 space-y-2.5 shadow-hearth-sm"
+          style={{ animationDelay: `${i * 60}ms` }}
+        >
+          {/* Category-pill stand-in */}
+          <div className="flex items-center gap-2">
+            <div className="h-4 w-16 animate-hearth-pulse rounded-full bg-muted" />
+            <div className="h-4 w-12 animate-hearth-pulse rounded-full bg-muted/70" />
+          </div>
+          <div className="h-3 w-3/4 animate-hearth-pulse rounded bg-muted" />
+          <div className="h-3 w-1/2 animate-hearth-pulse rounded bg-muted/70" />
         </div>
       ))}
     </div>

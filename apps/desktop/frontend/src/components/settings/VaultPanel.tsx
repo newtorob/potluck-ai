@@ -203,8 +203,8 @@ export function VaultPanel({ settings, isSaving, saveError, onUpdate }: VaultPan
         )}
 
         {lastResult && !scanError && (
-          <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2.5">
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-sage/30 bg-sage/5 p-2.5">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-sage" aria-hidden="true" />
             <p className="text-xs text-foreground/80">
               Scanned {lastResult.files_scanned} file{lastResult.files_scanned === 1 ? '' : 's'}
               {lastResult.files_added > 0 && ` — ${lastResult.files_added} new`}
@@ -227,7 +227,7 @@ export function VaultPanel({ settings, isSaving, saveError, onUpdate }: VaultPan
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="font-serif text-[10px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>{label}</span>
       <span className="text-lg font-semibold tabular-nums text-foreground">{value}</span>
     </div>
   );

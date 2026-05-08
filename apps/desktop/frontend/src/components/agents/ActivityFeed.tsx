@@ -135,7 +135,7 @@ function ActivityRow({ call, clientName, isHighlighted, isNew, onSelect }: Activ
 
       {/* Result count */}
       {call.result_count !== null && (
-        <span className="shrink-0 text-emerald-500">{call.result_count} results</span>
+        <span className="shrink-0 text-sage">{call.result_count} results</span>
       )}
 
       {/* Duration */}
@@ -329,8 +329,8 @@ export function ActivityFeed({
     <section aria-label="Recent activity">
       {/* Section header + filters */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Recent Activity
+        <h2 className="font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>
+          Recent activity
         </h2>
         <FilterControls
           sessions={sessions}

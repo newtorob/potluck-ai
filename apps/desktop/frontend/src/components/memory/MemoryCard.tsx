@@ -147,17 +147,24 @@ export function MemoryCard({ memory }: MemoryCardProps) {
   return (
     <article
       className={cn(
-        'group relative rounded-xl border border-border bg-card px-4 py-3',
-        'transition-shadow hover:shadow-sm',
+        'group relative rounded-xl border border-border/60 bg-card px-4 py-3.5',
+        // Hearth elevation: hairline gets warmer + soft shadow on hover
+        // (and a subtle top-line lift, NOT a stacked shadow). Lifts ~1px to
+        // signal "interactive without being loud."
+        'transition-all duration-fast',
+        'hover:border-border hover:shadow-hearth-sm',
+        editing && 'border-primary/30 shadow-hearth ring-1 ring-primary/15',
       )}
       aria-label={`Memory: ${memory.content.slice(0, 60)}`}
     >
-      {/* Hover action buttons — top right */}
+      {/* Hover action buttons — top right. Also revealed on focus-within
+          so keyboard users (Tab into the card) see the same affordances. */}
       {!editing && (
         <div
           className={cn(
             'absolute right-2 top-2 flex items-center gap-0.5',
-            'opacity-0 transition-opacity group-hover:opacity-100',
+            'opacity-0 transition-opacity duration-fast',
+            'group-hover:opacity-100 group-focus-within:opacity-100',
           )}
           aria-label="Memory actions"
         >
@@ -350,16 +357,20 @@ export function MemoryCard({ memory }: MemoryCardProps) {
             <ProjectPill project={memory.project} />
           </div>
 
-          {/* Content */}
-          <div className="prose prose-sm prose-invert max-w-none text-sm text-foreground">
+          {/* Content — dark:prose-invert (was hard-coded prose-invert which
+              bleached the light theme). Inline-only renderers preserve the
+              "memory as one note" reading rhythm. */}
+          <div className="prose prose-sm dark:prose-invert max-w-none text-[14px] leading-relaxed text-foreground">
             <ReactMarkdown
               components={{
                 // Keep inline-only — no block elements needed for memory content
                 p: ({ children }) => <span className="block">{children}</span>,
-                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
                 em: ({ children }) => <em className="italic">{children}</em>,
                 code: ({ children }) => (
-                  <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">{children}</code>
+                  <code className="rounded bg-muted/80 border border-border/40 px-1 py-0.5 font-mono text-[0.85em] text-foreground/90">
+                    {children}
+                  </code>
                 ),
               }}
             >
@@ -367,19 +378,28 @@ export function MemoryCard({ memory }: MemoryCardProps) {
             </ReactMarkdown>
           </div>
 
-          {/* Bottom row: metadata */}
+          {/* Bottom row: metadata. Uses the .meta-row utility for editorial
+              vertical rhythm + tabular nums on counts so they don't jitter.
+              Bullet-glyph dividers (·) read calmer than gaps alone. */}
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
             <ConfidenceBar value={memory.confidence} />
 
-            <span className="text-[10px] text-muted-foreground" title={memory.created_at}>
+            <span
+              className="text-[10px] text-muted-foreground tabular-nums"
+              title={memory.created_at}
+            >
               {formatRelativeTime(memory.created_at)}
             </span>
 
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-[10px] text-muted-foreground/60" aria-hidden="true">·</span>
+
+            <span className="text-[10px] text-muted-foreground tabular-nums">
               used {memory.access_count} {memory.access_count === 1 ? 'time' : 'times'}
             </span>
 
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-[10px] text-muted-foreground/60" aria-hidden="true">·</span>
+
+            <span className="text-[10px] text-muted-foreground italic">
               {memory.source_conversation_id ? 'from conversation' : 'explicit save'}
             </span>
           </div>
@@ -403,7 +423,8 @@ function ActionButton({ variant = 'default', className, children, ...props }: Ac
       type="button"
       {...props}
       className={cn(
-        'flex h-6 w-6 items-center justify-center rounded-md transition-colors',
+        'flex h-6 w-6 items-center justify-center rounded-md',
+        'transition-colors duration-fast',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         'disabled:cursor-not-allowed disabled:opacity-40',
         variant === 'destructive'

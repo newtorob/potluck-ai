@@ -27,8 +27,8 @@ const MIN_SIMILARITY = 0.35;
 // ---------------------------------------------------------------------------
 
 function similarityColor(s: number): string {
-  if (s >= 0.7) return 'bg-emerald-500';
-  if (s >= 0.4) return 'bg-amber-500';
+  if (s >= 0.7) return 'bg-sage';
+  if (s >= 0.4) return 'bg-amber-500/70';
   return 'bg-muted-foreground/40';
 }
 
@@ -151,7 +151,7 @@ export function RelatedMemoriesDrawer({ sourceMemory, onClose }: RelatedMemories
               {currentEntry && (
                 <CategoryPill category={currentEntry.memory.category} />
               )}
-              <span className="text-xs text-muted-foreground">Related memories</span>
+              <span className="font-serif text-[10px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>Related memories</span>
             </div>
             <p className="line-clamp-2 text-sm text-foreground">
               {currentEntry?.memory.content ?? sourceMemory.content}

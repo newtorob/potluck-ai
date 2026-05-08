@@ -20,51 +20,78 @@
   (warm-charcoal + serif headlines), Mercury (warm-dark for serious
   audiences), Anthropic clay accent. See potluck design brief 2026-05-08.
 
-  Light theme is the "Common Room" paper layer — used for manifesto /
-  about / governance pages once they exist. Product chrome stays in dark
-  by default.
+  Light theme is the "Common Room" paper layer — equally first-class.
+  Both themes carry the same product chrome; the user picks via the
+  theme toggle in the sidebar's chrome controls.
 */
 
 @layer base {
   :root {
-    /* Light — "Common Room" paper. Cream surfaces, warm-on-warm. */
+    /* ---------------------------------------------------------------- */
+    /* LIGHT — "Common Room" paper. Cream surfaces, warm-on-warm.       */
+    /* ---------------------------------------------------------------- */
+
     --background: 35 28% 95%;        /* #F7F3EC warm cream */
     --foreground: 28 22% 11%;        /* #211D17 nearly black, warm undertone */
 
     --card: 36 33% 97%;              /* #FBF7F0 raised paper */
     --card-foreground: 28 22% 11%;
 
-    --popover: 36 33% 97%;
+    --popover: 36 35% 98%;           /* #FCF9F3 floating paper */
     --popover-foreground: 28 22% 11%;
 
-    /* Ember accent. Slightly desaturated from the brief's #E07856 to
-       sit in "warm and present" instead of "BUY NOW" — first-cut feedback
-       said the original was on the loud side of right. */
+    /* Ember accent — same in both themes. Slightly desaturated from
+       the brief's #E07856 to sit in "warm and present" instead of
+       "BUY NOW." */
     --primary: 16 60% 56%;
-    --primary-foreground: 35 28% 95%;
+    --primary-foreground: 35 30% 97%;
 
     --secondary: 35 22% 88%;         /* warm sand for secondary chrome */
     --secondary-foreground: 28 22% 18%;
 
     --muted: 35 18% 90%;             /* aged paper */
-    --muted-foreground: 28 12% 38%;  /* subdued sepia */
+    --muted-foreground: 28 14% 34%;  /* subdued sepia, AA at small sizes */
 
     --accent: 35 22% 90%;            /* hover/selection on cream */
     --accent-foreground: 28 22% 18%;
 
     --destructive: 8 64% 48%;        /* deep oxblood, not screaming red */
-    --destructive-foreground: 35 28% 95%;
+    --destructive-foreground: 35 30% 97%;
 
     --border: 32 18% 84%;            /* hairline warm gray */
     --input: 32 18% 84%;
     --ring: 16 67% 61%;              /* ember focus ring */
 
+    /* Layered surfaces — for elevation discipline. Light theme uses
+       progressively warmer cream tones; dark theme uses warmer charcoals.
+       See "elevation" rule in the design system: surface tinting + a
+       hairline border, NOT stacked shadows. */
+    --surface-1: 35 28% 95%;         /* same as background — flat */
+    --surface-2: 36 33% 97%;         /* same as card — raised one step */
+    --surface-3: 36 35% 98%;         /* same as popover — floating */
+
+    /* Custom Hearth tokens (cross-theme bridges + alive signals) */
+    --sage: 138 22% 38%;             /* darker forest for AA on cream */
+    --sage-foreground: 35 28% 95%;
+    --paper: 35 28% 95%;             /* the cream itself, name-as-handle */
+
     --radius: 0.5rem;
+
+    /* Motion tokens — used by reusable utilities below */
+    --duration-fast: 120ms;          /* state changes (hover, focus) */
+    --duration-base: 180ms;          /* default UI transitions */
+    --duration-slow: 280ms;          /* reveal / expand */
+    --ease-out-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
+    --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
   }
 
   .dark {
-    /* Dark — "Hearth". Warm charcoal, ember accent, sage success.
-       Background never goes pure #000; the warm undertone is intentional. */
+    /* ---------------------------------------------------------------- */
+    /* DARK — "Hearth". Warm charcoal, ember accent, sage success.     */
+    /* Background never goes pure #000; the warm undertone is the      */
+    /* defining character lever.                                       */
+    /* ---------------------------------------------------------------- */
+
     --background: 28 12% 9%;         /* #1A1714 warm charcoal */
     --foreground: 36 30% 94%;        /* #F2EBDF warm off-white, never pure #FFF */
 
@@ -74,8 +101,6 @@
     --popover: 28 11% 14%;           /* #2C2723 floating layers */
     --popover-foreground: 36 30% 94%;
 
-    /* Same ember as the light theme, slightly desaturated from the
-       brief's original #E07856 — feedback said it was on the loud side. */
     --primary: 16 60% 56%;
     --primary-foreground: 28 22% 11%;
 
@@ -83,7 +108,7 @@
     --secondary-foreground: 36 30% 94%;
 
     --muted: 28 9% 17%;
-    --muted-foreground: 32 12% 62%;  /* warm gray, NOT cool blue-gray */
+    --muted-foreground: 32 14% 66%;  /* warm gray, NOT cool blue-gray */
 
     --accent: 28 11% 18%;            /* hover/selection states */
     --accent-foreground: 36 30% 94%;
@@ -95,14 +120,15 @@
     --input: 28 9% 19%;
     --ring: 16 67% 61%;              /* ember focus ring */
 
-    /* Custom Hearth tokens (not in shadcn defaults) — used by accent
-       chrome where ember is too loud or the content needs a "this is
-       alive" signal (heartbeat dots, online states, etc.). */
+    /* Layered surfaces (dark) — progressively warmer charcoals */
+    --surface-1: 28 12% 9%;          /* background */
+    --surface-2: 28 11% 12%;         /* card */
+    --surface-3: 28 11% 14%;         /* popover */
+
+    /* Custom Hearth tokens — sage gets a brighter cut on dark */
     --sage: 138 14% 56%;             /* #7FA088 muted forest */
     --sage-foreground: 28 22% 11%;
-    --paper: 35 28% 95%;             /* lets dark surfaces reference the
-                                        light theme's cream — useful for
-                                        the "open the manifesto" link */
+    --paper: 35 28% 95%;             /* references the light theme's cream */
   }
 
   * {
@@ -114,12 +140,11 @@
     /* Optical refinements: enable common ligatures, contextual alternates,
        and tabular numerals for stat displays so columns align. */
     font-feature-settings: 'rlig' 1, 'calt' 1, 'ss01' 1;
-    /* Subtle film-grain energy on dark mode — at 1.5% it's felt, not seen. */
   }
 
   /* Headlines use Instrument Serif by default — overridable per-element
      with .font-sans / .font-mono. The serif gives the editorial warmth
-     the agent brief identified as the single biggest character lever. */
+     the design brief identified as the single biggest character lever. */
   h1, h2, h3 {
     @apply font-serif;
     letter-spacing: -0.01em;
@@ -131,7 +156,15 @@
     user-select: none;
   }
 
-  /* Scrollbar — warm-tinted, minimal */
+  /* Selection — ember-tinted in both themes. Default browser blue
+     fights the warm palette badly. */
+  ::selection {
+    background-color: hsl(var(--primary) / 0.28);
+    color: hsl(var(--foreground));
+  }
+
+  /* Scrollbar — warm-tinted, minimal. Slightly higher contrast in light
+     where the default thumb on cream was hard to see. */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -140,30 +173,129 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-border rounded-full;
+    background-color: hsl(var(--border));
+    border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/40;
+    background-color: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Reduce motion — global guard for users who want it */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
-/* Agent activity feed — new-row highlight animation, retuned to ember */
+/* =================================================================
+   Animations
+   ================================================================= */
+
+/* Agent activity feed — new-row highlight, retuned to ember */
 @keyframes fadeHighlight {
   0%   { background-color: hsl(var(--primary) / 0.16); }
   100% { background-color: transparent; }
 }
 
-/* Hearth-specific utility: faint film-grain noise via SVG data-URL.
-   Apply via `class="grain"` on full-bleed dark surfaces (chat pane,
-   memory canvas, /network view) for the workshop / leather-notebook
-   tactility. ~1.5% opacity — felt, not seen. */
-.grain::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/></svg>");
-  opacity: 0.015;
-  mix-blend-mode: overlay;
-  z-index: 0;
+/* Generic reveal — fade in with a tiny upward drift */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Generic fade-only */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Pulse for "alive" indicators (sage online dots, streaming cursors).
+   Subtler than Tailwind's animate-pulse — never below 0.55 opacity so
+   the dot is always legible. */
+@keyframes hearthPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+/* Caret blink for streaming text — slightly slower than .animate-pulse */
+@keyframes caretBlink {
+  0%, 49%   { opacity: 1; }
+  50%, 100% { opacity: 0.2; }
+}
+
+/* =================================================================
+   Hearth utilities
+   ================================================================= */
+
+@layer utilities {
+  /* Faint film-grain noise via SVG data-URL. Apply via `class="grain"`
+     on full-bleed surfaces (chat pane, memory canvas, /network view) for
+     workshop / leather-notebook tactility. ~1.5% opacity — felt, not seen.
+     Applies to both themes; mix-blend-mode keeps it neutral on cream. */
+  .grain::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/></svg>");
+    opacity: 0.015;
+    mix-blend-mode: overlay;
+    z-index: 0;
+  }
+
+  /* Layered surface utilities — semantic elevation without shadow stacks.
+     Use these instead of bg-card / bg-popover when you want the meaning
+     to read as elevation rather than role. */
+  .surface-1 { background-color: hsl(var(--surface-1)); }
+  .surface-2 { background-color: hsl(var(--surface-2)); }
+  .surface-3 { background-color: hsl(var(--surface-3)); }
+
+  /* Hairline — single-side warm-tinted divider. Cheaper than border
+     classes when you only want one edge. */
+  .hairline-t { box-shadow: inset 0 1px 0 0 hsl(var(--border)); }
+  .hairline-b { box-shadow: inset 0 -1px 0 0 hsl(var(--border)); }
+
+  /* Ember focus ring — slightly more visible than the default 2px.
+     For destination CTAs that need stronger focus affordance. */
+  .ring-ember-glow {
+    box-shadow:
+      0 0 0 2px hsl(var(--background)),
+      0 0 0 4px hsl(var(--ring) / 0.55);
+  }
+
+  /* Editorial reading width — caps prose at a comfortable measure
+     (~65ch), so chat answers and memory notes don't run line-long
+     on wide displays. */
+  .reading-measure { max-width: 65ch; }
+
+  /* Tight, low-affordance vertical rhythm for inline metadata rows */
+  .meta-row {
+    @apply flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground;
+  }
+
+  /* Animation utilities (reusable, named) */
+  .animate-fade-in {
+    animation: fadeIn var(--duration-base) var(--ease-out-soft) both;
+  }
+  .animate-fade-in-up {
+    animation: fadeInUp var(--duration-base) var(--ease-out-soft) both;
+  }
+  .animate-hearth-pulse {
+    animation: hearthPulse 2s var(--ease-out-soft) infinite;
+  }
+  .animate-caret-blink {
+    animation: caretBlink 1.05s steps(2, end) infinite;
+  }
 }

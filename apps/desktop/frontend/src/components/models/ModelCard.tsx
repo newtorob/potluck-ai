@@ -34,9 +34,9 @@ const TIER_LABELS: Record<ModelTier, string> = {
 };
 
 const TIER_COLORS: Record<ModelTier, string> = {
-  small: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-  medium: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  large: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
+  small: 'bg-muted text-muted-foreground',
+  medium: 'bg-muted text-foreground/70',
+  large: 'bg-primary/10 text-primary',
 };
 
 type Sufficiency = 'ok' | 'borderline' | 'insufficient' | 'unknown';
@@ -59,7 +59,7 @@ function checkSufficiency(model: CatalogModel, hardware: HardwareInfo | null): S
 }
 
 const SUFFICIENCY_ICON: Record<Sufficiency, React.ReactNode> = {
-  ok: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" aria-label="Hardware sufficient" />,
+  ok: <CheckCircle2 className="h-3.5 w-3.5 text-sage" aria-label="Hardware sufficient" />,
   borderline: (
     <AlertTriangle className="h-3.5 w-3.5 text-amber-500" aria-label="Hardware borderline" />
   ),
@@ -125,7 +125,7 @@ export function ModelCard({
       {/* Header row */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-1">
-          <h3 className="truncate text-sm font-semibold text-foreground">{name}</h3>
+          <h3 className="truncate font-sans text-sm font-semibold text-foreground">{name}</h3>
           <div className="flex items-center gap-2">
             <span
               className={cn(
@@ -141,9 +141,9 @@ export function ModelCard({
 
         {/* Active pill */}
         {isActive && (
-          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Active
+          <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-sage/10 px-2.5 py-0.5 text-xs font-medium text-sage">
+            <span className="h-1.5 w-1.5 rounded-full bg-sage animate-pulse" />
+            Loaded
           </span>
         )}
       </div>

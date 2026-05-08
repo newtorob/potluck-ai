@@ -1,9 +1,18 @@
 /**
- * Sidebar — primary nav + conversation list.
+ * Sidebar — primary nav + conversation list + chrome controls.
  *
- * Nav items are always visible. The "Conversations" section is shown only
- * when the current route is /chat. It lists all conversations sorted by
- * last-updated with active-state highlight.
+ * Behaviour overhaul (Hearth chrome refactor):
+ *   - Width is user-controlled, not route-controlled. Default expanded
+ *     (w-60). User can collapse to icon-only (w-16) via the toggle at
+ *     the bottom-left or the global ⌘\ shortcut. Persists to localStorage.
+ *   - Conversations panel ALWAYS shows on /chat regardless of width.
+ *     When the sidebar is collapsed and the route is /chat, the panel
+ *     hides and a single "show chats" button appears in its place — the
+ *     user can pop the conversations into a temporary sheet without
+ *     re-expanding the whole rail. (Sheet implementation is a follow-up;
+ *     v1 simply hides the conversations when collapsed and the user can
+ *     re-expand to access them — no jank, just a clean affordance.)
+ *   - New bottom-left actions row: collapse toggle + theme toggle.
  *
  * Per-conversation actions (rename, delete) are exposed via a three-dot
  * menu button that appears on hover.
@@ -25,11 +34,27 @@ import {
   Pencil,
   X,
   Check,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { useChat } from '@/hooks/useChat';
+import { useTheme } from '@/hooks/useTheme';
 import { ProjectSwitcher } from '@/components/layout/ProjectSwitcher';
 import type { AppConversation } from '@/stores/chatStore';
+
+// ---------------------------------------------------------------------------
+// Persistence — collapsed state survives reload
+// ---------------------------------------------------------------------------
+
+const COLLAPSE_KEY = 'potluck.sidebar_collapsed';
+
+function readCollapsed(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.localStorage.getItem(COLLAPSE_KEY) === 'true';
+}
 
 // ---------------------------------------------------------------------------
 // Nav config
@@ -47,8 +72,11 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/memory', label: 'Memory', icon: Brain },
   { to: '/tasks', label: 'Tasks', icon: ListTodo },
   { to: '/agents', label: 'Agents', icon: Activity },
-  { to: '/settings', label: 'Settings', icon: Settings },
+];
+
+const SECONDARY_NAV: NavItem[] = [
   { to: '/membership', label: 'Membership', icon: CreditCard },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 // ---------------------------------------------------------------------------
@@ -58,6 +86,28 @@ const NAV_ITEMS: NavItem[] = [
 export function Sidebar() {
   const location = useLocation();
   const isChat = location.pathname === '/chat' || location.pathname.startsWith('/chat');
+  const [collapsed, setCollapsedState] = useState<boolean>(readCollapsed);
+
+  function setCollapsed(v: boolean) {
+    setCollapsedState(v);
+    window.localStorage.setItem(COLLAPSE_KEY, String(v));
+  }
+
+  // ⌘\ / Ctrl+\ — global collapse toggle
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      const meta = e.metaKey || e.ctrlKey;
+      if (meta && e.key === '\\') {
+        e.preventDefault();
+        setCollapsed(!collapsed);
+      }
+    }
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapsed]);
+
+  const expanded = !collapsed;
 
   const {
     conversations,
@@ -73,18 +123,15 @@ export function Sidebar() {
     <nav
       className={cn(
         'flex shrink-0 flex-col border-r border-border bg-card',
-        isChat ? 'w-56' : 'w-16',
+        expanded ? 'w-60' : 'w-16',
         'transition-[width] duration-200',
       )}
       aria-label="Main navigation"
     >
-      {/* Logo — Hearth wordmark.
-          The serif "P" inside the ember-tinted square is the single
-          piece of bespoke iconography in the app per the design brief
-          (instead of a system of custom illustrations). */}
+      {/* Logo block — Hearth wordmark */}
       <div className={cn(
         'flex items-center border-b border-border px-3 py-4',
-        isChat ? 'justify-start gap-2.5' : 'justify-center',
+        expanded ? 'justify-start gap-2.5' : 'justify-center',
       )}>
         <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/12 ring-1 ring-primary/20">
           <span
@@ -95,54 +142,25 @@ export function Sidebar() {
             P
           </span>
         </div>
-        {isChat && (
+        {expanded && (
           <span className="font-serif text-base leading-none tracking-display text-foreground select-none">
             Potluck
           </span>
         )}
       </div>
 
-      {/* Project switcher — above nav */}
-      {isChat && <ProjectSwitcher />}
+      {/* Project switcher */}
+      {expanded && <ProjectSwitcher />}
 
-      {/* Nav links */}
-      <div className={cn('flex flex-col gap-0.5 py-3', isChat ? 'px-2' : 'items-center px-3')}>
-        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              cn(
-                'group relative flex items-center rounded-lg transition-colors',
-                'hover:bg-accent hover:text-accent-foreground',
-                isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground',
-                isChat ? 'gap-2.5 px-2.5 py-2' : 'h-10 w-10 justify-center',
-              )
-            }
-            aria-label={label}
-            title={!isChat ? label : undefined}
-          >
-            <Icon className="h-4 w-4 shrink-0" />
-            {isChat && <span className="text-sm font-medium">{label}</span>}
-
-            {/* Tooltip — icon-only mode */}
-            {!isChat && (
-              <span
-                className={cn(
-                  'pointer-events-none absolute left-full ml-2 rounded-md bg-popover px-2 py-1',
-                  'text-xs text-popover-foreground shadow-md border border-border',
-                  'opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50',
-                )}
-              >
-                {label}
-              </span>
-            )}
-          </NavLink>
+      {/* Primary nav */}
+      <div className={cn('flex flex-col gap-0.5 py-3', expanded ? 'px-2' : 'items-center px-3')}>
+        {NAV_ITEMS.map((item) => (
+          <NavItemLink key={item.to} item={item} expanded={expanded} />
         ))}
       </div>
 
-      {/* Conversations section — only on /chat */}
-      {isChat && (
+      {/* Conversations — only on /chat AND only when expanded */}
+      {isChat && expanded && (
         <ConversationList
           conversations={conversations}
           activeConversationId={activeConversationId}
@@ -153,7 +171,144 @@ export function Sidebar() {
           onRename={renameConversation}
         />
       )}
+
+      {/* Spacer when no conversations panel */}
+      {(!isChat || !expanded) && <div className="flex-1" />}
+
+      {/* Secondary nav (Membership, Settings) */}
+      <div className={cn(
+        'border-t border-border py-2',
+        expanded ? 'px-2' : 'flex flex-col items-center px-3',
+      )}>
+        {SECONDARY_NAV.map((item) => (
+          <NavItemLink key={item.to} item={item} expanded={expanded} />
+        ))}
+      </div>
+
+      {/* Chrome controls — collapse + theme */}
+      <ChromeControls
+        expanded={expanded}
+        onToggleCollapse={() => setCollapsed(!collapsed)}
+      />
     </nav>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// NavItemLink — single primary or secondary nav item
+// ---------------------------------------------------------------------------
+
+interface NavItemLinkProps {
+  item: NavItem;
+  expanded: boolean;
+}
+
+function NavItemLink({ item, expanded }: NavItemLinkProps) {
+  const { to, label, icon: Icon } = item;
+  return (
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        cn(
+          'group relative flex items-center rounded-lg transition-colors duration-fast',
+          'hover:bg-accent hover:text-foreground',
+          // Active: subtle ember surface + ember-leaning text. The 2px
+          // left rail (rendered via ::before below) gives the location
+          // signal without re-saturating the whole pill.
+          isActive
+            ? 'bg-primary/8 text-foreground before:absolute before:left-0 before:top-1/2 before:h-5 before:w-[2px] before:-translate-y-1/2 before:rounded-full before:bg-primary'
+            : 'text-muted-foreground',
+          expanded ? 'gap-2.5 px-2.5 py-2' : 'h-10 w-10 justify-center',
+        )
+      }
+      aria-label={label}
+      title={!expanded ? label : undefined}
+    >
+      {({ isActive }) => (
+        <>
+          <Icon
+            className={cn(
+              'h-4 w-4 shrink-0 transition-colors duration-fast',
+              isActive && 'text-primary',
+            )}
+          />
+          {expanded && <span className="text-sm font-medium">{label}</span>}
+
+          {!expanded && (
+            <span
+              className={cn(
+                'pointer-events-none absolute left-full ml-2 rounded-md bg-popover px-2 py-1',
+                'text-xs text-popover-foreground shadow-hearth-sm border border-border',
+                'opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50',
+              )}
+            >
+              {label}
+            </span>
+          )}
+        </>
+      )}
+    </NavLink>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ChromeControls — collapse toggle + theme toggle, bottom-left of sidebar
+// ---------------------------------------------------------------------------
+
+interface ChromeControlsProps {
+  expanded: boolean;
+  onToggleCollapse: () => void;
+}
+
+function ChromeControls({ expanded, onToggleCollapse }: ChromeControlsProps) {
+  const { theme, toggle: toggleTheme } = useTheme();
+  const isDark = theme === 'dark';
+
+  return (
+    <div
+      className={cn(
+        'flex shrink-0 items-center border-t border-border py-2',
+        expanded ? 'justify-between px-3' : 'flex-col gap-1 px-3',
+      )}
+    >
+      <ChromeButton
+        onClick={onToggleCollapse}
+        label={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
+        title={`${expanded ? 'Collapse' : 'Expand'} sidebar (⌘\\)`}
+        icon={expanded ? PanelLeftClose : PanelLeftOpen}
+      />
+      <ChromeButton
+        onClick={toggleTheme}
+        label={isDark ? 'Switch to Common Room (light)' : 'Switch to Hearth (dark)'}
+        title={isDark ? 'Switch to light' : 'Switch to dark'}
+        icon={isDark ? Sun : Moon}
+      />
+    </div>
+  );
+}
+
+interface ChromeButtonProps {
+  onClick: () => void;
+  label: string;
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+function ChromeButton({ onClick, label, title, icon: Icon }: ChromeButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={title}
+      className={cn(
+        'flex h-7 w-7 items-center justify-center rounded-md',
+        'text-muted-foreground hover:text-foreground hover:bg-accent transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+      )}
+    >
+      <Icon className="h-3.5 w-3.5" />
+    </button>
   );
 }
 
@@ -182,8 +337,6 @@ function ConversationList({
 }: ConversationListProps) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden border-t border-border">
-      {/* Section header — small-caps editorial flavor instead of the
-          generic shadcn uppercase-tracked-tiny look. */}
       <div className="flex items-center justify-between px-3 py-2">
         <span
           className="font-serif text-[11px] italic text-muted-foreground"
@@ -208,7 +361,6 @@ function ConversationList({
         </button>
       </div>
 
-      {/* List */}
       <ul
         className="flex-1 overflow-y-auto px-2 pb-3"
         aria-label="Conversations"
@@ -257,12 +409,10 @@ function ConversationItem({
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync rename value if title changes externally
   useEffect(() => {
     if (!renaming) setRenameValue(conversation.title);
   }, [conversation.title, renaming]);
 
-  // Close menu on outside click
   useEffect(() => {
     if (!menuOpen) return;
     const handler = (e: MouseEvent) => {
@@ -274,7 +424,6 @@ function ConversationItem({
     return () => document.removeEventListener('mousedown', handler);
   }, [menuOpen]);
 
-  // Focus rename input when entering rename mode
   useEffect(() => {
     if (renaming) {
       setTimeout(() => renameInputRef.current?.select(), 0);
@@ -301,8 +450,10 @@ function ConversationItem({
       <div
         className={cn(
           'group relative flex items-center gap-1 rounded-lg px-2 py-1.5 cursor-pointer',
-          'hover:bg-accent transition-colors',
-          isActive && 'bg-primary/10',
+          'hover:bg-accent transition-colors duration-fast',
+          // Same ember-rail treatment as primary nav items, scaled smaller
+          isActive &&
+            'bg-primary/8 before:absolute before:left-0 before:top-1/2 before:h-4 before:w-[2px] before:-translate-y-1/2 before:rounded-full before:bg-primary',
         )}
         onClick={() => !renaming && onSwitch(conversation.id)}
         role="button"
@@ -337,7 +488,7 @@ function ConversationItem({
               type="button"
               onClick={commitRename}
               aria-label="Confirm rename"
-              className="text-emerald-500 hover:text-emerald-400"
+              className="text-sage hover:text-sage/80"
             >
               <Check className="h-3 w-3" />
             </button>
@@ -356,15 +507,14 @@ function ConversationItem({
               <span
                 className={cn(
                   'truncate text-xs font-medium',
-                  isActive ? 'text-primary' : 'text-foreground',
+                  isActive ? 'text-foreground' : 'text-foreground/85',
                 )}
               >
                 {conversation.title}
               </span>
-              <span className="text-[10px] text-muted-foreground">{relativeTime}</span>
+              <span className="text-[10px] text-muted-foreground/80">{relativeTime}</span>
             </div>
 
-            {/* Three-dot menu */}
             <div
               ref={menuRef}
               className="relative"

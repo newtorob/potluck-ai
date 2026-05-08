@@ -21,7 +21,7 @@
  */
 
 import { useState, useCallback, useRef, useId } from 'react';
-import { Network, Copy, Check, ChevronDown } from 'lucide-react';
+import { Copy, Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ function CopyButton({ snippet, editorLabel }: CopyButtonProps) {
           'border border-border',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
           copied
-            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+            ? 'border-sage/40 bg-sage/10 text-sage'
             : 'bg-muted/50 text-muted-foreground hover:bg-accent hover:text-foreground',
         )}
       >
@@ -285,12 +285,8 @@ function AvailableTools() {
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-0">
         {/* Column headers */}
         <div className="col-span-2 grid grid-cols-2 gap-x-4 border-b border-border pb-1.5 mb-1.5">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Tool
-          </span>
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            What it does
-          </span>
+          <span className="font-serif text-[10px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>Tool</span>
+          <span className="font-serif text-[10px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>What it does</span>
         </div>
 
         {/* Left column */}
@@ -361,10 +357,7 @@ export function McpIntegrationPanel() {
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-5">
       {/* Section heading */}
-      <div className="flex items-center gap-2">
-        <Network className="h-4 w-4 text-primary" aria-hidden="true" />
-        <h2 className="text-sm font-semibold text-foreground">External agents (MCP)</h2>
-      </div>
+      <h2 className="font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>External agents (MCP)</h2>
 
       {/* Description */}
       <p className="text-xs text-muted-foreground leading-relaxed">

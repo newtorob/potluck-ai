@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Settings } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { HardwarePanel } from '@/components/settings/HardwarePanel';
 import { PrivacyPanel } from '@/components/settings/PrivacyPanel';
@@ -20,6 +20,8 @@ import { AccountPanel } from '@/components/settings/AccountPanel';
 import { AdvancedPanel } from '@/components/settings/AdvancedPanel';
 import { VaultPanel } from '@/components/settings/VaultPanel';
 import { useSettings } from '@/hooks/useSettings';
+import { ViewHeader } from '@/components/layout/ViewHeader';
+import { EmptyState } from '@/components/layout/EmptyState';
 
 // ---------------------------------------------------------------------------
 // Tab definitions
@@ -99,11 +101,7 @@ export function SettingsView() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b border-border px-6 py-4">
-        <Settings className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-        <h1 className="text-sm font-semibold">Settings</h1>
-      </div>
+      <ViewHeader title="Settings" />
 
       {/* Tab bar */}
       <div
@@ -123,7 +121,7 @@ export function SettingsView() {
             onClick={() => setActiveTab(id)}
             onKeyDown={(e) => handleTabKeyDown(e, idx)}
             className={cn(
-              'px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px',
+              'px-4 py-2.5 text-sm font-medium transition-colors duration-fast border-b-2 -mb-px',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
               activeTab === id
                 ? 'border-primary text-foreground'
@@ -243,11 +241,11 @@ export function SettingsView() {
 
 function SettingsSkeleton() {
   return (
-    <div className="space-y-4" aria-label="Loading settings">
+    <div className="space-y-5 animate-fade-in" aria-label="Loading settings" aria-live="polite">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="space-y-2">
-          <div className="h-3 w-1/4 animate-pulse rounded bg-muted" />
-          <div className="h-10 w-full animate-pulse rounded-lg bg-muted" />
+        <div key={i} className="space-y-2" style={{ animationDelay: `${i * 60}ms` }}>
+          <div className="h-3 w-1/4 animate-hearth-pulse rounded-full bg-muted" />
+          <div className="h-10 w-full animate-hearth-pulse rounded-lg bg-muted/70" />
         </div>
       ))}
     </div>
@@ -256,13 +254,13 @@ function SettingsSkeleton() {
 
 function SidecarError() {
   return (
-    <div className="flex flex-col items-center gap-3 py-8 text-center">
-      <p className="text-sm font-medium text-muted-foreground">
-        Could not connect to the local sidecar
-      </p>
-      <p className="text-xs text-muted-foreground/70">
-        Make sure the Python backend is running, then refresh this page.
-      </p>
-    </div>
+    <EmptyState
+      icon={AlertCircle}
+      tone="warning"
+      title="Local sidecar unreachable"
+      description="The Python backend isn't responding on 127.0.0.1:8321. Settings will load once it's running."
+      align="top"
+      grain={false}
+    />
   );
 }

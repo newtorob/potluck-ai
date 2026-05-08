@@ -34,10 +34,10 @@ import type { TaskState, TaskStatus } from '@/types/tasks';
 // ---------------------------------------------------------------------------
 
 const STATUS_STYLES: Record<TaskStatus, string> = {
-  active: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
-  paused: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
-  completed: 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
-  abandoned: 'bg-muted text-muted-foreground',
+  active: 'bg-sage/15 text-sage',
+  paused: 'bg-muted text-muted-foreground',
+  completed: 'bg-muted text-muted-foreground',
+  abandoned: 'bg-destructive/10 text-destructive/70',
 };
 
 function StatusPill({ status }: { status: TaskStatus }) {
@@ -207,7 +207,7 @@ function StepsSection({ task, onCompleteStep, onAddStep }: StepsSectionProps) {
 
   return (
     <div className="space-y-1">
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Steps</p>
+      <p className="font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>Steps</p>
 
       {/* Completed steps */}
       {completed.length > 0 && (
@@ -344,7 +344,8 @@ function ErrorsSection({ task, onAddError }: ErrorsSectionProps) {
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+        className="flex items-center gap-1 font-serif text-[11px] italic text-muted-foreground hover:text-foreground"
+        style={{ letterSpacing: '0.04em' }}
         aria-expanded={expanded}
       >
         <AlertTriangle className="h-3 w-3 text-amber-500" aria-hidden="true" />

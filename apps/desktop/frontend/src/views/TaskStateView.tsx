@@ -14,6 +14,8 @@ import { useProject } from '@/hooks/useProject';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { ProjectPill } from '@/components/memory/ProjectPill';
 import { normaliseProjectName } from '@/lib/projectUtils';
+import { ViewHeader } from '@/components/layout/ViewHeader';
+import { EmptyState } from '@/components/layout/EmptyState';
 import type { TaskStatus } from '@/types/tasks';
 
 // ---------------------------------------------------------------------------
@@ -100,16 +102,25 @@ function NewTaskForm({ onCreate, onCancel, defaultProject, projects = [] }: NewT
   return (
     <form
       onSubmit={(e) => { void handleSubmit(e); }}
-      className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-3"
+      className="rounded-xl border border-border/60 bg-card p-4 shadow-hearth-sm space-y-3 animate-fade-in-up"
       aria-label="New task form"
     >
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-foreground">New task</p>
+        <p
+          className="font-serif text-[11px] italic text-muted-foreground"
+          style={{ letterSpacing: '0.04em' }}
+        >
+          New task
+        </p>
         <button
           type="button"
           onClick={onCancel}
           aria-label="Cancel new task"
-          className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          className={cn(
+            'flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground',
+            'hover:bg-accent hover:text-foreground transition-colors duration-fast',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          )}
         >
           <X className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
@@ -135,8 +146,9 @@ function NewTaskForm({ onCreate, onCancel, defaultProject, projects = [] }: NewT
           required
           className={cn(
             'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm',
-            'placeholder:text-muted-foreground',
-            'focus:outline-none focus:ring-2 focus:ring-ring',
+            'placeholder:text-muted-foreground/70',
+            'transition-all duration-base',
+            'focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-ring/50 focus:shadow-hearth-sm',
             'disabled:opacity-50',
           )}
         />
@@ -155,9 +167,10 @@ function NewTaskForm({ onCreate, onCancel, defaultProject, projects = [] }: NewT
           disabled={submitting}
           required
           className={cn(
-            'w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm',
-            'placeholder:text-muted-foreground',
-            'focus:outline-none focus:ring-2 focus:ring-ring',
+            'w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm leading-relaxed',
+            'placeholder:text-muted-foreground/70',
+            'transition-all duration-base',
+            'focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-ring/50 focus:shadow-hearth-sm',
             'disabled:opacity-50',
           )}
         />
@@ -176,9 +189,10 @@ function NewTaskForm({ onCreate, onCancel, defaultProject, projects = [] }: NewT
           rows={3}
           disabled={submitting}
           className={cn(
-            'w-full resize-none rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs',
-            'placeholder:text-muted-foreground',
-            'focus:outline-none focus:ring-2 focus:ring-ring',
+            'w-full resize-none rounded-lg border border-input bg-background px-3 py-2 font-mono text-xs leading-relaxed',
+            'placeholder:text-muted-foreground/70',
+            'transition-all duration-base',
+            'focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-ring/50 focus:shadow-hearth-sm',
             'disabled:opacity-50',
           )}
         />
@@ -195,8 +209,9 @@ function NewTaskForm({ onCreate, onCancel, defaultProject, projects = [] }: NewT
           onChange={(e) => handleProjectChange(e.target.value)}
           disabled={submitting}
           className={cn(
-            'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm',
-            'text-foreground focus:outline-none focus:ring-2 focus:ring-ring',
+            'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground',
+            'transition-all duration-base',
+            'focus:outline-none focus:border-primary/40 focus:ring-2 focus:ring-ring/50',
             'disabled:opacity-50',
           )}
         >
@@ -215,14 +230,15 @@ function NewTaskForm({ onCreate, onCancel, defaultProject, projects = [] }: NewT
         </select>
       </div>
 
-      <div className="flex gap-2 justify-end">
+      <div className="flex gap-2 justify-end pt-1">
         <button
           type="button"
           onClick={onCancel}
           disabled={submitting}
           className={cn(
             'rounded-lg border border-border px-3 py-1.5 text-xs font-medium',
-            'text-muted-foreground hover:text-foreground hover:bg-accent transition-colors',
+            'text-muted-foreground hover:text-foreground hover:bg-accent hover:border-border',
+            'transition-colors duration-fast',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
             'disabled:opacity-50',
           )}
@@ -233,10 +249,11 @@ function NewTaskForm({ onCreate, onCancel, defaultProject, projects = [] }: NewT
           type="submit"
           disabled={submitting}
           className={cn(
-            'rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground',
-            'hover:bg-primary/90 transition-colors',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-            'disabled:opacity-50',
+            'rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-hearth-sm',
+            'hover:bg-primary/90 active:scale-[0.98]',
+            'transition-all duration-fast',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card',
+            'disabled:opacity-50 disabled:active:scale-100',
           )}
         >
           {submitting ? 'Creating…' : 'Create task'}
@@ -311,35 +328,39 @@ export function TaskStateView() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-6 py-4">
-        <div className="flex items-center gap-3">
-          <ListTodo className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-          <h1 className="text-sm font-semibold">Tasks</h1>
-          {isFetching && (
-            <div
-              className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent"
-              role="status"
-              aria-label="Loading tasks"
-            />
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowNewForm(true)}
-          disabled={showNewForm}
-          className={cn(
-            'flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground',
-            'hover:bg-primary/90 transition-colors',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-            'disabled:opacity-50',
-          )}
-          aria-label="Create new task"
-        >
-          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-          New task
-        </button>
-      </div>
+      <ViewHeader
+        title={
+          <span className="flex items-center gap-3">
+            Tasks
+            {isFetching && (
+              <span
+                className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary/30 border-t-primary"
+                role="status"
+                aria-label="Loading tasks"
+              />
+            )}
+          </span>
+        }
+        count={tasks.length}
+        actions={
+          <button
+            type="button"
+            onClick={() => setShowNewForm(true)}
+            disabled={showNewForm}
+            className={cn(
+              'flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-hearth-sm',
+              'hover:bg-primary/90 active:scale-[0.98]',
+              'transition-all duration-fast',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'disabled:opacity-50 disabled:active:scale-100',
+            )}
+            aria-label="Create new task"
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            New task
+          </button>
+        }
+      />
 
       {/* Status filter chips */}
       <div
@@ -354,11 +375,12 @@ export function TaskStateView() {
             aria-pressed={activeFilter === value}
             onClick={() => setActiveFilter(value)}
             className={cn(
-              'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+              'shrink-0 rounded-full px-3 py-1 text-xs font-medium tabular-nums',
+              'transition-all duration-fast',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               activeFilter === value
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground',
+                ? 'bg-primary text-primary-foreground shadow-hearth-sm'
+                : 'bg-muted/70 text-muted-foreground hover:bg-accent hover:text-foreground',
             )}
           >
             {label}
@@ -372,21 +394,24 @@ export function TaskStateView() {
         aria-label="Filter tasks by project"
         className="flex flex-wrap items-center gap-1.5 border-b border-border px-6 py-2.5"
       >
-        {/* Active-project default */}
+        {/* Active-project default — distinguished as the resting filter */}
         <button
           type="button"
           aria-pressed={projectFilter.kind === 'active'}
           onClick={() => setProjectFilter({ kind: 'active' })}
           className={cn(
-            'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+            'shrink-0 rounded-full px-3 py-1 text-xs font-medium border',
+            'transition-all duration-fast',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
             projectFilter.kind === 'active'
-              ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
-              : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground border border-transparent',
+              ? 'bg-primary/12 text-primary border-primary/25 shadow-hearth-sm'
+              : 'bg-muted/70 text-muted-foreground border-transparent hover:bg-accent hover:text-foreground',
           )}
         >
           {activeProject ?? 'Global'}
-          {projectFilter.kind === 'active' && <span className="ml-1 opacity-60">(default)</span>}
+          {projectFilter.kind === 'active' && (
+            <span className="ml-1 italic opacity-60">(default)</span>
+          )}
         </button>
 
         <button
@@ -394,11 +419,12 @@ export function TaskStateView() {
           aria-pressed={projectFilter.kind === 'all'}
           onClick={() => setProjectFilter({ kind: 'all' })}
           className={cn(
-            'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors border border-transparent',
+            'shrink-0 rounded-full px-3 py-1 text-xs font-medium border border-transparent',
+            'transition-all duration-fast',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
             projectFilter.kind === 'all'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground',
+              ? 'bg-primary text-primary-foreground shadow-hearth-sm'
+              : 'bg-muted/70 text-muted-foreground hover:bg-accent hover:text-foreground',
           )}
         >
           All (browse)
@@ -409,11 +435,12 @@ export function TaskStateView() {
           aria-pressed={projectFilter.kind === 'global'}
           onClick={() => setProjectFilter({ kind: 'global' })}
           className={cn(
-            'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors border border-transparent',
+            'shrink-0 rounded-full px-3 py-1 text-xs font-medium border border-transparent',
+            'transition-all duration-fast',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
             projectFilter.kind === 'global'
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground',
+              ? 'bg-primary text-primary-foreground shadow-hearth-sm'
+              : 'bg-muted/70 text-muted-foreground hover:bg-accent hover:text-foreground',
           )}
         >
           Global
@@ -426,11 +453,12 @@ export function TaskStateView() {
             aria-pressed={projectFilter.kind === 'project' && projectFilter.name === p.project}
             onClick={() => setProjectFilter({ kind: 'project', name: p.project })}
             className={cn(
-              'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors border border-transparent',
+              'shrink-0 rounded-full px-3 py-1 text-xs font-medium font-mono tracking-tight border border-transparent',
+              'transition-all duration-fast',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               projectFilter.kind === 'project' && projectFilter.name === p.project
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground',
+                ? 'bg-primary text-primary-foreground shadow-hearth-sm'
+                : 'bg-muted/70 text-muted-foreground hover:bg-accent hover:text-foreground',
             )}
           >
             {p.project}
@@ -438,7 +466,7 @@ export function TaskStateView() {
         ))}
 
         {isTemporaryProjectFilter && (
-          <span className="text-[10px] text-muted-foreground/60 italic">(temporary)</span>
+          <span className="text-[10px] italic text-muted-foreground/60">(temporary)</span>
         )}
       </div>
 
@@ -459,7 +487,7 @@ export function TaskStateView() {
           {fetchError && (
             <div
               role="alert"
-              className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+              className="animate-fade-in-up rounded-lg border border-destructive/25 bg-destructive/8 px-4 py-3 text-sm text-destructive shadow-hearth-sm"
             >
               {fetchError}
             </div>
@@ -480,19 +508,14 @@ export function TaskStateView() {
 
           {/* Empty state */}
           {!fetchError && filtered.length === 0 && !showNewForm && (
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <ListTodo className="h-10 w-10 text-muted-foreground/40" aria-hidden="true" />
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-muted-foreground">
-                  {activeFilter === 'all' ? 'No tasks yet' : `No ${activeFilter} tasks`}
-                </p>
-                {activeFilter === 'all' && (
-                  <p className="text-xs text-muted-foreground/70">
-                    Tasks let an agent resume work across sessions.
-                  </p>
-                )}
-              </div>
-            </div>
+            <EmptyState
+              icon={ListTodo}
+              title={activeFilter === 'all' ? 'No tasks yet' : `No ${activeFilter} tasks`}
+              description={activeFilter === 'all'
+                ? 'Tasks let an agent resume work across sessions — break a goal into steps and check them off as you go.'
+                : undefined}
+              align="top"
+            />
           )}
         </div>
       </div>

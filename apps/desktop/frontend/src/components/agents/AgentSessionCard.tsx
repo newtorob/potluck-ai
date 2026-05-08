@@ -30,8 +30,10 @@ function getSessionStatus(session: AgentSession): SessionStatus {
 }
 
 const STATUS_DOT: Record<SessionStatus, string> = {
-  active: 'bg-emerald-500',
-  stale: 'bg-amber-400',
+  // Sage = alive (with the gentle hearth-pulse on active sessions)
+  active: 'bg-sage animate-hearth-pulse',
+  // Amber = idle/stale; theme-aware so light/dark both read correctly
+  stale: 'bg-amber-500 dark:bg-amber-400',
   disconnected: 'bg-muted-foreground/40',
 };
 
@@ -94,7 +96,7 @@ function PeerMcpChips({ peers }: PeerMcpChipsProps) {
       {visible.map((mcp) => (
         <span
           key={mcp}
-          className="inline-flex items-center rounded-full bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground"
+          className="inline-flex items-center rounded-full bg-secondary px-1.5 py-0.5 font-mono text-[10px] text-secondary-foreground"
         >
           {mcp}
         </span>
@@ -130,7 +132,7 @@ function ModelBadge({ model, modelSource }: ModelBadgeProps) {
 
   return (
     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-      <span className="font-medium text-foreground">{model}</span>
+      <span className="font-mono text-xs text-foreground">{model}</span>
       {modelSource !== null && (
         <span
           title={sourceTooltip}
@@ -177,11 +179,14 @@ export function AgentSessionCard({
       aria-pressed={isSelected}
       className={cn(
         'group relative flex w-full flex-col gap-2 rounded-xl border bg-card p-4 text-left',
-        'transition-colors hover:bg-accent/30',
+        // Hover: hairline lifts + ember-tinted bg. Selected: ember inset ring
+        // (uses the design-system "ember-inset" shadow token).
+        'transition-all duration-fast',
+        'hover:shadow-hearth-sm hover:border-border',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         isSelected
-          ? 'border-primary/50 bg-primary/5'
-          : 'border-border',
+          ? 'border-primary/45 bg-primary/5 shadow-ember-inset'
+          : 'border-border/60',
       )}
     >
       {/* Row 1: status dot + client name + version + project pill */}
@@ -205,8 +210,8 @@ export function AgentSessionCard({
 
       {/* Row 3: peer MCPs */}
       <div className="flex items-center gap-1.5">
-        <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
-          MCPs
+        <span className="shrink-0 font-serif text-[10px] italic text-muted-foreground/60" style={{ letterSpacing: '0.04em' }}>
+          peers
         </span>
         <PeerMcpChips peers={session.peer_mcps} />
       </div>
