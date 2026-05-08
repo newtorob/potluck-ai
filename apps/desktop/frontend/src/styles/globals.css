@@ -37,7 +37,10 @@
     --popover: 36 33% 97%;
     --popover-foreground: 28 22% 11%;
 
-    --primary: 16 67% 61%;           /* #E07856 ember terracotta */
+    /* Ember accent. Slightly desaturated from the brief's #E07856 to
+       sit in "warm and present" instead of "BUY NOW" — first-cut feedback
+       said the original was on the loud side of right. */
+    --primary: 16 60% 56%;
     --primary-foreground: 35 28% 95%;
 
     --secondary: 35 22% 88%;         /* warm sand for secondary chrome */
@@ -71,8 +74,9 @@
     --popover: 28 11% 14%;           /* #2C2723 floating layers */
     --popover-foreground: 36 30% 94%;
 
-    --primary: 16 67% 61%;           /* #E07856 ember — same in both themes,
-                                        bridges the two-layer brand */
+    /* Same ember as the light theme, slightly desaturated from the
+       brief's original #E07856 — feedback said it was on the loud side. */
+    --primary: 16 60% 56%;
     --primary-foreground: 28 22% 11%;
 
     --secondary: 28 9% 17%;          /* slightly raised chrome */

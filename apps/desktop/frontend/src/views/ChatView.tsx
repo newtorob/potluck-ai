@@ -195,7 +195,7 @@ function EmptyState({ modelLoaded, onSelectPrompt, onGoToModels }: EmptyStatePro
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20">
           <span
             className="font-serif text-3xl leading-none text-primary select-none"
-            style={{ transform: 'translateY(2px)' }}
+            style={{ transform: 'translateY(1px)' }}
             aria-hidden="true"
           >
             P

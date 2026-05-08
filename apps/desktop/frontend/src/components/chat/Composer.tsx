@@ -87,7 +87,10 @@ export function Composer({ onSend, onStop, isStreaming, modelLoaded }: ComposerP
     : 'Message (Enter to send, Shift+Enter for newline)';
 
   return (
-    <div className="border-t border-border bg-background px-4 py-3 sm:px-6">
+    {/* Slight elevation off pure background — card/40 reads as "lifted
+        but not loud" against the warm-charcoal canvas, anchoring the
+        composer to the page instead of floating in a void. */}
+    <div className="border-t border-border bg-card/40 px-4 py-3 sm:px-6">
       <div
         className={cn(
           'mx-auto flex max-w-3xl items-end gap-2 rounded-xl border border-input bg-card',
