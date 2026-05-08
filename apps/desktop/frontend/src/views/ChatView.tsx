@@ -23,10 +23,14 @@ import { useHealth } from '@/hooks/useHealth';
 // Example prompts for empty state
 // ---------------------------------------------------------------------------
 
+// First-impression prompts. Tone matters here — these are the moment a
+// new user infers the app's character. Replaced the generic
+// quantum/CSV/vegan trio with prompts that lean into the manifesto's
+// voice (curiosity, craft, useful work, a touch of warmth).
 const EXAMPLE_PROMPTS = [
-  'Explain quantum entanglement in simple terms',
-  'Write a Python function to parse a CSV file',
-  'What are the pros and cons of a vegan diet?',
+  'What should I cook tonight with what’s already in my fridge?',
+  'Help me draft an honest two-paragraph note to a friend I’ve been ignoring',
+  'Walk me through how a co-op differs from a corporation, plainly',
 ];
 
 // ---------------------------------------------------------------------------
@@ -183,19 +187,28 @@ interface EmptyStateProps {
 
 function EmptyState({ modelLoaded, onSelectPrompt, onGoToModels }: EmptyStateProps) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-6 px-4">
-      <div className="flex flex-col items-center gap-3 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-          <span className="text-2xl font-bold text-primary select-none">P</span>
+    <div className="relative flex flex-1 flex-col items-center justify-center gap-8 px-4 grain">
+      {/* Centered greeting. The serif heading is the moment the new
+          aesthetic announces itself — Direction-B "warm + handcrafted"
+          versus the previous default-shadcn cold sans heading. */}
+      <div className="relative z-10 flex flex-col items-center gap-4 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20">
+          <span
+            className="font-serif text-3xl leading-none text-primary select-none"
+            style={{ transform: 'translateY(2px)' }}
+            aria-hidden="true"
+          >
+            P
+          </span>
         </div>
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">
-            {modelLoaded ? 'Start chatting' : 'No model loaded'}
+        <div className="max-w-md">
+          <h2 className="font-serif text-3xl leading-tight tracking-display text-foreground">
+            {modelLoaded ? 'What can I help you with?' : 'No model loaded yet'}
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             {modelLoaded
-              ? 'Ask anything. Runs entirely on your device.'
-              : 'Load a model to begin your conversation.'}
+              ? 'Ask anything. The conversation runs on your machine; nothing leaves it.'
+              : 'Pick a model to load locally and we’ll be ready.'}
           </p>
         </div>
       </div>
@@ -205,9 +218,9 @@ function EmptyState({ modelLoaded, onSelectPrompt, onGoToModels }: EmptyStatePro
           type="button"
           onClick={onGoToModels}
           className={cn(
-            'rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground',
-            'hover:bg-primary/90 transition-colors',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            'relative z-10 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground',
+            'shadow-sm hover:bg-primary/90 transition-colors',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
           )}
         >
           Browse models
@@ -215,19 +228,26 @@ function EmptyState({ modelLoaded, onSelectPrompt, onGoToModels }: EmptyStatePro
       )}
 
       {modelLoaded && (
-        <div className="flex flex-wrap justify-center gap-2">
+        <div className="relative z-10 flex w-full max-w-2xl flex-col gap-2">
           {EXAMPLE_PROMPTS.map((prompt) => (
             <button
               key={prompt}
               type="button"
               onClick={() => onSelectPrompt(prompt)}
               className={cn(
-                'rounded-full border border-border bg-card px-4 py-2 text-sm text-foreground',
-                'hover:bg-accent hover:text-accent-foreground transition-colors',
+                'group flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3',
+                'text-left text-[15px] text-foreground/90 transition-colors',
+                'hover:border-primary/30 hover:bg-card hover:text-foreground',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               )}
             >
-              {prompt}
+              <span>{prompt}</span>
+              <span
+                className="font-serif italic text-sm text-muted-foreground/70 group-hover:text-primary transition-colors"
+                aria-hidden="true"
+              >
+                ask &rarr;
+              </span>
             </button>
           ))}
         </div>

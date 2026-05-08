@@ -78,13 +78,27 @@ export function Sidebar() {
       )}
       aria-label="Main navigation"
     >
-      {/* Logo */}
-      <div className={cn('flex items-center border-b border-border px-3 py-3', isChat ? 'justify-start gap-2' : 'justify-center')}>
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-          <span className="text-sm font-bold text-primary select-none">P</span>
+      {/* Logo — Hearth wordmark.
+          The serif "P" inside the ember-tinted square is the single
+          piece of bespoke iconography in the app per the design brief
+          (instead of a system of custom illustrations). */}
+      <div className={cn(
+        'flex items-center border-b border-border px-3 py-4',
+        isChat ? 'justify-start gap-2.5' : 'justify-center',
+      )}>
+        <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/12 ring-1 ring-primary/20">
+          <span
+            className="font-serif text-xl leading-none text-primary select-none"
+            style={{ transform: 'translateY(1px)' }}
+            aria-hidden="true"
+          >
+            P
+          </span>
         </div>
         {isChat && (
-          <span className="text-sm font-semibold text-foreground select-none">Potluck</span>
+          <span className="font-serif text-base leading-none tracking-display text-foreground select-none">
+            Potluck
+          </span>
         )}
       </div>
 
@@ -168,9 +182,13 @@ function ConversationList({
 }: ConversationListProps) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden border-t border-border">
-      {/* Section header */}
+      {/* Section header — small-caps editorial flavor instead of the
+          generic shadcn uppercase-tracked-tiny look. */}
       <div className="flex items-center justify-between px-3 py-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <span
+          className="font-serif text-[11px] italic text-muted-foreground"
+          style={{ letterSpacing: '0.04em' }}
+        >
           Chats
         </span>
         <button

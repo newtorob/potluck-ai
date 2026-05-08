@@ -1,83 +1,104 @@
 /* highlight.js theme — must be imported before Tailwind directives */
 @import 'highlight.js/styles/github-dark.css';
 
+/* Bundled fonts (open-source, OFL/SIL). ~400KB total across all three. */
+@import '@fontsource-variable/inter';
+@import '@fontsource/instrument-serif';
+@import '@fontsource-variable/jetbrains-mono';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /*
-  shadcn/ui-compatible CSS variables.
-  Defined in HSL without the hsl() wrapper so Tailwind can compose
-  opacity variants like bg-primary/50 using the raw channel values.
+  Potluck "Hearth" theme — warm-charcoal dark with an ember accent.
+  Replaces the default-shadcn cold-violet palette. Tokens are HSL channels
+  (no hsl() wrapper) so Tailwind can compose opacity variants like
+  bg-primary/50 against the raw values.
 
-  Light theme (:root) and dark theme (.dark) both defined.
-  The <html> element starts with class="dark" for dark-mode-first UX;
-  the settings store will toggle it dynamically.
+  Design references: Things 3 (warmth via spacing), Oxide Computer
+  (warm-charcoal + serif headlines), Mercury (warm-dark for serious
+  audiences), Anthropic clay accent. See potluck design brief 2026-05-08.
+
+  Light theme is the "Common Room" paper layer — used for manifesto /
+  about / governance pages once they exist. Product chrome stays in dark
+  by default.
 */
 
 @layer base {
   :root {
-    /* Light */
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Light — "Common Room" paper. Cream surfaces, warm-on-warm. */
+    --background: 35 28% 95%;        /* #F7F3EC warm cream */
+    --foreground: 28 22% 11%;        /* #211D17 nearly black, warm undertone */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 36 33% 97%;              /* #FBF7F0 raised paper */
+    --card-foreground: 28 22% 11%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 36 33% 97%;
+    --popover-foreground: 28 22% 11%;
 
-    --primary: 262 83% 58%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 16 67% 61%;           /* #E07856 ember terracotta */
+    --primary-foreground: 35 28% 95%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 35 22% 88%;         /* warm sand for secondary chrome */
+    --secondary-foreground: 28 22% 18%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 35 18% 90%;             /* aged paper */
+    --muted-foreground: 28 12% 38%;  /* subdued sepia */
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 35 22% 90%;            /* hover/selection on cream */
+    --accent-foreground: 28 22% 18%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 8 64% 48%;        /* deep oxblood, not screaming red */
+    --destructive-foreground: 35 28% 95%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 262 83% 58%;
+    --border: 32 18% 84%;            /* hairline warm gray */
+    --input: 32 18% 84%;
+    --ring: 16 67% 61%;              /* ember focus ring */
 
     --radius: 0.5rem;
   }
 
   .dark {
-    /* Dark — primary surface */
-    --background: 224 16% 10%;
-    --foreground: 210 40% 98%;
+    /* Dark — "Hearth". Warm charcoal, ember accent, sage success.
+       Background never goes pure #000; the warm undertone is intentional. */
+    --background: 28 12% 9%;         /* #1A1714 warm charcoal */
+    --foreground: 36 30% 94%;        /* #F2EBDF warm off-white, never pure #FFF */
 
-    --card: 224 16% 13%;
-    --card-foreground: 210 40% 98%;
+    --card: 28 11% 12%;              /* #221E1A panels */
+    --card-foreground: 36 30% 94%;
 
-    --popover: 224 16% 13%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 28 11% 14%;           /* #2C2723 floating layers */
+    --popover-foreground: 36 30% 94%;
 
-    --primary: 262 83% 65%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 16 67% 61%;           /* #E07856 ember — same in both themes,
+                                        bridges the two-layer brand */
+    --primary-foreground: 28 22% 11%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 28 9% 17%;          /* slightly raised chrome */
+    --secondary-foreground: 36 30% 94%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 28 9% 17%;
+    --muted-foreground: 32 12% 62%;  /* warm gray, NOT cool blue-gray */
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 28 11% 18%;            /* hover/selection states */
+    --accent-foreground: 36 30% 94%;
 
-    --destructive: 0 62.8% 50%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 8 60% 52%;        /* warm red, not blue-red */
+    --destructive-foreground: 36 30% 94%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 262 83% 65%;
+    --border: 28 9% 19%;             /* hairlines, warm-tinted */
+    --input: 28 9% 19%;
+    --ring: 16 67% 61%;              /* ember focus ring */
+
+    /* Custom Hearth tokens (not in shadcn defaults) — used by accent
+       chrome where ember is too loud or the content needs a "this is
+       alive" signal (heartbeat dots, online states, etc.). */
+    --sage: 138 14% 56%;             /* #7FA088 muted forest */
+    --sage-foreground: 28 22% 11%;
+    --paper: 35 28% 95%;             /* lets dark surfaces reference the
+                                        light theme's cream — useful for
+                                        the "open the manifesto" link */
   }
 
   * {
@@ -86,7 +107,18 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: 'rlig' 1, 'calt' 1;
+    /* Optical refinements: enable common ligatures, contextual alternates,
+       and tabular numerals for stat displays so columns align. */
+    font-feature-settings: 'rlig' 1, 'calt' 1, 'ss01' 1;
+    /* Subtle film-grain energy on dark mode — at 1.5% it's felt, not seen. */
+  }
+
+  /* Headlines use Instrument Serif by default — overridable per-element
+     with .font-sans / .font-mono. The serif gives the editorial warmth
+     the agent brief identified as the single biggest character lever. */
+  h1, h2, h3 {
+    @apply font-serif;
+    letter-spacing: -0.01em;
   }
 
   /* Frameless window: prevent text selection on drag regions */
@@ -95,10 +127,10 @@
     user-select: none;
   }
 
-  /* Scrollbar styling — minimal, themed */
+  /* Scrollbar — warm-tinted, minimal */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
@@ -111,8 +143,24 @@
   }
 }
 
-/* Agent activity feed — new-row highlight animation */
+/* Agent activity feed — new-row highlight animation, retuned to ember */
 @keyframes fadeHighlight {
-  0%   { background-color: hsl(var(--primary) / 0.18); }
+  0%   { background-color: hsl(var(--primary) / 0.16); }
   100% { background-color: transparent; }
 }
+
+/* Hearth-specific utility: faint film-grain noise via SVG data-URL.
+   Apply via `class="grain"` on full-bleed dark surfaces (chat pane,
+   memory canvas, /network view) for the workshop / leather-notebook
+   tactility. ~1.5% opacity — felt, not seen. */
+.grain::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/></svg>");
+  opacity: 0.015;
+  mix-blend-mode: overlay;
+  z-index: 0;
+}
+</content>
