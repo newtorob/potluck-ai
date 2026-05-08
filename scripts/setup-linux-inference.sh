@@ -156,10 +156,17 @@ install_llamacpp() {
     done
     [ "$installed" = "1" ] || fail "couldn't install llama-cpp-python from any candidate."
 
-    if "$VENV_PY" -c "import llama_cpp" 2>/dev/null; then
+    # Capture the actual import error if any. "Installed but won't import"
+    # is usually a CUDA-runtime / glibc / arch mismatch; we want to see the
+    # specific exception, not eat it. Common fix: --backend ollama to bypass.
+    local import_err
+    if import_err=$("$VENV_PY" -c "import llama_cpp" 2>&1); then
         pass "llama-cpp-python imports cleanly"
     else
-        fail "llama-cpp-python installed but won't import"
+        echo "$import_err" | sed 's/^/    /' >&2
+        fail "llama-cpp-python installed but won't import (see error above). \
+Easiest workaround: re-run with --backend ollama; Ollama uses CUDA too \
+and installs cleanly on virtually any Linux distro."
     fi
 
     # Model
