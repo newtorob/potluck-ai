@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Potluck favicon — same brandmark as PotluckLogo.tsx but rendered in a
+  rounded-square frame with the Hearth ember tint, so the icon reads as a
+  filled tile rather than a transparent shape at OS-icon sizes.
+-->
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background tile — ember-tinted with a hairline ring -->
+  <rect x="1" y="1" width="30" height="30" rx="7" fill="#3F261C" />
+  <rect
+    x="1"
+    y="1"
+    width="30"
+    height="30"
+    rx="7"
+    fill="none"
+    stroke="#D87F5C"
+    stroke-opacity="0.35"
+    stroke-width="1"
+  />
+
+  <!-- Hearth cradle -->
+  <path
+    d="M7 14 C 7 21, 10.5 25, 16 25 C 21.5 25, 25 21, 25 14"
+    stroke="#E89978"
+    stroke-width="2.4"
+    stroke-linecap="round"
+    fill="none"
+  />
+
+  <!-- Three embers — middle slightly higher and larger -->
+  <circle cx="11" cy="11.5" r="1.7" fill="#E89978" />
+  <circle cx="16" cy="9" r="2.1" fill="#E89978" />
+  <circle cx="21" cy="11.5" r="1.7" fill="#E89978" />
+</svg>

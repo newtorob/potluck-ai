@@ -7,6 +7,7 @@
  *   - Governance: active proposals, voting (guide §5 / cloudApi.getProposals)
  */
 import { ViewHeader } from '@/components/layout/ViewHeader';
+import { PotluckLogo } from '@/components/brand/PotluckLogo';
 
 export function MembershipView() {
   // TODO: read from authStore — replace with real auth state
@@ -52,13 +53,7 @@ export function MembershipView() {
                 aria-hidden="true"
               />
               <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20">
-                <span
-                  className="font-serif text-4xl leading-none text-primary select-none"
-                  style={{ transform: 'translateY(1px)' }}
-                  aria-hidden="true"
-                >
-                  P
-                </span>
+                <PotluckLogo size={36} className="text-primary" aria-label="Potluck" />
               </div>
             </div>
 

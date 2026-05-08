@@ -43,6 +43,7 @@ import { cn } from '@/components/ui/cn';
 import { useChat } from '@/hooks/useChat';
 import { useTheme } from '@/hooks/useTheme';
 import { ProjectSwitcher } from '@/components/layout/ProjectSwitcher';
+import { PotluckLogo } from '@/components/brand/PotluckLogo';
 import type { AppConversation } from '@/stores/chatStore';
 
 // ---------------------------------------------------------------------------
@@ -128,19 +129,13 @@ export function Sidebar() {
       )}
       aria-label="Main navigation"
     >
-      {/* Logo block — Hearth wordmark */}
+      {/* Logo block — Potluck mark + wordmark */}
       <div className={cn(
         'flex items-center border-b border-border px-3 py-4',
         expanded ? 'justify-start gap-2.5' : 'justify-center',
       )}>
         <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/12 ring-1 ring-primary/20">
-          <span
-            className="font-serif text-xl leading-none text-primary select-none"
-            style={{ transform: 'translateY(1px)' }}
-            aria-hidden="true"
-          >
-            P
-          </span>
+          <PotluckLogo size={20} className="text-primary" aria-label="Potluck" />
         </div>
         {expanded && (
           <span className="font-serif text-base leading-none tracking-display text-foreground select-none">

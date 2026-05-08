@@ -19,6 +19,7 @@ import { useChat } from '@/hooks/useChat';
 import { useSettings } from '@/hooks/useSettings';
 import { useHealth } from '@/hooks/useHealth';
 import { ViewHeader } from '@/components/layout/ViewHeader';
+import { PotluckLogo } from '@/components/brand/PotluckLogo';
 
 // ---------------------------------------------------------------------------
 // Example prompts for empty state
@@ -194,20 +195,14 @@ function EmptyState({ modelLoaded, onSelectPrompt, onGoToModels }: EmptyStatePro
           aesthetic announces itself — Direction-B "warm + handcrafted"
           versus the previous default-shadcn cold sans heading. */}
       <div className="relative z-10 flex flex-col items-center gap-4 text-center animate-fade-in-up">
-        {/* P-mark with ember halo — matches FirstRun and Membership */}
+        {/* Brandmark with ember halo — matches FirstRun and Membership */}
         <div className="relative h-14 w-14">
           <div
             className="absolute inset-0 rounded-2xl bg-primary/15 blur-xl"
             aria-hidden="true"
           />
           <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20">
-            <span
-              className="font-serif text-3xl leading-none text-primary select-none"
-              style={{ transform: 'translateY(1px)' }}
-              aria-hidden="true"
-            >
-              P
-            </span>
+            <PotluckLogo size={32} className="text-primary" aria-label="Potluck" />
           </div>
         </div>
         <div className="max-w-md">

@@ -18,12 +18,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
-  Sparkles,
   Loader2,
   CheckCircle2,
   X,
 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
+import { PotluckLogo } from '@/components/brand/PotluckLogo';
 import { HardwareDetect } from './HardwareDetect';
 import { ModelPick } from './ModelPick';
 import { useHardware } from '@/hooks/useHardware';
@@ -382,7 +382,7 @@ function WelcomeStep() {
       <div className="relative mx-auto h-16 w-16">
         <div className="absolute inset-0 rounded-2xl bg-primary/15 blur-xl" aria-hidden="true" />
         <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20">
-          <Sparkles className="h-7 w-7 text-primary" aria-hidden="true" />
+          <PotluckLogo size={36} className="text-primary" aria-label="Potluck" />
         </div>
       </div>
       <div className="space-y-3">
