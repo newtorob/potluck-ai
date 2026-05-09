@@ -20,6 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import { Network } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import type { AppMessage } from '@/stores/chatStore';
 
@@ -65,8 +66,52 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         {message.content.length > 0 && !isError && (
           <CopyButton text={message.content} isUser={isUser} />
         )}
+
+        {/* Network-routed footer. Only renders when the SSE stream
+            attached a meta envelope with served_by=contributor — i.e.
+            this message came back through the coordinator/jobs path,
+            not the local sidecar. The wording deliberately doesn't
+            expose peer identity (manifesto blinded-routing rule); only
+            confirms it left the device + summarises the round trip. */}
+        {message.meta?.served_by === 'contributor' && !isStreaming && (
+          <ServedByFooter
+            durationMs={message.meta.duration_ms}
+            outputTokens={message.meta.output_tokens}
+          />
+        )}
       </div>
     </article>
+  );
+}
+
+function ServedByFooter({
+  durationMs,
+  outputTokens,
+}: {
+  durationMs?: number;
+  outputTokens?: number;
+}) {
+  const parts: string[] = [];
+  if (typeof durationMs === 'number' && durationMs > 0) {
+    parts.push(durationMs >= 1000 ? `${(durationMs / 1000).toFixed(1)}s` : `${durationMs}ms`);
+  }
+  if (typeof outputTokens === 'number' && outputTokens > 0) {
+    parts.push(`${outputTokens} tokens`);
+  }
+  return (
+    <div
+      className="mt-3 flex items-center gap-1.5 border-t border-border/40 pt-2 text-[11px] text-muted-foreground/80"
+      aria-label="Routing metadata"
+    >
+      <Network className="h-3 w-3 text-primary/70" aria-hidden="true" />
+      <span className="font-serif italic">Served by a verified contributor</span>
+      {parts.length > 0 && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span className="tabular-nums">{parts.join(' · ')}</span>
+        </>
+      )}
+    </div>
   );
 }
 

@@ -227,6 +227,26 @@ def _sse_done() -> str:
     return "data: [DONE]\n\n"
 
 
+def _sse_meta(output_tokens: int, duration_ms: int, finish_reason: str) -> str:
+    """Encode a job-completion summary as an SSE chunk.
+
+    The frontend uses this to show "served by a verified contributor"
+    metadata under network-mode chat messages without exposing peer
+    identity. `served_by: "contributor"` is the only signal — peer_id,
+    hostname, and any other identifying fields are deliberately absent
+    per the manifesto's blinded-routing invariant (memory 42a7e671).
+    """
+    payload = {
+        "meta": {
+            "served_by": "contributor",
+            "output_tokens": output_tokens,
+            "duration_ms": duration_ms,
+            "finish_reason": finish_reason,
+        }
+    }
+    return f"data: {json.dumps(payload)}\n\n"
+
+
 def _sse_error(category: str, message: str) -> str:
     """Encode a job_error as an SSE chunk in a shape the frontend can
     surface to the user. Uses an OpenAI-style error envelope rather than
@@ -327,13 +347,19 @@ async def dispatch_job_stream(
                     continue
 
             # Stream drained. Translate any error the peer reported into
-            # an SSE error chunk; otherwise emit DONE.
+            # an SSE error chunk; otherwise emit a final meta envelope
+            # (output_tokens, duration_ms, served_by) and then DONE.
             if buf.error_category is not None:
                 yield _sse_error(
                     buf.error_category,
                     buf.error_message or "(no message)",
                 )
             else:
+                yield _sse_meta(
+                    output_tokens=buf.output_tokens,
+                    duration_ms=buf.duration_ms,
+                    finish_reason=buf.finish_reason or "stop",
+                )
                 yield _sse_done()
 
             # Persist the final job row state. Mirrors the sync /jobs path.

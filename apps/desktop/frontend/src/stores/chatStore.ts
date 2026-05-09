@@ -23,8 +23,25 @@ import { streamTokens } from '@/lib/streaming';
 
 export type MessageStatus = 'complete' | 'streaming' | 'partial' | 'error';
 
+/** Routing + completion metadata for assistant messages. Set by the
+ *  streaming layer when the SSE stream emits a `meta` envelope (only
+ *  the coordinator's /jobs/stream does this; local /chat/completions
+ *  doesn't, so meta stays undefined for local messages). Surfaced by
+ *  MessageBubble as a small footer ("Served by a verified contributor
+ *  ... duration / token count") under network-mode responses. */
+export interface MessageMeta {
+  served_by: 'contributor' | 'local';
+  output_tokens?: number;
+  duration_ms?: number;
+  finish_reason?: string;
+}
+
 export interface AppMessage extends ChatMessage {
   status: MessageStatus;
+  /** Set on assistant messages when the SSE stream emitted a meta
+   *  envelope. Always undefined for user messages and for assistant
+   *  messages that came from the local sidecar. */
+  meta?: MessageMeta;
   /** Only set on error messages */
   errorText?: string;
 }
@@ -263,10 +280,43 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         throw new Error(`[localApi] ${response.status}: ${response.statusText}`);
       }
 
-      for await (const token of streamTokens(response)) {
-        // Check abort between tokens
+      for await (const event of streamTokens(response)) {
+        // Check abort between events
         if (controller.signal.aborted) break;
 
+        if (event.type === 'meta') {
+          // Coordinator-only — attach to the in-flight assistant message
+          // so MessageBubble can render the "served by" footer when the
+          // stream finishes. No-op for local-sidecar streams.
+          set((s) => {
+            const target = s.conversations[conversationId];
+            if (!target) return s;
+            return {
+              conversations: {
+                ...s.conversations,
+                [conversationId]: {
+                  ...target,
+                  messages: target.messages.map((m) =>
+                    m.id === assistantId
+                      ? {
+                          ...m,
+                          meta: {
+                            served_by: event.served_by,
+                            output_tokens: event.output_tokens,
+                            duration_ms: event.duration_ms,
+                            finish_reason: event.finish_reason,
+                          },
+                        }
+                      : m,
+                  ),
+                },
+              },
+            };
+          });
+          continue;
+        }
+
+        // event.type === 'token'
         set((s) => {
           const target = s.conversations[conversationId];
           if (!target) return s;
@@ -277,7 +327,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
                 ...target,
                 messages: target.messages.map((m) =>
                   m.id === assistantId
-                    ? { ...m, content: m.content + token.content }
+                    ? { ...m, content: m.content + event.content }
                     : m,
                 ),
                 updatedAt: Date.now(),
