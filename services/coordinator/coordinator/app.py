@@ -6,10 +6,22 @@ from typing import AsyncIterator
 import sentry_sdk
 import structlog
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from coordinator.config import get_settings
 from coordinator.db.database import close_db, init_db
 from coordinator.routers import health, jobs, peers, transparency
+
+# Origins permitted to call the coordinator's HTTP endpoints from a
+# browser context (the Electron renderer counts). Curl + the WS handshake
+# are unaffected by CORS so this only matters for the desktop chat UI
+# hitting POST /jobs/stream from the renderer process.
+_CORS_ORIGINS: list[str] = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "app://.",
+    "file://",
+]
 
 logger = structlog.get_logger(__name__)
 
@@ -49,6 +61,13 @@ def create_app() -> FastAPI:
         docs_url="/docs" if settings.env == "development" else None,
         redoc_url="/redoc" if settings.env == "development" else None,
         openapi_url="/openapi.json" if settings.env == "development" else None,
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_CORS_ORIGINS,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     app.include_router(health.router)
