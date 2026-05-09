@@ -1,10 +1,17 @@
 'use strict';
 
-const { app, BrowserWindow, shell, ipcMain, dialog, Notification } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog, Notification, nativeImage } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
+
+// ─── App identity ────────────────────────────────────────────────────────────
+// Must be set BEFORE app.whenReady() so menu bar / app data path use the right
+// name. The macOS Dock *label* in dev still reads "Electron" from the bundled
+// Electron.app's Info.plist — that's only fixable in packaged builds (where
+// electron-builder writes our productName into the .app bundle).
+app.setName('Potluck AI');
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -319,6 +326,19 @@ function killSidecar() {
 
 app.whenReady().then(async () => {
   log.info(`[app] Starting Potluck AI ${app.getVersion()} on ${process.platform}/${process.arch}`);
+
+  // Override the Dock icon at runtime. Required on macOS dev, where the host
+  // Electron.app's icon would otherwise show. Harmless on other platforms
+  // (app.dock is undefined there).
+  if (process.platform === 'darwin' && app.dock) {
+    const iconPath = path.join(__dirname, 'icons', 'icon.png');
+    const dockIcon = nativeImage.createFromPath(iconPath);
+    if (!dockIcon.isEmpty()) {
+      app.dock.setIcon(dockIcon);
+    } else {
+      log.warn(`[app] Dock icon missing or empty at ${iconPath}`);
+    }
+  }
 
   startPythonSidecar();
 
