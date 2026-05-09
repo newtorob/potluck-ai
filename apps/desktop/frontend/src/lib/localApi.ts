@@ -29,6 +29,13 @@ import type { AgentSession, SessionDetail, ToolCall } from '@/types/agents';
 const LOCAL_BASE =
   (import.meta.env['VITE_LOCAL_API_URL'] as string | undefined) ?? 'http://127.0.0.1:8321';
 
+// Coordinator URL — the Phase G control plane (separate from the local
+// sidecar). Defaults to 127.0.0.1:8400 which is where docker-compose
+// publishes the dev coordinator. Overridable for staging / hosted
+// environments.
+const COORDINATOR_BASE =
+  (import.meta.env['VITE_COORDINATOR_URL'] as string | undefined) ?? 'http://127.0.0.1:8400';
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -179,6 +186,37 @@ export const localApi = {
         stream: true,
         temperature: options.temperature ?? 0.7,
         max_tokens: options.maxTokens ?? 2048,
+      }),
+      signal: options.abortSignal,
+    });
+  },
+
+  /**
+   * POST /jobs/stream against the coordinator (NOT the local sidecar).
+   * Returns a Response whose body is an OpenAI-compatible SSE stream
+   * — same shape /chat/completions emits, so streamTokens() consumes
+   *   it without any modification.
+   *
+   * v0 of "Use contributor network": single-turn dispatch. The full
+   * conversation history is NOT sent — only the latest prompt — because
+   * the coordinator's JobAssignedMessage has no multi-turn slot today
+   * and bolting one on without a thoughtful design is a privacy hazard.
+   * Multi-turn over the network is m4+ work.
+   */
+  streamNetworkJob(
+    prompt: string,
+    options: { modelSlug: string; temperature?: number; maxTokens?: number; abortSignal?: AbortSignal }
+  ): Promise<Response> {
+    return fetch(`${COORDINATOR_BASE}/jobs/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt,
+        model_slug: options.modelSlug,
+        sampling: {
+          temperature: options.temperature ?? 0.7,
+          max_tokens: options.maxTokens ?? 2048,
+        },
       }),
       signal: options.abortSignal,
     });

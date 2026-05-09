@@ -46,6 +46,13 @@ interface ChatState {
   /** Not serialised — held only for abort() */
   abortController: AbortController | null;
 
+  // ---- Phase G m3 #19: contributor-network routing ---- //
+  // When true, sendMessage() routes the latest user prompt through the
+  // coordinator's POST /jobs/stream instead of the local /chat/completions.
+  // Single-turn for now (history not forwarded — see localApi.streamNetworkJob).
+  networkMode: boolean;
+  networkModelSlug: string;
+
   // Actions
   createConversation: (modelSlug?: string) => string;
   deleteConversation: (id: string) => void;
@@ -54,6 +61,8 @@ interface ChatState {
   sendMessage: (content: string) => Promise<void>;
   abort: () => void;
   clearConversations: () => void;
+  setNetworkMode: (on: boolean) => void;
+  setNetworkModelSlug: (slug: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,6 +107,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   isStreaming: false,
   streamingMessageId: null,
   abortController: null,
+  networkMode: false,
+  // Default slug — qwen2.5:3b-instruct-q4_K_M is what both the Linux
+  // media server and the Windows gaming PC advertise via Ollama.
+  // Configurable via the model picker in /network (task 776cf3a7).
+  networkModelSlug: 'qwen2.5:3b-instruct-q4_K_M',
 
   createConversation(modelSlug) {
     const convo = makeConversation(modelSlug ?? null);
@@ -231,9 +245,19 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       .map((m): ChatMessage => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt }));
 
     try {
-      const response = await localApi.streamChat(apiMessages, {
-        abortSignal: controller.signal,
-      });
+      // Branch on network mode. Coordinator path is single-turn — only
+      // the just-sent user message is forwarded — because the
+      // JobAssignedMessage schema has no history slot today, and
+      // adding one without a thoughtful design is a privacy hazard.
+      const { networkMode, networkModelSlug } = get();
+      const response = networkMode
+        ? await localApi.streamNetworkJob(content, {
+            modelSlug: networkModelSlug,
+            abortSignal: controller.signal,
+          })
+        : await localApi.streamChat(apiMessages, {
+            abortSignal: controller.signal,
+          });
 
       if (!response.ok) {
         throw new Error(`[localApi] ${response.status}: ${response.statusText}`);
@@ -359,5 +383,13 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       streamingMessageId: null,
       abortController: null,
     });
+  },
+
+  setNetworkMode(on) {
+    set({ networkMode: on });
+  },
+
+  setNetworkModelSlug(slug) {
+    set({ networkModelSlug: slug });
   },
 }));

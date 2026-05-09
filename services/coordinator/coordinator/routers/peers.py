@@ -224,6 +224,18 @@ async def peer_connect(
                     )
                     continue
                 buf.tokens.append(tok.token_text)
+                # Also push to the streaming queue. put_nowait() can raise
+                # QueueFull on a runaway peer; we log + drop in that case
+                # rather than block the WS receive loop. Streaming consumer
+                # would see a brief gap; sync consumer is unaffected.
+                try:
+                    buf.token_stream.put_nowait(tok.token_text)
+                except asyncio.QueueFull:
+                    logger.warning(
+                        "peer_job_token_queue_full",
+                        peer_id=str(peer.id),
+                        job_id=str(tok.job_id),
+                    )
             elif msg_type == "job_complete":
                 try:
                     cmp = JobCompleteMessage.model_validate(msg)

@@ -37,11 +37,27 @@ class PeerConnection:
 
 @dataclass
 class JobBuffer:
-    """Accumulates streaming output for one job. The dispatch endpoint
-    awaits `done` and reads `tokens` + `error`."""
+    """Accumulates streaming output for one job.
+
+    Two consumer paths share the same buffer:
+    - **Sync /jobs**: awaits `done` and concatenates `tokens` for the response.
+    - **Streaming /jobs/stream**: reads `token_stream` (an asyncio.Queue) as
+      tokens arrive and yields them as SSE chunks.
+
+    The peer-side message handler in routers/peers.py pushes to BOTH on
+    every JobTokenMessage so either consumer works without coordination.
+    The queue is bounded (maxsize=512) so a runaway peer can't drive
+    coordinator memory unbounded; if it fills up `put_nowait` raises
+    QueueFull and the handler logs + drops, which the streaming consumer
+    sees as a brief gap (acceptable; backpressure on the peer side comes
+    in m4+).
+    """
 
     job_id: uuid.UUID
     tokens: list[str] = field(default_factory=list)
+    token_stream: asyncio.Queue[str] = field(
+        default_factory=lambda: asyncio.Queue(maxsize=512)
+    )
     output_tokens: int = 0
     duration_ms: int = 0
     finish_reason: str = ""

@@ -10,7 +10,7 @@
 
 import { type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Thermometer, Hash, Layers } from 'lucide-react';
+import { Thermometer, Hash, Layers, Network, Cpu } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { MessageList } from '@/components/chat/MessageList';
 import { Composer } from '@/components/chat/Composer';
@@ -19,6 +19,7 @@ import { useChat } from '@/hooks/useChat';
 import { useSettings } from '@/hooks/useSettings';
 import { useHealth } from '@/hooks/useHealth';
 import { ViewHeader } from '@/components/layout/ViewHeader';
+import { useChatStore } from '@/stores/chatStore';
 import { PotluckLogo } from '@/components/brand/PotluckLogo';
 
 // ---------------------------------------------------------------------------
@@ -51,6 +52,17 @@ export function ChatView() {
   const { settings, isLoaded: settingsLoaded } = useSettings();
   const { modelLoaded, nCtxLoaded } = useHealth();
 
+  // Network-mode routing toggle. When on, the latest user prompt routes
+  // through the coordinator (POST /jobs/stream) to an eligible
+  // contributor peer instead of the local sidecar's /chat/completions.
+  const networkMode = useChatStore((s) => s.networkMode);
+  const networkModelSlug = useChatStore((s) => s.networkModelSlug);
+  const setNetworkMode = useChatStore((s) => s.setNetworkMode);
+
+  // In network mode the local model isn't required — a peer hosts the
+  // weights. Send is gated on "either local OR network is available."
+  const sendReady = modelLoaded || networkMode;
+
   const isEmpty = messages.length === 0;
 
   async function handleSend(content: string) {
@@ -70,7 +82,40 @@ export function ChatView() {
         title="Chat"
         tools={
           <>
-            <ModelSelector disabled={isStreaming} />
+            <ModelSelector disabled={isStreaming || networkMode} />
+
+            {/* Network-mode toggle — pill that flips the chat between the
+                local sidecar and a contributor peer via the coordinator.
+                When on, the model selector is greyed out (the network
+                model is set separately) and the placeholder + helper
+                copy in the composer change to reflect routing.
+
+                Subtle ember treatment when active so the user always
+                knows their prompts are leaving the device. */}
+            <button
+              type="button"
+              onClick={() => setNetworkMode(!networkMode)}
+              disabled={isStreaming}
+              aria-pressed={networkMode}
+              aria-label={networkMode
+                ? `Network mode on - serving via ${networkModelSlug}. Click to switch back to local.`
+                : 'Switch to network mode (route via a contributor peer)'}
+              title={networkMode
+                ? `Network: ${networkModelSlug}. Click to go local.`
+                : 'Route via the contributor network'}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium',
+                'transition-colors duration-fast border',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                networkMode
+                  ? 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15'
+                  : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border',
+                isStreaming && 'cursor-not-allowed opacity-50',
+              )}
+            >
+              {networkMode ? <Network className="h-3 w-3" aria-hidden="true" /> : <Cpu className="h-3 w-3" aria-hidden="true" />}
+              <span>{networkMode ? 'Network' : 'Local'}</span>
+            </button>
 
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <InfoChip
@@ -125,7 +170,7 @@ export function ChatView() {
       {/* ------------------------------------------------------------------ */}
       {isEmpty ? (
         <EmptyState
-          modelLoaded={modelLoaded}
+          modelLoaded={sendReady}
           onSelectPrompt={(p) => void handleSend(p)}
           onGoToModels={() => navigate('/models')}
         />
@@ -140,7 +185,7 @@ export function ChatView() {
         onSend={(content) => void handleSend(content)}
         onStop={abort}
         isStreaming={isStreaming}
-        modelLoaded={modelLoaded}
+        modelLoaded={sendReady}
       />
     </div>
   );

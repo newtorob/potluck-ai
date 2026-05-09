@@ -1,8 +1,15 @@
 """Job dispatch endpoints.
 
-For m3 we ship a synchronous POST /jobs that returns the full collected
-response when inference completes. Streaming endpoints (SSE / WS for
-incremental tokens) come later when the desktop UI wires up.
+Two consumer paths:
+- POST /jobs        — synchronous; returns full collected response when
+                      inference completes. Used by curl smoke + tests.
+- POST /jobs/stream — Server-Sent Events; emits OpenAI-compatible delta
+                      chunks (`data: {"choices":[{"delta":{"content":"…"}}]}`)
+                      as tokens arrive. Used by the desktop chat composer
+                      when the user toggles "Use contributor network."
+
+The SSE shape mirrors the local sidecar's /chat endpoint so the frontend
+chat-stream parser is reused without modification.
 
 Privacy invariant (memory 42a7e671):
     JobAssignedMessage MUST NOT carry member_id, conversation_id, or any
@@ -14,11 +21,14 @@ Privacy invariant (memory 42a7e671):
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
+from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -196,4 +206,160 @@ async def dispatch_job(
         output_tokens=buf.output_tokens,
         duration_ms=buf.duration_ms,
         finish_reason=buf.finish_reason,
+    )
+
+
+# ---- Streaming endpoint ------------------------------------------------- #
+
+
+def _sse_chunk(content: str) -> str:
+    """Encode one token as an OpenAI-compatible SSE delta line.
+
+    Matches the shape the local sidecar's /chat/stream emits, so the
+    frontend chat-stream parser is reused without modification:
+        data: {"choices":[{"delta":{"content":"…"}}]}\n\n
+    """
+    payload = {"choices": [{"delta": {"content": content}}]}
+    return f"data: {json.dumps(payload)}\n\n"
+
+
+def _sse_done() -> str:
+    return "data: [DONE]\n\n"
+
+
+def _sse_error(category: str, message: str) -> str:
+    """Encode a job_error as an SSE chunk in a shape the frontend can
+    surface to the user. Uses an OpenAI-style error envelope rather than
+    the delta envelope so the parser can distinguish."""
+    payload = {"error": {"category": category, "message": message}}
+    return f"data: {json.dumps(payload)}\n\n"
+
+
+@router.post("/stream")
+async def dispatch_job_stream(
+    req: JobRequest,
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    """Stream tokens from a peer back to the requester as Server-Sent Events.
+
+    Same dispatch semantics as POST /jobs (capability-aware peer pick,
+    blinded routing, 503 on no eligible peer) but the response is an
+    SSE stream rather than a collected JSON body.
+    """
+    # ---- 1. Pick a peer that serves this model ---- #
+    peer_conn = await pick_peer_for_model(db, req.model_slug)
+    if peer_conn is None:
+        from coordinator.services.peer_registry import online_peer_count
+        online = await online_peer_count()
+        if online == 0:
+            detail = "No contributor peers connected. Bring at least one online and retry."
+        else:
+            detail = (
+                f"No online peer serves model '{req.model_slug}'. "
+                f"{online} peer(s) online but none advertise that capability."
+            )
+        raise HTTPException(status_code=503, detail=detail)
+
+    # ---- 2. Create the Job DB row ---- #
+    job = Job(
+        member_id=_STUB_MEMBER_ID,
+        peer_id=peer_conn.peer_id,
+        model_slug=req.model_slug,
+        privacy_mode="pseudonymous",
+        status="dispatched",
+    )
+    db.add(job)
+    await db.flush()
+    job_id = job.id
+    await db.commit()
+
+    # ---- 3. Register buffer + send JobAssigned ---- #
+    buf = await register_job(job_id)
+
+    assigned = JobAssignedMessage(
+        job_id=job_id,
+        model_slug=req.model_slug,
+        prompt=req.prompt,
+        sampling=req.sampling,
+    )
+    try:
+        await peer_conn.ws.send_json(assigned.model_dump(mode="json"))
+    except Exception as exc:
+        await complete_job(job_id)
+        raise HTTPException(
+            status_code=502,
+            detail=f"Couldn't deliver job to peer: {exc}",
+        ) from exc
+
+    logger.info(
+        "job_dispatched_stream",
+        job_id=str(job_id),
+        peer_id=str(peer_conn.peer_id),
+        model_slug=req.model_slug,
+        prompt_chars=len(req.prompt),
+    )
+
+    # ---- 4. Stream the response ---- #
+    async def _generate() -> AsyncGenerator[str, None]:
+        deadline = asyncio.get_event_loop().time() + JOB_TIMEOUT_S
+        try:
+            while True:
+                # Bail out cleanly when the peer has signalled completion
+                # AND the queue has drained — no point waiting on a put
+                # that will never come.
+                if buf.done.is_set() and buf.token_stream.empty():
+                    break
+
+                remaining = deadline - asyncio.get_event_loop().time()
+                if remaining <= 0:
+                    yield _sse_error("timeout", f"Peer didn't complete within {JOB_TIMEOUT_S}s")
+                    break
+
+                try:
+                    token = await asyncio.wait_for(
+                        buf.token_stream.get(), timeout=min(remaining, 1.0)
+                    )
+                    yield _sse_chunk(token)
+                except asyncio.TimeoutError:
+                    # Inner timeout = no token in the last ~1s. Loop back
+                    # to check `done` so we exit promptly when the peer
+                    # finishes between tokens (or the deadline expires).
+                    continue
+
+            # Stream drained. Translate any error the peer reported into
+            # an SSE error chunk; otherwise emit DONE.
+            if buf.error_category is not None:
+                yield _sse_error(
+                    buf.error_category,
+                    buf.error_message or "(no message)",
+                )
+            else:
+                yield _sse_done()
+
+            # Persist the final job row state. Mirrors the sync /jobs path.
+            try:
+                if buf.error_category is not None:
+                    job.status = "failed"
+                else:
+                    job.status = "completed"
+                    job.output_tokens = buf.output_tokens
+                    job.duration_ms = buf.duration_ms
+                job.completed_at = datetime.now(timezone.utc)
+                await db.commit()
+            except Exception:
+                logger.exception("job_stream_finalize_failed", job_id=str(job_id))
+        finally:
+            # If the client disconnected mid-stream, complete_job() may
+            # already have fired from the peer side. Idempotent — safe
+            # to call again.
+            await complete_job(job_id)
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
     )
