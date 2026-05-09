@@ -161,6 +161,45 @@ export interface VaultRescanResult {
 }
 
 // ---------------------------------------------------------------------------
+// Chat history shapes (sidecar SQLite)
+// ---------------------------------------------------------------------------
+
+/** A persisted conversation row. The frontend chatStore mirrors this
+ *  shape for hydration on app start and for round-tripping renames /
+ *  deletes through the local API. `network_mode` is stored as 0/1 in
+ *  SQLite; we coerce to bool at the type boundary. */
+export interface PersistedConversation {
+  id: string;
+  title: string;
+  project: string | null;
+  network_mode: number; // 0/1 from SQLite
+  network_model_slug: string | null;
+  created_at: string;
+  updated_at: string;
+  message_count?: number; // present in list endpoint, absent in single-get
+}
+
+/** A persisted message row. served_by is null for local-sidecar messages
+ *  and "contributor" for network-routed messages (carries the meta from
+ *  the SSE stream). */
+export interface PersistedMessage {
+  id: string;
+  conversation_id: string;
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+  status: 'complete' | 'streaming' | 'partial' | 'error';
+  served_by: 'contributor' | 'local' | null;
+  output_tokens: number | null;
+  duration_ms: number | null;
+  finish_reason: string | null;
+  created_at: string;
+}
+
+export interface PersistedConversationDetail extends PersistedConversation {
+  messages: PersistedMessage[];
+}
+
+// ---------------------------------------------------------------------------
 // Network (coordinator) shapes
 // ---------------------------------------------------------------------------
 
@@ -551,6 +590,99 @@ export const localApi = {
       return fetch(`${LOCAL_BASE}/agents/sessions`, { method: 'DELETE' }).then((r) =>
         handleResponse<{ removed: number }>(r),
       );
+    },
+  },
+
+  // ---- Chat history (sidecar SQLite, local-only) ---------------------------
+
+  history: {
+    list(opts: { project?: string | null; include_all?: boolean; limit?: number } = {}): Promise<PersistedConversation[]> {
+      const params = new URLSearchParams();
+      if (opts.include_all !== undefined) params.set('include_all', opts.include_all ? 'true' : 'false');
+      if (opts.project !== undefined && opts.project !== null) params.set('project', opts.project);
+      if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+      const qs = params.toString();
+      return fetch(`${LOCAL_BASE}/chat/conversations${qs ? `?${qs}` : ''}`).then((r) =>
+        handleResponse<PersistedConversation[]>(r),
+      );
+    },
+
+    get(id: string): Promise<PersistedConversationDetail> {
+      return fetch(`${LOCAL_BASE}/chat/conversations/${encodeURIComponent(id)}`).then((r) =>
+        handleResponse<PersistedConversationDetail>(r),
+      );
+    },
+
+    create(body: {
+      id?: string;
+      title?: string;
+      project?: string | null;
+      network_mode?: boolean;
+      network_model_slug?: string | null;
+    }): Promise<PersistedConversation> {
+      return fetch(`${LOCAL_BASE}/chat/conversations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then((r) => handleResponse<PersistedConversation>(r));
+    },
+
+    update(id: string, patch: {
+      title?: string;
+      network_mode?: boolean;
+      network_model_slug?: string | null;
+      project?: string | null;
+      project_set?: boolean;
+    }): Promise<PersistedConversation> {
+      return fetch(`${LOCAL_BASE}/chat/conversations/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      }).then((r) => handleResponse<PersistedConversation>(r));
+    },
+
+    delete(id: string): Promise<void> {
+      return fetch(`${LOCAL_BASE}/chat/conversations/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      }).then((r) => handle204(r));
+    },
+
+    appendMessage(conversationId: string, body: {
+      id?: string;
+      role: 'user' | 'assistant' | 'system';
+      content: string;
+      status?: 'complete' | 'streaming' | 'partial' | 'error';
+      served_by?: 'contributor' | 'local' | null;
+      output_tokens?: number | null;
+      duration_ms?: number | null;
+      finish_reason?: string | null;
+    }): Promise<PersistedMessage> {
+      return fetch(`${LOCAL_BASE}/chat/conversations/${encodeURIComponent(conversationId)}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).then((r) => handleResponse<PersistedMessage>(r));
+    },
+
+    updateMessage(messageId: string, patch: {
+      content?: string;
+      status?: 'complete' | 'streaming' | 'partial' | 'error';
+      served_by?: 'contributor' | 'local' | null;
+      output_tokens?: number | null;
+      duration_ms?: number | null;
+      finish_reason?: string | null;
+    }): Promise<{ id: string; updated: boolean }> {
+      return fetch(`${LOCAL_BASE}/chat/messages/${encodeURIComponent(messageId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      }).then((r) => handleResponse<{ id: string; updated: boolean }>(r));
+    },
+
+    clearMessages(conversationId: string): Promise<{ removed: number }> {
+      return fetch(`${LOCAL_BASE}/chat/conversations/${encodeURIComponent(conversationId)}/messages`, {
+        method: 'DELETE',
+      }).then((r) => handleResponse<{ removed: number }>(r));
     },
   },
 

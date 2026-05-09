@@ -15,6 +15,7 @@ import { SettingsView } from '@/views/SettingsView';
 import { MembershipView } from '@/views/MembershipView';
 import { FirstRun } from '@/views/FirstRun';
 import { useModelStore } from '@/stores/modelStore';
+import { useChatStore } from '@/stores/chatStore';
 import { useTheme } from '@/hooks/useTheme';
 
 /**
@@ -61,6 +62,9 @@ export default function App() {
 
   useEffect(() => {
     void fetchModels().finally(() => setFetchSettled(true));
+    // Hydrate chat history from the sidecar's SQLite. Runs once on mount;
+    // failures are non-fatal (chat still works in memory). See chatStore.hydrate().
+    void useChatStore.getState().hydrate();
     // fetchModels is stable (Zustand action ref never changes)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

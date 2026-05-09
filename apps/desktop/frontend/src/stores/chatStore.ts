@@ -1,21 +1,35 @@
 /**
  * Chat store — conversations, streaming state, and send/abort actions.
  *
- * All conversation data is in-memory only (v0). No disk persistence.
- * A single empty conversation is seeded on initialization.
+ * Local-first persistence: conversations + messages live in the sidecar's
+ * SQLite (memory_db). Local component state mirrors what's on disk and
+ * doubles as the UI source-of-truth during a session. API failures are
+ * caught + logged but never block the UI; the chat still works fully
+ * in-memory if the sidecar is unreachable, the user just loses history.
  *
- * The `sendMessage` action is the core orchestrator:
- *   1. Appends the user message.
- *   2. Creates an empty assistant placeholder.
- *   3. Opens the SSE stream via localApi.streamChat.
- *   4. Appends tokens as they arrive.
- *   5. Marks the stream complete (or partial on abort/error).
+ * Hydration: `hydrate()` is called once from App.tsx on mount. It loads
+ * the conversation list (summaries only) and restores the most recent
+ * (or the previously-active id from localStorage). Messages are lazy-
+ * loaded on `switchConversation()`.
+ *
+ * The `sendMessage` action:
+ *   1. Lazily creates a conversation if none active.
+ *   2. Appends user message + persists immediately.
+ *   3. Creates an empty assistant placeholder (local-only until done).
+ *   4. Opens the SSE stream via localApi.streamChat or streamNetworkJob.
+ *   5. Appends tokens as they arrive (memory-only during stream).
+ *   6. On stream completion: persists the assistant message in one shot
+ *      with all meta (served_by / output_tokens / duration_ms).
+ *   7. Marks partial on abort, error on failure (each persisted too).
  */
 
 import { create } from 'zustand';
 import type { ChatMessage, Conversation } from '@/types/chat';
 import { localApi } from '@/lib/localApi';
+import type { PersistedMessage } from '@/lib/localApi';
 import { streamTokens } from '@/lib/streaming';
+
+const ACTIVE_CONVO_KEY = 'potluck.active_conversation_id';
 
 // ---------------------------------------------------------------------------
 // Extended message type with streaming metadata
@@ -57,6 +71,12 @@ export interface AppConversation extends Omit<Conversation, 'messages'> {
 
 interface ChatState {
   conversations: Record<string, AppConversation>;
+  /** Conversation ids whose messages are loaded into local state. List
+   *  hydration loads summaries only; full messages come on switchConversation. */
+  hydratedIds: Set<string>;
+  /** True after hydrate() completes (success OR failure). UI uses this
+   *  to distinguish "still loading" from "loaded with zero conversations." */
+  isHydrated: boolean;
   activeConversationId: string | null;
   isStreaming: boolean;
   streamingMessageId: string | null;
@@ -71,10 +91,11 @@ interface ChatState {
   networkModelSlug: string;
 
   // Actions
-  createConversation: (modelSlug?: string) => string;
-  deleteConversation: (id: string) => void;
-  switchConversation: (id: string) => void;
-  renameConversation: (id: string, title: string) => void;
+  hydrate: () => Promise<void>;
+  createConversation: (modelSlug?: string) => Promise<string>;
+  deleteConversation: (id: string) => Promise<void>;
+  switchConversation: (id: string) => Promise<void>;
+  renameConversation: (id: string, title: string) => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
   abort: () => void;
   clearConversations: () => void;
@@ -108,19 +129,46 @@ function titleFromContent(content: string): string {
   return trimmed.length > 40 ? `${trimmed.slice(0, 40)}…` : trimmed;
 }
 
-// ---------------------------------------------------------------------------
-// Seed
-// ---------------------------------------------------------------------------
+/** Map a PersistedMessage from the API into the local AppMessage shape.
+ *  Includes the meta envelope reconstruction for assistant messages
+ *  that came via the contributor network. */
+function persistedToAppMessage(p: PersistedMessage): AppMessage {
+  const msg: AppMessage = {
+    id: p.id,
+    role: p.role,
+    content: p.content,
+    status: p.status,
+    createdAt: new Date(p.created_at).getTime(),
+  };
+  if (p.served_by !== null && p.role === 'assistant') {
+    msg.meta = {
+      served_by: p.served_by,
+      output_tokens: p.output_tokens ?? undefined,
+      duration_ms: p.duration_ms ?? undefined,
+      finish_reason: p.finish_reason ?? undefined,
+    };
+  }
+  return msg;
+}
 
-const seedConversation = makeConversation();
+/** Best-effort fire-and-forget — wraps a Promise so a sidecar outage
+ *  doesn't kill the chat UX. We log the error and move on; in-memory
+ *  state remains the user's source of truth for the session. */
+function persist<T>(p: Promise<T>, label: string): void {
+  void p.catch((err) => {
+    console.warn(`[chatStore] persist:${label} failed`, err);
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
 export const useChatStore = create<ChatState>()((set, get) => ({
-  conversations: { [seedConversation.id]: seedConversation },
-  activeConversationId: seedConversation.id,
+  conversations: {},
+  hydratedIds: new Set(),
+  isHydrated: false,
+  activeConversationId: null,
   isStreaming: false,
   streamingMessageId: null,
   abortController: null,
@@ -130,19 +178,88 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   // Configurable via the model picker in /network (task 776cf3a7).
   networkModelSlug: 'qwen2.5:3b-instruct-q4_K_M',
 
-  createConversation(modelSlug) {
-    const convo = makeConversation(modelSlug ?? null);
-    set((s) => ({
-      conversations: { ...s.conversations, [convo.id]: convo },
-      activeConversationId: convo.id,
-    }));
-    return convo.id;
+  async hydrate() {
+    try {
+      const persisted = await localApi.history.list({ include_all: true, limit: 200 });
+      const conversations: Record<string, AppConversation> = {};
+      for (const p of persisted) {
+        conversations[p.id] = {
+          id: p.id,
+          title: p.title,
+          modelSlug: null,
+          messages: [],
+          createdAt: new Date(p.created_at).getTime(),
+          updatedAt: new Date(p.updated_at).getTime(),
+        };
+      }
+
+      let activeId: string | null = null;
+      const savedActiveId = typeof window !== 'undefined'
+        ? window.localStorage.getItem(ACTIVE_CONVO_KEY)
+        : null;
+      if (savedActiveId !== null && savedActiveId in conversations) {
+        activeId = savedActiveId;
+      } else if (persisted.length > 0) {
+        // Most-recently-updated wins (the API already returns this order).
+        activeId = persisted[0]?.id ?? null;
+      }
+
+      set({ conversations, activeConversationId: activeId, isHydrated: true });
+
+      // Lazy-load messages for the now-active conversation so it's ready
+      // when the chat view first renders.
+      if (activeId !== null) {
+        await get().switchConversation(activeId);
+      }
+    } catch (err) {
+      console.warn('[chatStore] hydrate failed; running in memory-only mode', err);
+      set({ isHydrated: true });
+    }
   },
 
-  deleteConversation(id) {
+  async createConversation(modelSlug) {
+    const id = makeId();
+    const now = Date.now();
+    const optimistic: AppConversation = {
+      id,
+      title: 'New chat',
+      modelSlug: modelSlug ?? null,
+      messages: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Optimistic local insert — the UI reflects the new chat immediately.
+    set((s) => ({
+      conversations: { ...s.conversations, [id]: optimistic },
+      activeConversationId: id,
+      hydratedIds: new Set([...s.hydratedIds, id]),
+    }));
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(ACTIVE_CONVO_KEY, id);
+    }
+
+    // Persist. Failure leaves the convo in memory-only mode (won't survive
+    // restart) but the user can still chat in the current session.
+    persist(
+      localApi.history.create({
+        id,
+        title: 'New chat',
+        network_mode: get().networkMode,
+        network_model_slug: get().networkMode ? get().networkModelSlug : null,
+      }),
+      'create',
+    );
+
+    return id;
+  },
+
+  async deleteConversation(id) {
     set((s) => {
       const next = { ...s.conversations };
       delete next[id];
+      const nextHydrated = new Set(s.hydratedIds);
+      nextHydrated.delete(id);
 
       const remaining = Object.keys(next);
       let activeId = s.activeConversationId;
@@ -150,7 +267,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       if (activeId === id) {
         const firstId = remaining[0];
         if (firstId !== undefined) {
-          // Pick the most-recently-updated remaining conversation
           activeId = remaining.reduce((best, cid) => {
             const bestConvo = next[best];
             const candidate = next[cid];
@@ -158,35 +274,71 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             return candidate.updatedAt > bestConvo.updatedAt ? cid : best;
           }, firstId);
         } else {
-          // No conversations left — create a fresh one
-          const fresh = makeConversation();
-          next[fresh.id] = fresh;
-          activeId = fresh.id;
+          activeId = null;
+        }
+        if (typeof window !== 'undefined') {
+          if (activeId === null) {
+            window.localStorage.removeItem(ACTIVE_CONVO_KEY);
+          } else {
+            window.localStorage.setItem(ACTIVE_CONVO_KEY, activeId);
+          }
         }
       }
 
-      return { conversations: next, activeConversationId: activeId };
+      return { conversations: next, activeConversationId: activeId, hydratedIds: nextHydrated };
     });
+
+    // If the new active needs hydration, lazy-load.
+    const newActive = get().activeConversationId;
+    if (newActive !== null && !get().hydratedIds.has(newActive)) {
+      void get().switchConversation(newActive);
+    }
+
+    persist(localApi.history.delete(id), 'delete');
   },
 
-  switchConversation(id) {
-    const { conversations } = get();
-    if (id in conversations) {
-      set({ activeConversationId: id });
+  async switchConversation(id) {
+    const { conversations, hydratedIds } = get();
+    if (!(id in conversations)) return;
+    set({ activeConversationId: id });
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(ACTIVE_CONVO_KEY, id);
+    }
+
+    // Lazy-load messages if not already cached.
+    if (!hydratedIds.has(id)) {
+      try {
+        const detail = await localApi.history.get(id);
+        const messages = detail.messages.map(persistedToAppMessage);
+        set((s) => {
+          const target = s.conversations[id];
+          if (!target) return s;
+          const nextHydrated = new Set(s.hydratedIds);
+          nextHydrated.add(id);
+          return {
+            conversations: {
+              ...s.conversations,
+              [id]: { ...target, messages, title: detail.title },
+            },
+            hydratedIds: nextHydrated,
+          };
+        });
+      } catch (err) {
+        console.warn('[chatStore] failed to load conversation messages', err);
+      }
     }
   },
 
-  renameConversation(id, title) {
+  async renameConversation(id, title) {
+    const trimmed = title.trim() || 'New chat';
     set((s) => {
       const convo = s.conversations[id];
       if (!convo) return s;
       return {
-        conversations: {
-          ...s.conversations,
-          [id]: { ...convo, title: title.trim() || 'New chat' },
-        },
+        conversations: { ...s.conversations, [id]: { ...convo, title: trimmed } },
       };
     });
+    persist(localApi.history.update(id, { title: trimmed }), 'rename');
   },
 
   async sendMessage(content) {
@@ -199,7 +351,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const conversationId: string =
       maybeId && maybeId in state.conversations
         ? maybeId
-        : get().createConversation();
+        : await get().createConversation();
 
     const userMessage: AppMessage = {
       id: makeId(),
@@ -212,18 +364,35 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     // Auto-title from first user message
     const convo = get().conversations[conversationId];
     const isFirstMessage = convo ? convo.messages.length === 0 : true;
+    const newTitle = isFirstMessage ? titleFromContent(content) : null;
 
     set((s) => {
       const target = s.conversations[conversationId];
       if (!target) return s;
       const updated: AppConversation = {
         ...target,
-        title: isFirstMessage ? titleFromContent(content) : target.title,
+        title: newTitle ?? target.title,
         messages: [...target.messages, userMessage],
         updatedAt: Date.now(),
       };
       return { conversations: { ...s.conversations, [conversationId]: updated } };
     });
+
+    // Persist user message immediately. The first-message title rename
+    // piggybacks here as a separate update — small extra round-trip but
+    // keeps the API surface minimal (no compound endpoint).
+    persist(
+      localApi.history.appendMessage(conversationId, {
+        id: userMessage.id,
+        role: 'user',
+        content,
+        status: 'complete',
+      }),
+      'append:user',
+    );
+    if (newTitle !== null) {
+      persist(localApi.history.update(conversationId, { title: newTitle }), 'rename:auto');
+    }
 
     const assistantId = makeId();
     const assistantPlaceholder: AppMessage = {
@@ -357,10 +526,31 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             },
           };
         });
+
+        // Persist the now-finished assistant message in one shot. Read
+        // back from state so we capture the final content and any meta
+        // envelope (network mode emits served_by / token count / duration).
+        const finalConvo = get().conversations[conversationId];
+        const finalMsg = finalConvo?.messages.find((m) => m.id === assistantId);
+        if (finalMsg) {
+          persist(
+            localApi.history.appendMessage(conversationId, {
+              id: assistantId,
+              role: 'assistant',
+              content: finalMsg.content,
+              status: 'complete',
+              served_by: finalMsg.meta?.served_by ?? null,
+              output_tokens: finalMsg.meta?.output_tokens ?? null,
+              duration_ms: finalMsg.meta?.duration_ms ?? null,
+              finish_reason: finalMsg.meta?.finish_reason ?? null,
+            }),
+            'append:assistant',
+          );
+        }
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
-        // abort() already handled state cleanup — nothing to do here
+        // abort() handled state + persistence — nothing to do here.
         return;
       }
 
@@ -393,6 +583,26 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           },
         };
       });
+
+      // Persist the failed assistant message so history reflects what
+      // actually happened. Status='error' isn't a valid persisted status
+      // (the schema accepts complete|streaming|partial), so we stamp it
+      // as 'partial' on disk and embed the error in content. UI keeps
+      // the rich error styling because it reads from in-memory state
+      // for the active session.
+      const errConvo = get().conversations[conversationId];
+      const errMsg = errConvo?.messages.find((m) => m.id === assistantId);
+      if (errMsg) {
+        persist(
+          localApi.history.appendMessage(conversationId, {
+            id: assistantId,
+            role: 'assistant',
+            content: errMsg.content || `[error] ${errorText}`,
+            status: 'partial',
+          }),
+          'append:assistant-error',
+        );
+      }
     }
   },
 
@@ -422,17 +632,47 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         },
       };
     });
+
+    // Persist the partial assistant message so history reflects what
+    // the user saw before aborting. If the user aborted before any
+    // tokens arrived, we still persist an empty 'partial' so the
+    // exchange isn't lost from history.
+    if (activeConversationId !== null && streamingMessageId !== null) {
+      const convo = get().conversations[activeConversationId];
+      const msg = convo?.messages.find((m) => m.id === streamingMessageId);
+      if (msg) {
+        persist(
+          localApi.history.appendMessage(activeConversationId, {
+            id: streamingMessageId,
+            role: 'assistant',
+            content: msg.content,
+            status: 'partial',
+            served_by: msg.meta?.served_by ?? null,
+            output_tokens: msg.meta?.output_tokens ?? null,
+            duration_ms: msg.meta?.duration_ms ?? null,
+            finish_reason: msg.meta?.finish_reason ?? null,
+          }),
+          'append:assistant-partial',
+        );
+      }
+    }
   },
 
   clearConversations() {
-    const fresh = makeConversation();
+    // State-only reset — does NOT delete persisted conversations from disk.
+    // Use deleteConversation() per-id for that. This action exists for
+    // tests and future "panic clear" UI; not currently bound to any view.
     set({
-      conversations: { [fresh.id]: fresh },
-      activeConversationId: fresh.id,
+      conversations: {},
+      hydratedIds: new Set(),
+      activeConversationId: null,
       isStreaming: false,
       streamingMessageId: null,
       abortController: null,
     });
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(ACTIVE_CONVO_KEY);
+    }
   },
 
   setNetworkMode(on) {

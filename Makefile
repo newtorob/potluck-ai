@@ -19,8 +19,8 @@ COMPOSE ?= $(shell \
   fi)
 
 .PHONY: help setup check-python check-docker up down restart logs api-logs pg-logs coord-logs migrate psql \
-        api-shell coord-shell test-api dev desktop frontend sidecar sidecar-setup coordinator coordinator-setup \
-        frontend-setup electron-setup ps status clean reset
+        api-shell coord-shell test-api test-coordinator m3-smoke dev desktop frontend sidecar sidecar-setup \
+        coordinator coordinator-setup frontend-setup electron-setup ps status clean reset
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -115,6 +115,16 @@ coord-shell: check-docker ## Open a bash shell inside the coordinator container
 
 test-api: check-docker ## Run pytest inside the api container
 	$(COMPOSE) exec api pytest -q
+
+test-coordinator: ## Run coordinator pytest suite (privacy invariants etc.) in its venv
+	@if [ ! -x services/coordinator/.venv/bin/pytest ]; then \
+		echo "==> services/coordinator/.venv/bin/pytest missing — run 'make coordinator-setup' first"; \
+		exit 1; \
+	fi
+	@cd services/coordinator && ./.venv/bin/pytest -q
+
+m3-smoke: ## End-to-end Phase G m3 acceptance check (needs coordinator + at least one peer running)
+	@python3 scripts/m3-smoke.py $(M3_ARGS)
 
 ps: status ## Alias for status
 status: check-docker ## Show backend container status

@@ -26,9 +26,9 @@ import os
 import uuid
 from typing import AsyncGenerator, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from potluck_local.services.context_manager import handle_context_overflow
 from potluck_local.services.memory_extraction import get_memory_extractor
@@ -413,3 +413,193 @@ async def chat_completions(request: ChatRequest) -> object:
         result["conversation_id"] = conversation_id
 
     return result
+
+
+# =====================================================================
+# Conversation history
+# =====================================================================
+#
+# Local-first persistence. Every read/write goes against the same
+# SQLite file as memories/tasks. No third party ever sees this data
+# unless the user explicitly exports it.
+#
+# Sync across the user's own machines is v0.5+ (membership + cloud
+# sync layer). Schema is designed so sync is purely additive —
+# conversations + messages each carry their own UUID and updated_at,
+# enough for last-writer-wins or CRDT later.
+# =====================================================================
+
+import uuid as _uuid
+from potluck_local.services.memory_db import (
+    append_message,
+    clear_conversation_messages,
+    create_conversation as _create_conversation,
+    delete_conversation as _delete_conversation,
+    get_conversation as _get_conversation,
+    list_conversations as _list_conversations,
+    update_conversation as _update_conversation,
+    update_message,
+)
+
+
+class ConversationCreateRequest(BaseModel):
+    """Caller may pass an id (UUID) so the frontend can use it
+    optimistically before the round-trip; if absent, server generates."""
+
+    id: str | None = None
+    title: str = "New chat"
+    project: str | None = None
+    network_mode: bool = False
+    network_model_slug: str | None = None
+
+    @field_validator("project", mode="before")
+    @classmethod
+    def _coerce_empty_project(cls, v: object) -> str | None:
+        return None if v == "" else v  # type: ignore[return-value]
+
+
+class ConversationUpdateRequest(BaseModel):
+    title: str | None = None
+    network_mode: bool | None = None
+    network_model_slug: str | None = None
+    project: str | None = None
+    # Sentinel to distinguish "unchanged" from "set to NULL" — pydantic
+    # treats explicit None and absent identically by default.
+    project_set: bool = False
+
+    @field_validator("project", mode="before")
+    @classmethod
+    def _coerce_empty_project(cls, v: object) -> str | None:
+        return None if v == "" else v  # type: ignore[return-value]
+
+
+class MessageAppendRequest(BaseModel):
+    """One persisted turn. Caller-supplied id (UUID) so the frontend
+    can stream into a placeholder bubble before persisting."""
+
+    id: str | None = None
+    role: str  # "system" | "user" | "assistant"
+    content: str
+    status: str = "complete"
+    served_by: str | None = None  # NULL | "contributor" | "local"
+    output_tokens: int | None = None
+    duration_ms: int | None = None
+    finish_reason: str | None = None
+
+
+class MessageUpdateRequest(BaseModel):
+    """Patch an in-flight message — used to finalize an assistant message
+    after streaming completes (status flips, meta lands)."""
+
+    content: str | None = None
+    status: str | None = None
+    served_by: str | None = None
+    output_tokens: int | None = None
+    duration_ms: int | None = None
+    finish_reason: str | None = None
+
+
+@router.get("/conversations")
+async def list_conversations_endpoint(
+    project: str | None = None,
+    include_all: bool = False,
+    limit: int = 200,
+) -> list[dict]:
+    """List conversations with summary fields (no messages). Sorted by
+    most recently updated."""
+    return await _list_conversations(
+        project=project, include_all=include_all, limit=limit
+    )
+
+
+@router.post("/conversations", status_code=201)
+async def create_conversation_endpoint(req: ConversationCreateRequest) -> dict:
+    convo_id = req.id or str(_uuid.uuid4())
+    return await _create_conversation(
+        conversation_id=convo_id,
+        title=req.title,
+        project=req.project,
+        network_mode=req.network_mode,
+        network_model_slug=req.network_model_slug,
+    )
+
+
+@router.get("/conversations/{conversation_id}")
+async def get_conversation_endpoint(conversation_id: str) -> dict:
+    convo = await _get_conversation(conversation_id)
+    if convo is None:
+        raise HTTPException(status_code=404, detail=f"Conversation {conversation_id!r} not found")
+    return convo
+
+
+@router.patch("/conversations/{conversation_id}")
+async def patch_conversation_endpoint(
+    conversation_id: str,
+    req: ConversationUpdateRequest,
+) -> dict:
+    found = await _update_conversation(
+        conversation_id=conversation_id,
+        title=req.title,
+        network_mode=req.network_mode,
+        network_model_slug=req.network_model_slug,
+        project=req.project,
+        project_set=req.project_set,
+    )
+    if not found:
+        raise HTTPException(status_code=404, detail=f"Conversation {conversation_id!r} not found")
+    convo = await _get_conversation(conversation_id)
+    return convo or {}
+
+
+@router.delete("/conversations/{conversation_id}", status_code=204, response_class=Response)
+async def delete_conversation_endpoint(conversation_id: str) -> Response:
+    """Delete a conversation + cascade its messages."""
+    existed = await _delete_conversation(conversation_id)
+    if not existed:
+        raise HTTPException(status_code=404, detail=f"Conversation {conversation_id!r} not found")
+    return Response(status_code=204)
+
+
+@router.post("/conversations/{conversation_id}/messages", status_code=201)
+async def append_message_endpoint(
+    conversation_id: str,
+    req: MessageAppendRequest,
+) -> dict:
+    msg_id = req.id or str(_uuid.uuid4())
+    return await append_message(
+        message_id=msg_id,
+        conversation_id=conversation_id,
+        role=req.role,
+        content=req.content,
+        status=req.status,
+        served_by=req.served_by,
+        output_tokens=req.output_tokens,
+        duration_ms=req.duration_ms,
+        finish_reason=req.finish_reason,
+    )
+
+
+@router.patch("/messages/{message_id}")
+async def patch_message_endpoint(
+    message_id: str,
+    req: MessageUpdateRequest,
+) -> dict:
+    found = await update_message(
+        message_id=message_id,
+        content=req.content,
+        status=req.status,
+        served_by=req.served_by,
+        output_tokens=req.output_tokens,
+        duration_ms=req.duration_ms,
+        finish_reason=req.finish_reason,
+    )
+    if not found:
+        raise HTTPException(status_code=404, detail=f"Message {message_id!r} not found")
+    return {"id": message_id, "updated": True}
+
+
+@router.delete("/conversations/{conversation_id}/messages")
+async def clear_messages_endpoint(conversation_id: str) -> dict:
+    """Clear all messages in a conversation but keep the conversation row."""
+    removed = await clear_conversation_messages(conversation_id)
+    return {"removed": removed}

@@ -80,6 +80,38 @@ CREATE TABLE IF NOT EXISTS vault_files (
 )
 """
 
+# Chat conversations + messages — local-first history. Lives in the same
+# SQLite as memories/tasks because the chat surface is conceptually
+# adjacent (extracted memories come from these same conversations).
+# Cross-device sync is v0.5+ work; for now everything stays on the user's
+# machine, in line with the manifesto's local-first promise.
+_CREATE_CONVERSATIONS = """
+CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    project TEXT,
+    network_mode INTEGER NOT NULL DEFAULT 0,
+    network_model_slug TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+)
+"""
+
+_CREATE_MESSAGES = """
+CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'complete',
+    served_by TEXT,
+    output_tokens INTEGER,
+    duration_ms INTEGER,
+    finish_reason TEXT,
+    created_at TEXT NOT NULL
+)
+"""
+
 _INDICES = [
     "CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category)",
     "CREATE INDEX IF NOT EXISTS idx_memories_active ON memories(is_active, confidence DESC)",
@@ -89,6 +121,9 @@ _INDICES = [
     "CREATE INDEX IF NOT EXISTS idx_task_states_project ON task_states(project, status)",
     "CREATE INDEX IF NOT EXISTS idx_memories_source_type ON memories(source_type, is_active)",
     "CREATE INDEX IF NOT EXISTS idx_memories_source_ref ON memories(source_ref)",
+    "CREATE INDEX IF NOT EXISTS idx_messages_convo ON messages(conversation_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_conversations_updated ON conversations(updated_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_conversations_project ON conversations(project, updated_at DESC)",
 ]
 
 
@@ -99,6 +134,13 @@ def get_memory_db_path() -> Path:
         return Path(env_override)
     from potluck_local.utils.paths import memory_db_path
     return memory_db_path()
+
+
+def _now_iso() -> str:
+    """Local copy of the ISO-8601 helper other services define. Kept
+    here to avoid a circular import on memory_extraction et al."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _add_column_if_missing(
@@ -139,6 +181,8 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         await db.execute(_CREATE_MCP_SESSIONS)
         await db.execute(_CREATE_MCP_TOOL_CALLS)
         await db.execute(_CREATE_VAULT_FILES)
+        await db.execute(_CREATE_CONVERSATIONS)
+        await db.execute(_CREATE_MESSAGES)
 
         # Schema migrations first — indexes below may reference added columns.
         await _add_column_if_missing(db, "memories", "project", "TEXT")
@@ -523,3 +567,300 @@ async def list_projects(db_path: Path | None = None) -> list[dict]:
         }
         for p in all_projects
     ]
+
+
+# ---------------------------------------------------------------------------
+# Chat history — conversations + messages
+# ---------------------------------------------------------------------------
+
+
+async def list_conversations(
+    project: str | None = None,
+    include_all: bool = False,
+    limit: int = 200,
+    db_path: Path | None = None,
+) -> list[dict]:
+    """Return conversations ordered by most-recently-updated.
+
+    Project filtering matches the rest of the app (see memory router):
+    - include_all=True   → ignore project, return everything
+    - project=None       → only conversations with project IS NULL
+    - project='foo'      → conversations where project='foo' OR project IS NULL
+    """
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        if include_all:
+            where = ""
+            params: tuple = (limit,)
+        elif project is None:
+            where = "WHERE project IS NULL"
+            params = (limit,)
+        else:
+            where = "WHERE project = ? OR project IS NULL"
+            params = (project, limit)
+
+        cursor = await db.execute(
+            f"""
+            SELECT c.id, c.title, c.project, c.network_mode, c.network_model_slug,
+                   c.created_at, c.updated_at,
+                   (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS message_count
+            FROM conversations c
+            {where}
+            ORDER BY c.updated_at DESC
+            LIMIT ?
+            """,
+            params,
+        )
+        rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_conversation(
+    conversation_id: str,
+    db_path: Path | None = None,
+) -> dict | None:
+    """Return a conversation with its messages, ordered by created_at."""
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        c_cursor = await db.execute(
+            """
+            SELECT id, title, project, network_mode, network_model_slug,
+                   created_at, updated_at
+            FROM conversations
+            WHERE id = ?
+            """,
+            (conversation_id,),
+        )
+        c_row = await c_cursor.fetchone()
+        if c_row is None:
+            return None
+
+        m_cursor = await db.execute(
+            """
+            SELECT id, conversation_id, role, content, status,
+                   served_by, output_tokens, duration_ms, finish_reason, created_at
+            FROM messages
+            WHERE conversation_id = ?
+            ORDER BY created_at ASC
+            """,
+            (conversation_id,),
+        )
+        m_rows = await m_cursor.fetchall()
+
+    convo = dict(c_row)
+    convo["messages"] = [dict(r) for r in m_rows]
+    return convo
+
+
+async def create_conversation(
+    conversation_id: str,
+    title: str,
+    project: str | None,
+    network_mode: bool,
+    network_model_slug: str | None,
+    db_path: Path | None = None,
+) -> dict:
+    """Insert a new conversation row. Caller-supplied id (UUID) so the
+    frontend can optimistically use it before the round-trip completes."""
+    now = _now_iso()
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        await db.execute("PRAGMA foreign_keys=ON")
+        await db.execute(
+            """
+            INSERT INTO conversations
+                (id, title, project, network_mode, network_model_slug, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (conversation_id, title, project, 1 if network_mode else 0,
+             network_model_slug, now, now),
+        )
+        await db.commit()
+    return {
+        "id": conversation_id,
+        "title": title,
+        "project": project,
+        "network_mode": 1 if network_mode else 0,
+        "network_model_slug": network_model_slug,
+        "created_at": now,
+        "updated_at": now,
+        "message_count": 0,
+    }
+
+
+async def update_conversation(
+    conversation_id: str,
+    title: str | None = None,
+    network_mode: bool | None = None,
+    network_model_slug: str | None = None,
+    project: str | None = None,
+    project_set: bool = False,  # distinguish "unchanged" from "set to NULL"
+    db_path: Path | None = None,
+) -> bool:
+    """Patch a conversation. Returns True if the row was found."""
+    sets: list[str] = []
+    params: list = []
+    if title is not None:
+        sets.append("title = ?")
+        params.append(title)
+    if network_mode is not None:
+        sets.append("network_mode = ?")
+        params.append(1 if network_mode else 0)
+    if network_model_slug is not None:
+        sets.append("network_model_slug = ?")
+        params.append(network_model_slug)
+    if project_set:
+        sets.append("project = ?")
+        params.append(project)
+
+    if not sets:
+        return True  # noop is idempotent-success
+
+    sets.append("updated_at = ?")
+    params.append(_now_iso())
+    params.append(conversation_id)
+
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        cursor = await db.execute(
+            f"UPDATE conversations SET {', '.join(sets)} WHERE id = ?",
+            params,
+        )
+        found = cursor.rowcount > 0
+        await db.commit()
+    return found
+
+
+async def delete_conversation(
+    conversation_id: str,
+    db_path: Path | None = None,
+) -> bool:
+    """Delete a conversation + cascade its messages.
+
+    PRAGMA foreign_keys=ON is set so the ON DELETE CASCADE on
+    messages.conversation_id fires. Without that pragma the cascade
+    silently doesn't run and orphan messages accumulate.
+    """
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        await db.execute("PRAGMA foreign_keys=ON")
+        cursor = await db.execute(
+            "DELETE FROM conversations WHERE id = ?", (conversation_id,)
+        )
+        deleted = cursor.rowcount > 0
+        await db.commit()
+    return deleted
+
+
+async def append_message(
+    message_id: str,
+    conversation_id: str,
+    role: str,
+    content: str,
+    status: str = "complete",
+    served_by: str | None = None,
+    output_tokens: int | None = None,
+    duration_ms: int | None = None,
+    finish_reason: str | None = None,
+    db_path: Path | None = None,
+) -> dict:
+    """Append a message + bump the conversation's updated_at."""
+    now = _now_iso()
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        await db.execute("PRAGMA foreign_keys=ON")
+        await db.execute(
+            """
+            INSERT INTO messages
+                (id, conversation_id, role, content, status, served_by,
+                 output_tokens, duration_ms, finish_reason, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (message_id, conversation_id, role, content, status,
+             served_by, output_tokens, duration_ms, finish_reason, now),
+        )
+        await db.execute(
+            "UPDATE conversations SET updated_at = ? WHERE id = ?",
+            (now, conversation_id),
+        )
+        await db.commit()
+    return {
+        "id": message_id,
+        "conversation_id": conversation_id,
+        "role": role,
+        "content": content,
+        "status": status,
+        "served_by": served_by,
+        "output_tokens": output_tokens,
+        "duration_ms": duration_ms,
+        "finish_reason": finish_reason,
+        "created_at": now,
+    }
+
+
+async def update_message(
+    message_id: str,
+    content: str | None = None,
+    status: str | None = None,
+    served_by: str | None = None,
+    output_tokens: int | None = None,
+    duration_ms: int | None = None,
+    finish_reason: str | None = None,
+    db_path: Path | None = None,
+) -> bool:
+    """Patch an existing message. Used to finalize an assistant message
+    after streaming completes (status transitions from 'streaming' to
+    'complete', and meta fields land if the response came from the
+    contributor network)."""
+    sets: list[str] = []
+    params: list = []
+    if content is not None:
+        sets.append("content = ?")
+        params.append(content)
+    if status is not None:
+        sets.append("status = ?")
+        params.append(status)
+    if served_by is not None:
+        sets.append("served_by = ?")
+        params.append(served_by)
+    if output_tokens is not None:
+        sets.append("output_tokens = ?")
+        params.append(output_tokens)
+    if duration_ms is not None:
+        sets.append("duration_ms = ?")
+        params.append(duration_ms)
+    if finish_reason is not None:
+        sets.append("finish_reason = ?")
+        params.append(finish_reason)
+
+    if not sets:
+        return True
+
+    params.append(message_id)
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        cursor = await db.execute(
+            f"UPDATE messages SET {', '.join(sets)} WHERE id = ?",
+            params,
+        )
+        found = cursor.rowcount > 0
+        await db.commit()
+    return found
+
+
+async def clear_conversation_messages(
+    conversation_id: str,
+    db_path: Path | None = None,
+) -> int:
+    """Drop all messages in a conversation. Returns count deleted."""
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        cursor = await db.execute(
+            "DELETE FROM messages WHERE conversation_id = ?",
+            (conversation_id,),
+        )
+        removed = cursor.rowcount
+        await db.commit()
+    return removed

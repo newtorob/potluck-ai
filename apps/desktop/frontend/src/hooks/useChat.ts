@@ -20,10 +20,10 @@ export interface UseChatReturn {
   // Actions
   send: (content: string) => Promise<void>;
   abort: () => void;
-  createConversation: (modelSlug?: string) => string;
-  deleteConversation: (id: string) => void;
-  switchConversation: (id: string) => void;
-  renameConversation: (id: string, title: string) => void;
+  createConversation: (modelSlug?: string) => Promise<string>;
+  deleteConversation: (id: string) => Promise<void>;
+  switchConversation: (id: string) => Promise<void>;
+  renameConversation: (id: string, title: string) => Promise<void>;
   clearConversations: () => void;
 }
 
