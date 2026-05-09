@@ -26,6 +26,7 @@ import {
   Brain,
   ListTodo,
   Activity,
+  Globe2,
   Settings,
   CreditCard,
   Plus,
@@ -73,6 +74,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/memory', label: 'Memory', icon: Brain },
   { to: '/tasks', label: 'Tasks', icon: ListTodo },
   { to: '/agents', label: 'Agents', icon: Activity },
+  { to: '/network', label: 'Network', icon: Globe2 },
 ];
 
 const SECONDARY_NAV: NavItem[] = [

@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from coordinator.db.database import get_db
-from coordinator.models import ContributorRelease, Peer, PeerHeartbeat
+from coordinator.models import ContributorRelease, Job, Peer, PeerCapability, PeerHeartbeat
 
 router = APIRouter(tags=["transparency"])
 
@@ -70,6 +70,43 @@ async def fleet(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     release_count = await db.scalar(select(func.count(ContributorRelease.binary_hash)))
     last_release_at = await db.scalar(select(func.max(ContributorRelease.signed_at)))
 
+    # Models the network can currently serve. JOIN peer_capabilities with
+    # online peers and group by slug — gives the desktop /network view a
+    # "Available models" chip rack with a count per slug. No peer_id, no
+    # hostname; just slug + count, fully aggregate.
+    online_subq = (
+        select(Peer.id)
+        .where(Peer.status == "active", Peer.last_seen_at > online_threshold)
+        .subquery()
+    )
+    model_rows = (
+        await db.execute(
+            select(
+                PeerCapability.model_slug.label("slug"),
+                func.count(func.distinct(PeerCapability.peer_id)).label("count"),
+            )
+            .where(PeerCapability.peer_id.in_(select(online_subq.c.id)))
+            .group_by(PeerCapability.model_slug)
+            .order_by(func.count(func.distinct(PeerCapability.peer_id)).desc())
+        )
+    ).all()
+    models = [{"slug": row.slug, "online_peer_count": row.count} for row in model_rows]
+
+    # Activity totals over the last 24h. Counts completed jobs and sums
+    # output_tokens. No member_id grouping here — this is the public
+    # fleet-wide view. Per-member stats live at /jobs/stats.
+    day_ago = now - timedelta(hours=24)
+    jobs_24h = await db.scalar(
+        select(func.count(Job.id)).where(
+            Job.completed_at > day_ago, Job.status == "completed"
+        )
+    )
+    tokens_24h = await db.scalar(
+        select(func.coalesce(func.sum(Job.output_tokens), 0)).where(
+            Job.completed_at > day_ago, Job.status == "completed"
+        )
+    )
+
     return {
         "as_of": now.isoformat(),
         "online_window_minutes": ONLINE_WINDOW_MINUTES,
@@ -78,6 +115,11 @@ async def fleet(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
             "online_now": online or 0,
             "by_platform": platforms,
             "by_version": versions,
+        },
+        "models": models,
+        "activity": {
+            "jobs_completed_24h": int(jobs_24h or 0),
+            "tokens_served_24h": int(tokens_24h or 0),
         },
         "releases": {
             "trusted_count": release_count or 0,

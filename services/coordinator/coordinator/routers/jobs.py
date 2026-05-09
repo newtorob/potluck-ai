@@ -32,7 +32,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from coordinator.db.database import get_db
+from coordinator.db.database import get_db, get_session_factory
 from coordinator.models.job import Job
 from coordinator.schemas.peer import (
     JobAssignedMessage,
@@ -255,6 +255,60 @@ def _sse_error(category: str, message: str) -> str:
     return f"data: {json.dumps(payload)}\n\n"
 
 
+@router.get("/stats")
+async def my_job_stats(db: AsyncSession = Depends(get_db)) -> dict:
+    """Per-member requester stats for the desktop /network view.
+
+    v0 hardcodes member_id to the dev-fixture stub. When real auth lands
+    in v0.5 this filters by the authenticated session's member_id instead.
+
+    Returns counts + token totals + a coarse latency band (p50). NO
+    peer_id, NO per-job records — aggregate-only, in keeping with the
+    blinded-routing rule. The frontend's "Your usage" card on /network
+    consumes this directly.
+    """
+    from datetime import timedelta
+    from sqlalchemy import func, select
+
+    now = datetime.now(timezone.utc)
+    day_ago = now - timedelta(hours=24)
+
+    base = select(Job).where(
+        Job.member_id == _STUB_MEMBER_ID,
+        Job.completed_at > day_ago,
+        Job.status == "completed",
+    )
+
+    jobs_24h = await db.scalar(
+        select(func.count()).select_from(base.subquery())
+    )
+    tokens_24h = await db.scalar(
+        select(func.coalesce(func.sum(Job.output_tokens), 0)).where(
+            Job.member_id == _STUB_MEMBER_ID,
+            Job.completed_at > day_ago,
+            Job.status == "completed",
+        )
+    )
+    # Median-ish: SQLite would need percentile_cont; postgres has it but
+    # not all dev DBs are pg. Use a pragmatic approximation: the simple
+    # average of duration_ms instead. Real percentiles land when we have
+    # enough data to care about distribution shape.
+    avg_duration = await db.scalar(
+        select(func.coalesce(func.avg(Job.duration_ms), 0)).where(
+            Job.member_id == _STUB_MEMBER_ID,
+            Job.completed_at > day_ago,
+            Job.status == "completed",
+            Job.duration_ms.isnot(None),
+        )
+    )
+
+    return {
+        "jobs_24h": int(jobs_24h or 0),
+        "tokens_received_24h": int(tokens_24h or 0),
+        "avg_duration_ms": int(avg_duration or 0),
+    }
+
+
 @router.post("/stream")
 async def dispatch_job_stream(
     req: JobRequest,
@@ -361,24 +415,33 @@ async def dispatch_job_stream(
                     finish_reason=buf.finish_reason or "stop",
                 )
                 yield _sse_done()
+        finally:
+            # complete_job() is idempotent — peer side may have already
+            # signalled this when JobCompleteMessage landed.
+            await complete_job(job_id)
 
-            # Persist the final job row state. Mirrors the sync /jobs path.
+            # Finalize the Job row in a FRESH DB session. The
+            # request-scoped `db` from Depends(get_db) closes when the
+            # StreamingResponse hands the generator off to ASGI, so any
+            # commit attempted from inside the generator on that session
+            # silently no-ops (rows stay in 'dispatched' forever — bad).
+            # Opening our own session here is the only way to reliably
+            # persist completion state from a streaming endpoint.
             try:
-                if buf.error_category is not None:
-                    job.status = "failed"
-                else:
-                    job.status = "completed"
-                    job.output_tokens = buf.output_tokens
-                    job.duration_ms = buf.duration_ms
-                job.completed_at = datetime.now(timezone.utc)
-                await db.commit()
+                final_status = (
+                    "failed" if buf.error_category is not None else "completed"
+                )
+                async with get_session_factory()() as fresh_db:
+                    db_job = await fresh_db.get(Job, job_id)
+                    if db_job is not None:
+                        db_job.status = final_status
+                        if buf.error_category is None:
+                            db_job.output_tokens = buf.output_tokens
+                            db_job.duration_ms = buf.duration_ms
+                        db_job.completed_at = datetime.now(timezone.utc)
+                        await fresh_db.commit()
             except Exception:
                 logger.exception("job_stream_finalize_failed", job_id=str(job_id))
-        finally:
-            # If the client disconnected mid-stream, complete_job() may
-            # already have fired from the peer side. Idempotent — safe
-            # to call again.
-            await complete_job(job_id)
 
     return StreamingResponse(
         _generate(),

@@ -161,6 +161,39 @@ export interface VaultRescanResult {
 }
 
 // ---------------------------------------------------------------------------
+// Network (coordinator) shapes
+// ---------------------------------------------------------------------------
+
+/** Aggregate fleet summary returned by GET /transparency/fleet. Privacy
+ *  invariant: NO peer_id / hostname / hardware fields here, by design.
+ *  Per-peer identity is the line we don't cross in the requester UI. */
+export interface FleetSummary {
+  as_of: string;
+  online_window_minutes: number;
+  peers: {
+    active_total: number;
+    online_now: number;
+    by_platform: Record<string, number>;
+    by_version: Record<string, number>;
+  };
+  models: { slug: string; online_peer_count: number }[];
+  activity: {
+    jobs_completed_24h: number;
+    tokens_served_24h: number;
+  };
+  releases: {
+    trusted_count: number;
+    last_signed_at: string | null;
+  };
+}
+
+export interface MyJobStats {
+  jobs_24h: number;
+  tokens_received_24h: number;
+  avg_duration_ms: number;
+}
+
+// ---------------------------------------------------------------------------
 // API surface
 // ---------------------------------------------------------------------------
 
@@ -517,6 +550,26 @@ export const localApi = {
     clearDisconnected(): Promise<{ removed: number }> {
       return fetch(`${LOCAL_BASE}/agents/sessions`, { method: 'DELETE' }).then((r) =>
         handleResponse<{ removed: number }>(r),
+      );
+    },
+  },
+
+  // ---- Network (coordinator-side fleet + per-member stats) ---------------
+
+  network: {
+    /** GET /transparency/fleet on the coordinator. Aggregate-only — no
+     *  peer_id / hostname / individual peer fields, by manifesto rule. */
+    fleet(): Promise<FleetSummary> {
+      return fetch(`${COORDINATOR_BASE}/transparency/fleet`).then((r) =>
+        handleResponse<FleetSummary>(r),
+      );
+    },
+
+    /** GET /jobs/stats on the coordinator. Returns this member's
+     *  requester-side counts + average latency for the last 24h. */
+    myStats(): Promise<MyJobStats> {
+      return fetch(`${COORDINATOR_BASE}/jobs/stats`).then((r) =>
+        handleResponse<MyJobStats>(r),
       );
     },
   },

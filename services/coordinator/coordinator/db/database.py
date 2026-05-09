@@ -62,3 +62,13 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
     async with _session_factory() as session:
         yield session
+
+
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    """Return the session factory for code paths that outlive the request
+    lifecycle (e.g. background tasks, streaming-response finalizers that
+    need to update DB rows AFTER the StreamingResponse has consumed the
+    request-scoped session)."""
+    if _session_factory is None:
+        raise RuntimeError("Database not initialised — init_db() was not called")
+    return _session_factory
