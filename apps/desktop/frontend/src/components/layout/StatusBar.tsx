@@ -29,6 +29,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/components/ui/cn';
 import { useHealth } from '@/hooks/useHealth';
+import { useChatStore } from '@/stores/chatStore';
 import { ipc } from '@/lib/ipc';
 
 export function StatusBar() {
@@ -50,10 +51,17 @@ export function StatusBar() {
   // response means the local API is responding.
   const sidecarUp = activeModelId !== null || modelLoaded;
 
-  // Network mode is agent-neutral and v0 is always Off until /network ships.
-  // Memory: per-session network opt-in, never global. So this is a status
-  // pill, not a toggle — the toggle lives in the chat composer per-prompt.
-  const networkMode: 'off' | 'per-session' | 'standby' = 'off';
+  // Network mode reflects chatStore.networkMode — the same flag the
+  // chat-composer toggle flips. Off = nothing leaves the device;
+  // Per-session = the chat composer is currently set to route via the
+  // contributor network on next send.
+  //
+  // The pill stays a STATUS indicator (not a toggle) — flipping network
+  // mode happens at the place the user can also see what they're about
+  // to send (the composer), per the brief's "agent-neutral, opt-in,
+  // never global" rule (memory e555655d).
+  const networkOn = useChatStore((s) => s.networkMode);
+  const networkMode: 'off' | 'per-session' | 'standby' = networkOn ? 'per-session' : 'off';
 
   return (
     <footer
@@ -154,21 +162,29 @@ function NetworkPill({ mode }: NetworkPillProps) {
   const label =
     mode === 'off'      ? 'Network: Off'
     : mode === 'standby' ? 'Network: Standby'
-    : 'Network: Per-session';
+    : 'Network: On';
 
   const tooltip =
-    mode === 'off'      ? 'Nothing leaves your machine. Enable per-prompt in chat.'
+    mode === 'off'      ? 'Nothing leaves your machine. Toggle on in the chat composer.'
     : mode === 'standby' ? 'Network ready but inactive — opt in per session.'
-    : 'A request in this session is using the network anonymously, by your choice.';
+    : 'Your next chat send routes through the contributor network. Aggregate stats in /network.';
 
+  // Click-through goes to /network (the observability view), not
+  // /settings — the user wants to SEE the network state, not change a
+  // setting. Toggling happens in the chat composer.
   return (
     <Link
-      to="/settings#privacy"
+      to="/network"
       className={cn(
-        'flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 px-2 py-0.5',
-        'text-[10px] font-medium text-muted-foreground',
-        'hover:text-foreground hover:border-border transition-colors',
+        'flex items-center gap-1.5 rounded-full border px-2 py-0.5',
+        'text-[10px] font-medium transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        mode === 'off'
+          ? 'border-border/60 bg-muted/40 text-muted-foreground hover:text-foreground hover:border-border'
+          // Active state borrows the chat composer's ember treatment so
+          // the routing-decision signal looks the same wherever the user
+          // sees it.
+          : 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15',
       )}
       title={tooltip}
       aria-label={tooltip}
