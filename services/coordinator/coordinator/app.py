@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from coordinator.config import get_settings
 from coordinator.db.database import close_db, init_db
-from coordinator.routers import health, jobs, peers, transparency
+from coordinator.routers import health, jobs, me, mesh, peers, transparency
 
 # Origins permitted to call the coordinator's HTTP endpoints from a
 # browser context (the Electron renderer counts). Curl + the WS handshake
@@ -74,5 +74,7 @@ def create_app() -> FastAPI:
     app.include_router(peers.router)
     app.include_router(transparency.router)
     app.include_router(jobs.router, prefix="/jobs")
+    app.include_router(mesh.router)
+    app.include_router(me.router)
 
     return app

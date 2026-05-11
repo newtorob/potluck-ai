@@ -126,6 +126,9 @@ test-coordinator: ## Run coordinator pytest suite (privacy invariants etc.) in i
 m3-smoke: ## End-to-end Phase G m3 acceptance check (needs coordinator + at least one peer running)
 	@python3 scripts/m3-smoke.py $(M3_ARGS)
 
+mesh-smoke: ## End-to-end Phase G mesh week-1 acceptance (needs coordinator + Postgres)
+	@python3 scripts/mesh-smoke.py $(MESH_ARGS)
+
 lint: ## Run the privacy-invariant lint (member_id leaks + contributor in-memory-only). Free, local.
 	@python3 scripts/lint_privacy.py
 

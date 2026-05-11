@@ -309,6 +309,75 @@ async def my_job_stats(db: AsyncSession = Depends(get_db)) -> dict:
     }
 
 
+async def _finalize_job_in_db(
+    *,
+    job_id: uuid.UUID,
+    error_category: str | None,
+    error_message: str | None,
+    output_tokens: int,
+    duration_ms: int,
+) -> None:
+    """Persist final job state + credit-ledger rows. Runs as an independent
+    task spawned from the streaming finalizer's `finally:` block so it
+    survives the response generator's cancellation.
+
+    Two writes happen here, in order:
+      1. Mark the `jobs` row complete (status, output_tokens, duration,
+         completed_at).
+      2. If the job succeeded with non-zero output tokens, write the
+         two credit-ledger rows (spent for requester, earned for
+         contributor's owner). Per the asymmetric earn/spend math in
+         services/credit_ledger.py — earn = spent × 1.5.
+
+    All errors are logged at WARN; nothing propagates (the client is
+    already gone)."""
+    try:
+        async with get_session_factory()() as fresh_db:
+            db_job = await fresh_db.get(Job, job_id)
+            if db_job is None:
+                logger.warning("job_finalize_row_missing", job_id=str(job_id))
+                return
+
+            db_job.status = "failed" if error_category is not None else "completed"
+            if error_category is None:
+                db_job.output_tokens = output_tokens
+                db_job.duration_ms = duration_ms
+            db_job.completed_at = datetime.now(timezone.utc)
+            await fresh_db.commit()
+
+            # ---- Credit ledger write (success path only) ---- #
+            if error_category is None and output_tokens > 0:
+                try:
+                    from coordinator.models.peer import Peer
+                    from coordinator.services.credit_ledger import (
+                        record_job_credits,
+                    )
+
+                    peer = await fresh_db.get(Peer, db_job.peer_id)
+                    if peer is not None:
+                        await record_job_credits(
+                            fresh_db,
+                            job_id=job_id,
+                            requester_member_id=db_job.member_id,
+                            contributor_owner_member_id=peer.member_id,
+                            model_slug=db_job.model_slug,
+                            output_tokens=output_tokens,
+                        )
+                        await fresh_db.commit()
+                        logger.info(
+                            "credit_ledger_written",
+                            job_id=str(job_id),
+                            output_tokens=output_tokens,
+                            model_slug=db_job.model_slug,
+                        )
+                except Exception:
+                    logger.exception(
+                        "credit_ledger_write_failed", job_id=str(job_id)
+                    )
+    except Exception:
+        logger.exception("job_finalize_failed", job_id=str(job_id))
+
+
 @router.post("/stream")
 async def dispatch_job_stream(
     req: JobRequest,
@@ -420,28 +489,39 @@ async def dispatch_job_stream(
             # signalled this when JobCompleteMessage landed.
             await complete_job(job_id)
 
-            # Finalize the Job row in a FRESH DB session. The
-            # request-scoped `db` from Depends(get_db) closes when the
-            # StreamingResponse hands the generator off to ASGI, so any
-            # commit attempted from inside the generator on that session
-            # silently no-ops (rows stay in 'dispatched' forever — bad).
-            # Opening our own session here is the only way to reliably
-            # persist completion state from a streaming endpoint.
-            try:
-                final_status = (
-                    "failed" if buf.error_category is not None else "completed"
+            # ---- Finalize as a DETACHED background task ---- #
+            #
+            # Two intertwined problems if we await the DB writes here:
+            #
+            # 1. The request-scoped `db` from Depends(get_db) closes when
+            #    the StreamingResponse hands the generator off to ASGI,
+            #    so any commit on that session silently no-ops. We solve
+            #    this by opening a fresh session below.
+            # 2. When the client closes the connection (which happens
+            #    naturally right after `[DONE]`), uvicorn cancels the
+            #    response task. Any `await` from inside this `finally`
+            #    block then raises CancelledError, leaving the job in
+            #    'dispatched' and credits unwritten.
+            #
+            # The fix is to spawn the finalize as an independent task
+            # via `asyncio.create_task` — it owns its own cancel scope
+            # and runs to completion regardless of the streaming response's
+            # cancellation. Errors are logged but never propagated back
+            # to the (already-closed) client.
+            captured_error = buf.error_category
+            captured_error_msg = buf.error_message
+            captured_tokens = buf.output_tokens
+            captured_duration = buf.duration_ms
+
+            asyncio.create_task(
+                _finalize_job_in_db(
+                    job_id=job_id,
+                    error_category=captured_error,
+                    error_message=captured_error_msg,
+                    output_tokens=captured_tokens,
+                    duration_ms=captured_duration,
                 )
-                async with get_session_factory()() as fresh_db:
-                    db_job = await fresh_db.get(Job, job_id)
-                    if db_job is not None:
-                        db_job.status = final_status
-                        if buf.error_category is None:
-                            db_job.output_tokens = buf.output_tokens
-                            db_job.duration_ms = buf.duration_ms
-                        db_job.completed_at = datetime.now(timezone.utc)
-                        await fresh_db.commit()
-            except Exception:
-                logger.exception("job_stream_finalize_failed", job_id=str(job_id))
+            )
 
     return StreamingResponse(
         _generate(),
