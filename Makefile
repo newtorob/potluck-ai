@@ -20,7 +20,7 @@ COMPOSE ?= $(shell \
 
 .PHONY: help setup check-python check-docker up down restart logs api-logs pg-logs coord-logs migrate psql \
         api-shell coord-shell test-api test-coordinator m3-smoke lint install-hooks dev desktop frontend \
-        sidecar sidecar-setup coordinator coordinator-setup frontend-setup electron-setup ps status clean reset
+        sidecar sidecar-setup sidecar-go coordinator coordinator-setup frontend-setup electron-setup ps status clean reset
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -156,6 +156,14 @@ frontend: ## Start only the Vite dev server (useful when iterating on UI without
 
 sidecar: ## Start only the Python sidecar (useful when debugging inference)
 	cd apps/desktop/python && ./.venv/bin/python -m potluck_local.app --port 8321
+
+sidecar-go: ## Build the Go mesh sidecar for the current platform (output: apps/desktop/go/potluck-mesh/dist/)
+	@if [ ! -f apps/desktop/go/potluck-mesh/go.sum ]; then \
+		echo "==> go.sum missing — running go mod tidy first"; \
+		cd apps/desktop/go/potluck-mesh && go mod tidy; \
+	fi
+	@echo "==> Building potluck-mesh for $$(go env GOOS)/$$(go env GOARCH)"
+	$(MAKE) -C apps/desktop/go/potluck-mesh build
 
 # ---------- coordinator (Phase G control plane, native run) ----------
 

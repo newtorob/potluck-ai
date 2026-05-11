@@ -203,6 +203,53 @@ export interface PersistedConversationDetail extends PersistedConversation {
 // Network (coordinator) shapes
 // ---------------------------------------------------------------------------
 
+// ---- Credit ledger (Phase G m4) ------------------------------------------
+
+/**
+ * Per-model credit breakdown from GET /me/credit-balance.
+ * `earned` and `spent` are Decimal-serialised strings from the server
+ * (e.g. "13.50"). Keep them as strings here; format/parse only at the
+ * render layer to avoid floating-point precision loss.
+ */
+export interface CreditBalanceByModel {
+  model_slug: string;
+  earned: string;
+  spent: string;
+}
+
+/** Aggregated balance for the calling member. */
+export interface CreditBalance {
+  member_id: string;
+  earned: string;
+  spent: string;
+  net: string;
+  by_model: CreditBalanceByModel[];
+}
+
+/**
+ * One row from the per-member credit ledger (GET /me/credit-history).
+ * `multiplier`, `credits` are Decimal-serialised strings.
+ * `prev_row_hash` and `row_hash` are stored but not surfaced in v0 UI.
+ */
+export interface CreditHistoryEntry {
+  id: string;
+  direction: 'earned' | 'spent';
+  job_id: string;
+  model_slug: string;
+  output_tokens: number;
+  multiplier: string;
+  credits: string;
+  prev_row_hash: string;
+  row_hash: string;
+  created_at: string; // ISO-8601 from coordinator
+}
+
+export interface CreditHistory {
+  member_id: string;
+  entries: CreditHistoryEntry[];
+  next_cursor: string | null;
+}
+
 /** Aggregate fleet summary returned by GET /transparency/fleet. Privacy
  *  invariant: NO peer_id / hostname / hardware fields here, by design.
  *  Per-peer identity is the line we don't cross in the requester UI. */
@@ -702,6 +749,32 @@ export const localApi = {
     myStats(): Promise<MyJobStats> {
       return fetch(`${COORDINATOR_BASE}/jobs/stats`).then((r) =>
         handleResponse<MyJobStats>(r),
+      );
+    },
+  },
+
+  // ---- Credits (coordinator — Phase G m4 ledger) -------------------------
+
+  credits: {
+    /** GET /me/credit-balance — aggregated earned / spent / net plus
+     *  per-model breakdown. Decimal fields arrive as strings; keep them
+     *  that way — parse/format only at the render layer. */
+    balance(): Promise<CreditBalance> {
+      return fetch(`${COORDINATOR_BASE}/me/credit-balance`).then((r) =>
+        handleResponse<CreditBalance>(r),
+      );
+    },
+
+    /** GET /me/credit-history — newest-first ledger entries.
+     *  `direction` filters to 'earned' or 'spent'; omit for all.
+     *  `limit` defaults to 50 server-side; pass 10 for the glance widget. */
+    history(opts: { direction?: 'earned' | 'spent'; limit?: number } = {}): Promise<CreditHistory> {
+      const params = new URLSearchParams();
+      if (opts.direction !== undefined) params.set('direction', opts.direction);
+      if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+      const qs = params.toString();
+      return fetch(`${COORDINATOR_BASE}/me/credit-history${qs ? `?${qs}` : ''}`).then((r) =>
+        handleResponse<CreditHistory>(r),
       );
     },
   },

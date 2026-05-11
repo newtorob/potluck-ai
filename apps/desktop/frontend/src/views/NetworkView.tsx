@@ -1,46 +1,77 @@
 /**
  * NetworkView — /network route.
  *
- * The "see the co-op work" surface. Three sections:
+ * The "see the co-op work" surface. Four sections:
  *
  *   1. Aggregate fleet card — peers online, models served, jobs/tokens
- *      in the last 24h. Sage-tinted "alive" dot when peers >= 1.
- *   2. Available models chip rack — one chip per slug the network
- *      currently serves, with a small per-slug peer count.
- *   3. Your usage card — your requester-side stats for the last 24h.
+ *      in the last 24h.
+ *   2. Available models chip rack — one chip per slug the network serves.
+ *   3. Your usage card — requester-side stats for the last 24h.
+ *   4. Credit balance — earned / spent / net from the Phase G ledger,
+ *      polled every 30s.
+ *   5. Credit history — the 10 most-recent ledger entries.
  *
  * Privacy invariant (memory 42a7e671 / b3cbfba9):
- *   NO peer_id, hostname, hardware specs, or per-request peer
- *   attribution surface here. Aggregate-only. The "I'm serving" card
- *   from the original brief is deferred until we have a clean way to
- *   identify the user's own contributor without exposing identity to
- *   anyone else.
+ *   NO peer_id, hostname, hardware specs, or per-request peer attribution
+ *   surface here. Aggregate-only.
  *
- * Polls /transparency/fleet + /jobs/stats every 5s while the document
- * is visible. Pauses on tab blur (matches /agents pattern).
+ * Credit polling: balance refreshes every 30s; history refreshes alongside
+ * it. Both pause on tab blur (same pattern as fleet polling).
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Globe2, Layers, Activity, Cpu, BarChart3 } from 'lucide-react';
+import { Globe2, Layers, Activity, Cpu, BarChart3, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { localApi } from '@/lib/localApi';
-import type { FleetSummary, MyJobStats } from '@/lib/localApi';
+import type { FleetSummary, MyJobStats, CreditBalance, CreditHistory, CreditHistoryEntry } from '@/lib/localApi';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
 
-const POLL_INTERVAL_MS = 5_000;
+const FLEET_POLL_MS = 5_000;
+const CREDIT_POLL_MS = 30_000;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Format a Decimal-string like "13.50" for display. Preserves precision. */
+function fmtCredits(raw: string): string {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return raw;
+  return n.toFixed(2);
+}
+
+/** Relative time: "3 minutes ago", "just now", etc. */
+function relativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const secs = Math.floor(diffMs / 1000);
+  if (secs < 60) return 'just now';
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hour${hrs === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+}
+
+// ---------------------------------------------------------------------------
+// NetworkView
+// ---------------------------------------------------------------------------
 
 export function NetworkView() {
   const [fleet, setFleet] = useState<FleetSummary | null>(null);
   const [myStats, setMyStats] = useState<MyJobStats | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isFetching, setIsFetching] = useState(true);
+  const [fleetError, setFleetError] = useState<string | null>(null);
+  const [isFetchingFleet, setIsFetchingFleet] = useState(true);
 
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [balance, setBalance] = useState<CreditBalance | null>(null);
+  const [history, setHistory] = useState<CreditHistory | null>(null);
+  const [creditError, setCreditError] = useState<string | null>(null);
+  const [isFetchingCredits, setIsFetchingCredits] = useState(true);
 
-  // Wrap in refs so the polling closure always reads the live fetcher.
-  const fetchAllRef = useRef<() => Promise<void>>(async () => {});
-  fetchAllRef.current = async () => {
+  // Stable refs so polling closures always capture the latest fetch fns.
+  const fetchFleetRef = useRef<() => Promise<void>>(async () => {});
+  fetchFleetRef.current = async () => {
     try {
       const [f, s] = await Promise.all([
         localApi.network.fleet(),
@@ -48,33 +79,71 @@ export function NetworkView() {
       ]);
       setFleet(f);
       setMyStats(s);
-      setError(null);
+      setFleetError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Network fetch failed');
+      setFleetError(err instanceof Error ? err.message : 'Network fetch failed');
     } finally {
-      setIsFetching(false);
+      setIsFetchingFleet(false);
     }
   };
 
-  // Initial fetch + polling lifecycle.
-  useEffect(() => {
-    void fetchAllRef.current();
-    function schedule() {
-      timerRef.current = setTimeout(() => {
-        if (!document.hidden) void fetchAllRef.current();
-        schedule();
-      }, POLL_INTERVAL_MS);
+  const fetchCreditsRef = useRef<() => Promise<void>>(async () => {});
+  fetchCreditsRef.current = async () => {
+    try {
+      const [b, h] = await Promise.all([
+        localApi.credits.balance(),
+        localApi.credits.history({ limit: 10 }),
+      ]);
+      setBalance(b);
+      setHistory(h);
+      setCreditError(null);
+    } catch (err) {
+      setCreditError(
+        err instanceof Error ? err.message : 'Credit fetch failed',
+      );
+    } finally {
+      setIsFetchingCredits(false);
     }
-    schedule();
+  };
+
+  // Fleet polling lifecycle.
+  useEffect(() => {
+    void fetchFleetRef.current();
+    let fleetTimer: ReturnType<typeof setTimeout> | null = null;
+    function scheduleFleet() {
+      fleetTimer = setTimeout(() => {
+        if (!document.hidden) void fetchFleetRef.current();
+        scheduleFleet();
+      }, FLEET_POLL_MS);
+    }
+    scheduleFleet();
 
     function onVisibility() {
-      if (!document.hidden) void fetchAllRef.current();
+      if (!document.hidden) {
+        void fetchFleetRef.current();
+        void fetchCreditsRef.current();
+      }
     }
     document.addEventListener('visibilitychange', onVisibility);
-
     return () => {
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
+      if (fleetTimer !== null) clearTimeout(fleetTimer);
       document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
+
+  // Credit polling lifecycle (separate timer — 30s cadence).
+  useEffect(() => {
+    void fetchCreditsRef.current();
+    let creditTimer: ReturnType<typeof setTimeout> | null = null;
+    function scheduleCredits() {
+      creditTimer = setTimeout(() => {
+        if (!document.hidden) void fetchCreditsRef.current();
+        scheduleCredits();
+      }, CREDIT_POLL_MS);
+    }
+    scheduleCredits();
+    return () => {
+      if (creditTimer !== null) clearTimeout(creditTimer);
     };
   }, []);
 
@@ -83,7 +152,7 @@ export function NetworkView() {
 
   // ---- empty state -------------------------------------------------------
 
-  if (!isFetching && fleet !== null && !hasPeers) {
+  if (!isFetchingFleet && fleet !== null && !hasPeers) {
     return (
       <div className="flex h-full flex-col">
         <NetworkHeader fleet={null} />
@@ -105,7 +174,7 @@ export function NetworkView() {
 
   // ---- error state -------------------------------------------------------
 
-  if (error !== null && fleet === null) {
+  if (fleetError !== null && fleet === null) {
     return (
       <div className="flex h-full flex-col">
         <NetworkHeader fleet={null} />
@@ -128,7 +197,7 @@ export function NetworkView() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <NetworkHeader fleet={fleet} />
+      <NetworkHeader fleet={fleet} balance={balance} />
 
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
         {/* Aggregate fleet card */}
@@ -149,15 +218,35 @@ export function NetworkView() {
           <MyUsageCard stats={myStats} />
         </section>
 
+        {/* Credit balance */}
+        <section aria-label="Your credit balance">
+          <SectionHeader>Your credit balance</SectionHeader>
+          <CreditBalanceCard
+            balance={balance}
+            isLoading={isFetchingCredits}
+            error={creditError}
+          />
+        </section>
+
+        {/* Credit history */}
+        <section aria-label="Recent credit activity">
+          <SectionHeader>Recent credit activity</SectionHeader>
+          <CreditHistoryList
+            history={history}
+            isLoading={isFetchingCredits}
+            error={creditError}
+          />
+        </section>
+
         {/* Privacy footer */}
         <p
           className="pt-2 text-[11px] text-muted-foreground/70 max-w-2xl"
           aria-label="Privacy note"
         >
-          The numbers above are aggregate. We never show which specific peer
+          The network numbers above are aggregate. We never show which specific peer
           served which prompt, by design — that's the manifesto's blinded-routing
-          rule. To audit your own routing you can read the coordinator log
-          directly; that's your machine reporting back to you.
+          rule. Credit rows reflect your own ledger only; hash-chain verification
+          is coming in a future update.
         </p>
       </div>
     </div>
@@ -168,28 +257,76 @@ export function NetworkView() {
 // Header
 // ---------------------------------------------------------------------------
 
-function NetworkHeader({ fleet }: { fleet: FleetSummary | null }) {
+function NetworkHeader({
+  fleet,
+  balance,
+}: {
+  fleet: FleetSummary | null;
+  balance?: CreditBalance | null;
+}) {
   const onlineNow = fleet?.peers.online_now ?? 0;
   const isAlive = onlineNow > 0;
+
+  // Net balance pill — only show when we have data.
+  const netPill = balance !== null && balance !== undefined ? (
+    <NetBalancePill net={balance.net} />
+  ) : null;
+
   return (
     <ViewHeader
       eyebrow="Cooperative"
       title="Network"
       description={
-        <span className="flex items-center gap-1.5">
-          <span
-            className={cn(
-              'inline-block h-2 w-2 rounded-full',
-              isAlive ? 'bg-sage animate-hearth-pulse' : 'bg-muted-foreground/40',
-            )}
-            aria-hidden="true"
-          />
-          {isAlive
-            ? `${onlineNow} peer${onlineNow === 1 ? '' : 's'} online`
-            : 'Quiet — no peers online right now'}
+        <span className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5">
+            <span
+              className={cn(
+                'inline-block h-2 w-2 rounded-full',
+                isAlive ? 'bg-sage animate-hearth-pulse' : 'bg-muted-foreground/40',
+              )}
+              aria-hidden="true"
+            />
+            {isAlive
+              ? `${onlineNow} peer${onlineNow === 1 ? '' : 's'} online`
+              : 'Quiet — no peers online right now'}
+          </span>
+          {netPill}
         </span>
       }
     />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Net balance pill
+// ---------------------------------------------------------------------------
+
+function NetBalancePill({ net }: { net: string }) {
+  const n = Number(net);
+  const isPositive = n > 0;
+  const isNegative = n < 0;
+
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums',
+        isPositive
+          ? 'border-sage/30 bg-sage/10 text-sage dark:text-sage'
+          : isNegative
+            ? 'border-border/60 bg-muted/60 text-muted-foreground'
+            : 'border-border/60 bg-muted/60 text-muted-foreground',
+      )}
+      title="Your net credit balance (earned minus spent)"
+    >
+      {isPositive ? (
+        <TrendingUp className="h-3 w-3" aria-hidden="true" />
+      ) : isNegative ? (
+        <TrendingDown className="h-3 w-3" aria-hidden="true" />
+      ) : (
+        <Minus className="h-3 w-3" aria-hidden="true" />
+      )}
+      {isPositive ? '+' : ''}{fmtCredits(net)} credits
+    </span>
   );
 }
 
@@ -376,6 +513,275 @@ function SmallStat({ label, value }: { label: string; value: string }) {
       <p className="mt-0.5 font-serif text-xl tabular-nums tracking-display text-foreground">
         {value}
       </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Credit balance card
+// ---------------------------------------------------------------------------
+
+interface CreditBalanceCardProps {
+  balance: CreditBalance | null;
+  isLoading: boolean;
+  error: string | null;
+}
+
+function CreditBalanceCard({ balance, isLoading, error }: CreditBalanceCardProps) {
+  if (isLoading && balance === null) {
+    return <CreditSkeleton />;
+  }
+
+  if (error !== null && balance === null) {
+    return (
+      <p className="text-sm text-muted-foreground/70">
+        Coordinator unreachable — check connection.
+      </p>
+    );
+  }
+
+  if (balance === null) return null;
+
+  const hasActivity =
+    balance.earned !== '0' ||
+    balance.spent !== '0' ||
+    Number(balance.earned) !== 0 ||
+    Number(balance.spent) !== 0;
+
+  if (!hasActivity) {
+    return (
+      <div className="rounded-xl border border-border/60 bg-card p-4">
+        <p className="text-sm text-muted-foreground">
+          No activity yet — toggle network mode in chat to start contributing
+          or consuming from the cooperative.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-card p-4 space-y-4">
+      {/* Totals row */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <SmallStat label="Earned (contributor)" value={`${fmtCredits(balance.earned)} cr`} />
+        <SmallStat label="Spent (requester)" value={`${fmtCredits(balance.spent)} cr`} />
+        <div>
+          <p
+            className="font-serif text-[11px] italic text-muted-foreground"
+            style={{ letterSpacing: '0.04em' }}
+          >
+            Net balance
+          </p>
+          <p
+            className={cn(
+              'mt-0.5 font-serif text-xl tabular-nums tracking-display',
+              Number(balance.net) > 0
+                ? 'text-sage dark:text-sage'
+                : Number(balance.net) < 0
+                  ? 'text-muted-foreground'
+                  : 'text-foreground',
+            )}
+          >
+            {Number(balance.net) > 0 ? '+' : ''}{fmtCredits(balance.net)} cr
+          </p>
+        </div>
+      </div>
+
+      {/* Per-model breakdown */}
+      {balance.by_model.length > 0 && (
+        <div>
+          <p
+            className="mb-2 font-serif text-[11px] italic text-muted-foreground/70"
+            style={{ letterSpacing: '0.04em' }}
+          >
+            By model
+          </p>
+          <div className="space-y-1.5">
+            {balance.by_model.map((m) => (
+              <div key={m.model_slug} className="flex items-center gap-3 text-xs">
+                <span className="font-mono text-foreground/80 truncate max-w-[14rem]" title={m.model_slug}>
+                  {m.model_slug}
+                </span>
+                <span className="ml-auto flex items-center gap-3 shrink-0 tabular-nums text-muted-foreground">
+                  {Number(m.earned) > 0 && (
+                    <span className="text-sage dark:text-sage">
+                      +{fmtCredits(m.earned)}
+                    </span>
+                  )}
+                  {Number(m.spent) > 0 && (
+                    <span>−{fmtCredits(m.spent)}</span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Credit history list
+// ---------------------------------------------------------------------------
+
+interface CreditHistoryListProps {
+  history: CreditHistory | null;
+  isLoading: boolean;
+  error: string | null;
+}
+
+function CreditHistoryList({ history, isLoading, error }: CreditHistoryListProps) {
+  if (isLoading && history === null) {
+    return <CreditSkeleton rows={4} />;
+  }
+
+  if (error !== null && history === null) {
+    return (
+      <p className="text-sm text-muted-foreground/70">
+        Coordinator unreachable — check connection.
+      </p>
+    );
+  }
+
+  if (history === null || history.entries.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground/70">
+        No credit history yet — your ledger entries will appear here once
+        you contribute to or consume from the network.
+      </p>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+      <table className="w-full text-xs" role="table">
+        <thead>
+          <tr className="border-b border-border/60 bg-muted/30">
+            <th
+              className="px-3 py-2 text-left font-serif italic text-[11px] text-muted-foreground font-normal"
+              style={{ letterSpacing: '0.04em' }}
+              scope="col"
+            >
+              Direction
+            </th>
+            <th
+              className="px-3 py-2 text-left font-serif italic text-[11px] text-muted-foreground font-normal"
+              style={{ letterSpacing: '0.04em' }}
+              scope="col"
+            >
+              Model
+            </th>
+            <th
+              className="px-3 py-2 text-right font-serif italic text-[11px] text-muted-foreground font-normal"
+              style={{ letterSpacing: '0.04em' }}
+              scope="col"
+            >
+              Tokens
+            </th>
+            <th
+              className="px-3 py-2 text-right font-serif italic text-[11px] text-muted-foreground font-normal"
+              style={{ letterSpacing: '0.04em' }}
+              scope="col"
+            >
+              Credits
+            </th>
+            <th
+              className="px-3 py-2 text-right font-serif italic text-[11px] text-muted-foreground font-normal"
+              style={{ letterSpacing: '0.04em' }}
+              scope="col"
+            >
+              When
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {history.entries.map((entry, idx) => (
+            <CreditHistoryRow
+              key={entry.id}
+              entry={entry}
+              isLast={idx === history.entries.length - 1}
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function CreditHistoryRow({
+  entry,
+  isLast,
+}: {
+  entry: CreditHistoryEntry;
+  isLast: boolean;
+}) {
+  const isEarned = entry.direction === 'earned';
+  return (
+    <tr
+      className={cn(
+        'transition-colors hover:bg-accent/40',
+        !isLast && 'border-b border-border/40',
+        isEarned ? 'bg-sage/5' : '',
+      )}
+    >
+      <td className="px-3 py-2">
+        <span
+          className={cn(
+            'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+            isEarned
+              ? 'bg-sage/15 text-sage dark:text-sage'
+              : 'bg-muted/60 text-muted-foreground',
+          )}
+        >
+          {isEarned ? (
+            <TrendingUp className="h-2.5 w-2.5" aria-hidden="true" />
+          ) : (
+            <TrendingDown className="h-2.5 w-2.5" aria-hidden="true" />
+          )}
+          {entry.direction}
+        </span>
+      </td>
+      <td className="px-3 py-2">
+        <span
+          className="font-mono text-foreground/80 truncate block max-w-[12rem]"
+          title={entry.model_slug}
+        >
+          {entry.model_slug}
+        </span>
+      </td>
+      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+        {entry.output_tokens.toLocaleString()}
+      </td>
+      <td
+        className={cn(
+          'px-3 py-2 text-right tabular-nums font-medium',
+          isEarned ? 'text-sage dark:text-sage' : 'text-foreground',
+        )}
+      >
+        {isEarned ? '+' : '−'}{fmtCredits(entry.credits)}
+      </td>
+      <td className="px-3 py-2 text-right text-muted-foreground whitespace-nowrap">
+        {relativeTime(entry.created_at)}
+      </td>
+    </tr>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Skeleton / loading placeholder (credit sections only)
+// ---------------------------------------------------------------------------
+
+function CreditSkeleton({ rows = 2 }: { rows?: number }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card p-4 space-y-3 animate-pulse" aria-busy="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex gap-3">
+          <div className="h-4 w-24 rounded bg-muted" />
+          <div className="h-4 w-16 rounded bg-muted" />
+          <div className="ml-auto h-4 w-12 rounded bg-muted" />
+        </div>
+      ))}
     </div>
   );
 }
