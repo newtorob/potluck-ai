@@ -41,11 +41,14 @@ async def allocate_mesh_ip(db: AsyncSession, household_id: uuid.UUID, mesh_cidr:
     """
     network = ipaddress.ip_network(mesh_cidr, strict=False)
 
-    # Pull existing IPs as a set for O(1) membership tests.
+    # Pull existing IPs as a set for O(1) membership tests. asyncpg
+    # decodes INET columns to ipaddress.IPv4Address / IPv6Address
+    # objects, so we normalize to strings to compare cleanly with
+    # `str(host)` below.
     result = await db.execute(
         select(MeshNode.mesh_ip).where(MeshNode.household_id == household_id)
     )
-    used = {row[0] for row in result.all()}
+    used = {str(row[0]) for row in result.all()}
 
     for host in network.hosts():
         candidate = str(host)

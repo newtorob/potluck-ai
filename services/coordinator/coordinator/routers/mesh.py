@@ -12,9 +12,9 @@ This is the coordinator surface area for Potluck's own WireGuard mesh
   * GET  /mesh/peers            — current household roster for an
                                   enrolled node (auth via wg_public_key).
   * POST /mesh/heartbeat        — node alive + last-endpoint update.
-
-Signaling WebSocket (`/mesh/signal`) is week-2 work and is deliberately
-not included here yet.
+  * WS   /mesh/signal           — long-lived signaling channel. Carries
+                                  endpoint updates + roster broadcasts +
+                                  hole-punch coordination between peers.
 
 Privacy posture:
   * The coordinator KNOWS member identity + household membership. That's
@@ -29,17 +29,19 @@ Privacy posture:
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from coordinator.db.database import get_db
+from coordinator.db.database import get_db, get_session_factory
 from coordinator.models.household import Household
 from coordinator.models.mesh_node import MeshNode
 from coordinator.models.pairing import PairingToken
@@ -52,12 +54,36 @@ from coordinator.schemas.mesh import (
     HouseholdCreateRequest,
     HouseholdResponse,
     PairingTokenIssueResponse,
+    SignalEndpointUpdate,
+    SignalError,
+    SignalHello,
+    SignalPing,
+    SignalPong,
+    SignalPunchCoord,
+    SignalRequestPunch,
+    SignalRosterUpdate,
+    SignalWelcome,
 )
 from coordinator.services.household_allocator import (
     HouseholdCIDRExhausted,
     allocate_household_cidr,
 )
 from coordinator.services.mesh_allocator import MeshIPExhausted, allocate_mesh_ip
+
+# How long to wait for the client's first `hello` message before
+# dropping the connection. 10s is generous on any real network.
+SIGNAL_HELLO_TIMEOUT_S = 10.0
+
+# In-memory map: mesh_node.id → open WebSocket. Populated when a peer
+# hellos in, removed on disconnect. Used to broadcast roster updates
+# + coordinate hole-punches. Single-process: a multi-process / multi-
+# region coordinator deployment needs to lift this into Redis or a
+# coordinator-internal pub/sub. Out of scope for v0.
+_signal_connections: dict[uuid.UUID, WebSocket] = {}
+
+# Lock guarding `_signal_connections` so concurrent welcome / disconnect
+# / broadcast operations don't race on dict mutation.
+_signal_lock = asyncio.Lock()
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["mesh"])
@@ -281,6 +307,25 @@ async def enroll(
             detail="wg_public_key already enrolled (possibly to a different household)",
         )
 
+    # ---- 4b. Reject duplicate node_name in this household early ---- #
+    # There's a UNIQUE (household_id, node_name) constraint at the DB
+    # level; surfacing it as a structured 409 here is friendlier than a
+    # generic 500-on-IntegrityError.
+    name_conflict = await db.execute(
+        select(MeshNode).where(
+            MeshNode.household_id == household.id,
+            MeshNode.node_name == req.node_name,
+        )
+    )
+    if name_conflict.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"node_name '{req.node_name}' already exists in this household; "
+                "pick a different name"
+            ),
+        )
+
     # ---- 5. Persist the new node ---- #
     node = MeshNode(
         household_id=household.id,
@@ -414,3 +459,345 @@ async def heartbeat(
     await db.commit()
 
     return HeartbeatResponse(server_time=node.last_seen_at)
+
+
+# ---------------------------------------------------------------------------
+# WS /mesh/signal
+# ---------------------------------------------------------------------------
+
+
+def _peer_to_enrolled(peer: MeshNode) -> EnrolledPeer:
+    return EnrolledPeer(
+        node_id=peer.id,
+        node_name=peer.node_name,
+        mesh_ip=str(peer.mesh_ip),
+        wg_public_key=peer.wg_public_key,
+        last_endpoint=peer.last_endpoint,
+        last_seen_at=peer.last_seen_at,
+        platform=peer.platform,
+    )
+
+
+async def _safe_send(ws: WebSocket, payload: dict) -> bool:
+    """Send a JSON payload to a peer's WS. Returns True on success,
+    False if the peer is gone. Never raises."""
+    try:
+        await ws.send_json(payload)
+        return True
+    except Exception:
+        return False
+
+
+async def _broadcast_to_household(
+    household_id: uuid.UUID,
+    payload: dict,
+    *,
+    db: AsyncSession,
+    except_node_id: uuid.UUID | None = None,
+) -> None:
+    """Send a payload to every connected peer in a household.
+
+    Skips `except_node_id` (typically the originating peer for an
+    endpoint-update broadcast). Drops disconnected peers from the
+    registry."""
+    # Load the set of household members so we know which connections
+    # to talk to. Note this queries by household_id only — connections
+    # for nodes that aren't in this household are ignored.
+    result = await db.execute(
+        select(MeshNode.id).where(MeshNode.household_id == household_id)
+    )
+    household_node_ids = {row[0] for row in result.all()}
+
+    async with _signal_lock:
+        targets = [
+            (nid, ws)
+            for nid, ws in _signal_connections.items()
+            if nid in household_node_ids and nid != except_node_id
+        ]
+    # Send outside the lock so a slow peer doesn't block others.
+    dead: list[uuid.UUID] = []
+    for nid, ws in targets:
+        ok = await _safe_send(ws, payload)
+        if not ok:
+            dead.append(nid)
+    if dead:
+        async with _signal_lock:
+            for nid in dead:
+                _signal_connections.pop(nid, None)
+
+
+@router.websocket("/mesh/signal")
+async def mesh_signal(ws: WebSocket) -> None:
+    """Long-lived signaling channel for one mesh node.
+
+    Lifecycle:
+      1. Client connects, server accepts.
+      2. Client sends SignalHello { wg_public_key }.
+      3. Server validates against mesh_nodes, replies with SignalWelcome
+         + current roster. Server broadcasts SignalRosterUpdate to other
+         household members ('added' on first connect, 'updated' otherwise).
+      4. Server + client exchange messages until disconnect.
+      5. On disconnect: server removes the connection from the registry
+         and broadcasts the node's `removed` to the household.
+
+    v0 auth: possession of a valid `wg_public_key` is the credential.
+    Consistent with GET /mesh/peers + POST /mesh/heartbeat. Stronger
+    auth (signed-nonce challenge mirroring /peers/connect) is a v1
+    hardening item.
+    """
+    await ws.accept()
+
+    # ---- 1. Wait for hello ---- #
+    try:
+        raw = await asyncio.wait_for(
+            ws.receive_json(), timeout=SIGNAL_HELLO_TIMEOUT_S
+        )
+    except asyncio.TimeoutError:
+        await _safe_send(
+            ws,
+            SignalError(code="hello_timeout", message="no hello in 10s").model_dump(
+                mode="json"
+            ),
+        )
+        await ws.close(code=1008)
+        return
+    except WebSocketDisconnect:
+        return
+
+    try:
+        hello = SignalHello.model_validate(raw)
+    except ValidationError as e:
+        await _safe_send(
+            ws,
+            SignalError(
+                code="hello_invalid",
+                message=f"invalid hello: {e.error_count()} error(s)",
+            ).model_dump(mode="json"),
+        )
+        await ws.close(code=1008)
+        return
+
+    # ---- 2. Look up node by wg_public_key ---- #
+    async with get_session_factory()() as db:
+        result = await db.execute(
+            select(MeshNode).where(MeshNode.wg_public_key == hello.wg_public_key)
+        )
+        node = result.scalar_one_or_none()
+        if node is None:
+            await _safe_send(
+                ws,
+                SignalError(
+                    code="node_not_enrolled",
+                    message="wg_public_key not found in any household",
+                ).model_dump(mode="json"),
+            )
+            await ws.close(code=1008)
+            return
+
+        # Capture immutable fields before leaving the session scope.
+        node_id = node.id
+        household_id = node.household_id
+        mesh_ip = str(node.mesh_ip)
+
+        # Build the initial roster (everyone else in the household).
+        roster_result = await db.execute(
+            select(MeshNode).where(
+                MeshNode.household_id == household_id,
+                MeshNode.id != node_id,
+            )
+        )
+        roster = [_peer_to_enrolled(p) for p in roster_result.scalars().all()]
+
+        # Update last_seen_at as a side-effect of hello.
+        node.last_seen_at = datetime.now(timezone.utc)
+        await db.commit()
+
+        # Snapshot for the roster-broadcast below.
+        node_snapshot = _peer_to_enrolled(node)
+
+    # ---- 3. Register + welcome + broadcast added ---- #
+    async with _signal_lock:
+        old_ws = _signal_connections.get(node_id)
+        _signal_connections[node_id] = ws
+
+    if old_ws is not None:
+        # A previous connection for this node existed — close it cleanly.
+        try:
+            await old_ws.close(code=1000)
+        except Exception:
+            pass
+
+    await _safe_send(
+        ws,
+        SignalWelcome(
+            node_id=node_id,
+            household_id=household_id,
+            mesh_ip=mesh_ip,
+            roster=roster,
+        ).model_dump(mode="json"),
+    )
+
+    # Broadcast "added" to other household peers (this is the moment
+    # they can attempt to connect to the new node).
+    async with get_session_factory()() as db:
+        await _broadcast_to_household(
+            household_id,
+            SignalRosterUpdate(added=[node_snapshot]).model_dump(mode="json"),
+            db=db,
+            except_node_id=node_id,
+        )
+
+    logger.info(
+        "mesh_signal_connected",
+        node_id=str(node_id),
+        household_id=str(household_id),
+        roster_size=len(roster),
+    )
+
+    # ---- 4. Message loop ---- #
+    try:
+        while True:
+            raw = await ws.receive_json()
+            msg_type = raw.get("type") if isinstance(raw, dict) else None
+
+            if msg_type == "ping":
+                await _safe_send(
+                    ws,
+                    SignalPong(server_time=datetime.now(timezone.utc)).model_dump(
+                        mode="json"
+                    ),
+                )
+                continue
+
+            if msg_type == "endpoint_update":
+                try:
+                    upd = SignalEndpointUpdate.model_validate(raw)
+                except ValidationError as e:
+                    await _safe_send(
+                        ws,
+                        SignalError(
+                            code="endpoint_update_invalid",
+                            message=f"{e.error_count()} error(s)",
+                        ).model_dump(mode="json"),
+                    )
+                    continue
+
+                async with get_session_factory()() as db:
+                    db_node = await db.get(MeshNode, node_id)
+                    if db_node is not None:
+                        db_node.last_endpoint = upd.external_endpoint
+                        db_node.last_seen_at = datetime.now(timezone.utc)
+                        await db.commit()
+                        # Broadcast as 'updated' so peers can refresh.
+                        await _broadcast_to_household(
+                            household_id,
+                            SignalRosterUpdate(
+                                updated=[_peer_to_enrolled(db_node)]
+                            ).model_dump(mode="json"),
+                            db=db,
+                            except_node_id=node_id,
+                        )
+                continue
+
+            if msg_type == "request_punch":
+                try:
+                    rp = SignalRequestPunch.model_validate(raw)
+                except ValidationError as e:
+                    await _safe_send(
+                        ws,
+                        SignalError(
+                            code="request_punch_invalid",
+                            message=f"{e.error_count()} error(s)",
+                        ).model_dump(mode="json"),
+                    )
+                    continue
+
+                async with get_session_factory()() as db:
+                    target = await db.get(MeshNode, rp.target_node_id)
+                    if target is None or target.household_id != household_id:
+                        await _safe_send(
+                            ws,
+                            SignalError(
+                                code="punch_target_unknown",
+                                message="target not in your household",
+                            ).model_dump(mode="json"),
+                        )
+                        continue
+
+                    # Look up the requesting peer's current state (we
+                    # need its endpoint to send to the responder).
+                    requester = await db.get(MeshNode, node_id)
+                    if requester is None:
+                        continue
+
+                async with _signal_lock:
+                    target_ws = _signal_connections.get(rp.target_node_id)
+
+                if target_ws is None:
+                    await _safe_send(
+                        ws,
+                        SignalError(
+                            code="punch_target_offline",
+                            message="target peer is not currently connected",
+                        ).model_dump(mode="json"),
+                    )
+                    continue
+
+                # Tell the initiator about the target.
+                await _safe_send(
+                    ws,
+                    SignalPunchCoord(
+                        peer_node_id=rp.target_node_id,
+                        peer_wg_public_key=target.wg_public_key,
+                        peer_endpoint=target.last_endpoint,
+                        role="initiator",
+                    ).model_dump(mode="json"),
+                )
+                # Tell the responder to expect a punch from the initiator.
+                await _safe_send(
+                    target_ws,
+                    SignalPunchCoord(
+                        peer_node_id=node_id,
+                        peer_wg_public_key=requester.wg_public_key,
+                        peer_endpoint=requester.last_endpoint,
+                        role="responder",
+                    ).model_dump(mode="json"),
+                )
+                continue
+
+            # Unknown message types are non-fatal — log + ignore so
+            # forward-compatible protocol additions don't break old
+            # coordinators.
+            logger.info(
+                "mesh_signal_unknown_msg",
+                node_id=str(node_id),
+                msg_type=msg_type,
+            )
+
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        logger.exception("mesh_signal_loop_error", node_id=str(node_id))
+
+    # ---- 5. Cleanup + broadcast removed ---- #
+    async with _signal_lock:
+        current = _signal_connections.get(node_id)
+        if current is ws:
+            _signal_connections.pop(node_id, None)
+
+    try:
+        async with get_session_factory()() as db:
+            await _broadcast_to_household(
+                household_id,
+                SignalRosterUpdate(removed=[node_id]).model_dump(mode="json"),
+                db=db,
+                except_node_id=node_id,
+            )
+    except Exception:
+        logger.exception("mesh_signal_disconnect_broadcast_failed", node_id=str(node_id))
+
+    logger.info(
+        "mesh_signal_disconnected",
+        node_id=str(node_id),
+        household_id=str(household_id),
+    )

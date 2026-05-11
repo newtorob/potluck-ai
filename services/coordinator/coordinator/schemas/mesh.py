@@ -130,3 +130,97 @@ class PairingTokenIssueResponse(BaseModel):
     household_id: uuid.UUID
     expires_at: datetime
     created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# Signaling WebSocket message protocol (/mesh/signal)
+# ---------------------------------------------------------------------------
+#
+# All signal messages use a tagged-union shape: the `type` field carries
+# the discriminator, and Pydantic parses into the appropriate variant.
+# The contract is bidirectional — server and client both send + receive.
+#
+# Client → Server messages: SignalHello, SignalEndpointUpdate,
+#                            SignalRequestPunch, SignalPing
+# Server → Client messages: SignalWelcome, SignalRosterUpdate,
+#                            SignalPunchCoord, SignalPong, SignalError
+#
+# The first message a client sends MUST be SignalHello with its
+# wg_public_key. If it's not registered in mesh_nodes, server closes
+# with code 1008. Otherwise server replies with SignalWelcome carrying
+# the current household roster.
+# ---------------------------------------------------------------------------
+
+from typing import Literal
+
+
+# ---- Client → Server ---- #
+
+
+class SignalHello(BaseModel):
+    type: Literal["hello"] = "hello"
+    wg_public_key: str = Field(..., min_length=32, max_length=128)
+
+
+class SignalEndpointUpdate(BaseModel):
+    type: Literal["endpoint_update"] = "endpoint_update"
+    external_endpoint: str = Field(..., max_length=64)  # "ip:port"
+
+
+class SignalRequestPunch(BaseModel):
+    """Peer wants to coordinate a simultaneous-send hole-punch to a
+    specific household peer. Coordinator forwards `SignalPunchCoord`
+    to both sides with the other's endpoint."""
+
+    type: Literal["request_punch"] = "request_punch"
+    target_node_id: uuid.UUID
+
+
+class SignalPing(BaseModel):
+    type: Literal["ping"] = "ping"
+
+
+# ---- Server → Client ---- #
+
+
+class SignalWelcome(BaseModel):
+    """Sent immediately after a successful hello."""
+
+    type: Literal["welcome"] = "welcome"
+    node_id: uuid.UUID
+    household_id: uuid.UUID
+    mesh_ip: str
+    roster: list[EnrolledPeer]
+
+
+class SignalRosterUpdate(BaseModel):
+    """Broadcast to all open household connections when a peer joins,
+    leaves, or updates its endpoint."""
+
+    type: Literal["roster_update"] = "roster_update"
+    added: list[EnrolledPeer] = Field(default_factory=list)
+    updated: list[EnrolledPeer] = Field(default_factory=list)
+    removed: list[uuid.UUID] = Field(default_factory=list)
+
+
+class SignalPunchCoord(BaseModel):
+    """Server delivers this to both peers participating in a hole-punch.
+    `role='initiator'` means "you asked for it"; `role='responder'`
+    means "someone wants to reach you, send simultaneously."""
+
+    type: Literal["punch_coord"] = "punch_coord"
+    peer_node_id: uuid.UUID
+    peer_wg_public_key: str
+    peer_endpoint: str | None
+    role: Literal["initiator", "responder"]
+
+
+class SignalPong(BaseModel):
+    type: Literal["pong"] = "pong"
+    server_time: datetime
+
+
+class SignalError(BaseModel):
+    type: Literal["error"] = "error"
+    code: str
+    message: str

@@ -23,6 +23,15 @@ from coordinator.schemas.mesh import (
     EnrollResponse,
     HeartbeatRequest,
     HeartbeatResponse,
+    SignalEndpointUpdate,
+    SignalError,
+    SignalHello,
+    SignalPing,
+    SignalPong,
+    SignalPunchCoord,
+    SignalRequestPunch,
+    SignalRosterUpdate,
+    SignalWelcome,
 )
 
 
@@ -140,3 +149,111 @@ def test_heartbeat_request_minimal_shape() -> None:
     fields = set(req.model_dump().keys())
     # external_endpoint is allowed to be None; field exists either way
     assert fields == {"node_id", "wg_public_key", "external_endpoint"}
+
+
+# ---------------------------------------------------------------------------
+# /mesh/signal protocol — signal messages
+# ---------------------------------------------------------------------------
+
+
+def test_signal_messages_carry_type_discriminator() -> None:
+    """Every signal message has a `type` literal — clients use it as the
+    discriminator to parse incoming traffic. If we ever drop it, peers
+    can't tell messages apart."""
+    classes = [
+        SignalHello,
+        SignalEndpointUpdate,
+        SignalRequestPunch,
+        SignalPing,
+        SignalWelcome,
+        SignalRosterUpdate,
+        SignalPunchCoord,
+        SignalPong,
+        SignalError,
+    ]
+    for cls in classes:
+        assert "type" in cls.model_fields, (
+            f"{cls.__name__} lost its `type` discriminator field."
+        )
+
+
+def test_signal_messages_carry_no_inference_layer_identity() -> None:
+    """Signal messages route mesh-layer concerns — endpoints, pubkeys,
+    pairing — and must not carry inference-layer identifiers."""
+    classes = [
+        SignalHello,
+        SignalEndpointUpdate,
+        SignalRequestPunch,
+        SignalPing,
+        SignalWelcome,
+        SignalRosterUpdate,
+        SignalPunchCoord,
+        SignalPong,
+        SignalError,
+    ]
+    for cls in classes:
+        for field_name in cls.model_fields.keys():
+            lowered = field_name.lower()
+            for forbidden in _FORBIDDEN_SUBSTRINGS:
+                assert forbidden not in lowered, (
+                    f"{cls.__name__}.{field_name} contains forbidden "
+                    f"substring '{forbidden}'."
+                )
+
+
+def test_signal_hello_validates_wg_key_length() -> None:
+    """WG pubkeys are 32-128 chars in our wire encoding."""
+    SignalHello(wg_public_key="A" * 44)  # happy
+    # Too short
+    from pydantic import ValidationError as VE
+    try:
+        SignalHello(wg_public_key="short")
+        raise AssertionError("expected ValidationError")
+    except VE:
+        pass
+
+
+def test_signal_punch_coord_role_locked_down() -> None:
+    """`role` is a Literal — peers branch on it for simultaneous-send
+    logic. Drift would silently break the hole-punch protocol."""
+    msg = SignalPunchCoord(
+        peer_node_id=uuid.uuid4(),
+        peer_wg_public_key="A" * 44,
+        peer_endpoint="1.2.3.4:51820",
+        role="initiator",
+    )
+    assert msg.role == "initiator"
+    # Wrong role string should fail validation.
+    from pydantic import ValidationError as VE
+    try:
+        SignalPunchCoord(
+            peer_node_id=uuid.uuid4(),
+            peer_wg_public_key="A" * 44,
+            peer_endpoint=None,
+            role="other",  # type: ignore[arg-type]
+        )
+        raise AssertionError("expected ValidationError on invalid role")
+    except VE:
+        pass
+
+
+def test_signal_welcome_includes_roster() -> None:
+    """SignalWelcome must include the roster — that's how new peers
+    learn their household composition."""
+    msg = SignalWelcome(
+        node_id=uuid.uuid4(),
+        household_id=uuid.uuid4(),
+        mesh_ip="100.64.0.1",
+        roster=[],
+    )
+    fields = set(msg.model_dump().keys())
+    assert "roster" in fields
+
+
+def test_signal_roster_update_three_lists() -> None:
+    """SignalRosterUpdate has three independent lists: added / updated /
+    removed. All optional, default empty."""
+    msg = SignalRosterUpdate()
+    assert msg.added == []
+    assert msg.updated == []
+    assert msg.removed == []
