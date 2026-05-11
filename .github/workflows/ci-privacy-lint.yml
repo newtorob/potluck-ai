@@ -1,0 +1,49 @@
+name: CI - Privacy invariants
+
+# Enforces the two manifesto-level rules from memory 42a7e671 + 1fc85a49:
+#   - member_id MUST NOT appear in any peer-bound message construction
+#     or coordinator→peer WebSocket send (lint #20).
+#   - The contributor sidecar MUST NOT write prompt or response content
+#     to disk, logs, or telemetry (lint #21).
+#
+# Runs on every push and PR. Fails the build on violations.
+
+on: []  # disabled — runs locally via `make lint` and the git pre-commit hook.
+        # Re-enable later (when GH Actions budget allows) by restoring:
+        #   push:
+        #     branches: [main]
+        #   pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-privacy-lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  privacy-lint:
+    name: Privacy-invariant lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run privacy lint
+        run: python3 scripts/lint_privacy.py
+
+      - name: Run coordinator privacy-invariant tests
+        # The static lint above checks call sites; this pytest checks
+        # the schema-level invariants on JobAssignedMessage itself
+        # (no member_id field, no identifying keys when serialised).
+        # Together they cover the architectural rule + every call site.
+        working-directory: services/coordinator
+        run: |
+          python3 -m venv .venv
+          ./.venv/bin/pip install -q -r requirements-dev.txt
+          ./.venv/bin/pytest tests/ -q

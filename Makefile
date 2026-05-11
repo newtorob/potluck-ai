@@ -19,8 +19,8 @@ COMPOSE ?= $(shell \
   fi)
 
 .PHONY: help setup check-python check-docker up down restart logs api-logs pg-logs coord-logs migrate psql \
-        api-shell coord-shell test-api test-coordinator m3-smoke dev desktop frontend sidecar sidecar-setup \
-        coordinator coordinator-setup frontend-setup electron-setup ps status clean reset
+        api-shell coord-shell test-api test-coordinator m3-smoke lint install-hooks dev desktop frontend \
+        sidecar sidecar-setup coordinator coordinator-setup frontend-setup electron-setup ps status clean reset
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -125,6 +125,19 @@ test-coordinator: ## Run coordinator pytest suite (privacy invariants etc.) in i
 
 m3-smoke: ## End-to-end Phase G m3 acceptance check (needs coordinator + at least one peer running)
 	@python3 scripts/m3-smoke.py $(M3_ARGS)
+
+lint: ## Run the privacy-invariant lint (member_id leaks + contributor in-memory-only). Free, local.
+	@python3 scripts/lint_privacy.py
+
+install-hooks: ## Install git hooks (pre-commit privacy lint) into .git/hooks/
+	@if [ ! -d .git ]; then \
+		echo "error: not in a git repo. cd to the repo root and try again."; \
+		exit 1; \
+	fi
+	@cp scripts/git-hooks/pre-commit .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "==> installed .git/hooks/pre-commit"
+	@echo "    runs 'make lint' on every commit. bypass once with 'git commit --no-verify'."
 
 ps: status ## Alias for status
 status: check-docker ## Show backend container status
