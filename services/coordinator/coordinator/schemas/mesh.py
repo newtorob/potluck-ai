@@ -224,3 +224,53 @@ class SignalError(BaseModel):
     type: Literal["error"] = "error"
     code: str
     message: str
+
+
+# ---------------------------------------------------------------------------
+# DERP token issuance (/mesh/derp-token)
+# ---------------------------------------------------------------------------
+#
+# A mesh node calls POST /mesh/derp-token to obtain a short-lived JWT it
+# can use to authenticate with the DERP relay. The JWT is signed with a
+# symmetric key (POTLUCK_DERP_JWT_KEY) shared between the coordinator and
+# the relay. The relay validates the JWT on connect and only accepts
+# connections for pubkeys + regions that match the claims.
+#
+# Privacy notes:
+#   * JWT claims carry wg_pubkey + region + exp/iat only.
+#   * No member_id, no household_id, no node_id in the JWT — the relay
+#     should never know "who" the user is, only "which WG key".
+#   * The coordinator logs the truncated pubkey (first 8 chars), not the
+#     full token or claims.
+# ---------------------------------------------------------------------------
+
+
+class DERPTokenRequest(BaseModel):
+    """Body of POST /mesh/derp-token.
+
+    Caller identifies itself by its WG public key. The coordinator looks
+    up the corresponding mesh_node to confirm it is enrolled. The same v0
+    auth model as /mesh/peers: possession of the WG pubkey is the credential.
+    Signed-nonce challenge is a v1 hardening item.
+
+    No member_id or node_id in this schema — the relay must never learn
+    the calling user's identity, only their WG pubkey and requested region.
+    """
+
+    wg_public_key: str = Field(..., min_length=32, max_length=128)
+    region: str = Field(default="ord", min_length=1, max_length=32)
+
+
+class DERPTokenResponse(BaseModel):
+    """Returned by a successful POST /mesh/derp-token.
+
+    `token` is a compact HS256 JWT. The relay validates this on connect.
+    The `expires_at` is ISO 8601 — the client SHOULD refresh before this
+    time (the DERP client refreshes every 50 minutes for a 1-hour token).
+
+    No inference-layer identity in this response.
+    """
+
+    token: str
+    expires_at: str  # ISO 8601 datetime string
+    region: str

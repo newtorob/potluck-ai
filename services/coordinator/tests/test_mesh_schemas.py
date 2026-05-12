@@ -18,6 +18,8 @@ import pytest
 from pydantic import ValidationError
 
 from coordinator.schemas.mesh import (
+    DERPTokenRequest,
+    DERPTokenResponse,
     EnrolledPeer,
     EnrollRequest,
     EnrollResponse,
@@ -257,3 +259,98 @@ def test_signal_roster_update_three_lists() -> None:
     assert msg.added == []
     assert msg.updated == []
     assert msg.removed == []
+
+
+# ---------------------------------------------------------------------------
+# DERP token schemas
+# ---------------------------------------------------------------------------
+
+
+# Expected field sets for DERP schemas. Adding any field here requires
+# explicit review — especially guard against inference-layer identity leaking
+# into the JWT request/response (which flows to the relay).
+_DERP_TOKEN_REQUEST_FIELDS = frozenset({"wg_public_key", "region"})
+_DERP_TOKEN_RESPONSE_FIELDS = frozenset({"token", "expires_at", "region"})
+
+
+def test_derp_token_request_field_set_locked_down() -> None:
+    """DERPTokenRequest carries only wg_public_key + region.
+
+    Adding member_id, household_id, node_id, or any inference-layer field
+    here would leak identity to the DERP relay (which only needs to know
+    the WG pubkey + allowed region). This test pins the minimal field set.
+    """
+    actual = set(DERPTokenRequest.model_fields.keys())
+    extras = actual - _DERP_TOKEN_REQUEST_FIELDS
+    missing = _DERP_TOKEN_REQUEST_FIELDS - actual
+    assert not extras, (
+        f"DERPTokenRequest gained unexpected fields: {sorted(extras)}. "
+        "Review carefully: the relay must not learn caller identity."
+    )
+    assert not missing, (
+        f"DERPTokenRequest lost expected fields: {sorted(missing)}."
+    )
+
+
+def test_derp_token_response_field_set_locked_down() -> None:
+    """DERPTokenResponse carries only token + expires_at + region.
+
+    No identity beyond what the relay needs for auth. The JWT itself
+    carries wg_pubkey + region + exp/iat — the relay does not need more.
+    """
+    actual = set(DERPTokenResponse.model_fields.keys())
+    extras = actual - _DERP_TOKEN_RESPONSE_FIELDS
+    missing = _DERP_TOKEN_RESPONSE_FIELDS - actual
+    assert not extras, (
+        f"DERPTokenResponse gained unexpected fields: {sorted(extras)}."
+    )
+    assert not missing, (
+        f"DERPTokenResponse lost expected fields: {sorted(missing)}."
+    )
+
+
+def test_no_inference_layer_identity_in_derp_schemas() -> None:
+    """DERP token schemas must not carry inference-layer identity."""
+    schemas = [DERPTokenRequest, DERPTokenResponse]
+    for schema in schemas:
+        for field_name in schema.model_fields.keys():
+            lowered = field_name.lower()
+            for forbidden in _FORBIDDEN_SUBSTRINGS:
+                assert forbidden not in lowered, (
+                    f"{schema.__name__}.{field_name} contains forbidden "
+                    f"substring '{forbidden}'. DERP token schemas must not "
+                    "carry inference-layer identity — the relay only needs "
+                    "wg_pubkey + region + exp/iat."
+                )
+
+
+def test_derp_token_request_validates_key_length() -> None:
+    """wg_public_key must be at least 32 chars (base64-encoded 32 bytes)."""
+    # Happy path.
+    req = DERPTokenRequest(wg_public_key="A" * 44, region="ord")
+    assert req.region == "ord"
+
+    # Default region is "ord".
+    req2 = DERPTokenRequest(wg_public_key="A" * 44)
+    assert req2.region == "ord"
+
+    # Too-short key should fail.
+    with pytest.raises(ValidationError):
+        DERPTokenRequest(wg_public_key="short")
+
+
+def test_derp_token_response_round_trip() -> None:
+    """DERPTokenResponse serialises + deserialises cleanly."""
+    resp = DERPTokenResponse(
+        token="eyJhbGciOiJIUzI1NiJ9.stub",
+        expires_at="2026-05-11T12:00:00+00:00",
+        region="ord",
+    )
+    dumped = resp.model_dump(mode="json")
+    DERPTokenResponse.model_validate(dumped)  # must not raise
+
+
+def test_derp_token_request_region_defaults_to_ord() -> None:
+    """Region defaults to 'ord' when omitted (single-region v0 launch)."""
+    req = DERPTokenRequest(wg_public_key="A" * 44)
+    assert req.region == "ord"

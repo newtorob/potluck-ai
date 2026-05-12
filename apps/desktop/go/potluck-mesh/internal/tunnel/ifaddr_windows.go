@@ -3,41 +3,56 @@
 package tunnel
 
 import (
+	"fmt"
 	"log/slog"
+	"os/exec"
+	"strings"
 )
 
-// assignInterfaceAddress is NOT IMPLEMENTED on Windows in week 3.
+// assignInterfaceAddress assigns a host address to the named Wintun adapter
+// via `netsh interface ip add address`.
 //
-// Assigning an IP to a Wintun adapter requires either:
-//   - P/Invoke to iphlpapi.dll (AddIPAddress / CreateUnicastIpAddressEntry)
-//   - Calling `netsh interface ip add address` as a subprocess
-//   - Using the Windows IP Helper API via cgo
+// The /32 equivalent on Windows is expressed as the address + subnet mask
+// 255.255.255.255 (host-only route).
 //
-// All three paths are non-trivial without cgo. The cross-compilation constraint
-// (CGO_ENABLED=0 for Windows cross-builds from macOS/Linux) rules out cgo in CI.
+// netsh is present on all supported Windows versions (Vista+) and does not
+// require elevation after the Wintun driver has been installed by the Potluck
+// installer. We use `netsh` rather than cgo / iphlpapi so that cross-compilation
+// from macOS/Linux with CGO_ENABLED=0 works cleanly in CI.
 //
-// Impact: The WireGuard session initialises correctly; the sidecar can still
-// receive WG handshakes from peers that have the correct AllowedIPs configured.
-// However, the Windows node's mesh_ip is NOT routable on the local system —
-// traffic to 100.64.x.x will not traverse the tunnel on Windows until this is
-// implemented.
-//
-// TODO(week4-windows): implement via CreateUnicastIpAddressEntry from
-// iphlpapi.dll using a minimal CGO shim, or via `netsh` subprocess (simpler,
-// no cgo, but requires netsh in PATH which is true on all Windows versions).
-//
-// The netsh approach:
-//   netsh interface ip add address "Wintun" <ip> 255.255.255.255
-// This does not require elevation if the interface was created by our process.
+// Idempotency: if the address is already assigned, netsh exits with a non-zero
+// code and prints a message containing "already exists" or "The object already
+// exists". We detect that case and treat it as success so repeated calls
+// (e.g. on reconnect) are safe.
 func assignInterfaceAddress(ifName, ip string) error {
-	slog.Warn("tunnel: Windows mesh IP assignment not yet implemented — "+
-		"mesh_ip will not be routable on this node until week 4",
-		"interface", ifName,
-		"mesh_ip", ip,
+	// netsh interface ip add address "<ifName>" <ip> 255.255.255.255
+	//
+	// Using the interface name rather than index is more portable — wg-go
+	// names the Wintun adapter using whatever string was passed to
+	// tun.CreateTUN, which is the value of tunInterfaceName() ("Wintun").
+	// The caller (Tunnel.SetMeshIP) always passes t.ifName, which is the
+	// actual name resolved from tdev.Name() after device creation.
+	cmd := exec.Command(
+		"netsh", "interface", "ip", "add", "address",
+		ifName, ip, "255.255.255.255",
 	)
-	// Return nil (not an error) so the rest of startup proceeds normally.
-	// The WG device is still useful: peers with our pubkey can configure us
-	// as a peer and reach us if we initiate. The limitation is inbound-only
-	// routing from this Windows node's perspective.
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		outStr := strings.ToLower(string(out))
+		// Detect "already assigned" conditions. netsh error messages vary
+		// slightly across Windows versions; check for common substrings.
+		if strings.Contains(outStr, "already exists") ||
+			strings.Contains(outStr, "object already exists") ||
+			strings.Contains(outStr, "duplicate") {
+			slog.Debug("tunnel: Windows interface address already assigned (idempotent)",
+				"interface", ifName,
+				"ip", ip,
+			)
+			return nil
+		}
+		return fmt.Errorf("netsh add address %s to %q: %w: %s", ip, ifName, err, string(out))
+	}
+
 	return nil
 }

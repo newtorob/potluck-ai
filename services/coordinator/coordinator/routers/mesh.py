@@ -31,10 +31,12 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import os
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import jwt
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
 from pydantic import ValidationError
@@ -46,6 +48,8 @@ from coordinator.models.household import Household
 from coordinator.models.mesh_node import MeshNode
 from coordinator.models.pairing import PairingToken
 from coordinator.schemas.mesh import (
+    DERPTokenRequest,
+    DERPTokenResponse,
     EnrolledPeer,
     EnrollRequest,
     EnrollResponse,
@@ -98,6 +102,10 @@ _STUB_MEMBER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 # long enough for cross-room walk-and-install, short enough that a
 # leaked token is low-impact.
 PAIRING_TOKEN_TTL = timedelta(hours=1)
+
+# How long a DERP auth JWT is valid. The DERP client refreshes every
+# 50 minutes, so a 1-hour TTL gives a 10-minute buffer before expiry.
+DERP_TOKEN_TTL = timedelta(hours=1)
 
 
 def _generate_pairing_token() -> str:
@@ -459,6 +467,81 @@ async def heartbeat(
     await db.commit()
 
     return HeartbeatResponse(server_time=node.last_seen_at)
+
+
+# ---------------------------------------------------------------------------
+# POST /mesh/derp-token
+# ---------------------------------------------------------------------------
+
+
+@router.post("/mesh/derp-token", response_model=DERPTokenResponse)
+async def issue_derp_token(
+    req: DERPTokenRequest,
+    db: AsyncSession = Depends(get_db),
+) -> DERPTokenResponse:
+    """Issue a short-lived JWT that authorises a mesh node to connect to
+    the DERP relay.
+
+    Auth model (v0): same as /mesh/peers — possession of a registered
+    wg_public_key is the credential. The coordinator verifies the key
+    exists in mesh_nodes. Signed-nonce challenge is a v1 hardening item.
+
+    Privacy contract:
+      * JWT claims: wg_pubkey + region + exp + iat ONLY.
+      * No member_id, no household_id, no node_id leaks into the JWT.
+      * The relay therefore never learns the caller's identity.
+      * We log only the truncated pubkey (first 8 chars), never the token.
+
+    The relay validates this JWT using the symmetric key stored in
+    POTLUCK_DERP_JWT_KEY (shared secret, never in the JWT itself).
+    """
+    # ---- look up the node ---- #
+    result = await db.execute(
+        select(MeshNode).where(MeshNode.wg_public_key == req.wg_public_key)
+    )
+    node = result.scalar_one_or_none()
+    if node is None:
+        raise HTTPException(
+            status_code=404,
+            detail="wg_public_key not enrolled",
+        )
+
+    # ---- load the signing key ---- #
+    jwt_key = os.environ.get("POTLUCK_DERP_JWT_KEY", "")
+    if not jwt_key:
+        raise HTTPException(
+            status_code=503,
+            detail="DERP relay not configured (POTLUCK_DERP_JWT_KEY missing)",
+        )
+
+    # ---- build the JWT ---- #
+    # The wg_pubkey claim is base64-encoded so the relay can decode the raw
+    # 32-byte key. The coordinator stores it as a base64 string already.
+    now = datetime.now(timezone.utc)
+    expires_at = now + DERP_TOKEN_TTL
+
+    claims = {
+        "wg_pubkey": req.wg_public_key,  # base64-encoded 32-byte WG pubkey
+        "region": req.region,
+        "iat": int(now.timestamp()),
+        "exp": int(expires_at.timestamp()),
+    }
+
+    token = jwt.encode(claims, jwt_key, algorithm="HS256")
+
+    # Log the truncated pubkey only — never the token or full claims.
+    logger.info(
+        "derp_token_issued",
+        pubkey_prefix=req.wg_public_key[:8],
+        region=req.region,
+        expires_at=expires_at.isoformat(),
+    )
+
+    return DERPTokenResponse(
+        token=token,
+        expires_at=expires_at.isoformat(),
+        region=req.region,
+    )
 
 
 # ---------------------------------------------------------------------------

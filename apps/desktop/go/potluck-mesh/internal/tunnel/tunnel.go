@@ -30,8 +30,10 @@ import (
 	"log/slog"
 	"net"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
@@ -78,12 +80,39 @@ type Tunnel struct {
 	wgPort  int
 }
 
+// Option configures optional behaviour for New.
+type Option func(*tunnelOptions)
+
+type tunnelOptions struct {
+	bind conn.Bind
+}
+
+// WithBind supplies a custom conn.Bind implementation to the WireGuard device
+// instead of the default conn.NewDefaultBind(). Use this to install DerpBind
+// when DERP relay fallback is enabled.
+//
+// Example:
+//
+//	b := derp.NewDerpBind(conn.NewDefaultBind(), derpClient)
+//	t, err := tunnel.New(privKey, meshIP, tunnel.WithBind(b))
+func WithBind(b conn.Bind) Option {
+	return func(o *tunnelOptions) {
+		o.bind = b
+	}
+}
+
 // New creates and starts the userspace WireGuard device.
 //
 // privateKeyBase64 is the WG private key as a base64 string (32 bytes).
 // meshIPCIDR is optional on first boot (empty string is fine); call SetMeshIP
 // after the welcome message delivers the assigned mesh IP.
-func New(privateKeyBase64 string, meshIPCIDR string) (*Tunnel, error) {
+// opts are optional functional options; see WithBind.
+func New(privateKeyBase64 string, meshIPCIDR string, opts ...Option) (*Tunnel, error) {
+	o := &tunnelOptions{}
+	for _, opt := range opts {
+		opt(o)
+	}
+
 	ifName := tunInterfaceName()
 
 	slog.Info("tunnel: creating TUN device", "interface", ifName, "platform", runtime.GOOS)
@@ -93,11 +122,16 @@ func New(privateKeyBase64 string, meshIPCIDR string) (*Tunnel, error) {
 		return nil, fmt.Errorf("tunnel: create TUN %q: %w", ifName, err)
 	}
 
-	// Bind uses the default connection handler, which performs IPv6-first
-	// source address selection on platforms that support it (Linux, macOS).
-	// On Linux with CGNAT (T-Mobile Home Internet, Starlink), IPv4 is used
-	// as fallback automatically.
-	bind := conn.NewDefaultBind()
+	// Bind: use the caller-supplied bind if provided (e.g. DerpBind for relay
+	// fallback), otherwise fall back to the standard OS UDP bind.
+	// The default bind performs IPv6-first source address selection on
+	// platforms that support it (Linux, macOS).
+	var bind conn.Bind
+	if o.bind != nil {
+		bind = o.bind
+	} else {
+		bind = conn.NewDefaultBind()
+	}
 
 	logger := newWGLogger()
 	dev := device.NewDevice(tdev, bind, logger)
@@ -284,6 +318,90 @@ func (t *Tunnel) UpdatePeerEndpoint(pubkey, endpoint string) error {
 		"endpoint", endpoint,
 	)
 	return nil
+}
+
+// PeerReachability queries the wg-go UAPI for the named peer's last-handshake
+// time and traffic counters. The pubkey is the base64-encoded WireGuard public
+// key for the peer.
+//
+// Returns the zero time and zero counters if the peer is not found or has never
+// completed a handshake. Callers can determine reachability with:
+//
+//	reachable := !lastHandshake.IsZero() && time.Since(lastHandshake) < 3*time.Minute
+//
+// Privacy: this method parses the raw UAPI GET output but never logs it — the
+// output includes the device's own private key in hex form.
+func (t *Tunnel) PeerReachability(pubkeyBase64 string) (lastHandshake time.Time, rxBytes uint64, txBytes uint64, err error) {
+	pubkeyHex, err := base64ToHex(pubkeyBase64)
+	if err != nil {
+		return time.Time{}, 0, 0, fmt.Errorf("tunnel: decode pubkey for reachability: %w", err)
+	}
+
+	// IpcGet returns the full UAPI GET response as a string. We hold the
+	// mutex because IpcGet + IpcSet must not race. The installed wg-go
+	// version signature is `IpcGet() (string, error)` — older versions of
+	// the API took an io.Writer; if the build breaks on a future wg-go
+	// bump, swap to whichever shape the new version exposes.
+	t.mu.Lock()
+	uapiText, ipcErr := t.dev.IpcGet()
+	t.mu.Unlock()
+
+	if ipcErr != nil {
+		return time.Time{}, 0, 0, fmt.Errorf("tunnel: IpcGet: %w", ipcErr)
+	}
+
+	// Parse the UAPI output. The format is newline-separated key=value pairs.
+	// Device-level fields come first, then each peer starts with a
+	// `public_key=<hex>` line. We scan for the target peer's section.
+	//
+	// Example peer section (relevant fields only):
+	//   public_key=<hex>
+	//   last_handshake_time_sec=1715000000
+	//   last_handshake_time_nsec=0
+	//   rx_bytes=12345
+	//   tx_bytes=67890
+	//
+	// Privacy: we parse but do not log or store the full buffer.
+	inPeer := false
+	var lhSec, lhNsec int64
+	var rx, tx uint64
+
+	for _, line := range strings.Split(uapiText, "\n") {
+		line = strings.TrimRight(line, "\r")
+		if line == "" {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+
+		switch k {
+		case "public_key":
+			inPeer = strings.EqualFold(v, pubkeyHex)
+		case "last_handshake_time_sec":
+			if inPeer {
+				lhSec, _ = strconv.ParseInt(v, 10, 64)
+			}
+		case "last_handshake_time_nsec":
+			if inPeer {
+				lhNsec, _ = strconv.ParseInt(v, 10, 64)
+			}
+		case "rx_bytes":
+			if inPeer {
+				rx, _ = strconv.ParseUint(v, 10, 64)
+			}
+		case "tx_bytes":
+			if inPeer {
+				tx, _ = strconv.ParseUint(v, 10, 64)
+			}
+		}
+	}
+
+	if lhSec > 0 {
+		lastHandshake = time.Unix(lhSec, lhNsec)
+	}
+	return lastHandshake, rx, tx, nil
 }
 
 // appendPeerConfig writes the UAPI stanza for a single peer to sb.

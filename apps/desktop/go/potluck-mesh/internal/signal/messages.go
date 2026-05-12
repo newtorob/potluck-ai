@@ -45,6 +45,20 @@ type Ping struct {
 
 func NewPing() Ping { return Ping{Type: "ping"} }
 
+// RequestPunch asks the coordinator to broker a simultaneous-send hole-punch
+// with the specified peer. The coordinator responds to BOTH parties with a
+// PunchCoord message carrying the other's endpoint and a role discriminator.
+//
+// Wire shape mirrors schemas/mesh.py:SignalRequestPunch exactly.
+type RequestPunch struct {
+	Type         string `json:"type"`
+	TargetNodeID string `json:"target_node_id"` // UUID string
+}
+
+func NewRequestPunch(targetNodeID string) RequestPunch {
+	return RequestPunch{Type: "request_punch", TargetNodeID: targetNodeID}
+}
+
 // ---- server → client ---- //
 
 // RosterPeer mirrors schemas/mesh.py:EnrolledPeer.

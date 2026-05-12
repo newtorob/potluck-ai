@@ -3,6 +3,7 @@ module github.com/potluck-ai/potluck-mesh
 go 1.22
 
 require (
+	github.com/Microsoft/go-winio v0.6.2
 	github.com/pion/stun/v2 v2.0.0
 	golang.org/x/crypto v0.24.0
 	golang.zx2c4.com/wireguard v0.0.0-20231211153847-12269c276173

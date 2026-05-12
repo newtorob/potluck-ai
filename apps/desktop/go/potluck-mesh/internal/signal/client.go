@@ -34,13 +34,17 @@ const (
 )
 
 // RosterHandler is called (on the goroutine that reads from the WS) whenever
-// the roster changes. Implementations must not block; dispatch to a channel
-// if work is needed.
+// the roster changes or a hole-punch is coordinated. Implementations must not
+// block; dispatch to a channel or goroutine if work is needed.
 type RosterHandler interface {
 	// OnWelcome is called once, immediately after the first successful connect.
 	OnWelcome(w Welcome)
 	// OnRosterUpdate is called whenever the coordinator broadcasts a change.
 	OnRosterUpdate(u RosterUpdate)
+	// OnPunchCoord is called when the coordinator delivers a punch_coord message.
+	// The coord carries the peer's endpoint and a role discriminator
+	// ("initiator" = we asked; "responder" = the peer asked for us).
+	OnPunchCoord(coord PunchCoord)
 }
 
 // Client manages a persistent WebSocket connection to /mesh/signal.
@@ -85,6 +89,29 @@ func (c *Client) SendEndpointUpdate(endpoint string) {
 		// Channel full — highly unlikely given the cap, but never block.
 		slog.Warn("signal: send channel full, dropping endpoint_update",
 			"endpoint", endpoint,
+		)
+	}
+}
+
+// SendRequestPunch enqueues a request_punch message asking the coordinator to
+// broker a simultaneous-send hole-punch with the named peer. It is safe to
+// call from any goroutine. If there is no active connection the message is
+// dropped — the caller (main.go punch throttle) will retry on the next roster
+// event or after its 30-second cooldown expires.
+func (c *Client) SendRequestPunch(targetNodeID string) {
+	ch := c.sendCh
+	if ch == nil {
+		slog.Debug("signal: no active connection, dropping request_punch",
+			"target_node_id", targetNodeID,
+		)
+		return
+	}
+	select {
+	case ch <- NewRequestPunch(targetNodeID):
+		slog.Debug("signal: queued request_punch", "target_node_id", targetNodeID)
+	default:
+		slog.Warn("signal: send channel full, dropping request_punch",
+			"target_node_id", targetNodeID,
 		)
 	}
 }
@@ -300,14 +327,12 @@ func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
 			c.handler.OnRosterUpdate(ru)
 
 		case "punch_coord":
-			// Scaffolded for week 4. Log the arrival for now.
 			var pc PunchCoord
-			if err := json.Unmarshal(raw, &pc); err == nil {
-				slog.Info("signal: punch_coord received (hole-punch not yet implemented)",
-					"peer_node_id", pc.PeerNodeID,
-					"role", pc.Role,
-				)
+			if err := json.Unmarshal(raw, &pc); err != nil {
+				slog.Warn("signal: decode punch_coord failed", "err", err)
+				continue
 			}
+			c.handler.OnPunchCoord(pc)
 
 		case "error":
 			var se ServerError

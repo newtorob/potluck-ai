@@ -61,6 +61,27 @@ type Config struct {
 	// STUNRefreshInterval is how often the sidecar re-queries STUN to check
 	// whether the external endpoint has changed. Default 5 minutes.
 	STUNRefreshInterval time.Duration
+
+	// DERPRelayURL is the URL of the DERP relay to use as a fallback when
+	// direct UDP hole-punch fails. If empty, DERP is disabled.
+	//
+	// Supported schemes:
+	//   "tcp+tls://host:port"       — TLS (production default)
+	//   "tcp+insecure://host:port"  — cleartext TCP (dev / localhost testing)
+	//   "tcp://host:port"           — alias for tcp+insecure
+	//
+	// Set via env POTLUCK_DERP_URL or --derp-url flag.
+	DERPRelayURL string
+
+	// LocalAPISocketPath overrides the default Unix socket (macOS/Linux) or
+	// named pipe (Windows) path for the local IPC server. Leave empty to use
+	// the platform default:
+	//   macOS:   /tmp/potluck-mesh.sock
+	//   Linux:   ${XDG_RUNTIME_DIR:-/run/user/$UID}/potluck-mesh.sock
+	//   Windows: \\.\pipe\potluck-mesh
+	//
+	// Set via env POTLUCK_LOCAL_API_SOCKET or --local-api-socket flag.
+	LocalAPISocketPath string
 }
 
 // Load parses flags and environment, returning a validated Config.
@@ -105,6 +126,14 @@ func Load() (*Config, error) {
 	stunRefresh := flag.Duration("stun-refresh-interval",
 		envDuration("POTLUCK_STUN_REFRESH_INTERVAL", 5*time.Minute),
 		"How often to re-query STUN for endpoint changes (env: POTLUCK_STUN_REFRESH_INTERVAL)")
+
+	flag.StringVar(&cfg.DERPRelayURL, "derp-url",
+		envOr("POTLUCK_DERP_URL", ""),
+		"DERP relay URL for fallback routing (env: POTLUCK_DERP_URL); empty to disable")
+
+	flag.StringVar(&cfg.LocalAPISocketPath, "local-api-socket",
+		envOr("POTLUCK_LOCAL_API_SOCKET", ""),
+		"Local IPC socket path; empty to use platform default (env: POTLUCK_LOCAL_API_SOCKET)")
 
 	flag.Parse()
 

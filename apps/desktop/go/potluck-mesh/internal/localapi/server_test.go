@@ -1,0 +1,419 @@
+package localapi_test
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"nhooyr.io/websocket"
+	"nhooyr.io/websocket/wsjson"
+
+	"github.com/potluck-ai/potluck-mesh/internal/coordapi"
+	"github.com/potluck-ai/potluck-mesh/internal/events"
+	"github.com/potluck-ai/potluck-mesh/internal/localapi"
+	"github.com/potluck-ai/potluck-mesh/internal/peerstate"
+)
+
+// ---------------------------------------------------------------------------
+// Test helpers
+// ---------------------------------------------------------------------------
+
+// testServer starts a Server over a temporary Unix socket and returns a plain
+// net/http client configured to dial that socket, plus a cancel func.
+func testServer(t *testing.T, cfg localapi.Config) (*http.Client, context.CancelFunc) {
+	t.Helper()
+
+	// Unix sockets cap at 104 chars on macOS / 108 on Linux. t.TempDir()
+	// produces paths that include the full test name + a random suffix,
+	// which blows past the limit for longer test names. Use /tmp + a short
+	// random suffix instead, and clean up with t.Cleanup.
+	tmp := fmt.Sprintf("/tmp/potluck-test-%d.sock", time.Now().UnixNano())
+	t.Cleanup(func() { _ = os.Remove(tmp) })
+	cfg.SocketPath = tmp
+
+	srv := localapi.New(cfg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(func() {
+		cancel()
+	})
+
+	ready := make(chan struct{})
+	go func() {
+		// Poll until the socket appears.
+		for {
+			if _, err := os.Stat(tmp); err == nil {
+				close(ready)
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+
+	srvErrCh := make(chan error, 1)
+	go func() {
+		srvErrCh <- srv.Serve(ctx)
+	}()
+
+	select {
+	case <-ready:
+	case err := <-srvErrCh:
+		t.Fatalf("server exited before becoming ready: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("server did not start within 5s")
+	}
+
+	// http.Client that dials the Unix socket.
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, "unix", tmp)
+			},
+		},
+	}
+	return client, cancel
+}
+
+// defaultCfg returns a minimal Config with non-nil bus/store/state.
+func defaultCfg(t *testing.T) localapi.Config {
+	t.Helper()
+	return localapi.Config{
+		Bus:           events.NewBus(),
+		PeerStore:     peerstate.New(),
+		State:         localapi.NewState(),
+		WGPrivKeyPath: filepath.Join(t.TempDir(), "wg.key"),
+		Platform:      "darwin",
+	}
+}
+
+func get(t *testing.T, client *http.Client, path string) *http.Response {
+	t.Helper()
+	resp, err := client.Get("http://localhost" + path)
+	if err != nil {
+		t.Fatalf("GET %s: %v", path, err)
+	}
+	return resp
+}
+
+func checkProtocolHeader(t *testing.T, resp *http.Response) {
+	t.Helper()
+	v := resp.Header.Get("X-Potluck-Protocol-Version")
+	if v != "1" {
+		t.Errorf("X-Potluck-Protocol-Version: got %q want %q", v, "1")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GET /status
+// ---------------------------------------------------------------------------
+
+func TestHandleStatus_Starting(t *testing.T) {
+	cfg := defaultCfg(t)
+	client, _ := testServer(t, cfg)
+
+	resp := get(t, client, "/status")
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status: got %d want 200", resp.StatusCode)
+	}
+	checkProtocolHeader(t, resp)
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode status: %v", err)
+	}
+	if body["mesh_status"] != "starting" {
+		t.Errorf("mesh_status: got %v want starting", body["mesh_status"])
+	}
+	if body["peers_online_count"] != float64(0) {
+		t.Errorf("peers_online_count: got %v want 0", body["peers_online_count"])
+	}
+	if body["version"] != "0.1.0" {
+		t.Errorf("version: got %v want 0.1.0", body["version"])
+	}
+}
+
+func TestHandleStatus_Running(t *testing.T) {
+	cfg := defaultCfg(t)
+	cfg.State.SetWelcome("node-1", "hh-1", "100.64.0.5", "pubkeyABC")
+
+	client, _ := testServer(t, cfg)
+
+	resp := get(t, client, "/status")
+	defer resp.Body.Close()
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["mesh_status"] != "running" {
+		t.Errorf("mesh_status: got %v want running", body["mesh_status"])
+	}
+	if body["mesh_ip"] != "100.64.0.5" {
+		t.Errorf("mesh_ip: got %v", body["mesh_ip"])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GET /peers
+// ---------------------------------------------------------------------------
+
+func TestHandlePeers_Empty(t *testing.T) {
+	cfg := defaultCfg(t)
+	client, _ := testServer(t, cfg)
+
+	resp := get(t, client, "/peers")
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("peers: got %d want 200", resp.StatusCode)
+	}
+	checkProtocolHeader(t, resp)
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	peers, _ := body["peers"].([]any)
+	if len(peers) != 0 {
+		t.Errorf("expected 0 peers, got %d", len(peers))
+	}
+}
+
+// ---------------------------------------------------------------------------
+// POST /pair — coordinator error path
+// ---------------------------------------------------------------------------
+
+func TestHandlePair_CoordinatorError(t *testing.T) {
+	// Mock coordinator that always returns 404.
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/mesh/enroll" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotFound)
+			fmt.Fprint(w, `{"detail":"pairing token not found"}`)
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer mock.Close()
+
+	cfg := defaultCfg(t)
+	cfg.CoordClient = coordapi.New(mock.URL)
+	client, _ := testServer(t, cfg)
+
+	body := strings.NewReader(`{"pairing_token":"BADTOKEN12345678901234567890"}`)
+	resp, err := client.Post("http://localhost/pair", "application/json", body)
+	if err != nil {
+		t.Fatalf("POST /pair: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("expected 404 forwarded from coordinator, got %d", resp.StatusCode)
+	}
+	checkProtocolHeader(t, resp)
+
+	var errBody map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&errBody); err != nil {
+		t.Fatalf("decode error body: %v", err)
+	}
+	errObj, _ := errBody["error"].(map[string]any)
+	if errObj == nil {
+		t.Fatalf("expected {error:{code,message}}, got %v", errBody)
+	}
+	if errObj["code"] != "coordinator_error" {
+		t.Errorf("code: got %v want coordinator_error", errObj["code"])
+	}
+}
+
+func TestHandlePair_AlreadyEnrolled(t *testing.T) {
+	cfg := defaultCfg(t)
+
+	// Pre-create the key file so the server marks itself as enrolled at start.
+	keyPath := cfg.WGPrivKeyPath
+	if err := os.MkdirAll(filepath.Dir(keyPath), 0700); err != nil {
+		t.Fatal(err)
+	}
+	// Write a dummy base64 value (not a real WG key — just to trigger the file-exists check).
+	if err := os.WriteFile(keyPath, []byte("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	client, _ := testServer(t, cfg)
+
+	body := strings.NewReader(`{"pairing_token":"SOMETOKEN12345678901234567890123"}`)
+	resp, err := client.Post("http://localhost/pair", "application/json", body)
+	if err != nil {
+		t.Fatalf("POST /pair: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusConflict {
+		t.Errorf("expected 409, got %d", resp.StatusCode)
+	}
+
+	var errBody map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&errBody); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	errObj, _ := errBody["error"].(map[string]any)
+	if errObj["code"] != "already_enrolled" {
+		t.Errorf("code: got %v want already_enrolled", errObj["code"])
+	}
+}
+
+func TestHandlePair_MissingToken(t *testing.T) {
+	cfg := defaultCfg(t)
+	client, _ := testServer(t, cfg)
+
+	body := strings.NewReader(`{"pairing_token":""}`)
+	resp, err := client.Post("http://localhost/pair", "application/json", body)
+	if err != nil {
+		t.Fatalf("POST /pair: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// POST /unpair
+// ---------------------------------------------------------------------------
+
+func TestHandleUnpair(t *testing.T) {
+	cfg := defaultCfg(t)
+	client, _ := testServer(t, cfg)
+
+	resp, err := client.Post("http://localhost/unpair", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST /unpair: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("expected 204, got %d", resp.StatusCode)
+	}
+	checkProtocolHeader(t, resp)
+}
+
+// ---------------------------------------------------------------------------
+// WS /events
+// ---------------------------------------------------------------------------
+
+func TestHandleEvents_ReceivesPublishedEvent(t *testing.T) {
+	cfg := defaultCfg(t)
+	bus := cfg.Bus
+	// Same /tmp socket-path scheme as testServer — t.TempDir produces paths
+	// longer than the macOS sun_path 104-byte limit for some test names.
+	tmp := fmt.Sprintf("/tmp/potluck-test-%d.sock", time.Now().UnixNano())
+	t.Cleanup(func() { _ = os.Remove(tmp) })
+	cfg.SocketPath = tmp
+
+	srv := localapi.New(cfg)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Wait for socket to appear.
+	ready := make(chan struct{})
+	go func() {
+		for {
+			if _, err := os.Stat(tmp); err == nil {
+				close(ready)
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+	srvErrCh := make(chan error, 1)
+	go func() { srvErrCh <- srv.Serve(ctx) }()
+
+	select {
+	case <-ready:
+	case err := <-srvErrCh:
+		t.Fatalf("server exited before becoming ready: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("server did not start")
+	}
+
+	// Dial WS over the Unix socket.
+	wsDialer := websocket.DialOptions{
+		HTTPClient: &http.Client{
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+					return (&net.Dialer{}).DialContext(ctx, "unix", tmp)
+				},
+			},
+		},
+	}
+
+	wsCtx, wsCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer wsCancel()
+
+	conn, _, err := websocket.Dial(wsCtx, "ws://localhost/events", &wsDialer)
+	if err != nil {
+		t.Fatalf("WS dial: %v", err)
+	}
+	defer conn.CloseNow() //nolint:errcheck
+
+	// Give the server a moment to register the WS subscriber.
+	time.Sleep(50 * time.Millisecond)
+
+	// Publish an event.
+	bus.Publish(events.NewStatusChanged("running"))
+
+	// Read from the WS.
+	var evt events.Event
+	readCtx, readCancel := context.WithTimeout(ctx, 3*time.Second)
+	defer readCancel()
+
+	if err := wsjson.Read(readCtx, conn, &evt); err != nil {
+		t.Fatalf("WS read: %v", err)
+	}
+	if evt.Type != events.TypeStatusChanged {
+		t.Errorf("event type: got %q want %q", evt.Type, events.TypeStatusChanged)
+	}
+	if evt.Status != "running" {
+		t.Errorf("event status: got %q want running", evt.Status)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Coordinator 5xx → 502 remapping
+// ---------------------------------------------------------------------------
+
+func TestHandlePair_CoordinatorServerError_MappedTo502(t *testing.T) {
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, `{"detail":"internal error"}`)
+	}))
+	defer mock.Close()
+
+	cfg := defaultCfg(t)
+	cfg.CoordClient = coordapi.New(mock.URL)
+	client, _ := testServer(t, cfg)
+
+	body := strings.NewReader(`{"pairing_token":"BADTOKEN12345678901234567890"}`)
+	resp, err := client.Post("http://localhost/pair", "application/json", body)
+	if err != nil {
+		t.Fatalf("POST /pair: %v", err)
+	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
+
+	if resp.StatusCode != http.StatusBadGateway {
+		t.Errorf("expected 502 for coordinator 500, got %d", resp.StatusCode)
+	}
+}

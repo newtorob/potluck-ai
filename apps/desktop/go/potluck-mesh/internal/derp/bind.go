@@ -1,0 +1,354 @@
+// Package derp — DerpBind wires the DERP relay client into the wg-go
+// conn.Bind interface so that:
+//
+//  1. Packets received from the DERP relay are injected into the WireGuard
+//     device as if they arrived via UDP from a synthetic endpoint. WG can then
+//     decrypt, validate, and deliver them to the TUN interface as normal.
+//
+//  2. When wg-go wants to send a packet and the destination endpoint is a
+//     synthetic one (encoding a peer's WG pubkey), the packet is forwarded via
+//     the DERP relay instead of being sent over raw UDP.
+//
+// # Synthetic endpoint encoding
+//
+// We use approach (A) from the design doc: a custom syntheticEndpoint type that
+// implements conn.Endpoint. The type encodes the destination WG public key
+// directly; no IP address space is consumed and the routing decision is made
+// purely in Go.
+//
+// DstToString() returns "derp:<8-char-hex-prefix>" for logging. DstIP() /
+// SrcIP() return the zero netip.Addr — they are only used by the OS network
+// stack path which is bypassed for synthetic endpoints.
+//
+// # Concurrency
+//
+// - injectCh is a buffered channel (injectChanCap). The DERP read-loop goroutine
+//   calls Inject(); the wg-go receive-func goroutine drains it.
+// - derpPeers is guarded by derpMu. SetPeerRouting is called from the main
+//   goroutine; Send is called from one of wg-go's send-loop goroutines.
+// - The inner StdNetBind handles all its own concurrency.
+//
+// # Lifecycle
+//
+// DerpBind.Open is called by wg-go once when the device starts. It calls the
+// inner bind's Open and appends our own ReceiveFunc. Close propagates to the
+// inner bind and closes the injectCh so the ReceiveFunc goroutine exits cleanly.
+//
+// # Privacy
+//
+// - Never log payload bytes.
+// - Truncate pubkeys to 8 hex chars in all log output.
+package derp
+
+import (
+	"fmt"
+	"log/slog"
+	"net"
+	"net/netip"
+	"sync"
+
+	"golang.zx2c4.com/wireguard/conn"
+)
+
+const (
+	// injectChanCap is the buffer size for the DERP-inject channel.
+	// Deep enough to absorb a burst of WG handshake retries without blocking
+	// the DERP read loop.
+	injectChanCap = 256
+)
+
+// ---------------------------------------------------------------------------
+// syntheticEndpoint — implements conn.Endpoint for DERP-routed peers
+// ---------------------------------------------------------------------------
+
+// syntheticEndpoint encodes a WireGuard peer pubkey as a conn.Endpoint.
+// wg-go uses the endpoint to match incoming packets to a peer session
+// (by comparing it against the endpoint stored in the peer table). As long as
+// we always use the same syntheticEndpoint for the same pubkey, WG's session
+// lookup works correctly without any actual UDP address.
+type syntheticEndpoint struct {
+	pubkey [32]byte
+}
+
+// DstToString returns a human-readable string for logging / UAPI display.
+// Format: "derp:<8-char-hex-prefix>" — never includes full key material.
+func (e syntheticEndpoint) DstToString() string {
+	return fmt.Sprintf("derp:%x", e.pubkey[:4])
+}
+
+// SrcToString returns an empty string — source address has no meaning for
+// a relay-routed packet.
+func (e syntheticEndpoint) SrcToString() string { return "" }
+
+// DstIP returns a zero AddrPort — synthetic endpoints have no IP address.
+func (e syntheticEndpoint) DstIP() netip.Addr { return netip.Addr{} }
+
+// SrcIP returns a zero Addr — no source IP for relay-routed traffic.
+func (e syntheticEndpoint) SrcIP() netip.Addr { return netip.Addr{} }
+
+// DstToBytes returns the raw destination address bytes. wg-go uses this for
+// fast endpoint-equality checks. We return the WG pubkey itself — the stable
+// identity for a synthetic endpoint, uniquely identifying the routing target.
+func (e syntheticEndpoint) DstToBytes() []byte {
+	out := make([]byte, len(e.pubkey))
+	copy(out, e.pubkey[:])
+	return out
+}
+
+// ClearSrc is a no-op; synthetic endpoints have no source state to clear.
+func (e syntheticEndpoint) ClearSrc() {}
+
+// syntheticEndpointKey is the prefix used in ParseEndpoint to identify our
+// synthetic format. We use a "derp:" URL-like prefix that cannot collide with
+// real "ip:port" endpoint strings.
+const syntheticEndpointKey = "derp:"
+
+// SyntheticEndpointString returns the string representation used as the WG
+// peer endpoint when configuring DERP-routed peers via UAPI / UpdatePeerEndpoint.
+// This is what gets passed back to ParseEndpoint, so it must round-trip cleanly.
+func SyntheticEndpointString(pubkey [32]byte) string {
+	return fmt.Sprintf("derp:%x", pubkey[:])
+}
+
+// parseSyntheticEndpoint parses a string written by SyntheticEndpointString.
+// Returns (ep, true) if the string matches; (zero, false) otherwise.
+func parseSyntheticEndpoint(s string) (syntheticEndpoint, bool) {
+	if len(s) != len(syntheticEndpointKey)+64 {
+		return syntheticEndpoint{}, false
+	}
+	if s[:len(syntheticEndpointKey)] != syntheticEndpointKey {
+		return syntheticEndpoint{}, false
+	}
+	var key [32]byte
+	hexPart := s[len(syntheticEndpointKey):]
+	for i := 0; i < 32; i++ {
+		b, err := parseHexByte(hexPart[i*2], hexPart[i*2+1])
+		if err != nil {
+			return syntheticEndpoint{}, false
+		}
+		key[i] = b
+	}
+	return syntheticEndpoint{pubkey: key}, true
+}
+
+func parseHexByte(hi, lo byte) (byte, error) {
+	h, err := hexNibble(hi)
+	if err != nil {
+		return 0, err
+	}
+	l, err := hexNibble(lo)
+	if err != nil {
+		return 0, err
+	}
+	return (h << 4) | l, nil
+}
+
+func hexNibble(c byte) (byte, error) {
+	switch {
+	case c >= '0' && c <= '9':
+		return c - '0', nil
+	case c >= 'a' && c <= 'f':
+		return c - 'a' + 10, nil
+	case c >= 'A' && c <= 'F':
+		return c - 'A' + 10, nil
+	}
+	return 0, fmt.Errorf("invalid hex nibble: %c", c)
+}
+
+// ---------------------------------------------------------------------------
+// injectedPacket — unit of work queued from Inject → ReceiveFunc
+// ---------------------------------------------------------------------------
+
+type injectedPacket struct {
+	src     [32]byte
+	payload []byte
+}
+
+// ---------------------------------------------------------------------------
+// DerpBind — conn.Bind implementation
+// ---------------------------------------------------------------------------
+
+// DerpBind wraps wg-go's conn.StdNetBind and intercepts:
+//   - Outbound sends to syntheticEndpoints: routed via DERP relay.
+//   - Inbound DERP packets: injected into the ReceiveFunc channel.
+//
+// For all other traffic (real UDP endpoints) it delegates to the inner bind.
+type DerpBind struct {
+	inner  conn.Bind
+	client *Client
+
+	injectCh chan injectedPacket // Inject → wg-go receive-func
+	closeCh  chan struct{}       // closed by Close() to signal ReceiveFunc exit
+
+	derpMu    sync.RWMutex
+	derpPeers map[[32]byte]bool // pubkey → true if DERP-routed
+
+	closeOnce sync.Once
+}
+
+// NewDerpBind creates a DerpBind wrapping the provided inner bind and DERP client.
+// Call tunnel.New(..., tunnel.WithBind(b)) to install it in the WG device.
+func NewDerpBind(inner conn.Bind, client *Client) *DerpBind {
+	return &DerpBind{
+		inner:     inner,
+		client:    client,
+		injectCh:  make(chan injectedPacket, injectChanCap),
+		closeCh:   make(chan struct{}),
+		derpPeers: make(map[[32]byte]bool),
+	}
+}
+
+// Inject enqueues a packet received from the DERP relay for delivery into the
+// WireGuard device. Called by the DERP read-loop goroutine; must not block.
+// Drops the packet with a warning if the inject channel is full.
+func (b *DerpBind) Inject(src [32]byte, payload []byte) {
+	// Copy payload — the DERP read loop reuses its buffer across calls.
+	pkt := injectedPacket{src: src, payload: make([]byte, len(payload))}
+	copy(pkt.payload, payload)
+
+	select {
+	case b.injectCh <- pkt:
+	default:
+		slog.Warn("derp_bind: inject channel full, dropping inbound DERP packet",
+			"src_prefix", truncate8Bytes(src),
+			"payload_len", len(payload),
+		)
+	}
+}
+
+// SetPeerRouting marks (or unmarks) a peer as DERP-routed. When viaDERP is
+// true, Send() for that peer's syntheticEndpoint is dispatched to the relay.
+// Thread-safe; may be called from any goroutine.
+func (b *DerpBind) SetPeerRouting(pubkey [32]byte, viaDERP bool) {
+	b.derpMu.Lock()
+	defer b.derpMu.Unlock()
+	if viaDERP {
+		b.derpPeers[pubkey] = true
+		slog.Info("derp_bind: peer routed via DERP",
+			"pubkey_prefix", truncate8Bytes(pubkey),
+		)
+	} else {
+		delete(b.derpPeers, pubkey)
+		slog.Info("derp_bind: peer reverted to direct UDP",
+			"pubkey_prefix", truncate8Bytes(pubkey),
+		)
+	}
+}
+
+// IsPeerDERPRouted reports whether the given peer pubkey is currently
+// configured to route via the DERP relay. Thread-safe.
+func (b *DerpBind) IsPeerDERPRouted(pubkey [32]byte) bool {
+	b.derpMu.Lock()
+	defer b.derpMu.Unlock()
+	return b.derpPeers[pubkey]
+}
+
+// ---------------------------------------------------------------------------
+// conn.Bind interface implementation
+// ---------------------------------------------------------------------------
+
+// Open calls the inner bind's Open and appends our DERP-inject ReceiveFunc.
+// wg-go spawns one goroutine per ReceiveFunc and calls it in a loop.
+func (b *DerpBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
+	innerFns, actualPort, err := b.inner.Open(port)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	derpRecv := func(packets [][]byte, sizes []int, eps []conn.Endpoint) (int, error) {
+		select {
+		case <-b.closeCh:
+			return 0, net.ErrClosed
+		case pkt, ok := <-b.injectCh:
+			if !ok {
+				return 0, net.ErrClosed
+			}
+			// Grow the packet buffer if needed. wg-go pre-allocates packets[0]
+			// with an MTU-sized slice; extend rather than replace.
+			if cap(packets[0]) >= len(pkt.payload) {
+				packets[0] = packets[0][:len(pkt.payload)]
+			} else {
+				packets[0] = make([]byte, len(pkt.payload))
+			}
+			copy(packets[0], pkt.payload)
+			sizes[0] = len(pkt.payload)
+			eps[0] = syntheticEndpoint{pubkey: pkt.src}
+			slog.Debug("derp_bind: delivered DERP packet to WG device",
+				"src_prefix", truncate8Bytes(pkt.src),
+				"payload_len", len(pkt.payload),
+			)
+			return 1, nil
+		}
+	}
+
+	return append(innerFns, derpRecv), actualPort, nil
+}
+
+// Close shuts down the DERP inject path and propagates to the inner bind.
+func (b *DerpBind) Close() error {
+	b.closeOnce.Do(func() {
+		close(b.closeCh)
+	})
+	return b.inner.Close()
+}
+
+// SetMark delegates to the inner bind.
+func (b *DerpBind) SetMark(mark uint32) error {
+	return b.inner.SetMark(mark)
+}
+
+// Send routes each buffer to either DERP (synthetic endpoint) or UDP (inner bind).
+//
+// wg-go batches sends: one ep but potentially multiple bufs. For DERP we send
+// each buffer individually — the relay framing handles one WG packet per frame.
+// Errors from individual DERP sends are logged but not propagated; DERP is
+// best-effort and WG's own retry/rekeying logic will handle retransmit.
+func (b *DerpBind) Send(bufs [][]byte, ep conn.Endpoint) error {
+	se, ok := ep.(syntheticEndpoint)
+	if !ok {
+		// Not a synthetic endpoint — delegate to the inner UDP bind.
+		return b.inner.Send(bufs, ep)
+	}
+
+	// Confirm this peer is still in DERP-routing mode. If SetPeerRouting was
+	// called to revert to UDP after wg-go resolved the endpoint, we should
+	// not silently black-hole the packet — log and drop.
+	b.derpMu.RLock()
+	routed := b.derpPeers[se.pubkey]
+	b.derpMu.RUnlock()
+
+	if !routed {
+		slog.Debug("derp_bind: Send to synthetic endpoint but peer not in DERP map, dropping",
+			"dst_prefix", truncate8Bytes(se.pubkey),
+			"bufs", len(bufs),
+		)
+		return nil
+	}
+
+	for _, buf := range bufs {
+		if err := b.client.Send(se.pubkey, buf); err != nil {
+			// Best-effort: log at debug level, never propagate errors to wg-go.
+			slog.Debug("derp_bind: relay send failed",
+				"dst_prefix", truncate8Bytes(se.pubkey),
+				"payload_len", len(buf),
+				"err", err,
+			)
+		}
+	}
+	return nil
+}
+
+// ParseEndpoint checks whether the string encodes a synthetic DERP endpoint
+// (written by SyntheticEndpointString), otherwise delegates to the inner bind.
+func (b *DerpBind) ParseEndpoint(s string) (conn.Endpoint, error) {
+	if se, ok := parseSyntheticEndpoint(s); ok {
+		return se, nil
+	}
+	return b.inner.ParseEndpoint(s)
+}
+
+// BatchSize returns the inner bind's batch size. We do not change batching
+// behaviour for real UDP packets; DERP inject is always 1 packet at a time.
+func (b *DerpBind) BatchSize() int {
+	return b.inner.BatchSize()
+}

@@ -9,3 +9,4 @@ pydantic==2.10.*
 pydantic-settings==2.7.*
 websockets==13.*
 cryptography==44.*
+PyJWT[crypto]==2.10.*
