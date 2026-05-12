@@ -1,0 +1,3 @@
+# Build artifacts. Don't commit compiled binaries.
+bin/
+dist/
