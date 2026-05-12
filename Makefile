@@ -19,8 +19,9 @@ COMPOSE ?= $(shell \
   fi)
 
 .PHONY: help setup check-python check-docker up down restart logs api-logs pg-logs coord-logs migrate psql \
-        api-shell coord-shell test-api test-coordinator m3-smoke lint install-hooks dev desktop frontend \
-        sidecar sidecar-setup sidecar-go coordinator coordinator-setup frontend-setup electron-setup ps status clean reset
+        api-shell coord-shell test-api test-coordinator m3-smoke mesh-smoke lint install-hooks dev desktop frontend \
+        sidecar sidecar-setup sidecar-go installer-deps installer-bundle installer-mac installer-win installer-linux installer-clean \
+        coordinator coordinator-setup frontend-setup electron-setup ps status clean reset
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -164,6 +165,39 @@ sidecar-go: ## Build the Go mesh sidecar for the current platform (output: apps/
 	fi
 	@echo "==> Building potluck-mesh for $$(go env GOOS)/$$(go env GOARCH)"
 	$(MAKE) -C apps/desktop/go/potluck-mesh build
+
+# ---------- installer pipeline (unsigned dev builds — signing requires certs) ----------
+
+installer-deps: ## Verify the tools needed to build installers are present (pyinstaller, go, electron-builder via pnpm)
+	@command -v $(PYTHON_BIN) >/dev/null 2>&1 || { echo "error: $(PYTHON_BIN) not found"; exit 1; }
+	@command -v go >/dev/null 2>&1 || { echo "error: go not installed. brew install go"; exit 1; }
+	@command -v pnpm >/dev/null 2>&1 || { echo "error: pnpm not installed. brew install pnpm"; exit 1; }
+	@cd apps/desktop/python && ./.venv/bin/python -m pip show pyinstaller >/dev/null 2>&1 || \
+		{ echo "==> Installing pyinstaller into the sidecar venv"; ./.venv/bin/pip install pyinstaller; }
+	@echo "==> Installer build deps present."
+
+installer-bundle: installer-deps sidecar-go ## Bundle the Python sidecar + Go sidecar into apps/desktop/electron/resources/
+	@echo "==> Building Python sidecar binary (PyInstaller)"
+	@cd apps/desktop/python && ./.venv/bin/python build.py
+	@echo "==> Staging into apps/desktop/electron/resources/"
+	@cd apps/desktop/electron && pnpm run prepack
+
+installer-mac: installer-bundle ## Build unsigned macOS installer (.dmg + .zip). Signing requires Apple Developer cert.
+	@echo "==> Building macOS installer (unsigned — needs CSC_LINK + APPLE_ID env for signing)"
+	@cd apps/desktop/electron && CSC_IDENTITY_AUTO_DISCOVERY=false pnpm run build:mac
+
+installer-win: installer-bundle ## Build unsigned Windows installer (.exe via NSIS). Signing requires EV cert.
+	@echo "==> Building Windows installer (unsigned — needs CSC_LINK env for signing)"
+	@cd apps/desktop/electron && CSC_IDENTITY_AUTO_DISCOVERY=false pnpm run build:win
+
+installer-linux: installer-bundle ## Build Linux installers (.AppImage + .deb + .rpm)
+	@echo "==> Building Linux installers (AppImage + deb + rpm)"
+	@cd apps/desktop/electron && pnpm run build:linux
+
+installer-clean: ## Remove staged installer artifacts + electron-builder output
+	@cd apps/desktop/electron && pnpm run clean
+	@rm -rf apps/desktop/python/dist apps/desktop/python/build
+	@rm -rf apps/desktop/go/potluck-mesh/dist
 
 # ---------- coordinator (Phase G control plane, native run) ----------
 

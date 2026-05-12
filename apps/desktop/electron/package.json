@@ -12,7 +12,11 @@
     "build:mac": "electron-builder --mac",
     "build:win": "electron-builder --win",
     "build:linux": "electron-builder --linux",
-    "clean": "rimraf dist out resources/python"
+    "prepack:python": "cd ../python && python3 build.py && rm -rf ../electron/resources/python && mkdir -p ../electron/resources/python && cp -R dist/potluck-local* ../electron/resources/python/",
+    "prepack:mesh": "make -C ../go/potluck-mesh build && rm -rf resources/mesh && mkdir -p resources/mesh && cp ../go/potluck-mesh/dist/potluck-mesh* resources/mesh/",
+    "prepack": "pnpm run prepack:python && pnpm run prepack:mesh",
+    "package": "pnpm run prepack && pnpm run build",
+    "clean": "rimraf dist out resources/python resources/mesh"
   },
   "build": {
     "appId": "ai.trypotluck.app",
@@ -32,6 +36,16 @@
       {
         "from": "./resources/python/",
         "to": "python",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "./resources/mesh/",
+        "to": "mesh",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "../../../packaging/daemons/",
+        "to": "daemons",
         "filter": ["**/*"]
       }
     ],
@@ -59,8 +73,16 @@
     },
     "linux": {
       "icon": "icons/icon.png",
-      "target": ["AppImage"],
-      "category": "Utility"
+      "target": [
+        { "target": "AppImage", "arch": ["x64", "arm64"] },
+        { "target": "deb", "arch": ["x64", "arm64"] },
+        { "target": "rpm", "arch": ["x64", "arm64"] }
+      ],
+      "category": "Utility",
+      "synopsis": "Member-owned cooperative AI infrastructure",
+      "description": "Potluck is a cooperative AI you actually own. Local-first memory for AI coding agents, a WireGuard mesh between your machines, and member-governed cooperative compute.",
+      "maintainer": "Potluck AI <hello@trypotluck.ai>",
+      "vendor": "Potluck AI"
     },
     "publish": {
       "provider": "github",

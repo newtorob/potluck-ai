@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Potluck mesh sidecar — macOS LaunchDaemon template.
+
+  Installed to /Library/LaunchDaemons/ai.trypotluck.mesh.plist by the
+  .pkg installer's post-install script. Runs as the dedicated `_potluck`
+  system user (created at install time), not root. Starts at boot;
+  survives logout.
+
+  Substitution tokens (rendered by the installer):
+    {{BINARY_PATH}}       — absolute path to the installed sidecar binary
+    {{COORDINATOR_URL}}   — defaults to the cooperative's hosted URL;
+                             user can override via the desktop app's
+                             Settings → Advanced → Cooperative connection
+    {{KEY_DIR}}           — /Library/Application Support/Potluck/keys (0700)
+    {{LOG_DIR}}           — /Library/Logs/Potluck (0755)
+  TODO(installer): replace these at install time, OR have the binary
+  read POTLUCK_* env vars from a config file the installer writes.
+-->
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>ai.trypotluck.mesh</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>{{BINARY_PATH}}</string>
+      <string>--coordinator-url</string>
+      <string>{{COORDINATOR_URL}}</string>
+      <string>--log-format</string>
+      <string>json</string>
+    </array>
+
+    <!-- Run as the unprivileged service user. The installer creates
+         _potluck if it doesn't exist; the binary needs no special
+         privileges to operate the utun device on macOS. -->
+    <key>UserName</key>
+    <string>_potluck</string>
+    <key>GroupName</key>
+    <string>_potluck</string>
+
+    <!-- Run at load + restart if killed (with throttle to avoid restart
+         storms on a misconfigured binary). -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+      <key>SuccessfulExit</key>
+      <false/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!-- Environment variables consumed by the sidecar. Adjust to match
+         the actual env-var names in internal/config/config.go. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>POTLUCK_WG_PRIVATE_KEY_PATH</key>
+      <string>{{KEY_DIR}}/wg.key</string>
+      <key>POTLUCK_LOCAL_API_SOCKET</key>
+      <string>/var/run/potluck-mesh.sock</string>
+    </dict>
+
+    <!-- Structured JSON logs land in /Library/Logs/Potluck/mesh.log.
+         Errors go to a separate file so on-call can grep them quickly. -->
+    <key>StandardOutPath</key>
+    <string>{{LOG_DIR}}/mesh.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{LOG_DIR}}/mesh.err</string>
+
+    <!-- Lower the daemon's CPU priority so it doesn't compete with
+         interactive workloads when the user is actively using the
+         machine. Mesh keepalive + STUN traffic is bursty + low-CPU
+         anyway. -->
+    <key>Nice</key>
+    <integer>5</integer>
+  </dict>
+</plist>

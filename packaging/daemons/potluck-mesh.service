@@ -1,0 +1,69 @@
+# Potluck mesh sidecar — systemd system service template.
+#
+# Installed to /etc/systemd/system/potluck-mesh.service by the .deb /
+# .rpm post-install script. Runs as the dedicated `potluck` system user
+# (created at install time). Starts at boot; survives logout.
+#
+# Substitution tokens (rendered by the installer):
+#   @BINARY_PATH@       — absolute path to the installed sidecar binary
+#   @COORDINATOR_URL@   — defaults to the cooperative's hosted URL
+#   @KEY_DIR@           — /var/lib/potluck/keys (0700, owned by potluck)
+#   @LOG_DIR@           — /var/log/potluck (0755, owned by potluck)
+# TODO(installer): substitute at install time, or write a config file
+# the binary reads at startup.
+
+[Unit]
+Description=Potluck mesh sidecar (cooperative AI mesh)
+Documentation=https://potluck.ai/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=potluck
+Group=potluck
+
+# Capability the userspace-WG binary needs to bring up /dev/net/tun.
+# The .deb / .rpm post-install runs `setcap cap_net_admin+ep` on the
+# binary, but AmbientCapabilities here is a belt-and-suspenders.
+AmbientCapabilities=CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_ADMIN
+
+ExecStart=@BINARY_PATH@ \
+  --coordinator-url @COORDINATOR_URL@ \
+  --log-format json
+
+# Restart with backoff if the binary crashes.
+Restart=on-failure
+RestartSec=10s
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# Sandbox the service. Mesh traffic is opaque to anything outside the
+# WG tunnel anyway, but we follow defense-in-depth conventions.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=false
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+
+# Writable paths the service needs.
+ReadWritePaths=@KEY_DIR@ @LOG_DIR@ /var/run
+
+# Environment.
+Environment=POTLUCK_WG_PRIVATE_KEY_PATH=@KEY_DIR@/wg.key
+Environment=POTLUCK_LOCAL_API_SOCKET=/var/run/potluck-mesh.sock
+
+# Logs go through journald. `journalctl -u potluck-mesh` to view.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=potluck-mesh
+
+[Install]
+WantedBy=multi-user.target
