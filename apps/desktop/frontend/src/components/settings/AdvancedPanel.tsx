@@ -12,6 +12,7 @@ import { useState, useRef, useCallback } from 'react';
 import { cn } from '@/components/ui/cn';
 import { ModelPathPanel } from '@/components/settings/ModelPathPanel';
 import { McpIntegrationPanel } from '@/components/settings/McpIntegrationPanel';
+import { CooperativeConnectionPanel } from '@/components/settings/CooperativeConnectionPanel';
 import { useProject } from '@/hooks/useProject';
 import { normaliseProjectName } from '@/lib/projectUtils';
 import type { PotluckSettings, MemorySettings } from '@/lib/localApi';
@@ -394,6 +395,9 @@ export function AdvancedPanel({ settings, isSaving, saveError, onUpdate }: Advan
 
       {/* External agents (MCP) */}
       <McpIntegrationPanel />
+
+      {/* Cooperative connection — coordinator URL for the Phase G control plane. */}
+      <CooperativeConnectionPanel />
     </div>
   );
 }

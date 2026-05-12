@@ -25,16 +25,17 @@ import type {
 } from '@/types/memory';
 import type { TaskState, TaskStatus, TaskCreateInput, TaskUpdateInput } from '@/types/tasks';
 import type { AgentSession, SessionDetail, ToolCall } from '@/types/agents';
+import { coordinatorBase } from '@/stores/connectionStore';
 
 const LOCAL_BASE =
   (import.meta.env['VITE_LOCAL_API_URL'] as string | undefined) ?? 'http://127.0.0.1:8321';
 
 // Coordinator URL — the Phase G control plane (separate from the local
-// sidecar). Defaults to 127.0.0.1:8400 which is where docker-compose
-// publishes the dev coordinator. Overridable for staging / hosted
-// environments.
-const COORDINATOR_BASE =
-  (import.meta.env['VITE_COORDINATOR_URL'] as string | undefined) ?? 'http://127.0.0.1:8400';
+// sidecar). Read from the runtime connection store (settings UI +
+// localStorage) rather than a compile-time constant, so users can point
+// at a coordinator on another machine in their fleet (LAN / Tailscale /
+// hosted) without rebuilding. See `stores/connectionStore.ts` for the
+// bootstrap precedence + persistence model. Imported below.
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -326,7 +327,7 @@ export const localApi = {
     prompt: string,
     options: { modelSlug: string; temperature?: number; maxTokens?: number; abortSignal?: AbortSignal }
   ): Promise<Response> {
-    return fetch(`${COORDINATOR_BASE}/jobs/stream`, {
+    return fetch(`${coordinatorBase()}/jobs/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -739,7 +740,7 @@ export const localApi = {
     /** GET /transparency/fleet on the coordinator. Aggregate-only — no
      *  peer_id / hostname / individual peer fields, by manifesto rule. */
     fleet(): Promise<FleetSummary> {
-      return fetch(`${COORDINATOR_BASE}/transparency/fleet`).then((r) =>
+      return fetch(`${coordinatorBase()}/transparency/fleet`).then((r) =>
         handleResponse<FleetSummary>(r),
       );
     },
@@ -753,7 +754,7 @@ export const localApi = {
     health(timeoutMs = 2000): Promise<boolean> {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
-      return fetch(`${COORDINATOR_BASE}/health`, { signal: controller.signal })
+      return fetch(`${coordinatorBase()}/health`, { signal: controller.signal })
         .then((r) => r.ok)
         .catch(() => false)
         .finally(() => clearTimeout(timer));
@@ -762,7 +763,7 @@ export const localApi = {
     /** GET /jobs/stats on the coordinator. Returns this member's
      *  requester-side counts + average latency for the last 24h. */
     myStats(): Promise<MyJobStats> {
-      return fetch(`${COORDINATOR_BASE}/jobs/stats`).then((r) =>
+      return fetch(`${coordinatorBase()}/jobs/stats`).then((r) =>
         handleResponse<MyJobStats>(r),
       );
     },
@@ -775,7 +776,7 @@ export const localApi = {
      *  per-model breakdown. Decimal fields arrive as strings; keep them
      *  that way — parse/format only at the render layer. */
     balance(): Promise<CreditBalance> {
-      return fetch(`${COORDINATOR_BASE}/me/credit-balance`).then((r) =>
+      return fetch(`${coordinatorBase()}/me/credit-balance`).then((r) =>
         handleResponse<CreditBalance>(r),
       );
     },
@@ -788,7 +789,7 @@ export const localApi = {
       if (opts.direction !== undefined) params.set('direction', opts.direction);
       if (opts.limit !== undefined) params.set('limit', String(opts.limit));
       const qs = params.toString();
-      return fetch(`${COORDINATOR_BASE}/me/credit-history${qs ? `?${qs}` : ''}`).then((r) =>
+      return fetch(`${coordinatorBase()}/me/credit-history${qs ? `?${qs}` : ''}`).then((r) =>
         handleResponse<CreditHistory>(r),
       );
     },
