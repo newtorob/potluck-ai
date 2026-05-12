@@ -744,6 +744,21 @@ export const localApi = {
       );
     },
 
+    /** GET /health on the coordinator. Used as a cheap reachability probe
+     *  to gate UI affordances that depend on the coordinator (e.g. the
+     *  chat composer's Network-mode toggle). Resolves to `true` only when
+     *  the response is a 2xx; any other outcome (5xx, network error,
+     *  timeout) resolves to `false` rather than throwing — callers should
+     *  not need a try/catch for this. */
+    health(timeoutMs = 2000): Promise<boolean> {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      return fetch(`${COORDINATOR_BASE}/health`, { signal: controller.signal })
+        .then((r) => r.ok)
+        .catch(() => false)
+        .finally(() => clearTimeout(timer));
+    },
+
     /** GET /jobs/stats on the coordinator. Returns this member's
      *  requester-side counts + average latency for the last 24h. */
     myStats(): Promise<MyJobStats> {
