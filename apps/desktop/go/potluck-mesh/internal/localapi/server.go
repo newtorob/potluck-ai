@@ -323,11 +323,11 @@ func (s *Server) Serve(ctx context.Context) error {
 
 		shutCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		_ = s.httpSrv.Shutdown(shutCtx)
+		_ = s.httpSrv.Shutdown(shutCtx) // graceful drain; we're shutting down regardless
 
 		// Clean up Unix socket file.
 		if runtime.GOOS != "windows" {
-			_ = os.Remove(s.socketPath)
+			_ = os.Remove(s.socketPath) // best-effort; stale socket will be removed on next start
 		}
 		return ctx.Err()
 
@@ -576,7 +576,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("localapi: WS /events upgrade failed", "err", err)
 		return
 	}
-	defer conn.CloseNow() //nolint:errcheck
+	defer conn.CloseNow() // best-effort cleanup; error intentionally ignored
 
 	ch, unsub := s.bus.Subscribe()
 	defer unsub()
@@ -593,6 +593,8 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		case evt, ok := <-ch:
 			if !ok {
 				// Bus closed — the sidecar is shutting down.
+				// Best-effort: send a final status event before closing. Error ignored
+				// because we're closing immediately after regardless.
 				_ = wsjson.Write(ctx, conn, events.NewStatusChanged(string(StatusStopped)))
 				conn.Close(websocket.StatusNormalClosure, "sidecar shutdown")
 				return

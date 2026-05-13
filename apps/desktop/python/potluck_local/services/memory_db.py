@@ -14,6 +14,8 @@ from typing import Any
 
 import aiosqlite
 
+from potluck_local.utils.time import now_iso as _now_iso
+
 logger = logging.getLogger(__name__)
 
 DB_PATH_ENV = "POTLUCK_MEMORY_DB_PATH"
@@ -134,13 +136,6 @@ def get_memory_db_path() -> Path:
         return Path(env_override)
     from potluck_local.utils.paths import memory_db_path
     return memory_db_path()
-
-
-def _now_iso() -> str:
-    """Local copy of the ISO-8601 helper other services define. Kept
-    here to avoid a circular import on memory_extraction et al."""
-    from datetime import datetime, timezone
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _add_column_if_missing(

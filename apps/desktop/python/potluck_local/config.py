@@ -45,7 +45,5 @@ class LocalSettings(BaseSettings):
         return self.data_dir / "config.json"
 
 
-# Module-level singleton; callers import this directly.
-# Do NOT instantiate at import time — use get_settings() for testability.
 def get_local_settings() -> LocalSettings:
     return LocalSettings()

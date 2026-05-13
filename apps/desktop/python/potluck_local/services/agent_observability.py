@@ -13,14 +13,13 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import uuid
-from datetime import datetime, timezone
 from typing import Any, Literal
 
 import aiosqlite
 
 from potluck_local.services.memory_db import get_memory_db_path
+from potluck_local.utils.time import now_iso as _now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -69,15 +68,6 @@ def _summarize_args(tool_name: str, args: dict[str, Any] | None) -> dict[str, An
     if tool_name in _ALL_ARGS_SAFE_TOOLS:
         return dict(args)
     return {k: v for k, v in args.items() if k in _SAFE_ARG_KEYS}
-
-
-# ---------------------------------------------------------------------------
-# Timestamp helper
-# ---------------------------------------------------------------------------
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 # ---------------------------------------------------------------------------

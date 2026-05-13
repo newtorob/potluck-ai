@@ -30,6 +30,7 @@ from coordinator.schemas.peer import (
 from coordinator.services.attestation import AttestationError, verify_attestation
 from coordinator.services.peer_registry import (
     PeerConnection,
+    complete_job,
     get_job,
     register_peer,
     unregister_peer,
@@ -248,8 +249,6 @@ async def peer_connect(
                 buf.output_tokens = cmp.output_tokens
                 buf.duration_ms = cmp.duration_ms
                 buf.finish_reason = cmp.finish_reason
-                # Import here to avoid circular import at module load time.
-                from coordinator.services.peer_registry import complete_job
                 await complete_job(cmp.job_id)
                 logger.info(
                     "peer_job_complete",
@@ -269,7 +268,6 @@ async def peer_connect(
                     continue
                 buf.error_category = err.error_category
                 buf.error_message = err.error_message
-                from coordinator.services.peer_registry import complete_job
                 await complete_job(err.job_id)
                 logger.info(
                     "peer_job_error",

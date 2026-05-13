@@ -108,7 +108,7 @@ func (r *Resolver) tryResolve(ctx context.Context, network, server string) (stri
 	if err != nil {
 		return "", fmt.Errorf("bind local UDP (%s): %w", network, err)
 	}
-	defer conn.Close() //nolint:errcheck
+	defer conn.Close() // UDP socket; close error on defer is non-actionable
 
 	// Honour the context + per-attempt dial timeout (whichever comes first).
 	deadline := time.Now().Add(dialTimeout)

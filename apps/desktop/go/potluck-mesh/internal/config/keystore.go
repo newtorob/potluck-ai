@@ -1,17 +1,13 @@
 package config
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 
-	"golang.org/x/crypto/curve25519"
+	"github.com/potluck-ai/potluck-mesh/internal/util"
 )
-
-const wgKeyLen = 32
 
 // LoadOrGenerateKeyPair reads the private key from cfg.WGPrivateKeyPath.
 // If the file does not exist, it generates a fresh WireGuard keypair,
@@ -37,11 +33,11 @@ func LoadOrGenerateKeyPair(cfg *Config) error {
 	if err != nil {
 		return fmt.Errorf("keystore: decode private key: %w", err)
 	}
-	if len(privBytes) != wgKeyLen {
-		return fmt.Errorf("keystore: private key wrong length: want %d bytes, got %d", wgKeyLen, len(privBytes))
+	if len(privBytes) != util.WGKeyLen {
+		return fmt.Errorf("keystore: private key wrong length: want %d bytes, got %d", util.WGKeyLen, len(privBytes))
 	}
 
-	pubEncoded, err := derivePublicKey(privBytes)
+	pubEncoded, err := util.WGDerivePublicKey(privBytes)
 	if err != nil {
 		return fmt.Errorf("keystore: derive public key: %w", err)
 	}
@@ -53,34 +49,15 @@ func LoadOrGenerateKeyPair(cfg *Config) error {
 	}
 
 	cfg.WGPublicKey = pubEncoded
-	slog.Debug("loaded existing WG keypair", "wg_public_key", pubEncoded)
+	// Log only the truncated prefix — never the full public key in logs.
+	slog.Debug("loaded existing WG keypair", "wg_public_key_prefix", util.TruncatePubkey(pubEncoded))
 	return nil
 }
 
 func generateAndSave(cfg *Config) error {
-	privBytes := make([]byte, wgKeyLen)
-	if _, err := rand.Read(privBytes); err != nil {
-		return fmt.Errorf("keystore: generate random bytes: %w", err)
-	}
-
-	// WireGuard private key clamping (RFC 7748 §5 / Curve25519):
-	privBytes[0] &= 248
-	privBytes[31] &= 127
-	privBytes[31] |= 64
-
-	dir := filepath.Dir(cfg.WGPrivateKeyPath)
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return fmt.Errorf("keystore: create key directory %s: %w", dir, err)
-	}
-
-	encoded := base64.StdEncoding.EncodeToString(privBytes)
-	if err := os.WriteFile(cfg.WGPrivateKeyPath, []byte(encoded), 0600); err != nil {
-		return fmt.Errorf("keystore: write private key: %w", err)
-	}
-
-	pubEncoded, err := derivePublicKey(privBytes)
+	pubEncoded, err := util.WGGenerateAndSavePrivateKey(cfg.WGPrivateKeyPath)
 	if err != nil {
-		return fmt.Errorf("keystore: derive public key after generation: %w", err)
+		return fmt.Errorf("keystore: %w", err)
 	}
 	cfg.WGPublicKey = pubEncoded
 
@@ -89,15 +66,4 @@ func generateAndSave(cfg *Config) error {
 		"private_key_path", cfg.WGPrivateKeyPath,
 	)
 	return nil
-}
-
-// derivePublicKey computes the Curve25519 public key for a given private key.
-// This is the same derivation WireGuard uses internally (Diffie-Hellman base
-// point multiplication per RFC 7748).
-func derivePublicKey(privBytes []byte) (string, error) {
-	pub, err := curve25519.X25519(privBytes, curve25519.Basepoint)
-	if err != nil {
-		return "", fmt.Errorf("curve25519 scalar mult: %w", err)
-	}
-	return base64.StdEncoding.EncodeToString(pub), nil
 }

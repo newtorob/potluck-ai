@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -75,12 +74,12 @@ func dialAndAuth(t *testing.T, addr, token string) net.Conn {
 
 	// Read auth_ok (terminated by newline).
 	var buf [512]byte
-	conn.SetDeadline(time.Now().Add(5 * time.Second)) //nolint
+	_ = conn.SetDeadline(time.Now().Add(5 * time.Second)) // test helper; deadline error is non-fatal
 	n, err := conn.Read(buf[:])
 	if err != nil {
 		t.Fatalf("read auth_ok: %v", err)
 	}
-	conn.SetDeadline(time.Time{}) //nolint
+	_ = conn.SetDeadline(time.Time{}) // clear deadline
 
 	var resp map[string]interface{}
 	if err := json.Unmarshal(buf[:n], &resp); err != nil {
@@ -110,8 +109,8 @@ func sendFrame(t *testing.T, conn net.Conn, destPubkey [32]byte, payload []byte)
 // Returns (srcPubkey, payload).
 func recvFrame(t *testing.T, conn net.Conn, timeout time.Duration) ([32]byte, []byte) {
 	t.Helper()
-	conn.SetDeadline(time.Now().Add(timeout)) //nolint
-	defer conn.SetDeadline(time.Time{})       //nolint
+	_ = conn.SetDeadline(time.Now().Add(timeout))
+	defer func() { _ = conn.SetDeadline(time.Time{}) }()
 
 	var lenBuf [2]byte
 	if _, err := readFull(conn, lenBuf[:]); err != nil {
@@ -200,10 +199,10 @@ func TestAuthRejectsExpiredJWT(t *testing.T) {
 
 	msg, _ := json.Marshal(authMsg{Type: "auth", Token: expiredToken})
 	msg = append(msg, '\n')
-	conn.Write(msg) //nolint
+	_, _ = conn.Write(msg) // best-effort in test helper
 
 	var buf [512]byte
-	conn.SetDeadline(time.Now().Add(3 * time.Second)) //nolint
+	_ = conn.SetDeadline(time.Now().Add(3 * time.Second))
 	n, _ := conn.Read(buf[:])
 	var resp map[string]interface{}
 	_ = json.Unmarshal(buf[:n], &resp)
@@ -229,10 +228,10 @@ func TestAuthRejectsWrongRegion(t *testing.T) {
 
 	msg, _ := json.Marshal(authMsg{Type: "auth", Token: wrongRegionToken})
 	msg = append(msg, '\n')
-	conn.Write(msg) //nolint
+	_, _ = conn.Write(msg) // best-effort in test helper
 
 	var buf [512]byte
-	conn.SetDeadline(time.Now().Add(3 * time.Second)) //nolint
+	_ = conn.SetDeadline(time.Now().Add(3 * time.Second))
 	n, _ := conn.Read(buf[:])
 	var resp map[string]interface{}
 	_ = json.Unmarshal(buf[:n], &resp)
@@ -271,7 +270,6 @@ func TestSilentDropUnknownDest(t *testing.T) {
 	if got := relay.ConnectedClients(); got != 1 {
 		t.Errorf("expected 1 connected client after silent drop, got %d", got)
 	}
-	fmt.Println("silent drop test passed")
 }
 
 // TestMetrics verifies that forwarded bytes are counted.

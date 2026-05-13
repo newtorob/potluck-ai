@@ -32,6 +32,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from coordinator.constants import STUB_MEMBER_ID
 from coordinator.db.database import get_db, get_session_factory
 from coordinator.models.job import Job
 from coordinator.schemas.peer import (
@@ -52,10 +53,9 @@ router = APIRouter(tags=["jobs"])
 # should stop blocking the requesting client.
 JOB_TIMEOUT_S = 120.0
 
-# Stub-only constant — m3 dispatch doesn't yet have member auth wired up
-# from the desktop side. Real member_id comes from the authenticated session
-# in v0.5; this matches the dev-fixture seed already in contributor_releases.
-_STUB_MEMBER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+# Real member_id comes from the authenticated session in v0.5; until then
+# we use the dev-fixture stub from coordinator.constants.
+_STUB_MEMBER_ID = STUB_MEMBER_ID
 
 
 class JobRequest(BaseModel):

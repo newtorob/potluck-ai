@@ -13,7 +13,8 @@ import { useTasks } from '@/hooks/useTasks';
 import { useProject } from '@/hooks/useProject';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { ProjectPill } from '@/components/memory/ProjectPill';
-import { normaliseProjectName } from '@/lib/projectUtils';
+import { normaliseProjectName, resolveProjectFilter } from '@/lib/projectUtils';
+import type { ProjectFilter } from '@/lib/projectUtils';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
 import type { TaskStatus } from '@/types/tasks';
@@ -35,12 +36,6 @@ const FILTERS: Array<{ value: FilterValue; label: string }> = [
 // ---------------------------------------------------------------------------
 // New task form
 // ---------------------------------------------------------------------------
-
-type ProjectFilter =
-  | { kind: 'active' }
-  | { kind: 'all' }
-  | { kind: 'global' }
-  | { kind: 'project'; name: string };
 
 interface NewTaskFormProps {
   onCreate: (name: string, objective: string, steps: string[], project: string | null) => Promise<void>;
@@ -106,10 +101,7 @@ function NewTaskForm({ onCreate, onCancel, defaultProject, projects = [] }: NewT
       aria-label="New task form"
     >
       <div className="flex items-center justify-between">
-        <p
-          className="font-serif text-[11px] italic text-muted-foreground"
-          style={{ letterSpacing: '0.04em' }}
-        >
+        <p className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
           New task
         </p>
         <button
@@ -275,15 +267,7 @@ export function TaskStateView() {
   const { projects, activeProject } = useProject();
 
   // Resolve project params for the tasks fetch
-  const resolvedProject: string | null | undefined = (() => {
-    switch (projectFilter.kind) {
-      case 'active': return activeProject;
-      case 'all': return undefined;
-      case 'global': return null;
-      case 'project': return projectFilter.name;
-    }
-  })();
-  const includeAll = projectFilter.kind === 'all';
+  const { project: resolvedProject, includeAll } = resolveProjectFilter(projectFilter, activeProject);
 
   const {
     tasks,

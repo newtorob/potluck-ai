@@ -263,7 +263,7 @@ func TestSendViaDERPRoutesFakeClient(t *testing.T) {
 	// The relay handler reads whatever the client writes.
 	mr := newMockRelay(t, func(conn net.Conn) {
 		buf := make([]byte, 512)
-		conn.SetDeadline(time.Now().Add(3 * time.Second)) //nolint
+		_ = conn.SetDeadline(time.Now().Add(3 * time.Second))
 		n, err := conn.Read(buf)
 		if err != nil || n < 34 { // at minimum 2+32 bytes of frame header
 			return

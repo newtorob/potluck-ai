@@ -1,8 +1,9 @@
 /**
- * Time formatting utilities for the agents dashboard.
+ * Time formatting utilities shared across the desktop frontend.
  *
  * Kept as pure functions — no side effects, no dependencies.
- * All accept ISO-8601 UTC strings (the backend contract).
+ * ISO-8601 string overloads accept the backend contract format.
+ * Unix-ms overloads accept the chatStore / in-memory format.
  */
 
 /**
@@ -78,4 +79,24 @@ export function fullDateTime(isoString: string): string {
     minute: '2-digit',
     second: '2-digit',
   });
+}
+
+/**
+ * Returns a short relative string from a Unix millisecond timestamp.
+ * Mirrors relativeTime() but accepts the in-memory format used by
+ * chatStore (updatedAt is a number, not an ISO string).
+ *
+ * "just now" | "3m ago" | "2h ago" | "4d ago" | "Apr 21"
+ */
+export function relativeTimeFromMs(ms: number): string {
+  const diff = Date.now() - ms;
+  if (diff < 0) return 'just now';
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }

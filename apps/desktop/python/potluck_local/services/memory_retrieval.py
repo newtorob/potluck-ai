@@ -9,16 +9,12 @@ from __future__ import annotations
 import logging
 import re
 from collections import Counter
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING
 
 import aiosqlite
 import numpy as np
 
-if TYPE_CHECKING:
-    pass
-
 from potluck_local.services.memory_extraction import Memory, MemoryCategory
+from potluck_local.utils.time import now_iso as _now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +35,6 @@ _STOPWORDS: frozenset[str] = frozenset({
 })
 
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
 def _memory_enabled() -> bool:
     try:
         from potluck_local.services.settings_manager import get_settings
@@ -59,13 +51,13 @@ def _row_to_memory(row: dict) -> Memory:
         category=row["category"],
         confidence=row["confidence"],
         source_type=row["source_type"],
-        source_conversation_id=row.get("source_conversation_id"),
+        source_conversation_id=row["source_conversation_id"],
         created_at=row["created_at"],
         last_accessed_at=row["last_accessed_at"],
         access_count=row["access_count"],
         is_active=bool(row["is_active"]),
-        superseded_by=row.get("superseded_by"),
-        project=row.get("project"),
+        superseded_by=row["superseded_by"],
+        project=row["project"],
     )
 
 
@@ -183,11 +175,7 @@ async def get_related(
 
     Uses the target memory's stored embedding.  Returns [] if no embedding exists.
     """
-    from potluck_local.services.memory_db import (
-        get_embedding,
-        get_memory_db_path,
-        load_all_embeddings,
-    )
+    from potluck_local.services.memory_db import get_embedding, get_memory_db_path
 
     embed_result = await get_embedding(memory_id)
     if embed_result is None:
@@ -195,15 +183,11 @@ async def get_related(
 
     target_vec, _ = embed_result
 
-    # Load all embeddings globally (no project filter for related)
-    pairs = await load_all_embeddings(project=None)
-    # Also load project-scoped ones but avoid double-counting — load_all_embeddings
-    # returns project=None scope; for related we want the broadest set, so we
-    # re-fetch without project filtering by reading the table directly.
+    # Load all embeddings without project filter so related-memory lookup
+    # searches the broadest possible set (cross-project relatedness is useful).
     db_path = get_memory_db_path()
-    import aiosqlite as _aiosqlite
-    async with _aiosqlite.connect(db_path) as db:
-        db.row_factory = _aiosqlite.Row
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
         cursor = await db.execute(
             """SELECT e.memory_id, e.embedding
                FROM memory_embeddings e
@@ -227,8 +211,8 @@ async def get_related(
     top_ids = [candidate_ids[i] for i in top_indices]
     top_scores = [float(scores[i]) for i in top_indices]
 
-    async with _aiosqlite.connect(db_path) as db:
-        db.row_factory = _aiosqlite.Row
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
         placeholders = ",".join("?" for _ in top_ids)
         cursor = await db.execute(
             f"SELECT * FROM memories WHERE id IN ({placeholders}) AND is_active = 1",  # noqa: S608
@@ -260,13 +244,7 @@ async def get_keywords(
 
     project = project or None
     db_path = get_memory_db_path()
-
-    if project is not None:
-        proj_clause = "(project = ? OR project IS NULL)"
-        proj_params: list = [project]
-    else:
-        proj_clause = "project IS NULL"
-        proj_params = []
+    proj_clause, proj_params = _project_clause(project)
 
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row

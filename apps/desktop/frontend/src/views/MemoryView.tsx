@@ -25,6 +25,8 @@ import { useMemories } from '@/hooks/useMemories';
 import { useSettings } from '@/hooks/useSettings';
 import { useProject } from '@/hooks/useProject';
 import { useMemoryStore } from '@/stores/memoryStore';
+import { resolveProjectFilter } from '@/lib/projectUtils';
+import type { ProjectFilter } from '@/lib/projectUtils';
 import { MemoryCard } from '@/components/memory/MemoryCard';
 import { MemoryCategorySection } from '@/components/memory/MemoryCategorySection';
 import { NewMemoryForm } from '@/components/memory/NewMemoryForm';
@@ -75,16 +77,6 @@ function sortMemories(memories: Memory[], sortKey: SortKey): Memory[] {
 }
 
 // ---------------------------------------------------------------------------
-// Project filter chip type (unchanged from previous implementation)
-// ---------------------------------------------------------------------------
-
-type ProjectFilter =
-  | { kind: 'active' }
-  | { kind: 'all' }
-  | { kind: 'global' }
-  | { kind: 'project'; name: string };
-
-// ---------------------------------------------------------------------------
 // MemoryView
 // ---------------------------------------------------------------------------
 
@@ -93,15 +85,7 @@ export function MemoryView() {
 
   // Project scoping for memory list
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>({ kind: 'active' });
-  const resolvedProject: string | null | undefined = (() => {
-    switch (projectFilter.kind) {
-      case 'active': return activeProject;
-      case 'all': return undefined;
-      case 'global': return null;
-      case 'project': return projectFilter.name;
-    }
-  })();
-  const includeAll = projectFilter.kind === 'all';
+  const { project: resolvedProject, includeAll } = resolveProjectFilter(projectFilter, activeProject);
 
   const { memories, isFetching, fetchError, performSearch } = useMemories({
     project: resolvedProject,
@@ -185,11 +169,10 @@ export function MemoryView() {
   // ---------------------------------------------------------------------------
   // Memory enabled detection
   // ---------------------------------------------------------------------------
-  const memoryEnabled =
-    settings?.privacy &&
-    'memory_enabled' in (settings.privacy as Record<string, unknown>)
-      ? Boolean((settings.privacy as Record<string, unknown>)['memory_enabled'])
-      : true;
+  // PrivacySettings.memory_enabled is typed — no cast needed.
+  // Default to true when settings haven't loaded yet so the banner
+  // doesn't flash on startup.
+  const memoryEnabled = settings?.privacy.memory_enabled ?? true;
 
   // ---------------------------------------------------------------------------
   // Search handling
@@ -354,22 +337,15 @@ export function MemoryView() {
 
   const handleEnableMemory = () => {
     if (!settings) return;
-    void updateSettings({
-      privacy: {
-        ...settings.privacy,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- forward-compat shape extension
-        memory_enabled: true,
-      } as any,
-    });
+    void updateSettings({ privacy: { ...settings.privacy, memory_enabled: true } });
   };
 
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
-  // Resolve the project string for tag cloud (undefined = global/all)
-  const tagCloudProject =
-    resolvedProject === undefined ? undefined : (resolvedProject ?? undefined);
+  // TagCloud accepts string | undefined — coerce null (global) to undefined
+  const tagCloudProject = resolvedProject ?? undefined;
 
   return (
     <div className="flex h-full flex-col">

@@ -329,7 +329,7 @@ export function ActivityFeed({
     <section aria-label="Recent activity">
       {/* Section header + filters */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>
+        <h2 className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
           Recent activity
         </h2>
         <FilterControls

@@ -11,7 +11,7 @@ from coordinator.db.base import Base
 
 
 class Household(Base):
-    """A member's machine pool. CIDR is a /24 slice of the 10.42.0.0/16 mesh."""
+    """A member's machine pool. CIDR is a /24 slice of 100.64.0.0/10 (CGNAT range)."""
 
     __tablename__ = "households"
 

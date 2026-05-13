@@ -22,6 +22,7 @@ import { VaultPanel } from '@/components/settings/VaultPanel';
 import { useSettings } from '@/hooks/useSettings';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
+import type { PotluckSettings } from '@/lib/localApi';
 
 // ---------------------------------------------------------------------------
 // Tab definitions
@@ -146,89 +147,36 @@ export function SettingsView() {
             <AccountPanel />
           </section>
 
-          {/* Hardware */}
-          <section
-            id="tabpanel-hardware"
-            role="tabpanel"
-            aria-labelledby="tab-hardware"
-            hidden={activeTab !== 'hardware'}
-          >
-            {!isLoaded ? (
-              <SettingsSkeleton />
-            ) : settings ? (
-              <HardwarePanel
-                settings={settings}
-                isSaving={isSaving}
-                saveError={saveError}
-                onUpdate={update}
-              />
-            ) : (
-              <SidecarError />
-            )}
-          </section>
-
-          {/* Privacy */}
-          <section
-            id="tabpanel-privacy"
-            role="tabpanel"
-            aria-labelledby="tab-privacy"
-            hidden={activeTab !== 'privacy'}
-          >
-            {!isLoaded ? (
-              <SettingsSkeleton />
-            ) : settings ? (
-              <PrivacyPanel
-                settings={settings}
-                isSaving={isSaving}
-                saveError={saveError}
-                onUpdate={update}
-              />
-            ) : (
-              <SidecarError />
-            )}
-          </section>
-
-          {/* Vault */}
-          <section
-            id="tabpanel-vault"
-            role="tabpanel"
-            aria-labelledby="tab-vault"
-            hidden={activeTab !== 'vault'}
-          >
-            {!isLoaded ? (
-              <SettingsSkeleton />
-            ) : settings ? (
-              <VaultPanel
-                settings={settings}
-                isSaving={isSaving}
-                saveError={saveError}
-                onUpdate={update}
-              />
-            ) : (
-              <SidecarError />
-            )}
-          </section>
-
-          {/* Advanced */}
-          <section
-            id="tabpanel-advanced"
-            role="tabpanel"
-            aria-labelledby="tab-advanced"
-            hidden={activeTab !== 'advanced'}
-          >
-            {!isLoaded ? (
-              <SettingsSkeleton />
-            ) : settings ? (
-              <AdvancedPanel
-                settings={settings}
-                isSaving={isSaving}
-                saveError={saveError}
-                onUpdate={update}
-              />
-            ) : (
-              <SidecarError />
-            )}
-          </section>
+          {/* Settings-backed panels share the same loading/error pattern */}
+          {(
+            [
+              { id: 'hardware', Panel: HardwarePanel },
+              { id: 'privacy', Panel: PrivacyPanel },
+              { id: 'vault', Panel: VaultPanel },
+              { id: 'advanced', Panel: AdvancedPanel },
+            ] as const
+          ).map(({ id, Panel }) => (
+            <section
+              key={id}
+              id={`tabpanel-${id}`}
+              role="tabpanel"
+              aria-labelledby={`tab-${id}`}
+              hidden={activeTab !== id}
+            >
+              {!isLoaded ? (
+                <SettingsSkeleton />
+              ) : settings ? (
+                <Panel
+                  settings={settings}
+                  isSaving={isSaving}
+                  saveError={saveError}
+                  onUpdate={update}
+                />
+              ) : (
+                <SidecarError />
+              )}
+            </section>
+          ))}
         </div>
       </div>
     </div>

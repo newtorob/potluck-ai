@@ -207,7 +207,7 @@ function StepsSection({ task, onCompleteStep, onAddStep }: StepsSectionProps) {
 
   return (
     <div className="space-y-1">
-      <p className="font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>Steps</p>
+      <p className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">Steps</p>
 
       {/* Completed steps */}
       {completed.length > 0 && (
@@ -344,8 +344,7 @@ function ErrorsSection({ task, onAddError }: ErrorsSectionProps) {
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="flex items-center gap-1 font-serif text-[11px] italic text-muted-foreground hover:text-foreground"
-        style={{ letterSpacing: '0.04em' }}
+        className="flex items-center gap-1 font-serif text-[11px] italic text-muted-foreground tracking-hearth-label hover:text-foreground"
         aria-expanded={expanded}
       >
         <AlertTriangle className="h-3 w-3 text-amber-500" aria-hidden="true" />

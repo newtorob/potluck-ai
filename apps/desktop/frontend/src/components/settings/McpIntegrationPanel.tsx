@@ -285,8 +285,8 @@ function AvailableTools() {
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-0">
         {/* Column headers */}
         <div className="col-span-2 grid grid-cols-2 gap-x-4 border-b border-border pb-1.5 mb-1.5">
-          <span className="font-serif text-[10px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>Tool</span>
-          <span className="font-serif text-[10px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>What it does</span>
+          <span className="font-serif text-[10px] italic text-muted-foreground tracking-hearth-label">Tool</span>
+          <span className="font-serif text-[10px] italic text-muted-foreground tracking-hearth-label">What it does</span>
         </div>
 
         {/* Left column */}
@@ -357,7 +357,7 @@ export function McpIntegrationPanel() {
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-5">
       {/* Section heading */}
-      <h2 className="font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>External agents (MCP)</h2>
+      <h2 className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">External agents (MCP)</h2>
 
       {/* Description */}
       <p className="text-xs text-muted-foreground leading-relaxed">

@@ -152,7 +152,7 @@ export function SessionDetailDrawer({ detail, onClose }: SessionDetailDrawerProp
         <>
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <h2 className="font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>Session detail</h2>
+            <h2 className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">Session detail</h2>
             <button
               ref={closeButtonRef}
               type="button"
@@ -172,7 +172,7 @@ export function SessionDetailDrawer({ detail, onClose }: SessionDetailDrawerProp
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
             {/* Metadata block */}
             <section aria-label="Session metadata">
-              <h3 className="mb-2 font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>
+              <h3 className="mb-2 font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
                 Metadata
               </h3>
               <div className="rounded-lg border border-border bg-background/50 px-3 py-1">
@@ -216,7 +216,7 @@ export function SessionDetailDrawer({ detail, onClose }: SessionDetailDrawerProp
 
             {/* Tool call timeline */}
             <section aria-label="Tool call timeline">
-              <h3 className="mb-2 flex items-center gap-2 font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>
+              <h3 className="mb-2 flex items-center gap-2 font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
                 Tool call timeline
                 <span className="font-sans not-italic text-muted-foreground/60">
                   ({detail.recent_tool_calls.length} calls)

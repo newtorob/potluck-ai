@@ -23,10 +23,14 @@ export interface UseHealthReturn {
 
 const POLL_INTERVAL_MS = 10_000;
 
+const INITIAL_STATE: UseHealthReturn = {
+  modelLoaded: false,
+  activeModelId: null,
+  nCtxLoaded: null,
+};
+
 export function useHealth(): UseHealthReturn {
-  const [modelLoaded, setModelLoaded] = useState(false);
-  const [activeModelId, setActiveModelId] = useState<string | null>(null);
-  const [nCtxLoaded, setNCtxLoaded] = useState<number | null>(null);
+  const [state, setState] = useState<UseHealthReturn>(INITIAL_STATE);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,16 +40,16 @@ export function useHealth(): UseHealthReturn {
       try {
         const health = await localApi.health();
         if (cancelled) return;
-        setModelLoaded(health.model_loaded);
-        setActiveModelId(health.active_model_id);
-        // n_ctx_loaded is optional for backwards compat with older backends.
-        // Treat undefined the same as null (no loaded context available).
-        setNCtxLoaded(health.n_ctx_loaded ?? null);
+        setState({
+          modelLoaded: health.model_loaded,
+          activeModelId: health.active_model_id,
+          // n_ctx_loaded is optional for backwards compat with older backends.
+          // Treat undefined the same as null (no loaded context available).
+          nCtxLoaded: health.n_ctx_loaded ?? null,
+        });
       } catch {
         if (cancelled) return;
-        setModelLoaded(false);
-        setActiveModelId(null);
-        setNCtxLoaded(null);
+        setState(INITIAL_STATE);
       }
     }
 
@@ -68,5 +72,5 @@ export function useHealth(): UseHealthReturn {
     };
   }, []);
 
-  return { modelLoaded, activeModelId, nCtxLoaded };
+  return state;
 }

@@ -38,6 +38,8 @@ import (
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun"
+
+	"github.com/potluck-ai/potluck-mesh/internal/util"
 )
 
 const (
@@ -264,7 +266,7 @@ func (t *Tunnel) AddPeer(p Peer) error {
 	}
 
 	slog.Info("tunnel: peer added",
-		"pubkey_prefix", truncatePubkey(p.PublicKey),
+		"pubkey_prefix", util.TruncatePubkey(p.PublicKey),
 		"endpoint", p.Endpoint,
 		"allowed_ips", p.AllowedIPs,
 	)
@@ -286,7 +288,7 @@ func (t *Tunnel) RemovePeer(pubkey string) error {
 		return fmt.Errorf("tunnel: remove peer %s: %w", pubkey, err)
 	}
 
-	slog.Info("tunnel: peer removed", "pubkey_prefix", truncatePubkey(pubkey))
+	slog.Info("tunnel: peer removed", "pubkey_prefix", util.TruncatePubkey(pubkey))
 	return nil
 }
 
@@ -303,7 +305,7 @@ func (t *Tunnel) UpdatePeerEndpoint(pubkey, endpoint string) error {
 
 	if endpoint == "" {
 		slog.Debug("tunnel: UpdatePeerEndpoint called with empty endpoint, no-op",
-			"pubkey_prefix", truncatePubkey(pubkey),
+			"pubkey_prefix", util.TruncatePubkey(pubkey),
 		)
 		return nil
 	}
@@ -314,7 +316,7 @@ func (t *Tunnel) UpdatePeerEndpoint(pubkey, endpoint string) error {
 	}
 
 	slog.Info("tunnel: peer endpoint updated",
-		"pubkey_prefix", truncatePubkey(pubkey),
+		"pubkey_prefix", util.TruncatePubkey(pubkey),
 		"endpoint", endpoint,
 	)
 	return nil
@@ -410,7 +412,7 @@ func appendPeerConfig(sb *strings.Builder, p Peer) {
 	pubkeyHex, err := base64ToHex(p.PublicKey)
 	if err != nil {
 		slog.Error("tunnel: cannot encode peer pubkey, skipping peer",
-			"pubkey_prefix", truncatePubkey(p.PublicKey),
+			"pubkey_prefix", util.TruncatePubkey(p.PublicKey),
 			"err", err,
 		)
 		return
@@ -486,12 +488,3 @@ func newWGLogger() *device.Logger {
 	}
 }
 
-// truncatePubkey returns the first 8 characters of a base64 public key for
-// safe logging (enough to identify the peer, not enough to be useful for
-// anything else).
-func truncatePubkey(pubkey string) string {
-	if len(pubkey) > 8 {
-		return pubkey[:8] + "…"
-	}
-	return pubkey
-}

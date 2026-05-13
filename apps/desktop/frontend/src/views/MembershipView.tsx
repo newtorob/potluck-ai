@@ -69,7 +69,7 @@ export function MembershipView() {
 
             {/* What you get */}
             <div className="w-full rounded-xl border border-border/60 bg-card/60 px-6 py-5 text-left space-y-3 shadow-hearth-sm">
-              <p className="font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>Founding member perks</p>
+              <p className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">Founding member perks</p>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-start gap-2.5">
                   <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-primary" aria-hidden="true" />

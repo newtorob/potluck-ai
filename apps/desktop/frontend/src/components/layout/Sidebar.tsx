@@ -45,6 +45,7 @@ import { useChat } from '@/hooks/useChat';
 import { useTheme } from '@/hooks/useTheme';
 import { ProjectSwitcher } from '@/components/layout/ProjectSwitcher';
 import { PotluckLogo } from '@/components/brand/PotluckLogo';
+import { relativeTimeFromMs } from '@/lib/timeFormat';
 import type { AppConversation } from '@/stores/chatStore';
 
 // ---------------------------------------------------------------------------
@@ -336,8 +337,7 @@ function ConversationList({
     <div className="flex flex-1 flex-col overflow-hidden border-t border-border">
       <div className="flex items-center justify-between px-3 py-2">
         <span
-          className="font-serif text-[11px] italic text-muted-foreground"
-          style={{ letterSpacing: '0.04em' }}
+          className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label"
         >
           Chats
         </span>
@@ -440,7 +440,7 @@ function ConversationItem({
     setRenaming(false);
   }
 
-  const relativeTime = formatRelativeTime(conversation.updatedAt);
+  const relativeTime = relativeTimeFromMs(conversation.updatedAt);
 
   return (
     <li>
@@ -569,18 +569,3 @@ function ConversationItem({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatRelativeTime(ts: number): string {
-  const diff = Date.now() - ts;
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}

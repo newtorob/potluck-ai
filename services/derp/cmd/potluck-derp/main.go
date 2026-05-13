@@ -119,7 +119,8 @@ func run() int {
 	healthMux := http.NewServeMux()
 	healthMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{ //nolint:errcheck
+		// Encode error is non-actionable for an HTTP health handler writing to ResponseWriter.
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":            "ok",
 			"connected_clients": r.ConnectedClients(),
 		})

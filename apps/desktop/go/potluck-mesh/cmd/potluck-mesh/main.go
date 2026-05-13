@@ -93,6 +93,7 @@ import (
 	msignal "github.com/potluck-ai/potluck-mesh/internal/signal"
 	"github.com/potluck-ai/potluck-mesh/internal/stun"
 	"github.com/potluck-ai/potluck-mesh/internal/tunnel"
+	"github.com/potluck-ai/potluck-mesh/internal/util"
 )
 
 // punchThrottlePeriod is the minimum interval between request_punch calls for
@@ -420,7 +421,7 @@ func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.
 			lastHS, _, _, err := tun.PeerReachability(pubkey)
 			if err != nil {
 				slog.Debug("reachability: query error",
-					"pubkey_prefix", truncate8(pubkey),
+					"pubkey_prefix", util.TruncatePubkey(pubkey),
 					"err", err,
 				)
 				continue
@@ -443,7 +444,7 @@ func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.
 				kb, decErr := base64.StdEncoding.DecodeString(pubkey)
 				if decErr != nil || len(kb) != 32 {
 					slog.Warn("reachability: could not decode peer pubkey, DERP flip skipped",
-						"pubkey_prefix", truncate8(pubkey),
+						"pubkey_prefix", util.TruncatePubkey(pubkey),
 					)
 					peerDerpBind = nil
 				} else {
@@ -457,7 +458,7 @@ func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.
 				st.seenOnce = true
 				slog.Info("reachability: initial state",
 					"node_id", p.NodeID,
-					"pubkey_prefix", truncate8(pubkey),
+					"pubkey_prefix", util.TruncatePubkey(pubkey),
 					"reachable", nowReachable,
 					"last_handshake_ago", formatHandshakeAge(lastHS),
 				)
@@ -489,7 +490,7 @@ func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.
 			if nowReachable {
 				slog.Info("reachability: peer became reachable",
 					"node_id", p.NodeID,
-					"pubkey_prefix", truncate8(pubkey),
+					"pubkey_prefix", util.TruncatePubkey(pubkey),
 					"last_handshake_ago", formatHandshakeAge(lastHS),
 				)
 				// Publish peer_updated with reachable=true.
@@ -504,7 +505,7 @@ func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.
 			} else {
 				slog.Warn("reachability: peer became unreachable",
 					"node_id", p.NodeID,
-					"pubkey_prefix", truncate8(pubkey),
+					"pubkey_prefix", util.TruncatePubkey(pubkey),
 					"last_handshake_ago", formatHandshakeAge(lastHS),
 				)
 				// Publish peer_updated with reachable=false.
@@ -554,7 +555,7 @@ func flipToDERP(tun *tunnel.Tunnel, dBind *derp.DerpBind, pubkeyBase64 string, p
 	dBind.SetPeerRouting(pubkeyBytes, true)
 	if err := tun.UpdatePeerEndpoint(pubkeyBase64, syntheticEp); err != nil {
 		slog.Error("derp_fallback: UpdatePeerEndpoint to synthetic failed",
-			"pubkey_prefix", truncate8(pubkeyBase64),
+			"pubkey_prefix", util.TruncatePubkey(pubkeyBase64),
 			"err", err,
 		)
 		// Roll back the routing change to avoid a black-hole.
@@ -562,7 +563,7 @@ func flipToDERP(tun *tunnel.Tunnel, dBind *derp.DerpBind, pubkeyBase64 string, p
 		return
 	}
 	slog.Info("derp_fallback: peer flipped to DERP routing",
-		"pubkey_prefix", truncate8(pubkeyBase64),
+		"pubkey_prefix", util.TruncatePubkey(pubkeyBase64),
 		"synthetic_ep", syntheticEp,
 	)
 }
@@ -578,7 +579,7 @@ func flipToDirectUDP(tun *tunnel.Tunnel, dBind *derp.DerpBind, pubkeyBase64 stri
 	// stays configured in wg-go. The coordinator will deliver a fresh
 	// endpoint_update when the peer's STUN binding is current.
 	slog.Info("derp_fallback: peer reverted to direct UDP",
-		"pubkey_prefix", truncate8(pubkeyBase64),
+		"pubkey_prefix", util.TruncatePubkey(pubkeyBase64),
 	)
 }
 
@@ -589,14 +590,6 @@ func formatHandshakeAge(t time.Time) string {
 		return "<never>"
 	}
 	return time.Since(t).Round(time.Second).String()
-}
-
-// truncate8 returns the first 8 characters of a string (for safe pubkey logging).
-func truncate8(s string) string {
-	if len(s) > 8 {
-		return s[:8] + "..."
-	}
-	return s
 }
 
 // punchEntry records when we last issued a request_punch for a given peer.
@@ -791,7 +784,7 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 
 	slog.Info("punch_coord received",
 		"peer_node_id", coord.PeerNodeID,
-		"pubkey_prefix", truncate8(coord.PeerWGPublicKey),
+		"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
 		"role", coord.Role,
 		"endpoint", *coord.PeerEndpoint,
 	)
@@ -805,7 +798,7 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 	if err := h.tun.UpdatePeerEndpoint(coord.PeerWGPublicKey, *coord.PeerEndpoint); err != nil {
 		slog.Error("tunnel: UpdatePeerEndpoint failed in punch_coord handler",
 			"peer_node_id", coord.PeerNodeID,
-			"pubkey_prefix", truncate8(coord.PeerWGPublicKey),
+			"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
 			"err", err,
 		)
 	}
@@ -834,7 +827,7 @@ func (h *rosterHandler) maybeSendRequestPunch(nodeID string) {
 	if err == nil && !lastHS.IsZero() && time.Since(lastHS) < handshakeFreshWindow {
 		slog.Debug("punch: peer has fresh handshake, skipping request_punch",
 			"node_id", nodeID,
-			"pubkey_prefix", truncate8(cached.WGPublicKey),
+			"pubkey_prefix", util.TruncatePubkey(cached.WGPublicKey),
 			"handshake_age", time.Since(lastHS).Round(time.Second),
 		)
 		return
@@ -860,7 +853,7 @@ func (h *rosterHandler) maybeSendRequestPunch(nodeID string) {
 
 	slog.Info("punch: sending request_punch",
 		"node_id", nodeID,
-		"pubkey_prefix", truncate8(cached.WGPublicKey),
+		"pubkey_prefix", util.TruncatePubkey(cached.WGPublicKey),
 	)
 	h.client.SendRequestPunch(nodeID)
 }
@@ -869,11 +862,11 @@ func (h *rosterHandler) maybeSendRequestPunch(nodeID string) {
 // publishing over the event bus. Only mesh-layer metadata is included.
 func rosterPeerToSnapshot(p msignal.RosterPeer, reachable bool, derpRouted bool) events.PeerSnapshot {
 	snap := events.PeerSnapshot{
-		NodeID:    p.NodeID,
-		NodeName:  p.NodeName,
-		MeshIP:    p.MeshIP,
-		WGPublicKey: truncate8(p.WGPublicKey), // truncated for privacy in event stream
-		Reachable: reachable,
+		NodeID:      p.NodeID,
+		NodeName:    p.NodeName,
+		MeshIP:      p.MeshIP,
+		WGPublicKey: util.TruncatePubkey(p.WGPublicKey), // truncated for privacy in event stream
+		Reachable:   reachable,
 	}
 	if p.LastEndpoint != nil {
 		snap.LastEndpoint = p.LastEndpoint
@@ -938,7 +931,7 @@ func buildDERPBind(cfg *config.Config) (*derp.DerpBind, *derp.Client) {
 	keyBytes, err := base64.StdEncoding.DecodeString(cfg.WGPublicKey)
 	if err != nil || len(keyBytes) != 32 {
 		slog.Warn("derp: could not decode WG public key; DERP disabled",
-			"pubkey_prefix", truncate8(cfg.WGPublicKey),
+			"pubkey_prefix", util.TruncatePubkey(cfg.WGPublicKey),
 		)
 		return nil, nil
 	}
@@ -959,7 +952,7 @@ func buildDERPBind(cfg *config.Config) (*derp.DerpBind, *derp.Client) {
 		b := bindPtr
 		if b == nil {
 			slog.Warn("derp: received packet before bind initialised, dropping",
-				"src_prefix", fmt.Sprintf("%x...", src[:4]),
+				"src_prefix", util.TruncatePubkeyBytes(src),
 			)
 			return
 		}

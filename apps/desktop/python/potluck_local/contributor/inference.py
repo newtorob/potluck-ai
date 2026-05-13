@@ -314,7 +314,12 @@ class OllamaInferenceEngine:
 _engine: InferenceBackend | None = None
 
 
-def get_llamacpp_engine(model_path: Path, model_slug: str, n_ctx: int = 4096, n_gpu_layers: int = -1) -> LlamaCppInferenceEngine:
+def get_llamacpp_engine(
+    model_path: Path,
+    model_slug: str,
+    n_ctx: int = 4096,
+    n_gpu_layers: int = -1,
+) -> LlamaCppInferenceEngine:
     """Module-level singleton for llama-cpp. Re-creating per job would
     re-load the GGUF every time."""
     global _engine
@@ -328,11 +333,20 @@ def get_llamacpp_engine(model_path: Path, model_slug: str, n_ctx: int = 4096, n_
     return _engine
 
 
-def get_ollama_engine(base_url: str, model_slug: str, n_ctx: int = 4096) -> OllamaInferenceEngine:
+def get_ollama_engine(
+    base_url: str,
+    model_slug: str,
+    n_ctx: int = 4096,
+) -> OllamaInferenceEngine:
     """Module-level singleton for Ollama. Cached so we don't re-verify
     model presence on every job."""
     global _engine
-    if not isinstance(_engine, OllamaInferenceEngine) or _engine.model_slug != model_slug or _engine.base_url != base_url.rstrip("/"):
+    normalized_url = base_url.rstrip("/")
+    if (
+        not isinstance(_engine, OllamaInferenceEngine)
+        or _engine.model_slug != model_slug
+        or _engine.base_url != normalized_url
+    ):
         _engine = OllamaInferenceEngine(
             base_url=base_url,
             model_slug=model_slug,
@@ -341,6 +355,3 @@ def get_ollama_engine(base_url: str, model_slug: str, n_ctx: int = 4096) -> Olla
     return _engine
 
 
-# Backward compat: old call site in earlier client.py revisions.
-def get_engine(model_path: Path, model_slug: str) -> LlamaCppInferenceEngine:
-    return get_llamacpp_engine(model_path=model_path, model_slug=model_slug)

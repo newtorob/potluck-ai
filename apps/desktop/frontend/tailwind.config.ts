@@ -77,6 +77,9 @@ const config: Config = {
       letterSpacing: {
         // Tight tracking on display headlines (per Things 3 / Oxide style).
         display: '-0.015em',
+        // Open tracking on the Hearth label pattern — font-serif text-[11px] italic
+        // used for section sub-headers throughout the app. Replaces style={{ letterSpacing: '0.04em' }}.
+        'hearth-label': '0.04em',
       },
       // Hearth elevation — surface tinting + hairline, NOT stacked shadows.
       // These shadows are deliberately quiet; if you reach for them, ask

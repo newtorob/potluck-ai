@@ -24,6 +24,7 @@ import { Globe2, Layers, Activity, Cpu, BarChart3, TrendingUp, TrendingDown, Min
 import { cn } from '@/components/ui/cn';
 import { localApi } from '@/lib/localApi';
 import type { FleetSummary, MyJobStats, CreditBalance, CreditHistory, CreditHistoryEntry } from '@/lib/localApi';
+import { relativeTime } from '@/lib/timeFormat';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
 
@@ -39,19 +40,6 @@ function fmtCredits(raw: string): string {
   const n = Number(raw);
   if (!Number.isFinite(n)) return raw;
   return n.toFixed(2);
-}
-
-/** Relative time: "3 minutes ago", "just now", etc. */
-function relativeTime(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const secs = Math.floor(diffMs / 1000);
-  if (secs < 60) return 'just now';
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs} hour${hrs === 1 ? '' : 's'} ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
 // ---------------------------------------------------------------------------
@@ -396,7 +384,7 @@ function StatCard({ icon: Icon, label, value, sub, emphasize, formatLarge }: Sta
     >
       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
         <Icon className={cn('h-3 w-3', emphasize ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
-        <span className="font-serif italic" style={{ letterSpacing: '0.04em' }}>
+        <span className="font-serif italic tracking-hearth-label">
           {label}
         </span>
       </div>
@@ -505,8 +493,7 @@ function SmallStat({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p
-        className="font-serif text-[11px] italic text-muted-foreground"
-        style={{ letterSpacing: '0.04em' }}
+        className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label"
       >
         {label}
       </p>
@@ -566,10 +553,7 @@ function CreditBalanceCard({ balance, isLoading, error }: CreditBalanceCardProps
         <SmallStat label="Earned (contributor)" value={`${fmtCredits(balance.earned)} cr`} />
         <SmallStat label="Spent (requester)" value={`${fmtCredits(balance.spent)} cr`} />
         <div>
-          <p
-            className="font-serif text-[11px] italic text-muted-foreground"
-            style={{ letterSpacing: '0.04em' }}
-          >
+          <p className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
             Net balance
           </p>
           <p
@@ -590,10 +574,7 @@ function CreditBalanceCard({ balance, isLoading, error }: CreditBalanceCardProps
       {/* Per-model breakdown */}
       {balance.by_model.length > 0 && (
         <div>
-          <p
-            className="mb-2 font-serif text-[11px] italic text-muted-foreground/70"
-            style={{ letterSpacing: '0.04em' }}
-          >
+          <p className="mb-2 font-serif text-[11px] italic text-muted-foreground/70 tracking-hearth-label">
             By model
           </p>
           <div className="space-y-1.5">
@@ -659,36 +640,31 @@ function CreditHistoryList({ history, isLoading, error }: CreditHistoryListProps
         <thead>
           <tr className="border-b border-border/60 bg-muted/30">
             <th
-              className="px-3 py-2 text-left font-serif italic text-[11px] text-muted-foreground font-normal"
-              style={{ letterSpacing: '0.04em' }}
+              className="px-3 py-2 text-left font-serif italic text-[11px] text-muted-foreground font-normal tracking-hearth-label"
               scope="col"
             >
               Direction
             </th>
             <th
-              className="px-3 py-2 text-left font-serif italic text-[11px] text-muted-foreground font-normal"
-              style={{ letterSpacing: '0.04em' }}
+              className="px-3 py-2 text-left font-serif italic text-[11px] text-muted-foreground font-normal tracking-hearth-label"
               scope="col"
             >
               Model
             </th>
             <th
-              className="px-3 py-2 text-right font-serif italic text-[11px] text-muted-foreground font-normal"
-              style={{ letterSpacing: '0.04em' }}
+              className="px-3 py-2 text-right font-serif italic text-[11px] text-muted-foreground font-normal tracking-hearth-label"
               scope="col"
             >
               Tokens
             </th>
             <th
-              className="px-3 py-2 text-right font-serif italic text-[11px] text-muted-foreground font-normal"
-              style={{ letterSpacing: '0.04em' }}
+              className="px-3 py-2 text-right font-serif italic text-[11px] text-muted-foreground font-normal tracking-hearth-label"
               scope="col"
             >
               Credits
             </th>
             <th
-              className="px-3 py-2 text-right font-serif italic text-[11px] text-muted-foreground font-normal"
-              style={{ letterSpacing: '0.04em' }}
+              className="px-3 py-2 text-right font-serif italic text-[11px] text-muted-foreground font-normal tracking-hearth-label"
               scope="col"
             >
               When
@@ -792,10 +768,7 @@ function CreditSkeleton({ rows = 2 }: { rows?: number }) {
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
-    <h2
-      className="mb-3 font-serif text-[11px] italic text-muted-foreground"
-      style={{ letterSpacing: '0.04em' }}
-    >
+    <h2 className="mb-3 font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
       {children}
     </h2>
   );

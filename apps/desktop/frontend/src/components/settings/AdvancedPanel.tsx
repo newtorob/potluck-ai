@@ -144,7 +144,7 @@ function MemoryTuningSection({ memory, isSaving, onUpdate }: MemoryTuningProps) 
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-5">
-      <h2 className="font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>Memory tuning</h2>
+      <h2 className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">Memory tuning</h2>
 
       {/* Toggles */}
       <div>
@@ -331,7 +331,7 @@ function ActiveProjectSection() {
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-4">
-      <h2 className="font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>Active project</h2>
+      <h2 className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">Active project</h2>
       <p className="text-xs text-muted-foreground">
         The active project scopes memory and task views by default. Memories tagged with this
         project (or no project) are surfaced in chat.

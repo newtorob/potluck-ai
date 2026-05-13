@@ -240,7 +240,7 @@ export function AgentsView() {
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-8">
           {/* ACTIVE NOW section */}
           <section aria-label="Active sessions">
-            <h2 className="mb-3 font-serif text-[11px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>
+            <h2 className="mb-3 font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
               Active now
             </h2>
 

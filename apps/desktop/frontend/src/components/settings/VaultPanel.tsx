@@ -227,7 +227,7 @@ export function VaultPanel({ settings, isSaving, saveError, onUpdate }: VaultPan
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="font-serif text-[10px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>{label}</span>
+      <span className="font-serif text-[10px] italic text-muted-foreground tracking-hearth-label">{label}</span>
       <span className="text-lg font-semibold tabular-nums text-foreground">{value}</span>
     </div>
   );

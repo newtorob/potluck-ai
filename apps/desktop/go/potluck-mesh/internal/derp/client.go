@@ -40,6 +40,8 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	"github.com/potluck-ai/potluck-mesh/internal/util"
 )
 
 const (
@@ -127,7 +129,7 @@ func (c *Client) Send(destPubkey [pubkeyLen]byte, payload []byte) error {
 	ch := c.sendCh // read once
 	if ch == nil {
 		slog.Debug("derp: no active connection, dropping outbound packet",
-			"dest_prefix", truncate8Bytes(destPubkey),
+			"dest_prefix", util.TruncatePubkeyBytes(destPubkey),
 		)
 		return fmt.Errorf("derp: no active connection")
 	}
@@ -136,7 +138,7 @@ func (c *Client) Send(destPubkey [pubkeyLen]byte, payload []byte) error {
 		return nil
 	default:
 		slog.Warn("derp: send channel full, dropping outbound packet",
-			"dest_prefix", truncate8Bytes(destPubkey),
+			"dest_prefix", util.TruncatePubkeyBytes(destPubkey),
 		)
 		return fmt.Errorf("derp: send channel full")
 	}
@@ -243,7 +245,7 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 	if authErr != nil {
 		return false, fmt.Errorf("derp: read auth_ok: %w", authErr)
 	}
-	conn.SetDeadline(time.Time{}) //nolint:errcheck
+	_ = conn.SetDeadline(time.Time{}) // clear auth deadline; errors here are non-fatal
 
 	var resp map[string]interface{}
 	if err := json.Unmarshal(authLine, &resp); err != nil {
@@ -325,7 +327,7 @@ func (c *Client) readLoop(ctx context.Context, r io.Reader) error {
 		// Dispatch — must not block.
 		// Privacy: never log payload.
 		slog.Debug("derp: received packet",
-			"src_prefix", truncate8Bytes(srcBuf),
+			"src_prefix", util.TruncatePubkeyBytes(srcBuf),
 			"payload_len", payloadLen,
 		)
 		c.onPacketRx(srcBuf, payload)
@@ -423,9 +425,3 @@ func (c *Client) jwtRefreshLoop(ctx context.Context) {
 	}
 }
 
-// truncate8Bytes returns the first 8 hex chars of a 32-byte pubkey for logging.
-// Never returns more than needed to correlate log lines.
-func truncate8Bytes(key [pubkeyLen]byte) string {
-	// 4 bytes = 8 hex chars
-	return fmt.Sprintf("%x...", key[:4])
-}

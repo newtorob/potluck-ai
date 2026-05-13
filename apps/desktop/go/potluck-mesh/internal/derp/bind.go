@@ -48,6 +48,8 @@ import (
 	"sync"
 
 	"golang.zx2c4.com/wireguard/conn"
+
+	"github.com/potluck-ai/potluck-mesh/internal/util"
 )
 
 const (
@@ -210,7 +212,7 @@ func (b *DerpBind) Inject(src [32]byte, payload []byte) {
 	case b.injectCh <- pkt:
 	default:
 		slog.Warn("derp_bind: inject channel full, dropping inbound DERP packet",
-			"src_prefix", truncate8Bytes(src),
+			"src_prefix", util.TruncatePubkeyBytes(src),
 			"payload_len", len(payload),
 		)
 	}
@@ -225,12 +227,12 @@ func (b *DerpBind) SetPeerRouting(pubkey [32]byte, viaDERP bool) {
 	if viaDERP {
 		b.derpPeers[pubkey] = true
 		slog.Info("derp_bind: peer routed via DERP",
-			"pubkey_prefix", truncate8Bytes(pubkey),
+			"pubkey_prefix", util.TruncatePubkeyBytes(pubkey),
 		)
 	} else {
 		delete(b.derpPeers, pubkey)
 		slog.Info("derp_bind: peer reverted to direct UDP",
-			"pubkey_prefix", truncate8Bytes(pubkey),
+			"pubkey_prefix", util.TruncatePubkeyBytes(pubkey),
 		)
 	}
 }
@@ -238,8 +240,8 @@ func (b *DerpBind) SetPeerRouting(pubkey [32]byte, viaDERP bool) {
 // IsPeerDERPRouted reports whether the given peer pubkey is currently
 // configured to route via the DERP relay. Thread-safe.
 func (b *DerpBind) IsPeerDERPRouted(pubkey [32]byte) bool {
-	b.derpMu.Lock()
-	defer b.derpMu.Unlock()
+	b.derpMu.RLock()
+	defer b.derpMu.RUnlock()
 	return b.derpPeers[pubkey]
 }
 
@@ -274,7 +276,7 @@ func (b *DerpBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 			sizes[0] = len(pkt.payload)
 			eps[0] = syntheticEndpoint{pubkey: pkt.src}
 			slog.Debug("derp_bind: delivered DERP packet to WG device",
-				"src_prefix", truncate8Bytes(pkt.src),
+				"src_prefix", util.TruncatePubkeyBytes(pkt.src),
 				"payload_len", len(pkt.payload),
 			)
 			return 1, nil
@@ -319,7 +321,7 @@ func (b *DerpBind) Send(bufs [][]byte, ep conn.Endpoint) error {
 
 	if !routed {
 		slog.Debug("derp_bind: Send to synthetic endpoint but peer not in DERP map, dropping",
-			"dst_prefix", truncate8Bytes(se.pubkey),
+			"dst_prefix", util.TruncatePubkeyBytes(se.pubkey),
 			"bufs", len(bufs),
 		)
 		return nil
@@ -329,7 +331,7 @@ func (b *DerpBind) Send(bufs [][]byte, ep conn.Endpoint) error {
 		if err := b.client.Send(se.pubkey, buf); err != nil {
 			// Best-effort: log at debug level, never propagate errors to wg-go.
 			slog.Debug("derp_bind: relay send failed",
-				"dst_prefix", truncate8Bytes(se.pubkey),
+				"dst_prefix", util.TruncatePubkeyBytes(se.pubkey),
 				"payload_len", len(buf),
 				"err", err,
 			)

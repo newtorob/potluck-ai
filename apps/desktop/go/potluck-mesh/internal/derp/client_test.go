@@ -54,7 +54,7 @@ func (mr *mockRelay) handleConn(conn net.Conn) {
 	defer conn.Close()
 
 	// Read auth line.
-	conn.SetDeadline(time.Now().Add(5 * time.Second)) //nolint
+	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 	scanner := bufio.NewScanner(conn)
 	if !scanner.Scan() {
 		return
@@ -66,7 +66,7 @@ func (mr *mockRelay) handleConn(conn net.Conn) {
 	if msg["type"] != "auth" {
 		return
 	}
-	conn.SetDeadline(time.Time{}) //nolint
+	_ = conn.SetDeadline(time.Time{}) // clear auth deadline
 
 	// Send auth_ok.
 	resp, _ := json.Marshal(map[string]interface{}{

@@ -68,6 +68,7 @@ from coordinator.schemas.mesh import (
     SignalRosterUpdate,
     SignalWelcome,
 )
+from coordinator.constants import STUB_MEMBER_ID
 from coordinator.services.household_allocator import (
     HouseholdCIDRExhausted,
     allocate_household_cidr,
@@ -92,11 +93,8 @@ _signal_lock = asyncio.Lock()
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["mesh"])
 
-# Stub-only constant — real member auth lands with the PBC member-share
-# class in v0.5. Until then, every /mesh/households + /mesh/pairing-tokens
-# call attributes to this single member. Matches the pattern used in
-# `routers/jobs.py:_STUB_MEMBER_ID`.
-_STUB_MEMBER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+# Real member auth lands in v0.5; until then we use the dev-fixture stub.
+_STUB_MEMBER_ID = STUB_MEMBER_ID
 
 # How long a pairing token stays valid. 1 hour per design doc:
 # long enough for cross-room walk-and-install, short enough that a
@@ -358,18 +356,7 @@ async def enroll(
             MeshNode.id != node.id,
         )
     )
-    peers = [
-        EnrolledPeer(
-            node_id=peer.id,
-            node_name=peer.node_name,
-            mesh_ip=str(peer.mesh_ip),
-            wg_public_key=peer.wg_public_key,
-            last_endpoint=peer.last_endpoint,
-            last_seen_at=peer.last_seen_at,
-            platform=peer.platform,
-        )
-        for peer in roster_result.scalars().all()
-    ]
+    peers = [_peer_to_enrolled(p) for p in roster_result.scalars().all()]
 
     logger.info(
         "mesh_node_enrolled",
@@ -424,18 +411,7 @@ async def list_peers(
             MeshNode.id != caller.id,
         )
     )
-    return [
-        EnrolledPeer(
-            node_id=peer.id,
-            node_name=peer.node_name,
-            mesh_ip=str(peer.mesh_ip),
-            wg_public_key=peer.wg_public_key,
-            last_endpoint=peer.last_endpoint,
-            last_seen_at=peer.last_seen_at,
-            platform=peer.platform,
-        )
-        for peer in roster_result.scalars().all()
-    ]
+    return [_peer_to_enrolled(p) for p in roster_result.scalars().all()]
 
 
 # ---------------------------------------------------------------------------

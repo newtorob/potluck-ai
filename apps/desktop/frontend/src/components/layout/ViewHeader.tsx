@@ -76,8 +76,7 @@ export function ViewHeader({
         <div className="min-w-0 flex-1">
           {eyebrow !== undefined && (
             <p
-              className="mb-0.5 font-serif text-[11px] italic text-muted-foreground"
-              style={{ letterSpacing: '0.04em' }}
+              className="mb-0.5 font-serif text-[11px] italic text-muted-foreground tracking-hearth-label"
             >
               {eyebrow}
             </p>

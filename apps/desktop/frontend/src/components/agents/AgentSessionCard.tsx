@@ -219,7 +219,7 @@ export function AgentSessionCard({
 
       {/* Row 3: peer MCPs */}
       <div className="flex items-center gap-1.5">
-        <span className="shrink-0 font-serif text-[10px] italic text-muted-foreground/60" style={{ letterSpacing: '0.04em' }}>
+        <span className="shrink-0 font-serif text-[10px] italic text-muted-foreground/60 tracking-hearth-label">
           peers
         </span>
         <PeerMcpChips peers={session.peer_mcps} />

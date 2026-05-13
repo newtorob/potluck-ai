@@ -242,7 +242,7 @@ func (r *Relay) authenticate(conn net.Conn) (*client, error) {
 		return nil, fmt.Errorf("set deadline: %w", err)
 	}
 	// Remove the deadline after auth so the data phase has no timeout.
-	defer conn.SetDeadline(time.Time{}) //nolint:errcheck
+	defer func() { _ = conn.SetDeadline(time.Time{}) }() // clear auth deadline after auth completes
 
 	scanner := bufio.NewScanner(conn)
 	if !scanner.Scan() {

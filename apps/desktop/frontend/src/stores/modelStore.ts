@@ -13,6 +13,12 @@
 import { create } from 'zustand';
 import { localApi } from '@/lib/localApi';
 
+// Sidecar base URL — mirrors the constant in localApi.ts.
+// localApi encapsulates most calls, but the polling loop and
+// cancel/unload endpoints need raw fetch for stream-compatible access.
+const LOCAL_BASE =
+  (import.meta.env['VITE_LOCAL_API_URL'] as string | undefined) ?? 'http://127.0.0.1:8321';
+
 // ---------------------------------------------------------------------------
 // API response shapes (snake_case to match sidecar JSON)
 // ---------------------------------------------------------------------------
@@ -169,7 +175,7 @@ export const useModelStore = create<ModelState>()((set, get) => ({
   async cancelInstall(slug) {
     get()._stopPolling(slug);
     try {
-      await fetch(`http://127.0.0.1:8321/models/${encodeURIComponent(slug)}/cancel-download`, {
+      await fetch(`${LOCAL_BASE}/models/${encodeURIComponent(slug)}/cancel-download`, {
         method: 'POST',
       });
     } catch {
@@ -219,7 +225,7 @@ export const useModelStore = create<ModelState>()((set, get) => ({
     get()._setLoading(slug, true);
     get()._setLoadError(slug, null);
     try {
-      await fetch(`http://127.0.0.1:8321/models/${encodeURIComponent(slug)}/unload`, {
+      await fetch(`${LOCAL_BASE}/models/${encodeURIComponent(slug)}/unload`, {
         method: 'POST',
       });
       if (get().activeModelSlug === slug) {
@@ -242,7 +248,7 @@ export const useModelStore = create<ModelState>()((set, get) => ({
     const timer = setInterval(() => {
       const store = get();
 
-      fetch(`http://127.0.0.1:8321/models/${encodeURIComponent(slug)}/download-progress`)
+      fetch(`${LOCAL_BASE}/models/${encodeURIComponent(slug)}/download-progress`)
         .then(async (res) => {
           if (res.status === 404) {
             // No record — download may not have started yet; keep polling briefly

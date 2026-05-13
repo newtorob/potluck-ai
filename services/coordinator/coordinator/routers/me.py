@@ -6,7 +6,6 @@ swaps in here when v0.5 lands.
 """
 from __future__ import annotations
 
-import uuid
 from decimal import Decimal
 
 import structlog
@@ -14,6 +13,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from coordinator.constants import STUB_MEMBER_ID
 from coordinator.db.database import get_db
 from coordinator.models.credit import CreditLedger
 from coordinator.schemas.credit import (
@@ -26,8 +26,7 @@ from coordinator.schemas.credit import (
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["me"])
 
-# Stub-only constant — real member auth lands in v0.5.
-_STUB_MEMBER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+_STUB_MEMBER_ID = STUB_MEMBER_ID
 
 
 @router.get("/me/credit-balance", response_model=CreditBalanceResponse)

@@ -185,7 +185,7 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 	if err != nil {
 		return false, fmt.Errorf("signal: dial: %w", err)
 	}
-	defer conn.CloseNow() //nolint:errcheck
+	defer conn.CloseNow() // best-effort cleanup; error intentionally ignored
 
 	// ---- send hello ---- //
 	if err := wsjson.Write(ctx, conn, NewHello(c.wgPublicKey)); err != nil {

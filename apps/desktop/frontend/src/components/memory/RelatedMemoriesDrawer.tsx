@@ -151,7 +151,7 @@ export function RelatedMemoriesDrawer({ sourceMemory, onClose }: RelatedMemories
               {currentEntry && (
                 <CategoryPill category={currentEntry.memory.category} />
               )}
-              <span className="font-serif text-[10px] italic text-muted-foreground" style={{ letterSpacing: '0.04em' }}>Related memories</span>
+              <span className="font-serif text-[10px] italic text-muted-foreground tracking-hearth-label">Related memories</span>
             </div>
             <p className="line-clamp-2 text-sm text-foreground">
               {currentEntry?.memory.content ?? sourceMemory.content}

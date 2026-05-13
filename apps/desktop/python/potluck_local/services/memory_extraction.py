@@ -11,11 +11,12 @@ import json
 import logging
 import re
 import uuid
-from datetime import datetime, timezone
 from typing import Literal
 
 import aiosqlite
 from pydantic import BaseModel, field_validator
+
+from potluck_local.utils.time import now_iso as _now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -75,10 +76,6 @@ class Memory(BaseModel):
         if v == "":
             return None
         return v  # type: ignore[return-value]
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _jaccard(a: str, b: str) -> float:
