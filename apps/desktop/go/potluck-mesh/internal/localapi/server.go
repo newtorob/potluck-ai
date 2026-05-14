@@ -147,6 +147,24 @@ func (s *State) SetWGPublicKey(pubkey string) {
 	s.mu.Unlock()
 }
 
+// ClearEnrollment wipes the in-memory enrollment identity (node_id,
+// household_id, mesh_ip, wg_public_key, external_endpoint) and moves
+// the status back to Stopped. Called from handleUnpair so the next
+// GET /status reflects an actually-unpaired node — otherwise the
+// frontend sees stale node_id + mesh_ip and concludes the node is
+// still paired.
+func (s *State) ClearEnrollment() {
+	s.mu.Lock()
+	s.nodeID = ""
+	s.householdID = ""
+	s.meshIP = ""
+	s.wgPublicKey = ""
+	s.externalEndpoint = ""
+	s.lastError = ""
+	s.meshStatus = StatusStopped
+	s.mu.Unlock()
+}
+
 // WGPublicKey returns the current WG public key (base64).
 func (s *State) WGPublicKey() string {
 	s.mu.RLock()
@@ -555,7 +573,7 @@ func (s *Server) handleUnpair(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.enrolled.Store(0)
-	s.state.SetMeshStatus(StatusStopped)
+	s.state.ClearEnrollment()
 	s.bus.Publish(events.NewStatusChanged(string(StatusStopped)))
 
 	// TODO(week7): call coordinator DELETE /mesh/nodes/{id} to deregister.

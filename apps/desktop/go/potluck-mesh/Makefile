@@ -18,7 +18,10 @@ DIST   := dist
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS := -X main.version=$(VERSION) -s -w
 
-.PHONY: help build build-all clean tidy lint
+.PHONY: help build build-all run clean tidy lint
+
+# Default coordinator URL for `make run`. Override with `COORDINATOR_URL=...`.
+COORDINATOR_URL ?= http://127.0.0.1:8400
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -27,6 +30,9 @@ build: ## Build for the current platform into dist/
 	@mkdir -p $(DIST)
 	go build -ldflags "$(LDFLAGS)" -o $(DIST)/potluck-mesh$(shell go env GOEXE) $(CMD)
 	@echo "built: $(DIST)/potluck-mesh$(shell go env GOEXE)"
+
+run: ## Run the sidecar in the current shell (uses COORDINATOR_URL, default http://127.0.0.1:8400)
+	go run $(CMD) --coordinator-url $(COORDINATOR_URL)
 
 build-all: ## Build for all 5 target triples into dist/
 	@mkdir -p $(DIST)

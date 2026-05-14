@@ -18,12 +18,18 @@ router = APIRouter()
 async def health() -> dict[str, object]:
     """Liveness probe — frontend polls this to confirm the sidecar is up."""
     runtime = get_runtime()
+    rpc_servers = runtime.loaded_rpc_servers()
     return {
         "status": "ok",
         "version": __version__,
         "model_loaded": runtime.is_loaded(),
         "active_model_id": runtime.current_model_id(),
         "n_ctx_loaded": runtime.loaded_n_ctx(),
+        # Big Model Mode status — list of llama.cpp RPC endpoints the
+        # current model is loaded across. Null when the model is local-only
+        # or no model is loaded. Frontend uses this as the source of truth
+        # for whether the toggle in HouseholdView shows on/off.
+        "loaded_rpc_servers": list(rpc_servers) if rpc_servers else None,
     }
 
 

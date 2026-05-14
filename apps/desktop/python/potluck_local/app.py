@@ -14,11 +14,12 @@ import contextlib
 import os
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from potluck_local import __version__
-from potluck_local.routers import agents, chat, hardware, health, memory, models, settings, tasks, vault
+from potluck_local.routers import agents, chat, hardware, health, memory, models, peer, settings, tasks, vault
 from potluck_local.utils.logging import setup_logging
 
 
@@ -71,6 +72,33 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Peer-access guard — when the sidecar is bound to 0.0.0.0 (required so
+    # household peers can dial it over the mesh), the bare socket would
+    # expose every endpoint. This middleware restricts non-loopback callers
+    # to the explicit peer-facing surface (/peer/* + /health). The local
+    # user's memory, tasks, conversation history, and agent observability
+    # are never reachable from another machine — even one in the same
+    # household.
+    #
+    # Localhost source IPs (Electron, dev tools) get the full surface.
+    @app.middleware("http")
+    async def peer_access_middleware(request: Request, call_next):
+        client_host = request.client.host if request.client else ""
+        is_loopback = client_host in ("127.0.0.1", "::1", "localhost")
+        if not is_loopback:
+            path = request.url.path
+            if not (path.startswith("/peer/") or path == "/health"):
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "detail": (
+                            "this path is only available to localhost; "
+                            "household peers may call /peer/* or /health"
+                        ),
+                    },
+                )
+        return await call_next(request)
+
     # Routers — prefixes must match localApi.ts in the frontend
     app.include_router(health.router, tags=["health"])
     app.include_router(chat.router, prefix="/chat", tags=["chat"])
@@ -81,6 +109,7 @@ def create_app() -> FastAPI:
     app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
     app.include_router(agents.router, prefix="/agents", tags=["agents"])
     app.include_router(vault.router, prefix="/vault", tags=["vault"])
+    app.include_router(peer.router, prefix="/peer", tags=["peer"])
 
     return app
 
@@ -100,9 +129,16 @@ def main() -> None:
     setup_logging(dev=dev_mode)
 
     app = create_app()
+    # Bind to all interfaces so household-mesh peers can dial us over the
+    # WireGuard mesh IP. The peer_access_middleware in create_app() is the
+    # access boundary — non-loopback callers can only reach /peer/* + /health,
+    # not the local user's memory / tasks / chat history. Override with
+    # POTLUCK_BIND_HOST=127.0.0.1 to opt out (e.g. on a machine that should
+    # never serve peer inference).
+    bind_host = os.environ.get("POTLUCK_BIND_HOST", "0.0.0.0")
     uvicorn.run(
         app,
-        host="127.0.0.1",  # loopback only — never exposed to the network
+        host=bind_host,
         port=args.port,
         log_level="debug" if dev_mode else "info",
     )

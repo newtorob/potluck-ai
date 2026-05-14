@@ -168,7 +168,7 @@ func run() int {
 		slog.Error("tunnel init failed",
 			"err", err,
 			"hint_linux", "ensure CAP_NET_ADMIN is set: sudo setcap cap_net_admin+ep ./potluck-mesh",
-			"hint_mac", "no extra privileges required for utun on macOS",
+			"hint_mac", "utun creation needs root in dev — run with sudo, or sign the binary with the Network Extension entitlement",
 			"hint_windows", "wintun.dll must be installed; run the installer once as admin",
 		)
 		return 1

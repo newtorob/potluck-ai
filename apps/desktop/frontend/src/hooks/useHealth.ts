@@ -19,6 +19,12 @@ export interface UseHealthReturn {
   modelLoaded: boolean;
   activeModelId: string | null;
   nCtxLoaded: number | null;
+  /** True when the most recent /health call returned 2xx. Decoupled
+   *  from model state: the sidecar can be up with no model loaded. */
+  sidecarUp: boolean;
+  /** Big Model Mode: list of RPC endpoints the current model is
+   *  distributed across. Null when loaded locally or no model loaded. */
+  loadedRpcServers: string[] | null;
 }
 
 const POLL_INTERVAL_MS = 10_000;
@@ -27,6 +33,8 @@ const INITIAL_STATE: UseHealthReturn = {
   modelLoaded: false,
   activeModelId: null,
   nCtxLoaded: null,
+  sidecarUp: false,
+  loadedRpcServers: null,
 };
 
 export function useHealth(): UseHealthReturn {
@@ -46,6 +54,8 @@ export function useHealth(): UseHealthReturn {
           // n_ctx_loaded is optional for backwards compat with older backends.
           // Treat undefined the same as null (no loaded context available).
           nCtxLoaded: health.n_ctx_loaded ?? null,
+          sidecarUp: true,
+          loadedRpcServers: health.loaded_rpc_servers ?? null,
         });
       } catch {
         if (cancelled) return;

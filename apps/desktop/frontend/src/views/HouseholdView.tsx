@@ -1,0 +1,1085 @@
+/**
+ * HouseholdView — /household route.
+ *
+ * The visible payoff for the Phase G mesh stack. Surfaces:
+ *   1. **Status header** — mesh up/down + node identity (truncated mesh IP).
+ *   2. **Roster** — every peer in the household with reachability badges.
+ *   3. **Add another machine** CTA — opens the AddMachineWizard.
+ *   4. **Onboarding for unpaired machines** — "be first" or "join existing".
+ *   5. **Unpair** — destructive action, confirms inline.
+ *
+ * Privacy invariant (memory 42a7e671 / b3cbfba9):
+ *   THIS view is allowed to surface per-peer identity (node_name, mesh_ip,
+ *   reachability mode) — that's exactly what a household roster is for.
+ *   What this view must NOT do is leak peer identity into the /network
+ *   aggregate view or into error toasts for unrelated peers.
+ *
+ * The view subscribes to the meshStore on mount and unsubscribes on
+ * unmount; the store handles polling cadence + visibility-pause.
+ */
+
+import { useEffect, useState } from 'react';
+import {
+  Home,
+  Plus,
+  LogOut,
+  Link2,
+  RadioTower,
+  AlertCircle,
+  Monitor,
+  Loader2,
+  WifiOff,
+  ShieldOff,
+  Maximize2,
+  CheckCircle2,
+} from 'lucide-react';
+import { cn } from '@/components/ui/cn';
+import { ViewHeader } from '@/components/layout/ViewHeader';
+import { EmptyState } from '@/components/layout/EmptyState';
+import { useMeshStore } from '@/stores/meshStore';
+import { useChatStore } from '@/stores/chatStore';
+import { useHealth } from '@/hooks/useHealth';
+import { localApi } from '@/lib/localApi';
+import { getBigModelEligiblePeers, type PeerCapabilities } from '@/lib/householdInference';
+import { meshClient, issuePairingToken, MeshApiError, CoordinatorError } from '@/lib/meshClient';
+import { relativeTime } from '@/lib/timeFormat';
+import type { MeshPeer, MeshStatus } from '@/types/mesh';
+import { AddMachineWizard } from '@/components/household/AddMachineWizard';
+
+// ---------------------------------------------------------------------------
+// Root
+// ---------------------------------------------------------------------------
+
+export function HouseholdView() {
+  const status = useMeshStore((s) => s.status);
+  const peers = useMeshStore((s) => s.peers);
+  const bridge = useMeshStore((s) => s.bridge);
+  const lastError = useMeshStore((s) => s.lastError);
+  const start = useMeshStore((s) => s.start);
+  const stop = useMeshStore((s) => s.stop);
+  const refresh = useMeshStore((s) => s.refresh);
+
+  const [wizardOpen, setWizardOpen] = useState(false);
+
+  useEffect(() => {
+    start();
+    return () => stop();
+  }, [start, stop]);
+
+  // --- bridge-missing (running outside Electron) ---
+  if (bridge === 'bridge_missing') {
+    return (
+      <div className="flex h-full flex-col">
+        <HouseholdHeader status={null} />
+        <EmptyState
+          icon={ShieldOff}
+          title="Mesh is only available in the desktop app"
+          description={
+            <>
+              You're seeing this view in a regular browser. To set up a
+              household, open Potluck through the desktop app — the mesh
+              sidecar runs only there.
+            </>
+          }
+        />
+      </div>
+    );
+  }
+
+  // --- sidecar offline (bridge present, socket not reachable) ---
+  if (bridge === 'sidecar_offline') {
+    return (
+      <div className="flex h-full flex-col">
+        <HouseholdHeader status={null} />
+        <EmptyState
+          icon={WifiOff}
+          tone="warning"
+          title="Mesh sidecar isn't running"
+          description={
+            <>
+              The Go mesh sidecar isn't responding on the local socket.
+              In development, start it from{' '}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+                apps/desktop/go/potluck-mesh
+              </code>
+              {' '}with{' '}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+                make run
+              </code>
+              . In packaged builds, the system daemon should be running —
+              if it isn't, reinstall.
+            </>
+          }
+        />
+      </div>
+    );
+  }
+
+  // --- still bootstrapping ---
+  if (status === null) {
+    return (
+      <div className="flex h-full flex-col">
+        <HouseholdHeader status={null} />
+        <div className="flex flex-1 items-center justify-center">
+          <Loader2
+            className="h-5 w-5 animate-spin text-muted-foreground"
+            aria-label="Loading mesh status"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const isPaired = status.node_id !== null && status.mesh_ip !== null;
+
+  return (
+    <>
+      <div className="flex h-full flex-col overflow-hidden">
+        <HouseholdHeader status={status} />
+
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+          {lastError !== null && (
+            <ErrorBanner message={lastError} />
+          )}
+
+          {!isPaired ? (
+            <UnpairedPanels onPaired={() => void refresh()} />
+          ) : (
+            <PairedView
+              status={status}
+              peers={peers}
+              onAddMachine={() => setWizardOpen(true)}
+              onUnpaired={() => void refresh()}
+            />
+          )}
+
+          {/* Privacy footer — same treatment as /network */}
+          <p
+            className="pt-2 text-[11px] text-muted-foreground/70 max-w-2xl"
+            aria-label="Privacy note"
+          >
+            Your household is private. Peer names, mesh IPs, and reachability
+            details on this page never leave your machines — the coordinator
+            knows your household exists but the cooperative network has no
+            view into who's in it.
+          </p>
+        </div>
+      </div>
+
+      <AddMachineWizard
+        open={wizardOpen}
+        onClose={() => {
+          setWizardOpen(false);
+          // Refresh once on close so a newly-paired peer shows up promptly.
+          void refresh();
+        }}
+      />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Header — title + status pill
+// ---------------------------------------------------------------------------
+
+function HouseholdHeader({ status }: { status: MeshStatus | null }) {
+  const onlineCount = status?.peers_online_count ?? 0;
+  const meshUp = status?.mesh_status === 'running';
+
+  return (
+    <ViewHeader
+      eyebrow="Cooperative"
+      title="Household"
+      description={
+        <span className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5">
+            <span
+              className={cn(
+                'inline-block h-2 w-2 rounded-full',
+                meshUp
+                  ? 'bg-sage animate-hearth-pulse'
+                  : status?.mesh_status === 'error'
+                    ? 'bg-destructive'
+                    : 'bg-muted-foreground/40',
+              )}
+              aria-hidden="true"
+            />
+            {meshUp
+              ? `Mesh up — ${onlineCount} peer${onlineCount === 1 ? '' : 's'} online`
+              : status?.mesh_status === 'error'
+                ? 'Mesh error'
+                : status?.mesh_status === 'starting'
+                  ? 'Starting…'
+                  : 'Mesh not set up'}
+          </span>
+          {status?.mesh_ip && (
+            <span
+              className="font-mono text-[11px] text-muted-foreground/70"
+              title="Your mesh IP within this household"
+            >
+              {status.mesh_ip}
+            </span>
+          )}
+        </span>
+      }
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Unpaired state — two onboarding paths
+// ---------------------------------------------------------------------------
+
+function UnpairedPanels({ onPaired }: { onPaired: () => void }) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <BeFirstPanel onPaired={onPaired} />
+      <JoinExistingPanel onPaired={onPaired} />
+    </div>
+  );
+}
+
+function BeFirstPanel({ onPaired }: { onPaired: () => void }) {
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function pairOnce(token: string): Promise<void> {
+    await meshClient.pair({ pairing_token: token });
+  }
+
+  async function handleSetup() {
+    setError(null);
+    setWorking(true);
+    try {
+      const token = await issuePairingToken();
+      try {
+        await pairOnce(token.token);
+      } catch (err) {
+        // Stale-key recovery: the sidecar persists wg.key on disk and
+        // marks itself enrolled at startup whenever the file exists.
+        // If the coordinator's DB was wiped (or this is a fresh dev
+        // setup), the local "enrolled" flag is out of sync with the
+        // coordinator's view of the world. Auto-unpair wipes the key,
+        // then we re-issue a token (the first one was single-use so
+        // it's now consumed even though the pair errored) and retry.
+        if (err instanceof MeshApiError && err.code === 'already_enrolled') {
+          await meshClient.unpair();
+          const fresh = await issuePairingToken();
+          await pairOnce(fresh.token);
+        } else {
+          throw err;
+        }
+      }
+      onPaired();
+    } catch (err) {
+      if (err instanceof MeshApiError) {
+        setError(`${err.code}: ${err.message}`);
+      } else if (err instanceof CoordinatorError) {
+        setError(
+          err.httpStatus === 0 || err.httpStatus >= 500
+            ? "Couldn't reach the coordinator. Check the connection URL in Settings → Advanced."
+            : err.message,
+        );
+      } else {
+        setError(err instanceof Error ? err.message : 'Could not set up household.');
+      }
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-primary/25 bg-card p-5 space-y-3 shadow-hearth-sm">
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/12 ring-1 ring-primary/20">
+          <Home className="h-4 w-4 text-primary" aria-hidden="true" />
+        </div>
+        <h2 className="font-serif text-base leading-tight tracking-display text-foreground">
+          Set up a new household
+        </h2>
+      </div>
+      <p className="text-sm text-muted-foreground leading-snug">
+        This will be the first machine in your household. You can add more
+        later — any machine with Potluck installed can join.
+      </p>
+
+      {error !== null && (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="button"
+        onClick={() => void handleSetup()}
+        disabled={working}
+        className={cn(
+          'inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3.5',
+          'bg-primary text-primary-foreground text-sm font-medium',
+          'hover:bg-primary/90 transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'disabled:cursor-not-allowed disabled:opacity-60',
+        )}
+      >
+        {working ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Setting up…
+          </>
+        ) : (
+          <>
+            <Home className="h-3.5 w-3.5" />
+            Set up household
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
+function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
+  const [tokenInput, setTokenInput] = useState('');
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleJoin(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = tokenInput.trim();
+    if (trimmed.length === 0) return;
+    setError(null);
+    setWorking(true);
+    try {
+      await meshClient.pair({ pairing_token: trimmed });
+      setTokenInput('');
+      onPaired();
+    } catch (err) {
+      if (err instanceof MeshApiError) {
+        if (err.code === 'coordinator_error') {
+          setError(
+            'Token rejected. It may have expired (tokens last one hour) or already been used.',
+          );
+        } else if (err.code === 'already_enrolled') {
+          setError(
+            'This machine still has credentials from a previous setup. Click "Leave household" first, then try joining again.',
+          );
+        } else if (err.code === 'pair_in_progress') {
+          setError('A pairing attempt is already running — please wait a moment.');
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError(err instanceof Error ? err.message : 'Pairing failed.');
+      }
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={(e) => void handleJoin(e)}
+      className="rounded-2xl border border-border/60 bg-card p-5 space-y-3 shadow-hearth-sm"
+    >
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted ring-1 ring-border/60">
+          <Plus className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        </div>
+        <h2 className="font-serif text-base leading-tight tracking-display text-foreground">
+          Join an existing household
+        </h2>
+      </div>
+      <p className="text-sm text-muted-foreground leading-snug">
+        Paste the pairing token you generated on another machine. Tokens
+        expire after an hour and can only be used once.
+      </p>
+
+      <div className="space-y-2">
+        <label
+          htmlFor="join-token"
+          className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label"
+        >
+          Pairing token
+        </label>
+        <input
+          id="join-token"
+          type="text"
+          value={tokenInput}
+          onChange={(e) => setTokenInput(e.target.value)}
+          placeholder="Paste here…"
+          autoComplete="off"
+          spellCheck={false}
+          disabled={working}
+          className={cn(
+            'w-full rounded-lg border border-input bg-background px-3 py-2',
+            'font-mono text-sm text-foreground placeholder:text-muted-foreground/50',
+            'focus:outline-none focus:ring-2 focus:ring-ring',
+            'disabled:cursor-not-allowed disabled:opacity-60',
+          )}
+        />
+      </div>
+
+      {error !== null && (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={working || tokenInput.trim().length === 0}
+        className={cn(
+          'inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3.5',
+          'border border-border bg-card text-sm font-medium text-foreground',
+          'hover:bg-accent transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'disabled:cursor-not-allowed disabled:opacity-60',
+        )}
+      >
+        {working ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Joining…
+          </>
+        ) : (
+          'Join household'
+        )}
+      </button>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Paired state — this machine + roster
+// ---------------------------------------------------------------------------
+
+function PairedView({
+  status,
+  peers,
+  onAddMachine,
+  onUnpaired,
+}: {
+  status: MeshStatus;
+  peers: MeshPeer[];
+  onAddMachine: () => void;
+  onUnpaired: () => void;
+}) {
+  return (
+    <div className="space-y-8">
+      {/* This machine + Add CTA */}
+      <section aria-label="This machine">
+        <SectionHeader>This machine</SectionHeader>
+        <div className="flex items-center justify-between rounded-xl border border-primary/25 bg-card p-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/12 ring-1 ring-primary/20">
+              <Monitor className="h-4 w-4 text-primary" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-medium text-foreground truncate">
+                {/* mesh_ip is the only stable identifier we have for the
+                    local node from /status — it doesn't include the
+                    node_name (that lives on the server side). */}
+                {status.mesh_ip}
+              </p>
+              <p className="text-[11px] text-muted-foreground/80">
+                {status.coordinator_connection === 'connected'
+                  ? 'Connected to the coordinator'
+                  : status.coordinator_connection === 'connecting'
+                    ? 'Reconnecting to the coordinator…'
+                    : 'Coordinator unreachable'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onAddMachine}
+            className={cn(
+              'inline-flex shrink-0 h-9 items-center justify-center gap-1.5 rounded-lg px-3',
+              'bg-primary text-primary-foreground text-sm font-medium',
+              'hover:bg-primary/90 transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            )}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add another machine
+          </button>
+        </div>
+      </section>
+
+      {/* Roster */}
+      <section aria-label="Other machines">
+        <SectionHeader>Other machines in this household</SectionHeader>
+        {peers.length === 0 ? (
+          <div className="rounded-xl border border-border/60 bg-card p-4">
+            <p className="text-sm text-muted-foreground">
+              You're the only machine in this household right now. Click{' '}
+              <span className="font-medium text-foreground">Add another machine</span>{' '}
+              to invite one more — installations on the same Wi-Fi, on a
+              friend's house with Tailscale, or anywhere with internet all
+              work.
+            </p>
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {peers.map((peer) => (
+              <PeerRow key={peer.node_id} peer={peer} />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Big Model Mode — gated on at least one peer offering rpc compute.
+          The component itself probes on mount + shows nothing if none. */}
+      <section aria-label="Big Model Mode">
+        <BigModelModeCard peers={peers} />
+      </section>
+
+      {/* Routing strategy — only matters when there's more than one peer */}
+      {peers.length > 0 && (
+        <section aria-label="Routing strategy">
+          <SectionHeader>How requests get routed</SectionHeader>
+          <RoutingStrategyControl />
+        </section>
+      )}
+
+      {/* Leave household */}
+      <section aria-label="Leave household">
+        <SectionHeader>Leave this household</SectionHeader>
+        <UnpairControl onUnpaired={onUnpaired} />
+      </section>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Big Model Mode card
+// ---------------------------------------------------------------------------
+
+/**
+ * Big Model Mode — load the LOCAL model with one or more household peers
+ * acting as remote ggml-backend RPC devices. Weights + KV + compute get
+ * spread across the local machine and the chosen peers.
+ *
+ * Honesty rule (memory e369308e): this is for CAPACITY (running models
+ * bigger than any single machine holds), NOT SPEED. UX must reflect that.
+ */
+function BigModelModeCard({ peers }: { peers: MeshPeer[] }) {
+  const { activeModelId, loadedRpcServers, sidecarUp } = useHealth();
+  const [eligible, setEligible] = useState<
+    { peer: MeshPeer; capabilities: PeerCapabilities }[]
+  >([]);
+  const [probing, setProbing] = useState(true);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Probe peers for available_for_big_model on mount + whenever the peer
+  // roster changes. Cheap — single GET /peer/capabilities per peer.
+  useEffect(() => {
+    let cancelled = false;
+    setProbing(true);
+    void (async () => {
+      try {
+        const result = await getBigModelEligiblePeers(peers);
+        if (!cancelled) setEligible(result);
+      } catch {
+        if (!cancelled) setEligible([]);
+      } finally {
+        if (!cancelled) setProbing(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [peers]);
+
+  const isOn = (loadedRpcServers?.length ?? 0) > 0;
+
+  // Don't render the card at all when nothing's eligible AND not already
+  // running — keeps the household view uncluttered for users who haven't
+  // set up rpc-server on any peer.
+  if (!probing && eligible.length === 0 && !isOn) {
+    return null;
+  }
+
+  async function handleToggle() {
+    setError(null);
+    if (!sidecarUp || !activeModelId) {
+      setError(
+        'Load a model in the Models view first — Big Model Mode reloads whatever is currently loaded with RPC peers participating.',
+      );
+      return;
+    }
+
+    setWorking(true);
+    try {
+      if (isOn) {
+        // Disable — reload model with no rpc_servers.
+        await localApi.loadModel(activeModelId, {});
+      } else {
+        // Enable — reload model distributed across eligible peers.
+        const rpcServers = eligible
+          .map((e) => e.capabilities.rpc_endpoint)
+          .filter((s): s is string => Boolean(s));
+        if (rpcServers.length === 0) {
+          setError('No eligible peers found to host RPC compute.');
+          return;
+        }
+        await localApi.loadModel(activeModelId, { rpc_servers: rpcServers });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // 501 from the sidecar means stock (unpatched) llama-cpp-python.
+      if (msg.includes('501') || msg.toLowerCase().includes('patched')) {
+        setError(
+          'This sidecar is running stock llama-cpp-python. Install the Potluck-patched wheel — see docs/phase-g/household-contributor-headless.md.',
+        );
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <div
+      className={cn(
+        'rounded-2xl border p-5 space-y-4 shadow-hearth-sm',
+        isOn ? 'border-primary/25 bg-primary/5' : 'border-border/60 bg-card',
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={cn(
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1',
+            isOn ? 'bg-primary/15 ring-primary/30' : 'bg-muted ring-border/60',
+          )}
+        >
+          {isOn ? (
+            <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden="true" />
+          ) : (
+            <Maximize2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-serif text-base leading-tight tracking-display text-foreground">
+            Big Model Mode
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground leading-snug">
+            Run a model that's too big for any single machine in your household
+            by spreading its weights across multiple peers. Slower per token,
+            but lets you load larger models.
+          </p>
+        </div>
+      </div>
+
+      {/* Status / peer list */}
+      <div className="rounded-lg border border-border/40 bg-background/40 p-3">
+        {probing ? (
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+            Probing household peers…
+          </p>
+        ) : isOn ? (
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-foreground">
+              Active — model split across {loadedRpcServers?.length ?? 0} peer
+              {(loadedRpcServers?.length ?? 0) === 1 ? '' : 's'} + this machine
+            </p>
+            <ul className="space-y-0.5">
+              {(loadedRpcServers ?? []).map((ep) => (
+                <li
+                  key={ep}
+                  className="font-mono text-[11px] text-muted-foreground"
+                >
+                  {ep}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : eligible.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No eligible peers found. A peer is eligible when it's running
+            contributor mode AND has <code className="font-mono">rpc-server</code>
+            {' '}listening (see the headless contributor docs).
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-foreground">
+              {eligible.length} peer{eligible.length === 1 ? '' : 's'} eligible
+            </p>
+            <ul className="space-y-0.5">
+              {eligible.map(({ peer, capabilities }) => (
+                <li key={peer.node_id} className="text-[11px] text-muted-foreground">
+                  <span className="font-medium text-foreground/85">{peer.node_name}</span>
+                  {capabilities.hardware?.gpu_vram_gb && (
+                    <span className="mx-1.5 text-muted-foreground/40">·</span>
+                  )}
+                  {capabilities.hardware?.gpu_vram_gb && (
+                    <span>{capabilities.hardware.gpu_vram_gb} GB VRAM</span>
+                  )}
+                  <span className="mx-1.5 text-muted-foreground/40">·</span>
+                  <span className="font-mono">{capabilities.rpc_endpoint}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {error !== null && (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] text-muted-foreground/80 leading-snug">
+          {isOn
+            ? 'Disabling reloads the model locally, dropping the peers.'
+            : activeModelId
+              ? `Will reload "${activeModelId}" across the peers above.`
+              : 'Load a model first in the Models view.'}
+        </p>
+        <button
+          type="button"
+          onClick={() => void handleToggle()}
+          disabled={working || probing || (!isOn && eligible.length === 0)}
+          className={cn(
+            'inline-flex shrink-0 h-9 items-center gap-1.5 rounded-lg px-3.5 text-sm font-medium',
+            'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            isOn
+              ? 'border border-border/60 bg-card text-foreground hover:bg-accent'
+              : 'bg-primary text-primary-foreground hover:bg-primary/90',
+            'disabled:cursor-not-allowed disabled:opacity-60',
+          )}
+        >
+          {working ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              {isOn ? 'Disabling…' : 'Enabling…'}
+            </>
+          ) : isOn ? (
+            'Disable'
+          ) : (
+            'Enable'
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Routing strategy control
+// ---------------------------------------------------------------------------
+
+function RoutingStrategyControl() {
+  const routingMode = useChatStore((s) => s.routingMode);
+  const setRoutingMode = useChatStore((s) => s.setRoutingMode);
+
+  const options: {
+    id: 'capability' | 'round_robin';
+    title: string;
+    blurb: string;
+  }[] = [
+    {
+      id: 'capability',
+      title: 'Smart routing',
+      blurb:
+        "Picks the best machine for each prompt — uses the busy/idle signal, hardware tier, and which model is loaded. Long or complex prompts go to higher-tier machines.",
+    },
+    {
+      id: 'round_robin',
+      title: 'Rotate evenly',
+      blurb:
+        "Alternates across all eligible machines so each one stays warm. Pick this when you'd rather spread load than concentrate it on the fastest peer.",
+    },
+  ];
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-card p-2 space-y-1">
+      {options.map((opt) => {
+        const active = routingMode === opt.id;
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => setRoutingMode(opt.id)}
+            className={cn(
+              'w-full text-left rounded-lg p-3 transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              active
+                ? 'bg-primary/8 ring-1 ring-primary/30'
+                : 'hover:bg-accent',
+            )}
+            aria-pressed={active}
+          >
+            <div className="flex items-center gap-2.5">
+              <span
+                className={cn(
+                  'flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2',
+                  active ? 'border-primary' : 'border-muted-foreground/40',
+                )}
+                aria-hidden="true"
+              >
+                {active && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+              </span>
+              <span
+                className={cn(
+                  'text-sm font-medium',
+                  active ? 'text-foreground' : 'text-foreground/85',
+                )}
+              >
+                {opt.title}
+              </span>
+            </div>
+            <p className="mt-1 ml-6 text-xs text-muted-foreground leading-snug">
+              {opt.blurb}
+            </p>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Peer row
+// ---------------------------------------------------------------------------
+
+function PeerRow({ peer }: { peer: MeshPeer }) {
+  const isReachable = peer.reachable;
+  const mode = peer.reachability_mode;
+
+  return (
+    <li className="flex items-center gap-3 rounded-xl border border-border/60 bg-card p-3.5">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted ring-1 ring-border/60">
+        <Monitor className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-foreground truncate">
+          {peer.node_name}
+        </p>
+        <p className="text-[11px] text-muted-foreground/80 truncate">
+          <span className="font-mono">{peer.mesh_ip}</span>
+          {peer.platform && (
+            <>
+              <span className="mx-1.5 text-muted-foreground/40">·</span>
+              {peer.platform}
+            </>
+          )}
+          {peer.last_seen_at && (
+            <>
+              <span className="mx-1.5 text-muted-foreground/40">·</span>
+              last seen {relativeTime(peer.last_seen_at)}
+            </>
+          )}
+        </p>
+      </div>
+
+      <ReachabilityBadge reachable={isReachable} mode={mode} />
+    </li>
+  );
+}
+
+function ReachabilityBadge({
+  reachable,
+  mode,
+}: {
+  reachable: boolean;
+  mode: MeshPeer['reachability_mode'];
+}) {
+  if (!reachable) {
+    return (
+      <span
+        className={cn(
+          'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5',
+          'border-border/60 bg-muted text-[10px] font-medium text-muted-foreground',
+        )}
+        title="No recent WireGuard handshake; this peer may be offline."
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" aria-hidden="true" />
+        Offline
+      </span>
+    );
+  }
+  if (mode === 'direct') {
+    return (
+      <span
+        className={cn(
+          'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5',
+          'border-sage/30 bg-sage/10 text-[10px] font-medium text-sage',
+        )}
+        title="Direct WireGuard tunnel — peer-to-peer."
+      >
+        <Link2 className="h-2.5 w-2.5" aria-hidden="true" />
+        Direct
+      </span>
+    );
+  }
+  // DERP-relayed
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5',
+        'border-amber-500/30 bg-amber-500/10 text-[10px] font-medium text-amber-700 dark:text-amber-300',
+      )}
+      title="Relayed through Potluck's DERP servers — used when a direct tunnel isn't possible."
+    >
+      <RadioTower className="h-2.5 w-2.5" aria-hidden="true" />
+      Relayed
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Unpair — destructive, inline confirmation
+// ---------------------------------------------------------------------------
+
+function UnpairControl({ onUnpaired }: { onUnpaired: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleConfirm() {
+    setError(null);
+    setWorking(true);
+    try {
+      await meshClient.unpair();
+      setConfirming(false);
+      onUnpaired();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unpair failed.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  if (!confirming) {
+    return (
+      <div className="rounded-xl border border-border/60 bg-card p-4 flex items-center justify-between gap-4">
+        <p className="text-sm text-muted-foreground">
+          Wipe this machine's WireGuard keys and remove it from the
+          household. The other machines stay paired with each other.
+        </p>
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className={cn(
+            'inline-flex shrink-0 h-9 items-center gap-1.5 rounded-lg px-3',
+            'border border-destructive/30 bg-destructive/8 text-sm font-medium text-destructive',
+            'hover:bg-destructive/12 transition-colors',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive',
+          )}
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          Leave household
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="rounded-xl border border-destructive/30 bg-destructive/8 p-4 space-y-3"
+      role="alertdialog"
+      aria-labelledby="unpair-confirm-title"
+    >
+      <div className="flex items-start gap-2.5">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
+        <div>
+          <p
+            id="unpair-confirm-title"
+            className="font-medium text-foreground"
+          >
+            Leave this household?
+          </p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            This machine's mesh key will be wiped. You'll need a fresh
+            pairing token from another machine to re-join.
+          </p>
+        </div>
+      </div>
+
+      {error !== null && (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setConfirming(false);
+            setError(null);
+          }}
+          disabled={working}
+          className={cn(
+            'rounded-lg border border-border/60 bg-card px-3 py-1.5 text-sm font-medium text-foreground',
+            'hover:bg-accent transition-colors',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            'disabled:cursor-not-allowed disabled:opacity-60',
+          )}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleConfirm()}
+          disabled={working}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5',
+            'bg-destructive text-destructive-foreground text-sm font-medium',
+            'hover:bg-destructive/90 transition-colors',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive',
+            'disabled:cursor-not-allowed disabled:opacity-60',
+          )}
+        >
+          {working ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Leaving…
+            </>
+          ) : (
+            <>
+              <LogOut className="h-3.5 w-3.5" />
+              Leave
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mb-3 font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
+      {children}
+    </h2>
+  );
+}
+
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div
+      className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/8 p-3"
+      role="status"
+    >
+      <AlertCircle
+        className="mt-0.5 h-4 w-4 shrink-0 text-destructive"
+        aria-hidden="true"
+      />
+      <p className="text-sm text-foreground">
+        <span className="font-medium">Mesh sidecar reported an error:</span>{' '}
+        <span className="text-muted-foreground">{message}</span>
+      </p>
+    </div>
+  );
+}

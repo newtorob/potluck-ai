@@ -28,6 +28,17 @@ import type { ChatMessage, Conversation } from '@/types/chat';
 import { localApi } from '@/lib/localApi';
 import type { PersistedMessage } from '@/lib/localApi';
 import { streamTokens } from '@/lib/streaming';
+import { streamHouseholdInference } from '@/lib/householdInference';
+import type { RoutingMode } from '@/lib/householdInference';
+import { useMeshStore } from '@/stores/meshStore';
+
+const ROUTING_MODE_KEY = 'potluck.household_routing_mode';
+
+function readBootstrapRoutingMode(): RoutingMode {
+  if (typeof window === 'undefined') return 'capability';
+  const v = window.localStorage.getItem(ROUTING_MODE_KEY);
+  return v === 'round_robin' ? 'round_robin' : 'capability';
+}
 
 const ACTIVE_CONVO_KEY = 'potluck.active_conversation_id';
 
@@ -90,6 +101,20 @@ interface ChatState {
   networkMode: boolean;
   networkModelSlug: string;
 
+  // ---- Household routing (post-mesh-launch addition) ---- //
+  // When true, sendMessage() routes directly to a peer in the user's
+  // household mesh (POST /peer/chat/completions over the WireGuard IP).
+  // Strictly more private than networkMode — bypasses the coordinator
+  // entirely. Mutually exclusive with networkMode (the setters enforce).
+  householdMode: boolean;
+
+  // How to pick which household peer serves the request. 'capability'
+  // (default) scores peers by hardware + load + model fit. 'round_robin'
+  // rotates evenly across eligible peers — useful when the user wants
+  // to keep multiple machines warm rather than concentrate load on the
+  // best one. Persisted to localStorage; per-machine setting.
+  routingMode: RoutingMode;
+
   // Actions
   hydrate: () => Promise<void>;
   createConversation: (modelSlug?: string) => Promise<string>;
@@ -101,6 +126,8 @@ interface ChatState {
   clearConversations: () => void;
   setNetworkMode: (on: boolean) => void;
   setNetworkModelSlug: (slug: string) => void;
+  setHouseholdMode: (on: boolean) => void;
+  setRoutingMode: (mode: RoutingMode) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -177,6 +204,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   // media server and the Windows gaming PC advertise via Ollama.
   // Configurable via the model picker in /network (task 776cf3a7).
   networkModelSlug: 'qwen2.5:3b-instruct-q4_K_M',
+  householdMode: false,
+  routingMode: readBootstrapRoutingMode(),
 
   async hydrate() {
     try {
@@ -431,22 +460,50 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       .map((m): ChatMessage => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt }));
 
     try {
-      // Branch on network mode. Coordinator path is single-turn — only
-      // the just-sent user message is forwarded — because the
-      // JobAssignedMessage schema has no history slot today, and
-      // adding one without a thoughtful design is a privacy hazard.
-      const { networkMode, networkModelSlug } = get();
-      const response = networkMode
-        ? await localApi.streamNetworkJob(content, {
-            modelSlug: networkModelSlug,
-            abortSignal: controller.signal,
-          })
-        : await localApi.streamChat(apiMessages, {
-            abortSignal: controller.signal,
-          });
+      // Branch on routing mode. Three paths:
+      //   1. household — direct to a household peer over the mesh
+      //      (full history forwarded; trusted machines we own)
+      //   2. network   — through the coordinator to a cooperative peer
+      //      (single-turn only — JobAssignedMessage has no history slot
+      //      and bolting one on is a privacy-design exercise)
+      //   3. local     — this machine's Python sidecar
+      const { networkMode, networkModelSlug, householdMode } = get();
+      let response: Response;
+      if (householdMode) {
+        const peers = useMeshStore.getState().peers;
+        const { response: r } = await streamHouseholdInference(apiMessages, peers, {
+          abortSignal: controller.signal,
+          routingMode: get().routingMode,
+        });
+        response = r;
+      } else if (networkMode) {
+        response = await localApi.streamNetworkJob(content, {
+          modelSlug: networkModelSlug,
+          abortSignal: controller.signal,
+        });
+      } else {
+        response = await localApi.streamChat(apiMessages, {
+          abortSignal: controller.signal,
+        });
+      }
 
       if (!response.ok) {
-        throw new Error(`[localApi] ${response.status}: ${response.statusText}`);
+        // Surface the response body's `detail` / `error` when present so the
+        // user sees the actionable reason (e.g. coordinator's "No online peer
+        // serves model 'X'") instead of a generic "Service Unavailable."
+        let detail: string | undefined;
+        try {
+          const body = (await response.clone().json()) as { detail?: unknown; error?: unknown };
+          if (typeof body.detail === 'string') detail = body.detail;
+          else if (typeof body.error === 'string') detail = body.error;
+        } catch {
+          // Body wasn't JSON — fall through to statusText.
+        }
+        throw new Error(
+          detail
+            ? `[localApi] ${response.status}: ${detail}`
+            : `[localApi] ${response.status}: ${response.statusText}`,
+        );
       }
 
       for await (const event of streamTokens(response)) {
@@ -676,7 +733,28 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   setNetworkMode(on) {
-    set({ networkMode: on });
+    // Mutually exclusive with householdMode — turning on network routing
+    // implicitly turns off household routing.
+    if (on) {
+      set({ networkMode: true, householdMode: false });
+    } else {
+      set({ networkMode: false });
+    }
+  },
+
+  setHouseholdMode(on) {
+    if (on) {
+      set({ householdMode: true, networkMode: false });
+    } else {
+      set({ householdMode: false });
+    }
+  },
+
+  setRoutingMode(mode) {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(ROUTING_MODE_KEY, mode);
+    }
+    set({ routingMode: mode });
   },
 
   setNetworkModelSlug(slug) {

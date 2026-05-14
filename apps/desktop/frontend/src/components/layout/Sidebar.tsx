@@ -27,6 +27,7 @@ import {
   ListTodo,
   Activity,
   Globe2,
+  Home,
   Settings,
   CreditCard,
   Plus,
@@ -75,6 +76,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/memory', label: 'Memory', icon: Brain },
   { to: '/tasks', label: 'Tasks', icon: ListTodo },
   { to: '/agents', label: 'Agents', icon: Activity },
+  { to: '/household', label: 'Household', icon: Home },
   { to: '/network', label: 'Network', icon: Globe2 },
 ];
 

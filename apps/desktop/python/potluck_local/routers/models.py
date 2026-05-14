@@ -16,6 +16,7 @@ import logging
 import shutil
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
+from pydantic import BaseModel, Field
 
 from potluck_local.services import model_registry
 from potluck_local.services.model_downloader import get_downloader
@@ -86,8 +87,22 @@ async def delete_model(slug: str) -> dict:
     return {"status": "deleted"}
 
 
+class LoadModelRequest(BaseModel):
+    """Optional body for POST /models/{slug}/load.
+
+    rpc_servers: when set, the model loads with one or more remote
+    llama.cpp RPC servers participating as ggml-backend devices. This is
+    Big Model Mode — used to run a model too big to fit on this machine
+    alone, by spreading weights/KV/compute across household peers that
+    are running `rpc-server`. Endpoints look like "100.64.0.6:50052".
+    Requires the Potluck-patched llama-cpp-python wheel.
+    """
+
+    rpc_servers: list[str] | None = Field(default=None)
+
+
 @router.post("/{slug}/load", status_code=200)
-async def load_model(slug: str) -> dict:
+async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
     model_path = models_dir() / slug / "model.gguf"
     if not model_path.exists():
         raise HTTPException(
@@ -98,13 +113,37 @@ async def load_model(slug: str) -> dict:
     settings = get_settings()
     runtime = get_runtime()
 
-    logger.info("load_model_start slug=%s", slug)
-    result = runtime.load_model(
-        str(model_path),
-        n_ctx=settings.runtime.context_size,
-        n_gpu_layers=settings.runtime.gpu_layers,
-        n_threads=settings.runtime.threads or None,
+    rpc_servers = body.rpc_servers if body and body.rpc_servers else None
+
+    logger.info(
+        "load_model_start slug=%s rpc_servers=%s",
+        slug,
+        ",".join(rpc_servers) if rpc_servers else "(none)",
     )
+    try:
+        result = runtime.load_model(
+            str(model_path),
+            n_ctx=settings.runtime.context_size,
+            n_gpu_layers=settings.runtime.gpu_layers,
+            n_threads=settings.runtime.threads or None,
+            rpc_servers=rpc_servers,
+        )
+    except TypeError as exc:
+        # Stock (non-Potluck-patched) llama-cpp-python doesn't accept the
+        # rpc_servers kwarg. Surface a clean error so the frontend can
+        # tell the user to upgrade their wheel.
+        if rpc_servers and "rpc_servers" in str(exc):
+            raise HTTPException(
+                status_code=501,
+                detail=(
+                    "Big Model Mode requires the Potluck-patched "
+                    "llama-cpp-python wheel. This sidecar appears to be running "
+                    "stock llama-cpp-python. Install the patched wheel from "
+                    "~/Documents/potluck-parallel/llama-cpp-python or rebuild "
+                    "with CMAKE_ARGS='-DGGML_RPC=ON'."
+                ),
+            )
+        raise
     logger.info("load_model_complete slug=%s load_time=%.2f", slug, result.get("load_time_seconds", 0))
     return result
 

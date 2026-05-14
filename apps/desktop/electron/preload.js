@@ -70,4 +70,27 @@ contextBridge.exposeInMainWorld('potluck', {
     ipcRenderer.on('update-downloaded', handler);
     return () => ipcRenderer.removeListener('update-downloaded', handler);
   },
+
+  // ── Mesh sidecar bridge ────────────────────────────────────────────────────
+  //
+  // The Go mesh sidecar listens on a Unix-domain socket (mac/linux) or named
+  // pipe (Windows). Renderer code can't dial those directly, so main.js
+  // proxies HTTP requests via the `mesh:request` IPC channel.
+  //
+  // Method whitelist (enforced in main.js): GET, POST, DELETE.
+  // Path must begin with "/". Body is JSON-serialised (or omitted).
+  // Return shape: { status: number, body: object | null }
+  //   status === 0 indicates a transport-layer failure (sidecar unreachable,
+  //   timeout). In that case body.error.code is "sidecar_unreachable" or
+  //   "timeout".
+  mesh: {
+    /**
+     * @param {'GET'|'POST'|'DELETE'} method
+     * @param {string} path     Must start with "/"
+     * @param {unknown} [body]  JSON-serialisable; omit for GET / no-body POST
+     * @returns {Promise<{ status: number, body: any }>}
+     */
+    request: (method, path, body) =>
+      ipcRenderer.invoke('mesh:request', method, path, body),
+  },
 });

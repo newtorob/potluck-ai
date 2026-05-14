@@ -11,6 +11,7 @@ import { MemoryMapView } from '@/views/MemoryMapView';
 import { TaskStateView } from '@/views/TaskStateView';
 import { AgentsView } from '@/views/AgentsView';
 import { NetworkView } from '@/views/NetworkView';
+import { HouseholdView } from '@/views/HouseholdView';
 import { SettingsView } from '@/views/SettingsView';
 import { MembershipView } from '@/views/MembershipView';
 import { FirstRun } from '@/views/FirstRun';
@@ -122,6 +123,7 @@ export default function App() {
               <Route path="/memory/map" element={<MemoryMapView />} />
               <Route path="/tasks" element={<TaskStateView />} />
               <Route path="/agents" element={<AgentsView />} />
+              <Route path="/household" element={<HouseholdView />} />
               <Route path="/network" element={<NetworkView />} />
               <Route path="/settings" element={<SettingsView />} />
               <Route path="/membership" element={<MembershipView />} />

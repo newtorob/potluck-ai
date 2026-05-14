@@ -79,6 +79,9 @@ export interface HealthResponse {
   active_model_id: string | null;
   /** Context window actually loaded into the runtime. Null when no model is loaded. */
   n_ctx_loaded?: number | null;
+  /** Big Model Mode: list of llama.cpp RPC endpoints the current model
+   *  is distributed across. Null when loaded locally or no model loaded. */
+  loaded_rpc_servers?: string[] | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -360,10 +363,30 @@ export const localApi = {
     }).then((r) => handleResponse<{ status: string }>(r));
   },
 
-  loadModel(id: string): Promise<{ model_path: string; load_time_seconds: number }> {
+  loadModel(
+    id: string,
+    options: { rpc_servers?: string[] } = {},
+  ): Promise<{ model_path: string; load_time_seconds: number; rpc_servers?: string[] | null }> {
+    // When `rpc_servers` is set, this triggers Big Model Mode — the
+    // sidecar reloads the model with remote llama.cpp RPC backends
+    // participating as ggml devices. Requires the Potluck-patched
+    // llama-cpp-python wheel; the sidecar surfaces a 501 if not.
+    const body =
+      options.rpc_servers && options.rpc_servers.length > 0
+        ? { rpc_servers: options.rpc_servers }
+        : null;
     return fetch(`${LOCAL_BASE}/models/${encodeURIComponent(id)}/load`, {
       method: 'POST',
-    }).then((r) => handleResponse<{ model_path: string; load_time_seconds: number }>(r));
+      ...(body
+        ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+        : {}),
+    }).then((r) =>
+      handleResponse<{
+        model_path: string;
+        load_time_seconds: number;
+        rpc_servers?: string[] | null;
+      }>(r),
+    );
   },
 
   downloadProgress(id: string): Promise<DownloadProgress> {

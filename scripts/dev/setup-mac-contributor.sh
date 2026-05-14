@@ -7,7 +7,7 @@
 #   1. Checks Python 3.11 + git + curl are present
 #   2. Probes both the LAN IP and the Tailscale IP for the coordinator;
 #      picks whichever responds and writes that into .env
-#   3. Runs scripts/install-contributor.py
+#   3. Runs scripts/dev/install-contributor.py
 #   4. Writes apps/desktop/python/.env with the dev smoke-test values
 #   5. Smoke-launches the sidecar to confirm the handshake works
 #   6. Drops a Start-PotluckContributor.command launcher on ~/Desktop
@@ -97,8 +97,8 @@ COORDINATOR_URL="ws://$COORDINATOR_HOST:$COORDINATOR_PORT/peers/connect"
 
 # ---------- 3. Install --------------------------------------------------------
 
-step "Running scripts/install-contributor.py"
-"$PY" "$REPO_ROOT/scripts/install-contributor.py"
+step "Running scripts/dev/install-contributor.py"
+"$PY" "$REPO_ROOT/scripts/dev/install-contributor.py"
 [ -x "$VENV_PY" ] || fail "venv python missing at $VENV_PY after install"
 pass "venv ready at $VENV_PY"
 

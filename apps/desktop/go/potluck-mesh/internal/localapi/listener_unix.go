@@ -34,6 +34,30 @@ func platformListen(socketPath string) (net.Listener, error) {
 		return nil, fmt.Errorf("localapi: chmod socket %s: %w", socketPath, err)
 	}
 
+	// Dev-mode workaround for the daemon-user vs Electron-user reconciliation
+	// (IPC doc open question #1). On macOS the sidecar needs root in dev to
+	// create utun, but Electron runs as the logged-in user. When started via
+	// sudo, $SUDO_UID points at that user — chown the socket so Electron can
+	// open it without us having to slacken mode to 0666.
+	//
+	// Production daemon-install scripts (launchd / systemd) handle this
+	// differently — dedicated daemon user, socket-group membership — so this
+	// branch only fires when SUDO_UID is present.
+	if sudoUID := os.Getenv("SUDO_UID"); sudoUID != "" {
+		if uid, parseErr := strconv.Atoi(sudoUID); parseErr == nil {
+			gid := uid
+			if sudoGID := os.Getenv("SUDO_GID"); sudoGID != "" {
+				if g, parseErr := strconv.Atoi(sudoGID); parseErr == nil {
+					gid = g
+				}
+			}
+			if err := os.Chown(socketPath, uid, gid); err != nil {
+				ln.Close()
+				return nil, fmt.Errorf("localapi: chown socket to SUDO_UID %s: %w", sudoUID, err)
+			}
+		}
+	}
+
 	return ln, nil
 }
 

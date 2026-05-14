@@ -10,7 +10,7 @@
 
 import { type ReactNode, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Thermometer, Hash, Layers, Network, Cpu } from 'lucide-react';
+import { Thermometer, Hash, Layers, Network, Cpu, Home } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { MessageList } from '@/components/chat/MessageList';
 import { Composer } from '@/components/chat/Composer';
@@ -21,6 +21,7 @@ import { useHealth } from '@/hooks/useHealth';
 import { useCoordinatorHealth } from '@/hooks/useCoordinatorHealth';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { useChatStore } from '@/stores/chatStore';
+import { useMeshStore } from '@/stores/meshStore';
 import { PotluckLogo } from '@/components/brand/PotluckLogo';
 
 // ---------------------------------------------------------------------------
@@ -60,6 +61,26 @@ export function ChatView() {
   const networkModelSlug = useChatStore((s) => s.networkModelSlug);
   const setNetworkMode = useChatStore((s) => s.setNetworkMode);
 
+  // Household-mode routing toggle. When on, the prompt goes directly to a
+  // peer in the user's household mesh (POST /peer/chat/completions over
+  // the WireGuard IP). Distinct from networkMode: household = machines you
+  // paired yourself, no coordinator routing, full conversation history
+  // forwarded. Mutually exclusive with networkMode — chatStore enforces.
+  const householdMode = useChatStore((s) => s.householdMode);
+  const setHouseholdMode = useChatStore((s) => s.setHouseholdMode);
+
+  // Household-peer availability — mesh store polls the sidecar; we gate
+  // the toggle on having at least one reachable peer.
+  const householdPeersReachable = useMeshStore(
+    (s) => s.peers.some((p) => p.reachable),
+  );
+  // Start the mesh store on mount so the toggle has live data even when
+  // the user hasn't visited /household yet. start() is idempotent.
+  const meshStart = useMeshStore((s) => s.start);
+  useEffect(() => {
+    meshStart();
+  }, [meshStart]);
+
   // Coordinator reachability — gates the Network toggle. If the user has
   // network mode on AND the coordinator drops, we auto-flip them back to
   // local rather than letting them hit send and get an opaque error.
@@ -71,9 +92,16 @@ export function ChatView() {
     }
   }, [networkMode, coordinatorReachable, lastCheckedAt, setNetworkMode]);
 
-  // In network mode the local model isn't required — a peer hosts the
-  // weights. Send is gated on "either local OR network is available."
-  const sendReady = modelLoaded || networkMode;
+  // Auto-clear household mode if no peers are reachable anymore.
+  useEffect(() => {
+    if (householdMode && !householdPeersReachable) {
+      setHouseholdMode(false);
+    }
+  }, [householdMode, householdPeersReachable, setHouseholdMode]);
+
+  // In network OR household mode the local model isn't required — a peer
+  // hosts the weights. Send is gated on "any of the three is available."
+  const sendReady = modelLoaded || networkMode || householdMode;
 
   const isEmpty = messages.length === 0;
 
@@ -94,16 +122,49 @@ export function ChatView() {
         title="Chat"
         tools={
           <>
-            <ModelSelector disabled={isStreaming || networkMode} />
+            <ModelSelector disabled={isStreaming || networkMode || householdMode} />
 
-            {/* Network-mode toggle — pill that flips the chat between the
-                local sidecar and a contributor peer via the coordinator.
-                When on, the model selector is greyed out (the network
-                model is set separately) and the placeholder + helper
-                copy in the composer change to reflect routing.
+            {/* Routing-mode toggles. Three exclusive states:
+                  - Local      (default): this machine's Python sidecar
+                  - Household  : a peer in the user's household mesh
+                  - Network    : a contributor peer via the coordinator
+                Household + Network buttons are mutually exclusive — clicking
+                one auto-clears the other (enforced in chatStore.set*Mode).
+                Local is the implicit fallback when neither is active. */}
 
-                Subtle ember treatment when active so the user always
-                knows their prompts are leaving the device. */}
+            {/* Household button — strict private routing to a paired machine.
+                Only enabled when at least one household peer is reachable. */}
+            <button
+              type="button"
+              onClick={() => setHouseholdMode(!householdMode)}
+              disabled={isStreaming || !householdPeersReachable}
+              aria-pressed={householdMode}
+              aria-label={householdMode
+                ? 'Household mode on — serving via one of your paired machines. Click to go local.'
+                : !householdPeersReachable
+                  ? 'Household mode unavailable — no paired machines reachable. Set one up in Household.'
+                  : 'Route to a machine in your household'}
+              title={!householdPeersReachable
+                ? 'No household peers reachable — pair a machine in Household first'
+                : householdMode
+                  ? 'Routing to your household. Click to go local.'
+                  : 'Route to your household (private — no coordinator involved)'}
+              className={cn(
+                'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium',
+                'transition-colors duration-fast border',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                householdMode
+                  ? 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15'
+                  : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border',
+                (isStreaming || !householdPeersReachable) && 'cursor-not-allowed opacity-50',
+              )}
+            >
+              <Home className="h-3 w-3" aria-hidden="true" />
+              <span>Household</span>
+            </button>
+
+            {/* Network-mode toggle — routes through the coordinator to an
+                eligible contributor peer (cooperative-wide blinded path). */}
             <button
               type="button"
               onClick={() => setNetworkMode(!networkMode)}

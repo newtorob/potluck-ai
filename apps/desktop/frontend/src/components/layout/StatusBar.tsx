@@ -33,7 +33,7 @@ import { useChatStore } from '@/stores/chatStore';
 import { ipc } from '@/lib/ipc';
 
 export function StatusBar() {
-  const { modelLoaded, activeModelId } = useHealth();
+  const { modelLoaded, activeModelId, sidecarUp } = useHealth();
 
   // App version — fetched from Electron preload on mount
   const [appVersion, setAppVersion] = useState<string | null>(null);
@@ -44,12 +44,6 @@ export function StatusBar() {
       .catch(() => { /* non-fatal — running outside Electron */ });
     return () => { cancelled = true; };
   }, []);
-
-  // MCP server status placeholder — wired to real /health.mcp_running once
-  // the sidecar exposes it. For now we infer "up" from sidecar reachability
-  // via useHealth's activeModelId !== undefined behaviour: any successful
-  // response means the local API is responding.
-  const sidecarUp = activeModelId !== null || modelLoaded;
 
   // Network mode reflects chatStore.networkMode — the same flag the
   // chat-composer toggle flips. Off = nothing leaves the device;

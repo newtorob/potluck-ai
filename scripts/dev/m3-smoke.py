@@ -20,8 +20,8 @@ in-memory-only invariant lint (task #21). Those guard the code paths;
 this harness validates that the code paths actually work end-to-end.
 
 Run from the repo root:
-    python3 scripts/m3-smoke.py
-    python3 scripts/m3-smoke.py --coordinator-url http://127.0.0.1:8400 \\
+    python3 scripts/dev/m3-smoke.py
+    python3 scripts/dev/m3-smoke.py --coordinator-url http://127.0.0.1:8400 \\
             --model qwen2.5:3b-instruct-q4_K_M \\
             --prompt "say hello in five words"
 

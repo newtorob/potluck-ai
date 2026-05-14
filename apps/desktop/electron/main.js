@@ -3,6 +3,7 @@
 const { app, BrowserWindow, shell, ipcMain, dialog, Notification, nativeImage } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
+const http = require('http');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 
@@ -237,6 +238,126 @@ ipcMain.handle('show-notification', (_event, title, body) => {
 });
 
 ipcMain.handle('get-app-version', () => app.getVersion());
+
+// ─── Mesh IPC bridge ─────────────────────────────────────────────────────────
+//
+// The Go mesh sidecar exposes an HTTP server over a Unix domain socket
+// (macOS/Linux) or named pipe (Windows). See docs/phase-g/local-ipc.md.
+// Renderer code can't dial Unix sockets directly, so main.js proxies the
+// HTTP request via ipcMain.handle('mesh:request').
+//
+// Status / peers / pair / unpair endpoints — all small JSON request/response
+// pairs. We deliberately do NOT forward the WS /events stream here: per the
+// shipped /agents-view precedent, polling at 2–5s is cheaper to package and
+// keeps the architecture simple. If live push becomes necessary, add a
+// separate `mesh:subscribe-events` channel.
+//
+// Errors come in three flavours:
+//   * `unreachable`  — the sidecar isn't running / socket file doesn't exist
+//   * `timeout`      — the sidecar accepted but didn't reply in 10s
+//   * regular HTTP   — status >= 400 with a JSON `{ error: { code, message } }`
+//                      body (the localapi server's contract).
+
+const MESH_REQUEST_TIMEOUT_MS = 10_000;
+
+function meshSocketPath() {
+  if (process.platform === 'win32') {
+    return '\\\\.\\pipe\\potluck-mesh';
+  }
+  if (process.platform === 'darwin') {
+    // macOS's launchd / RUNNING_FOR_USER semantics make XDG_RUNTIME_DIR
+    // unreliable. The Go sidecar's defaultSocketPath uses /tmp on Mac.
+    return '/tmp/potluck-mesh.sock';
+  }
+  // Linux: XDG_RUNTIME_DIR or /run/user/$UID fallback.
+  const xdg = process.env.XDG_RUNTIME_DIR;
+  if (xdg && xdg.trim().length > 0) {
+    return path.join(xdg, 'potluck-mesh.sock');
+  }
+  const uid = typeof process.getuid === 'function' ? process.getuid() : 1000;
+  return `/run/user/${uid}/potluck-mesh.sock`;
+}
+
+function meshRequest({ method, path: reqPath, body }) {
+  return new Promise((resolve, reject) => {
+    const opts = {
+      socketPath: meshSocketPath(),
+      method,
+      path: reqPath,
+      headers: { Accept: 'application/json' },
+    };
+
+    let bodyBuf = null;
+    if (body !== undefined && body !== null) {
+      bodyBuf = Buffer.from(JSON.stringify(body));
+      opts.headers['Content-Type'] = 'application/json';
+      opts.headers['Content-Length'] = bodyBuf.length;
+    }
+
+    const req = http.request(opts, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        const text = buf.toString('utf8');
+        let parsed = null;
+        if (text.length > 0) {
+          try {
+            parsed = JSON.parse(text);
+          } catch (_) {
+            parsed = { raw: text };
+          }
+        }
+        resolve({ status: res.statusCode, body: parsed });
+      });
+    });
+
+    req.setTimeout(MESH_REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error('timeout'));
+    });
+
+    req.on('error', (err) => {
+      // ENOENT / ECONNREFUSED → sidecar isn't running. Surface a stable
+      // error code so the renderer can render the "Mesh sidecar offline"
+      // state without parsing OS error strings.
+      const code = err && err.code ? err.code : '';
+      if (code === 'ENOENT' || code === 'ECONNREFUSED') {
+        reject(Object.assign(new Error('sidecar_unreachable'), { code: 'sidecar_unreachable' }));
+        return;
+      }
+      if (err && err.message === 'timeout') {
+        reject(Object.assign(new Error('timeout'), { code: 'timeout' }));
+        return;
+      }
+      reject(err);
+    });
+
+    if (bodyBuf) req.write(bodyBuf);
+    req.end();
+  });
+}
+
+ipcMain.handle('mesh:request', async (_evt, method, reqPath, body) => {
+  // Whitelist methods to keep the surface tight. Renderer must only call
+  // the methods we expose; an arbitrary method through the bridge would
+  // be a bug, not a feature.
+  const allowed = new Set(['GET', 'POST', 'DELETE']);
+  if (typeof method !== 'string' || !allowed.has(method)) {
+    return { status: 400, body: { error: { code: 'bad_method', message: 'method not allowed' } } };
+  }
+  if (typeof reqPath !== 'string' || !reqPath.startsWith('/')) {
+    return { status: 400, body: { error: { code: 'bad_path', message: 'path must start with /' } } };
+  }
+  try {
+    return await meshRequest({ method, path: reqPath, body });
+  } catch (err) {
+    const code = err && err.code ? err.code : 'unknown';
+    return {
+      status: 0,
+      body: { error: { code, message: err && err.message ? err.message : String(err) } },
+    };
+  }
+});
 
 // ─── Auto-updater ────────────────────────────────────────────────────────────
 

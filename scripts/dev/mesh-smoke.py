@@ -15,7 +15,7 @@ Exits 0 on full success.
 
 Run from the repo root with the coordinator + Postgres up:
     make coordinator   # in another terminal
-    python3 scripts/mesh-smoke.py
+    python3 scripts/dev/mesh-smoke.py
 
 The WS step requires the `websockets` package; the HTTP-only portion
 runs stdlib-only.

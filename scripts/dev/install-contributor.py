@@ -21,10 +21,10 @@ What it does NOT do:
     - Modify anything outside apps/desktop/python/
 
 Usage:
-    python3 scripts/install-contributor.py            # install + print next step
-    python3 scripts/install-contributor.py --start    # install then launch
-    python3 scripts/install-contributor.py --reset    # delete venv first
-    python3 scripts/install-contributor.py --quiet    # less output
+    python3 scripts/dev/install-contributor.py            # install + print next step
+    python3 scripts/dev/install-contributor.py --start    # install then launch
+    python3 scripts/dev/install-contributor.py --reset    # delete venv first
+    python3 scripts/dev/install-contributor.py --quiet    # less output
 """
 from __future__ import annotations
 

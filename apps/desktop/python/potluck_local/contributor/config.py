@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 
     # SHA256 of the contributor binary, hex-encoded. The coordinator
     # rejects connections whose hash isn't in `contributor_releases`. In
-    # dev: produced by `scripts/sign-contributor-release.py emit-sql ...`
+    # dev: produced by `scripts/dev/sign-contributor-release.py emit-sql ...`
     # and seeded via psql. In prod: computed at install-time from the
     # signed release artifact.
     binary_hash: str = ""

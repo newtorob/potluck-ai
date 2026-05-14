@@ -23,7 +23,7 @@ keys; the privacy-tests file references `member_id` in strings as part of
 the very assertion that it must not appear).
 
 Run locally:
-    python3 scripts/lint_privacy.py
+    python3 scripts/dev/lint_privacy.py
 
 Run in CI: see `.github/workflows/ci-privacy-lint.yml`.
 
@@ -47,7 +47,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # that asserts member_id MUST NOT appear — it references the string itself).
 PEER_LINT_WHITELIST = {
     "services/coordinator/tests/test_privacy_invariants.py",
-    "scripts/lint_privacy.py",
+    "scripts/dev/lint_privacy.py",
 }
 
 # WS-send method names we want to scrutinize.
@@ -357,7 +357,7 @@ def main() -> int:
     print(f"✗ privacy lint FAIL: {total} violation(s)")
     print(
         "  If the flagged code is intentional + safe, either:\n"
-        "    - add the file to the appropriate whitelist in scripts/lint_privacy.py\n"
+        "    - add the file to the appropriate whitelist in scripts/dev/lint_privacy.py\n"
         "    - refactor to not mention the sensitive name in the flagged context\n"
         "  These invariants are manifesto-level (memory 42a7e671 + 1fc85a49)."
     )

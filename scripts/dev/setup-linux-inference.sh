@@ -6,7 +6,7 @@
 #   - NVIDIA (nvidia-smi works) -> llama-cpp-python with CUDA wheels
 #   - AMD / Intel / no GPU      -> Ollama (handles ROCm/Vulkan/CPU itself)
 #
-# Run AFTER scripts/setup-linux-contributor.sh OR setup-linux-tailscale-contributor.sh.
+# Run AFTER scripts/dev/setup-linux-contributor.sh OR scripts/dev/setup-linux-tailscale-contributor.sh.
 # Idempotent.
 
 set -euo pipefail
@@ -75,8 +75,8 @@ ENV_FILE="$SIDECAR_DIR/.env"
 # ---------- 1. Pre-flight -----------------------------------------------------
 
 step "Pre-flight"
-[ -x "$VENV_PY" ] || fail "venv missing at $VENV_PY - run scripts/setup-linux-contributor.sh first."
-[ -f "$ENV_FILE" ] || fail ".env missing at $ENV_FILE - run scripts/setup-linux-contributor.sh first."
+[ -x "$VENV_PY" ] || fail "venv missing at $VENV_PY - run scripts/dev/setup-linux-contributor.sh first."
+[ -f "$ENV_FILE" ] || fail ".env missing at $ENV_FILE - run scripts/dev/setup-linux-contributor.sh first."
 pass "venv + .env present"
 
 # ---------- 2. Detect GPU vendor + pick backend -------------------------------
@@ -294,7 +294,7 @@ tmp_env="$(mktemp)"
 grep -vE "$strip_re" "$ENV_FILE" > "$tmp_env" || true
 {
     echo ""
-    echo "# Inference (added by scripts/setup-linux-inference.sh)"
+    echo "# Inference (added by scripts/dev/setup-linux-inference.sh)"
     echo "# Backend: $CHOSEN_BACKEND (auto-detected from GPU vendor: $GPU_VENDOR)"
     for kv in "${INFERENCE_KEYS[@]}"; do echo "$kv"; done
 } >> "$tmp_env"
