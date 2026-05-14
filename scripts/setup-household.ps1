@@ -255,15 +255,31 @@ function Install-Prerequisites {
     $pnpm = Get-Command pnpm -ErrorAction SilentlyContinue
     if (-not $pnpm) {
         Info "installing pnpm globally via npm..."
-        & npm install --global pnpm 2>&1 | Out-Null
+        # npm emits 'notice' lines to stderr; with $ErrorActionPreference =
+        # 'Stop' (set at the top of this script) PowerShell treats those as
+        # fatal NativeCommandErrors. We relax the policy just for this call
+        # and verify success via Get-Command afterward (npm's exit code
+        # may also be non-zero in some 'already up to date' cases).
+        $prevEAP = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            & npm install --global pnpm 2>&1 | Out-Null
+        } catch {
+            # Swallow — we verify with Get-Command below, which is the
+            # authoritative check anyway.
+        }
+        $ErrorActionPreference = $prevEAP
+
         $pnpm = Get-Command pnpm -ErrorAction SilentlyContinue
         if (-not $pnpm) {
             $probe = "$env:APPDATA\npm\pnpm.cmd"
             if (Test-Path $probe) {
                 $env:PATH = "$env:APPDATA\npm;" + $env:PATH
-            } else {
-                Fail "pnpm not found after npm install. Open a NEW PowerShell window and re-run -SetupOnly."
+                $pnpm = Get-Command pnpm -ErrorAction SilentlyContinue
             }
+        }
+        if (-not $pnpm) {
+            Fail "pnpm not found after npm install. Open a NEW PowerShell window and re-run -SetupOnly to refresh PATH, or manually 'npm install --global pnpm'."
         }
         Pass "pnpm installed"
     } else {
