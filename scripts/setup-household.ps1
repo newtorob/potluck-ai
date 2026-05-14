@@ -111,6 +111,33 @@ function Ask($prompt, $default = "") {
     return Read-Host "    $prompt"
 }
 
+# Invoke-Native: run an external command tolerantly.
+#
+# PowerShell with $ErrorActionPreference = 'Stop' treats ANY stderr output
+# from a native command (npm notice lines, 'go: downloading <dep>' lines,
+# pip warnings, etc.) as a fatal NativeCommandError. This wrapper relaxes
+# the policy for the duration of the call and reports the real exit code
+# back. Callers should check the return value (or Test-Path on a known
+# build artifact) rather than relying on PowerShell exception flow.
+function Invoke-Native {
+    param(
+        [Parameter(Mandatory)][scriptblock]$Block,
+        [string]$Label = "command"
+    )
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $Block
+        return $LASTEXITCODE
+    } catch {
+        # Genuine exception (not just stderr-as-error). Surface it.
+        Write-Host "    [warn] ${Label}: $($_.Exception.Message)" -ForegroundColor Yellow
+        return 1
+    } finally {
+        $ErrorActionPreference = $prevEAP
+    }
+}
+
 # ----------------------------------------------------------------------------
 # Process lifecycle helpers
 # ----------------------------------------------------------------------------
@@ -265,7 +292,7 @@ function Install-Prerequisites {
         try {
             & npm install --global pnpm 2>&1 | Out-Null
         } catch {
-            # Swallow — we verify with Get-Command below, which is the
+            # Swallow - we verify with Get-Command below, which is the
             # authoritative check anyway.
         }
         $ErrorActionPreference = $prevEAP
@@ -312,12 +339,14 @@ function Build-MeshSidecar {
     Push-Location $MeshDir
     try {
         if (-not (Test-Path "dist")) { New-Item -ItemType Directory -Path "dist" | Out-Null }
-        & go build -o "dist\potluck-mesh.exe" ".\cmd\potluck-mesh" 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Fail "go build failed. Check for compiler errors above."
+        # Go prints 'go: downloading <dep>' to stderr while fetching modules.
+        # PowerShell's strict mode treats that as a fatal error; Invoke-Native
+        # relaxes the policy so the build can complete normally.
+        $exitCode = Invoke-Native -Label "go build" -Block {
+            & go build -o "dist\potluck-mesh.exe" ".\cmd\potluck-mesh"
         }
         if (-not (Test-Path $MeshBin)) {
-            Fail "mesh binary missing at $MeshBin after build"
+            Fail "mesh binary missing at $MeshBin after build (go exit $exitCode). Check the output above for compile errors."
         }
         Pass "built $MeshBin"
     } finally {
@@ -328,17 +357,29 @@ function Build-MeshSidecar {
 function Setup-PythonVenv {
     Step "Setting up Python venv at $VenvDir"
     if (-not (Test-Path $VenvDir)) {
-        & python -m venv $VenvDir 2>&1 | Out-Null
+        Invoke-Native -Label "python -m venv" -Block { & python -m venv $VenvDir } | Out-Null
+        if (-not (Test-Path $VenvPython)) {
+            Fail "venv creation failed. Make sure Python is on PATH (open a new shell + re-run)."
+        }
         Pass "venv created"
     } else {
         Pass "venv already exists"
     }
     Info "upgrading pip..."
-    & $VenvPip install --quiet --upgrade pip 2>&1 | Out-Null
-    Info "installing requirements.txt (this can take a minute)..."
-    & $VenvPip install --quiet -r (Join-Path $PyDir "requirements.txt") 2>&1 | Out-Null
+    Invoke-Native -Label "pip upgrade" -Block {
+        & $VenvPip install --quiet --upgrade pip
+    } | Out-Null
+    Info "installing requirements.txt (this can take a few minutes - llama-cpp-python compiles on first install)..."
+    $rc = Invoke-Native -Label "pip install -r requirements.txt" -Block {
+        & $VenvPip install --quiet -r (Join-Path $PyDir "requirements.txt")
+    }
+    if ($rc -ne 0) {
+        Fail "pip install failed (exit $rc). Re-run with --setup-only and watch for the actual error."
+    }
     Info "installing potluck_local in editable mode..."
-    & $VenvPip install --quiet -e $PyDir 2>&1 | Out-Null
+    Invoke-Native -Label "pip install -e" -Block {
+        & $VenvPip install --quiet -e $PyDir
+    } | Out-Null
     Pass "Python sidecar deps installed"
 }
 
@@ -349,22 +390,26 @@ function Build-ElectronApp {
     Info "installing frontend deps..."
     Push-Location $FrontendDir
     try {
-        & pnpm install --silent 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { Fail "pnpm install in frontend failed" }
+        $rc = Invoke-Native -Label "pnpm install (frontend)" -Block {
+            & pnpm install --silent
+        }
+        if ($rc -ne 0) { Fail "pnpm install in frontend failed (exit $rc)" }
         Info "building frontend bundle..."
-        & pnpm build 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { Fail "pnpm build in frontend failed" }
+        $rc = Invoke-Native -Label "pnpm build (frontend)" -Block { & pnpm build }
+        if ($rc -ne 0) { Fail "pnpm build in frontend failed (exit $rc)" }
         Pass "frontend built"
     } finally {
         Pop-Location
     }
 
-    # Electron deps (the build step downloads Electron itself - large)
+    # Electron deps (the install step downloads Electron itself - large)
     Info "installing Electron deps (downloads Electron runtime ~150MB)..."
     Push-Location $ElectronDir
     try {
-        & pnpm install --silent 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { Fail "pnpm install in electron failed" }
+        $rc = Invoke-Native -Label "pnpm install (electron)" -Block {
+            & pnpm install --silent
+        }
+        if ($rc -ne 0) { Fail "pnpm install in electron failed (exit $rc)" }
         Pass "Electron deps installed"
     } finally {
         Pop-Location
