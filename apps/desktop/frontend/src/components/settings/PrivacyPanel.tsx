@@ -7,14 +7,14 @@
 
 import { Shield } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
-import type { PotluckSettings } from '@/lib/localApi';
+import type { PotluckSettings, PotluckSettingsPatch } from '@/lib/localApi';
 import { MemorySettings } from '@/components/memory/MemorySettings';
 
 interface PrivacyPanelProps {
   settings: PotluckSettings;
   isSaving: boolean;
   saveError: string | null;
-  onUpdate: (patch: Partial<PotluckSettings>) => Promise<void>;
+  onUpdate: (patch: PotluckSettingsPatch) => Promise<void>;
 }
 
 interface ToggleRowProps {

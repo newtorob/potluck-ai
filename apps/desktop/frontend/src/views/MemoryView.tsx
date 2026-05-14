@@ -36,7 +36,6 @@ import { CATEGORY_STYLES, CATEGORY_LABELS } from '@/components/memory/CategoryPi
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
 import type { Memory, MemoryCategory } from '@/types/memory';
-import type { SearchMode } from '@/stores/memoryStore';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -88,8 +87,8 @@ export function MemoryView() {
   const { project: resolvedProject, includeAll } = resolveProjectFilter(projectFilter, activeProject);
 
   const { memories, isFetching, fetchError, performSearch } = useMemories({
-    project: resolvedProject,
-    include_all: includeAll,
+    ...(resolvedProject !== undefined ? { project: resolvedProject } : {}),
+    ...(includeAll !== undefined ? { include_all: includeAll } : {}),
   });
 
   // Pull search state directly from the store (avoids double-definition)
@@ -186,8 +185,8 @@ export function MemoryView() {
         return;
       }
       performSearch(value, {
-        project: resolvedProject,
-        min_confidence: confidenceMin > 0 ? confidenceMin : undefined,
+        ...(resolvedProject !== undefined ? { project: resolvedProject } : {}),
+        ...(confidenceMin > 0 ? { min_confidence: confidenceMin } : {}),
       });
     },
     [performSearch, clearSearch, resolvedProject, confidenceMin],
@@ -210,7 +209,7 @@ export function MemoryView() {
       // Trigger search immediately via store (bypass debounce since user
       // explicitly chose this keyword)
       void useMemoryStore.getState().performSearch(keyword, {
-        project: resolvedProject,
+        ...(resolvedProject !== undefined ? { project: resolvedProject } : {}),
       });
     },
     [setSearchMode, resolvedProject],
@@ -220,8 +219,8 @@ export function MemoryView() {
   useEffect(() => {
     if (searchQuery.trim()) {
       performSearch(searchQuery, {
-        project: resolvedProject,
-        min_confidence: confidenceMin > 0 ? confidenceMin : undefined,
+        ...(resolvedProject !== undefined ? { project: resolvedProject } : {}),
+        ...(confidenceMin > 0 ? { min_confidence: confidenceMin } : {}),
       });
     }
     // Only re-run when mode changes, not every time performSearch ref is created
@@ -675,7 +674,7 @@ export function MemoryView() {
           {/* Tag cloud                                                        */}
           {/* ---------------------------------------------------------------- */}
           <TagCloud
-            activeProject={tagCloudProject}
+            {...(tagCloudProject !== undefined ? { activeProject: tagCloudProject } : {})}
             onKeywordClick={handleKeywordClick}
           />
 

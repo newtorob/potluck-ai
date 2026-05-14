@@ -40,6 +40,7 @@ import {
   PanelLeftOpen,
   Sun,
   Moon,
+  type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { useChat } from '@/hooks/useChat';
@@ -67,7 +68,7 @@ function readCollapsed(): boolean {
 interface NavItem {
   to: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -291,7 +292,7 @@ interface ChromeButtonProps {
   onClick: () => void;
   label: string;
   title: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
 }
 
 function ChromeButton({ onClick, label, title, icon: Icon }: ChromeButtonProps) {

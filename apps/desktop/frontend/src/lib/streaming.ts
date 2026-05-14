@@ -130,11 +130,9 @@ function extractMeta(parsed: unknown): StreamMeta | null {
   const m = (parsed as { meta: Record<string, unknown> }).meta;
   const served = m['served_by'];
   if (served !== 'contributor' && served !== 'local') return null;
-  return {
-    type: 'meta',
-    served_by: served,
-    output_tokens: typeof m['output_tokens'] === 'number' ? (m['output_tokens'] as number) : undefined,
-    duration_ms: typeof m['duration_ms'] === 'number' ? (m['duration_ms'] as number) : undefined,
-    finish_reason: typeof m['finish_reason'] === 'string' ? (m['finish_reason'] as string) : undefined,
-  };
+  const result: StreamMeta = { type: 'meta', served_by: served };
+  if (typeof m['output_tokens'] === 'number') result.output_tokens = m['output_tokens'];
+  if (typeof m['duration_ms'] === 'number') result.duration_ms = m['duration_ms'];
+  if (typeof m['finish_reason'] === 'string') result.finish_reason = m['finish_reason'];
+  return result;
 }

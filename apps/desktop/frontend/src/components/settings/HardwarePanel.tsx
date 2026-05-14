@@ -8,7 +8,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
-import type { PotluckSettings } from '@/lib/localApi';
+import type { PotluckSettings, PotluckSettingsPatch } from '@/lib/localApi';
 
 const CONTEXT_SIZE_OPTIONS = [2048, 4096, 8192, 16384, 32768] as const;
 type ContextSize = (typeof CONTEXT_SIZE_OPTIONS)[number];
@@ -17,7 +17,7 @@ interface HardwarePanelProps {
   settings: PotluckSettings;
   isSaving: boolean;
   saveError: string | null;
-  onUpdate: (patch: Partial<PotluckSettings>) => Promise<void>;
+  onUpdate: (patch: PotluckSettingsPatch) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------

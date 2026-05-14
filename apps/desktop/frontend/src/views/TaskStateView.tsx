@@ -12,7 +12,6 @@ import { cn } from '@/components/ui/cn';
 import { useTasks } from '@/hooks/useTasks';
 import { useProject } from '@/hooks/useProject';
 import { TaskCard } from '@/components/tasks/TaskCard';
-import { ProjectPill } from '@/components/memory/ProjectPill';
 import { normaliseProjectName, resolveProjectFilter } from '@/lib/projectUtils';
 import type { ProjectFilter } from '@/lib/projectUtils';
 import { ViewHeader } from '@/components/layout/ViewHeader';
@@ -279,7 +278,10 @@ export function TaskStateView() {
     addError,
     deleteTask,
     setStatus,
-  } = useTasks({ project: resolvedProject, include_all: includeAll });
+  } = useTasks({
+    ...(resolvedProject !== undefined ? { project: resolvedProject } : {}),
+    ...(includeAll !== undefined ? { include_all: includeAll } : {}),
+  });
 
   // Client-side filter on top of the full list so switching tabs is instant
   const filtered = tasks
@@ -298,7 +300,7 @@ export function TaskStateView() {
     await createTask({
       task_name: name,
       objective,
-      pending_steps: steps.length > 0 ? steps : undefined,
+      ...(steps.length > 0 ? { pending_steps: steps } : {}),
       project,
     });
     setShowNewForm(false);

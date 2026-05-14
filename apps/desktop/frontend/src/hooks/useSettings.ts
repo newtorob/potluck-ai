@@ -7,7 +7,7 @@
 
 import { useEffect } from 'react';
 import { useSettingsStore } from '@/stores/settingsStore';
-import type { PotluckSettings } from '@/lib/localApi';
+import type { PotluckSettings, PotluckSettingsPatch } from '@/lib/localApi';
 
 export function applyTheme(theme: 'system' | 'light' | 'dark') {
   const html = document.documentElement;
@@ -26,7 +26,7 @@ export interface UseSettingsReturn {
   isLoaded: boolean;
   isSaving: boolean;
   saveError: string | null;
-  update: (patch: Partial<PotluckSettings>) => Promise<void>;
+  update: (patch: PotluckSettingsPatch) => Promise<void>;
 }
 
 export function useSettings(): UseSettingsReturn {
@@ -42,7 +42,7 @@ export function useSettings(): UseSettingsReturn {
   }, []);
 
   // Wrap update to also apply theme changes
-  const update = async (patch: Partial<PotluckSettings>) => {
+  const update = async (patch: PotluckSettingsPatch) => {
     await store.update(patch);
     const s = useSettingsStore.getState().settings;
     if (s) applyTheme(s.app.theme);

@@ -39,12 +39,15 @@ async function handleResponse<T>(res: Response): Promise<T> {
 }
 
 function post<T>(path: string, body?: unknown): Promise<T> {
-  return fetch(`${CLOUD_BASE}${path}`, {
+  const init: RequestInit = {
     method: 'POST',
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
-    body: body !== undefined ? JSON.stringify(body) : undefined,
     credentials: 'include',
-  }).then((r) => handleResponse<T>(r));
+  };
+  if (body !== undefined) {
+    init.headers = { 'Content-Type': 'application/json' };
+    init.body = JSON.stringify(body);
+  }
+  return fetch(`${CLOUD_BASE}${path}`, init).then((r) => handleResponse<T>(r));
 }
 
 function get<T>(path: string): Promise<T> {

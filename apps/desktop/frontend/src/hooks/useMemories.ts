@@ -16,7 +16,7 @@ import { useMemoryStore } from '@/stores/memoryStore';
 import type { MemoryState } from '@/stores/memoryStore';
 import type { MemoryCategory } from '@/types/memory';
 
-export type UseMemoriesReturn = MemoryState & {
+export type UseMemoriesReturn = Omit<MemoryState, 'performSearch'> & {
   refetch: () => void;
   performSearch: (query: string, opts?: { project?: string | null; min_confidence?: number }) => void;
 };
@@ -34,10 +34,10 @@ export function useMemories(opts: UseMemoriesOptions = {}): UseMemoriesReturn {
 
   const refetch = useCallback(() => {
     void store.fetchMemories({
-      category: opts.category,
-      limit: opts.limit,
-      project: opts.project,
-      include_all: opts.include_all,
+      ...(opts.category !== undefined ? { category: opts.category } : {}),
+      ...(opts.limit !== undefined ? { limit: opts.limit } : {}),
+      ...(opts.project !== undefined ? { project: opts.project } : {}),
+      ...(opts.include_all !== undefined ? { include_all: opts.include_all } : {}),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store, opts.category, opts.limit, opts.project, opts.include_all]);

@@ -45,9 +45,9 @@ export const useTaskStore = create<TaskStoreState>()((set, get) => ({
     set({ isFetching: true, fetchError: null });
     try {
       const tasks = await localApi.tasks.list({
-        status: opts?.status,
-        project: opts?.project,
-        include_all: opts?.include_all,
+        ...(opts?.status !== undefined ? { status: opts.status } : {}),
+        ...(opts?.project !== undefined ? { project: opts.project } : {}),
+        ...(opts?.include_all !== undefined ? { include_all: opts.include_all } : {}),
       });
       set({ tasks, isFetching: false });
     } catch (err) {

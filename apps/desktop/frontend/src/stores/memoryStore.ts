@@ -89,11 +89,11 @@ export const useMemoryStore = create<MemoryState>()((set, get) => ({
     set({ isFetching: true, fetchError: null });
     try {
       const memories = await localApi.memory.list({
-        category: opts.category,
+        ...(opts.category !== undefined ? { category: opts.category } : {}),
         limit: opts.limit ?? 100,
         offset: opts.offset ?? 0,
-        project: opts.project,
-        include_all: opts.include_all,
+        ...(opts.project !== undefined ? { project: opts.project } : {}),
+        ...(opts.include_all !== undefined ? { include_all: opts.include_all } : {}),
       });
       set({ memories, isFetching: false, lastFetchedAt: Date.now() });
     } catch (err) {
@@ -222,8 +222,8 @@ export const useMemoryStore = create<MemoryState>()((set, get) => ({
         query,
         semantic: get().searchMode === 'semantic',
         max_memories: 100,
-        project: opts.project,
-        min_confidence: opts.min_confidence,
+        ...(opts.project !== undefined ? { project: opts.project } : {}),
+        ...(opts.min_confidence !== undefined ? { min_confidence: opts.min_confidence } : {}),
       });
       set({ searchResults: results, isSearching: false });
     } catch {

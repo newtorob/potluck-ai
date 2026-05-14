@@ -16,13 +16,13 @@ import { useEffect, useState } from 'react';
 import { FolderTree, RefreshCw, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { localApi } from '@/lib/localApi';
-import type { PotluckSettings, VaultStatus, VaultRescanResult } from '@/lib/localApi';
+import type { PotluckSettingsPatch, PotluckSettings, VaultStatus, VaultRescanResult } from '@/lib/localApi';
 
 interface VaultPanelProps {
   settings: PotluckSettings;
   isSaving: boolean;
   saveError: string | null;
-  onUpdate: (patch: Partial<PotluckSettings>) => Promise<void>;
+  onUpdate: (patch: PotluckSettingsPatch) => Promise<void>;
 }
 
 function formatRelative(iso: string | null): string {

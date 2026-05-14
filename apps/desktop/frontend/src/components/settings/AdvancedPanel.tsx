@@ -15,7 +15,7 @@ import { McpIntegrationPanel } from '@/components/settings/McpIntegrationPanel';
 import { CooperativeConnectionPanel } from '@/components/settings/CooperativeConnectionPanel';
 import { useProject } from '@/hooks/useProject';
 import { normaliseProjectName } from '@/lib/projectUtils';
-import type { PotluckSettings, MemorySettings } from '@/lib/localApi';
+import type { PotluckSettingsPatch, PotluckSettings, MemorySettings } from '@/lib/localApi';
 import type { MemoryCategory } from '@/types/memory';
 
 // ---------------------------------------------------------------------------
@@ -307,7 +307,7 @@ interface AdvancedPanelProps {
   settings: PotluckSettings;
   isSaving: boolean;
   saveError: string | null;
-  onUpdate: (patch: Partial<PotluckSettings>) => Promise<void>;
+  onUpdate: (patch: PotluckSettingsPatch) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
