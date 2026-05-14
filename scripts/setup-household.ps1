@@ -369,9 +369,14 @@ function Setup-PythonVenv {
     Invoke-Native -Label "pip upgrade" -Block {
         & $VenvPip install --quiet --upgrade pip
     } | Out-Null
-    Info "installing requirements.txt (this can take a few minutes - llama-cpp-python compiles on first install)..."
+    Info "installing requirements.txt (this can take a few minutes)..."
+    # --prefer-binary: tell pip to grab a pre-built wheel even if it's a
+    # slightly older release than the source-only one. Crucial on Windows
+    # where llama-cpp-python's C++ build needs MSVC + cmake, which most
+    # users don't have. Better to install a recent-enough wheel than to
+    # fail trying to compile from source.
     $rc = Invoke-Native -Label "pip install -r requirements.txt" -Block {
-        & $VenvPip install --quiet -r (Join-Path $PyDir "requirements.txt")
+        & $VenvPip install --quiet --prefer-binary -r (Join-Path $PyDir "requirements.txt")
     }
     if ($rc -ne 0) {
         Fail "pip install failed (exit $rc). Re-run with --setup-only and watch for the actual error."
