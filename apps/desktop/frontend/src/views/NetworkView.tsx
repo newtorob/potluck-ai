@@ -20,7 +20,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Globe2, Layers, Activity, Cpu, BarChart3, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Globe2, Layers, Activity, Cpu, BarChart3, TrendingUp, TrendingDown, Minus, type LucideIcon } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { localApi } from '@/lib/localApi';
 import type { FleetSummary, MyJobStats, CreditBalance, CreditHistory, CreditHistoryEntry } from '@/lib/localApi';
@@ -360,10 +360,10 @@ function FleetCard({ fleet }: { fleet: FleetSummary | null }) {
 }
 
 interface StatCardProps {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   label: string;
   value: number | undefined;
-  sub?: string;
+  sub?: string | undefined;
   emphasize?: boolean;
   formatLarge?: boolean;
 }

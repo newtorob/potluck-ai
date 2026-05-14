@@ -15,7 +15,7 @@ import { useRef, useState } from 'react';
 import { Download, Upload, Trash2, Check } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { useMemoryStore } from '@/stores/memoryStore';
-import type { PotluckSettings } from '@/lib/localApi';
+import type { PotluckSettings, PotluckSettingsPatch } from '@/lib/localApi';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -24,7 +24,7 @@ import type { PotluckSettings } from '@/lib/localApi';
 interface MemorySettingsProps {
   settings: PotluckSettings;
   isSaving: boolean;
-  onUpdate: (patch: Partial<PotluckSettings>) => Promise<void>;
+  onUpdate: (patch: PotluckSettingsPatch) => Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,12 +149,7 @@ function InlineToast({ message, className }: InlineToastProps) {
 export function MemorySettings({ settings, isSaving, onUpdate }: MemorySettingsProps) {
   const { memories, exportToFile, importFromFile, wipeAll, wipeError } = useMemoryStore();
 
-  // Privacy setting — default true if the field doesn't exist yet on the
-  // settings shape (forward-compat: Agent B adds memory_enabled to the schema)
-  const memoryEnabled =
-    'memory_enabled' in (settings.privacy as Record<string, unknown>)
-      ? Boolean((settings.privacy as Record<string, unknown>)['memory_enabled'])
-      : true;
+  const memoryEnabled = settings.privacy.memory_enabled;
 
   const [exportSuccess, setExportSuccess] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);

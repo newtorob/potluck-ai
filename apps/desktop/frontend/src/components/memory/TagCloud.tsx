@@ -56,7 +56,7 @@ export function TagCloud({ activeProject, onKeywordClick }: TagCloudProps) {
     void localApi.memory
       .keywords({
         limit: MAX_KEYWORDS,
-        project: activeProject ?? undefined,
+        ...(activeProject ? { project: activeProject } : {}),
         min_count: 2,
       })
       .then((data) => {

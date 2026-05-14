@@ -133,6 +133,12 @@ export interface VaultSettings {
   chunk_count: number;
 }
 
+export type PotluckSettingsPatch = {
+  [K in keyof PotluckSettings]?: PotluckSettings[K] extends object
+    ? Partial<PotluckSettings[K]>
+    : PotluckSettings[K];
+};
+
 export interface PotluckSettings {
   runtime: RuntimeSettings;
   privacy: PrivacySettings;
@@ -301,7 +307,7 @@ export const localApi = {
    * lib/streaming.ts to yield tokens as an async generator.
    */
   streamChat(messages: ChatMessage[], options: ChatOptions): Promise<Response> {
-    return fetch(`${LOCAL_BASE}/chat/completions`, {
+    const init: RequestInit = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -310,8 +316,9 @@ export const localApi = {
         temperature: options.temperature ?? 0.7,
         max_tokens: options.maxTokens ?? 2048,
       }),
-      signal: options.abortSignal,
-    });
+    };
+    if (options.abortSignal) init.signal = options.abortSignal;
+    return fetch(`${LOCAL_BASE}/chat/completions`, init);
   },
 
   /**
@@ -330,7 +337,7 @@ export const localApi = {
     prompt: string,
     options: { modelSlug: string; temperature?: number; maxTokens?: number; abortSignal?: AbortSignal }
   ): Promise<Response> {
-    return fetch(`${coordinatorBase()}/jobs/stream`, {
+    const init: RequestInit = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -341,8 +348,9 @@ export const localApi = {
           max_tokens: options.maxTokens ?? 2048,
         },
       }),
-      signal: options.abortSignal,
-    });
+    };
+    if (options.abortSignal) init.signal = options.abortSignal;
+    return fetch(`${coordinatorBase()}/jobs/stream`, init);
   },
 
   // ---- Models --------------------------------------------------------------
@@ -409,7 +417,7 @@ export const localApi = {
     return fetch(`${LOCAL_BASE}/settings`).then((r) => handleResponse<PotluckSettings>(r));
   },
 
-  updateSettings(patch: Partial<PotluckSettings>): Promise<PotluckSettings> {
+  updateSettings(patch: PotluckSettingsPatch): Promise<PotluckSettings> {
     return fetch(`${LOCAL_BASE}/settings`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },

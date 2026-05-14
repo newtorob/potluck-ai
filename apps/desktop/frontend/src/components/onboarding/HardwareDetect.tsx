@@ -137,7 +137,7 @@ function SpecCard({
   icon: React.ReactNode;
   label: string;
   value: string;
-  sub?: string;
+  sub?: string | undefined;
 }) {
   return (
     <div className="flex flex-col gap-1 rounded-lg border border-border bg-card px-3 py-3">

@@ -22,7 +22,6 @@ import { VaultPanel } from '@/components/settings/VaultPanel';
 import { useSettings } from '@/hooks/useSettings';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
-import type { PotluckSettings } from '@/lib/localApi';
 
 // ---------------------------------------------------------------------------
 // Tab definitions

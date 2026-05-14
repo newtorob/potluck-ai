@@ -27,7 +27,6 @@ import type { ToolCall, AgentSession } from '@/types/agents';
 // ---------------------------------------------------------------------------
 
 const SAFE_ARG_KEYS = ['category', 'project', 'limit', 'status', 'query', 'tool'] as const;
-type SafeArgKey = (typeof SAFE_ARG_KEYS)[number];
 
 function renderArgsSummary(args: Record<string, unknown> | null): string | null {
   if (args === null) return null;
@@ -163,8 +162,8 @@ function ActivityRow({ call, clientName, isHighlighted, isNew, onSelect }: Activ
 interface FilterControlsProps {
   sessions: AgentSession[];
   activity: ToolCall[];
-  currentFilter: { client?: string; project?: string; tool?: string };
-  onSetFilter: (patch: { client?: string; project?: string; tool?: string }) => void;
+  currentFilter: { client?: string | undefined; project?: string | undefined; tool?: string | undefined };
+  onSetFilter: (patch: { client?: string | undefined; project?: string | undefined; tool?: string | undefined }) => void;
   onClearFilter: () => void;
   selectId: string;
 }
@@ -288,8 +287,8 @@ interface ActivityFeedProps {
   sessions: AgentSession[];
   activity: ToolCall[];
   selectedSessionId: string | null;
-  filter: { client?: string; project?: string; tool?: string };
-  onSetFilter: (patch: { client?: string; project?: string; tool?: string }) => void;
+  filter: { client?: string | undefined; project?: string | undefined; tool?: string | undefined };
+  onSetFilter: (patch: { client?: string | undefined; project?: string | undefined; tool?: string | undefined }) => void;
   onClearFilter: () => void;
   onSelectSession: (id: string) => void;
   /** IDs of calls that just arrived and should get the flash highlight */

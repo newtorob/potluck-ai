@@ -138,18 +138,6 @@ function makeId(): string {
   return crypto.randomUUID();
 }
 
-function makeConversation(modelSlug: string | null = null): AppConversation {
-  const now = Date.now();
-  return {
-    id: makeId(),
-    title: 'New chat',
-    modelSlug,
-    messages: [],
-    createdAt: now,
-    updatedAt: now,
-  };
-}
-
 /** Derive a conversation title from the first user message (max 40 chars). */
 function titleFromContent(content: string): string {
   const trimmed = content.trim().replace(/\s+/g, ' ');
@@ -168,12 +156,11 @@ function persistedToAppMessage(p: PersistedMessage): AppMessage {
     createdAt: new Date(p.created_at).getTime(),
   };
   if (p.served_by !== null && p.role === 'assistant') {
-    msg.meta = {
-      served_by: p.served_by,
-      output_tokens: p.output_tokens ?? undefined,
-      duration_ms: p.duration_ms ?? undefined,
-      finish_reason: p.finish_reason ?? undefined,
-    };
+    const meta: NonNullable<AppMessage['meta']> = { served_by: p.served_by };
+    if (p.output_tokens !== null && p.output_tokens !== undefined) meta.output_tokens = p.output_tokens;
+    if (p.duration_ms !== null && p.duration_ms !== undefined) meta.duration_ms = p.duration_ms;
+    if (p.finish_reason !== null && p.finish_reason !== undefined) meta.finish_reason = p.finish_reason;
+    msg.meta = meta;
   }
   return msg;
 }
@@ -522,19 +509,14 @@ export const useChatStore = create<ChatState>()((set, get) => ({
                 ...s.conversations,
                 [conversationId]: {
                   ...target,
-                  messages: target.messages.map((m) =>
-                    m.id === assistantId
-                      ? {
-                          ...m,
-                          meta: {
-                            served_by: event.served_by,
-                            output_tokens: event.output_tokens,
-                            duration_ms: event.duration_ms,
-                            finish_reason: event.finish_reason,
-                          },
-                        }
-                      : m,
-                  ),
+                  messages: target.messages.map((m) => {
+                    if (m.id !== assistantId) return m;
+                    const meta: NonNullable<AppMessage['meta']> = { served_by: event.served_by };
+                    if (event.output_tokens !== undefined) meta.output_tokens = event.output_tokens;
+                    if (event.duration_ms !== undefined) meta.duration_ms = event.duration_ms;
+                    if (event.finish_reason !== undefined) meta.finish_reason = event.finish_reason;
+                    return { ...m, meta };
+                  }),
                 },
               },
             };

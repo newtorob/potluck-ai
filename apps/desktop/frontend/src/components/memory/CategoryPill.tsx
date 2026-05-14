@@ -35,6 +35,10 @@ const CATEGORY_STYLES: Record<MemoryCategory, string> = {
     'dark:bg-rose-500/12 dark:text-rose-300 dark:border-rose-500/25',
   // Neutral → "instruction" (the most rule-like, lowest emotional weight)
   instruction: 'bg-muted text-muted-foreground border-border/60',
+  // Violet → "reference" (points to external state)
+  reference:
+    'bg-violet-500/10 text-violet-700 border-violet-500/20 ' +
+    'dark:bg-violet-500/12 dark:text-violet-300 dark:border-violet-500/25',
 };
 
 const CATEGORY_LABELS: Record<MemoryCategory, string> = {
@@ -44,6 +48,7 @@ const CATEGORY_LABELS: Record<MemoryCategory, string> = {
   project: 'Project',
   person: 'Person',
   instruction: 'Instruction',
+  reference: 'Reference',
 };
 
 interface CategoryPillProps {

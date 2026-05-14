@@ -19,7 +19,7 @@
  * yet exported by Agent 2's work, so we fall back to URL navigation).
  */
 
-import React, {
+import {
   Suspense,
   lazy,
   useCallback,
@@ -27,6 +27,7 @@ import React, {
   useMemo,
   useRef,
   useState,
+  type ComponentType,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Crosshair, AlertCircle } from 'lucide-react';
@@ -40,7 +41,7 @@ import type { Memory } from '@/types/memory';
 // ---------------------------------------------------------------------------
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-force-graph-2d uses complex generic types; the lazy wrapper needs the cast
-const ForceGraph2D = lazy(() => import('react-force-graph-2d').then((mod) => ({ default: mod.default as any })));
+const ForceGraph2D = lazy(() => import('react-force-graph-2d').then((mod) => ({ default: mod.default as ComponentType<any> })));
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -168,7 +169,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
         const allMemories = await localApi.memory.list({
           include_all: true,
           limit: 1000,
-          project: activeProject ?? undefined,
+          ...(activeProject ? { project: activeProject } : {}),
         });
 
         if (cancelled) return;
@@ -311,6 +312,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
       }, 800);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [graphData]);
 
   // ---------------------------------------------------------------------------

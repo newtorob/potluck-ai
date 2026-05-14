@@ -75,8 +75,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             confirms it left the device + summarises the round trip. */}
         {message.meta?.served_by === 'contributor' && !isStreaming && (
           <ServedByFooter
-            durationMs={message.meta.duration_ms}
-            outputTokens={message.meta.output_tokens}
+            {...(message.meta.duration_ms !== undefined ? { durationMs: message.meta.duration_ms } : {})}
+            {...(message.meta.output_tokens !== undefined ? { outputTokens: message.meta.output_tokens } : {})}
           />
         )}
       </div>

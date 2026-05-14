@@ -20,9 +20,9 @@ import type { AgentSession, SessionDetail, ToolCall } from '@/types/agents';
 // ---------------------------------------------------------------------------
 
 interface ActivityFilter {
-  client?: string;
-  project?: string;
-  tool?: string;
+  client?: string | undefined;
+  project?: string | undefined;
+  tool?: string | undefined;
 }
 
 interface AgentStoreState {

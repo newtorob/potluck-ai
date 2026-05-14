@@ -334,7 +334,7 @@ export async function streamHouseholdInference(
     content: m.content,
   }));
 
-  const response = await fetch(`${peerBaseURL(peer)}/peer/chat/completions`, {
+  const init: RequestInit = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -343,8 +343,9 @@ export async function streamHouseholdInference(
       temperature: options.temperature ?? 0.7,
       max_tokens: options.maxTokens ?? 2048,
     }),
-    signal: options.abortSignal,
-  });
+  };
+  if (options.abortSignal) init.signal = options.abortSignal;
+  const response = await fetch(`${peerBaseURL(peer)}/peer/chat/completions`, init);
 
   return { response, peer, capabilities };
 }
