@@ -41,6 +41,14 @@ import { useChatStore } from '@/stores/chatStore';
 import { useHealth } from '@/hooks/useHealth';
 import { localApi } from '@/lib/localApi';
 import { getBigModelEligiblePeers, type PeerCapabilities } from '@/lib/householdInference';
+import {
+  computeCapacity,
+  speedLabel,
+  speedHint,
+  speedColorClasses,
+  type CapacitySnapshot,
+  type CapacityResult,
+} from '@/lib/capacity';
 import { meshClient, issuePairingToken, MeshApiError, CoordinatorError } from '@/lib/meshClient';
 import { relativeTime } from '@/lib/timeFormat';
 import type { MeshPeer, MeshStatus } from '@/types/mesh';
@@ -527,6 +535,16 @@ function PairedView({
         )}
       </section>
 
+      {/* Capacity — "your network can run X fast / Y good / Z slow".
+          Renders only when at least one peer is reachable; computes from
+          live /peer/capabilities probes. */}
+      {peers.some((p) => p.reachable) && (
+        <section aria-label="Network capacity">
+          <SectionHeader>Your network can run</SectionHeader>
+          <CapacityCard peers={peers} />
+        </section>
+      )}
+
       {/* Big Model Mode — gated on at least one peer offering rpc compute.
           The component itself probes on mount + shows nothing if none. */}
       <section aria-label="Big Model Mode">
@@ -547,6 +565,99 @@ function PairedView({
         <UnpairControl onUnpaired={onUnpaired} />
       </section>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Capacity card — "your network can run X fast / Y good / Z slow"
+// ---------------------------------------------------------------------------
+
+/**
+ * CapacityCard — surface what the household's live peer set can actually
+ * run, bucketed by model size. Probes each reachable peer on mount and
+ * whenever the roster changes. Honesty rule: conservative buckets only;
+ * "good" never lies, "unavailable" gives an actionable upgrade hint.
+ */
+function CapacityCard({ peers }: { peers: MeshPeer[] }) {
+  const [snapshot, setSnapshot] = useState<CapacitySnapshot | null>(null);
+  const [probing, setProbing] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setProbing(true);
+    void (async () => {
+      try {
+        const result = await computeCapacity(peers);
+        if (!cancelled) setSnapshot(result);
+      } catch {
+        if (!cancelled) setSnapshot(null);
+      } finally {
+        if (!cancelled) setProbing(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [peers]);
+
+  if (probing && !snapshot) {
+    return (
+      <div className="rounded-lg border border-border/60 bg-card p-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          Probing peers for capability...
+        </div>
+      </div>
+    );
+  }
+
+  if (!snapshot || snapshot.peerCount === 0) {
+    return (
+      <div className="rounded-lg border border-border/60 bg-card p-4 text-sm text-muted-foreground">
+        No reachable peers — capacity unavailable.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-border/60 bg-card p-4">
+      <ul className="flex flex-wrap gap-2" aria-label="Network capacity by model size">
+        {snapshot.buckets.map((bucket) => (
+          <CapacityPill key={bucket.bucket} result={bucket} />
+        ))}
+      </ul>
+      <p className="mt-3 text-[11px] text-muted-foreground/70">
+        Buckets reflect the best single peer for each model size. fast = &gt;20 tok/s, good = 8-20, slow = 1-8.
+        {snapshot.bigModelPoolSize >= 2 && (
+          <> {snapshot.bigModelPoolSize} peers can pool for Big Model Mode.</>
+        )}
+      </p>
+    </div>
+  );
+}
+
+function CapacityPill({ result }: { result: CapacityResult }) {
+  const titleParts: string[] = [`${result.label} model — ${speedLabel(result.speed)} (${speedHint(result.speed)})`];
+  if (result.bestPeerHost && result.speed !== 'unavailable') {
+    titleParts.push(`best peer: ${result.bestPeerHost}`);
+  }
+  if (result.bigModelEligible) {
+    titleParts.push('unlocked via Big Model Mode pooling — capacity, not speed');
+  }
+  return (
+    <li
+      className={cn(
+        'flex items-baseline gap-1.5 rounded-md border px-2.5 py-1 text-xs',
+        speedColorClasses(result.speed),
+      )}
+      title={titleParts.join(' • ')}
+    >
+      <span className="font-semibold">{result.label}</span>
+      <span className="opacity-80">{speedLabel(result.speed)}</span>
+      {result.bigModelEligible && (
+        <span className="text-[10px] opacity-70" aria-label="via Big Model pooling">·pool</span>
+      )}
+    </li>
   );
 }
 
