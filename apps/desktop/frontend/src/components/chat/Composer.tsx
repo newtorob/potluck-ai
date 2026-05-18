@@ -27,14 +27,18 @@ interface ComposerProps {
   onSend: (content: string) => void;
   onStop: () => void;
   isStreaming: boolean;
-  /** Disable sending when no model is loaded */
+  /** Disable sending when no inference path is available (no local model AND
+   *  no network / household mode active). */
   modelLoaded: boolean;
+  /** Current routing mode — drives the privacy-honesty footer copy. */
+  householdMode: boolean;
+  networkMode: boolean;
 }
 
 /** Approximate max height for ~12 lines at 20px line-height */
 const MAX_HEIGHT_PX = 240;
 
-export function Composer({ onSend, onStop, isStreaming, modelLoaded }: ComposerProps) {
+export function Composer({ onSend, onStop, isStreaming, modelLoaded, householdMode, networkMode }: ComposerProps) {
   const [value, setValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -177,7 +181,12 @@ export function Composer({ onSend, onStop, isStreaming, modelLoaded }: ComposerP
         )}
       </div>
 
-      <ComposerHint isStreaming={isStreaming} modelLoaded={modelLoaded} />
+      <ComposerHint
+        isStreaming={isStreaming}
+        modelLoaded={modelLoaded}
+        householdMode={householdMode}
+        networkMode={networkMode}
+      />
     </div>
   );
 }
@@ -189,11 +198,15 @@ export function Composer({ onSend, onStop, isStreaming, modelLoaded }: ComposerP
 interface ComposerHintProps {
   isStreaming: boolean;
   modelLoaded: boolean;
+  householdMode: boolean;
+  networkMode: boolean;
 }
 
-function ComposerHint({ isStreaming, modelLoaded }: ComposerHintProps) {
-  // The hint switches voice depending on state. Always-local promise is the
-  // anchor; the streaming and "no model" states get their own honest line.
+function ComposerHint({ isStreaming, modelLoaded, householdMode, networkMode }: ComposerHintProps) {
+  // The hint switches voice depending on routing mode. The privacy line MUST
+  // accurately describe where the prompt actually goes (memory 20fd8d9f:
+  // honest framing — never overclaim privacy). When no inference path is
+  // ready, fall back to a "pick a model" nudge.
   let body: React.ReactNode;
   if (!modelLoaded) {
     body = (
@@ -206,6 +219,25 @@ function ComposerHint({ isStreaming, modelLoaded }: ComposerHintProps) {
     body = (
       <>
         Press <Kbd>Esc</Kbd> to stop generating.
+      </>
+    );
+  } else if (householdMode) {
+    // Household: prompt POSTs directly to a paired peer's mesh IP over
+    // WireGuard. The coordinator is not on the inference path. The peer
+    // *does* see prompt content — be honest about that.
+    body = (
+      <>
+        Routed over your WireGuard mesh to a machine in your household — never the coordinator.
+      </>
+    );
+  } else if (networkMode) {
+    // Cooperative network: blinded dispatch via the coordinator. The
+    // serving peer receives a JobAssignedMessage with no member-identifying
+    // fields (privacy invariant in services/coordinator). It DOES see the
+    // prompt content at inference time — say so.
+    body = (
+      <>
+        Blinded routing through the coordinator — the serving peer doesn’t see who you are.
       </>
     );
   } else {

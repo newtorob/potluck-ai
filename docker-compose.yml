@@ -161,6 +161,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://potluck:potluck@postgres:5432/potluck
       ENV: development
       SENTRY_DSN: ""
+      POTLUCK_DERP_JWT_KEY: dev-only-derp-jwt-key-change-me-000000000000000000000000000000000000
     volumes:
       - ./services/coordinator:/app
     working_dir: /app
@@ -181,6 +182,33 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
+
+  # DERP relay — TCP packet-forwarding fallback for symmetric NAT / hairpin NAT
+  # scenarios where direct UDP hole-punch between WG peers fails. The relay sees
+  # only encrypted WG packets (no plaintext); JWT auth via the symmetric key
+  # shared with the coordinator. Dev mode uses cleartext (--insecure-cleartext);
+  # production deploys terminate TLS via --tls-cert/--tls-key.
+  derp:
+    build:
+      context: ./services/derp
+      dockerfile: Dockerfile
+    container_name: potluck-derp
+    # Bind 0.0.0.0 so LAN / Tailscale machines (media server, gaming PC) can
+    # reach the relay during cross-machine mesh testing.
+    ports:
+      - "0.0.0.0:8443:8443"
+      - "0.0.0.0:8444:8444"
+    environment:
+      POTLUCK_DERP_JWT_KEY: dev-only-derp-jwt-key-change-me-000000000000000000000000000000000000
+      # Match the v0 single-region default hardcoded in the mesh sidecar
+      # (cmd/potluck-mesh/main.go:992) + coordinator schema default.
+      POTLUCK_DERP_REGION: ord
+    command: ["--insecure-cleartext"]
+    healthcheck:
+      # distroless image has no shell or curl; use the binary's own readiness signal via the relay's health port via wget from a busybox sidecar isn't worth it.
+      # Skip explicit healthcheck; the binary logs "relay listening" on stderr and the relay port refuses connections only when crashed.
+      disable: true
+    restart: unless-stopped
 
 volumes:
   pgdata:

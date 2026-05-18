@@ -263,6 +263,8 @@ export function ChatView() {
         onStop={abort}
         isStreaming={isStreaming}
         modelLoaded={sendReady}
+        householdMode={householdMode}
+        networkMode={networkMode}
       />
     </div>
   );

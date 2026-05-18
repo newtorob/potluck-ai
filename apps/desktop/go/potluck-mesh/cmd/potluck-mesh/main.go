@@ -211,6 +211,20 @@ func run() int {
 			copy(pub[:], kb)
 			return dBind.IsPeerDERPRouted(pub)
 		})
+
+		// Proactive flip-to-DERP on roster receive. Same decoding pattern as
+		// above; reuses the existing flipToDERP helper. Errors are logged
+		// inside flipToDERP, so this closure stays terse.
+		handler.setFlipPeerToDERPFn(func(pubkey string) {
+			kb, err := base64.StdEncoding.DecodeString(pubkey)
+			if err != nil || len(kb) != 32 {
+				slog.Warn("flip-on-roster: bad pubkey", "pubkey_prefix", util.TruncatePubkey(pubkey))
+				return
+			}
+			var pub [32]byte
+			copy(pub[:], kb)
+			flipToDERP(tun, dBind, pubkey, pub)
+		})
 	}
 
 	client := msignal.NewClient(cfg.SignalURL(), cfg.WGPublicKey, handler)
@@ -645,6 +659,13 @@ type rosterHandler struct {
 	// latest known STUN endpoint to point at.
 	isDERPRoutedFn func(pubkey string) bool
 
+	// flipPeerToDERPFn proactively switches a peer to DERP routing at the
+	// moment we first see it. Called from OnWelcome / OnRosterUpdate so
+	// peers DON'T burn the first 30 seconds of life trying direct-UDP
+	// handshakes that can't succeed under hairpin/symmetric NAT. The
+	// reachability loop still handles re-flipping on later state changes.
+	flipPeerToDERPFn func(pubkey string)
+
 	// punchMu guards punchState.
 	punchMu    sync.Mutex
 	punchState map[string]*punchEntry // keyed by node_id
@@ -666,6 +687,12 @@ func newRosterHandler(tun *tunnel.Tunnel, ps *peerstate.Store, bus *events.Bus, 
 // always-overwrite behavior.
 func (h *rosterHandler) setIsDERPRoutedFn(fn func(pubkey string) bool) {
 	h.isDERPRoutedFn = fn
+}
+
+// setFlipPeerToDERPFn wires the proactive-flip callback. Same nil-safety
+// story as setIsDERPRoutedFn — left nil when DERP is disabled.
+func (h *rosterHandler) setFlipPeerToDERPFn(fn func(pubkey string)) {
+	h.flipPeerToDERPFn = fn
 }
 
 // setClient wires the signal client back into the handler after construction.
@@ -730,6 +757,18 @@ func (h *rosterHandler) OnWelcome(w msignal.Welcome) {
 		}
 	}
 
+	// 4c. Proactively flip every roster peer to DERP routing immediately,
+	// rather than waiting 30s for the reachability loop's first tick. The
+	// 30s gap was burning handshakes via direct UDP (which can't succeed
+	// under hairpin/symmetric NAT anyway) and leaving the household toggle
+	// greyed out during that window. DERP is the safe default; the loop
+	// still detects later transitions if direct ever works.
+	if h.flipPeerToDERPFn != nil {
+		for _, p := range w.Roster {
+			h.flipPeerToDERPFn(p.WGPublicKey)
+		}
+	}
+
 	// 5. Publish status_changed + peer_added events for each roster peer.
 	if h.bus != nil {
 		h.bus.Publish(events.NewStatusChanged(string(localapi.StatusRunning)))
@@ -782,6 +821,12 @@ func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
 					"err", err,
 				)
 			}
+		}
+		// Proactively flip to DERP for the new peer (same rationale as
+		// OnWelcome — don't waste 30s on direct-UDP handshakes that
+		// can't succeed under hairpin/symmetric NAT).
+		if h.flipPeerToDERPFn != nil {
+			h.flipPeerToDERPFn(p.WGPublicKey)
 		}
 		if h.bus != nil {
 			h.bus.Publish(events.NewPeerAdded(rosterPeerToSnapshot(p, false, false)))
@@ -1009,7 +1054,14 @@ func rosterToPeers(roster []msignal.RosterPeer) []tunnel.Peer {
 // rosterPeerToTunnelPeer converts a single RosterPeer to a tunnel.Peer.
 // AllowedIPs is always "<mesh_ip>/32" — traffic to the peer's mesh address
 // only, nothing broader.
-// PersistentKeepalive is 0 (off) per the design doc mandate.
+//
+// PersistentKeepalive is 25s (matches Tailscale's default). This is REQUIRED
+// for DERP-routed peers — without keepalive, idle WG sessions age out after
+// ~3 min and the household toggle flickers off in the UI. The cost is ~150
+// bytes every 25s per peer, which is negligible for household-scope traffic
+// over a relay you control. The original "keepalive=0 by design" stance was
+// written before DERP fallback existed; revisit if/when direct-UDP-only
+// scenarios become important.
 func rosterPeerToTunnelPeer(p msignal.RosterPeer) tunnel.Peer {
 	ep := ""
 	if p.LastEndpoint != nil {
@@ -1019,7 +1071,7 @@ func rosterPeerToTunnelPeer(p msignal.RosterPeer) tunnel.Peer {
 		PublicKey:           p.WGPublicKey,
 		AllowedIPs:          []string{p.MeshIP + "/32"},
 		Endpoint:            ep,
-		PersistentKeepalive: 0, // TODO(keepalive-toggle): user-configurable opt-in
+		PersistentKeepalive: 25,
 	}
 }
 

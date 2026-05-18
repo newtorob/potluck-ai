@@ -121,8 +121,9 @@ func run() int {
 		w.Header().Set("Content-Type", "application/json")
 		// Encode error is non-actionable for an HTTP health handler writing to ResponseWriter.
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"status":            "ok",
-			"connected_clients": r.ConnectedClients(),
+			"status":                "ok",
+			"connected_clients":     r.ConnectedClients(),
+			"total_bytes_forwarded": r.TotalBytesForwarded(),
 		})
 	})
 	go func() {

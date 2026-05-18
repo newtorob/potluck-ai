@@ -339,6 +339,13 @@ func (b *DerpBind) Send(bufs [][]byte, ep conn.Endpoint) error {
 	se, ok := ep.(syntheticEndpoint)
 	if !ok {
 		// Not a synthetic endpoint — delegate to the inner UDP bind.
+		// Log at INFO so we can SEE when WG is falling through to direct UDP
+		// despite our DERP flip. If this fires for a peer we expect to be
+		// DERP-routed, the endpoint got reverted somewhere upstream.
+		slog.Info("derp_bind: Send via inner UDP (non-synthetic endpoint)",
+			"endpoint_type", fmt.Sprintf("%T", ep),
+			"bufs", len(bufs),
+		)
 		return b.inner.Send(bufs, ep)
 	}
 
@@ -350,7 +357,7 @@ func (b *DerpBind) Send(bufs [][]byte, ep conn.Endpoint) error {
 	b.derpMu.RUnlock()
 
 	if !routed {
-		slog.Debug("derp_bind: Send to synthetic endpoint but peer not in DERP map, dropping",
+		slog.Info("derp_bind: Send to synthetic endpoint but peer not in DERP map, dropping",
 			"dst_prefix", util.TruncatePubkeyBytes(se.pubkey),
 			"bufs", len(bufs),
 		)
@@ -359,8 +366,7 @@ func (b *DerpBind) Send(bufs [][]byte, ep conn.Endpoint) error {
 
 	for _, buf := range bufs {
 		if err := b.client.Send(se.pubkey, buf); err != nil {
-			// Best-effort: log at debug level, never propagate errors to wg-go.
-			slog.Debug("derp_bind: relay send failed",
+			slog.Info("derp_bind: relay send failed",
 				"dst_prefix", util.TruncatePubkeyBytes(se.pubkey),
 				"payload_len", len(buf),
 				"err", err,
