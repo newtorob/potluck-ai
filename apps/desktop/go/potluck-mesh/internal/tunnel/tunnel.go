@@ -185,12 +185,40 @@ func (t *Tunnel) Close() {
 	t.dev.Close()
 }
 
+// AddPeerRoute installs a /32 host route for the given peer mesh IP via this
+// node's TUN interface. Required because the local mesh-IP /32 (installed by
+// SetMeshIP) only covers our own address — without explicit host routes for
+// each peer, the kernel falls back to the default gateway and drops the
+// packets before they ever reach WG (and therefore before DERP can relay
+// them). Idempotent.
+func (t *Tunnel) AddPeerRoute(peerMeshIP string) error {
+	if peerMeshIP == "" {
+		return nil
+	}
+	if t.ifName == "" {
+		return fmt.Errorf("tunnel: AddPeerRoute called before interface ready")
+	}
+	return addPeerHostRoute(t.ifName, peerMeshIP)
+}
+
+// RemovePeerRoute tears down the host route installed by AddPeerRoute.
+// Called when a peer is removed from the household. Idempotent.
+func (t *Tunnel) RemovePeerRoute(peerMeshIP string) error {
+	if peerMeshIP == "" {
+		return nil
+	}
+	if t.ifName == "" {
+		return nil
+	}
+	return removePeerHostRoute(t.ifName, peerMeshIP)
+}
+
 // SetMeshIP assigns the given IP address to the TUN interface so that traffic
 // destined for this node's mesh_ip is routed into the WG tunnel.
 //
 // The IP is a bare address without a prefix length; the interface is configured
-// with a /32 (host route). Routing the household /24 is deferred to a later week
-// when we have per-platform route management sorted.
+// with a /32 (host route). Peer host routes are installed separately via
+// AddPeerRoute when the roster is applied.
 //
 // Platform behaviour:
 //   - Linux: shells out to `ip addr add <ip>/32 dev <iface>`

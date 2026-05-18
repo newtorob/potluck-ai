@@ -20,8 +20,9 @@ LDFLAGS := -X main.version=$(VERSION) -s -w
 
 .PHONY: help build build-all run clean tidy lint
 
-# Default coordinator URL for `make run`. Override with `COORDINATOR_URL=...`.
+# Default coordinator + DERP relay URLs for `make run`. Override with env.
 COORDINATOR_URL ?= http://127.0.0.1:8400
+DERP_URL        ?= tcp+insecure://127.0.0.1:8443
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -31,8 +32,8 @@ build: ## Build for the current platform into dist/
 	go build -ldflags "$(LDFLAGS)" -o $(DIST)/potluck-mesh$(shell go env GOEXE) $(CMD)
 	@echo "built: $(DIST)/potluck-mesh$(shell go env GOEXE)"
 
-run: ## Run the sidecar in the current shell (uses COORDINATOR_URL, default http://127.0.0.1:8400)
-	go run $(CMD) --coordinator-url $(COORDINATOR_URL)
+run: ## Run the sidecar in the current shell (uses COORDINATOR_URL + DERP_URL)
+	go run $(CMD) --coordinator-url $(COORDINATOR_URL) --derp-url $(DERP_URL)
 
 build-all: ## Build for all 5 target triples into dist/
 	@mkdir -p $(DIST)

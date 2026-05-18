@@ -251,18 +251,48 @@ func (b *DerpBind) IsPeerDERPRouted(pubkey [32]byte) bool {
 
 // Open calls the inner bind's Open and appends our DERP-inject ReceiveFunc.
 // wg-go spawns one goroutine per ReceiveFunc and calls it in a loop.
+//
+// Note on lifecycle: wg-go's BindUpdate calls bind.Close() before calling
+// bind.Open() — even on first startup, because closeBindLocked runs
+// unconditionally and is a no-op only when netc.bind is nil (it isn't, since
+// the bind was attached at device construction). That means by the time we
+// get here, b.closeCh may already be closed and b.closeOnce already consumed
+// from a prior Close. Reset both for this Open cycle so derpRecv doesn't
+// immediately bail via the closeCh case on its first invocation.
 func (b *DerpBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 	innerFns, actualPort, err := b.inner.Open(port)
 	if err != nil {
 		return nil, 0, err
 	}
 
+	// Reset close machinery for this Open cycle. Holding derpMu here is
+	// overkill but cheap — we have no contention during Open and it keeps
+	// the relationship between closeCh and closeOnce atomic across any
+	// concurrent Send/Inject/Close calls that race in.
+	b.derpMu.Lock()
+	b.closeCh = make(chan struct{})
+	b.closeOnce = sync.Once{}
+	closeCh := b.closeCh // capture for closure stability
+	b.derpMu.Unlock()
+
+	// One-shot logger to confirm wg-go calls our ReceiveFunc at all. INFO-level
+	// to make the wiring visible without enabling DEBUG everywhere.
+	var firstCall sync.Once
 	derpRecv := func(packets [][]byte, sizes []int, eps []conn.Endpoint) (int, error) {
+		firstCall.Do(func() {
+			slog.Info("derp_bind: wg-go entered derpRecv for the first time",
+				"packets_cap", len(packets),
+				"sizes_cap", len(sizes),
+				"eps_cap", len(eps),
+			)
+		})
 		select {
-		case <-b.closeCh:
+		case <-closeCh:
+			slog.Info("derp_bind: derpRecv exiting via closeCh")
 			return 0, net.ErrClosed
 		case pkt, ok := <-b.injectCh:
 			if !ok {
+				slog.Info("derp_bind: derpRecv exiting via injectCh closed")
 				return 0, net.ErrClosed
 			}
 			// Grow the packet buffer if needed. wg-go pre-allocates packets[0]
@@ -275,7 +305,7 @@ func (b *DerpBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 			copy(packets[0], pkt.payload)
 			sizes[0] = len(pkt.payload)
 			eps[0] = syntheticEndpoint{pubkey: pkt.src}
-			slog.Debug("derp_bind: delivered DERP packet to WG device",
+			slog.Info("derp_bind: delivered DERP packet to WG device",
 				"src_prefix", util.TruncatePubkeyBytes(pkt.src),
 				"payload_len", len(pkt.payload),
 			)

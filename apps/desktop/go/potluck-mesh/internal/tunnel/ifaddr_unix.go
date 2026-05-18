@@ -43,9 +43,21 @@ func assignInterfaceAddress(ifName, ip string) error {
 		// assigned — treat it as success.
 		if runtime.GOOS == "linux" && strings.Contains(string(out), "File exists") {
 			slog.Debug("tunnel: interface address already assigned", "interface", ifName, "ip", ip)
-			return nil
+		} else {
+			return fmt.Errorf("assign address %s to %s: %w: %s", ip, ifName, err, string(out))
 		}
-		return fmt.Errorf("assign address %s to %s: %w: %s", ip, ifName, err, string(out))
+	}
+
+	// Linux: explicitly bring the interface UP. `ip addr add` does NOT do this
+	// (unlike macOS ifconfig, which auto-ups the interface when an address is
+	// assigned). A DOWN interface can't accept route installations — `ip route
+	// add ... dev <iface>` fails with "Device for nexthop is not up".
+	if runtime.GOOS == "linux" {
+		upCmd := exec.Command("ip", "link", "set", ifName, "up")
+		if upOut, upErr := upCmd.CombinedOutput(); upErr != nil {
+			return fmt.Errorf("bring up %s: %w: %s", ifName, upErr, string(upOut))
+		}
+		slog.Debug("tunnel: interface brought up", "interface", ifName)
 	}
 
 	return nil

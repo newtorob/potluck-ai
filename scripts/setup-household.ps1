@@ -354,6 +354,79 @@ function Build-MeshSidecar {
     }
 }
 
+# Test whether the venv can import llama_cpp.
+function Test-LlamaCppInstalled {
+    if (-not (Test-Path $VenvPython)) { return $false }
+    $check = & $VenvPython -c "import llama_cpp; print('OK')" 2>$null
+    return ($check -eq "OK")
+}
+
+# Install llama-cpp-python via a fallback chain. Critical because the
+# default pip path on Windows hits a C++ source build that requires MSVC,
+# which most users don't have. We try three increasingly heavyweight
+# routes:
+#   1. PyPI with --prefer-binary  (fast if there's a wheel for this Python)
+#   2. abetlen's custom wheel index  (covers more Python-version combos)
+#   3. Source build  (only works if MSVC Build Tools are installed)
+function Install-LlamaCppPython {
+    Step "Installing llama-cpp-python (has a fallback chain - this is the historically-painful one)"
+    if (Test-LlamaCppInstalled) {
+        Pass "llama_cpp already importable; skipping reinstall"
+        return
+    }
+
+    # Attempt 1: PyPI with --prefer-binary
+    Info "attempt 1/3: PyPI pre-built wheel (--prefer-binary)"
+    Invoke-Native -Label "pip install llama-cpp-python (PyPI)" -Block {
+        & $VenvPip install --prefer-binary llama-cpp-python
+    } | Out-Null
+    if (Test-LlamaCppInstalled) {
+        Pass "llama-cpp-python installed via PyPI"
+        return
+    }
+    Warn "PyPI install did not produce a working llama_cpp"
+
+    # Attempt 2: abetlen's custom wheel index (CPU-only wheels)
+    Info "attempt 2/3: abetlen.github.io custom wheel index"
+    Invoke-Native -Label "pip install llama-cpp-python (abetlen)" -Block {
+        & $VenvPip install --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu llama-cpp-python
+    } | Out-Null
+    if (Test-LlamaCppInstalled) {
+        Pass "llama-cpp-python installed via abetlen wheel index"
+        return
+    }
+    Warn "abetlen wheel index install did not produce a working llama_cpp"
+
+    # Attempt 3: source build (needs MSVC Build Tools)
+    Info "attempt 3/3: source build (requires Visual Studio Build Tools)"
+    Invoke-Native -Label "pip install llama-cpp-python (source)" -Block {
+        & $VenvPip install llama-cpp-python
+    } | Out-Null
+    if (Test-LlamaCppInstalled) {
+        Pass "llama-cpp-python built from source"
+        return
+    }
+
+    # All three failed. Surface the actionable next step explicitly.
+    Fail @"
+llama-cpp-python could not be installed via any of three paths:
+  1. PyPI pre-built wheel (--prefer-binary)
+  2. abetlen.github.io custom wheel index
+  3. Source build (needs MSVC)
+
+The most reliable fix is installing Microsoft Visual Studio Build Tools (~4 GB, ~15 min):
+  winget install --silent --override "--passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" Microsoft.VisualStudio.2022.BuildTools
+
+After it installs, close PowerShell, open a fresh admin window, cd back to the repo, and re-run this script.
+
+Alternatively, install a Python version that has a published wheel. PyPI currently ships wheels for cp310 / cp311 / cp312 amd64. If your Python is 3.13 (which is newer than the latest llama-cpp-python wheel), downgrade:
+  winget install Python.Python.3.11
+  Remove-Item -Recurse -Force apps\desktop\python\.venv
+  py -3.11 -m venv apps\desktop\python\.venv
+  # Re-run this script.
+"@
+}
+
 function Setup-PythonVenv {
     Step "Setting up Python venv at $VenvDir"
     if (-not (Test-Path $VenvDir)) {
@@ -367,23 +440,28 @@ function Setup-PythonVenv {
     }
     Info "upgrading pip..."
     Invoke-Native -Label "pip upgrade" -Block {
-        & $VenvPip install --quiet --upgrade pip
+        & $VenvPip install --upgrade pip
     } | Out-Null
-    Info "installing requirements.txt (this can take a few minutes)..."
-    # --prefer-binary: tell pip to grab a pre-built wheel even if it's a
-    # slightly older release than the source-only one. Crucial on Windows
-    # where llama-cpp-python's C++ build needs MSVC + cmake, which most
-    # users don't have. Better to install a recent-enough wheel than to
-    # fail trying to compile from source.
+
+    # Install llama-cpp-python via the smart fallback chain BEFORE the
+    # rest of requirements.txt. If it succeeds, the subsequent
+    # `-r requirements.txt` install sees llama_cpp is already satisfied
+    # and skips it. If it fails, we Fail() with actionable advice.
+    Install-LlamaCppPython
+
+    Info "installing remaining requirements.txt (visible progress - no --quiet)..."
+    # No --quiet: yesterday's lesson was that silent installs make hangs
+    # indistinguishable from progress. The output is verbose but at least
+    # you can tell if pip is doing something or stuck.
     $rc = Invoke-Native -Label "pip install -r requirements.txt" -Block {
-        & $VenvPip install --quiet --prefer-binary -r (Join-Path $PyDir "requirements.txt")
+        & $VenvPip install --prefer-binary -r (Join-Path $PyDir "requirements.txt")
     }
     if ($rc -ne 0) {
-        Fail "pip install failed (exit $rc). Re-run with --setup-only and watch for the actual error."
+        Fail "pip install -r requirements.txt failed (exit $rc). Scroll up for the actual error."
     }
     Info "installing potluck_local in editable mode..."
     Invoke-Native -Label "pip install -e" -Block {
-        & $VenvPip install --quiet -e $PyDir
+        & $VenvPip install -e $PyDir
     } | Out-Null
     Pass "Python sidecar deps installed"
 }
@@ -391,17 +469,36 @@ function Setup-PythonVenv {
 function Build-ElectronApp {
     Step "Building Electron desktop app (this can take 5-10 minutes the first time)"
 
-    # Frontend deps + production build
-    Info "installing frontend deps..."
+    # Frontend deps + production build. No --silent on pnpm - yesterday's
+    # lesson was that silent makes hangs look like progress. The output
+    # is noisy but legible.
+    Info "installing frontend deps (visible progress)..."
     Push-Location $FrontendDir
     try {
         $rc = Invoke-Native -Label "pnpm install (frontend)" -Block {
-            & pnpm install --silent
+            & pnpm install
         }
-        if ($rc -ne 0) { Fail "pnpm install in frontend failed (exit $rc)" }
-        Info "building frontend bundle..."
+        if ($rc -ne 0) { Fail "pnpm install in frontend failed (exit $rc). Scroll up for the actual error." }
+        Info "building frontend bundle (tsc -b + vite build)..."
         $rc = Invoke-Native -Label "pnpm build (frontend)" -Block { & pnpm build }
-        if ($rc -ne 0) { Fail "pnpm build in frontend failed (exit $rc)" }
+        if ($rc -ne 0) {
+            Fail @"
+pnpm build in frontend failed (exit $rc).
+
+Common causes + fixes:
+  - TypeScript error: scroll up to find a 'src/...:NNN:NN - error TSXXXX' line.
+    Tell me the file + line and I will fix it.
+  - Out of memory: bump Node's heap. Try:
+      \$env:NODE_OPTIONS = '--max-old-space-size=8192'
+    then re-run -SetupOnly.
+  - Stale build artifacts: try
+      Remove-Item -Recurse -Force apps\desktop\frontend\dist
+      Remove-Item -Recurse -Force apps\desktop\frontend\node_modules\.vite
+    then re-run -SetupOnly.
+
+Output was visible in this terminal (no --silent flag) so the actual error should be in your scrollback.
+"@
+        }
         Pass "frontend built"
     } finally {
         Pop-Location
@@ -412,9 +509,9 @@ function Build-ElectronApp {
     Push-Location $ElectronDir
     try {
         $rc = Invoke-Native -Label "pnpm install (electron)" -Block {
-            & pnpm install --silent
+            & pnpm install
         }
-        if ($rc -ne 0) { Fail "pnpm install in electron failed (exit $rc)" }
+        if ($rc -ne 0) { Fail "pnpm install in electron failed (exit $rc). Scroll up." }
         Pass "Electron deps installed"
     } finally {
         Pop-Location
@@ -511,11 +608,22 @@ function Start-MeshSidecar {
     }
     Pass "coordinator reachable"
 
+    # Derive the DERP relay URL from the coordinator URL host (same machine
+    # in dev, port 8443 cleartext). The relay is the fallback when direct
+    # UDP punch fails (hairpin NAT, symmetric NAT, restrictive firewalls).
+    # Override with $env:POTLUCK_DERP_URL.
+    $derpUrl = $env:POTLUCK_DERP_URL
+    if (-not $derpUrl) {
+        $coordHost = ([Uri]$coordUrl).Host
+        $derpUrl = "tcp+insecure://${coordHost}:8443"
+    }
+    Info "derp relay URL: $derpUrl"
+
     # The mesh sidecar needs admin to open the wintun adapter (one-time per
     # boot). We use Start-Process -Verb RunAs to trigger a UAC prompt.
     Info "starting mesh sidecar (UAC prompt may appear for wintun access)..."
     $proc = Start-Process -FilePath $MeshBin `
-        -ArgumentList "--coordinator-url", $coordUrl `
+        -ArgumentList "--coordinator-url", $coordUrl, "--derp-url", $derpUrl `
         -RedirectStandardOutput $MeshLog `
         -RedirectStandardError "$MeshLog.err" `
         -WindowStyle Hidden `
@@ -597,6 +705,21 @@ function Launch-ElectronApp {
 
 Step "Potluck household contributor - Windows setup"
 Info "repo root: $RepoRoot"
+
+# Pre-flight checks: catch the environmental issues that historically
+# caused setup to fail mid-install (admin, long-paths, network, etc.).
+# If preflight reports a hard failure we exit immediately - cheaper to
+# fix prereqs upfront than to discover them 15 minutes into a build.
+$preflightScript = Join-Path $ScriptDir "setup-household-preflight.ps1"
+if (Test-Path $preflightScript) {
+    Step "Running pre-flight checks"
+    & $preflightScript -AutoFix
+    if ($LASTEXITCODE -ne 0) {
+        Fail "pre-flight checks failed (see above). Fix the listed issues + re-run this script."
+    }
+} else {
+    Warn "preflight script not found at $preflightScript; skipping checks (continuing at your own risk)"
+}
 
 # Setup phase
 Install-Prerequisites

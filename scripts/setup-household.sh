@@ -445,11 +445,19 @@ start_mesh_sidecar() {
     fi
     ok "coordinator reachable"
 
+    # Derive the DERP relay URL from the coordinator URL — same host, port 8443,
+    # cleartext for dev. The relay is the fallback path when direct UDP punch
+    # fails (hairpin NAT, symmetric NAT, restrictive firewalls). Without it,
+    # nodes can be roster-aware but unable to exchange traffic.
+    local derp_url
+    derp_url="${POTLUCK_DERP_URL:-tcp+insecure://$(echo "$coord_url" | sed -E 's|https?://([^/:]+).*|\1|'):8443}"
+    info "derp relay URL: $derp_url"
+
     # Forward the user's sudo credentials so the chown-to-SUDO_UID logic in
     # listener_unix.go puts the IPC socket under our regular UID.
     info "starting mesh sidecar in background (log: $MESH_LOG)"
     sudo -E env SUDO_UID="$(id -u)" SUDO_GID="$(id -g)" \
-        nohup "$MESH_BIN" --coordinator-url "$coord_url" \
+        nohup "$MESH_BIN" --coordinator-url "$coord_url" --derp-url "$derp_url" \
         >"$MESH_LOG" 2>&1 &
     local pid=$!
     echo "$pid" >"$MESH_PID"
@@ -469,12 +477,55 @@ start_mesh_sidecar() {
     fail "mesh sidecar failed to start"
 }
 
+resolve_cuda_lib_path() {
+    # If the installed llama-cpp-python wheel was built with CUDA support,
+    # libllama.so depends on libcudart.so.12 + libcublas.so.12 + libcublasLt.so.12.
+    # These ship with the CUDA Toolkit but NOT with the bare NVIDIA driver,
+    # and most contributor machines have the driver only.
+    #
+    # Workaround: if Ollama is installed, its CUDA-12 bundle at
+    # /usr/local/lib/ollama/cuda_v12/ already has all three. Use it.
+    # Returns the path to prepend to LD_LIBRARY_PATH, or empty string if
+    # not needed / not available.
+    local llama_lib="$PY_DIR/.venv/lib/python3.11/site-packages/llama_cpp/lib/libllama.so"
+    [ ! -f "$llama_lib" ] && { echo ""; return; }
+
+    # Does libllama.so actually link against libcudart.so.12?
+    if ! ldd "$llama_lib" 2>/dev/null | grep -q "libcudart\.so\.12"; then
+        echo ""
+        return  # CPU-only build, no CUDA libs needed
+    fi
+
+    # Is libcudart.so.12 already resolvable? If so, nothing to do.
+    if ldconfig -p 2>/dev/null | grep -q "libcudart\.so\.12"; then
+        echo ""
+        return
+    fi
+
+    # Look for Ollama's bundled CUDA-12 runtime.
+    if [ -f /usr/local/lib/ollama/cuda_v12/libcudart.so.12 ]; then
+        echo "/usr/local/lib/ollama/cuda_v12"
+        return
+    fi
+
+    # Couldn't find a fallback - sidecar will fail to load the model.
+    echo ""
+}
+
 start_python_sidecar() {
     step "Starting Python sidecar"
 
     if is_running "$PY_PID"; then
         ok "python sidecar already running (pid $(cat "$PY_PID"))"
         return
+    fi
+
+    # CUDA library path resolution (Linux GPU contributors).
+    local cuda_lib_path
+    cuda_lib_path="$(resolve_cuda_lib_path)"
+    if [ -n "$cuda_lib_path" ]; then
+        info "llama-cpp-python needs libcudart.so.12 - found at $cuda_lib_path (Ollama bundle), prepending to LD_LIBRARY_PATH"
+        export LD_LIBRARY_PATH="$cuda_lib_path${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     fi
 
     info "starting on 0.0.0.0:$PYTHON_PORT in background (log: $PY_LOG)"
@@ -839,6 +890,21 @@ fi
 
 step "Potluck household contributor — Linux ($DISTRO_FAMILY family, gui=$GUI)"
 info "repo root: $REPO_ROOT"
+
+# Pre-flight checks: catch environmental issues (VPN, Python version, network,
+# coordinator reachability) BEFORE any installs run. Yesterday's pain came
+# almost entirely from these conditions failing silently mid-install.
+# `--auto-fix` disconnects Mullvad if connected; leave it OFF if you'd rather
+# disconnect manually.
+PREFLIGHT="$REPO_ROOT/scripts/setup-household-preflight.sh"
+if [ -x "$PREFLIGHT" ]; then
+    step "Running pre-flight checks"
+    if ! "$PREFLIGHT" --auto-fix; then
+        fail "pre-flight checks failed (see above). Fix the listed issues then re-run."
+    fi
+else
+    warn "preflight script not found at $PREFLIGHT; continuing without environment checks"
+fi
 
 if [ "$MODE" = "setup" ] || [ "$MODE" = "full" ]; then
     install_system_deps

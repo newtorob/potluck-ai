@@ -195,6 +195,24 @@ func run() int {
 
 	// ---- signaling client ---- //
 	handler := newRosterHandler(tun, ps, bus, ipcState)
+
+	// Wire DERP-routing introspection so the roster + punch_coord handlers
+	// know not to overwrite the synthetic derp:<pubkey> endpoint with a
+	// raw IP:port when a peer is currently being routed via the relay.
+	// nil-safe when --derp-url isn't set: dBind stays nil and the gate
+	// returns false (always allow direct updates).
+	if dBind != nil {
+		handler.setIsDERPRoutedFn(func(pubkey string) bool {
+			kb, err := base64.StdEncoding.DecodeString(pubkey)
+			if err != nil || len(kb) != 32 {
+				return false
+			}
+			var pub [32]byte
+			copy(pub[:], kb)
+			return dBind.IsPeerDERPRouted(pub)
+		})
+	}
+
 	client := msignal.NewClient(cfg.SignalURL(), cfg.WGPublicKey, handler)
 
 	// Give the handler a reference to the client so it can call
@@ -497,11 +515,23 @@ func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.
 				if bus != nil {
 					bus.Publish(events.NewPeerUpdated(peerSnap))
 				}
-				// Peer recovered: flip back to direct UDP if we had routed via DERP.
-				if peerDerpBind != nil && st.derpRouted {
-					flipToDirectUDP(tun, peerDerpBind, pubkey, pubkeyBytes)
-					st.derpRouted = false
-				}
+				// DO NOT auto-flip back to direct UDP here.
+				//
+				// The "peer became reachable" event fires when there's a fresh
+				// handshake — but the handshake itself may have completed VIA
+				// DERP, not via direct UDP. Flipping back to direct would set
+				// the WG peer endpoint to a raw IP:port that the NAT can't
+				// actually deliver to (e.g. hairpin, CGNAT), silently breaking
+				// the connection we just established. Stay on DERP; the cost
+				// is one relay hop of latency, which is negligible vs. the
+				// alternative ("handshake completes then everything stops
+				// working").
+				//
+				// Future enhancement: track whether the most recent handshake
+				// arrived via direct UDP (TX/RX counters on the inner bind vs.
+				// the DERP-inject path) and flip back only when there's
+				// evidence direct UDP actually works for this peer.
+				_ = peerDerpBind // intentionally not flipping back
 			} else {
 				slog.Warn("reachability: peer became unreachable",
 					"node_id", p.NodeID,
@@ -606,6 +636,15 @@ type rosterHandler struct {
 	bus      *events.Bus
 	ipcState *localapi.State
 
+	// isDERPRoutedFn reports whether a given peer (by base64 pubkey) is
+	// currently being routed via the DERP relay. When true, signal-driven
+	// endpoint updates (roster_update.Updated, punch_coord) MUST NOT overwrite
+	// the synthetic DERP endpoint on the WG device — doing so silently
+	// breaks the relay path. We still update the peerstate cache so that
+	// when the reachability loop flips the peer back to direct, it has the
+	// latest known STUN endpoint to point at.
+	isDERPRoutedFn func(pubkey string) bool
+
 	// punchMu guards punchState.
 	punchMu    sync.Mutex
 	punchState map[string]*punchEntry // keyed by node_id
@@ -619,6 +658,14 @@ func newRosterHandler(tun *tunnel.Tunnel, ps *peerstate.Store, bus *events.Bus, 
 		ipcState:   ipcState,
 		punchState: make(map[string]*punchEntry),
 	}
+}
+
+// setIsDERPRoutedFn wires the DERP-routing introspection callback. Called in
+// main after the DerpBind is constructed. nil-safe — when DERP is disabled
+// (no --derp-url) this stays nil and the handler degrades to its prior
+// always-overwrite behavior.
+func (h *rosterHandler) setIsDERPRoutedFn(fn func(pubkey string) bool) {
+	h.isDERPRoutedFn = fn
 }
 
 // setClient wires the signal client back into the handler after construction.
@@ -666,6 +713,23 @@ func (h *rosterHandler) OnWelcome(w msignal.Welcome) {
 		return
 	}
 
+	// 4b. Install host routes for every peer so the kernel actually delivers
+	// packets to the WG interface. Without these, only the local mesh IP /32
+	// is in the routing table and packets to peer mesh IPs fall through to
+	// the default gateway (and the relay never sees a byte).
+	for _, p := range w.Roster {
+		if p.MeshIP == "" {
+			continue
+		}
+		if err := h.tun.AddPeerRoute(p.MeshIP); err != nil {
+			slog.Warn("tunnel: AddPeerRoute failed on welcome",
+				"node_id", p.NodeID,
+				"mesh_ip", p.MeshIP,
+				"err", err,
+			)
+		}
+	}
+
 	// 5. Publish status_changed + peer_added events for each roster peer.
 	if h.bus != nil {
 		h.bus.Publish(events.NewStatusChanged(string(localapi.StatusRunning)))
@@ -709,6 +773,16 @@ func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
 				"err", err,
 			)
 		}
+		// Install the kernel route for the new peer's mesh IP.
+		if p.MeshIP != "" {
+			if err := h.tun.AddPeerRoute(p.MeshIP); err != nil {
+				slog.Warn("tunnel: AddPeerRoute failed for new peer",
+					"node_id", p.NodeID,
+					"mesh_ip", p.MeshIP,
+					"err", err,
+				)
+			}
+		}
 		if h.bus != nil {
 			h.bus.Publish(events.NewPeerAdded(rosterPeerToSnapshot(p, false, false)))
 		}
@@ -722,7 +796,18 @@ func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
 	for _, p := range u.Updated {
 		h.ps.Upsert(p)
 		if p.LastEndpoint != nil && *p.LastEndpoint != "" {
-			if err := h.tun.UpdatePeerEndpoint(p.WGPublicKey, *p.LastEndpoint); err != nil {
+			// If the peer is currently DERP-routed, do NOT push the raw
+			// IP:port back onto the WG device — that would silently break
+			// the relay path. The peerstate cache still records the latest
+			// endpoint (Upsert above) so the reachability loop can flip
+			// back to direct later when handshakes resume.
+			if h.isDERPRoutedFn != nil && h.isDERPRoutedFn(p.WGPublicKey) {
+				slog.Debug("roster update: peer is DERP-routed, skipping WG endpoint overwrite",
+					"node_id", p.NodeID,
+					"pubkey_prefix", util.TruncatePubkey(p.WGPublicKey),
+					"would_have_set", *p.LastEndpoint,
+				)
+			} else if err := h.tun.UpdatePeerEndpoint(p.WGPublicKey, *p.LastEndpoint); err != nil {
 				slog.Error("tunnel: UpdatePeerEndpoint failed",
 					"node_id", p.NodeID,
 					"err", err,
@@ -756,6 +841,16 @@ func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
 				"err", err,
 			)
 		}
+		// Tear down the host route so packets don't black-hole at this iface.
+		if cached.MeshIP != "" {
+			if err := h.tun.RemovePeerRoute(cached.MeshIP); err != nil {
+				slog.Warn("tunnel: RemovePeerRoute failed",
+					"node_id", nodeID,
+					"mesh_ip", cached.MeshIP,
+					"err", err,
+				)
+			}
+		}
 		if h.bus != nil {
 			h.bus.Publish(events.NewPeerRemoved(nodeID))
 		}
@@ -788,6 +883,22 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 		"role", coord.Role,
 		"endpoint", *coord.PeerEndpoint,
 	)
+
+	// If the peer is currently DERP-routed, skip the WG endpoint overwrite.
+	// Otherwise this punch_coord would replace the synthetic derp:<pubkey>
+	// endpoint with a raw IP:port that the NAT can't actually deliver to.
+	// We still let the coordinator's punch broker do its thing on the
+	// other side — if both sides recover direct reachability, the next
+	// successful handshake will trigger the reachability loop to flip the
+	// peer back to direct routing.
+	if h.isDERPRoutedFn != nil && h.isDERPRoutedFn(coord.PeerWGPublicKey) {
+		slog.Debug("punch_coord: peer is DERP-routed, skipping WG endpoint overwrite",
+			"peer_node_id", coord.PeerNodeID,
+			"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
+			"would_have_set", *coord.PeerEndpoint,
+		)
+		return
+	}
 
 	// Configure the peer's endpoint. This causes wg-go to fire a
 	// handshake-init toward the peer's NAT-mapped address, creating our
