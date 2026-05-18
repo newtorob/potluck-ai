@@ -67,3 +67,8 @@ docs/security/signed-releases/
 *.deb
 *.rpm
 release/
+
+# Agent / IDE tooling scratch state (per-user, not project-meaningful)
+.agents/
+AGENTS.md
+.claude/scheduled_tasks.lock
