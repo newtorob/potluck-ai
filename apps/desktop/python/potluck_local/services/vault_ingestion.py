@@ -198,6 +198,8 @@ async def _ingest_file(
     now = _now_iso()
     inserted_ids: list[tuple[str, list]] = []  # (id, vector-or-None)
 
+    from potluck_local.services.ai_contracts import VAULT_INGESTION_VERSION
+
     for chunk, body in zip(chunks, bodies):
         mem_id = str(uuid.uuid4())
         source_ref = f"vault:{file_path}#{chunk.anchor}"
@@ -205,9 +207,10 @@ async def _ingest_file(
             """INSERT INTO memories
                (id, content, category, confidence, source_type,
                 source_conversation_id, source_ref,
-                created_at, last_accessed_at, access_count, is_active, project)
-               VALUES (?, ?, 'reference', 0.6, 'vault', NULL, ?, ?, ?, 0, 1, NULL)""",
-            (mem_id, body, source_ref, now, now),
+                created_at, last_accessed_at, access_count, is_active, project,
+                extraction_prompt_version)
+               VALUES (?, ?, 'reference', 0.6, 'vault', NULL, ?, ?, ?, 0, 1, NULL, ?)""",
+            (mem_id, body, source_ref, now, now, VAULT_INGESTION_VERSION),
         )
         inserted_ids.append((mem_id, body))
 

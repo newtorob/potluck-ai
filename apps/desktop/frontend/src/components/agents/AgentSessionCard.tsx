@@ -198,7 +198,10 @@ export function AgentSessionCard({
           : 'border-border/60',
       )}
     >
-      {/* Row 1: status dot + client name + version + project pill */}
+      {/* Row 1: status dot + client name + version + friendly-name + project pill.
+          The friendly_name chip disambiguates simultaneous instances of the
+          same client (two Claude Codes side-by-side). Falls back to omitting
+          the chip for legacy sessions written before the migration. */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <span
@@ -209,6 +212,14 @@ export function AgentSessionCard({
           <span className="truncate text-sm font-semibold text-foreground">{clientLabel}</span>
           {session.client_version !== null && (
             <span className="shrink-0 text-xs text-muted-foreground">v{session.client_version}</span>
+          )}
+          {session.friendly_name !== null && (
+            <span
+              className="shrink-0 rounded-md border border-border/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/80"
+              title="Auto-assigned nickname for this session — distinct per process"
+            >
+              {session.friendly_name}
+            </span>
           )}
         </div>
         <ProjectPill project={session.project} className="shrink-0" />

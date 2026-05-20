@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import logging
 import re
+import uuid
 from collections import Counter
 
 import aiosqlite
 import numpy as np
 
+from potluck_local.services.ai_contracts import RETRIEVAL_PROFILE_VERSION
 from potluck_local.services.memory_extraction import Memory, MemoryCategory
 from potluck_local.utils.time import now_iso as _now_iso
 
@@ -58,6 +60,7 @@ def _row_to_memory(row: dict) -> Memory:
         is_active=bool(row["is_active"]),
         superseded_by=row["superseded_by"],
         project=row["project"],
+        extraction_prompt_version=row.get("extraction_prompt_version"),
     )
 
 
@@ -297,6 +300,7 @@ class MemoryRetriever:
         max_memories: int = 20,
         min_confidence: float = 0.5,
         project: str | None = None,
+        conversation_id: str | None = None,
     ) -> list[Memory]:
         """Retrieve memories relevant to the current conversation context.
 
@@ -368,15 +372,33 @@ class MemoryRetriever:
 
             combined = combined[:max_memories]
 
-            # Update access metadata for returned memories
+            # Update access metadata for returned memories AND log the
+            # access with the retrieval profile version. The version stamp
+            # lets the debugger answer "what retrieval rules ranked this
+            # memory at this point in history?" even after we bump the
+            # profile.
             if combined:
                 ts = _now_iso()
+                conversation_id = conversation_id or ""  # log requires a string
                 for row in combined:
                     await db.execute(
                         """UPDATE memories
                            SET last_accessed_at = ?, access_count = access_count + 1
                            WHERE id = ?""",
                         (ts, row["id"]),
+                    )
+                    await db.execute(
+                        """INSERT INTO memory_access_log
+                           (id, memory_id, conversation_id, was_useful,
+                            accessed_at, retrieval_profile_version)
+                           VALUES (?, ?, ?, NULL, ?, ?)""",
+                        (
+                            str(uuid.uuid4()),
+                            row["id"],
+                            conversation_id,
+                            ts,
+                            RETRIEVAL_PROFILE_VERSION,
+                        ),
                     )
                 await db.commit()
 

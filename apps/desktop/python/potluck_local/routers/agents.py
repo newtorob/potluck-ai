@@ -34,13 +34,44 @@ router = APIRouter()
 
 
 def _deserialize_session(row: dict[str, Any]) -> dict[str, Any]:
-    """Convert peer_mcps from JSON string to list in-place."""
+    """Convert peer_mcps from JSON string to list in-place and compute the
+    liveness tier ('live' | 'idle' | 'stale' | 'disconnected') so the UI
+    can render the four states without re-doing time math in JS."""
     if isinstance(row.get("peer_mcps"), str):
         try:
             row["peer_mcps"] = json.loads(row["peer_mcps"])
         except Exception:
             row["peer_mcps"] = []
+    row["liveness"] = _liveness(row)
     return row
+
+
+def _liveness(row: dict[str, Any]) -> str:
+    """Bucket the row into one of four liveness tiers:
+        - 'disconnected' — disconnected_at is set
+        - 'live'         — last_seen_at within last 60 seconds (heartbeating)
+        - 'idle'         — last_seen_at within 5 min (connected, quiet)
+        - 'stale'        — last_seen_at older than 5 min, but not yet swept
+    Computing this server-side keeps the AgentsView render simple and
+    avoids client/server clock-skew weirdness on the boundaries."""
+    if row.get("disconnected_at") is not None:
+        return "disconnected"
+    last_seen = row.get("last_seen_at")
+    if not last_seen:
+        return "stale"
+    try:
+        from datetime import datetime, timezone
+        last_seen_dt = datetime.fromisoformat(last_seen)
+        if last_seen_dt.tzinfo is None:
+            last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
+        age = (datetime.now(timezone.utc) - last_seen_dt).total_seconds()
+    except Exception:
+        return "stale"
+    if age < 60:
+        return "live"
+    if age < 300:
+        return "idle"
+    return "stale"
 
 
 def _deserialize_tool_call(row: dict[str, Any]) -> dict[str, Any]:
@@ -127,6 +158,27 @@ async def clear_disconnected_sessions() -> dict:
         logger.error("agents_clear_disconnected_error type=%s", type(exc).__name__)
         raise HTTPException(status_code=500, detail="Database error") from exc
     return {"removed": removed}
+
+
+@router.post("/sessions/sweep", status_code=200)
+async def sweep_sessions() -> dict:
+    """Run the stale-session sweep on demand. Marks any active session
+    whose last_seen_at is older than 5 minutes as disconnected, and
+    DELETES rows that never identified themselves and have zero tool
+    calls older than 30 minutes (the AgentsView clutter problem).
+
+    Returns counts. Idempotent; safe to spam the button. The same sweep
+    runs automatically every 60s, but the manual trigger is the
+    fast-feedback path from the AgentsView "Clean up stale" affordance.
+    """
+    from potluck_local.services.agent_observability import AgentObserver
+    try:
+        observer = AgentObserver()
+        result = await observer.sweep_stale_sessions(max_age_seconds=300)
+    except Exception as exc:
+        logger.error("agents_sweep_error type=%s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Sweep failed") from exc
+    return result
 
 
 @router.get("/activity")

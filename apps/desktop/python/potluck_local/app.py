@@ -39,11 +39,33 @@ async def _lifespan(app: FastAPI):  # noqa: ARG001
     import asyncio
     from potluck_local.services.memory_db import init_memory_db
     from potluck_local.services.embedding_backfill import run_embedding_backfill
+    from potluck_local.services.agent_observability import AgentObserver
 
     await init_memory_db()
     # Fire-and-forget: backfill embeddings for any memories that don't have them.
     # Runs to completion in the background; never blocks startup or the event loop.
     asyncio.create_task(run_embedding_backfill())
+
+    # Stale-session sweep. MCP transports don't always send a clean disconnect
+    # (crash, kill, network loss), so without this, rows pile up as "active"
+    # forever and clutter the AgentsView. We do one immediate sweep at startup
+    # to clean up anything stranded across a sidecar restart, then a periodic
+    # 60s loop catches sessions that go stale during this run.
+    observer = AgentObserver()
+    await observer.sweep_stale_sessions(max_age_seconds=300)
+
+    async def _stale_session_sweeper() -> None:
+        while True:
+            try:
+                await asyncio.sleep(60)
+                await observer.sweep_stale_sessions(max_age_seconds=300)
+            except asyncio.CancelledError:
+                return
+            except Exception:  # noqa: BLE001
+                # Don't let one failed sweep kill the loop.
+                pass
+    asyncio.create_task(_stale_session_sweeper())
+
     yield
 
 

@@ -16,6 +16,10 @@ from typing import Literal
 import aiosqlite
 from pydantic import BaseModel, field_validator
 
+from potluck_local.services.ai_contracts import (
+    EXPLICIT_MEMORY_VERSION,
+    EXTRACTION_PROMPT_VERSION,
+)
 from potluck_local.utils.time import now_iso as _now_iso
 
 logger = logging.getLogger(__name__)
@@ -68,6 +72,7 @@ class Memory(BaseModel):
     is_active: bool
     superseded_by: str | None = None
     project: str | None = None  # null = global memory, applies across all projects
+    extraction_prompt_version: str | None = None  # NULL for pre-2026-05-20 rows
 
     @field_validator("project", mode="before")
     @classmethod
@@ -252,18 +257,21 @@ class MemoryExtractor:
                         is_active=True,
                         superseded_by=None,
                         project=project,
+                        extraction_prompt_version=EXTRACTION_PROMPT_VERSION,
                     )
                     await db.execute(
                         """INSERT INTO memories
                            (id, content, category, confidence, source_type,
                             source_conversation_id, created_at, last_accessed_at,
-                            access_count, is_active, project)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            access_count, is_active, project,
+                            extraction_prompt_version)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
                             mem.id, mem.content, mem.category, mem.confidence,
                             mem.source_type, mem.source_conversation_id,
                             mem.created_at, mem.last_accessed_at,
                             mem.access_count, 1, mem.project,
+                            EXTRACTION_PROMPT_VERSION,
                         ),
                     )
                     inserted.append(mem)
@@ -312,6 +320,7 @@ class MemoryExtractor:
             is_active=True,
             superseded_by=None,
             project=project,
+            extraction_prompt_version=EXPLICIT_MEMORY_VERSION,
         )
 
         from potluck_local.services.memory_db import get_memory_db_path
@@ -323,13 +332,15 @@ class MemoryExtractor:
                 """INSERT INTO memories
                    (id, content, category, confidence, source_type,
                     source_conversation_id, created_at, last_accessed_at,
-                    access_count, is_active, project)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    access_count, is_active, project,
+                    extraction_prompt_version)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     mem.id, mem.content, mem.category, mem.confidence,
                     mem.source_type, mem.source_conversation_id,
                     mem.created_at, mem.last_accessed_at,
                     mem.access_count, 1, mem.project,
+                    EXPLICIT_MEMORY_VERSION,
                 ),
             )
             await db.commit()

@@ -38,7 +38,7 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, Depends, HTTPException, Response, WebSocket, WebSocketDisconnect, status
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -412,6 +412,81 @@ async def list_peers(
         )
     )
     return [_peer_to_enrolled(p) for p in roster_result.scalars().all()]
+
+
+# ---------------------------------------------------------------------------
+# DELETE /mesh/nodes/{node_id}
+# ---------------------------------------------------------------------------
+
+
+@router.delete("/mesh/nodes/{node_id}", status_code=204, response_class=Response)
+async def delete_mesh_node(
+    node_id: uuid.UUID,
+    wg_public_key: str,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Remove a node from a household. Idempotent — returns 204 even if the
+    node row is already gone (re-running the cleanup is safe).
+
+    v0 auth model: the caller proves household membership with their own
+    wg_public_key. Either:
+      * the caller IS the node being deleted (self-leave), OR
+      * the caller is a household-mate of the target (peer cleanup of a
+        stale roster entry — e.g. a paired machine that died or was
+        re-paired with a fresh key).
+    A signed-nonce challenge is v1 hardening; for v0, possession of any
+    enrolled household key is sufficient.
+
+    On success: deletes the row + broadcasts SignalRosterUpdate(removed)
+    to the surviving household-mates currently on the signal WS.
+    """
+    # Look up the caller by their WG key to bound this delete to their
+    # household. Random pubkeys can't delete anything.
+    caller_result = await db.execute(
+        select(MeshNode).where(MeshNode.wg_public_key == wg_public_key)
+    )
+    caller = caller_result.scalar_one_or_none()
+    if caller is None:
+        raise HTTPException(status_code=403, detail="wg_public_key not enrolled")
+
+    target = await db.get(MeshNode, node_id)
+    if target is None:
+        # Already gone — return 204 anyway. Idempotent cleanup is more
+        # ergonomic than forcing the client to special-case 404.
+        return Response(status_code=204)
+
+    if target.household_id != caller.household_id:
+        # Don't leak whether the node exists across households — return 403
+        # like any other unauthorized delete.
+        raise HTTPException(
+            status_code=403, detail="caller is not in target's household"
+        )
+
+    target_id_str = str(target.id)
+    household_id = target.household_id
+
+    await db.delete(target)
+    await db.commit()
+
+    logger.info(
+        "mesh_node_deleted",
+        node_id=target_id_str,
+        household_id=str(household_id),
+        deleted_by_prefix=wg_public_key[:8],
+    )
+
+    # Broadcast removal to surviving household-mates on the signal WS.
+    # The except_node_id filter doesn't matter here (the target is already
+    # gone) but the household scope does.
+    async with get_session_factory()() as broadcast_db:
+        await _broadcast_to_household(
+            household_id,
+            SignalRosterUpdate(removed=[target_id_str]).model_dump(mode="json"),
+            db=broadcast_db,
+            except_node_id=None,
+        )
+
+    return Response(status_code=204)
 
 
 # ---------------------------------------------------------------------------

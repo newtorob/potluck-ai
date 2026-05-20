@@ -25,19 +25,56 @@ import { ActivityFeed } from '@/components/agents/ActivityFeed';
 import { SessionDetailDrawer } from '@/components/agents/SessionDetailDrawer';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
-import type { AgentSession } from '@/types/agents';
+import type { AgentSession, ToolCall, SessionDetail } from '@/types/agents';
 
 // ---------------------------------------------------------------------------
-// Session status helpers (duplicated from AgentSessionCard to avoid coupling)
+// Session status helpers — keyed off the server-computed `liveness` field so
+// the four tiers (live / idle / stale / disconnected) match the backend's
+// own time math. Pre-migration sessions without `liveness` fall back to the
+// older client-side calc.
 // ---------------------------------------------------------------------------
+
+function liveness(session: AgentSession): 'live' | 'idle' | 'stale' | 'disconnected' {
+  // Defensive: a sidecar that hasn't been bounced since the migration may
+  // omit liveness. Recompute client-side in that case.
+  if (session.liveness) return session.liveness;
+  if (session.disconnected_at !== null) return 'disconnected';
+  const age = (Date.now() - new Date(session.last_seen_at).getTime()) / 1000;
+  if (age < 60) return 'live';
+  if (age < 300) return 'idle';
+  return 'stale';
+}
 
 function isActive(session: AgentSession): boolean {
-  if (session.disconnected_at !== null) return false;
-  return new Date(session.last_seen_at).getTime() >= Date.now() - 60_000;
+  return liveness(session) === 'live';
 }
 
 function isDisconnected(session: AgentSession): boolean {
-  return session.disconnected_at !== null;
+  return liveness(session) === 'disconnected';
+}
+
+// ---------------------------------------------------------------------------
+// CountChip — colored-dot count for the AgentsView header. One per liveness
+// tier. Declared above the main view so Vite's fast-refresh can't trip on
+// a forward reference during HMR.
+// ---------------------------------------------------------------------------
+
+function CountChip({
+  dotClass,
+  count,
+  label,
+}: {
+  dotClass: string;
+  count: number;
+  label: string;
+}) {
+  return (
+    <span className="flex items-center gap-1">
+      <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', dotClass)} aria-hidden="true" />
+      <span className="font-medium text-foreground">{count}</span>
+      <span>{label}</span>
+    </span>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -102,6 +139,30 @@ export function AgentsView() {
     [sessions, fetchSessions, selectedSessionId, selectSession],
   );
 
+  // One-click cleanup: trigger the backend sweep (marks stale → disconnected
+  // + deletes worthless rows), then clear all disconnected. Two API calls,
+  // single refresh. This is the button people will actually use; the
+  // narrower "clear disconnected" stays as a more conservative path.
+  const handleCleanUpStale = useCallback(
+    async () => {
+      setIsClearing(true);
+      try {
+        const sweep = await localApi.agents.sweep();
+        await localApi.agents.clearDisconnected();
+        selectSession(null);
+        await fetchSessions();
+        // Informational console line; AgentsView is a power-user surface
+        // so a toast isn't necessary, but the numbers are nice in devtools.
+        console.info('agent cleanup:', sweep);
+      } catch (err) {
+        console.error('failed to clean up stale sessions', err);
+      } finally {
+        setIsClearing(false);
+      }
+    },
+    [fetchSessions, selectSession],
+  );
+
   // Track IDs of calls that arrived in the last fetch cycle so we can flash them
   const prevActivityIdsRef = useRef<Set<string>>(new Set());
   const [newCallIds, setNewCallIds] = useState<Set<string>>(new Set());
@@ -148,13 +209,14 @@ export function AgentsView() {
     selectSession(null);
   }, [selectSession]);
 
-  // Derived counts
-  const activeSessions = sessions.filter(isActive);
+  // Derived counts. Four tiers per the server's `liveness` field.
+  const liveSessions = sessions.filter((s) => liveness(s) === 'live');
+  const idleSessions = sessions.filter((s) => liveness(s) === 'idle');
+  const staleSessions = sessions.filter((s) => liveness(s) === 'stale');
   const disconnectedSessions = sessions.filter(isDisconnected);
-
-  const visibleSessions = showDisconnected
-    ? sessions
-    : sessions.filter((s) => !isDisconnected(s));
+  // Kept for the header chip naming. "Active" still means "live" in user-
+  // facing copy (live = heartbeating right now is the colloquial meaning).
+  const activeSessions = liveSessions;
 
   const hasEverHadSessions = sessions.length > 0;
 
@@ -191,15 +253,49 @@ export function AgentsView() {
         {/* Header */}
         <AgentsHeader isFetching={isFetching}>
           <div className="flex items-center gap-4">
-            <span className="text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">{activeSessions.length}</span> active
+            {/* Honest count by liveness tier. The old single "X active"
+                conflated four states and lied about reality (sessions that
+                had not heartbeated in days still counted as "active"). Now
+                we show each tier explicitly with a colored dot so the
+                user can tell at a glance what's actually happening. */}
+            <span className="flex items-center gap-2.5 text-xs text-muted-foreground">
+              <CountChip dotClass="bg-emerald-400" count={liveSessions.length} label="connected" />
+              {idleSessions.length > 0 && (
+                <CountChip dotClass="bg-sky-400/70" count={idleSessions.length} label="idle" />
+              )}
+              {staleSessions.length > 0 && (
+                <CountChip dotClass="bg-amber-400/70" count={staleSessions.length} label="stale" />
+              )}
               {disconnectedSessions.length > 0 && (
-                <>
-                  {' · '}
-                  <span className="font-medium text-foreground">{disconnectedSessions.length}</span> disconnected
-                </>
+                <CountChip dotClass="bg-muted-foreground/40" count={disconnectedSessions.length} label="disconnected" />
               )}
             </span>
+
+            {/* Clean-up stale: visible whenever there's at least one session,
+                whether disconnected or not. Runs the backend sweep (marks stale
+                + deletes worthless never-identified rows), then clears every
+                disconnected row in one round-trip. The narrower "Clear N
+                disconnected" stays as a more conservative path users can pick
+                if they want to see what would be removed first. */}
+            {sessions.length > 0 && (
+              <button
+                type="button"
+                onClick={() => void handleCleanUpStale()}
+                disabled={isClearing}
+                className={cn(
+                  'flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-xs',
+                  'text-muted-foreground hover:text-foreground hover:border-border',
+                  'transition-colors duration-fast',
+                  'disabled:cursor-not-allowed disabled:opacity-50',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                )}
+                aria-label="Sweep stale sessions and clear disconnected"
+                title="Mark sessions with no recent activity as disconnected, drop sessions that never identified themselves, and remove every disconnected row"
+              >
+                <Trash2 className="h-3 w-3" aria-hidden="true" />
+                <span>{isClearing ? 'Cleaning…' : 'Clean up stale'}</span>
+              </button>
+            )}
 
             {disconnectedSessions.length > 0 && (
               <>
@@ -238,45 +334,73 @@ export function AgentsView() {
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-8">
-          {/* ACTIVE NOW section */}
-          <section aria-label="Active sessions">
-            <h2 className="mb-3 font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
-              Active now
-            </h2>
+          {/* CONNECTED NOW section — sessions with heartbeat in last 60s.
+              This is what "my one agent" means colloquially; it's the
+              actually-alive process you're working with right now. */}
+          <AgentSessionGroup
+            label="Connected now"
+            sessions={liveSessions}
+            emptyHint={
+              (idleSessions.length + staleSessions.length + (showDisconnected ? disconnectedSessions.length : 0)) === 0
+                ? 'No agent is currently connected.'
+                : null
+            }
+            activity={activity}
+            sessionDetail={sessionDetail}
+            selectedSessionId={selectedSessionId}
+            cardRefs={cardRefs}
+            onSelect={handleSelectSession}
+            onDelete={(id) => void handleDeleteSession(id)}
+          />
 
-            {visibleSessions.length === 0 ? (
-              <p className="text-sm text-muted-foreground/70">
-                {showDisconnected ? 'No sessions recorded.' : 'No active or stale sessions.'}
-              </p>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {visibleSessions.map((session) => (
-                  <div
-                    key={session.id}
-                    ref={(el) => {
-                      if (el !== null) {
-                        cardRefs.current.set(session.id, el);
-                      } else {
-                        cardRefs.current.delete(session.id);
-                      }
-                    }}
-                  >
-                    <AgentSessionCard
-                      session={session}
-                      recentToolCalls={
-                        sessionDetail?.id === session.id
-                          ? sessionDetail.recent_tool_calls
-                          : activity.filter((c) => c.session_id === session.id)
-                      }
-                      isSelected={session.id === selectedSessionId}
-                      onSelect={handleSelectSession}
-                      onDelete={(id) => void handleDeleteSession(id)}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          {/* IDLE section — connected but quiet for 1–5 min. Same agent,
+              just not invoking a tool right this second. Common during
+              user-think pauses. */}
+          {idleSessions.length > 0 && (
+            <AgentSessionGroup
+              label="Idle"
+              hint="connected, quiet for 1–5 minutes"
+              sessions={idleSessions}
+              activity={activity}
+              sessionDetail={sessionDetail}
+              selectedSessionId={selectedSessionId}
+              cardRefs={cardRefs}
+              onSelect={handleSelectSession}
+              onDelete={(id) => void handleDeleteSession(id)}
+            />
+          )}
+
+          {/* STALE section — last seen >5 min ago, sweep will mark them
+              disconnected on its next tick. Surfacing them gives users a
+              chance to see what's about to be cleaned up. */}
+          {staleSessions.length > 0 && (
+            <AgentSessionGroup
+              label="Stale"
+              hint="no heartbeat for 5+ minutes — sweep will mark these disconnected"
+              sessions={staleSessions}
+              activity={activity}
+              sessionDetail={sessionDetail}
+              selectedSessionId={selectedSessionId}
+              cardRefs={cardRefs}
+              onSelect={handleSelectSession}
+              onDelete={(id) => void handleDeleteSession(id)}
+            />
+          )}
+
+          {/* DISCONNECTED section — gated by the toolbar checkbox. */}
+          {showDisconnected && disconnectedSessions.length > 0 && (
+            <AgentSessionGroup
+              label="Disconnected"
+              hint="closed cleanly or swept after going stale"
+              sessions={disconnectedSessions}
+              activity={activity}
+              sessionDetail={sessionDetail}
+              selectedSessionId={selectedSessionId}
+              cardRefs={cardRefs}
+              onSelect={handleSelectSession}
+              onDelete={(id) => void handleDeleteSession(id)}
+            />
+          )}
 
           {/* RECENT ACTIVITY section */}
           <ActivityFeed
@@ -328,5 +452,91 @@ function AgentsHeader({ isFetching, children }: AgentsHeaderProps) {
       }
       tools={children}
     />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AgentSessionGroup — one liveness-tier section of the AgentsView. Renders
+// a 3-column grid of cards (sm:2, lg:3 cards across), or a single explanatory
+// line when the group is empty (only used by "Connected now"). Other groups
+// don't render at all when empty so the page stays compact.
+// ---------------------------------------------------------------------------
+
+interface AgentSessionGroupProps {
+  label: string;
+  /** Optional subtle text beneath the section label, explaining the tier. */
+  hint?: string;
+  /** Only rendered when `sessions` is empty — explains why nothing's here. */
+  emptyHint?: string | null;
+  sessions: AgentSession[];
+  activity: ToolCall[];
+  sessionDetail: SessionDetail | null;
+  selectedSessionId: string | null;
+  cardRefs: React.MutableRefObject<Map<string, HTMLDivElement>>;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+}
+
+function AgentSessionGroup({
+  label,
+  hint,
+  emptyHint,
+  sessions,
+  activity,
+  sessionDetail,
+  selectedSessionId,
+  cardRefs,
+  onSelect,
+  onDelete,
+}: AgentSessionGroupProps) {
+  return (
+    <section aria-label={label}>
+      <div className="mb-3 flex items-baseline gap-2">
+        <h2 className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
+          {label}
+        </h2>
+        {sessions.length > 0 && (
+          <span className="text-[11px] text-muted-foreground/60">
+            ({sessions.length})
+          </span>
+        )}
+        {hint !== undefined && (
+          <span className="text-[11px] text-muted-foreground/50">{hint}</span>
+        )}
+      </div>
+
+      {sessions.length === 0 ? (
+        emptyHint !== undefined && emptyHint !== null ? (
+          <p className="text-sm text-muted-foreground/70">{emptyHint}</p>
+        ) : null
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {sessions.map((session) => (
+            <div
+              key={session.id}
+              ref={(el) => {
+                if (el !== null) {
+                  cardRefs.current.set(session.id, el);
+                } else {
+                  cardRefs.current.delete(session.id);
+                }
+              }}
+            >
+              <AgentSessionCard
+                session={session}
+                recentToolCalls={
+                  sessionDetail?.id === session.id
+                    ? sessionDetail.recent_tool_calls
+                    : activity.filter((c) => c.session_id === session.id)
+                }
+                isSelected={session.id === selectedSessionId}
+                onSelect={onSelect}
+                onDelete={onDelete}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

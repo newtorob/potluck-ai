@@ -185,6 +185,22 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         # source_ref carries the originating identifier for ingested content,
         # e.g. "vault:/path/to/notes.md#heading-anchor" for vault chunks.
         await _add_column_if_missing(db, "memories", "source_ref", "TEXT")
+        # friendly_name is an adjective+animal nickname assigned at session
+        # create, used to disambiguate multiple instances of the same client
+        # in the AgentsView (e.g. two Claude Code processes running side by
+        # side). Persisted so the same session keeps the same nickname across
+        # AgentsView refreshes; never reused after a session is deleted.
+        await _add_column_if_missing(db, "mcp_sessions", "friendly_name", "TEXT")
+
+        # AI contract versions (services/ai_contracts.py). Stamped at write
+        # time so the debugger can answer "what prompt extracted this memory
+        # / ranked this retrieval / shaped this tool call?" even after the
+        # underlying contract is bumped. NULL on rows older than 2026-05-20
+        # (pre-versioning era); the debugger renders that honestly rather
+        # than backfilling and lying about provenance.
+        await _add_column_if_missing(db, "memories", "extraction_prompt_version", "TEXT")
+        await _add_column_if_missing(db, "memory_access_log", "retrieval_profile_version", "TEXT")
+        await _add_column_if_missing(db, "mcp_tool_calls", "tool_schema_version", "TEXT")
 
         for stmt in _INDICES:
             await db.execute(stmt)
@@ -261,6 +277,7 @@ async def list_sessions(
                 s.id, s.client_name, s.client_version, s.transport, s.pid,
                 s.project, s.model, s.model_source, s.peer_mcps,
                 s.started_at, s.last_seen_at, s.disconnected_at,
+                s.friendly_name,
                 COUNT(t.id) AS tool_call_count
             FROM mcp_sessions s
             LEFT JOIN mcp_tool_calls t ON t.session_id = s.id
@@ -289,6 +306,7 @@ async def get_session(
                 s.id, s.client_name, s.client_version, s.transport, s.pid,
                 s.project, s.model, s.model_source, s.peer_mcps,
                 s.started_at, s.last_seen_at, s.disconnected_at,
+                s.friendly_name,
                 COUNT(t.id) AS tool_call_count
             FROM mcp_sessions s
             LEFT JOIN mcp_tool_calls t ON t.session_id = s.id
@@ -330,7 +348,8 @@ async def list_recent_tool_calls(
             f"""
             SELECT
                 t.id, t.session_id, t.tool_name, t.args_summary,
-                t.result_count, t.duration_ms, t.error, t.called_at
+                t.result_count, t.duration_ms, t.error, t.called_at,
+                t.tool_schema_version
             FROM mcp_tool_calls t
             JOIN mcp_sessions s ON s.id = t.session_id
             {where}
@@ -348,14 +367,19 @@ async def session_tool_calls(
     limit: int = 200,
     db_path: Path | None = None,
 ) -> list[dict]:
-    """Return tool calls for a single session; ordered called_at desc."""
+    """Return tool calls for a single session; ordered called_at desc.
+
+    Includes tool_schema_version so the debugger can render which contract
+    version each call ran under (NULL for pre-2026-05-20 rows).
+    """
     path = db_path or get_memory_db_path()
     async with aiosqlite.connect(path) as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
             """
             SELECT id, session_id, tool_name, args_summary,
-                   result_count, duration_ms, error, called_at
+                   result_count, duration_ms, error, called_at,
+                   tool_schema_version
             FROM mcp_tool_calls
             WHERE session_id = ?
             ORDER BY called_at DESC

@@ -670,6 +670,18 @@ export const localApi = {
         handleResponse<{ removed: number }>(r),
       );
     },
+
+    /** Trigger a one-shot stale-session sweep. Marks any active session
+     *  whose last_seen_at is > 5 min old as disconnected, and DELETES rows
+     *  that never identified themselves and have zero tool calls older
+     *  than 30 min. Returns counts. Same sweep runs every 60s automatically;
+     *  this is the immediate-feedback path from the AgentsView clean-up
+     *  button. */
+    sweep(): Promise<{ marked_disconnected: number; deleted_worthless: number }> {
+      return fetch(`${LOCAL_BASE}/agents/sessions/sweep`, { method: 'POST' }).then((r) =>
+        handleResponse<{ marked_disconnected: number; deleted_worthless: number }>(r),
+      );
+    },
   },
 
   // ---- Chat history (sidecar SQLite, local-only) ---------------------------

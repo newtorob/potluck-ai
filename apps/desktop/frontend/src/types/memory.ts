@@ -29,6 +29,9 @@ export interface Memory {
   is_active: boolean;
   superseded_by: string | null;
   project?: string | null;
+  /** Version of the extraction contract that produced this memory.
+   *  NULL for rows written before the 2026-05-20 contract-versioning rollout. */
+  extraction_prompt_version?: string | null;
 }
 
 // ---------------------------------------------------------------------------
