@@ -202,6 +202,14 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         await _add_column_if_missing(db, "memory_access_log", "retrieval_profile_version", "TEXT")
         await _add_column_if_missing(db, "mcp_tool_calls", "tool_schema_version", "TEXT")
 
+        # Memory-IDs each tool call read or wrote, JSON-encoded array of
+        # strings. Populated by AgentObserver.log_tool_call when callers know
+        # the affected ids (memory_save / memory_search / memory_delete /
+        # memory_list). NULL when not applicable or pre-debugger rows. The
+        # debugger UI joins this with `memories` so a tool call expands to
+        # show the previews of the memories it touched.
+        await _add_column_if_missing(db, "mcp_tool_calls", "memory_ids_touched", "TEXT")
+
         for stmt in _INDICES:
             await db.execute(stmt)
 
@@ -349,7 +357,7 @@ async def list_recent_tool_calls(
             SELECT
                 t.id, t.session_id, t.tool_name, t.args_summary,
                 t.result_count, t.duration_ms, t.error, t.called_at,
-                t.tool_schema_version
+                t.tool_schema_version, t.memory_ids_touched
             FROM mcp_tool_calls t
             JOIN mcp_sessions s ON s.id = t.session_id
             {where}
@@ -379,7 +387,7 @@ async def session_tool_calls(
             """
             SELECT id, session_id, tool_name, args_summary,
                    result_count, duration_ms, error, called_at,
-                   tool_schema_version
+                   tool_schema_version, memory_ids_touched
             FROM mcp_tool_calls
             WHERE session_id = ?
             ORDER BY called_at DESC

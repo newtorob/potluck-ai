@@ -91,6 +91,20 @@ _ALL_ARGS_SAFE_TOOLS: frozenset[str] = frozenset(
     }
 )
 
+# Tools where it makes sense to record which memory ids were read or
+# written, for the debugger's memory-overlay view. Anything outside this
+# set has its memory_ids_touched silently dropped — same defense-in-depth
+# pattern as the args_summary whitelist.
+_MEMORY_TOOL_NAMES: frozenset[str] = frozenset(
+    {
+        "memory_save",
+        "memory_search",
+        "memory_delete",
+        "memory_list",
+        "memory_get",
+    }
+)
+
 
 def _summarize_args(tool_name: str, args: dict[str, Any] | None) -> dict[str, Any]:
     """Return a privacy-safe subset of tool args.
@@ -308,12 +322,32 @@ class AgentObserver:
         result_count: int | None = None,
         duration_ms: int | None = None,
         error: str | None = None,
+        memory_ids_touched: list[str] | None = None,
     ) -> None:
-        """Insert an mcp_tool_calls row with privacy-safe args_summary."""
+        """Insert an mcp_tool_calls row with privacy-safe args_summary.
+
+        memory_ids_touched: optional list of memory ids this call read or
+        wrote. Stored JSON-encoded so the debugger can join back to the
+        `memories` table and render previews. Pure ids — already
+        privacy-safe (we never log content here). Whitelist of memory
+        tools is enforced via _MEMORY_TOOL_NAMES — pass None for any
+        other tool.
+        """
         from potluck_local.services.ai_contracts import MCP_TOOL_SCHEMA_VERSION
         call_id = str(uuid.uuid4())
         summary = _summarize_args(tool_name, args)
         summary_json = json.dumps(summary) if summary else None
+
+        # Only persist memory_ids_touched for the whitelisted memory tools.
+        # Defense-in-depth: even if a caller hands them to us for some other
+        # tool by mistake, we drop them rather than create a side-channel.
+        memory_ids_json: str | None = None
+        if memory_ids_touched and tool_name in _MEMORY_TOOL_NAMES:
+            # Filter to non-empty strings only; cheap normalisation.
+            clean = [m for m in memory_ids_touched if isinstance(m, str) and m]
+            if clean:
+                memory_ids_json = json.dumps(clean)
+
         now = _now_iso()
         path = get_memory_db_path()
         try:
@@ -324,8 +358,8 @@ class AgentObserver:
                     INSERT INTO mcp_tool_calls
                         (id, session_id, tool_name, args_summary,
                          result_count, duration_ms, error, called_at,
-                         tool_schema_version)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         tool_schema_version, memory_ids_touched)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         call_id,
@@ -337,6 +371,7 @@ class AgentObserver:
                         error,
                         now,
                         MCP_TOOL_SCHEMA_VERSION,
+                        memory_ids_json,
                     ),
                 )
                 await db.commit()

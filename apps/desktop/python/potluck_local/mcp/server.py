@@ -100,6 +100,44 @@ async def _heartbeat_loop(session_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _extract_memory_ids(
+    tool_name: str,
+    args: dict[str, Any],
+    result: Any,
+) -> list[str] | None:
+    """Pull the memory ids a tool call touched, from args or result shape.
+
+    Pure ids, no content — already privacy-safe. AgentObserver enforces its
+    own whitelist (_MEMORY_TOOL_NAMES) as defense-in-depth, so a non-memory
+    tool that returns dicts-with-ids won't accidentally write a memory link.
+
+    Shapes by tool:
+      memory_save / memory_get -> dict with "id"
+      memory_search / memory_list -> list of dicts with "id"
+      memory_delete -> id is in args["memory_id"]
+    """
+    try:
+        if tool_name == "memory_delete":
+            mid = args.get("memory_id")
+            return [mid] if isinstance(mid, str) and mid else None
+
+        if isinstance(result, dict):
+            mid = result.get("id")
+            return [mid] if isinstance(mid, str) and mid else None
+
+        if isinstance(result, list):
+            ids = [
+                item["id"]
+                for item in result
+                if isinstance(item, dict) and isinstance(item.get("id"), str)
+            ]
+            return ids or None
+    except Exception:
+        # Never let the observer hook break a tool call.
+        return None
+    return None
+
+
 def _wrap_tool_fn(
     tool_name: str,
     fn: Any,
@@ -120,8 +158,10 @@ def _wrap_tool_fn(
         start = time.monotonic()
         error_str: str | None = None
         result_count: int | None = None
+        captured_result: Any = None
         try:
             result = await fn(*args, **kwargs)
+            captured_result = result
             if isinstance(result, list):
                 result_count = len(result)
             return result
@@ -132,6 +172,7 @@ def _wrap_tool_fn(
             duration_ms = int((time.monotonic() - start) * 1000)
             # Collect args for summarization from kwargs (FastMCP passes by kwarg)
             all_args: dict[str, Any] = dict(kwargs)
+            memory_ids = _extract_memory_ids(tool_name, all_args, captured_result)
             if session_id is not None:
                 asyncio.create_task(
                     observer.log_tool_call(
@@ -141,6 +182,7 @@ def _wrap_tool_fn(
                         result_count=result_count,
                         duration_ms=duration_ms,
                         error=error_str,
+                        memory_ids_touched=memory_ids,
                     )
                 )
                 # Update project from args if present

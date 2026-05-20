@@ -75,12 +75,20 @@ def _liveness(row: dict[str, Any]) -> str:
 
 
 def _deserialize_tool_call(row: dict[str, Any]) -> dict[str, Any]:
-    """Convert args_summary from JSON string to dict in-place."""
+    """Convert args_summary and memory_ids_touched from JSON strings to
+    in-memory shapes. Both columns are nullable; pre-2026-05-20 rows have
+    NULL memory_ids_touched and that propagates as null in the response.
+    """
     if isinstance(row.get("args_summary"), str):
         try:
             row["args_summary"] = json.loads(row["args_summary"])
         except Exception:
             row["args_summary"] = {}
+    if isinstance(row.get("memory_ids_touched"), str):
+        try:
+            row["memory_ids_touched"] = json.loads(row["memory_ids_touched"])
+        except Exception:
+            row["memory_ids_touched"] = None
     return row
 
 
@@ -200,3 +208,61 @@ async def get_activity(
         logger.error("agents_activity_error type=%s", type(exc).__name__)
         return []
     return [_deserialize_tool_call(r) for r in rows]
+
+
+@router.post("/memory-previews")
+async def memory_previews(payload: dict[str, Any]) -> list[dict]:
+    """Resolve a list of memory ids to lightweight previews for the
+    debugger's memory-overlay panel.
+
+    POST (not GET) because ids can be many and putting them on a query
+    string is awkward. Body shape: {"ids": ["uuid-1", "uuid-2", ...]}.
+
+    Returns one row per id that exists; missing ids are silently dropped
+    (the debugger renders that as 'memory deleted since this call'). Each
+    row includes only what the panel renders: id, a truncated content
+    preview, category, project, created_at, is_active. Full content is
+    never broadcast — the privacy invariant on agent observability holds.
+    """
+    raw_ids = payload.get("ids")
+    if not isinstance(raw_ids, list):
+        raise HTTPException(status_code=400, detail="`ids` must be a list of strings")
+    ids = [i for i in raw_ids if isinstance(i, str) and i]
+    if not ids:
+        return []
+    # Cap to keep one debugger query bounded; the panel only needs as many
+    # rows as a single tool call touched.
+    ids = ids[:100]
+
+    import aiosqlite
+    from potluck_local.services.memory_db import get_memory_db_path
+
+    db_path = get_memory_db_path()
+    placeholders = ",".join(["?"] * len(ids))
+    try:
+        async with aiosqlite.connect(db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                f"""
+                SELECT id, content, category, project, created_at, is_active
+                FROM memories
+                WHERE id IN ({placeholders})
+                """,
+                ids,
+            )
+            rows = await cursor.fetchall()
+    except Exception as exc:
+        logger.error("memory_previews_error type=%s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Database error") from exc
+
+    return [
+        {
+            "id": r["id"],
+            "preview": (r["content"][:200] + ("…" if len(r["content"]) > 200 else "")),
+            "category": r["category"],
+            "project": r["project"],
+            "created_at": r["created_at"],
+            "is_active": bool(r["is_active"]),
+        }
+        for r in rows
+    ]

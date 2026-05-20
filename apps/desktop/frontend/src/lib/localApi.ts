@@ -24,7 +24,7 @@ import type {
   ClusterResponse,
 } from '@/types/memory';
 import type { TaskState, TaskStatus, TaskCreateInput, TaskUpdateInput } from '@/types/tasks';
-import type { AgentSession, SessionDetail, ToolCall } from '@/types/agents';
+import type { AgentSession, MemoryPreview, SessionDetail, ToolCall } from '@/types/agents';
 import { coordinatorBase } from '@/stores/connectionStore';
 
 const LOCAL_BASE =
@@ -681,6 +681,19 @@ export const localApi = {
       return fetch(`${LOCAL_BASE}/agents/sessions/sweep`, { method: 'POST' }).then((r) =>
         handleResponse<{ marked_disconnected: number; deleted_worthless: number }>(r),
       );
+    },
+
+    /** Resolve a batch of memory ids to lightweight previews for the
+     *  debugger's memory-overlay panel. Capped server-side at 100 ids per
+     *  call. Missing ids are silently dropped — the panel renders that as
+     *  "memory deleted since this call". */
+    memoryPreviews(ids: string[]): Promise<MemoryPreview[]> {
+      if (ids.length === 0) return Promise.resolve([]);
+      return fetch(`${LOCAL_BASE}/agents/memory-previews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      }).then((r) => handleResponse<MemoryPreview[]>(r));
     },
   },
 

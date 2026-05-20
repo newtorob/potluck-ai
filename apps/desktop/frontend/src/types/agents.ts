@@ -49,6 +49,21 @@ export interface ToolCall {
   /** Version of the MCP tool-schema contract this call ran under.
    *  NULL for rows written before the 2026-05-20 contract-versioning rollout. */
   tool_schema_version: string | null;
+  /** IDs of the memories this call read or wrote, when applicable. NULL on
+   *  non-memory tools, and on pre-debugger rows. The debugger calls
+   *  POST /agents/memory-previews to expand these into previews. */
+  memory_ids_touched: string[] | null;
+}
+
+/** Lightweight memory preview returned by POST /agents/memory-previews —
+ *  never includes full content, just the first 200 chars. */
+export interface MemoryPreview {
+  id: string;
+  preview: string;
+  category: string;
+  project: string | null;
+  created_at: string;
+  is_active: boolean;
 }
 
 export interface SessionDetail extends AgentSession {
