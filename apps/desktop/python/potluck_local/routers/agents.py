@@ -112,6 +112,108 @@ async def get_sessions(
     return [_deserialize_session(r) for r in rows]
 
 
+TRACE_FORMAT_VERSION = "potluck-trace-v1"
+
+
+@router.get("/sessions/{session_id}/trace")
+async def export_session_trace(session_id: str) -> Response:
+    """Download a portable trace of one session for bug reports.
+
+    The blob is JSON: session metadata + ALL tool calls (not capped at 200)
+    + memory previews for any memory ids touched. Same privacy guarantees
+    as the rest of the agent observability surface — no prompt content, no
+    raw memory content beyond the first 200 chars per memory. Safe to
+    attach to a public bug tracker.
+
+    Opt-in: the user clicks Export in the debugger drawer. We never
+    auto-upload anywhere.
+
+    Filename pattern: potluck-trace-{session_short}-{YYYYMMDD-HHMMSS}.json
+    """
+    from datetime import datetime, timezone
+
+    try:
+        row = await get_session(session_id)
+    except Exception as exc:
+        logger.error("agents_trace_error id=%s type=%s", session_id, type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Database error") from exc
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Session {session_id!r} not found")
+
+    session = _deserialize_session(row)
+
+    # No 200-row cap on exports — the user is asking for the whole picture.
+    try:
+        calls = await session_tool_calls(session_id, limit=10_000)
+    except Exception as exc:
+        logger.error("agents_trace_calls_error id=%s type=%s", session_id, type(exc).__name__)
+        calls = []
+    tool_calls = [_deserialize_tool_call(c) for c in calls]
+
+    # Collect all unique memory ids touched across the calls and resolve
+    # them to previews in one batch. Deleted memories are silently dropped
+    # (the consumer can spot them by id mismatch).
+    touched: set[str] = set()
+    for c in tool_calls:
+        ids = c.get("memory_ids_touched")
+        if isinstance(ids, list):
+            touched.update(i for i in ids if isinstance(i, str) and i)
+
+    memories: list[dict[str, Any]] = []
+    if touched:
+        import aiosqlite
+        from potluck_local.services.memory_db import get_memory_db_path
+
+        ids_list = list(touched)
+        placeholders = ",".join(["?"] * len(ids_list))
+        try:
+            async with aiosqlite.connect(get_memory_db_path()) as db:
+                db.row_factory = aiosqlite.Row
+                cursor = await db.execute(
+                    f"""
+                    SELECT id, content, category, project, created_at, is_active
+                    FROM memories
+                    WHERE id IN ({placeholders})
+                    """,
+                    ids_list,
+                )
+                rows = await cursor.fetchall()
+            memories = [
+                {
+                    "id": r["id"],
+                    "preview": r["content"][:200] + ("…" if len(r["content"]) > 200 else ""),
+                    "category": r["category"],
+                    "project": r["project"],
+                    "created_at": r["created_at"],
+                    "is_active": bool(r["is_active"]),
+                }
+                for r in rows
+            ]
+        except Exception as exc:
+            logger.error("agents_trace_memories_error type=%s", type(exc).__name__)
+            memories = []
+
+    blob = {
+        "format": TRACE_FORMAT_VERSION,
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "session": session,
+        "tool_calls": tool_calls,
+        "memories": memories,
+    }
+
+    short_id = session_id.split("-", 1)[0]
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    filename = f"potluck-trace-{short_id}-{ts}.json"
+
+    return Response(
+        content=json.dumps(blob, indent=2),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
 @router.get("/sessions/{session_id}")
 async def get_session_detail(session_id: str) -> dict:
     """Return a single session with its most recent tool calls (up to 200)."""

@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronRight, X } from 'lucide-react';
+import { ChevronRight, Download, X } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { ProjectPill } from '@/components/memory/ProjectPill';
 import { relativeTime, fullDateTime } from '@/lib/timeFormat';
@@ -214,6 +214,58 @@ function TimelineRow({ call }: TimelineRowProps) {
 }
 
 // ---------------------------------------------------------------------------
+// Export trace button — downloads a portable JSON for bug reports
+// ---------------------------------------------------------------------------
+
+function ExportTraceButton({ sessionId }: { sessionId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleExport() {
+    setBusy(true);
+    setError(null);
+    try {
+      const { blob, filename } = await localApi.agents.exportSessionTrace(sessionId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void handleExport()}
+      disabled={busy}
+      title={
+        error !== null
+          ? `Export failed: ${error}`
+          : 'Download a portable JSON trace of this session — safe to share with bug reports.'
+      }
+      aria-label="Export session trace"
+      className={cn(
+        'flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground',
+        'hover:bg-accent hover:text-foreground transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'disabled:opacity-50 disabled:cursor-not-allowed',
+        error !== null && 'text-destructive hover:text-destructive',
+      )}
+    >
+      <Download className="h-4 w-4" aria-hidden="true" />
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // SessionDetailDrawer
 // ---------------------------------------------------------------------------
 
@@ -296,19 +348,22 @@ export function SessionDetailDrawer({ detail, onClose }: SessionDetailDrawerProp
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
             <h2 className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">Session detail</h2>
-            <button
-              ref={closeButtonRef}
-              type="button"
-              onClick={onClose}
-              aria-label="Close session detail"
-              className={cn(
-                'flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground',
-                'hover:bg-accent hover:text-foreground transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-              )}
-            >
-              <X className="h-4 w-4" aria-hidden="true" />
-            </button>
+            <div className="flex items-center gap-1">
+              <ExportTraceButton sessionId={detail.id} />
+              <button
+                ref={closeButtonRef}
+                type="button"
+                onClick={onClose}
+                aria-label="Close session detail"
+                className={cn(
+                  'flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground',
+                  'hover:bg-accent hover:text-foreground transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                )}
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
           </div>
 
           {/* Scrollable content */}

@@ -695,6 +695,25 @@ export const localApi = {
         body: JSON.stringify({ ids }),
       }).then((r) => handleResponse<MemoryPreview[]>(r));
     },
+
+    /** Download a portable JSON trace of one session — session metadata +
+     *  full tool-call history + memory previews for any ids touched.
+     *  Returns the response as a Blob (not decoded JSON) so the caller can
+     *  trigger a file save while preserving the server's filename hint.
+     *  See the /trace endpoint for the privacy guarantees. */
+    async exportSessionTrace(
+      sessionId: string,
+    ): Promise<{ blob: Blob; filename: string }> {
+      const res = await fetch(
+        `${LOCAL_BASE}/agents/sessions/${encodeURIComponent(sessionId)}/trace`,
+      );
+      if (!res.ok) throw new Error(`Trace export failed: HTTP ${res.status}`);
+      const blob = await res.blob();
+      const cd = res.headers.get('Content-Disposition') ?? '';
+      const match = /filename="([^"]+)"/.exec(cd);
+      const filename = match?.[1] ?? `potluck-trace-${sessionId}.json`;
+      return { blob, filename };
+    },
   },
 
   // ---- Chat history (sidecar SQLite, local-only) ---------------------------
