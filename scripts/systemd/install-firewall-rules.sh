@@ -79,12 +79,12 @@ tailscale_rule_present() {
 
 mullvad_input_rule_present() {
     nft list chain inet mullvad input 2>/dev/null \
-        | grep -q "iif \"$POTLUCK_IFACE\" accept"
+        | grep -q "iifname \"$POTLUCK_IFACE\" accept"
 }
 
 mullvad_output_rule_present() {
     nft list chain inet mullvad output 2>/dev/null \
-        | grep -q "oif \"$POTLUCK_IFACE\" accept"
+        | grep -q "oifname \"$POTLUCK_IFACE\" accept"
 }
 
 # ----------------------------------------------------------------------------
@@ -114,7 +114,9 @@ do_install() {
             log "mullvad: input accept for $POTLUCK_IFACE already present"
         else
             log "mullvad: inserting input accept for $POTLUCK_IFACE"
-            nft insert rule inet mullvad input iif "$POTLUCK_IFACE" accept
+            # iifname (not iif) — string match, doesn't require the interface
+            # to exist at insert time. At boot, potluck0 isn't up yet.
+            nft insert rule inet mullvad input iifname "$POTLUCK_IFACE" accept
             any_inserted=1
         fi
 
@@ -122,7 +124,7 @@ do_install() {
             log "mullvad: output accept for $POTLUCK_IFACE already present"
         else
             log "mullvad: inserting output accept for $POTLUCK_IFACE"
-            nft insert rule inet mullvad output oif "$POTLUCK_IFACE" accept
+            nft insert rule inet mullvad output oifname "$POTLUCK_IFACE" accept
             any_inserted=1
         fi
     else
@@ -174,13 +176,13 @@ do_uninstall() {
         if mullvad_input_rule_present; then
             log "mullvad: removing input accept for $POTLUCK_IFACE"
             delete_rule_by_predicate inet mullvad input \
-                "iif \"$POTLUCK_IFACE\" accept" \
+                "iifname \"$POTLUCK_IFACE\" accept" \
                 || log "  (rule disappeared between check and delete; ok)"
         fi
         if mullvad_output_rule_present; then
             log "mullvad: removing output accept for $POTLUCK_IFACE"
             delete_rule_by_predicate inet mullvad output \
-                "oif \"$POTLUCK_IFACE\" accept" \
+                "oifname \"$POTLUCK_IFACE\" accept" \
                 || log "  (rule disappeared between check and delete; ok)"
         fi
     fi
