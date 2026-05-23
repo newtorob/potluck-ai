@@ -1,0 +1,51 @@
+[Unit]
+Description=Potluck WireGuard mesh sidecar (household)
+Documentation=https://github.com/newtorob/potluckai/blob/main/scripts/systemd/README.md
+After=network-online.target potluck-firewall.service
+Wants=network-online.target
+# We don't strictly need the firewall unit (the mesh would still come up
+# without it), but on a Tailscale/Mullvad box it would come up "dark" until
+# the rules land. Bind ordering so the rules are in place first.
+Requires=potluck-firewall.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+# RuntimeDirectory creates /run/potluck-mesh (root:root, 0755) every boot
+# and tears it down on stop. The Go sidecar's listener_unix.go uses
+# XDG_RUNTIME_DIR to decide where the IPC socket lives.
+RuntimeDirectory=potluck-mesh
+RuntimeDirectoryMode=0755
+Environment=XDG_RUNTIME_DIR=/run/potluck-mesh
+
+# SUDO_UID/SUDO_GID make the sidecar chown the IPC socket to the regular
+# user that owns this household, so CLI tools running as that user can
+# connect without sudo. Filled in by install-persistence.sh at install
+# time from the invoking user's id.
+Environment=SUDO_UID=@SUDO_UID@
+Environment=SUDO_GID=@SUDO_GID@
+
+# Coordinator + DERP URLs are templated at install time. The DERP URL is
+# derived from the coordinator URL by install-persistence.sh.
+ExecStart=@MESH_BIN@ --coordinator-url @COORD_URL@ --derp-url @DERP_URL@
+
+Restart=on-failure
+RestartSec=5
+
+# Tighten where we can without breaking TUN creation. CAP_NET_ADMIN is
+# required (TUN/WG), so we can't drop privileges fully. But we can lock
+# the rest down.
+ProtectSystem=strict
+ProtectHome=read-only
+NoNewPrivileges=no
+# /run is read-write because of RuntimeDirectory; everything else is
+# untouched by ProtectSystem=strict.
+PrivateTmp=yes
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
