@@ -72,19 +72,27 @@ mullvad_present() {
 # Rule-presence checks (so we don't double-insert)
 # ----------------------------------------------------------------------------
 
+# These use bash's native [[ "$var" == *substring* ]] rather than piping nft
+# to grep. The grep approach was hitting a `set -euo pipefail` interaction
+# that made the predicate return non-zero even when the substring was clearly
+# present in nft's output (verified by hand). Variable-capture sidesteps it.
+
 tailscale_rule_present() {
-    nft list chain ip filter ts-input 2>/dev/null \
-        | grep -q "iifname \"$POTLUCK_IFACE\" accept"
+    local out
+    out=$(nft list chain ip filter ts-input 2>/dev/null) || return 1
+    [[ "$out" == *"iifname \"$POTLUCK_IFACE\" accept"* ]]
 }
 
 mullvad_input_rule_present() {
-    nft list chain inet mullvad input 2>/dev/null \
-        | grep -q "iifname \"$POTLUCK_IFACE\" accept"
+    local out
+    out=$(nft list chain inet mullvad input 2>/dev/null) || return 1
+    [[ "$out" == *"iifname \"$POTLUCK_IFACE\" accept"* ]]
 }
 
 mullvad_output_rule_present() {
-    nft list chain inet mullvad output 2>/dev/null \
-        | grep -q "oifname \"$POTLUCK_IFACE\" accept"
+    local out
+    out=$(nft list chain inet mullvad output 2>/dev/null) || return 1
+    [[ "$out" == *"oifname \"$POTLUCK_IFACE\" accept"* ]]
 }
 
 # ----------------------------------------------------------------------------
@@ -138,20 +146,28 @@ do_install() {
     fi
 }
 
-# Remove a rule by handle. We re-list the chain, find the handle for the rule
-# matching our predicate, then delete it. Handles are unique per chain.
+# Remove a rule by handle. We re-list the chain, find the handle for the
+# FIRST rule matching our predicate, then delete it. Caller can call us in
+# a loop to remove duplicates. Same variable-capture approach as the
+# rule-presence checks for the same robustness reason.
 delete_rule_by_predicate() {
     local family="$1"      # ip / inet
     local table="$2"       # filter / mullvad
     local chain="$3"       # ts-input / input / output
     local predicate="$4"   # substring to match
 
-    local handle
-    handle=$(nft -a list chain "$family" "$table" "$chain" 2>/dev/null \
-        | grep "$predicate" \
-        | grep -oE 'handle [0-9]+' \
-        | awk '{print $2}' \
-        | head -1 || true)
+    local out
+    out=$(nft -a list chain "$family" "$table" "$chain" 2>/dev/null) || return 1
+
+    local line handle=""
+    while IFS= read -r line; do
+        if [[ "$line" == *"$predicate"* ]]; then
+            if [[ "$line" =~ handle[[:space:]]+([0-9]+) ]]; then
+                handle="${BASH_REMATCH[1]}"
+                break
+            fi
+        fi
+    done <<< "$out"
 
     if [ -z "$handle" ]; then
         return 1
@@ -165,26 +181,30 @@ do_uninstall() {
     require_root
     require_nft
 
-    if tailscale_present && tailscale_rule_present; then
-        log "tailscale: removing ts-input accept for $POTLUCK_IFACE"
-        delete_rule_by_predicate ip filter ts-input \
-            "iifname \"$POTLUCK_IFACE\" accept" \
-            || log "  (rule disappeared between check and delete; ok)"
+    # Loop to clean up duplicates — a buggy earlier install may have
+    # inserted the same rule more than once.
+    if tailscale_present; then
+        while tailscale_rule_present; do
+            log "tailscale: removing ts-input accept for $POTLUCK_IFACE"
+            delete_rule_by_predicate ip filter ts-input \
+                "iifname \"$POTLUCK_IFACE\" accept" \
+                || { log "  (could not delete; bailing to avoid infinite loop)"; break; }
+        done
     fi
 
     if mullvad_present; then
-        if mullvad_input_rule_present; then
+        while mullvad_input_rule_present; do
             log "mullvad: removing input accept for $POTLUCK_IFACE"
             delete_rule_by_predicate inet mullvad input \
                 "iifname \"$POTLUCK_IFACE\" accept" \
-                || log "  (rule disappeared between check and delete; ok)"
-        fi
-        if mullvad_output_rule_present; then
+                || { log "  (could not delete; bailing to avoid infinite loop)"; break; }
+        done
+        while mullvad_output_rule_present; do
             log "mullvad: removing output accept for $POTLUCK_IFACE"
             delete_rule_by_predicate inet mullvad output \
                 "oifname \"$POTLUCK_IFACE\" accept" \
-                || log "  (rule disappeared between check and delete; ok)"
-        fi
+                || { log "  (could not delete; bailing to avoid infinite loop)"; break; }
+        done
     fi
 
     log "uninstall done"
