@@ -1,8 +1,14 @@
 """PyInstaller build driver for the potluck-mcp binary.
 
-Produces a single self-contained binary at dist/potluck-mcp[.exe].
-Heavy inference dependencies (llama_cpp, torch, sentence_transformers) are
-explicitly excluded — the MCP server only needs the db/settings/services layer.
+Produces a onedir bundle at dist/potluck-mcp/ containing the executable
+and an _internal/ directory with all shared libraries and data files.
+
+Heavy inference deps (llama_cpp, torch, sentence_transformers, numpy, GPUtil)
+are excluded — the MCP server only needs the db/settings/services layer.
+
+The spec file (potluck-mcp.spec) is the source of truth for build flags.
+Regenerate it intentionally when dependencies change — do not delete it
+between builds, as that breaks reproducibility.
 
 Usage:
     python build-mcp.py
@@ -18,21 +24,18 @@ _ROOT = Path(__file__).parent
 
 
 def main() -> None:
+    spec = _ROOT / "potluck-mcp.spec"
+    if not spec.exists():
+        print(f"error: spec file not found: {spec}", file=sys.stderr)
+        print("Run PyInstaller manually once to generate it, then commit it.", file=sys.stderr)
+        sys.exit(1)
+
     cmd = [
         sys.executable,
         "-m",
         "PyInstaller",
-        "--onefile",
-        "--name", "potluck-mcp",
-        "--clean",
-        # Exclude heavy inference deps — MCP does not call the LLM
-        "--exclude-module", "llama_cpp",
-        "--exclude-module", "torch",
-        "--exclude-module", "sentence_transformers",
-        "--exclude-module", "numpy",
-        "--exclude-module", "GPUtil",
-        # Entry point is the __main__ module
-        str(_ROOT / "potluck_local" / "mcp" / "__main__.py"),
+        str(spec),
+        "--noconfirm",
     ]
 
     print("Running:", " ".join(cmd))
@@ -41,11 +44,10 @@ def main() -> None:
     if result.returncode != 0:
         sys.exit(result.returncode)
 
-    binary = _ROOT / "dist" / "potluck-mcp"
-    if sys.platform == "win32":
-        binary = binary.with_suffix(".exe")
-
+    exe_name = "potluck-mcp.exe" if sys.platform == "win32" else "potluck-mcp"
+    binary = _ROOT / "dist" / "potluck-mcp" / exe_name
     print(f"\nBuild complete: {binary}")
+    print(f"Bundle directory: {binary.parent}")
 
 
 if __name__ == "__main__":

@@ -12,9 +12,11 @@
     "build:mac": "electron-builder --mac",
     "build:win": "electron-builder --win",
     "build:linux": "electron-builder --linux",
-    "prepack:python": "cd ../python && python3 build.py && rm -rf ../electron/resources/python && mkdir -p ../electron/resources/python && cp -R dist/potluck-local* ../electron/resources/python/",
+    "prepack:frontend": "cd ../frontend && pnpm exec vite build",
+    "prepack:python": "rm -rf resources/python && mkdir -p resources/python && cp -R ../python/dist/potluck-local resources/python/",
+    "prepack:mcp": "cp -R ../python/dist/potluck-mcp resources/python/",
     "prepack:mesh": "make -C ../go/potluck-mesh build && rm -rf resources/mesh && mkdir -p resources/mesh && cp ../go/potluck-mesh/dist/potluck-mesh* resources/mesh/",
-    "prepack": "pnpm run prepack:python && pnpm run prepack:mesh",
+    "prepack": "pnpm run prepack:frontend && pnpm run prepack:python && pnpm run prepack:mcp && pnpm run prepack:mesh",
     "package": "pnpm run prepack && pnpm run build",
     "clean": "rimraf dist out resources/python resources/mesh"
   },
@@ -27,12 +29,14 @@
     "files": [
       "main.js",
       "preload.js",
-      "icons/**/*",
-      "!node_modules/**/*",
-      "node_modules/electron-log/**/*",
-      "node_modules/electron-updater/**/*"
+      "icons/**/*"
     ],
     "extraResources": [
+      {
+        "from": "../frontend/dist/",
+        "to": "frontend",
+        "filter": ["**/*"]
+      },
       {
         "from": "./resources/python/",
         "to": "python",

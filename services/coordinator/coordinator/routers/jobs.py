@@ -34,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from coordinator.constants import STUB_MEMBER_ID
 from coordinator.db.database import get_db, get_session_factory
+from coordinator.middleware.auth import require_coordinator_token
 from coordinator.models.job import Job
 from coordinator.schemas.peer import (
     JobAssignedMessage,
@@ -81,7 +82,12 @@ class JobErrorResponse(BaseModel):
     error_message: str
 
 
-@router.post("", response_model=JobResponse, responses={502: {"model": JobErrorResponse}})
+@router.post(
+    "",
+    response_model=JobResponse,
+    responses={502: {"model": JobErrorResponse}},
+    dependencies=[Depends(require_coordinator_token)],
+)
 async def dispatch_job(
     req: JobRequest,
     db: AsyncSession = Depends(get_db),
@@ -255,7 +261,7 @@ def _sse_error(category: str, message: str) -> str:
     return f"data: {json.dumps(payload)}\n\n"
 
 
-@router.get("/stats")
+@router.get("/stats", dependencies=[Depends(require_coordinator_token)])
 async def my_job_stats(db: AsyncSession = Depends(get_db)) -> dict:
     """Per-member requester stats for the desktop /network view.
 
@@ -378,7 +384,7 @@ async def _finalize_job_in_db(
         logger.exception("job_finalize_failed", job_id=str(job_id))
 
 
-@router.post("/stream")
+@router.post("/stream", dependencies=[Depends(require_coordinator_token)])
 async def dispatch_job_stream(
     req: JobRequest,
     db: AsyncSession = Depends(get_db),

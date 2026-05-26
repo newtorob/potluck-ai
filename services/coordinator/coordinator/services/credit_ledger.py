@@ -17,6 +17,13 @@ Asymmetric earn/spend (memory `b408b3a5`):
 Hash chain is per-member: each new row's `prev_row_hash` is the
 previous row's `row_hash` for the *same* member. Bootstrap value for
 the first row in a chain is the constant `GENESIS_HASH`.
+
+Idempotency (migration 0003):
+`credit_ledger` carries UNIQUE (job_id, direction). `record_job_credits`
+uses INSERT … ON CONFLICT (job_id, direction) DO NOTHING. Calling this
+function twice for the same job is a safe no-op — the second call
+returns the rows that were created by the first call, identical to what
+the first call returned.
 """
 from __future__ import annotations
 
@@ -25,6 +32,7 @@ import uuid
 from decimal import Decimal
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from coordinator.models.credit import CreditLedger, CreditModelMultiplier
@@ -106,6 +114,24 @@ async def _resolve_multiplier(
     return Decimal(found)
 
 
+async def _fetch_existing_rows(
+    db: AsyncSession, job_id: uuid.UUID
+) -> tuple[CreditLedger, CreditLedger] | None:
+    """Return the (spent, earned) rows for job_id if both exist, else None."""
+    result = await db.execute(
+        select(CreditLedger)
+        .where(CreditLedger.job_id == job_id)
+        .order_by(CreditLedger.created_at.asc(), CreditLedger.id.asc())
+    )
+    rows = result.scalars().all()
+    if len(rows) < 2:
+        return None
+    by_direction = {r.direction: r for r in rows}
+    if "spent" not in by_direction or "earned" not in by_direction:
+        return None
+    return by_direction["spent"], by_direction["earned"]
+
+
 async def record_job_credits(
     db: AsyncSession,
     *,
@@ -116,11 +142,14 @@ async def record_job_credits(
     output_tokens: int,
 ) -> tuple[CreditLedger, CreditLedger]:
     """Write the two ledger rows for a completed job. Returns the
-    (spent_row, earned_row) tuple, both freshly inserted + hash-chained.
+    (spent_row, earned_row) tuple.
 
-    Idempotency: callers should ensure this is invoked at most once per
-    job (the FK to jobs + the per-job nature of the row makes duplicates
-    visible at the DB level if anyone bypasses this contract).
+    Idempotent: calling this function twice for the same job_id is safe.
+    The second call detects the conflict via UNIQUE (job_id, direction),
+    skips the insert, and returns the rows created by the first call.
+    The hash chain is unaffected — the no-op insert does not write a
+    new row, so the chain state is identical to what the first call
+    produced.
     """
     if output_tokens <= 0:
         # No credit for zero-output jobs. Callers shouldn't invoke us
@@ -145,25 +174,35 @@ async def record_job_credits(
         credits=spent,
         prev_row_hash=spent_prev,
     )
-    spent_row = CreditLedger(
-        member_id=requester_member_id,
-        direction="spent",
-        job_id=job_id,
-        model_slug=model_slug,
-        output_tokens=output_tokens,
-        multiplier=multiplier,
-        credits=spent,
-        prev_row_hash=spent_prev,
-        row_hash=spent_hash,
+
+    spent_stmt = (
+        pg_insert(CreditLedger)
+        .values(
+            member_id=requester_member_id,
+            direction="spent",
+            job_id=job_id,
+            model_slug=model_slug,
+            output_tokens=output_tokens,
+            multiplier=multiplier,
+            credits=spent,
+            prev_row_hash=spent_prev,
+            row_hash=spent_hash,
+        )
+        .on_conflict_do_nothing(index_elements=["job_id", "direction"])
+        .returning(CreditLedger)
     )
-    db.add(spent_row)
+    spent_result = await db.execute(spent_stmt)
+    spent_row = spent_result.scalar_one_or_none()
 
     # --- 'earned' row for the contributor's owner --- #
-    # Look up prev_row_hash AFTER spent_row is added but BEFORE flush —
-    # if requester == contributor_owner (a self-served job), the spent
-    # row above is the new latest and our earned row chains onto it.
-    # Without a flush, the SELECT won't see the spent row yet, so we
-    # construct the chain manually:
+    # Look up prev_row_hash AFTER the spent insert (which may have been a
+    # no-op) — if requester == contributor_owner (a self-served job), the
+    # spent row is the new latest and the earned row chains onto it.
+    # When the spent insert was a genuine insert, the DB has the row but
+    # the session hasn't flushed yet, so we construct the chain manually.
+    # When the spent insert was a no-op (duplicate call), spent_row is None
+    # and the earned insert will also be a no-op; the chain construction
+    # below still produces the same hash (same inputs), which is correct.
     if requester_member_id == contributor_owner_member_id:
         earned_prev = spent_hash
     else:
@@ -181,18 +220,38 @@ async def record_job_credits(
         credits=earned,
         prev_row_hash=earned_prev,
     )
-    earned_row = CreditLedger(
-        member_id=contributor_owner_member_id,
-        direction="earned",
-        job_id=job_id,
-        model_slug=model_slug,
-        output_tokens=output_tokens,
-        multiplier=multiplier * CONTRIBUTION_BONUS_MULTIPLIER,
-        credits=earned,
-        prev_row_hash=earned_prev,
-        row_hash=earned_hash,
-    )
-    db.add(earned_row)
 
-    await db.flush()
-    return spent_row, earned_row
+    earned_stmt = (
+        pg_insert(CreditLedger)
+        .values(
+            member_id=contributor_owner_member_id,
+            direction="earned",
+            job_id=job_id,
+            model_slug=model_slug,
+            output_tokens=output_tokens,
+            multiplier=multiplier * CONTRIBUTION_BONUS_MULTIPLIER,
+            credits=earned,
+            prev_row_hash=earned_prev,
+            row_hash=earned_hash,
+        )
+        .on_conflict_do_nothing(index_elements=["job_id", "direction"])
+        .returning(CreditLedger)
+    )
+    earned_result = await db.execute(earned_stmt)
+    earned_row = earned_result.scalar_one_or_none()
+
+    # Both inserts were genuine — flush so the rows are visible.
+    if spent_row is not None and earned_row is not None:
+        await db.flush()
+        return spent_row, earned_row
+
+    # At least one insert was a no-op (conflict). The constraint guarantees
+    # both rows exist if either does — fetch and return them.
+    existing = await _fetch_existing_rows(db, job_id)
+    if existing is None:
+        # Should be unreachable: the constraint fired but the rows are gone.
+        raise RuntimeError(
+            f"credit_ledger invariant violated: conflict on job {job_id} "
+            "but existing rows not found"
+        )
+    return existing

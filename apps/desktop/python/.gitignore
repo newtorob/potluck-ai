@@ -3,5 +3,7 @@ __pycache__/
 dist/
 build/
 *.spec
+!potluck-local.spec
+!potluck-mcp.spec
 *.egg-info/
 .env

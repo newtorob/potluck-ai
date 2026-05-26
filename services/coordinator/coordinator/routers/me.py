@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from coordinator.constants import STUB_MEMBER_ID
 from coordinator.db.database import get_db
+from coordinator.middleware.auth import require_coordinator_token
 from coordinator.models.credit import CreditLedger
 from coordinator.schemas.credit import (
     CreditBalanceByModel,
@@ -29,7 +30,11 @@ router = APIRouter(tags=["me"])
 _STUB_MEMBER_ID = STUB_MEMBER_ID
 
 
-@router.get("/me/credit-balance", response_model=CreditBalanceResponse)
+@router.get(
+    "/me/credit-balance",
+    response_model=CreditBalanceResponse,
+    dependencies=[Depends(require_coordinator_token)],
+)
 async def credit_balance(
     db: AsyncSession = Depends(get_db),
 ) -> CreditBalanceResponse:
@@ -76,7 +81,11 @@ async def credit_balance(
     )
 
 
-@router.get("/me/credit-history", response_model=CreditHistoryResponse)
+@router.get(
+    "/me/credit-history",
+    response_model=CreditHistoryResponse,
+    dependencies=[Depends(require_coordinator_token)],
+)
 async def credit_history(
     direction: str | None = Query(default=None, pattern="^(earned|spent)$"),
     limit: int = Query(default=50, ge=1, le=500),

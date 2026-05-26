@@ -26,6 +26,11 @@
 //   calls Inject(); the wg-go receive-func goroutine drains it.
 // - derpPeers is guarded by derpMu. SetPeerRouting is called from the main
 //   goroutine; Send is called from one of wg-go's send-loop goroutines.
+// - closeState is held in atomic.Pointer so Open and Close can race safely.
+//   Each Open installs a fresh *closeState (its own channel + sync.Once), and
+//   Close atomically loads-and-clears the current state, running its Once at
+//   most once. No mutex is involved on the close path, eliminating the
+//   prior write-write race on the sync.Once value.
 // - The inner StdNetBind handles all its own concurrency.
 //
 // # Lifecycle
@@ -46,6 +51,7 @@ import (
 	"net"
 	"net/netip"
 	"sync"
+	"sync/atomic"
 
 	"golang.zx2c4.com/wireguard/conn"
 
@@ -170,6 +176,15 @@ type injectedPacket struct {
 // DerpBind — conn.Bind implementation
 // ---------------------------------------------------------------------------
 
+// closeState bundles a closeCh and the sync.Once that closes it for a single
+// Open/Close cycle. A fresh *closeState is installed by Open and atomically
+// swapped out by Close, so the Once value is never re-used or shared across
+// concurrent Close paths.
+type closeState struct {
+	ch   chan struct{}
+	once sync.Once
+}
+
 // DerpBind wraps wg-go's conn.StdNetBind and intercepts:
 //   - Outbound sends to syntheticEndpoints: routed via DERP relay.
 //   - Inbound DERP packets: injected into the ReceiveFunc channel.
@@ -180,24 +195,28 @@ type DerpBind struct {
 	client *Client
 
 	injectCh chan injectedPacket // Inject → wg-go receive-func
-	closeCh  chan struct{}       // closed by Close() to signal ReceiveFunc exit
+
+	// cs holds the *closeState for the current Open cycle. Nil means
+	// "no active Open" — Close on a nil pointer is a safe no-op.
+	cs atomic.Pointer[closeState]
 
 	derpMu    sync.RWMutex
 	derpPeers map[[32]byte]bool // pubkey → true if DERP-routed
-
-	closeOnce sync.Once
 }
 
 // NewDerpBind creates a DerpBind wrapping the provided inner bind and DERP client.
 // Call tunnel.New(..., tunnel.WithBind(b)) to install it in the WG device.
 func NewDerpBind(inner conn.Bind, client *Client) *DerpBind {
-	return &DerpBind{
+	b := &DerpBind{
 		inner:     inner,
 		client:    client,
 		injectCh:  make(chan injectedPacket, injectChanCap),
-		closeCh:   make(chan struct{}),
 		derpPeers: make(map[[32]byte]bool),
 	}
+	// Install an initial closeState so callers that hit Close before Open
+	// (defensive, unusual) still find a usable Once.
+	b.cs.Store(&closeState{ch: make(chan struct{})})
+	return b
 }
 
 // Inject enqueues a packet received from the DERP relay for delivery into the
@@ -256,24 +275,23 @@ func (b *DerpBind) IsPeerDERPRouted(pubkey [32]byte) bool {
 // bind.Open() — even on first startup, because closeBindLocked runs
 // unconditionally and is a no-op only when netc.bind is nil (it isn't, since
 // the bind was attached at device construction). That means by the time we
-// get here, b.closeCh may already be closed and b.closeOnce already consumed
-// from a prior Close. Reset both for this Open cycle so derpRecv doesn't
-// immediately bail via the closeCh case on its first invocation.
+// get here, the previous closeState may have had its Once consumed. Install
+// a fresh *closeState atomically so derpRecv doesn't immediately bail via
+// the closeCh case on its first invocation.
 func (b *DerpBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 	innerFns, actualPort, err := b.inner.Open(port)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	// Reset close machinery for this Open cycle. Holding derpMu here is
-	// overkill but cheap — we have no contention during Open and it keeps
-	// the relationship between closeCh and closeOnce atomic across any
-	// concurrent Send/Inject/Close calls that race in.
-	b.derpMu.Lock()
-	b.closeCh = make(chan struct{})
-	b.closeOnce = sync.Once{}
-	closeCh := b.closeCh // capture for closure stability
-	b.derpMu.Unlock()
+	// Install a fresh closeState atomically. Any concurrent Close that
+	// happens to race with this Store will either:
+	//   (a) Load the previous closeState (already-fired Once → no-op), or
+	//   (b) Load this new closeState (fires once, closes the new ch).
+	// Either way, the Once value is never written-while-read.
+	cs := &closeState{ch: make(chan struct{})}
+	b.cs.Store(cs)
+	closeCh := cs.ch // capture for closure stability
 
 	// One-shot logger to confirm wg-go calls our ReceiveFunc at all. INFO-level
 	// to make the wiring visible without enabling DEBUG everywhere.
@@ -317,10 +335,15 @@ func (b *DerpBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 }
 
 // Close shuts down the DERP inject path and propagates to the inner bind.
+// Safe to call concurrently with Open: each closeState's Once is private to
+// its Open cycle, so multiple Closes simply fire each cycle's Once at most
+// once and never write to the same Once value.
 func (b *DerpBind) Close() error {
-	b.closeOnce.Do(func() {
-		close(b.closeCh)
-	})
+	if cs := b.cs.Load(); cs != nil {
+		cs.once.Do(func() {
+			close(cs.ch)
+		})
+	}
 	return b.inner.Close()
 }
 

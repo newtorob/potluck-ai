@@ -69,6 +69,7 @@ from coordinator.schemas.mesh import (
     SignalWelcome,
 )
 from coordinator.constants import STUB_MEMBER_ID
+from coordinator.middleware.auth import require_coordinator_token
 from coordinator.services.household_allocator import (
     HouseholdCIDRExhausted,
     allocate_household_cidr,
@@ -121,6 +122,7 @@ def _generate_pairing_token() -> str:
     "/mesh/households",
     response_model=HouseholdResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_coordinator_token)],
 )
 async def create_household(
     req: HouseholdCreateRequest,
@@ -189,6 +191,7 @@ async def create_household(
     "/mesh/pairing-tokens",
     response_model=PairingTokenIssueResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_coordinator_token)],
 )
 async def issue_pairing_token(
     db: AsyncSession = Depends(get_db),
@@ -247,6 +250,7 @@ async def issue_pairing_token(
     "/mesh/enroll",
     response_model=EnrollResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_coordinator_token)],
 )
 async def enroll(
     req: EnrollRequest,
@@ -419,7 +423,12 @@ async def list_peers(
 # ---------------------------------------------------------------------------
 
 
-@router.delete("/mesh/nodes/{node_id}", status_code=204, response_class=Response)
+@router.delete(
+    "/mesh/nodes/{node_id}",
+    status_code=204,
+    response_class=Response,
+    dependencies=[Depends(require_coordinator_token)],
+)
 async def delete_mesh_node(
     node_id: uuid.UUID,
     wg_public_key: str,
@@ -494,7 +503,11 @@ async def delete_mesh_node(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/mesh/heartbeat", response_model=HeartbeatResponse)
+@router.post(
+    "/mesh/heartbeat",
+    response_model=HeartbeatResponse,
+    dependencies=[Depends(require_coordinator_token)],
+)
 async def heartbeat(
     req: HeartbeatRequest,
     db: AsyncSession = Depends(get_db),
@@ -525,7 +538,11 @@ async def heartbeat(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/mesh/derp-token", response_model=DERPTokenResponse)
+@router.post(
+    "/mesh/derp-token",
+    response_model=DERPTokenResponse,
+    dependencies=[Depends(require_coordinator_token)],
+)
 async def issue_derp_token(
     req: DERPTokenRequest,
     db: AsyncSession = Depends(get_db),

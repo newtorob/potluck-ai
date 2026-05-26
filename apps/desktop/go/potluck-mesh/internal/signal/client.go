@@ -1,3 +1,15 @@
+// Package signal — Client maintains a persistent WebSocket to the coordinator.
+//
+// Concurrency model:
+//   - sendCh is an atomic.Pointer[chan any]. Run/runOnce installs a fresh
+//     channel via Store on each connection and Stores nil after the read/write
+//     loops have exited. Callers (Send*) Load the pointer; a nil load means
+//     "no active connection — drop the message." The channel is never
+//     close()d while a sender could still see it: a sync.WaitGroup guarantees
+//     runOnce waits for both loops to exit before clearing the pointer.
+//   - Senders use `select { case ch <- msg; default: drop }` so a full buffer
+//     never blocks. Sending on an orphaned (post-Store-nil) channel is safe:
+//     no one closes it; it is simply garbage-collected once no senders hold it.
 package signal
 
 import (
@@ -6,6 +18,8 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"nhooyr.io/websocket"
@@ -57,8 +71,11 @@ type Client struct {
 	// sendCh is the channel used to enqueue outbound messages from any
 	// goroutine. A dedicated writer goroutine drains it, ensuring only
 	// one goroutine calls wsjson.Write at a time.
-	// The channel is replaced on each new connection inside runOnce.
-	sendCh chan any
+	//
+	// Stored as an atomic.Pointer to a chan so concurrent Send* callers
+	// can Load it without racing against runOnce's Store(new) / Store(nil)
+	// across reconnects. See package doc for the lifecycle contract.
+	sendCh atomic.Pointer[chan any]
 }
 
 // NewClient creates a Client. Call Run(ctx) to start the connection loop.
@@ -70,12 +87,22 @@ func NewClient(signalURL, wgPublicKey string, handler RosterHandler) *Client {
 	}
 }
 
+// loadSendCh returns the currently armed send channel, or nil if no
+// connection is active.
+func (c *Client) loadSendCh() chan any {
+	p := c.sendCh.Load()
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
 // SendEndpointUpdate enqueues an endpoint_update message to be sent over the
 // active signaling connection. It is safe to call from any goroutine. If there
 // is no active connection (e.g. during reconnect backoff), the message is
 // dropped with a debug log — the next STUN refresh will retry.
 func (c *Client) SendEndpointUpdate(endpoint string) {
-	ch := c.sendCh // read once, atomically — nil if no connection yet
+	ch := c.loadSendCh()
 	if ch == nil {
 		slog.Debug("signal: no active connection, dropping endpoint_update",
 			"endpoint", endpoint,
@@ -99,7 +126,7 @@ func (c *Client) SendEndpointUpdate(endpoint string) {
 // dropped — the caller (main.go punch throttle) will retry on the next roster
 // event or after its 30-second cooldown expires.
 func (c *Client) SendRequestPunch(targetNodeID string) {
-	ch := c.sendCh
+	ch := c.loadSendCh()
 	if ch == nil {
 		slog.Debug("signal: no active connection, dropping request_punch",
 			"target_node_id", targetNodeID,
@@ -135,8 +162,8 @@ func (c *Client) Run(ctx context.Context) error {
 		slog.Info("signal: connecting", "url", c.signalURL, "attempt", attempt)
 
 		established, err := c.runOnce(ctx)
-		// Clear the send channel so callers don't try to write to a closed conn.
-		c.sendCh = nil
+		// runOnce already cleared sendCh under its WaitGroup ordering before
+		// returning, so callers see no active connection from this point on.
 
 		if ctx.Err() != nil {
 			// Normal shutdown — parent context cancelled.
@@ -177,6 +204,10 @@ func (c *Client) Run(ctx context.Context) error {
 // returns when the connection is closed or an unrecoverable error occurs.
 // Returns (true, nil-or-err) if a welcome was successfully received (connection
 // was established), or (false, err) if the connection never got past hello.
+//
+// Guarantees on return: the read and write loop goroutines have both exited,
+// and c.sendCh has been Stored to nil. This is the safety contract the Send*
+// methods rely on for race-free lifecycle.
 func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 	dialCtx, dialCancel := context.WithTimeout(ctx, 15*time.Second)
 	defer dialCancel()
@@ -228,7 +259,13 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 
 	// Arm the outbound channel so SendEndpointUpdate can start writing.
 	sendCh := make(chan any, sendChanCap)
-	c.sendCh = sendCh
+	c.sendCh.Store(&sendCh)
+	// On any exit from this function, ensure the pointer is cleared AFTER
+	// the read/write loops have exited (we Wait below). This protects against
+	// late senders observing a stale channel that nothing will drain.
+	defer func() {
+		c.sendCh.Store(nil)
+	}()
 
 	c.handler.OnWelcome(welcome)
 
@@ -237,22 +274,43 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 	defer ticker.Stop()
 
 	// ---- message loops ---- //
-	// Read loop goroutine.
+	// readLoop/writeLoop run for the lifetime of this connection. loopCtx
+	// is cancelled when either loop returns (or parent ctx is cancelled),
+	// which is how we unblock writeLoop — it would otherwise wait forever
+	// on sendCh after the underlying conn has died. The WaitGroup ensures
+	// runOnce does not return (and the deferred Store(nil) does not fire)
+	// until both loops have actually exited.
+	loopCtx, cancelLoops := context.WithCancel(ctx)
+	defer cancelLoops()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
 	readErr := make(chan error, 1)
 	go func() {
-		readErr <- c.readLoop(ctx, conn)
+		defer wg.Done()
+		readErr <- c.readLoop(loopCtx, conn)
 	}()
 
-	// Write loop goroutine — drains sendCh so all writes happen on one goroutine.
 	writeErr := make(chan error, 1)
 	go func() {
-		writeErr <- c.writeLoop(ctx, conn, sendCh)
+		defer wg.Done()
+		writeErr <- c.writeLoop(loopCtx, conn, sendCh)
 	}()
+
+	// finish cancels loopCtx (so writeLoop's select-on-ctx fires) and
+	// closes the websocket (so readLoop's blocking Read returns), then
+	// waits for both goroutines to actually exit.
+	finish := func() {
+		cancelLoops()
+		_ = conn.Close(websocket.StatusNormalClosure, "shutdown")
+		wg.Wait()
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			_ = conn.Close(websocket.StatusNormalClosure, "shutdown")
+			finish()
 			return true, ctx.Err()
 
 		case <-ticker.C:
@@ -263,12 +321,14 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 			}
 
 		case err := <-readErr:
+			finish()
 			if err != nil {
 				return true, fmt.Errorf("signal: read loop: %w", err)
 			}
 			return true, nil
 
 		case err := <-writeErr:
+			finish()
 			if err != nil {
 				return true, fmt.Errorf("signal: write loop: %w", err)
 			}

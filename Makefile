@@ -168,19 +168,23 @@ sidecar-go: ## Build the Go mesh sidecar for the current platform (output: apps/
 
 # ---------- installer pipeline (unsigned dev builds — signing requires certs) ----------
 
-installer-deps: ## Verify the tools needed to build installers are present (pyinstaller, go, electron-builder via pnpm)
+installer-deps: ## Install build-time tools (pyinstaller) from requirements-build.txt; verify go + pnpm present
 	@command -v $(PYTHON_BIN) >/dev/null 2>&1 || { echo "error: $(PYTHON_BIN) not found"; exit 1; }
 	@command -v go >/dev/null 2>&1 || { echo "error: go not installed. brew install go"; exit 1; }
 	@command -v pnpm >/dev/null 2>&1 || { echo "error: pnpm not installed. brew install pnpm"; exit 1; }
-	@cd apps/desktop/python && ./.venv/bin/python -m pip show pyinstaller >/dev/null 2>&1 || \
-		{ echo "==> Installing pyinstaller into the sidecar venv"; ./.venv/bin/pip install pyinstaller; }
+	@echo "==> Installing build-time deps from requirements-build.txt"
+	@cd apps/desktop/python && ./.venv/bin/pip install -r requirements-build.txt --quiet
 	@echo "==> Installer build deps present."
 
-installer-bundle: installer-deps sidecar-go ## Bundle the Python sidecar + Go sidecar into apps/desktop/electron/resources/
-	@echo "==> Building Python sidecar binary (PyInstaller)"
+installer-bundle: installer-deps sidecar-go ## Bundle both Python sidecar binaries + Go sidecar into apps/desktop/electron/resources/
+	@echo "==> Building Python sidecar binary (potluck-local, PyInstaller --onedir)"
 	@cd apps/desktop/python && ./.venv/bin/python build.py
+	@echo "==> Building MCP sidecar binary (potluck-mcp, PyInstaller --onedir)"
+	@cd apps/desktop/python && ./.venv/bin/python build-mcp.py
+	@echo "==> Building frontend bundle"
+	@cd apps/desktop/frontend && pnpm exec vite build
 	@echo "==> Staging into apps/desktop/electron/resources/"
-	@cd apps/desktop/electron && pnpm run prepack
+	@cd apps/desktop/electron && pnpm run prepack:python && pnpm run prepack:mcp && pnpm run prepack:mesh
 
 installer-mac: installer-bundle ## Build unsigned macOS installer (.dmg + .zip). Signing requires Apple Developer cert.
 	@echo "==> Building macOS installer (unsigned — needs CSC_LINK + APPLE_ID env for signing)"

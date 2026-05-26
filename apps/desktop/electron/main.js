@@ -54,7 +54,8 @@ function getSidecarPath() {
   }
   const binaryName =
     process.platform === 'win32' ? 'potluck-local.exe' : 'potluck-local';
-  return path.join(process.resourcesPath, 'python', binaryName);
+  // onedir layout: potluck-local/<binary> (PyInstaller --onedir)
+  return path.join(process.resourcesPath, 'python', 'potluck-local', binaryName);
 }
 
 // ─── Sidecar lifecycle ───────────────────────────────────────────────────────
@@ -203,14 +204,12 @@ async function createWindow() {
     }
   });
 
-  if (process.env.NODE_ENV === 'development') {
+  if (!app.isPackaged) {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    // In production the React bundle sits at apps/desktop/frontend/dist/index.html
-    // relative to this file (which lives in the app's Resources/ root after packaging).
     mainWindow.loadFile(
-      path.join(__dirname, '..', 'frontend', 'dist', 'index.html')
+      path.join(process.resourcesPath, 'frontend', 'index.html')
     );
   }
 

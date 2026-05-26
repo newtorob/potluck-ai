@@ -17,10 +17,16 @@
 //  2. Server replies: {"type":"auth_ok","region":"...","server_time":<unix>}
 //
 // Concurrency:
+//   - sendCh is an atomic.Pointer[chan sendItem]; runOnce Stores a fresh
+//     channel after auth, and Stores nil only AFTER its read/write loop
+//     goroutines have exited (sync.WaitGroup). Callers (Send) Load the
+//     pointer — a nil load means "no active connection, drop." Senders
+//     use select-default so a full buffer never blocks; sending to an
+//     orphaned channel is safe because nothing close()s it.
 //   - One read-loop goroutine; it calls onPacketRx for each inbound frame.
 //   - One write-loop goroutine; it drains the sendCh channel.
-//     This mirrors the pattern in internal/signal/client.go exactly.
-//   - Send() enqueues to sendCh — never blocks; drops on overflow.
+//     The WaitGroup pairing guarantees both have exited before the next
+//     reconnect arms a new channel.
 //
 // Privacy:
 //   - Never log payload bytes.
@@ -39,6 +45,8 @@ import (
 	"math"
 	"net"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/potluck-ai/potluck-mesh/internal/util"
@@ -97,14 +105,25 @@ type Client struct {
 	ourPubkey   [pubkeyLen]byte
 	onPacketRx  PacketRxHandler
 
-	// sendCh is the outbound queue. Replaced on every new connection
-	// inside runOnce; nil when no active connection.
-	sendCh chan sendItem
+	// sendCh is the outbound queue. Stored as an atomic.Pointer so concurrent
+	// Send() callers can Load it without racing against runOnce installing a
+	// fresh channel on reconnect or clearing it after teardown.
+	sendCh atomic.Pointer[chan sendItem]
 
 	// currentJWT caches the most recently fetched token.
 	// Only the refresh goroutine and runOnce write it; they don't race
 	// because runOnce is sequential and refresh updates between connects.
 	currentJWT string
+}
+
+// loadSendCh returns the currently armed send channel, or nil if no
+// connection is active.
+func (c *Client) loadSendCh() chan sendItem {
+	p := c.sendCh.Load()
+	if p == nil {
+		return nil
+	}
+	return *p
 }
 
 // New creates a Client. Call Run(ctx) to start the connection loop.
@@ -126,7 +145,7 @@ func New(relayURL string, jwtFetcher JWTFetcher, ourPubkey [pubkeyLen]byte, onPa
 // Concurrency-safe. Returns an error if the channel is full (caller can retry).
 // If there is no active connection, the send is dropped with a debug log.
 func (c *Client) Send(destPubkey [pubkeyLen]byte, payload []byte) error {
-	ch := c.sendCh // read once
+	ch := c.loadSendCh()
 	if ch == nil {
 		slog.Debug("derp: no active connection, dropping outbound packet",
 			"dest_prefix", util.TruncatePubkeyBytes(destPubkey),
@@ -166,7 +185,9 @@ func (c *Client) Run(ctx context.Context) error {
 		slog.Info("derp: connecting", "url", c.relayURL, "attempt", attempt)
 
 		established, err := c.runOnce(ctx)
-		c.sendCh = nil // clear so Send() drops until reconnected
+		// runOnce clears sendCh AFTER its read/write loop goroutines have
+		// exited (WaitGroup ordering), so Send() reliably observes nil
+		// before any subsequent reconnect arms a new channel.
 
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -262,27 +283,58 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 
 	// Arm the outbound channel now that auth succeeded.
 	sendCh := make(chan sendItem, sendChanCap)
-	c.sendCh = sendCh
+	c.sendCh.Store(&sendCh)
+	// Guarantee: clear the pointer only AFTER both loops have exited (we
+	// Wait below). This prevents Send() from observing a stale channel
+	// reference for a connection that has already finished tearing down.
+	defer func() {
+		c.sendCh.Store(nil)
+	}()
 
 	// ---- run read + write loops ---- //
+	// loopCtx is cancelled when either loop exits or ctx is cancelled — this
+	// is how we unblock writeLoop, which would otherwise wait forever on
+	// sendCh after the underlying connection dies. The WaitGroup guarantees
+	// runOnce does not return until both loops have exited, which in turn
+	// guarantees the deferred Store(nil) above fires after teardown.
+	loopCtx, cancelLoops := context.WithCancel(ctx)
+	defer cancelLoops()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
 	readErr := make(chan error, 1)
 	go func() {
-		readErr <- c.readLoop(ctx, br)
+		defer wg.Done()
+		readErr <- c.readLoop(loopCtx, br)
 	}()
 	writeErr := make(chan error, 1)
 	go func() {
-		writeErr <- c.writeLoop(ctx, conn, sendCh)
+		defer wg.Done()
+		writeErr <- c.writeLoop(loopCtx, conn, sendCh)
 	}()
+
+	// finish cancels loopCtx (so writeLoop's select-on-ctx fires) and
+	// closes the connection (so readLoop's blocking I/O returns), then
+	// waits for both goroutines to actually exit.
+	finish := func() {
+		cancelLoops()
+		_ = conn.Close()
+		wg.Wait()
+	}
 
 	select {
 	case <-ctx.Done():
+		finish()
 		return true, ctx.Err()
 	case err := <-readErr:
+		finish()
 		if err != nil {
 			return true, fmt.Errorf("derp: read loop: %w", err)
 		}
 		return true, nil
 	case err := <-writeErr:
+		finish()
 		if err != nil {
 			return true, fmt.Errorf("derp: write loop: %w", err)
 		}

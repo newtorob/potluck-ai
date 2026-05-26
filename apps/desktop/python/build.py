@@ -1,7 +1,11 @@
-"""PyInstaller build driver.
+"""PyInstaller build driver for the potluck-local sidecar.
 
-Produces a single self-contained binary at dist/potluck-local[.exe].
-Code signing and notarization are handled in a later CI task.
+Produces a onedir bundle at dist/potluck-local/ containing the executable
+and an _internal/ directory with all shared libraries and data files.
+
+The spec file (potluck-local.spec) is the source of truth for build flags.
+Regenerate it intentionally when dependencies change — do not delete it
+between builds, as that breaks reproducibility.
 
 Usage:
     python build.py
@@ -17,16 +21,18 @@ _ROOT = Path(__file__).parent
 
 
 def main() -> None:
+    spec = _ROOT / "potluck-local.spec"
+    if not spec.exists():
+        print(f"error: spec file not found: {spec}", file=sys.stderr)
+        print("Run PyInstaller manually once to generate it, then commit it.", file=sys.stderr)
+        sys.exit(1)
+
     cmd = [
         sys.executable,
         "-m",
         "PyInstaller",
-        "--onefile",
-        "--name", "potluck-local",
-        "--clean",
-        # Bundle the offline model registry fallback
-        "--add-data", f"{_ROOT / 'potluck_local' / 'data' / 'models.json'}:potluck_local/data",
-        str(_ROOT / "potluck_local" / "app.py"),
+        str(spec),
+        "--noconfirm",
     ]
 
     print("Running:", " ".join(cmd))
@@ -35,11 +41,10 @@ def main() -> None:
     if result.returncode != 0:
         sys.exit(result.returncode)
 
-    binary = _ROOT / "dist" / "potluck-local"
-    if sys.platform == "win32":
-        binary = binary.with_suffix(".exe")
-
+    exe_name = "potluck-local.exe" if sys.platform == "win32" else "potluck-local"
+    binary = _ROOT / "dist" / "potluck-local" / exe_name
     print(f"\nBuild complete: {binary}")
+    print(f"Bundle directory: {binary.parent}")
 
 
 if __name__ == "__main__":

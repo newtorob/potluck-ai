@@ -57,6 +57,13 @@ SYSTEMD_DIR="/etc/systemd/system"
 FIREWALL_UNIT_DST="$SYSTEMD_DIR/potluck-firewall.service"
 MESH_UNIT_DST="$SYSTEMD_DIR/potluck-mesh.service"
 
+# Dedicated system user the mesh service runs as. Created by
+# create_potluck_user() during --install. Owns /var/lib/potluck/mesh and
+# the WG private key inside it.
+POTLUCK_USER="potluck"
+POTLUCK_STATE_DIR="/var/lib/potluck/mesh"
+POTLUCK_KEY_PATH="$POTLUCK_STATE_DIR/wg.key"
+
 # Templates (in this repo)
 FIREWALL_SCRIPT_SRC="$SCRIPT_DIR/install-firewall-rules.sh"
 FIREWALL_TEMPLATE="$SCRIPT_DIR/potluck-firewall.service.template"
@@ -98,6 +105,109 @@ derive_derp_url() {
     echo "tcp+insecure://${host}:8443"
 }
 
+# Create the dedicated 'potluck' system user if it doesn't exist.
+# Idempotent — re-running --install is a no-op when the user is already there.
+# We use --system (UID < 1000), --no-create-home, and a nologin shell so the
+# account can't be used for interactive access.
+create_potluck_user() {
+    if id "$POTLUCK_USER" >/dev/null 2>&1; then
+        info "system user '$POTLUCK_USER' already exists (uid=$(id -u "$POTLUCK_USER"))"
+        return 0
+    fi
+    step "Creating system user '$POTLUCK_USER'"
+    # /usr/sbin/nologin is standard on Debian/Ubuntu/RHEL. Fall back to
+    # /sbin/nologin if it's there instead (some minimal images).
+    local nologin="/usr/sbin/nologin"
+    [ -x "$nologin" ] || nologin="/sbin/nologin"
+    [ -x "$nologin" ] || nologin="/bin/false"
+    useradd --system --no-create-home --shell "$nologin" "$POTLUCK_USER" \
+        || fail "useradd failed for '$POTLUCK_USER'"
+    ok "created system user '$POTLUCK_USER' (uid=$(id -u "$POTLUCK_USER"))"
+}
+
+# Migrate an existing WG private key from the old per-user location
+# ($SUDO_USER's $HOME/.local/state/potluck/mesh/wg.key) into the new
+# system-owned location ($POTLUCK_KEY_PATH).
+#
+# Behavior:
+#   - Clean install (no old key)  → no-op
+#   - Old key present, new absent → copy, chown potluck:potluck, chmod 0600
+#   - Both present                → keep the new one untouched, warn loudly
+#   - Old key absent              → no-op
+#
+# We do NOT delete the old key — operator deletes it after verifying the
+# service comes up with the same public key. Silent identity changes are
+# the footgun we're guarding against.
+migrate_existing_key() {
+    # Figure out which user's $HOME to look in. SUDO_USER is set when invoked
+    # via sudo; otherwise we don't have a sensible source path and skip.
+    local src_user="${SUDO_USER:-}"
+    if [ -z "$src_user" ] || [ "$src_user" = "root" ]; then
+        info "no SUDO_USER set; skipping key migration check"
+        return 0
+    fi
+
+    local src_home
+    src_home=$(getent passwd "$src_user" | cut -d: -f6)
+    if [ -z "$src_home" ] || [ ! -d "$src_home" ]; then
+        info "could not resolve home dir for '$src_user'; skipping key migration"
+        return 0
+    fi
+
+    local old_key="$src_home/.local/state/potluck/mesh/wg.key"
+    if [ ! -f "$old_key" ]; then
+        info "no pre-existing WG key at $old_key; clean install"
+        return 0
+    fi
+
+    step "Migrating WireGuard private key to system location"
+    info "found existing key: $old_key"
+
+    if [ -f "$POTLUCK_KEY_PATH" ]; then
+        warn "key already exists at $POTLUCK_KEY_PATH — NOT overwriting."
+        warn "If you want the old key to win, run:"
+        warn "  sudo cp '$old_key' '$POTLUCK_KEY_PATH'"
+        warn "  sudo chown $POTLUCK_USER:$POTLUCK_USER '$POTLUCK_KEY_PATH'"
+        warn "  sudo chmod 0600 '$POTLUCK_KEY_PATH'"
+        warn "Leaving things alone — service will use the existing system key."
+        return 0
+    fi
+
+    # StateDirectory= creates the dir at unit-start; do it ourselves now so
+    # we have somewhere to copy into before the first service start.
+    mkdir -p "$POTLUCK_STATE_DIR"
+    cp "$old_key" "$POTLUCK_KEY_PATH"
+    chown "$POTLUCK_USER:$POTLUCK_USER" "$POTLUCK_KEY_PATH"
+    chmod 0600 "$POTLUCK_KEY_PATH"
+    chown "$POTLUCK_USER:$POTLUCK_USER" "$POTLUCK_STATE_DIR"
+    chmod 0700 "$POTLUCK_STATE_DIR"
+
+    ok "copied key to $POTLUCK_KEY_PATH (owner=$POTLUCK_USER, mode=0600)"
+    printf "\n%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n" "$C_YELLOW" "$C_OFF"
+    printf "%s KEY MIGRATED — preserving household identity %s\n" "$C_YELLOW" "$C_OFF"
+    printf "%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n" "$C_YELLOW" "$C_OFF"
+    info "Old key at $old_key was NOT deleted."
+    info "Verify the service starts with the same public key, then remove it:"
+    info "  rm '$old_key'"
+    info ""
+}
+
+# Remove the 'potluck' system user. Only called from --uninstall --purge-user.
+# Default uninstall leaves the user in place because it owns state files
+# (the WG key under /var/lib/potluck/mesh).
+remove_potluck_user() {
+    if ! id "$POTLUCK_USER" >/dev/null 2>&1; then
+        info "system user '$POTLUCK_USER' not present; nothing to remove"
+        return 0
+    fi
+    step "Removing system user '$POTLUCK_USER' (--purge-user)"
+    warn "this will leave $POTLUCK_STATE_DIR orphaned (owned by deleted UID)"
+    warn "if you re-install later, the new 'potluck' user will get a fresh UID"
+    warn "and may not be able to read the old WG key."
+    userdel "$POTLUCK_USER" || fail "userdel failed for '$POTLUCK_USER'"
+    ok "removed system user '$POTLUCK_USER'"
+}
+
 # ----------------------------------------------------------------------------
 # Install
 # ----------------------------------------------------------------------------
@@ -113,6 +223,11 @@ do_install() {
     [ -f "$FIREWALL_SCRIPT_SRC" ] || fail "firewall script template missing: $FIREWALL_SCRIPT_SRC"
     [ -f "$FIREWALL_TEMPLATE" ] || fail "firewall unit template missing: $FIREWALL_TEMPLATE"
     [ -f "$MESH_TEMPLATE" ] || fail "mesh unit template missing: $MESH_TEMPLATE"
+
+    # User + state must exist BEFORE we render the unit (which references
+    # User=potluck) and BEFORE we migrate the key (which chowns to potluck).
+    create_potluck_user
+    migrate_existing_key
 
     step "Installing firewall helper script to $LIB_DIR"
     mkdir -p "$LIB_DIR"
@@ -176,6 +291,8 @@ do_install() {
 # ----------------------------------------------------------------------------
 
 do_uninstall() {
+    local purge_user="${1:-no}"
+
     step "Stopping + disabling units"
     if systemctl is-enabled potluck-mesh.service >/dev/null 2>&1; then
         systemctl disable --now potluck-mesh.service >/dev/null 2>&1 || true
@@ -216,6 +333,14 @@ do_uninstall() {
     fi
     # Don't rmdir $LIB_DIR — other Potluck installers may share it.
 
+    if [ "$purge_user" = "yes" ]; then
+        remove_potluck_user
+    else
+        info "Leaving system user '$POTLUCK_USER' and $POTLUCK_STATE_DIR in place."
+        info "These hold the WG private key (household identity). Pass --purge-user"
+        info "to also remove the user (you'll lose the household key)."
+    fi
+
     echo
     ok "Potluck mesh persistence uninstalled"
     info "Your $HOME/.potluck state (pairings, logs) was NOT touched."
@@ -247,6 +372,7 @@ MODE=""
 COORD_URL="${POTLUCK_COORDINATOR_URL:-}"
 MESH_BIN="$MESH_BIN_DEFAULT"
 DERP_URL="${POTLUCK_DERP_URL:-}"
+PURGE_USER="no"
 
 # When invoked via sudo, SUDO_UID/SUDO_GID are set by sudo itself. When invoked
 # as root directly (not via sudo), fall back to 0/0 — which means the IPC
@@ -265,6 +391,7 @@ while [ $# -gt 0 ]; do
         --mesh-bin)         shift; MESH_BIN="${1:-}" ;;
         --user-uid)         shift; TARGET_UID="${1:-}" ;;
         --user-gid)         shift; TARGET_GID="${1:-}" ;;
+        --purge-user)       PURGE_USER="yes" ;;
         -h|--help)
             sed -n '2,40p' "$0" | sed 's/^# \?//'
             exit 0
@@ -283,7 +410,7 @@ case "$MODE" in
         ;;
     uninstall)
         require_root "$@"
-        do_uninstall
+        do_uninstall "$PURGE_USER"
         exit 0
         ;;
     install)

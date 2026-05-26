@@ -10,15 +10,27 @@ Requires=potluck-firewall.service
 
 [Service]
 Type=simple
-User=root
-Group=root
+# Run as a dedicated system user, not root. The 'potluck' user is created
+# by install-persistence.sh (useradd --system --no-create-home).
+# CAP_NET_ADMIN (TUN/WG) and CAP_NET_RAW are granted via ambient caps below
+# so the sidecar can still create the potluck0 device without being root.
+User=potluck
+Group=potluck
 
-# RuntimeDirectory creates /run/potluck-mesh (root:root, 0755) every boot
-# and tears it down on stop. The Go sidecar's listener_unix.go uses
+# RuntimeDirectory creates /run/potluck-mesh (potluck:potluck, 0755) every
+# boot and tears it down on stop. The Go sidecar's listener_unix.go uses
 # XDG_RUNTIME_DIR to decide where the IPC socket lives.
 RuntimeDirectory=potluck-mesh
 RuntimeDirectoryMode=0755
 Environment=XDG_RUNTIME_DIR=/run/potluck-mesh
+
+# StateDirectory creates /var/lib/potluck/mesh (potluck:potluck, 0700) and
+# persists across reboots. This is where the WG private key lives now that
+# the service no longer runs as root with access to a real $HOME.
+# ProtectHome=read-only would otherwise block writes to $HOME/.local/state.
+StateDirectory=potluck/mesh
+StateDirectoryMode=0700
+Environment=POTLUCK_WG_PRIVATE_KEY_PATH=/var/lib/potluck/mesh/wg.key
 
 # SUDO_UID/SUDO_GID make the sidecar chown the IPC socket to the regular
 # user that owns this household, so CLI tools running as that user can
@@ -34,14 +46,23 @@ ExecStart=@MESH_BIN@ --coordinator-url @COORD_URL@ --derp-url @DERP_URL@
 Restart=on-failure
 RestartSec=5
 
-# Tighten where we can without breaking TUN creation. CAP_NET_ADMIN is
-# required (TUN/WG), so we can't drop privileges fully. But we can lock
-# the rest down.
+# Capabilities: we run as non-root 'potluck', so we need to explicitly grant
+# the network privileges the sidecar requires.
+#   CAP_NET_ADMIN — create/configure the potluck0 TUN device, WG ops
+#   CAP_NET_RAW   — required by some kernel paths for raw socket fallback
+# AmbientCapabilities passes them to the started process; CapabilityBoundingSet
+# is the hard ceiling — nothing this service can do can exceed these caps.
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+
+# Tighten where we can. Now that we're non-root, NoNewPrivileges is safe to
+# enable — the sidecar never needs to gain new privileges after startup.
+NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=read-only
-NoNewPrivileges=no
-# /run is read-write because of RuntimeDirectory; everything else is
-# untouched by ProtectSystem=strict.
+# /run is read-write because of RuntimeDirectory; /var/lib/potluck/mesh is
+# read-write because of StateDirectory; everything else is untouched by
+# ProtectSystem=strict.
 PrivateTmp=yes
 
 StandardOutput=journal

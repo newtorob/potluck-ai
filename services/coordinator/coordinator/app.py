@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
@@ -40,6 +41,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     await init_db()
     logger.info("database_pool_initialized")
+
+    if not os.environ.get("POTLUCK_COORDINATOR_TOKEN", "").strip():
+        logger.warning(
+            "POTLUCK_COORDINATOR_TOKEN not set — coordinator running in "
+            "unauthenticated dev mode. Set this env var before any network exposure."
+        )
 
     yield
 
