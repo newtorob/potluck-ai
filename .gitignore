@@ -14,6 +14,8 @@ env/
 dist/
 build/
 *.spec
+!apps/desktop/python/potluck-local.spec
+!apps/desktop/python/potluck-mcp.spec
 
 # Node
 node_modules/
