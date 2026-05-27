@@ -1,0 +1,41 @@
+[Unit]
+Description=Potluck main sidecar (FastAPI + memory + MCP)
+Documentation=https://github.com/newtorob/potluckai/blob/main/scripts/systemd/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# Runs as the user that owns the Potluck data directory (~/.potluck).
+# Filled in at install time by install-sidecar.sh from the invoking user.
+User=@SIDECAR_USER@
+Group=@SIDECAR_GROUP@
+
+# The repo checkout. Templated so other household nodes can place it
+# wherever they want.
+WorkingDirectory=@REPO_PATH@/apps/desktop/python
+
+# The bind port. Defaults to 8321; override at install time.
+# The sidecar binds to 0.0.0.0 by default for mesh reachability and applies
+# an application-layer middleware that restricts non-loopback callers to
+# /peer/* and /health. To force loopback-only set POTLUCK_BIND_HOST=127.0.0.1.
+ExecStart=@REPO_PATH@/apps/desktop/python/.venv/bin/python -m potluck_local.app --port @PORT@
+
+# Restart on crash. The Electron app does its own restart-and-bail dance
+# when running in dev; systemd does the same job here.
+Restart=on-failure
+RestartSec=5
+
+# Tighten where we can. The sidecar reads/writes ~/.potluck — under $HOME —
+# so ProtectHome must NOT be read-only. ProtectSystem=strict blocks writes
+# to /etc, /usr, /boot which the sidecar never needs.
+NoNewPrivileges=yes
+ProtectSystem=strict
+PrivateTmp=yes
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

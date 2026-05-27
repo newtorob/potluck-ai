@@ -53,6 +53,10 @@ MESH_BIN_DEFAULT="$REPO_ROOT/apps/desktop/go/potluck-mesh/dist/potluck-mesh"
 # System install locations
 LIB_DIR="/usr/local/lib/potluck"
 FIREWALL_SCRIPT_DST="$LIB_DIR/install-firewall-rules.sh"
+# Mesh binary is staged into a system path so the dedicated 'potluck' user
+# can exec it. Running as User=potluck means the daemon can NOT traverse
+# /home/sam (mode 0750) to read the binary out of the repo checkout.
+MESH_BIN_DST="$LIB_DIR/potluck-mesh"
 SYSTEMD_DIR="/etc/systemd/system"
 FIREWALL_UNIT_DST="$SYSTEMD_DIR/potluck-firewall.service"
 MESH_UNIT_DST="$SYSTEMD_DIR/potluck-mesh.service"
@@ -139,24 +143,67 @@ create_potluck_user() {
 # service comes up with the same public key. Silent identity changes are
 # the footgun we're guarding against.
 migrate_existing_key() {
-    # Figure out which user's $HOME to look in. SUDO_USER is set when invoked
-    # via sudo; otherwise we don't have a sensible source path and skip.
-    local src_user="${SUDO_USER:-}"
-    if [ -z "$src_user" ] || [ "$src_user" = "root" ]; then
-        info "no SUDO_USER set; skipping key migration check"
-        return 0
+    # Discover the canonical legacy key. In priority order:
+    #   1. The home of the User= currently set in /etc/systemd/system/potluck-mesh.service
+    #      — this is THE active key, because that's the user under whose $HOME
+    #      the Go binary's default key path resolved.
+    #   2. $SUDO_USER's $HOME — first-time install from setup-household.sh
+    #      with no prior systemd unit.
+    #   3. /root — belt-and-suspenders for ad-hoc `sudo -E` runs.
+    #
+    # Priority matters: multiple legacy keys can coexist (e.g. user ran
+    # setup-household.sh interactively, THEN systemd installed under root —
+    # both /home/sam/...wg.key and /root/...wg.key exist, but only /root's is
+    # the active identity). Picking the wrong one silently re-enrolls the
+    # node under a new public key. (Discovered 2026-05-26 on media server.)
+    local old_key=""
+
+    local existing_unit="/etc/systemd/system/potluck-mesh.service"
+    if [ -f "$existing_unit" ]; then
+        local prev_user
+        prev_user=$(grep -E '^User=' "$existing_unit" 2>/dev/null | head -1 | cut -d= -f2 | tr -d '[:space:]')
+        # No User= line ⇒ systemd default of root.
+        [ -n "$prev_user" ] || prev_user="root"
+        # If the previous unit already ran as $POTLUCK_USER, the migration
+        # is already done — no legacy lookup needed.
+        if [ "$prev_user" != "$POTLUCK_USER" ]; then
+            local prev_home
+            if [ "$prev_user" = "root" ]; then
+                prev_home="/root"
+            else
+                prev_home=$(getent passwd "$prev_user" 2>/dev/null | cut -d: -f6)
+            fi
+            if [ -n "$prev_home" ] && [ -d "$prev_home" ]; then
+                local candidate="$prev_home/.local/state/potluck/mesh/wg.key"
+                if [ -f "$candidate" ]; then
+                    old_key="$candidate"
+                    info "found active legacy key (previous unit ran as '$prev_user')"
+                fi
+            fi
+        fi
     fi
 
-    local src_home
-    src_home=$(getent passwd "$src_user" | cut -d: -f6)
-    if [ -z "$src_home" ] || [ ! -d "$src_home" ]; then
-        info "could not resolve home dir for '$src_user'; skipping key migration"
-        return 0
+    if [ -z "$old_key" ]; then
+        local src_user="${SUDO_USER:-}"
+        if [ -n "$src_user" ] && [ "$src_user" != "root" ]; then
+            local src_home
+            src_home=$(getent passwd "$src_user" | cut -d: -f6)
+            if [ -n "$src_home" ] && [ -d "$src_home" ]; then
+                local candidate="$src_home/.local/state/potluck/mesh/wg.key"
+                if [ -f "$candidate" ]; then
+                    old_key="$candidate"
+                fi
+            fi
+        fi
     fi
 
-    local old_key="$src_home/.local/state/potluck/mesh/wg.key"
-    if [ ! -f "$old_key" ]; then
-        info "no pre-existing WG key at $old_key; clean install"
+    if [ -z "$old_key" ] && [ -f "/root/.local/state/potluck/mesh/wg.key" ]; then
+        old_key="/root/.local/state/potluck/mesh/wg.key"
+        info "found legacy key under /root (User=root install)"
+    fi
+
+    if [ -z "$old_key" ]; then
+        info "no pre-existing WG key found; clean install"
         return 0
     fi
 
@@ -234,6 +281,13 @@ do_install() {
     install -m 0755 "$FIREWALL_SCRIPT_SRC" "$FIREWALL_SCRIPT_DST"
     ok "installed $FIREWALL_SCRIPT_DST"
 
+    step "Staging mesh binary to $MESH_BIN_DST"
+    # Copy (don't symlink) so the running daemon under User=potluck doesn't
+    # depend on /home/sam being traversable. Re-running --install picks up
+    # a newer binary from the repo checkout automatically.
+    install -m 0755 "$mesh_bin" "$MESH_BIN_DST"
+    ok "staged $MESH_BIN_DST"
+
     step "Rendering systemd unit files"
     # Use a unique sed delimiter so URLs containing / don't break us.
     sed -e "s|@FIREWALL_SCRIPT@|$FIREWALL_SCRIPT_DST|g" \
@@ -241,7 +295,7 @@ do_install() {
     chmod 0644 "$FIREWALL_UNIT_DST"
     ok "wrote $FIREWALL_UNIT_DST"
 
-    sed -e "s|@MESH_BIN@|$mesh_bin|g" \
+    sed -e "s|@MESH_BIN@|$MESH_BIN_DST|g" \
         -e "s|@COORD_URL@|$coord_url|g" \
         -e "s|@DERP_URL@|$derp_url|g" \
         -e "s|@SUDO_UID@|$sudo_uid|g" \
@@ -326,10 +380,14 @@ do_uninstall() {
         warn "no firewall script found to clean up rules; remove by hand if needed"
     fi
 
-    step "Removing firewall helper script"
+    step "Removing staged binaries + scripts"
     if [ -f "$FIREWALL_SCRIPT_DST" ]; then
         rm -f "$FIREWALL_SCRIPT_DST"
         ok "removed $FIREWALL_SCRIPT_DST"
+    fi
+    if [ -f "$MESH_BIN_DST" ]; then
+        rm -f "$MESH_BIN_DST"
+        ok "removed $MESH_BIN_DST"
     fi
     # Don't rmdir $LIB_DIR — other Potluck installers may share it.
 
