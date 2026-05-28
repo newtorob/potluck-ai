@@ -35,7 +35,14 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['llama_cpp', 'torch', 'sentence_transformers', 'numpy', 'GPUtil'],
+    # numpy stays IN the bundle: memory_retrieval.py and embeddings.py import it
+    # at module level for cosine similarity over stored embeddings. The brief's
+    # exclude list was stale on this point — without numpy the MCP entry fails
+    # with ModuleNotFoundError before reaching the optional embedder path.
+    # sentence_transformers / torch / llama_cpp / GPUtil remain excluded — they
+    # are lazy-loaded and the embedder gracefully degrades (embed() returns None)
+    # so semantic_search falls back to [] and callers fall back to keyword search.
+    excludes=['llama_cpp', 'torch', 'sentence_transformers', 'GPUtil'],
     noarchive=False,
     optimize=0,
 )
