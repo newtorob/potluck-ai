@@ -147,12 +147,21 @@ async def list_memories(
     offset: int = Query(default=0, ge=0),
     project: str | None = Query(default=None),
     include_all: bool = Query(default=False),
+    since: str | None = Query(
+        default=None,
+        description=(
+            "ISO-8601 timestamp. When given, returns only rows with updated_at > since. "
+            "Pushed to SQL. Combine with project/category/include_all as normal. "
+            "Example: 2026-05-27T00:00:00Z"
+        ),
+    ),
 ) -> list[dict[str, Any]]:
     """List stored memories.
 
     project: when given, returns scoped + global memories.
              when absent, returns globals only.
     include_all: bypasses project filter (browse mode).
+    since: ISO-8601 string; restricts to rows updated after that timestamp.
 
     Always returns even when memory is disabled (returns empty list so the UI
     can display a 'memory is off' state without a separate API call).
@@ -167,12 +176,14 @@ async def list_memories(
         offset=offset,
         project=project or None,
         include_all=include_all,
+        since=since,
     )
     logger.info(
-        "memory_list category=%s project=%s include_all=%s limit=%d offset=%d count=%d",
+        "memory_list category=%s project=%s include_all=%s since=%s limit=%d offset=%d count=%d",
         category,
         project,
         include_all,
+        since,
         limit,
         offset,
         len(memories),
@@ -180,16 +191,55 @@ async def list_memories(
     return [m.model_dump() for m in memories]
 
 
+_EXPORT_PAGE_SIZE = 1_000  # hard cap per page — keeps response payloads bounded
+
+
 @router.get("/export")
-async def export_memories() -> list[dict[str, Any]]:
-    """Return the full active memory set as JSON (excludes soft-deleted)."""
+async def export_memories(
+    cursor: int = Query(default=0, ge=0, description="Offset into the memory set (for pagination)."),
+    since: str | None = Query(
+        default=None,
+        description=(
+            "ISO-8601 timestamp. When given, exports only rows with updated_at > since "
+            "(incremental backup). Combine with cursor for large incremental pages. "
+            "Example: 2026-05-27T00:00:00Z"
+        ),
+    ),
+) -> dict[str, Any]:
+    """Return a page of the active memory set as JSON (excludes soft-deleted).
+
+    The cap per response is 1,000 rows.  Callers that need the full set should
+    page by incrementing cursor by 1,000 until has_more is false.
+
+    since: when given, returns only rows updated after that timestamp — enables
+    incremental backup instead of full-dump on every call.
+
+    Rationale: the previous 10,000-row cap could produce multi-MB responses in
+    a single round-trip.  At 1,000 rows the worst-case payload is ~500 KB which
+    is acceptable for a loopback-only export endpoint.  No rate limit is applied
+    because this endpoint is loopback-gated by peer_access_middleware.
+    """
     if not _memory_active():
         raise HTTPException(status_code=403, detail=_DISABLED_DETAIL)
 
     retriever = get_memory_retriever()
-    memories = await retriever.list_memories(limit=10_000, offset=0, include_all=True)
-    logger.info("memory_export count=%d", len(memories))
-    return [m.model_dump() for m in memories]
+    memories = await retriever.list_memories(
+        limit=_EXPORT_PAGE_SIZE + 1,  # fetch one extra to detect has_more
+        offset=cursor,
+        include_all=True,
+        since=since,
+    )
+    has_more = len(memories) > _EXPORT_PAGE_SIZE
+    page = memories[:_EXPORT_PAGE_SIZE]
+    logger.info(
+        "memory_export cursor=%d since=%s count=%d has_more=%s",
+        cursor, since, len(page), has_more,
+    )
+    return {
+        "memories": [m.model_dump() for m in page],
+        "cursor": cursor + len(page),
+        "has_more": has_more,
+    }
 
 
 @router.post("", status_code=201)

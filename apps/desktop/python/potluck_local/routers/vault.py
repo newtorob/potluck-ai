@@ -69,9 +69,12 @@ async def vault_rescan() -> dict:
 
     try:
         result = await scan_vault_locked(folder)
-    except Exception as exc:
-        logger.exception("vault_rescan_failed folder=%s", folder)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception:
+        logger.exception("vault_rescan_failed", extra={"event": "vault_rescan_failed"})
+        raise HTTPException(
+            status_code=500,
+            detail="Vault scan failed — check sidecar logs",
+        )
 
     # Persist updated stats back to settings so the UI shows them even before
     # the next /status call.

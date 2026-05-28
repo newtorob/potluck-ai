@@ -12,10 +12,12 @@ from __future__ import annotations
 import argparse
 import contextlib
 import os
+import posixpath
 
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from potluck_local import __version__
@@ -42,6 +44,13 @@ async def _lifespan(app: FastAPI):  # noqa: ARG001
     from potluck_local.services.agent_observability import AgentObserver
 
     await init_memory_db()
+
+    # Eagerly warm the hardware-detect cache so the first /hardware or
+    # /peer/capabilities request never pays the blocking subprocess cost.
+    # Runs in a thread-pool executor via the same helper used by both routers.
+    from potluck_local.routers.peer import _cached_hardware
+    asyncio.create_task(_cached_hardware())
+
     # Fire-and-forget: backfill embeddings for any memories that don't have them.
     # Runs to completion in the background; never blocks startup or the event loop.
     asyncio.create_task(run_embedding_backfill())
@@ -93,6 +102,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # Compress responses >= 1 KB when the client sends Accept-Encoding: gzip.
+    # Keeps multi-row memory/export and trace payloads well under the wire.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
 
     # Peer-access guard — when the sidecar is bound to 0.0.0.0 (required so
     # household peers can dial it over the mesh), the bare socket would
@@ -108,8 +120,15 @@ def create_app() -> FastAPI:
         client_host = request.client.host if request.client else ""
         is_loopback = client_host in ("127.0.0.1", "::1", "localhost")
         if not is_loopback:
-            path = request.url.path
-            if not (path.startswith("/peer/") or path == "/health"):
+            raw_path = request.url.path
+            # Reject null bytes — they can confuse downstream parsers.
+            if "\x00" in raw_path:
+                return JSONResponse(status_code=400, content={"detail": "invalid path"})
+            # Normalise away any ../ traversal sequences.  posixpath.normpath
+            # collapses these; if the result no longer starts with /peer/ the
+            # caller is trying to escape the allowed surface.
+            normalised = posixpath.normpath(raw_path)
+            if not (normalised.startswith("/peer/") or normalised == "/health"):
                 return JSONResponse(
                     status_code=403,
                     content={

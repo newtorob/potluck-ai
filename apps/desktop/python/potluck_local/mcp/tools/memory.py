@@ -54,7 +54,7 @@ def register_memory_tools(mcp: FastMCP) -> None:
     )
     async def memory_search(
         query: str,
-        category: str | None = None,
+        category: MemoryCategory | None = None,
         max_results: int = 20,
         min_confidence: float = 0.5,
         project: str | None = None,
@@ -63,6 +63,9 @@ def register_memory_tools(mcp: FastMCP) -> None:
 
         project: scope filter. None = global-only. Named project = scoped + globals.
         project=None means 'global memory, applies across all projects.'
+        category: when given, restricts results to that category. The filter is
+        pushed to the DB query — results are not post-filtered, so max_results
+        is honored correctly even when a category is specified.
         """
         if not _memory_active():
             logger.warning("memory_search_skipped reason=memory_disabled")
@@ -76,16 +79,13 @@ def register_memory_tools(mcp: FastMCP) -> None:
                 max_memories=max_results,
                 min_confidence=min_confidence,
                 project=project or None,
+                category=category,
             )
         except Exception as exc:
             logger.error("memory_search_error type=%s", type(exc).__name__)
             raise ToolError(f"Memory search failed: {exc}") from exc
 
-        # If a category filter was requested, apply it post-retrieval
-        if category is not None:
-            memories = [m for m in memories if m.category == category]
-
-        logger.info("memory_search result_count=%d project=%s", len(memories), project)
+        logger.info("memory_search result_count=%d project=%s category=%s", len(memories), project, category)
         return [m.model_dump() for m in memories]
 
     @mcp.tool(
@@ -147,7 +147,11 @@ def register_memory_tools(mcp: FastMCP) -> None:
             "for finding specific context relevant to a query; memory_list is for "
             "enumeration.\n\n"
             "Scope: project=None for global-only, a project name for scoped+global, "
-            "include_all=True for everything regardless of scope (browse mode)."
+            "include_all=True for everything regardless of scope (browse mode).\n\n"
+            "Incremental sync: pass since='2026-05-27T00:00:00Z' (ISO-8601) to retrieve "
+            "only memories updated after that timestamp. Use this at session start to "
+            "detect what changed since you last connected, rather than re-fetching the "
+            "full set. Returns results ordered by updated_at DESC when since is set."
         ),
     )
     async def memory_list(
@@ -156,12 +160,15 @@ def register_memory_tools(mcp: FastMCP) -> None:
         offset: int = 0,
         project: str | None = None,
         include_all: bool = False,
+        since: str | None = None,
     ) -> list[dict]:
         """List active memories.
 
         project: scope filter. None = global-only. Named project = scoped + globals.
         include_all: bypass project filter entirely (browse mode).
         project=None means 'global memory, applies across all projects.'
+        since: ISO-8601 string. When given, restricts to rows with updated_at > since.
+               Pushed to SQL — not post-filtered.
         """
         if not _memory_active():
             logger.warning("memory_list_skipped reason=memory_disabled")
@@ -175,12 +182,13 @@ def register_memory_tools(mcp: FastMCP) -> None:
                 offset=offset,
                 project=project or None,
                 include_all=include_all,
+                since=since,
             )
         except Exception as exc:
             logger.error("memory_list_error type=%s", type(exc).__name__)
             raise ToolError(f"Failed to list memories: {exc}") from exc
 
-        logger.info("memory_list count=%d project=%s", len(memories), project)
+        logger.info("memory_list count=%d project=%s since=%s", len(memories), project, since)
         return [m.model_dump() for m in memories]
 
     @mcp.tool(

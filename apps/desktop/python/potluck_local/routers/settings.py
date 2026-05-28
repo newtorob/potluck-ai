@@ -57,18 +57,29 @@ async def update_settings(patch: dict[str, Any]) -> dict[str, Any]:
             merged_sub = {**existing_sub, **value}
             try:
                 current_data[key] = _SUB_MODELS[key](**merged_sub).model_dump()
-            except Exception as exc:
+            except Exception:
+                logger.exception(
+                    "settings_sub_model_validation_failed",
+                    extra={"event": "settings_sub_model_validation_failed", "key": key},
+                )
                 raise HTTPException(
                     status_code=422,
-                    detail=f"Invalid value for '{key}': {exc}",
-                ) from exc
+                    detail=f"Invalid value for settings key '{key}' — check sidecar logs",
+                )
         else:
             current_data[key] = value
 
     try:
         updated = PotluckSettings(**current_data)
-    except Exception as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception:
+        logger.exception(
+            "settings_validation_failed",
+            extra={"event": "settings_validation_failed"},
+        )
+        raise HTTPException(
+            status_code=422,
+            detail="Settings update failed — check sidecar logs",
+        )
 
     save_settings(updated)
     logger.info("settings_updated")

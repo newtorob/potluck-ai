@@ -19,6 +19,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Response
+from pydantic import BaseModel, Field
 
 from potluck_local.services.memory_db import (
     delete_disconnected_sessions,
@@ -312,8 +313,19 @@ async def get_activity(
     return [_deserialize_tool_call(r) for r in rows]
 
 
+class MemoryPreviewRequest(BaseModel):
+    """Typed request body for POST /agents/memory-previews.
+
+    Malformed payloads (wrong type for ids, ids too long, non-string elements)
+    now produce clear 422 responses from FastAPI's validation layer instead of
+    being silently filtered or returning an opaque 400.
+    """
+
+    ids: list[str] = Field(default_factory=list, max_length=100)
+
+
 @router.post("/memory-previews")
-async def memory_previews(payload: dict[str, Any]) -> list[dict]:
+async def memory_previews(req: MemoryPreviewRequest) -> list[dict]:
     """Resolve a list of memory ids to lightweight previews for the
     debugger's memory-overlay panel.
 
@@ -326,15 +338,9 @@ async def memory_previews(payload: dict[str, Any]) -> list[dict]:
     preview, category, project, created_at, is_active. Full content is
     never broadcast — the privacy invariant on agent observability holds.
     """
-    raw_ids = payload.get("ids")
-    if not isinstance(raw_ids, list):
-        raise HTTPException(status_code=400, detail="`ids` must be a list of strings")
-    ids = [i for i in raw_ids if isinstance(i, str) and i]
+    ids = [i for i in req.ids if i]  # drop empty strings
     if not ids:
         return []
-    # Cap to keep one debugger query bounded; the panel only needs as many
-    # rows as a single tool call touched.
-    ids = ids[:100]
 
     import aiosqlite
     from potluck_local.services.memory_db import get_memory_db_path

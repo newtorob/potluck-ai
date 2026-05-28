@@ -123,6 +123,7 @@ _INDICES = [
     "CREATE INDEX IF NOT EXISTS idx_task_states_project ON task_states(project, status)",
     "CREATE INDEX IF NOT EXISTS idx_memories_source_type ON memories(source_type, is_active)",
     "CREATE INDEX IF NOT EXISTS idx_memories_source_ref ON memories(source_ref)",
+    "CREATE INDEX IF NOT EXISTS idx_memories_updated_at ON memories(updated_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_messages_convo ON messages(conversation_id, created_at)",
     "CREATE INDEX IF NOT EXISTS idx_conversations_updated ON conversations(updated_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_conversations_project ON conversations(project, updated_at DESC)",
@@ -138,6 +139,29 @@ def get_memory_db_path() -> Path:
     return memory_db_path()
 
 
+# Explicit allowlist of (table, column, sql_type) triples that
+# _add_column_if_missing is permitted to create.  All values are hardcoded
+# string literals — nothing here comes from external input.  If a caller
+# passes a combination not in this set the function raises immediately so
+# the mistake is caught at development time rather than silently allowing
+# arbitrary DDL.
+_ALLOWED_SCHEMA_ADDITIONS: frozenset[tuple[str, str, str]] = frozenset(
+    {
+        ("memories", "project", "TEXT"),
+        ("task_states", "project", "TEXT"),
+        ("memories", "source_ref", "TEXT"),
+        ("mcp_sessions", "friendly_name", "TEXT"),
+        ("memories", "extraction_prompt_version", "TEXT"),
+        ("memory_access_log", "retrieval_profile_version", "TEXT"),
+        ("mcp_tool_calls", "tool_schema_version", "TEXT"),
+        ("mcp_tool_calls", "memory_ids_touched", "TEXT"),
+        # updated_at enables incremental sync, agent delta queries, and
+        # export diffing. ISO-8601 TEXT matches the rest of the schema.
+        ("memories", "updated_at", "TEXT"),
+    }
+)
+
+
 def _add_column_if_missing(
     conn: aiosqlite.Connection,
     table: str,
@@ -148,7 +172,19 @@ def _add_column_if_missing(
 
     Uses PRAGMA table_info to check — cleaner than catching OperationalError
     on duplicate-column, which masks real errors.
+
+    Only (table, column, sql_type) combinations listed in
+    _ALLOWED_SCHEMA_ADDITIONS are permitted.  This prevents the f-string
+    DDL interpolation from becoming a latent injection vector if a future
+    caller ever passes a non-literal value.
     """
+    if (table, column, sql_type) not in _ALLOWED_SCHEMA_ADDITIONS:
+        raise ValueError(
+            f"_add_column_if_missing: ({table!r}, {column!r}, {sql_type!r}) "
+            "is not in the allowlist — add it to _ALLOWED_SCHEMA_ADDITIONS "
+            "with a hardcoded literal to proceed."
+        )
+
     # We return a coroutine so callers can await it.
     async def _run() -> None:
         cursor = await conn.execute(f"PRAGMA table_info({table})")
@@ -168,6 +204,30 @@ async def init_memory_db(db_path: Path | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
     async with aiosqlite.connect(path) as db:
+        # WAL mode: allows concurrent readers + one writer without blocking.
+        # Both the FastAPI sidecar and the MCP server process open this file
+        # independently; without WAL, simultaneous writes produce "database is
+        # locked" errors.  WAL is stored in the file header so this is a
+        # one-time flip — subsequent calls are no-ops.
+        await db.execute("PRAGMA journal_mode=WAL")
+        # NORMAL sync is the correct companion for WAL: safe (no data loss on
+        # crash), and ~3x faster than FULL because WAL checkpoints are the
+        # real durability boundary.
+        await db.execute("PRAGMA synchronous=NORMAL")
+        # Return gracefully on cross-process lock contention instead of
+        # immediately raising "database is locked".
+        await db.execute("PRAGMA busy_timeout=5000")
+
+        # Verify WAL actually took effect — SQLite ignores the PRAGMA if it
+        # can't switch (e.g. in-memory DB or read-only filesystem).
+        cursor = await db.execute("PRAGMA journal_mode")
+        row = await cursor.fetchone()
+        actual_mode = row[0] if row else "unknown"
+        if actual_mode != "wal":
+            logger.warning("memory_db_wal_not_enabled actual_mode=%s path=%s", actual_mode, path)
+        else:
+            logger.info("memory_db_wal_enabled path=%s", path)
+
         await db.execute("PRAGMA foreign_keys=ON")
         await db.execute(_CREATE_MEMORIES)
         await db.execute(_CREATE_MEMORY_EMBEDDINGS)
@@ -191,6 +251,16 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         # side). Persisted so the same session keeps the same nickname across
         # AgentsView refreshes; never reused after a session is deleted.
         await _add_column_if_missing(db, "mcp_sessions", "friendly_name", "TEXT")
+
+        # updated_at: records every write mutation (insert, update, soft-delete,
+        # dedup-bump). Enables incremental sync ("what changed since X"),
+        # export diffing, and agent delta queries.  ISO-8601 TEXT to match
+        # the rest of the schema. Backfill sets updated_at = created_at for
+        # all existing rows where the column was just added (NULLs only).
+        await _add_column_if_missing(db, "memories", "updated_at", "TEXT")
+        await db.execute(
+            "UPDATE memories SET updated_at = created_at WHERE updated_at IS NULL"
+        )
 
         # AI contract versions (services/ai_contracts.py). Stamped at write
         # time so the debugger can answer "what prompt extracted this memory
@@ -218,7 +288,7 @@ async def init_memory_db(db_path: Path | None = None) -> None:
 
         await db.commit()
 
-    logger.info("memory_db_ready path=%s", path)
+    logger.info("memory_db_ready path=%s journal_mode=wal", path)
 
 
 async def reset_memory_db(db_path: Path | None = None) -> None:

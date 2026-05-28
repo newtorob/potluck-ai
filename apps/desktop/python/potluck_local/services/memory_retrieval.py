@@ -47,6 +47,11 @@ def _memory_enabled() -> bool:
 
 
 def _row_to_memory(row: dict) -> Memory:
+    # updated_at may be NULL on rows predating the migration (the backfill in
+    # init_memory_db sets it to created_at, but rows written between schema add
+    # and process restart could theoretically be NULL in theory).  Fall back to
+    # created_at so the model invariant (non-None str) is always satisfied.
+    updated_at: str = row.get("updated_at") or row["created_at"]
     return Memory(
         id=row["id"],
         content=row["content"],
@@ -56,6 +61,7 @@ def _row_to_memory(row: dict) -> Memory:
         source_conversation_id=row["source_conversation_id"],
         created_at=row["created_at"],
         last_accessed_at=row["last_accessed_at"],
+        updated_at=updated_at,
         access_count=row["access_count"],
         is_active=bool(row["is_active"]),
         superseded_by=row["superseded_by"],
@@ -301,11 +307,17 @@ class MemoryRetriever:
         min_confidence: float = 0.5,
         project: str | None = None,
         conversation_id: str | None = None,
+        category: MemoryCategory | None = None,
     ) -> list[Memory]:
         """Retrieve memories relevant to the current conversation context.
 
         project: when given, returns project-scoped + global memories.
         When None, returns only global memories (project IS NULL).
+
+        category: when given, restricts results to that category only.
+        Tier 1 (preference + instruction preloading) is skipped entirely when a
+        category is specified — the caller asked for something specific and we
+        push the filter to the DB rather than post-filtering results.
         """
         if not _memory_enabled():
             return []
@@ -325,36 +337,54 @@ class MemoryRetriever:
             db.row_factory = aiosqlite.Row
             await db.execute("PRAGMA foreign_keys=ON")
 
-            # Tier 1: always-relevant high-confidence preferences + instructions
-            cursor = await db.execute(
-                f"""SELECT * FROM memories
-                   WHERE is_active = 1
-                     AND confidence >= ?
-                     AND category IN ('preference', 'instruction')
-                     AND {proj_clause}
-                   ORDER BY confidence DESC, last_accessed_at DESC
-                   LIMIT ?""",
-                [min_confidence] + proj_params + [always_budget],
-            )
-            always_rows = [dict(r) for r in await cursor.fetchall()]
+            always_rows: list[dict] = []
 
-            # Tier 2: keyword-matched from other categories
+            if category is None:
+                # Tier 1: always-relevant high-confidence preferences + instructions
+                cursor = await db.execute(
+                    f"""SELECT * FROM memories
+                       WHERE is_active = 1
+                         AND confidence >= ?
+                         AND category IN ('preference', 'instruction')
+                         AND {proj_clause}
+                       ORDER BY confidence DESC, last_accessed_at DESC
+                       LIMIT ?""",
+                    [min_confidence] + proj_params + [always_budget],
+                )
+                always_rows = [dict(r) for r in await cursor.fetchall()]
+            # When category is specified, skip Tier 1 entirely — the caller wants
+            # a specific category; loading preference/instruction rows only to
+            # throw them away wastes the result budget.
+
+            # Tier 2: keyword-matched memories
+            # When category is None: exclude preference/instruction (already in Tier 1).
+            # When category is set: filter strictly to the requested category.
             keyword_rows: list[dict] = []
             keywords = _extract_keywords(current_messages)
-            if keywords and keyword_budget > 0:
+            tier2_budget = max_memories if category is not None else keyword_budget
+            if keywords and tier2_budget > 0:
                 # Build parameterized OR conditions — no f-string SQL injection risk
                 conditions = " OR ".join("content LIKE ?" for _ in keywords)
                 like_params = [f"%{kw}%" for kw in keywords]
 
-                # params order: like values, min_confidence, project params, limit
-                params: list = like_params + [min_confidence] + proj_params + [keyword_budget]
+                if category is not None:
+                    # Restrict to the caller's requested category
+                    cat_clause = "AND category = ?"
+                    cat_params: list = [category]
+                else:
+                    # Exclude Tier-1 categories to avoid duplicating those rows
+                    cat_clause = "AND category NOT IN ('preference', 'instruction')"
+                    cat_params = []
+
+                # params order: like values, min_confidence, category params, project params, limit
+                params: list = like_params + [min_confidence] + cat_params + proj_params + [tier2_budget]
 
                 cursor = await db.execute(
                     f"""SELECT * FROM memories
                         WHERE is_active = 1
                           AND ({conditions})
                           AND confidence >= ?
-                          AND category NOT IN ('preference', 'instruction')
+                          {cat_clause}
                           AND {proj_clause}
                         ORDER BY confidence DESC, last_accessed_at DESC
                         LIMIT ?""",  # noqa: S608 — conditions built safely above
@@ -413,11 +443,14 @@ class MemoryRetriever:
         offset: int = 0,
         project: str | None = None,
         include_all: bool = False,
+        since: str | None = None,
     ) -> list[Memory]:
         """Browse active memories without updating access timestamps.
 
         project: scope filter. Ignored when include_all=True.
         include_all: when True, bypasses the project filter entirely (browse mode).
+        since: ISO-8601 string. When given, only rows with updated_at > since are
+               returned. Pushed to SQL — not post-filtered.
         """
         # Normalise empty string to None
         project = project or None
@@ -440,14 +473,22 @@ class MemoryRetriever:
                 conditions.append(proj_clause)
                 params.extend(proj_params)
 
+            if since is not None:
+                conditions.append("updated_at > ?")
+                params.append(since)
+
             where = " AND ".join(conditions)
+            # When a since cursor is active, order by recency of change so the
+            # caller gets the delta newest-first. Without since, preserve the
+            # original confidence-descending browse order.
+            order = "updated_at DESC, confidence DESC" if since is not None else "confidence DESC, created_at DESC"
             params.extend([limit, offset])
 
             cursor = await db.execute(
                 f"""SELECT * FROM memories
                    WHERE {where}
-                   ORDER BY confidence DESC, created_at DESC
-                   LIMIT ? OFFSET ?""",
+                   ORDER BY {order}
+                   LIMIT ? OFFSET ?""",  # noqa: S608
                 params,
             )
             rows = await cursor.fetchall()
@@ -477,8 +518,8 @@ class MemoryRetriever:
 
         async with aiosqlite.connect(db_path) as db:
             cursor = await db.execute(
-                "UPDATE memories SET is_active = 0 WHERE id = ? AND is_active = 1",
-                (memory_id,),
+                "UPDATE memories SET is_active = 0, updated_at = ? WHERE id = ? AND is_active = 1",
+                (_now_iso(), memory_id),
             )
             await db.commit()
             affected = cursor.rowcount > 0
@@ -525,9 +566,11 @@ class MemoryRetriever:
         async with aiosqlite.connect(db_path) as db:
             await db.execute(
                 """UPDATE memories
-                   SET content = ?, category = ?, confidence = ?, project = ?
+                   SET content = ?, category = ?, confidence = ?, project = ?,
+                       updated_at = ?
                    WHERE id = ?""",
-                (new_content, new_category, new_confidence, new_project, memory_id),
+                (new_content, new_category, new_confidence, new_project,
+                 _now_iso(), memory_id),
             )
             await db.commit()
 

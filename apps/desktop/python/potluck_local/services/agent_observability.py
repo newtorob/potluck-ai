@@ -78,8 +78,10 @@ _SAFE_ARG_KEYS: frozenset[str] = frozenset(
         "include_all",
         "status",
         "task_id",
-        # task_update patch keys that are safe
-        "name",
+        # NOTE: "name" was removed — it matched task_create's `name` kwarg which
+        # holds the user-supplied task title (user content, not metadata).
+        # task_update passes its mutable fields inside a nested `patch` dict,
+        # which is never serialized by _summarize_args regardless.
     }
 )
 
@@ -119,6 +121,20 @@ def _summarize_args(tool_name: str, args: dict[str, Any] | None) -> dict[str, An
         return dict(args)
     return {k: v for k, v in args.items() if k in _SAFE_ARG_KEYS}
 
+
+# ---------------------------------------------------------------------------
+# SQL update dispatch table — pre-verified column literals for update_session.
+# Keys are the accepted patch parameter names; values are the exact SQL column
+# names to use in SET clauses.  Neither the key nor the value ever comes from
+# external input — this module owns both sides of the mapping.
+# ---------------------------------------------------------------------------
+
+_ALLOWED_SESSION_UPDATES: dict[str, str] = {
+    "project": "project",
+    "model": "model",
+    "model_source": "model_source",
+    "peer_mcps": "peer_mcps",
+}
 
 # ---------------------------------------------------------------------------
 # AgentObserver
@@ -191,17 +207,19 @@ class AgentObserver:
 
         Accepted patch keys: project, model, model_source, peer_mcps.
         Always refreshes last_seen_at.
+
+        Column literals are sourced from _ALLOWED_SESSION_UPDATES (a pre-verified
+        dispatch table), never interpolated from caller-supplied strings directly.
+        This means even if the allowlist check were somehow bypassed upstream, the
+        column name in the SQL is always a known-safe literal from this module.
         """
-        allowed = {"project", "model", "model_source", "peer_mcps"}
-        clean = {k: v for k, v in patch.items() if k in allowed}
-        if not clean and not patch:
-            # Still touch last_seen_at even when no patch keys given
-            pass
+        clean = {k: v for k, v in patch.items() if k in _ALLOWED_SESSION_UPDATES}
         now = _now_iso()
         set_clauses: list[str] = ["last_seen_at = ?"]
         values: list[Any] = [now]
         for key, val in clean.items():
-            set_clauses.append(f"{key} = ?")
+            col_literal = _ALLOWED_SESSION_UPDATES[key]
+            set_clauses.append(f"{col_literal} = ?")
             if key == "peer_mcps" and isinstance(val, list):
                 values.append(json.dumps(val))
             else:

@@ -38,6 +38,17 @@ SourceType = Literal["extracted", "explicit", "agent_state"]
 _CONFIDENCE_THRESHOLD = 0.7
 _JACCARD_THRESHOLD = 0.7
 
+# Limit the conversation text passed to the extraction prompt.
+# A 30-turn coding session with code snippets can exceed 4000 tokens on its
+# own, consuming the entire context window of a 3B model at n_ctx=4096 and
+# leaving no room for the prompt or the generated output — llama.cpp clips
+# silently. We take the LAST N characters because the most recent turns
+# contain the most extractable signal; early turns in a long session are
+# mostly scaffolding. The tradeoff: extractions from the very start of a
+# long session may be missed. Acceptable — session-start context is usually
+# re-stated later or saved via explicit memory_save.
+_EXTRACTION_MAX_CHARS = 6000
+
 _EXTRACTION_PROMPT = """Analyze this conversation and extract facts, preferences, decisions, or context the user expressed.
 
 Return ONLY a JSON array. Each element must have exactly these keys:
@@ -51,7 +62,13 @@ Rules:
 - Skip greetings, questions, acknowledgments, and ephemeral details
 - If nothing worth remembering was said, return []
 
-Example: [{"content": "User prefers Python over JavaScript", "category": "preference", "confidence": 0.9}]
+Examples:
+[
+  {"content": "Project uses pnpm, not npm — always use pnpm install", "category": "instruction", "confidence": 1.0},
+  {"content": "Auth API requires Bearer token in Authorization header", "category": "fact", "confidence": 0.95},
+  {"content": "Decided to use Postgres over SQLite for the tasks table", "category": "decision", "confidence": 0.9},
+  {"content": "Do not touch the legacy payments module — being deprecated next quarter", "category": "instruction", "confidence": 0.95}
+]
 
 Conversation:
 {conversation}
@@ -68,6 +85,7 @@ class Memory(BaseModel):
     source_conversation_id: str | None
     created_at: str
     last_accessed_at: str
+    updated_at: str  # ISO-8601; refreshed on every write path (insert/update/soft-delete/dedup-bump)
     access_count: int
     is_active: bool
     superseded_by: str | None = None
@@ -188,6 +206,12 @@ class MemoryExtractor:
             if m.get("content")
         )
 
+        # Apply the length cap: take the tail of the conversation text so
+        # the extraction prompt fits inside the model's context window.
+        # See _EXTRACTION_MAX_CHARS for the rationale.
+        if len(conversation_text) > _EXTRACTION_MAX_CHARS:
+            conversation_text = conversation_text[-_EXTRACTION_MAX_CHARS:]
+
         prompt = _EXTRACTION_PROMPT.format(conversation=conversation_text)
         try:
             result = await runtime.chat(
@@ -237,13 +261,16 @@ class MemoryExtractor:
                         duplicate_id = ex_id
                         new_conf = min(ex_conf + 0.1, 1.0)
                         ts = _now_iso()
+                        # Bump confidence + refresh updated_at; last_accessed_at
+                        # tracks reads, not writes, so we leave it alone here.
                         await db.execute(
-                            "UPDATE memories SET confidence = ?, last_accessed_at = ? WHERE id = ?",
-                            (new_conf, ts, ex_id),
+                            "UPDATE memories SET confidence = ?, last_accessed_at = ?, updated_at = ? WHERE id = ?",
+                            (new_conf, ts, ts, ex_id),
                         )
                         break
 
                 if duplicate_id is None:
+                    now = _now_iso()
                     mem = Memory(
                         id=str(uuid.uuid4()),
                         content=content,
@@ -251,8 +278,9 @@ class MemoryExtractor:
                         confidence=confidence,
                         source_type="extracted",
                         source_conversation_id=conversation_id,
-                        created_at=_now_iso(),
-                        last_accessed_at=_now_iso(),
+                        created_at=now,
+                        last_accessed_at=now,
+                        updated_at=now,
                         access_count=0,
                         is_active=True,
                         superseded_by=None,
@@ -263,13 +291,13 @@ class MemoryExtractor:
                         """INSERT INTO memories
                            (id, content, category, confidence, source_type,
                             source_conversation_id, created_at, last_accessed_at,
-                            access_count, is_active, project,
+                            updated_at, access_count, is_active, project,
                             extraction_prompt_version)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                         (
                             mem.id, mem.content, mem.category, mem.confidence,
                             mem.source_type, mem.source_conversation_id,
-                            mem.created_at, mem.last_accessed_at,
+                            mem.created_at, mem.last_accessed_at, mem.updated_at,
                             mem.access_count, 1, mem.project,
                             EXTRACTION_PROMPT_VERSION,
                         ),
@@ -307,6 +335,7 @@ class MemoryExtractor:
         # Normalise empty string to None
         project = project or None
 
+        now = _now_iso()
         mem = Memory(
             id=str(uuid.uuid4()),
             content=content.strip(),
@@ -314,8 +343,9 @@ class MemoryExtractor:
             confidence=min(max(confidence, 0.0), 1.0),
             source_type="explicit",
             source_conversation_id=conversation_id,
-            created_at=_now_iso(),
-            last_accessed_at=_now_iso(),
+            created_at=now,
+            last_accessed_at=now,
+            updated_at=now,
             access_count=0,
             is_active=True,
             superseded_by=None,
@@ -332,13 +362,13 @@ class MemoryExtractor:
                 """INSERT INTO memories
                    (id, content, category, confidence, source_type,
                     source_conversation_id, created_at, last_accessed_at,
-                    access_count, is_active, project,
+                    updated_at, access_count, is_active, project,
                     extraction_prompt_version)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     mem.id, mem.content, mem.category, mem.confidence,
                     mem.source_type, mem.source_conversation_id,
-                    mem.created_at, mem.last_accessed_at,
+                    mem.created_at, mem.last_accessed_at, mem.updated_at,
                     mem.access_count, 1, mem.project,
                     EXPLICIT_MEMORY_VERSION,
                 ),

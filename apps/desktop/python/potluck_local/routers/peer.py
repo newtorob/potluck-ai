@@ -26,6 +26,7 @@ that isn't /peer/* or /health gets 403 from non-loopback callers.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import socket
@@ -142,11 +143,20 @@ class PeerCapabilities(BaseModel):
 _hardware_cache: dict | None = None
 
 
-def _cached_hardware() -> dict:
+async def _cached_hardware() -> dict:
+    """Return hardware info, detecting on first call via a thread-pool executor.
+
+    `detect_hardware()` may shell out to system_profiler / GPUtil which can
+    block for several seconds.  Off-loading to run_in_executor ensures the
+    uvicorn event loop stays unblocked on that cold path.  The result is
+    cached in `_hardware_cache` so every subsequent call is a fast dict
+    lookup — the executor is never entered again.
+    """
     global _hardware_cache
     if _hardware_cache is None:
+        loop = asyncio.get_running_loop()
         try:
-            _hardware_cache = detect_hardware()
+            _hardware_cache = await loop.run_in_executor(None, detect_hardware)
         except Exception as exc:
             logger.warning("peer_hardware_detect_failed err=%s", type(exc).__name__)
             _hardware_cache = {}
@@ -163,7 +173,7 @@ async def peer_capabilities() -> PeerCapabilities:
 
     # Build PeerHardware from the cached detect_hardware() result. Fields
     # default to None when detection failed or didn't fill them in.
-    hw_raw = _cached_hardware()
+    hw_raw = await _cached_hardware()
     hw = PeerHardware(
         platform=hw_raw.get("platform"),
         arch=hw_raw.get("arch"),

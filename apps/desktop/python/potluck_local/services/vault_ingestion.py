@@ -207,10 +207,11 @@ async def _ingest_file(
             """INSERT INTO memories
                (id, content, category, confidence, source_type,
                 source_conversation_id, source_ref,
-                created_at, last_accessed_at, access_count, is_active, project,
+                created_at, last_accessed_at, updated_at,
+                access_count, is_active, project,
                 extraction_prompt_version)
-               VALUES (?, ?, 'reference', 0.6, 'vault', NULL, ?, ?, ?, 0, 1, NULL, ?)""",
-            (mem_id, body, source_ref, now, now, VAULT_INGESTION_VERSION),
+               VALUES (?, ?, 'reference', 0.6, 'vault', NULL, ?, ?, ?, ?, 0, 1, NULL, ?)""",
+            (mem_id, body, source_ref, now, now, now, VAULT_INGESTION_VERSION),
         )
         inserted_ids.append((mem_id, body))
 

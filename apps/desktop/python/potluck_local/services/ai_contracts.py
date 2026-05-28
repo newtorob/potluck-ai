@@ -36,7 +36,7 @@ from __future__ import annotations
 #   - the prompt text in _EXTRACTION_PROMPT changes
 #   - the JSON schema we ask the model to return changes
 #   - the input-conversation slicing (how much context we pass in) changes
-EXTRACTION_PROMPT_VERSION = "extraction-v1-2026-05-20"
+EXTRACTION_PROMPT_VERSION = "extraction-v2-2026-05-27"
 
 # Version stamped on memories saved via the explicit user-typed path
 # (memory_save MCP tool, /memory POST endpoint). No LLM is involved here,
