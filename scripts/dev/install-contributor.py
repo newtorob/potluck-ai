@@ -40,7 +40,9 @@ MIN_PY = (3, 11)
 
 
 def repo_root() -> Path:
-    return Path(__file__).resolve().parent.parent
+    # This script lives at scripts/dev/install-contributor.py, so the repo
+    # root is three levels up (parent of scripts/).
+    return Path(__file__).resolve().parent.parent.parent
 
 
 def sidecar_dir() -> Path:

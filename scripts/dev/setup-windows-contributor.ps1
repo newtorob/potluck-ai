@@ -55,7 +55,8 @@ function Pass($msg) { Write-Host "    [ok]   $msg" -ForegroundColor Green }
 function Warn($msg) { Write-Host "    [warn] $msg" -ForegroundColor Yellow }
 function Fail($msg) { Write-Host "    [fail] $msg" -ForegroundColor Red; exit 1 }
 
-$RepoRoot   = Split-Path -Parent $PSScriptRoot
+# Script lives at scripts\dev\ — repo root is two levels up, not one.
+$RepoRoot   = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $SidecarDir = Join-Path $RepoRoot "apps\desktop\python"
 $VenvPython = Join-Path $SidecarDir ".venv\Scripts\python.exe"
 $EnvFile    = Join-Path $SidecarDir ".env"
@@ -146,8 +147,9 @@ $CoordinatorUrl = "ws://${CoordinatorHost}:${CoordinatorPort}/peers/connect"
 
 # ---------- 4. Install via cross-platform installer --------------------------
 
-Step "Running scripts\install-contributor.py (creates venv + installs deps)"
-$installer = Join-Path $RepoRoot "scripts\install-contributor.py"
+Step "Running scripts\dev\install-contributor.py (creates venv + installs deps)"
+# install-contributor.py is a sibling of this script, not at scripts/ root.
+$installer = Join-Path $PSScriptRoot "install-contributor.py"
 if (-not (Test-Path $installer)) {
     Fail "missing $installer. Did the git pull succeed?"
 }
