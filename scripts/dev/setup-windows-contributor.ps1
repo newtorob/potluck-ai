@@ -30,10 +30,18 @@ param(
 # ---------- HARDCODED CONFIG (edit if IPs / keys change) ---------------------
 
 # In probe order - first one to answer /transparency/fleet wins.
-$CandidateHosts = @(
-    "192.168.4.76",     # dev Mac LAN IP
-    "100.101.102.103"      # dev Mac Tailscale IP
-)
+# Override with POTLUCK_COORDINATOR_HOST (host or host:port) when the
+# coordinator moves to Fly.io or the Mac's DHCP-assigned LAN IP rotates:
+#   $env:POTLUCK_COORDINATOR_HOST = "potluck-coordinator.fly.dev"
+#   .\setup-windows-contributor.ps1
+$CandidateHosts = if ($env:POTLUCK_COORDINATOR_HOST) {
+    @($env:POTLUCK_COORDINATOR_HOST)
+} else {
+    @(
+        "192.168.4.74",     # dev Mac LAN IP (DHCP — set a static lease or use the env override above)
+        "100.101.102.103"      # dev Mac Tailscale IP (inbound to the Mac is currently broken; Fly.io is the fix)
+    )
+}
 $CoordinatorPort = "8400"
 $BinaryHash      = "59b74f2ea0e8b6f23f3672336f90c97435b1dfa13ef7aabc1994b61c54c7d65a"
 $MemberId        = "00000000-0000-0000-0000-000000000001"
@@ -54,24 +62,32 @@ $EnvFile    = Join-Path $SidecarDir ".env"
 
 # ---------- 1. Python 3.11 ---------------------------------------------------
 
-Step "Checking Python 3.11"
+Step "Checking Python (3.11+)"
+# Accept any Python 3.11 or newer. Windows commonly ships 3.12/3.13; the
+# contributor module has no native-extension deps that pin to 3.11 (inference
+# is delegated to Ollama), so 3.12+ is fine. Prefer the newest match found.
 $pythonExe = $null
-foreach ($candidate in @("py -3.11", "python3.11", "python")) {
+foreach ($candidate in @("py -3.11", "py -3.12", "py -3.13", "python3.11", "python")) {
     try {
         $parts = $candidate.Split(" ")
         $cmd = $parts[0]
         $args_ = $parts[1..($parts.Length - 1)]
         $ver = & $cmd @args_ -c "import sys; print('.'.join(map(str, sys.version_info[:2])))" 2>$null
-        if ($LASTEXITCODE -eq 0 -and $ver -eq "3.11") {
-            $pythonExe = $candidate
-            break
+        if ($LASTEXITCODE -eq 0 -and $ver) {
+            $verParts = $ver.Split(".")
+            $major = [int]$verParts[0]
+            $minor = [int]$verParts[1]
+            if ($major -eq 3 -and $minor -ge 11) {
+                $pythonExe = $candidate
+                Pass "found Python $ver via '$pythonExe'"
+                break
+            }
         }
     } catch { }
 }
 if (-not $pythonExe) {
-    Fail "Python 3.11 not found. Install via 'winget install Python.Python.3.11' (then open a new shell), or grab the python.org installer."
+    Fail "Python 3.11+ not found. Install via 'winget install Python.Python.3.11' (then open a new shell), or grab the python.org installer."
 }
-Pass "found Python 3.11 via '$pythonExe'"
 
 # ---------- 2. Git -----------------------------------------------------------
 
