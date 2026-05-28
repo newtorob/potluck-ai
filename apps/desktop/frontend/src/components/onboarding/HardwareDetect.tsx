@@ -110,6 +110,26 @@ export function HardwareDetect({ hardware, isLoading, error }: HardwareDetectPro
         />
       </div>
 
+      {/* GPU-missing warning — surfaces when detection found nothing.
+          Keeps onboarding moving (CPU inference works for the small tier)
+          but tells the user why their tier might not be what they expected. */}
+      {hardware.gpu_name === null && (
+        <div className="flex gap-3 rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-foreground">
+              No GPU detected — inference will run on CPU
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Small-tier (3B–4B) models work well on CPU. Medium- and large-tier models
+              will be slow without GPU acceleration. If you have a discrete GPU on
+              Windows or Linux, make sure its driver is installed and Potluck is up to
+              date — detection covers NVIDIA, AMD, Intel, and Apple Silicon.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Recommended tier callout */}
       <div
         className={cn(
