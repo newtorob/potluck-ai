@@ -7,7 +7,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Pencil, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
+import { Pencil, Trash2, ChevronUp, ChevronDown, Pin } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/components/ui/cn';
 import { CategoryPill } from './CategoryPill';
@@ -48,7 +48,7 @@ interface MemoryCardProps {
 }
 
 export function MemoryCard({ memory }: MemoryCardProps) {
-  const { updateMemory, deleteMemory, boostConfidence } = useMemoryStore();
+  const { updateMemory, deleteMemory, boostConfidence, pinMemory } = useMemoryStore();
 
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(memory.content);
@@ -125,6 +125,10 @@ export function MemoryCard({ memory }: MemoryCardProps) {
     }
   }, [memory.id, deleteMemory]);
 
+  const handleTogglePin = useCallback(() => {
+    void pinMemory(memory.id, !memory.pinned);
+  }, [memory.id, memory.pinned, pinMemory]);
+
   const handleBoost = useCallback(() => {
     if (memory.confidence < 1) {
       void boostConfidence(memory.id, 0.1);
@@ -168,6 +172,15 @@ export function MemoryCard({ memory }: MemoryCardProps) {
           )}
           aria-label="Memory actions"
         >
+          <ActionButton
+            onClick={handleTogglePin}
+            aria-label={memory.pinned ? 'Unpin memory' : 'Pin memory'}
+            title={memory.pinned ? 'Unpin — stop always-injecting' : 'Pin — always inject into retrieval'}
+            className={memory.pinned ? 'text-primary' : undefined}
+          >
+            <Pin className={cn('h-3 w-3', memory.pinned && 'fill-current')} aria-hidden="true" />
+          </ActionButton>
+
           <ActionButton
             onClick={handleEditOpen}
             aria-label="Edit memory"
@@ -355,6 +368,15 @@ export function MemoryCard({ memory }: MemoryCardProps) {
           <div className="mb-2 flex items-center gap-2 pr-20">
             <CategoryPill category={memory.category} />
             <ProjectPill project={memory.project} />
+            {memory.pinned && (
+              <span
+                className="inline-flex items-center gap-1 text-[10px] font-medium text-primary"
+                title="Pinned — always injected into retrieval, regardless of query"
+              >
+                <Pin className="h-3 w-3 fill-current" aria-hidden="true" />
+                pinned
+              </span>
+            )}
           </div>
 
           {/* Content — dark:prose-invert (was hard-coded prose-invert which

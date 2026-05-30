@@ -32,6 +32,8 @@ export interface Memory {
   /** Version of the extraction contract that produced this memory.
    *  NULL for rows written before the 2026-05-20 contract-versioning rollout. */
   extraction_prompt_version?: string | null;
+  /** Pinned: always injected into retrieval regardless of query (ambient context). */
+  pinned?: boolean;
 }
 
 // ---------------------------------------------------------------------------

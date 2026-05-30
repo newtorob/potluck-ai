@@ -126,6 +126,7 @@ export function Composer({ onSend, onStop, isStreaming, modelLoaded, householdMo
       >
         <textarea
           ref={textareaRef}
+          data-testid="chat-composer-input"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}

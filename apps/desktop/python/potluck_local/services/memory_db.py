@@ -158,6 +158,10 @@ _ALLOWED_SCHEMA_ADDITIONS: frozenset[tuple[str, str, str]] = frozenset(
         # updated_at enables incremental sync, agent delta queries, and
         # export diffing. ISO-8601 TEXT matches the rest of the schema.
         ("memories", "updated_at", "TEXT"),
+        # pinned: standing/ambient memories that are ALWAYS injected into
+        # retrieval regardless of query (the explicit "pinned instructions"
+        # mechanism the always_budget heuristic only approximated).
+        ("memories", "pinned", "INTEGER NOT NULL DEFAULT 0"),
     }
 )
 
@@ -279,6 +283,10 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         # debugger UI joins this with `memories` so a tool call expands to
         # show the previews of the memories it touched.
         await _add_column_if_missing(db, "mcp_tool_calls", "memory_ids_touched", "TEXT")
+
+        # pinned: 1 = always-inject this memory into retrieval regardless of
+        # query (ambient/standing context). Defaults 0 for all existing rows.
+        await _add_column_if_missing(db, "memories", "pinned", "INTEGER NOT NULL DEFAULT 0")
 
         for stmt in _INDICES:
             await db.execute(stmt)

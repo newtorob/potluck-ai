@@ -61,17 +61,19 @@ VAULT_INGESTION_VERSION = "vault-ingest-v1"
 # AND its parameters as a single unit. Same algorithm with different top_k
 # or threshold = different version.
 #
-# v1 is the current two-tier hybrid:
-#   tier 1 — always-relevant: top N//2 preference + instruction memories
-#            above min_confidence, ordered by (confidence DESC,
-#            last_accessed_at DESC).
-#   tier 2 — keyword-match: rest of budget filled from non-preference /
-#            non-instruction categories matching keywords extracted from
-#            the last 3 user messages (stopword-filtered LIKE).
-# A separate semantic_search() path uses cosine ranking against stored
-# embeddings; that path stamps the same RETRIEVAL_PROFILE_VERSION because
-# it's the same conceptual contract from the caller's perspective. If we
-# split them into distinct callable profiles we'll add a second constant.
+# v1 was a two-tier hybrid with keyword-only Tier 2 (retrieval-v1-2026-05-20).
+#
+# v2 (retrieval-v2-rrf-2026-05-28) adds Reciprocal Rank Fusion to Tier 2:
+#   tier 1 — unchanged: top N//2 preference + instruction memories above
+#            min_confidence, ordered by (confidence DESC, last_accessed_at DESC).
+#   tier 2 — RRF-fused keyword+semantic: keyword LIKE query and
+#            semantic_search() (cosine similarity via sentence-transformers
+#            all-MiniLM-L6-v2) run in parallel via asyncio.gather; results
+#            are fused with RRF (k=60, 1-based ranks), deduped by memory ID,
+#            sorted by fused score, top N fills the remaining budget.
+#            Graceful degradation: if semantic_search returns [] (no embedder
+#            or empty embedding store), RRF reduces to keyword-only ranking —
+#            identical to v1 behavior.
 #
 # Bump when:
 #   - any tier's algorithm, weighting, or budget split changes
@@ -80,7 +82,7 @@ VAULT_INGESTION_VERSION = "vault-ingest-v1"
 #   - we swap the embedding model used at query time (embedding-model
 #     drift for stored vectors is already captured separately on
 #     memory_embeddings.model_used)
-RETRIEVAL_PROFILE_VERSION = "retrieval-v1-2026-05-20"
+RETRIEVAL_PROFILE_VERSION = "retrieval-v2-rrf-2026-05-28"
 
 
 # ---------------------------------------------------------------------------

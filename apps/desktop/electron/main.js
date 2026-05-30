@@ -206,7 +206,12 @@ async function createWindow() {
 
   if (!app.isPackaged) {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    // Skip DevTools when POTLUCK_DISABLE_DEVTOOLS is set (demo-video capture
+    // sets it) — a detached DevTools window confuses Playwright's recordVideo
+    // and gets filmed instead of the app. Normal `make desktop` is unaffected.
+    if (!process.env.POTLUCK_DISABLE_DEVTOOLS) {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
   } else {
     mainWindow.loadFile(
       path.join(process.resourcesPath, 'frontend', 'index.html')

@@ -80,6 +80,9 @@ function TimelineRow({ call }: TimelineRowProps) {
         type="button"
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
+        data-testid="timeline-row"
+        data-tool={call.tool_name}
+        data-has-memories={memoryIds.length > 0 ? 'true' : 'false'}
         aria-label={expanded ? `Collapse ${call.tool_name} details` : `Expand ${call.tool_name} details`}
         className={cn(
           'flex w-full flex-col gap-0.5 px-2 py-2 text-left',
@@ -148,7 +151,7 @@ function TimelineRow({ call }: TimelineRowProps) {
           )}
 
           {memoryIds.length > 0 && (
-            <div>
+            <div data-testid="memories-touched">
               <div className="mb-1 flex items-center gap-1.5 font-medium text-muted-foreground">
                 Memories touched
                 <span className="font-sans text-muted-foreground/60">({memoryIds.length})</span>
@@ -169,6 +172,7 @@ function TimelineRow({ call }: TimelineRowProps) {
                   {previews.map((m) => (
                     <li
                       key={m.id}
+                      data-testid="memory-preview"
                       className={cn(
                         'rounded-sm border border-border/40 bg-background/60 px-2 py-1.5',
                         !m.is_active && 'opacity-60',
@@ -336,6 +340,8 @@ export function SessionDetailDrawer({ detail, onClose }: SessionDetailDrawerProp
       ref={drawerRef}
       role="complementary"
       aria-label="Session detail"
+      data-testid="session-detail-drawer"
+      data-open={detail !== null ? 'true' : 'false'}
       aria-hidden={detail === null}
       className={cn(
         'flex h-full w-[480px] shrink-0 flex-col border-l border-border bg-card',

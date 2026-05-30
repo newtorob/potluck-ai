@@ -91,6 +91,7 @@ class Memory(BaseModel):
     superseded_by: str | None = None
     project: str | None = None  # null = global memory, applies across all projects
     extraction_prompt_version: str | None = None  # NULL for pre-2026-05-20 rows
+    pinned: bool = False  # always-inject into retrieval regardless of query
 
     @field_validator("project", mode="before")
     @classmethod

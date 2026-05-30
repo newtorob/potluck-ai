@@ -184,6 +184,8 @@ export function AgentSessionCard({
     <button
       type="button"
       onClick={() => onSelect(session.id)}
+      data-testid="agent-session-card"
+      data-client={session.client_name ?? 'unknown'}
       aria-label={`Agent session: ${clientLabel}${session.project ? `, project ${session.project}` : ''}`}
       aria-pressed={isSelected}
       className={cn(

@@ -167,6 +167,7 @@ export function ChatView() {
                 eligible contributor peer (cooperative-wide blinded path). */}
             <button
               type="button"
+              data-testid="chat-network-toggle"
               onClick={() => setNetworkMode(!networkMode)}
               disabled={isStreaming || !coordinatorReachable}
               aria-pressed={networkMode}

@@ -36,6 +36,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   return (
     <article
       aria-label={`${message.role} message`}
+      data-testid={`chat-message-${message.role}`}
       className={cn(
         'flex w-full animate-fade-in-up',
         isUser ? 'justify-end' : 'justify-start',

@@ -194,12 +194,12 @@ def register_memory_tools(mcp: FastMCP) -> None:
     @mcp.tool(
         name="memory_delete",
         description=(
-            "Soft-delete a memory by its ID. The memory is marked inactive "
-            "and will no longer be returned by search or list."
+            "Permanently delete a memory by its ID. The memory and its embedding "
+            "are removed and it can no longer be returned by search or list."
         ),
     )
     async def memory_delete(memory_id: str) -> dict:
-        """Soft-delete a memory."""
+        """Permanently delete a memory (and its embedding)."""
         if not _memory_active():
             logger.warning("memory_delete_skipped reason=memory_disabled")
             raise ToolError(
@@ -218,3 +218,33 @@ def register_memory_tools(mcp: FastMCP) -> None:
 
         logger.info("memory_deleted id=%s", memory_id)
         return {"deleted": True}
+
+    @mcp.tool(
+        name="memory_pin",
+        description=(
+            "Pin or unpin a memory by its ID. A pinned memory is ALWAYS included "
+            "in retrieval regardless of the query — use it for standing rules / "
+            "ambient context that should always be in scope (e.g. 'always use "
+            "pnpm', 'deploys go out after 6pm'). Pass pinned=false to unpin."
+        ),
+    )
+    async def memory_pin(memory_id: str, pinned: bool = True) -> dict:
+        """Pin/unpin a memory so retrieval always injects it."""
+        if not _memory_active():
+            logger.warning("memory_pin_skipped reason=memory_disabled")
+            raise ToolError(
+                "Memory is disabled in Privacy settings. Enable it to manage memories."
+            )
+
+        retriever = get_memory_retriever()
+        try:
+            ok = await retriever.set_pinned(memory_id, pinned)
+        except Exception as exc:
+            logger.error("memory_pin_error type=%s", type(exc).__name__)
+            raise ToolError(f"Failed to pin memory: {exc}") from exc
+
+        if not ok:
+            raise ToolError(f"Memory not found: {memory_id!r}")
+
+        logger.info("memory_pin_set id=%s pinned=%s", memory_id, pinned)
+        return {"id": memory_id, "pinned": pinned}

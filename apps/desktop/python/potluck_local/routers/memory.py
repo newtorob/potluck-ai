@@ -125,6 +125,10 @@ class ImportRequest(BaseModel):
     memories: list[dict[str, Any]]
 
 
+class PinRequest(BaseModel):
+    pinned: bool = True
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -305,6 +309,7 @@ async def search_memories(req: SearchMemoryRequest) -> list[dict[str, Any]]:
             project=req.project,
             limit=req.max_memories,
             min_confidence=req.min_confidence,
+            include_pinned=True,
         )
         if pairs:
             logger.info(
@@ -518,7 +523,11 @@ async def update_memory(memory_id: str, req: UpdateMemoryRequest) -> dict[str, A
 
 @router.delete("/{memory_id}", response_class=Response, status_code=204)
 async def delete_memory(memory_id: str) -> Response:
-    """Soft-delete a memory. 204 on success, 404 if not found."""
+    """Permanently delete a memory (and its embedding). 204 on success, 404 if not found.
+
+    Hard delete: content is removed from disk, not just flagged inactive — the
+    privacy contract for a store the user owns.
+    """
     if not _memory_active():
         raise HTTPException(status_code=403, detail=_DISABLED_DETAIL)
 
@@ -528,3 +537,20 @@ async def delete_memory(memory_id: str) -> Response:
 
     logger.info("memory_deleted id=%s", memory_id)
     return Response(status_code=204)
+
+
+@router.post("/{memory_id}/pin")
+async def pin_memory(memory_id: str, req: PinRequest) -> dict[str, Any]:
+    """Pin/unpin a memory so retrieval always injects it regardless of query.
+
+    Body: {"pinned": true|false} (default true). 404 if the memory isn't active.
+    """
+    if not _memory_active():
+        raise HTTPException(status_code=403, detail=_DISABLED_DETAIL)
+
+    ok = await get_memory_retriever().set_pinned(memory_id, req.pinned)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Memory not found.")
+
+    logger.info("memory_pin_set id=%s pinned=%s", memory_id, req.pinned)
+    return {"id": memory_id, "pinned": req.pinned}

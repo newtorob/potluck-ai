@@ -490,6 +490,14 @@ export const localApi = {
       }).then((r) => handle204(r));
     },
 
+    pin(id: string, pinned: boolean): Promise<{ id: string; pinned: boolean }> {
+      return fetch(`${LOCAL_BASE}/memory/${encodeURIComponent(id)}/pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pinned }),
+      }).then((r) => handleResponse<{ id: string; pinned: boolean }>(r));
+    },
+
     search(body: {
       query?: string;
       current_messages?: ChatMessage[];

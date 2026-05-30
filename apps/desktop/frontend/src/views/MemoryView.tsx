@@ -462,6 +462,7 @@ export function MemoryView() {
               {/* Input — Hearth shadow at rest, ember ring on focus */}
               <input
                 ref={searchInputRef}
+                data-testid="memory-search-input"
                 type="search"
                 value={searchQuery}
                 onChange={(e) => handleSearchInput(e.target.value)}
@@ -497,17 +498,20 @@ export function MemoryView() {
                 <div
                   role="group"
                   aria-label="Search mode"
+                  data-testid="memory-search-mode-group"
                   className="flex rounded-lg border border-border bg-muted p-0.5 text-xs"
                 >
                   <ModeToggleButton
                     active={searchMode === 'semantic'}
                     onClick={() => setSearchMode('semantic')}
                     label="Semantic"
+                    data-testid="memory-semantic-toggle"
                   />
                   <ModeToggleButton
                     active={searchMode === 'exact'}
                     onClick={() => setSearchMode('exact')}
                     label="Exact"
+                    data-testid="memory-exact-toggle"
                   />
                 </div>
 
@@ -699,7 +703,7 @@ export function MemoryView() {
           {!isFetching && isFiltered && (
             <>
               {displayMemories.length > 0 ? (
-                <div className="space-y-2" role="list" aria-label="Memory search results">
+                <div className="space-y-2" role="list" aria-label="Memory search results" data-testid="memory-results-list">
                   {displayMemories.map((memory, index) => (
                     <MemoryCardWrapper
                       key={memory.id}
@@ -781,14 +785,16 @@ interface ModeToggleButtonProps {
   active: boolean;
   onClick: () => void;
   label: string;
+  'data-testid'?: string;
 }
 
-function ModeToggleButton({ active, onClick, label }: ModeToggleButtonProps) {
+function ModeToggleButton({ active, onClick, label, 'data-testid': testId }: ModeToggleButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
+      data-testid={testId}
       className={cn(
         'rounded-md px-2 py-0.5 text-xs font-medium transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
@@ -823,6 +829,7 @@ function MemoryCardWrapper({ memory, index, onOpen, registerRef }: MemoryCardWra
       ref={registerRef}
       role="listitem"
       tabIndex={0}
+      data-testid={`memory-result-${index}`}
       aria-label={`Memory: ${memory.content.slice(0, 60)}`}
       className={cn(
         'cursor-pointer rounded-xl',

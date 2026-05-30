@@ -247,7 +247,7 @@ export function AgentsView() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden" data-testid="agents-view">
       {/* Main content */}
       <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
         {/* Header */}

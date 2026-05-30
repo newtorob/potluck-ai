@@ -57,6 +57,7 @@ export interface MemoryState {
   createMemory: (input: MemoryCreateInput) => Promise<Memory>;
   updateMemory: (id: string, patch: MemoryUpdateInput) => Promise<void>;
   deleteMemory: (id: string) => Promise<void>;
+  pinMemory: (id: string, pinned: boolean) => Promise<void>;
   boostConfidence: (id: string, delta?: number) => Promise<void>;
   wipeAll: () => Promise<void>;
   exportToFile: () => Promise<void>;
@@ -141,6 +142,20 @@ export const useMemoryStore = create<MemoryState>()((set, get) => ({
     } catch (err) {
       // Rollback
       set({ memories: previous });
+      throw err;
+    }
+  },
+
+  async pinMemory(id, pinned) {
+    // Optimistic toggle of the pinned flag
+    const previous = get().memories;
+    set((state) => ({
+      memories: state.memories.map((m) => (m.id === id ? { ...m, pinned } : m)),
+    }));
+    try {
+      await localApi.memory.pin(id, pinned);
+    } catch (err) {
+      set({ memories: previous }); // rollback
       throw err;
     }
   },

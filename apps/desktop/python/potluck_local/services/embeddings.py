@@ -6,13 +6,29 @@ fast and avoids blocking uvicorn startup on model download.
 
 All CPU-heavy operations (model load, encode) run in a ThreadPoolExecutor so they
 don't block the asyncio event loop.
+
+Model selection:
+    Set POTLUCK_EMBED_MODEL to override the default at startup.
+    e.g. POTLUCK_EMBED_MODEL=BAAI/bge-small-en-v1.5
+
+Asymmetric embedding (BGE-style):
+    Some models (notably BGE family) require a task instruction prepended to the
+    QUERY text only.  Document/memory texts are embedded without any prefix.
+    The query prefix is controlled by QUERY_PREFIX, which is set per model in
+    _MODEL_CONFIGS.  For symmetric models (all-MiniLM, GTE) the prefix is "".
+
+    - embed_query(text)      — applies the model's query prefix before encoding
+    - embed(text)            — raw encode, no prefix (use for document/memory side)
+    - embed_many(texts)      — raw batch encode, no prefix (use for document/memory side)
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
+from typing import NamedTuple
 
 import numpy as np
 
@@ -22,17 +38,67 @@ logger = logging.getLogger(__name__)
 _embed_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="embedder")
 
 
+class _ModelConfig(NamedTuple):
+    dim: int
+    query_prefix: str  # prepended to queries only; "" for symmetric models
+
+
+# Per-model configuration.  Add entries here when adding new candidate models.
+# Keys must match the HuggingFace model ID (or the value of POTLUCK_EMBED_MODEL).
+_MODEL_CONFIGS: dict[str, _ModelConfig] = {
+    # Default — symmetric, no prefix needed
+    "sentence-transformers/all-MiniLM-L6-v2": _ModelConfig(dim=384, query_prefix=""),
+    # BGE small — asymmetric: queries need the retrieval instruction prefix
+    "BAAI/bge-small-en-v1.5": _ModelConfig(
+        dim=384,
+        query_prefix="Represent this sentence for searching relevant passages: ",
+    ),
+    # GTE small — symmetric, no prefix needed
+    "thenlper/gte-small": _ModelConfig(dim=384, query_prefix=""),
+    # MPNet base — 768-dim (breaks DIM=384 storage assumption; flagged, not recommended)
+    "sentence-transformers/all-mpnet-base-v2": _ModelConfig(dim=768, query_prefix=""),
+}
+
+# bge-small-en-v1.5 chosen 2026-05-28: same 384-dim storage as MiniLM (no schema
+# change) and same Eval B recall@5 (0.72, no regression), but doubles precision@1
+# on hard close-distractor pairs (0.40 -> 0.80) — fixes cases like ranking
+# "Python linting" above "use pnpm" for a JS-package query. Asymmetric model:
+# embed_query() prepends the retrieval prefix (see _MODEL_CONFIGS). Switching the
+# default requires re-embedding existing memories (vectors are model-specific).
+_DEFAULT_MODEL = "BAAI/bge-small-en-v1.5"
+
+
 class EmbeddingService:
-    """Lazy-loading wrapper around sentence-transformers all-MiniLM-L6-v2.
+    """Lazy-loading wrapper around sentence-transformers.
+
+    The active model is controlled by POTLUCK_EMBED_MODEL (read at instantiation).
+    Default: sentence-transformers/all-MiniLM-L6-v2
+
+    Asymmetric models (BGE): use embed_query() for query-side encoding.
+    Symmetric models (MiniLM, GTE): embed() and embed_query() are equivalent.
 
     Thread safety: the internal SentenceTransformer is only ever called from
     _embed_executor (a single-worker pool), so there is no concurrent access.
     """
 
-    MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-    DIM = 384
-
     def __init__(self) -> None:
+        # Read model name at instantiation so env-var overrides take effect
+        # even when the singleton is created after the env is set.
+        self.MODEL_NAME: str = os.environ.get("POTLUCK_EMBED_MODEL", _DEFAULT_MODEL)
+        cfg = _MODEL_CONFIGS.get(self.MODEL_NAME)
+        if cfg is not None:
+            self.DIM: int = cfg.dim
+            self._query_prefix: str = cfg.query_prefix
+        else:
+            # Unknown model — assume 384-dim, symmetric. Log a warning.
+            logger.warning(
+                "embedder_unknown_model model=%s — assuming dim=384 symmetric; "
+                "add it to _MODEL_CONFIGS for correct asymmetric handling",
+                self.MODEL_NAME,
+            )
+            self.DIM = 384
+            self._query_prefix = ""
+
         self._model = None  # type: ignore[assignment]
         self._load_lock = asyncio.Lock()
         self._available: bool | None = None  # None = untested yet
@@ -91,7 +157,11 @@ class EmbeddingService:
         return self._available is True
 
     async def embed(self, text: str) -> np.ndarray | None:
-        """Embed a single string.  Returns None if the model is unavailable."""
+        """Embed a single string WITHOUT a query prefix.
+
+        Use this for document/memory-side encoding.
+        Returns None if the model is unavailable.
+        """
         if not await self._ensure_loaded():
             return None
         loop = asyncio.get_event_loop()
@@ -100,9 +170,26 @@ class EmbeddingService:
         )
         return result[0]  # shape (DIM,)
 
-    async def embed_many(self, texts: list[str]) -> np.ndarray | None:
-        """Embed a batch of strings.  Returns None if the model is unavailable.
+    async def embed_query(self, text: str) -> np.ndarray | None:
+        """Embed a query string, applying the model's query prefix if any.
 
+        For symmetric models (MiniLM, GTE) this is identical to embed().
+        For asymmetric models (BGE) this prepends the retrieval instruction.
+        Returns None if the model is unavailable.
+        """
+        if not await self._ensure_loaded():
+            return None
+        prefixed = self._query_prefix + text if self._query_prefix else text
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            _embed_executor, self._encode_sync, [prefixed]
+        )
+        return result[0]  # shape (DIM,)
+
+    async def embed_many(self, texts: list[str]) -> np.ndarray | None:
+        """Embed a batch of strings WITHOUT a query prefix (document/memory side).
+
+        Returns None if the model is unavailable.
         Returns float32 array of shape (len(texts), DIM).
         """
         if not texts:
@@ -115,7 +202,8 @@ class EmbeddingService:
         )
 
 
-# Module-level singleton
+# Module-level singleton — reset when POTLUCK_EMBED_MODEL changes between runs
+# by calling _reset_embedder() (used by the eval harness).
 _embedder: EmbeddingService | None = None
 
 
@@ -125,3 +213,13 @@ def get_embedder() -> EmbeddingService:
     if _embedder is None:
         _embedder = EmbeddingService()
     return _embedder
+
+
+def _reset_embedder() -> None:
+    """Reset the singleton so a new POTLUCK_EMBED_MODEL value is picked up.
+
+    Only intended for use by the eval harness and tests.  Production code
+    should never call this.
+    """
+    global _embedder
+    _embedder = None

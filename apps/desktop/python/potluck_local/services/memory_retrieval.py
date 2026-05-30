@@ -6,7 +6,9 @@ Also provides semantic search, related-memory lookup, and keyword frequency.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 import re
 import uuid
 from collections import Counter
@@ -67,6 +69,7 @@ def _row_to_memory(row: dict) -> Memory:
         superseded_by=row["superseded_by"],
         project=row["project"],
         extraction_prompt_version=row.get("extraction_prompt_version"),
+        pinned=bool(row.get("pinned", 0)),
     )
 
 
@@ -119,11 +122,17 @@ async def semantic_search(
     project: str | None = None,
     limit: int = 20,
     min_confidence: float = 0.0,
+    include_pinned: bool = False,
 ) -> list[tuple[Memory, float]]:
     """Embed the query and return top-K memories by cosine similarity.
 
     Returns [] (not raises) if the embedder is unavailable — callers should
     fall back to keyword search in that case.
+
+    include_pinned: when True, pinned memories (in scope) are prepended to the
+    results regardless of cosine score — ambient/standing context that should
+    always be present. Off by default so the RRF retriever's internal call
+    isn't double-counted (it injects pinned via its own Tier-0).
     """
     from potluck_local.services.embeddings import get_embedder
     from potluck_local.services.memory_db import (
@@ -132,7 +141,9 @@ async def semantic_search(
     )
 
     embedder = get_embedder()
-    query_vec = await embedder.embed(query)
+    # Use embed_query() so asymmetric models (e.g. BGE) apply their retrieval
+    # instruction prefix.  For symmetric models this is identical to embed().
+    query_vec = await embedder.embed_query(query)
     if query_vec is None:
         return []
 
@@ -171,6 +182,25 @@ async def semantic_search(
         if mem.confidence < min_confidence:
             continue
         results.append((mem, sim))
+
+    if include_pinned:
+        # Pinned memories always inject, regardless of cosine score or
+        # min_confidence. Prepend them (deduped) and re-cap at `limit`.
+        pclause, pparams = _project_clause(project or None)
+        async with aiosqlite.connect(db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cur = await db.execute(
+                f"""SELECT * FROM memories
+                   WHERE is_active = 1 AND pinned = 1 AND {pclause}
+                   ORDER BY confidence DESC, last_accessed_at DESC
+                   LIMIT ?""",
+                pparams + [limit],
+            )
+            pinned_rows = [dict(r) for r in await cur.fetchall()]
+        if pinned_rows:
+            have = {m.id for m, _ in results}
+            prepend = [(_row_to_memory(r), 1.0) for r in pinned_rows if r["id"] not in have]
+            results = (prepend + results)[:limit]
 
     logger.info("semantic_search query_len=%d results=%d project=%s", len(query), len(results), project)
     return results
@@ -328,8 +358,22 @@ class MemoryRetriever:
         from potluck_local.services.memory_db import get_memory_db_path
         db_path = get_memory_db_path()
 
-        always_budget = max(1, max_memories // 2)
-        keyword_budget = max_memories - always_budget
+        # How many of the max_memories slots Tier 1 (standing preference +
+        # instruction preload) may take. Lowered from max_memories//2 (=10) to
+        # 3 on 2026-05-28 after the eval showed the half-budget preload buried
+        # query-relevant results below the recall@5 cutoff: capping it 10->0
+        # roughly doubled recall@5 (0.40->0.80) with no loss to standing-pref
+        # recall. We keep a small floor of 3 (not 0) so the top-3-confidence
+        # standing rules still inject as ambient context on unrelated queries.
+        # NOTE: the eval also showed this confidence-ranked preload only ever
+        # delivers ambient context for the top-~3 rules at a tight budget;
+        # mid-confidence standing rules never reach the top-5 via preload. True
+        # always-inject ambient context needs a separate pinned-instructions
+        # mechanism (tracked as a follow-up), not this budget knob.
+        # Overridable per-call via POTLUCK_ALWAYS_BUDGET (eval sweeps / tuning).
+        _default_always = 3
+        always_budget = int(os.environ.get("POTLUCK_ALWAYS_BUDGET", str(_default_always)))
+        always_budget = max(0, min(always_budget, max_memories))
 
         proj_clause, proj_params = _project_clause(project)
 
@@ -339,11 +383,27 @@ class MemoryRetriever:
 
             always_rows: list[dict] = []
 
+            # Tier 0 — PINNED: standing/ambient memories that always inject,
+            # regardless of query OR category. Capped at max_memories so they
+            # can't overflow the budget; query results fill whatever remains.
+            pinned_cursor = await db.execute(
+                f"""SELECT * FROM memories
+                   WHERE is_active = 1 AND pinned = 1 AND {proj_clause}
+                   ORDER BY confidence DESC, last_accessed_at DESC
+                   LIMIT ?""",
+                proj_params + [max_memories],
+            )
+            always_rows = [dict(r) for r in await pinned_cursor.fetchall()]
+            pinned_ids = {r["id"] for r in always_rows}
+
             if category is None:
-                # Tier 1: always-relevant high-confidence preferences + instructions
+                # Tier 1: top high-confidence preferences + instructions as
+                # ambient context (excludes already-pinned rows so they don't
+                # double-count).
                 cursor = await db.execute(
                     f"""SELECT * FROM memories
                        WHERE is_active = 1
+                         AND pinned = 0
                          AND confidence >= ?
                          AND category IN ('preference', 'instruction')
                          AND {proj_clause}
@@ -351,48 +411,137 @@ class MemoryRetriever:
                        LIMIT ?""",
                     [min_confidence] + proj_params + [always_budget],
                 )
-                always_rows = [dict(r) for r in await cursor.fetchall()]
-            # When category is specified, skip Tier 1 entirely — the caller wants
-            # a specific category; loading preference/instruction rows only to
-            # throw them away wastes the result budget.
+                for r in await cursor.fetchall():
+                    if r["id"] not in pinned_ids:
+                        always_rows.append(dict(r))
+            # When category is specified, skip the Tier 1 heuristic — but the
+            # pinned rows above still inject (that's the whole point of pinning).
 
-            # Tier 2: keyword-matched memories
-            # When category is None: exclude preference/instruction (already in Tier 1).
-            # When category is set: filter strictly to the requested category.
-            keyword_rows: list[dict] = []
+            # Tier 2: RRF-fused keyword + semantic retrieval.
+            # Both arms apply the same project scope, is_active, category, and
+            # min_confidence filters so neither arm can surface results the other
+            # would exclude.  Results are merged with Reciprocal Rank Fusion
+            # (k=60, 1-based ranks) which is rank-ordinal and requires no score
+            # normalisation between cosine similarity and keyword confidence rank.
+            #
+            # Graceful degradation: if semantic_search returns [] (embedder
+            # unavailable or zero stored embeddings), RRF reduces to pure keyword
+            # ranking — identical to the previous v1 behavior.
             keywords = _extract_keywords(current_messages)
-            tier2_budget = max_memories if category is not None else keyword_budget
-            if keywords and tier2_budget > 0:
+            # Query results get whatever budget the pinned + ambient rows leave.
+            tier2_budget = max(0, max_memories - len(always_rows))
+
+            if category is not None:
+                # Restrict to the caller's requested category
+                cat_clause = "AND category = ?"
+                cat_params: list = [category]
+            else:
+                # Exclude Tier-1 categories to avoid duplicating those rows
+                cat_clause = "AND category NOT IN ('preference', 'instruction')"
+                cat_params = []
+
+            # --- Keyword arm (same SQL as before) ---
+            async def _keyword_query() -> list[dict]:
+                if not keywords or tier2_budget <= 0:
+                    return []
                 # Build parameterized OR conditions — no f-string SQL injection risk
                 conditions = " OR ".join("content LIKE ?" for _ in keywords)
                 like_params = [f"%{kw}%" for kw in keywords]
-
-                if category is not None:
-                    # Restrict to the caller's requested category
-                    cat_clause = "AND category = ?"
-                    cat_params: list = [category]
-                else:
-                    # Exclude Tier-1 categories to avoid duplicating those rows
-                    cat_clause = "AND category NOT IN ('preference', 'instruction')"
-                    cat_params = []
-
                 # params order: like values, min_confidence, category params, project params, limit
-                params: list = like_params + [min_confidence] + cat_params + proj_params + [tier2_budget]
+                kw_params: list = like_params + [min_confidence] + cat_params + proj_params + [tier2_budget]
+                async with aiosqlite.connect(db_path) as _db:
+                    _db.row_factory = aiosqlite.Row
+                    cur = await _db.execute(
+                        f"""SELECT * FROM memories
+                            WHERE is_active = 1
+                              AND ({conditions})
+                              AND confidence >= ?
+                              {cat_clause}
+                              AND {proj_clause}
+                            ORDER BY confidence DESC, last_accessed_at DESC
+                            LIMIT ?""",  # noqa: S608 — conditions built safely above
+                        kw_params,
+                    )
+                    return [dict(r) for r in await cur.fetchall()]
 
-                cursor = await db.execute(
-                    f"""SELECT * FROM memories
-                        WHERE is_active = 1
-                          AND ({conditions})
-                          AND confidence >= ?
-                          {cat_clause}
-                          AND {proj_clause}
-                        ORDER BY confidence DESC, last_accessed_at DESC
-                        LIMIT ?""",  # noqa: S608 — conditions built safely above
-                    params,
-                )
-                keyword_rows = [dict(r) for r in await cursor.fetchall()]
+            # --- Semantic arm ---
+            # semantic_search already applies: project scope, is_active=1, min_confidence.
+            # Category is NOT applied inside semantic_search, so we post-filter here.
+            async def _semantic_query() -> list[tuple[Memory, float]]:
+                if tier2_budget <= 0 or not keywords:
+                    return []
+                try:
+                    pairs = await semantic_search(
+                        query=" ".join(keywords),
+                        project=project,
+                        limit=tier2_budget,
+                        min_confidence=min_confidence,
+                    )
+                except Exception as _exc:
+                    logger.warning("semantic_search_error_in_rrf reason=%s — falling back to keyword", _exc)
+                    return []
+                # Post-filter by category if required
+                if category is not None:
+                    pairs = [(m, s) for m, s in pairs if m.category == category]
+                return pairs
 
-            # Merge, deduplicate by id
+            # Run both arms in parallel — neither touches the open db connection
+            # from the outer context (each opens its own).
+            keyword_rows, semantic_pairs = await asyncio.gather(
+                _keyword_query(), _semantic_query()
+            )
+
+            # --- RRF fusion (1-based ranks) ---
+            # Score each memory id by summing 1/(k + rank) across lists it appears in.
+            # k is read per-call from POTLUCK_RRF_K (default 60) so the eval can
+            # sweep it without a code change — and so an eval-driven tuning loop
+            # can later set the winning value. Lower k lets top-ranked hits in
+            # either arm dominate (matters at tight budgets); higher k flattens.
+            _RRF_K = int(os.environ.get("POTLUCK_RRF_K", "60"))
+            rrf_scores: dict[str, float] = {}
+            # Build id → row lookup from keyword results
+            id_to_row: dict[str, dict] = {}
+
+            for rank, row in enumerate(keyword_rows, start=1):
+                mid = row["id"]
+                rrf_scores[mid] = rrf_scores.get(mid, 0.0) + 1.0 / (_RRF_K + rank)
+                id_to_row[mid] = row
+
+            for rank, (mem, _sim) in enumerate(semantic_pairs, start=1):
+                mid = mem.id
+                rrf_scores[mid] = rrf_scores.get(mid, 0.0) + 1.0 / (_RRF_K + rank)
+                # Reconstruct a dict for memories only seen in the semantic arm
+                if mid not in id_to_row:
+                    id_to_row[mid] = {
+                        "id": mem.id,
+                        "content": mem.content,
+                        "category": mem.category,
+                        "confidence": mem.confidence,
+                        "source_type": mem.source_type,
+                        "source_conversation_id": mem.source_conversation_id,
+                        "created_at": mem.created_at,
+                        "last_accessed_at": mem.last_accessed_at,
+                        "updated_at": mem.updated_at,
+                        "access_count": mem.access_count,
+                        "is_active": int(mem.is_active),
+                        "superseded_by": mem.superseded_by,
+                        "project": mem.project,
+                        "extraction_prompt_version": mem.extraction_prompt_version,
+                    }
+
+            # Sort by fused score descending, take the tier-2 budget
+            sorted_ids = sorted(rrf_scores, key=lambda mid: rrf_scores[mid], reverse=True)
+            keyword_rows = [id_to_row[mid] for mid in sorted_ids[:tier2_budget]]
+
+            logger.debug(
+                "rrf_tier2 keyword_hits=%d semantic_hits=%d fused=%d budget=%d",
+                len(keyword_rows),  # after slice — use pre-slice counts below would be clearer
+                len(semantic_pairs),
+                len(rrf_scores),
+                tier2_budget,
+            )
+
+            # Merge Tier 1 + fused Tier 2, deduplicate by id
             seen_ids: set[str] = set()
             combined: list[dict] = []
             for row in always_rows + keyword_rows:
@@ -511,21 +660,56 @@ class MemoryRetriever:
             return None
         return _row_to_memory(dict(row))
 
+    async def set_pinned(self, memory_id: str, pinned: bool) -> bool:
+        """Pin/unpin a memory so retrieval always (or no longer) injects it
+        regardless of query. Returns True if an active row was affected."""
+        from potluck_local.services.memory_db import get_memory_db_path
+        db_path = get_memory_db_path()
+        async with aiosqlite.connect(db_path) as db:
+            cursor = await db.execute(
+                "UPDATE memories SET pinned = ?, updated_at = ? WHERE id = ? AND is_active = 1",
+                (1 if pinned else 0, _now_iso(), memory_id),
+            )
+            await db.commit()
+            affected = cursor.rowcount > 0
+        if affected:
+            logger.info("memory_pin_set id=%s pinned=%s", memory_id, pinned)
+        return affected
+
     async def delete_memory(self, memory_id: str) -> bool:
-        """Soft-delete a memory. Returns True if a row was affected."""
+        """Permanently delete a memory and its embedding. Returns True if removed.
+
+        Hard delete by design: "delete" must mean the content is actually gone
+        from disk, not just flagged inactive — that's the privacy contract for a
+        local-first store the user owns. A prior soft delete left the row (and
+        its content) in memory.db and still surfaced it, with content, in the
+        /agents "memories touched" debugger.
+
+        Removes the row from `memories` and its vector from `memory_embeddings`.
+        Deletes regardless of is_active so already-soft-deleted rows can be
+        purged too. Any agent tool-call history that referenced this id
+        (mcp_tool_calls.memory_ids_touched) degrades gracefully: the debugger
+        shows the touch count but can no longer resurrect the deleted content.
+
+        Note: SQLite leaves freed bytes in free pages until VACUUM; run a VACUUM
+        as a periodic maintenance op for stronger "unrecoverable" guarantees —
+        not per-delete (a full-DB rewrite is too costly to do on every call).
+        """
         from potluck_local.services.memory_db import get_memory_db_path
         db_path = get_memory_db_path()
 
         async with aiosqlite.connect(db_path) as db:
             cursor = await db.execute(
-                "UPDATE memories SET is_active = 0, updated_at = ? WHERE id = ? AND is_active = 1",
-                (_now_iso(), memory_id),
+                "DELETE FROM memories WHERE id = ?", (memory_id,)
+            )
+            await db.execute(
+                "DELETE FROM memory_embeddings WHERE memory_id = ?", (memory_id,)
             )
             await db.commit()
             affected = cursor.rowcount > 0
 
         if affected:
-            logger.info("memory_soft_deleted id=%s", memory_id)
+            logger.info("memory_hard_deleted id=%s", memory_id)
             from potluck_local.services.memory_clustering import get_cluster_cache
             await get_cluster_cache().invalidate_all()
         return affected

@@ -54,6 +54,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_TCP_PORT = 8322
 _LOOPBACK = "127.0.0.1"
 _HEARTBEAT_INTERVAL = 30  # seconds
+_PARENT_POLL_SECONDS = 5  # how often the orphan-watcher checks getppid (stdio)
 
 # ---------------------------------------------------------------------------
 # Per-process session context
@@ -69,6 +70,7 @@ _session_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 # path can access them from a synchronous context.
 _current_session_id: str | None = None
 _heartbeat_task: asyncio.Task | None = None
+_parent_watch_task: asyncio.Task | None = None
 
 # Set to True after we've successfully identified the client (one-shot).
 _client_identified: bool = False
@@ -93,6 +95,36 @@ async def _heartbeat_loop(session_id: str) -> None:
             await observer.heartbeat(session_id)
         except Exception:
             logger.debug("observer_heartbeat_error session=%s", session_id)
+
+
+async def _parent_watch_loop(session_id: str) -> None:
+    """Detect parent-process death and exit cleanly (stdio orphan guard).
+
+    A stdio MCP server is one-per-agent: if the parent (Claude Code, Cursor,
+    Zed, …) dies ungracefully, we should NOT linger as an orphan. In normal
+    shutdown the parent closes our stdin and the read loop exits — but as a
+    belt-and-suspenders against held-fd or kill-9 paths, we also poll
+    os.getppid(): a reparented orphan's ppid drifts (usually to 1 = init/
+    launchd). When that happens we close the session and hard-exit.
+    """
+    initial_ppid = os.getppid()
+    observer = get_observer()
+    while True:
+        await asyncio.sleep(_PARENT_POLL_SECONDS)
+        ppid = os.getppid()
+        if ppid != initial_ppid or ppid <= 1:
+            logger.warning(
+                "mcp_parent_died initial_ppid=%d now_ppid=%d session=%s — exiting",
+                initial_ppid, ppid, session_id,
+            )
+            try:
+                await observer.close_session(session_id)
+            except Exception:
+                logger.debug("observer_close_on_parent_death_error", exc_info=True)
+            # Hard exit — don't risk lingering as an orphan. Skips Python
+            # atexit handlers, which is intentional (heartbeat task etc. get
+            # torn down by the kernel).
+            os._exit(0)
 
 
 # ---------------------------------------------------------------------------
@@ -289,7 +321,7 @@ FastMCP.add_tool = _patched_add_tool  # type: ignore[method-assign]
 @asynccontextmanager
 async def _observability_lifespan(mcp: FastMCP) -> AsyncIterator[None]:
     """FastMCP lifespan: open an AgentSession and start the heartbeat."""
-    global _current_session_id, _heartbeat_task
+    global _current_session_id, _heartbeat_task, _parent_watch_task
 
     transport_str = _resolve_transport()
     observer = get_observer()
@@ -312,6 +344,12 @@ async def _observability_lifespan(mcp: FastMCP) -> AsyncIterator[None]:
     # Start heartbeat task.
     _heartbeat_task = asyncio.create_task(_heartbeat_loop(session_id))
 
+    # Stdio MCP servers are one-per-agent — if the parent agent dies, we
+    # shouldn't linger. The stdio read loop usually exits on stdin EOF; this
+    # watcher is belt-and-suspenders against held-fd / SIGKILL paths.
+    if transport_str == "stdio":
+        _parent_watch_task = asyncio.create_task(_parent_watch_loop(session_id))
+
     try:
         yield
     finally:
@@ -320,6 +358,12 @@ async def _observability_lifespan(mcp: FastMCP) -> AsyncIterator[None]:
             await _heartbeat_task
         except asyncio.CancelledError:
             pass
+        if _parent_watch_task is not None:
+            _parent_watch_task.cancel()
+            try:
+                await _parent_watch_task
+            except asyncio.CancelledError:
+                pass
         await observer.close_session(session_id)
         logger.info("potluck_mcp_observer_shutdown session=%s", session_id)
 

@@ -21,7 +21,8 @@ COMPOSE ?= $(shell \
 .PHONY: help setup check-python check-docker up down restart logs api-logs pg-logs coord-logs migrate psql \
         api-shell coord-shell test-api test-coordinator m3-smoke mesh-smoke lint install-hooks dev desktop frontend \
         sidecar sidecar-setup sidecar-go installer-deps installer-bundle installer-mac installer-win installer-linux installer-clean \
-        coordinator coordinator-setup frontend-setup electron-setup ps status clean reset
+        coordinator coordinator-setup frontend-setup electron-setup ps status clean reset eval-retrieval \
+        demo-setup demo-capture demo-video
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -129,6 +130,13 @@ m3-smoke: ## End-to-end Phase G m3 acceptance check (needs coordinator + at leas
 
 mesh-smoke: ## End-to-end Phase G mesh week-1 acceptance (needs coordinator + Postgres)
 	@python3 scripts/mesh-smoke.py $(MESH_ARGS)
+
+eval-retrieval: ## Eval B — retrieval quality: RRF vs keyword-only on labeled corpus
+	@if [ ! -x apps/desktop/python/.venv/bin/python ]; then \
+		echo "==> sidecar venv not found — run 'make sidecar-setup' first"; \
+		exit 1; \
+	fi
+	@cd apps/desktop/python && .venv/bin/python -m evals.eval_retrieval_quality
 
 lint: ## Run the privacy-invariant lint (member_id leaks + contributor in-memory-only). Free, local.
 	@python3 scripts/lint_privacy.py
@@ -241,5 +249,16 @@ reset: ## Full nuke: stop containers, drop db volume, wipe build artifacts (asks
 	rm -rf apps/desktop/frontend/dist apps/desktop/frontend/node_modules
 	rm -rf apps/desktop/electron/out apps/desktop/electron/resources/python apps/desktop/electron/node_modules
 	rm -rf apps/desktop/python/.venv apps/desktop/python/dist apps/desktop/python/build
+
+# ---------- demo video pipeline ----------
+
+demo-setup: ## Install Playwright + deps for the demo-video harness
+	cd tools/demo-video && pnpm install && pnpm exec playwright install chromium
+
+demo-capture: ## Capture Demo A silent .webm (requires sidecar + Vite dev server running)
+	cd tools/demo-video && pnpm run capture
+
+demo-video: ## Compose narrated mp4 (add audio/scene-NN.mp3 clips first; degrades to silent mp4 if absent)
+	cd tools/demo-video && bash compose.sh
 
 .DEFAULT_GOAL := help
