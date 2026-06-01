@@ -1,0 +1,227 @@
+{
+  "per_instance": [
+    {
+      "ranked_ids": [
+        "answer_4be1b6b4_3",
+        "answer_4be1b6b4_1",
+        "answer_4be1b6b4_2"
+      ],
+      "ranked_all": [
+        "answer_4be1b6b4_2",
+        "answer_4be1b6b4_3",
+        "answer_4be1b6b4_1"
+      ],
+      "recall_any": 1.0,
+      "recall_all": 1.0,
+      "ndcg": 1.0,
+      "elapsed_ms": 70.01199998194352,
+      "embedder_ok": true,
+      "n_sessions": 3,
+      "question_id": "gpt4_2655b836",
+      "question_type": "temporal-reasoning",
+      "question": "What was the first issue I had with my new car after its first service?",
+      "answer": "GPS system not functioning correctly"
+    },
+    {
+      "ranked_ids": [
+        "answer_1c6b85ea_2",
+        "answer_1c6b85ea_1"
+      ],
+      "ranked_all": [
+        "answer_1c6b85ea_1",
+        "answer_1c6b85ea_2"
+      ],
+      "recall_any": 1.0,
+      "recall_all": 1.0,
+      "ndcg": 1.0,
+      "elapsed_ms": 74.04954102821648,
+      "embedder_ok": true,
+      "n_sessions": 2,
+      "question_id": "gpt4_2487a7cb",
+      "question_type": "temporal-reasoning",
+      "question": "Which event did I attend first, the 'Effective Time Management' workshop or the 'Data Analysis using Python' webinar?",
+      "answer": "'Data Analysis using Python' webinar"
+    },
+    {
+      "ranked_ids": [
+        "answer_b535969f_2",
+        "answer_b535969f_1"
+      ],
+      "ranked_all": [
+        "answer_b535969f_2",
+        "answer_b535969f_1"
+      ],
+      "recall_any": 1.0,
+      "recall_all": 1.0,
+      "ndcg": 1.0,
+      "elapsed_ms": 71.35004102019593,
+      "embedder_ok": true,
+      "n_sessions": 2,
+      "question_id": "gpt4_76048e76",
+      "question_type": "temporal-reasoning",
+      "question": "Which vehicle did I take care of first in February, the bike or the car?",
+      "answer": "bike"
+    },
+    {
+      "ranked_ids": [
+        "answer_5328c3c2_2",
+        "answer_5328c3c2_1"
+      ],
+      "ranked_all": [
+        "answer_5328c3c2_1",
+        "answer_5328c3c2_2"
+      ],
+      "recall_any": 1.0,
+      "recall_all": 1.0,
+      "ndcg": 1.0,
+      "elapsed_ms": 41.8487080023624,
+      "embedder_ok": true,
+      "n_sessions": 2,
+      "question_id": "gpt4_2312f94c",
+      "question_type": "temporal-reasoning",
+      "question": "Which device did I got first, the Samsung Galaxy S22 or the Dell XPS 13?",
+      "answer": "Samsung Galaxy S22"
+    },
+    {
+      "ranked_ids": [
+        "answer_e936197f_1",
+        "answer_e936197f_2"
+      ],
+      "ranked_all": [
+        "answer_e936197f_1",
+        "answer_e936197f_2"
+      ],
+      "recall_any": 1.0,
+      "recall_all": 1.0,
+      "ndcg": 1.0,
+      "elapsed_ms": 49.96074998052791,
+      "embedder_ok": true,
+      "n_sessions": 2,
+      "question_id": "0bb5a684",
+      "question_type": "temporal-reasoning",
+      "question": "How many days before the team meeting I was preparing for did I attend the workshop on 'Effective Communication in the Workplace'?",
+      "answer": "7 days. 8 days (including the last day) is also acceptable."
+    },
+    {
+      "ranked_ids": [
+        "answer_6ea1541e_1",
+        "answer_6ea1541e_2"
+      ],
+      "ranked_all": [
+        "answer_6ea1541e_2",
+        "answer_6ea1541e_1"
+      ],
+      "recall_any": 1.0,
+      "recall_all": 1.0,
+      "ndcg": 1.0,
+      "elapsed_ms": 25.091333023738116,
+      "embedder_ok": true,
+      "n_sessions": 2,
+      "question_id": "08f4fc43",
+      "question_type": "temporal-reasoning",
+      "question": "How many days had passed between the Sunday mass at St. Mary's Church and the Ash Wednesday service at the cathedral?",
+      "answer": "30 days. 31 days (including the last day) is also acceptable."
+    },
+    {
+      "ranked_ids": [
+        "answer_d39b7977_1",
+        "answer_d39b7977_2"
+      ],
+      "ranked_all": [
+        "answer_d39b7977_1",
+        "answer_d39b7977_2"
+      ],
+      "recall_any": 1.0,
+      "recall_all": 1.0,
+      "ndcg": 1.0,
+      "elapsed_ms": 68.01283301319927,
+      "embedder_ok": true,
+      "n_sessions": 2,
+      "question_id": "2c63a862",
+      "question_type": "temporal-reasoning",
+      "question": "How many days did it take for me to find a house I loved after starting to work with Rachel?",
+      "answer": "14 days. 15 days (including the last day) is also acceptable."
+    },
+    {
+      "ranked_ids": [
+        "answer_7a4a93f1_2",
+        "answer_7a4a93f1_1"
+      ],
+      "ranked_all": [
+        "answer_7a4a93f1_2",
+        "answer_7a4a93f1_1"
+      ],
+      "recall_any": 1.0,
+      "recall_all": 1.0,
+      "ndcg": 1.0,
+      "elapsed_ms": 60.68670895183459,
+      "embedder_ok": true,
+      "n_sessions": 2,
+      "question_id": "gpt4_385a5000",
+      "question_type": "temporal-reasoning",
+      "question": "Which seeds were started first, the tomatoes or the marigolds?",
+      "answer": "Tomatoes"
+    },
+    {
+      "ranked_ids": [
+        "answer_1cc3cd0c_1",
+        "answer_1cc3cd0c_2"
+      ],
+      "ranked_all": [
+        "answer_1cc3cd0c_2",
+        "answer_1cc3cd0c_1"
+      ],
+      "recall_any": 1.0,
+      "recall_all": 1.0,
+      "ndcg": 1.0,
+      "elapsed_ms": 33.43450004467741,
+      "embedder_ok": true,
+      "n_sessions": 2,
+      "question_id": "2a1811e2",
+      "question_type": "temporal-reasoning",
+      "question": "How many days had passed between the Hindu festival of Holi and the Sunday mass at St. Mary's Church?",
+      "answer": "21 days. 22 days (including the last day) is also acceptable."
+    },
+    {
+      "ranked_ids": [
+        "answer_b3763b6b_1",
+        "answer_b3763b6b_2"
+      ],
+      "ranked_all": [
+        "answer_b3763b6b_1",
+        "answer_b3763b6b_2"
+      ],
+      "recall_any": 1.0,
+      "recall_all": 1.0,
+      "ndcg": 1.0,
+      "elapsed_ms": 65.44254196342081,
+      "embedder_ok": true,
+      "n_sessions": 2,
+      "question_id": "bbf86515",
+      "question_type": "temporal-reasoning",
+      "question": "How many days before the 'Rack Fest' did I participate in the 'Turbocharged Tuesdays' event?",
+      "answer": "4 days."
+    }
+  ],
+  "aggregate": {
+    "recall_any": 1.0,
+    "recall_all": 1.0,
+    "ndcg": 1.0,
+    "p50_ms": 63.0646254576277,
+    "p95_ms": 74.04954102821648,
+    "total_ms": 559.8889570101164,
+    "n_valid": 10,
+    "n_errors": 0
+  },
+  "by_type": {
+    "temporal-reasoning": {
+      "recall_any": 1.0,
+      "recall_all": 1.0,
+      "ndcg": 1.0,
+      "n": 10
+    }
+  },
+  "embedder_ok": true,
+  "k": 10,
+  "n_instances": 10
+}

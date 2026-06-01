@@ -29,13 +29,6 @@
   <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
   <true/>
 
-  <!-- Disable library validation so the frozen sidecar binary (and its bundled
-       .dylibs) can be loaded even when they are not signed by the same identity
-       as the app.
-       NOTE: Remove this entitlement once the sidecar binary and all bundled
-       dylibs are properly signed with your Apple Developer certificate. -->
-  <key>com.apple.security.cs.disable-library-validation</key>
-  <true/>
 
 </dict>
 </plist>

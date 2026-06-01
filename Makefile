@@ -21,7 +21,7 @@ COMPOSE ?= $(shell \
 .PHONY: help setup check-python check-docker up down restart logs api-logs pg-logs coord-logs migrate psql \
         api-shell coord-shell test-api test-coordinator m3-smoke mesh-smoke lint install-hooks dev desktop frontend \
         sidecar sidecar-setup sidecar-go installer-deps installer-bundle installer-mac installer-win installer-linux installer-clean \
-        coordinator coordinator-setup frontend-setup electron-setup ps status clean reset eval-retrieval \
+        coordinator coordinator-setup frontend-setup electron-setup ps status clean reset eval-retrieval bench \
         demo-setup demo-capture demo-video
 
 help: ## Show this help
@@ -137,6 +137,23 @@ eval-retrieval: ## Eval B — retrieval quality: RRF vs keyword-only on labeled 
 		exit 1; \
 	fi
 	@cd apps/desktop/python && .venv/bin/python -m evals.eval_retrieval_quality
+
+bench: ## LongMemEval retrieval benchmark — scores Potluck retriever on 500 oracle questions
+	@if [ ! -x apps/desktop/python/.venv/bin/python ]; then \
+		echo "==> sidecar venv not found — run 'make sidecar-setup' first"; \
+		exit 1; \
+	fi
+	@if [ ! -f bench/longmemeval/data/longmemeval_oracle.json ]; then \
+		echo "==> Downloading LongMemEval oracle dataset..."; \
+		curl -L --max-time 120 \
+		  "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned/resolve/main/longmemeval_oracle.json" \
+		  -o bench/longmemeval/data/longmemeval_oracle.json; \
+	fi
+	@echo "==> Running LongMemEval oracle (500 instances, k=10)..."
+	@PYTHONPATH=. apps/desktop/python/.venv/bin/python bench/run_longmemeval.py \
+		--data bench/longmemeval/data/longmemeval_oracle.json \
+		--k 10 \
+		--verbose
 
 lint: ## Run the privacy-invariant lint (member_id leaks + contributor in-memory-only). Free, local.
 	@python3 scripts/lint_privacy.py

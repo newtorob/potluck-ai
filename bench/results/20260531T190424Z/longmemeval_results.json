@@ -1,0 +1,128 @@
+{
+  "per_instance": [
+    {
+      "question_id": "gpt4_2655b836",
+      "question_type": "temporal-reasoning",
+      "error": "1 validation error for Memory\nsource_type\n  Input should be 'extracted', 'explicit' or 'agent_state' [type=literal_error, input_value='longmemeval', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.10/v/literal_error",
+      "recall_any": 0.0,
+      "recall_all": 0.0,
+      "ndcg": 0.0,
+      "elapsed_ms": 0.0,
+      "embedder_ok": false,
+      "n_sessions": 0
+    },
+    {
+      "question_id": "gpt4_2487a7cb",
+      "question_type": "temporal-reasoning",
+      "error": "1 validation error for Memory\nsource_type\n  Input should be 'extracted', 'explicit' or 'agent_state' [type=literal_error, input_value='longmemeval', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.10/v/literal_error",
+      "recall_any": 0.0,
+      "recall_all": 0.0,
+      "ndcg": 0.0,
+      "elapsed_ms": 0.0,
+      "embedder_ok": false,
+      "n_sessions": 0
+    },
+    {
+      "question_id": "gpt4_76048e76",
+      "question_type": "temporal-reasoning",
+      "error": "1 validation error for Memory\nsource_type\n  Input should be 'extracted', 'explicit' or 'agent_state' [type=literal_error, input_value='longmemeval', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.10/v/literal_error",
+      "recall_any": 0.0,
+      "recall_all": 0.0,
+      "ndcg": 0.0,
+      "elapsed_ms": 0.0,
+      "embedder_ok": false,
+      "n_sessions": 0
+    },
+    {
+      "question_id": "gpt4_2312f94c",
+      "question_type": "temporal-reasoning",
+      "error": "1 validation error for Memory\nsource_type\n  Input should be 'extracted', 'explicit' or 'agent_state' [type=literal_error, input_value='longmemeval', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.10/v/literal_error",
+      "recall_any": 0.0,
+      "recall_all": 0.0,
+      "ndcg": 0.0,
+      "elapsed_ms": 0.0,
+      "embedder_ok": false,
+      "n_sessions": 0
+    },
+    {
+      "question_id": "0bb5a684",
+      "question_type": "temporal-reasoning",
+      "error": "1 validation error for Memory\nsource_type\n  Input should be 'extracted', 'explicit' or 'agent_state' [type=literal_error, input_value='longmemeval', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.10/v/literal_error",
+      "recall_any": 0.0,
+      "recall_all": 0.0,
+      "ndcg": 0.0,
+      "elapsed_ms": 0.0,
+      "embedder_ok": false,
+      "n_sessions": 0
+    },
+    {
+      "question_id": "08f4fc43",
+      "question_type": "temporal-reasoning",
+      "error": "1 validation error for Memory\nsource_type\n  Input should be 'extracted', 'explicit' or 'agent_state' [type=literal_error, input_value='longmemeval', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.10/v/literal_error",
+      "recall_any": 0.0,
+      "recall_all": 0.0,
+      "ndcg": 0.0,
+      "elapsed_ms": 0.0,
+      "embedder_ok": false,
+      "n_sessions": 0
+    },
+    {
+      "question_id": "2c63a862",
+      "question_type": "temporal-reasoning",
+      "error": "1 validation error for Memory\nsource_type\n  Input should be 'extracted', 'explicit' or 'agent_state' [type=literal_error, input_value='longmemeval', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.10/v/literal_error",
+      "recall_any": 0.0,
+      "recall_all": 0.0,
+      "ndcg": 0.0,
+      "elapsed_ms": 0.0,
+      "embedder_ok": false,
+      "n_sessions": 0
+    },
+    {
+      "question_id": "gpt4_385a5000",
+      "question_type": "temporal-reasoning",
+      "error": "1 validation error for Memory\nsource_type\n  Input should be 'extracted', 'explicit' or 'agent_state' [type=literal_error, input_value='longmemeval', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.10/v/literal_error",
+      "recall_any": 0.0,
+      "recall_all": 0.0,
+      "ndcg": 0.0,
+      "elapsed_ms": 0.0,
+      "embedder_ok": false,
+      "n_sessions": 0
+    },
+    {
+      "question_id": "2a1811e2",
+      "question_type": "temporal-reasoning",
+      "error": "1 validation error for Memory\nsource_type\n  Input should be 'extracted', 'explicit' or 'agent_state' [type=literal_error, input_value='longmemeval', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.10/v/literal_error",
+      "recall_any": 0.0,
+      "recall_all": 0.0,
+      "ndcg": 0.0,
+      "elapsed_ms": 0.0,
+      "embedder_ok": false,
+      "n_sessions": 0
+    },
+    {
+      "question_id": "bbf86515",
+      "question_type": "temporal-reasoning",
+      "error": "1 validation error for Memory\nsource_type\n  Input should be 'extracted', 'explicit' or 'agent_state' [type=literal_error, input_value='longmemeval', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.10/v/literal_error",
+      "recall_any": 0.0,
+      "recall_all": 0.0,
+      "ndcg": 0.0,
+      "elapsed_ms": 0.0,
+      "embedder_ok": false,
+      "n_sessions": 0
+    }
+  ],
+  "aggregate": {
+    "recall_any": 0.0,
+    "recall_all": 0.0,
+    "ndcg": 0.0,
+    "p50_ms": 0.0,
+    "p95_ms": 0.0,
+    "total_ms": 0,
+    "n_valid": 0,
+    "n_errors": 10
+  },
+  "by_type": {},
+  "embedder_ok": true,
+  "k": 10,
+  "n_instances": 10
+}

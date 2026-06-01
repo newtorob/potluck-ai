@@ -13,14 +13,15 @@
     "build:win": "electron-builder --win",
     "build:linux": "electron-builder --linux",
     "prepack:frontend": "cd ../frontend && pnpm exec vite build",
-    "prepack:python": "rm -rf resources/python && mkdir -p resources/python && cp -R ../python/dist/potluck-local resources/python/",
-    "prepack:mcp": "cp -R ../python/dist/potluck-mcp resources/python/",
+    "prepack:python": "rm -rf resources/python && mkdir -p resources/python && bash scripts/sign-sidecars.sh ../python/dist/potluck-local && cp -R ../python/dist/potluck-local resources/python/",
+    "prepack:mcp": "bash scripts/sign-sidecars.sh ../python/dist/potluck-mcp && cp -R ../python/dist/potluck-mcp resources/python/",
     "prepack:mesh": "make -C ../go/potluck-mesh build && rm -rf resources/mesh && mkdir -p resources/mesh && cp ../go/potluck-mesh/dist/potluck-mesh* resources/mesh/",
     "prepack": "pnpm run prepack:frontend && pnpm run prepack:python && pnpm run prepack:mcp && pnpm run prepack:mesh",
     "package": "pnpm run prepack && pnpm run build",
     "clean": "rimraf dist out resources/python resources/mesh"
   },
   "build": {
+    "afterSign": "scripts/notarize.js",
     "appId": "ai.trypotluck.app",
     "productName": "Potluck AI",
     "directories": {
@@ -64,9 +65,7 @@
         { "target": "dmg", "arch": ["arm64", "x64"] },
         { "target": "zip", "arch": ["arm64", "x64"] }
       ],
-      "notarize": {
-        "teamId": "YOUR_TEAM_ID"
-      }
+      "notarize": false
     },
     "win": {
       "icon": "icons/icon.ico",

@@ -1,0 +1,26 @@
+========================================================================
+Potluck Memory Retriever — LongMemEval Oracle Results
+========================================================================
+  Dataset:          longmemeval_oracle (500 questions, evidence sessions only)
+  Instances run:    10
+  Retrieval cutoff: k=10
+  Embedder:         BAAI/bge-small-en-v1.5 (ok)
+  Wall time:        7.7s
+
+AGGREGATE
+----------------------------------------
+  recall_any@10:  0.0000
+  recall_all@10:  0.0000
+  nDCG@10:        0.0000
+  p50 latency:    0.0ms
+  p95 latency:    0.0ms
+  errors:         10
+
+BY QUESTION TYPE (recall_any@10)
+----------------------------------------
+
+NOTE: These numbers measure retrieval layer only (does the right session
+rank at top-k?), not answer generation accuracy. The oracle split uses
+evidence sessions only — no filler noise. See docs/benchmarks.md for
+full context and comparison to Mem0/Letta/Zep.
+========================================================================
