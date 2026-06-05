@@ -75,3 +75,12 @@ release/
 .agents/
 AGENTS.md
 .claude/scheduled_tasks.lock
+CLAUDE.md
+.claude/skills/
+
+# Internal strategy / marketing / fundraise material (kept locally, out of the shared repo)
+launch-post-localllama.md
+marketing/
+docs/grants/
+docs/governance/contributor-equity.md
+docs/concepts/cooperative-connection.md
