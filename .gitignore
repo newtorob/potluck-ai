@@ -59,9 +59,6 @@ Thumbs.db
 models/*.gguf
 bench/models/*.gguf
 
-# LongMemEval-S source dataset (264MB, exceeds GitHub's 100MB limit; download separately)
-bench/longmemeval/data/longmemeval_s.json
-
 # Signed-release SQL archive (kept locally for audit, never committed)
 docs/security/signed-releases/
 
