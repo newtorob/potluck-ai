@@ -1,0 +1,679 @@
+{
+  "benchmark": "potluck-inference-v1",
+  "timestamp": "20260601T160255Z",
+  "prompt_suite": "inference_v1",
+  "n_runs": 3,
+  "n_ctx": 4096,
+  "n_gpu_layers": -1,
+  "n_threads": 6,
+  "metal_enabled": true,
+  "llama_cpp_version": "0.3.23",
+  "system": {
+    "os": "Darwin",
+    "os_version": "15.7.3",
+    "arch": "arm64",
+    "cpu_chip": "Apple M2 Pro",
+    "cpu_logical_cores": 10,
+    "cpu_physical_cores": 10,
+    "ram_gb": 16.0,
+    "is_apple_silicon": true
+  },
+  "wall_time_total_s": 389.1,
+  "models": [
+    {
+      "model": "Phi-3-mini-4k-instruct-Q4_K_M.gguf",
+      "model_path": "bench/models/Phi-3-mini-4k-instruct-Q4_K_M.gguf",
+      "status": "ok",
+      "load_time_s": 11.33,
+      "load_meta": {
+        "model_path": "bench/models/Phi-3-mini-4k-instruct-Q4_K_M.gguf",
+        "n_ctx": 4096,
+        "n_gpu_layers": -1,
+        "n_threads": 6,
+        "load_time_s": 11.21,
+        "llama_cpp_version": "0.3.23"
+      },
+      "per_prompt": [
+        {
+          "prompt_id": "short_qa_1",
+          "category": "short_qa",
+          "max_tokens": 200,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 5.917,
+              "ttft_s": 0.409,
+              "prompt_eval_time_s": 0.409,
+              "generation_time_s": 5.508,
+              "prompt_tokens": 40,
+              "output_tokens": 127,
+              "prompt_eval_toks_per_s": 97.7,
+              "gen_toks_per_s": 23.1,
+              "peak_rss_bytes": 4039016448,
+              "output_text": " TCP (Transmission Control Protocol) is a connection-oriented protocol that ensures reliable, ordered delivery of data between devices. UDP (User Datagram Protocol) is a connectionless protocol with no guarantee of delivery, order, or error correction.\n\nYou would choose TCP when you require reliable and ordered data delivery, such as web browsing (HTTP), email (SMTP), or file transfers (FTP). UDP is chosen when you need low-latency, fast data delivery, such as streaming audio or video, online gaming, or IoT (Internet of Things) applications."
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 5.492,
+              "ttft_s": 0.021,
+              "prompt_eval_time_s": 0.021,
+              "generation_time_s": 5.471,
+              "prompt_tokens": 40,
+              "output_tokens": 127,
+              "prompt_eval_toks_per_s": 1861.0,
+              "gen_toks_per_s": 23.2,
+              "peak_rss_bytes": 4039458816,
+              "output_text": " TCP (Transmission Control Protocol) is a connection-oriented protocol that ensures reliable, ordered delivery of data between devices. UDP (User Datagram Protocol) is a connectionless protocol with no guarantee of delivery, order, or error correction.\n\nYou would choose TCP when you require reliable and ordered data delivery, such as web browsing (HTTP), email (SMTP), or file transfers (FTP). UDP is chosen when you need low-latency, fast data delivery, such as streaming audio or video, online gaming, or IoT (Internet of Things) applications."
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 5.481,
+              "ttft_s": 0.022,
+              "prompt_eval_time_s": 0.022,
+              "generation_time_s": 5.459,
+              "prompt_tokens": 40,
+              "output_tokens": 127,
+              "prompt_eval_toks_per_s": 1798.8,
+              "gen_toks_per_s": 23.3,
+              "peak_rss_bytes": 4031774720,
+              "output_text": " TCP (Transmission Control Protocol) is a connection-oriented protocol that ensures reliable, ordered delivery of data between devices. UDP (User Datagram Protocol) is a connectionless protocol with no guarantee of delivery, order, or error correction.\n\nYou would choose TCP when you require reliable and ordered data delivery, such as web browsing (HTTP), email (SMTP), or file transfers (FTP). UDP is chosen when you need low-latency, fast data delivery, such as streaming audio or video, online gaming, or IoT (Internet of Things) applications."
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 23.2,
+            "median_prompt_eval_toks_per_s": 1798.8,
+            "median_ttft_s": 0.022,
+            "median_ttft_ms": 22.0,
+            "median_wall_time_s": 5.492,
+            "median_output_tokens": 127,
+            "median_peak_rss_bytes": 4039016448,
+            "median_peak_rss_mb": 3851.9
+          }
+        },
+        {
+          "prompt_id": "short_qa_2",
+          "category": "short_qa",
+          "max_tokens": 200,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 6.888,
+              "ttft_s": 0.082,
+              "prompt_eval_time_s": 0.082,
+              "generation_time_s": 6.807,
+              "prompt_tokens": 45,
+              "output_tokens": 158,
+              "prompt_eval_toks_per_s": 551.3,
+              "gen_toks_per_s": 23.2,
+              "peak_rss_bytes": 4026384384,
+              "output_text": " The CAP theorem states that a distributed system can only simultaneously provide two out of the following three guarantees: Consistency (all nodes see the same data at the same time), Availability (every request receives a response), and Partition Tolerance (the system continues to operate despite network failures).\n\nReal databases:\n\n- Consistency and Partition Tolerance: Google Spanner prioritizes consistency and partition tolerance.\n- Availability and Partition Tolerance: Cassandra prioritizes availability and partition tolerance.\n- Consistency, Availability, and Partition Tolerance: Apache HBase prioritizes all three properties, but it may not guarantee all three simultaneously in every scenario."
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 6.804,
+              "ttft_s": 0.023,
+              "prompt_eval_time_s": 0.023,
+              "generation_time_s": 6.781,
+              "prompt_tokens": 45,
+              "output_tokens": 158,
+              "prompt_eval_toks_per_s": 1984.7,
+              "gen_toks_per_s": 23.3,
+              "peak_rss_bytes": 4024238080,
+              "output_text": " The CAP theorem states that a distributed system can only simultaneously provide two out of the following three guarantees: Consistency (all nodes see the same data at the same time), Availability (every request receives a response), and Partition Tolerance (the system continues to operate despite network failures).\n\nReal databases:\n\n- Consistency and Partition Tolerance: Google Spanner prioritizes consistency and partition tolerance.\n- Availability and Partition Tolerance: Cassandra prioritizes availability and partition tolerance.\n- Consistency, Availability, and Partition Tolerance: Apache HBase prioritizes all three properties, but it may not guarantee all three simultaneously in every scenario."
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 6.836,
+              "ttft_s": 0.021,
+              "prompt_eval_time_s": 0.021,
+              "generation_time_s": 6.815,
+              "prompt_tokens": 45,
+              "output_tokens": 158,
+              "prompt_eval_toks_per_s": 2103.8,
+              "gen_toks_per_s": 23.2,
+              "peak_rss_bytes": 4022206464,
+              "output_text": " The CAP theorem states that a distributed system can only simultaneously provide two out of the following three guarantees: Consistency (all nodes see the same data at the same time), Availability (every request receives a response), and Partition Tolerance (the system continues to operate despite network failures).\n\nReal databases:\n\n- Consistency and Partition Tolerance: Google Spanner prioritizes consistency and partition tolerance.\n- Availability and Partition Tolerance: Cassandra prioritizes availability and partition tolerance.\n- Consistency, Availability, and Partition Tolerance: Apache HBase prioritizes all three properties, but it may not guarantee all three simultaneously in every scenario."
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 23.2,
+            "median_prompt_eval_toks_per_s": 1984.7,
+            "median_ttft_s": 0.023,
+            "median_ttft_ms": 23.0,
+            "median_wall_time_s": 6.836,
+            "median_output_tokens": 158,
+            "median_peak_rss_bytes": 4024238080,
+            "median_peak_rss_mb": 3837.8
+          }
+        },
+        {
+          "prompt_id": "code_gen_1",
+          "category": "code_generation",
+          "max_tokens": 500,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 17.348,
+              "ttft_s": 0.414,
+              "prompt_eval_time_s": 0.414,
+              "generation_time_s": 16.934,
+              "prompt_tokens": 132,
+              "output_tokens": 377,
+              "prompt_eval_toks_per_s": 318.6,
+              "gen_toks_per_s": 22.3,
+              "peak_rss_bytes": 4036329472,
+              "output_text": " import time\nimport random\nimport logging\nfrom typing import Callable, Any, Type, List\n\nlogging.basicConfig(level=logging.INFO)\n\ndef retry_with_backoff(\n    func: Callable[..., Any],\n    max_attempts: int = 5,\n    base_delay: float = 0.5,\n    max_delay: float = 30.0,\n    exceptions: List[Type[Exception]] = [Exception]\n) -> Any:\n    \"\"\"\n    Retry a callable with exponential backoff and jitter.\n\n    Args:\n    func: The callable to execute with retries.\n    max_attempts: Maximum number of attempts to retry the callable.\n    base_delay: The base delay for exponential backoff.\n    max_delay: The maximum delay for exponential backoff.\n    exceptions: The exceptions to catch and retry on.\n\n    Returns:\n    The return value of the callable on success, or the last exception on failure.\n    \"\"\"\n    attempt = 0\n    delay = base_delay\n\n    while attempt < max_attempts:\n        try:\n            result = func()\n            logging.info(f\"Attempt {attempt + 1}: Success with result {result}\")\n            return result\n        except tuple(exceptions) as e:\n            attempt += 1\n            logging.warning(f\"Attempt {attempt}: Exception occurred - {e}\")\n            delay = min(max_delay, delay * 2) + random.uniform(0, 1 * delay)\n            time.sleep(delay)\n\n    raise e"
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 16.92,
+              "ttft_s": 0.023,
+              "prompt_eval_time_s": 0.023,
+              "generation_time_s": 16.897,
+              "prompt_tokens": 132,
+              "output_tokens": 377,
+              "prompt_eval_toks_per_s": 5717.7,
+              "gen_toks_per_s": 22.3,
+              "peak_rss_bytes": 4036329472,
+              "output_text": " import time\nimport random\nimport logging\nfrom typing import Callable, Any, Type, List\n\nlogging.basicConfig(level=logging.INFO)\n\ndef retry_with_backoff(\n    func: Callable[..., Any],\n    max_attempts: int = 5,\n    base_delay: float = 0.5,\n    max_delay: float = 30.0,\n    exceptions: List[Type[Exception]] = [Exception]\n) -> Any:\n    \"\"\"\n    Retry a callable with exponential backoff and jitter.\n\n    Args:\n    func: The callable to execute with retries.\n    max_attempts: Maximum number of attempts to retry the callable.\n    base_delay: The base delay for exponential backoff.\n    max_delay: The maximum delay for exponential backoff.\n    exceptions: The exceptions to catch and retry on.\n\n    Returns:\n    The return value of the callable on success, or the last exception on failure.\n    \"\"\"\n    attempt = 0\n    delay = base_delay\n\n    while attempt < max_attempts:\n        try:\n            result = func()\n            logging.info(f\"Attempt {attempt + 1}: Success with result {result}\")\n            return result\n        except tuple(exceptions) as e:\n            attempt += 1\n            logging.warning(f\"Attempt {attempt}: Exception occurred - {e}\")\n            delay = min(max_delay, delay * 2) + random.uniform(0, 1 * delay)\n            time.sleep(delay)\n\n    raise e"
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 16.973,
+              "ttft_s": 0.023,
+              "prompt_eval_time_s": 0.023,
+              "generation_time_s": 16.95,
+              "prompt_tokens": 132,
+              "output_tokens": 377,
+              "prompt_eval_toks_per_s": 5624.2,
+              "gen_toks_per_s": 22.2,
+              "peak_rss_bytes": 4030676992,
+              "output_text": " import time\nimport random\nimport logging\nfrom typing import Callable, Any, Type, List\n\nlogging.basicConfig(level=logging.INFO)\n\ndef retry_with_backoff(\n    func: Callable[..., Any],\n    max_attempts: int = 5,\n    base_delay: float = 0.5,\n    max_delay: float = 30.0,\n    exceptions: List[Type[Exception]] = [Exception]\n) -> Any:\n    \"\"\"\n    Retry a callable with exponential backoff and jitter.\n\n    Args:\n    func: The callable to execute with retries.\n    max_attempts: Maximum number of attempts to retry the callable.\n    base_delay: The base delay for exponential backoff.\n    max_delay: The maximum delay for exponential backoff.\n    exceptions: The exceptions to catch and retry on.\n\n    Returns:\n    The return value of the callable on success, or the last exception on failure.\n    \"\"\"\n    attempt = 0\n    delay = base_delay\n\n    while attempt < max_attempts:\n        try:\n            result = func()\n            logging.info(f\"Attempt {attempt + 1}: Success with result {result}\")\n            return result\n        except tuple(exceptions) as e:\n            attempt += 1\n            logging.warning(f\"Attempt {attempt}: Exception occurred - {e}\")\n            delay = min(max_delay, delay * 2) + random.uniform(0, 1 * delay)\n            time.sleep(delay)\n\n    raise e"
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 22.3,
+            "median_prompt_eval_toks_per_s": 5624.2,
+            "median_ttft_s": 0.023,
+            "median_ttft_ms": 23.0,
+            "median_wall_time_s": 16.973,
+            "median_output_tokens": 377,
+            "median_peak_rss_bytes": 4036329472,
+            "median_peak_rss_mb": 3849.3
+          }
+        },
+        {
+          "prompt_id": "code_gen_2",
+          "category": "code_generation",
+          "max_tokens": 500,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 23.191,
+              "ttft_s": 0.294,
+              "prompt_eval_time_s": 0.294,
+              "generation_time_s": 22.897,
+              "prompt_tokens": 151,
+              "output_tokens": 500,
+              "prompt_eval_toks_per_s": 512.9,
+              "gen_toks_per_s": 21.8,
+              "peak_rss_bytes": 4037640192,
+              "output_text": " ```python\nimport threading\nfrom typing import Union\nfrom time import time\n\nclass TokenBucket:\n    \"\"\"\n    Implements the token bucket rate limiting algorithm.\n    \n    This token bucket allows a certain number of requests per second, controlled by the\n    capacity (max tokens) and the rate (tokens per second).\n    \"\"\"\n    \n    def __init__(self, capacity: int, rate: float):\n        \"\"\"\n        Initializes the token bucket with a given capacity and rate.\n        \n        :param capacity: Maximum number of tokens in the bucket.\n        :param rate: Rate of tokens added per second.\n        \"\"\"\n        self._capacity = capacity\n        self._rate = rate\n        self._tokens = capacity\n        self._lock = threading.Lock()\n        self._last_update = time()\n\n    def consume(self, tokens: int = 1) -> bool:\n        \"\"\"\n        Consumes tokens from the bucket. Returns True if the request is allowed, False if rate limited.\n        \n        :param tokens: Number of tokens to consume. Defaults to 1.\n        :return: True if the request is allowed, False if rate limited.\n        \"\"\"\n        with self._lock:\n            current_time = time()\n            elapsed_time = current_time - self._last_update\n            tokens_to_add = elapsed_time * self._rate\n            self._tokens = min(self._tokens + tokens_to_add, self._capacity)\n            if self._tokens >= tokens:\n                self._last_update = current_time\n                self._tokens -= tokens\n                return True\n            return False\n\n    def wait_and_consume(self, tokens: int = 1) -> float:\n        \"\"\"\n        Blocks until enough tokens are available in the bucket to consume the request.\n        Returns the wait time in seconds.\n        \n        :param tokens: Number of tokens to consume. Defaults to 1.\n        :return: Wait time in seconds.\n        \"\"\"\n        start_time = time()\n        while True:\n            if self.consume(tokens):\n                return time() - start_time"
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 23.284,
+              "ttft_s": 0.024,
+              "prompt_eval_time_s": 0.024,
+              "generation_time_s": 23.26,
+              "prompt_tokens": 151,
+              "output_tokens": 500,
+              "prompt_eval_toks_per_s": 6339.2,
+              "gen_toks_per_s": 21.5,
+              "peak_rss_bytes": 4037066752,
+              "output_text": " ```python\nimport threading\nfrom typing import Union\nfrom time import time\n\nclass TokenBucket:\n    \"\"\"\n    Implements the token bucket rate limiting algorithm.\n    \n    This token bucket allows a certain number of requests per second, controlled by the\n    capacity (max tokens) and the rate (tokens per second).\n    \"\"\"\n    \n    def __init__(self, capacity: int, rate: float):\n        \"\"\"\n        Initializes the token bucket with a given capacity and rate.\n        \n        :param capacity: Maximum number of tokens in the bucket.\n        :param rate: Rate of tokens added per second.\n        \"\"\"\n        self._capacity = capacity\n        self._rate = rate\n        self._tokens = capacity\n        self._lock = threading.Lock()\n        self._last_update = time()\n\n    def consume(self, tokens: int = 1) -> bool:\n        \"\"\"\n        Consumes tokens from the bucket. Returns True if the request is allowed, False if rate limited.\n        \n        :param tokens: Number of tokens to consume. Defaults to 1.\n        :return: True if the request is allowed, False if rate limited.\n        \"\"\"\n        with self._lock:\n            current_time = time()\n            elapsed_time = current_time - self._last_update\n            tokens_to_add = elapsed_time * self._rate\n            self._tokens = min(self._tokens + tokens_to_add, self._capacity)\n            if self._tokens >= tokens:\n                self._last_update = current_time\n                self._tokens -= tokens\n                return True\n            return False\n\n    def wait_and_consume(self, tokens: int = 1) -> float:\n        \"\"\"\n        Blocks until enough tokens are available in the bucket to consume the request.\n        Returns the wait time in seconds.\n        \n        :param tokens: Number of tokens to consume. Defaults to 1.\n        :return: Wait time in seconds.\n        \"\"\"\n        start_time = time()\n        while True:\n            if self.consume(tokens):\n                return time() - start_time"
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 22.997,
+              "ttft_s": 0.024,
+              "prompt_eval_time_s": 0.024,
+              "generation_time_s": 22.972,
+              "prompt_tokens": 151,
+              "output_tokens": 500,
+              "prompt_eval_toks_per_s": 6189.5,
+              "gen_toks_per_s": 21.8,
+              "peak_rss_bytes": 3952164864,
+              "output_text": " ```python\nimport threading\nfrom typing import Union\nfrom time import time\n\nclass TokenBucket:\n    \"\"\"\n    Implements the token bucket rate limiting algorithm.\n    \n    This token bucket allows a certain number of requests per second, controlled by the\n    capacity (max tokens) and the rate (tokens per second).\n    \"\"\"\n    \n    def __init__(self, capacity: int, rate: float):\n        \"\"\"\n        Initializes the token bucket with a given capacity and rate.\n        \n        :param capacity: Maximum number of tokens in the bucket.\n        :param rate: Rate of tokens added per second.\n        \"\"\"\n        self._capacity = capacity\n        self._rate = rate\n        self._tokens = capacity\n        self._lock = threading.Lock()\n        self._last_update = time()\n\n    def consume(self, tokens: int = 1) -> bool:\n        \"\"\"\n        Consumes tokens from the bucket. Returns True if the request is allowed, False if rate limited.\n        \n        :param tokens: Number of tokens to consume. Defaults to 1.\n        :return: True if the request is allowed, False if rate limited.\n        \"\"\"\n        with self._lock:\n            current_time = time()\n            elapsed_time = current_time - self._last_update\n            tokens_to_add = elapsed_time * self._rate\n            self._tokens = min(self._tokens + tokens_to_add, self._capacity)\n            if self._tokens >= tokens:\n                self._last_update = current_time\n                self._tokens -= tokens\n                return True\n            return False\n\n    def wait_and_consume(self, tokens: int = 1) -> float:\n        \"\"\"\n        Blocks until enough tokens are available in the bucket to consume the request.\n        Returns the wait time in seconds.\n        \n        :param tokens: Number of tokens to consume. Defaults to 1.\n        :return: Wait time in seconds.\n        \"\"\"\n        start_time = time()\n        while True:\n            if self.consume(tokens):\n                return time() - start_time"
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 21.8,
+            "median_prompt_eval_toks_per_s": 6189.5,
+            "median_ttft_s": 0.024,
+            "median_ttft_ms": 24.0,
+            "median_wall_time_s": 23.191,
+            "median_output_tokens": 500,
+            "median_peak_rss_bytes": 4037066752,
+            "median_peak_rss_mb": 3850.0
+          }
+        },
+        {
+          "prompt_id": "code_gen_3",
+          "category": "code_generation",
+          "max_tokens": 500,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 23.554,
+              "ttft_s": 0.441,
+              "prompt_eval_time_s": 0.441,
+              "generation_time_s": 23.113,
+              "prompt_tokens": 187,
+              "output_tokens": 500,
+              "prompt_eval_toks_per_s": 423.7,
+              "gen_toks_per_s": 21.6,
+              "peak_rss_bytes": 3963338752,
+              "output_text": " import re\nfrom datetime import datetime\nfrom typing import Optional, Dict, Union\n\ndef parse_log_line(line: str) -> Optional[Dict[str, Union[datetime, str, Dict[str, Union[str, int, float, bool]]]]]:\n    \"\"\"\n    Parses a structured log line.\n\n    Parameters:\n    - line (str): The log line to parse.\n\n    Returns:\n    - dict: Parsed log line with keys: 'timestamp', 'level', 'fields', or None if the line does not match the expected format.\n    \"\"\"\n\n    # Regular expression to match the log line format\n    log_line_pattern = re.compile(\n        r'^(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}) [A-Z]+ (.*)$'\n    )\n\n    match = log_line_pattern.match(line)\n\n    if match:\n        # Extract timestamp and log level\n        timestamp_str, fields_str = match.groups()\n        timestamp = datetime.fromisoformat(timestamp_str)\n        level = fields_str.split('=')[0]\n\n        # Extract and parse fields\n        fields_dict = {}\n        for field_str in fields_str.split(','):\n            key, value = field_str.split('=')\n            fields_dict[key] = parse_field(value)\n\n        return {\n            'timestamp': timestamp,\n            'level': level,\n            'fields': fields_dict\n        }\n    else:\n        return None\n\n\ndef parse_field(value: str) -> Union[str, int, float, bool]:\n    \"\"\"\n    Parses a single field value, handling quoted strings, integers, floats, and booleans.\n\n    Parameters:\n    - value (str): The value to parse.\n\n    Returns:\n    - Union[str, int, float, bool]: The parsed value.\n    \"\"\"\n\n    if value.lower() == 'true':\n        return True\n    elif value.lower() == 'false':"
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 23.157,
+              "ttft_s": 0.024,
+              "prompt_eval_time_s": 0.024,
+              "generation_time_s": 23.134,
+              "prompt_tokens": 187,
+              "output_tokens": 500,
+              "prompt_eval_toks_per_s": 7890.4,
+              "gen_toks_per_s": 21.6,
+              "peak_rss_bytes": 3954966528,
+              "output_text": " import re\nfrom datetime import datetime\nfrom typing import Optional, Dict, Union\n\ndef parse_log_line(line: str) -> Optional[Dict[str, Union[datetime, str, Dict[str, Union[str, int, float, bool]]]]]:\n    \"\"\"\n    Parses a structured log line.\n\n    Parameters:\n    - line (str): The log line to parse.\n\n    Returns:\n    - dict: Parsed log line with keys: 'timestamp', 'level', 'fields', or None if the line does not match the expected format.\n    \"\"\"\n\n    # Regular expression to match the log line format\n    log_line_pattern = re.compile(\n        r'^(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}) [A-Z]+ (.*)$'\n    )\n\n    match = log_line_pattern.match(line)\n\n    if match:\n        # Extract timestamp and log level\n        timestamp_str, fields_str = match.groups()\n        timestamp = datetime.fromisoformat(timestamp_str)\n        level = fields_str.split('=')[0]\n\n        # Extract and parse fields\n        fields_dict = {}\n        for field_str in fields_str.split(','):\n            key, value = field_str.split('=')\n            fields_dict[key] = parse_field(value)\n\n        return {\n            'timestamp': timestamp,\n            'level': level,\n            'fields': fields_dict\n        }\n    else:\n        return None\n\n\ndef parse_field(value: str) -> Union[str, int, float, bool]:\n    \"\"\"\n    Parses a single field value, handling quoted strings, integers, floats, and booleans.\n\n    Parameters:\n    - value (str): The value to parse.\n\n    Returns:\n    - Union[str, int, float, bool]: The parsed value.\n    \"\"\"\n\n    if value.lower() == 'true':\n        return True\n    elif value.lower() == 'false':"
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 23.163,
+              "ttft_s": 0.028,
+              "prompt_eval_time_s": 0.028,
+              "generation_time_s": 23.135,
+              "prompt_tokens": 187,
+              "output_tokens": 500,
+              "prompt_eval_toks_per_s": 6633.4,
+              "gen_toks_per_s": 21.6,
+              "peak_rss_bytes": 3955228672,
+              "output_text": " import re\nfrom datetime import datetime\nfrom typing import Optional, Dict, Union\n\ndef parse_log_line(line: str) -> Optional[Dict[str, Union[datetime, str, Dict[str, Union[str, int, float, bool]]]]]:\n    \"\"\"\n    Parses a structured log line.\n\n    Parameters:\n    - line (str): The log line to parse.\n\n    Returns:\n    - dict: Parsed log line with keys: 'timestamp', 'level', 'fields', or None if the line does not match the expected format.\n    \"\"\"\n\n    # Regular expression to match the log line format\n    log_line_pattern = re.compile(\n        r'^(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}) [A-Z]+ (.*)$'\n    )\n\n    match = log_line_pattern.match(line)\n\n    if match:\n        # Extract timestamp and log level\n        timestamp_str, fields_str = match.groups()\n        timestamp = datetime.fromisoformat(timestamp_str)\n        level = fields_str.split('=')[0]\n\n        # Extract and parse fields\n        fields_dict = {}\n        for field_str in fields_str.split(','):\n            key, value = field_str.split('=')\n            fields_dict[key] = parse_field(value)\n\n        return {\n            'timestamp': timestamp,\n            'level': level,\n            'fields': fields_dict\n        }\n    else:\n        return None\n\n\ndef parse_field(value: str) -> Union[str, int, float, bool]:\n    \"\"\"\n    Parses a single field value, handling quoted strings, integers, floats, and booleans.\n\n    Parameters:\n    - value (str): The value to parse.\n\n    Returns:\n    - Union[str, int, float, bool]: The parsed value.\n    \"\"\"\n\n    if value.lower() == 'true':\n        return True\n    elif value.lower() == 'false':"
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 21.6,
+            "median_prompt_eval_toks_per_s": 6633.4,
+            "median_ttft_s": 0.028,
+            "median_ttft_ms": 28.0,
+            "median_wall_time_s": 23.163,
+            "median_output_tokens": 500,
+            "median_peak_rss_bytes": 3955228672,
+            "median_peak_rss_mb": 3772.0
+          }
+        },
+        {
+          "prompt_id": "summarization_1",
+          "category": "summarization",
+          "max_tokens": 300,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 9.035,
+              "ttft_s": 1.309,
+              "prompt_eval_time_s": 1.309,
+              "generation_time_s": 7.726,
+              "prompt_tokens": 545,
+              "output_tokens": 161,
+              "prompt_eval_toks_per_s": 416.3,
+              "gen_toks_per_s": 20.8,
+              "peak_rss_bytes": 4001480704,
+              "output_text": " The Linux kernel's Completely Fair Scheduler (CFS) was introduced in 2007 to replace the O(1) scheduler, utilizing a red-black tree for tracking process runnability based on virtual runtime. CFS aims to provide fair CPU time to tasks by considering their priority weight and scheduling period, with each task receiving a minimum granularity to avoid excessive context switching. However, CFS struggles with interactive tasks due to vruntime buildup, which is mitigated by EEVDF, introduced in Linux 6.6, that integrates a deadline component. Additionally, CFS manages CPU affinity and NUMA topology, optimizing task scheduling on multi-socket systems through work stealing."
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 7.739,
+              "ttft_s": 0.026,
+              "prompt_eval_time_s": 0.026,
+              "generation_time_s": 7.713,
+              "prompt_tokens": 545,
+              "output_tokens": 161,
+              "prompt_eval_toks_per_s": 20879.0,
+              "gen_toks_per_s": 20.9,
+              "peak_rss_bytes": 3995893760,
+              "output_text": " The Linux kernel's Completely Fair Scheduler (CFS) was introduced in 2007 to replace the O(1) scheduler, utilizing a red-black tree for tracking process runnability based on virtual runtime. CFS aims to provide fair CPU time to tasks by considering their priority weight and scheduling period, with each task receiving a minimum granularity to avoid excessive context switching. However, CFS struggles with interactive tasks due to vruntime buildup, which is mitigated by EEVDF, introduced in Linux 6.6, that integrates a deadline component. Additionally, CFS manages CPU affinity and NUMA topology, optimizing task scheduling on multi-socket systems through work stealing."
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 7.747,
+              "ttft_s": 0.026,
+              "prompt_eval_time_s": 0.026,
+              "generation_time_s": 7.721,
+              "prompt_tokens": 545,
+              "output_tokens": 161,
+              "prompt_eval_toks_per_s": 20741.7,
+              "gen_toks_per_s": 20.9,
+              "peak_rss_bytes": 3995222016,
+              "output_text": " The Linux kernel's Completely Fair Scheduler (CFS) was introduced in 2007 to replace the O(1) scheduler, utilizing a red-black tree for tracking process runnability based on virtual runtime. CFS aims to provide fair CPU time to tasks by considering their priority weight and scheduling period, with each task receiving a minimum granularity to avoid excessive context switching. However, CFS struggles with interactive tasks due to vruntime buildup, which is mitigated by EEVDF, introduced in Linux 6.6, that integrates a deadline component. Additionally, CFS manages CPU affinity and NUMA topology, optimizing task scheduling on multi-socket systems through work stealing."
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 20.9,
+            "median_prompt_eval_toks_per_s": 20741.7,
+            "median_ttft_s": 0.026,
+            "median_ttft_ms": 26.0,
+            "median_wall_time_s": 7.747,
+            "median_output_tokens": 161,
+            "median_peak_rss_bytes": 3995893760,
+            "median_peak_rss_mb": 3810.8
+          }
+        },
+        {
+          "prompt_id": "summarization_2",
+          "category": "summarization",
+          "max_tokens": 300,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 6.764,
+              "ttft_s": 1.148,
+              "prompt_eval_time_s": 1.148,
+              "generation_time_s": 5.616,
+              "prompt_tokens": 513,
+              "output_tokens": 117,
+              "prompt_eval_toks_per_s": 446.8,
+              "gen_toks_per_s": 20.8,
+              "peak_rss_bytes": 4003201024,
+              "output_text": " Vector databases store high-dimensional vectors and enable approximate nearest neighbor (ANN) search, crucial for applications using large language models. Key algorithms include HNSW for efficient O(log n) complexity and IVF for lower memory usage. Widely used databases like Pinecone and Weaviate offer hybrid search capabilities, combining vector similarity with keyword search. However, a study in 2023 suggests that chunking strategy and reranking have greater impact on the quality of retrieval-augmented generation systems than vector database choice alone."
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 5.638,
+              "ttft_s": 0.025,
+              "prompt_eval_time_s": 0.025,
+              "generation_time_s": 5.613,
+              "prompt_tokens": 513,
+              "output_tokens": 117,
+              "prompt_eval_toks_per_s": 20143.9,
+              "gen_toks_per_s": 20.8,
+              "peak_rss_bytes": 4003512320,
+              "output_text": " Vector databases store high-dimensional vectors and enable approximate nearest neighbor (ANN) search, crucial for applications using large language models. Key algorithms include HNSW for efficient O(log n) complexity and IVF for lower memory usage. Widely used databases like Pinecone and Weaviate offer hybrid search capabilities, combining vector similarity with keyword search. However, a study in 2023 suggests that chunking strategy and reranking have greater impact on the quality of retrieval-augmented generation systems than vector database choice alone."
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 5.64,
+              "ttft_s": 0.026,
+              "prompt_eval_time_s": 0.026,
+              "generation_time_s": 5.614,
+              "prompt_tokens": 513,
+              "output_tokens": 117,
+              "prompt_eval_toks_per_s": 19654.4,
+              "gen_toks_per_s": 20.8,
+              "peak_rss_bytes": 4003676160,
+              "output_text": " Vector databases store high-dimensional vectors and enable approximate nearest neighbor (ANN) search, crucial for applications using large language models. Key algorithms include HNSW for efficient O(log n) complexity and IVF for lower memory usage. Widely used databases like Pinecone and Weaviate offer hybrid search capabilities, combining vector similarity with keyword search. However, a study in 2023 suggests that chunking strategy and reranking have greater impact on the quality of retrieval-augmented generation systems than vector database choice alone."
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 20.8,
+            "median_prompt_eval_toks_per_s": 19654.4,
+            "median_ttft_s": 0.026,
+            "median_ttft_ms": 26.0,
+            "median_wall_time_s": 5.64,
+            "median_output_tokens": 117,
+            "median_peak_rss_bytes": 4003512320,
+            "median_peak_rss_mb": 3818.0
+          }
+        },
+        {
+          "prompt_id": "summarization_3",
+          "category": "summarization",
+          "max_tokens": 300,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 6.2,
+              "ttft_s": 1.051,
+              "prompt_eval_time_s": 1.051,
+              "generation_time_s": 5.149,
+              "prompt_tokens": 484,
+              "output_tokens": 91,
+              "prompt_eval_toks_per_s": 460.4,
+              "gen_toks_per_s": 17.7,
+              "peak_rss_bytes": 4002037760,
+              "output_text": " Rust's ownership system ensures memory safety and prevents data races by enforcing a single owner per value, which is dropped and its memory freed when the owner goes out of scope. Borrowing rules prohibit concurrent mutable and immutable access to prevent data races, and lifetimes ensure references are valid. Rust's deterministic memory management leads to high performance, but requires careful structuring of data ownership to avoid compiler errors."
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 4.345,
+              "ttft_s": 0.026,
+              "prompt_eval_time_s": 0.026,
+              "generation_time_s": 4.319,
+              "prompt_tokens": 484,
+              "output_tokens": 91,
+              "prompt_eval_toks_per_s": 18793.1,
+              "gen_toks_per_s": 21.1,
+              "peak_rss_bytes": 4001054720,
+              "output_text": " Rust's ownership system ensures memory safety and prevents data races by enforcing a single owner per value, which is dropped and its memory freed when the owner goes out of scope. Borrowing rules prohibit concurrent mutable and immutable access to prevent data races, and lifetimes ensure references are valid. Rust's deterministic memory management leads to high performance, but requires careful structuring of data ownership to avoid compiler errors."
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 4.33,
+              "ttft_s": 0.025,
+              "prompt_eval_time_s": 0.025,
+              "generation_time_s": 4.305,
+              "prompt_tokens": 484,
+              "output_tokens": 91,
+              "prompt_eval_toks_per_s": 19094.9,
+              "gen_toks_per_s": 21.1,
+              "peak_rss_bytes": 3978035200,
+              "output_text": " Rust's ownership system ensures memory safety and prevents data races by enforcing a single owner per value, which is dropped and its memory freed when the owner goes out of scope. Borrowing rules prohibit concurrent mutable and immutable access to prevent data races, and lifetimes ensure references are valid. Rust's deterministic memory management leads to high performance, but requires careful structuring of data ownership to avoid compiler errors."
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 21.1,
+            "median_prompt_eval_toks_per_s": 18793.1,
+            "median_ttft_s": 0.026,
+            "median_ttft_ms": 26.0,
+            "median_wall_time_s": 4.345,
+            "median_output_tokens": 91,
+            "median_peak_rss_bytes": 4001054720,
+            "median_peak_rss_mb": 3815.7
+          }
+        },
+        {
+          "prompt_id": "long_context_1",
+          "category": "long_context",
+          "max_tokens": 500,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 7.389,
+              "ttft_s": 4.15,
+              "prompt_eval_time_s": 4.15,
+              "generation_time_s": 3.239,
+              "prompt_tokens": 1691,
+              "output_tokens": 56,
+              "prompt_eval_toks_per_s": 407.5,
+              "gen_toks_per_s": 17.3,
+              "peak_rss_bytes": 4018159616,
+              "output_text": " The three most important tradeoffs when choosing between a monolithic architecture and microservices are operational complexity, team autonomy, and scalability. The author recommends for teams smaller than 15 engineers to start with a well-structured monolith."
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 3.272,
+              "ttft_s": 0.035,
+              "prompt_eval_time_s": 0.035,
+              "generation_time_s": 3.237,
+              "prompt_tokens": 1691,
+              "output_tokens": 56,
+              "prompt_eval_toks_per_s": 48556.3,
+              "gen_toks_per_s": 17.3,
+              "peak_rss_bytes": 4018896896,
+              "output_text": " The three most important tradeoffs when choosing between a monolithic architecture and microservices are operational complexity, team autonomy, and scalability. The author recommends for teams smaller than 15 engineers to start with a well-structured monolith."
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 3.271,
+              "ttft_s": 0.033,
+              "prompt_eval_time_s": 0.033,
+              "generation_time_s": 3.238,
+              "prompt_tokens": 1691,
+              "output_tokens": 56,
+              "prompt_eval_toks_per_s": 51709.4,
+              "gen_toks_per_s": 17.3,
+              "peak_rss_bytes": 4020453376,
+              "output_text": " The three most important tradeoffs when choosing between a monolithic architecture and microservices are operational complexity, team autonomy, and scalability. The author recommends for teams smaller than 15 engineers to start with a well-structured monolith."
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 17.3,
+            "median_prompt_eval_toks_per_s": 48556.3,
+            "median_ttft_s": 0.035,
+            "median_ttft_ms": 35.0,
+            "median_wall_time_s": 3.272,
+            "median_output_tokens": 56,
+            "median_peak_rss_bytes": 4018896896,
+            "median_peak_rss_mb": 3832.7
+          }
+        },
+        {
+          "prompt_id": "long_context_2",
+          "category": "long_context",
+          "max_tokens": 500,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 29.183,
+              "ttft_s": 4.61,
+              "prompt_eval_time_s": 4.61,
+              "generation_time_s": 24.572,
+              "prompt_tokens": 1881,
+              "output_tokens": 399,
+              "prompt_eval_toks_per_s": 408.0,
+              "gen_toks_per_s": 16.2,
+              "peak_rss_bytes": 4021108736,
+              "output_text": "<|assistant|> 1) The main reason a B-tree index becomes less effective for high-cardinality columns used in range queries vs. equality queries is due to the way B-tree indexes store data. In a B-tree index, the index entries do not store the actual row data, but rather pointers to where the data can be found in the table. This means that when a range query is performed, the database engine has to traverse the index to find the starting and ending points of the range, and then follow the pointers to retrieve the actual row data. For high-cardinality columns, where many distinct values exist, this process can be inefficient because it may require a large number of random disk reads to fetch the actual row data, which can be slower than a sequential table scan that reads the data directly from the disk.\n\n2) A covering index solves the problem by including all the columns needed to satisfy a query in the index itself. This means that the database engine can retrieve all the necessary data directly from the index, without having to access the table itself. As a result, a covering index eliminates the need for random disk reads, which can be a performance bottleneck, especially on spinning disk drives.\n\n3) The anti-pattern mentioned in the text is the creation of a composite index on (user_id, status) to serve both `WHERE user_id = X` and `WHERE user_id = X AND status = 'active'`, while also adding a redundant standalone index on (user_id). The text explains that this is considered an anti-pattern because the composite index (user_id, status) already covers the query `WHERE user_id = X`. The standalone index on (user_id) is unnecessary and inefficient, wasting space and slowing writes. When creating a composite index, always ask if your standalone index on the leading column applies."
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 24.599,
+              "ttft_s": 0.035,
+              "prompt_eval_time_s": 0.035,
+              "generation_time_s": 24.564,
+              "prompt_tokens": 1881,
+              "output_tokens": 399,
+              "prompt_eval_toks_per_s": 53231.7,
+              "gen_toks_per_s": 16.2,
+              "peak_rss_bytes": 3988881408,
+              "output_text": "<|assistant|> 1) The main reason a B-tree index becomes less effective for high-cardinality columns used in range queries vs. equality queries is due to the way B-tree indexes store data. In a B-tree index, the index entries do not store the actual row data, but rather pointers to where the data can be found in the table. This means that when a range query is performed, the database engine has to traverse the index to find the starting and ending points of the range, and then follow the pointers to retrieve the actual row data. For high-cardinality columns, where many distinct values exist, this process can be inefficient because it may require a large number of random disk reads to fetch the actual row data, which can be slower than a sequential table scan that reads the data directly from the disk.\n\n2) A covering index solves the problem by including all the columns needed to satisfy a query in the index itself. This means that the database engine can retrieve all the necessary data directly from the index, without having to access the table itself. As a result, a covering index eliminates the need for random disk reads, which can be a performance bottleneck, especially on spinning disk drives.\n\n3) The anti-pattern mentioned in the text is the creation of a composite index on (user_id, status) to serve both `WHERE user_id = X` and `WHERE user_id = X AND status = 'active'`, while also adding a redundant standalone index on (user_id). The text explains that this is considered an anti-pattern because the composite index (user_id, status) already covers the query `WHERE user_id = X`. The standalone index on (user_id) is unnecessary and inefficient, wasting space and slowing writes. When creating a composite index, always ask if your standalone index on the leading column applies."
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 24.609,
+              "ttft_s": 0.034,
+              "prompt_eval_time_s": 0.034,
+              "generation_time_s": 24.574,
+              "prompt_tokens": 1881,
+              "output_tokens": 399,
+              "prompt_eval_toks_per_s": 54560.0,
+              "gen_toks_per_s": 16.2,
+              "peak_rss_bytes": 3989897216,
+              "output_text": "<|assistant|> 1) The main reason a B-tree index becomes less effective for high-cardinality columns used in range queries vs. equality queries is due to the way B-tree indexes store data. In a B-tree index, the index entries do not store the actual row data, but rather pointers to where the data can be found in the table. This means that when a range query is performed, the database engine has to traverse the index to find the starting and ending points of the range, and then follow the pointers to retrieve the actual row data. For high-cardinality columns, where many distinct values exist, this process can be inefficient because it may require a large number of random disk reads to fetch the actual row data, which can be slower than a sequential table scan that reads the data directly from the disk.\n\n2) A covering index solves the problem by including all the columns needed to satisfy a query in the index itself. This means that the database engine can retrieve all the necessary data directly from the index, without having to access the table itself. As a result, a covering index eliminates the need for random disk reads, which can be a performance bottleneck, especially on spinning disk drives.\n\n3) The anti-pattern mentioned in the text is the creation of a composite index on (user_id, status) to serve both `WHERE user_id = X` and `WHERE user_id = X AND status = 'active'`, while also adding a redundant standalone index on (user_id). The text explains that this is considered an anti-pattern because the composite index (user_id, status) already covers the query `WHERE user_id = X`. The standalone index on (user_id) is unnecessary and inefficient, wasting space and slowing writes. When creating a composite index, always ask if your standalone index on the leading column applies."
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 16.2,
+            "median_prompt_eval_toks_per_s": 53231.7,
+            "median_ttft_s": 0.035,
+            "median_ttft_ms": 35.0,
+            "median_wall_time_s": 24.609,
+            "median_output_tokens": 399,
+            "median_peak_rss_bytes": 3989897216,
+            "median_peak_rss_mb": 3805.1
+          }
+        }
+      ],
+      "model_summary": {
+        "model": "Phi-3-mini-4k-instruct-Q4_K_M.gguf",
+        "overall_median_gen_toks_per_s": 21.35,
+        "overall_median_prompt_eval_toks_per_s": 12713.25,
+        "overall_median_ttft_ms": 26.0,
+        "overall_median_peak_rss_mb": 3825.4,
+        "n_prompts_run": 10,
+        "n_prompts_ok": 10
+      }
+    }
+  ]
+}

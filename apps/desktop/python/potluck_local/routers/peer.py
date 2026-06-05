@@ -1,11 +1,19 @@
-"""Peer-facing endpoints — household-scoped inference dispatch.
+"""Peer-facing endpoints — household-scoped inference dispatch and (opt-in) memory aggregation.
 
 The Python sidecar exposes a separate, **stateless** API surface for
-inference requests coming from OTHER machines in the same household
-(via the WireGuard mesh). The local user's memory, tasks, conversation
-history, and agent observability stay strictly on the local side
-(/chat/completions, /memory, /tasks, /agents); peer endpoints here
-do pure inference and nothing else.
+requests coming from OTHER machines in the same household (via the
+WireGuard mesh). Two categories of peer endpoint:
+
+  Inference dispatch (always available):
+    - GET  /peer/capabilities      — hardware advertisement
+    - POST /peer/chat/completions  — stateless inference dispatch
+
+  Memory aggregation (OPT-IN via POTLUCK_PEER_MEMORY_ENABLED=1):
+    - POST /peer/memory/search     — read-only semantic search
+
+Tasks, conversation history, and agent observability still stay strictly
+on the local side. Memory writes also remain strictly local — the peer
+memory endpoint is read-only.
 
 Trust model:
   v0 — request comes in on a non-loopback interface, which means the
@@ -13,11 +21,19 @@ Trust model:
   peer. Mesh-IP reachability is the credential. Signed-nonce challenge
   is a v0.5+ hardening item.
 
+  For memory aggregation specifically: the env var gate exists because
+  even within a household-trusted mesh, sharing memory by default would
+  violate the privacy posture the rest of the sidecar enforces. Owners
+  opt machines into participating; each machine decides independently.
+
 Privacy invariants enforced here:
-  * No memory injection (no `_build_enhanced_messages` call).
+  * No memory injection on inference (no `_build_enhanced_messages` call).
   * No conversation persistence (no `chat_conversations` write).
   * No agent observability session (no `_get_chat_session_id` call).
   * No memory extraction trigger (no `_fire_extraction` task).
+  * Memory search endpoint is read-only — no write paths reachable.
+  * Memory search returns the same projection a local user would get
+    via /memory/search; no extra metadata, no source attribution.
   * Request body MAY be logged in dev mode but content stays in-process.
 
 Path access control: see `app.py`'s `peer_access_middleware`. Anything
@@ -335,3 +351,96 @@ async def _passthrough_stream(
     serving node remembers nothing about the request."""
     async for chunk in upstream:
         yield chunk
+
+
+# ---------------------------------------------------------------------------
+# Memory search (own-fleet aggregation, opt-in)
+# ---------------------------------------------------------------------------
+#
+# Read-only semantic search across this machine's memory store, exposed to
+# household-mesh peers only when POTLUCK_PEER_MEMORY_ENABLED=1 is set on
+# this machine. The endpoint mirrors /memory/search semantically (same
+# retriever, same projection, same pinned-injection behaviour) but never
+# triggers extraction, never writes, never opens an observability session.
+#
+# Trust model: mesh-IP reachability (peer_access_middleware already gates
+# /peer/* paths to non-loopback callers). The env var is the user's
+# explicit opt-in beyond mesh membership.
+
+class PeerMemorySearchRequest(BaseModel):
+    """Cross-machine memory search request from a household peer."""
+
+    query: str = Field(..., min_length=1, max_length=4000)
+    project: str | None = Field(default=None)
+    limit: int = Field(default=10, ge=1, le=50)
+    min_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class PeerMemorySearchResponse(BaseModel):
+    """Response shape: list of memory dicts plus a count for cheap parsing."""
+
+    memories: list[dict]
+    count: int
+
+
+def _peer_memory_enabled() -> bool:
+    """Read POTLUCK_PEER_MEMORY_ENABLED on every call (no module-level cache).
+
+    Reading per-request lets the user toggle the setting without restarting
+    the sidecar, and avoids the test-isolation pain a cached module-level
+    flag would introduce.
+    """
+    return os.environ.get("POTLUCK_PEER_MEMORY_ENABLED", "0") == "1"
+
+
+@router.post("/memory/search", response_model=PeerMemorySearchResponse)
+async def peer_memory_search(
+    request: PeerMemorySearchRequest,
+) -> PeerMemorySearchResponse:
+    """Stateless semantic search for household peers (opt-in).
+
+    Mirrors /memory/search (loopback-only) semantically. Trust = mesh
+    membership; opt-in = POTLUCK_PEER_MEMORY_ENABLED=1.
+
+    Side effects: none. No extraction, no access-log writes (the local
+    /memory/search updates last_accessed_at; the peer endpoint deliberately
+    skips that to avoid letting peers signal back into the local user's
+    view of their own memory usage).
+    """
+    # Import here to avoid pulling memory services into the peer module's
+    # import graph when memory aggregation is off. Keeps the inference-only
+    # boot path fast for users who never enable peer memory.
+    from potluck_local.routers.memory import _memory_active, _DISABLED_DETAIL
+    from potluck_local.services.memory_retrieval import semantic_search
+
+    if not _peer_memory_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Peer memory search is opt-in and disabled on this machine. "
+                "Set POTLUCK_PEER_MEMORY_ENABLED=1 to enable household-fleet "
+                "memory aggregation."
+            ),
+        )
+
+    if not _memory_active():
+        raise HTTPException(status_code=403, detail=_DISABLED_DETAIL)
+
+    pairs = await semantic_search(
+        query=request.query,
+        project=request.project,
+        limit=request.limit,
+        min_confidence=request.min_confidence,
+        include_pinned=True,
+    )
+
+    memories = [m.model_dump() for m, _ in pairs]
+
+    logger.info(
+        "peer_memory_search query_len=%d project=%s result_count=%d",
+        len(request.query),
+        request.project,
+        len(memories),
+    )
+
+    return PeerMemorySearchResponse(memories=memories, count=len(memories))

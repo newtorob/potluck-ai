@@ -74,18 +74,52 @@ def _make_out_dir(base: Path) -> Path:
     return out
 
 
-def _format_summary(results: dict, wall_seconds: float) -> str:
+_SPLIT_DESCRIPTIONS = {
+    "longmemeval_oracle": "longmemeval_oracle (500 questions, evidence sessions only)",
+    "longmemeval_s":      "longmemeval_s (500 questions, ~48 sessions/instance with filler noise)",
+    "longmemeval_m":      "longmemeval_m (500 questions, ~500 sessions/instance with heavy filler noise)",
+}
+
+_SPLIT_NOTES = {
+    "longmemeval_oracle": (
+        "The oracle split uses evidence sessions only — no filler noise. "
+        "recall_any@10 is structurally bounded near 1.0; the meaningful "
+        "ranking signal is recall_all@1."
+    ),
+    "longmemeval_s": (
+        "The S split mixes ~48 sessions per question with the gold "
+        "evidence session(s) hidden among them. This is the split Zep "
+        "and other systems benchmark on for comparable accuracy numbers."
+    ),
+    "longmemeval_m": (
+        "The M split uses ~500 sessions per question — extreme filler "
+        "noise. Tests retrieval at scale."
+    ),
+}
+
+
+def _split_label(data_path: Path) -> str:
+    """Derive the split label from the data filename, e.g. 'longmemeval_s'."""
+    stem = data_path.stem.replace("_cleaned", "")
+    return stem if stem.startswith("longmemeval_") else "longmemeval_oracle"
+
+
+def _format_summary(results: dict, wall_seconds: float, split: str) -> str:
     agg = results["aggregate"]
     by_type = results["by_type"]
     k = results["k"]
     n = results["n_instances"]
     embedder_ok = results["embedder_ok"]
 
+    title_label = split.replace("longmemeval_", "").upper()
+    dataset_line = _SPLIT_DESCRIPTIONS.get(split, f"{split} (unrecognized split)")
+    note = _SPLIT_NOTES.get(split, "See docs/benchmarks.md for context.")
+
     lines = [
         "=" * 72,
-        "Potluck Memory Retriever — LongMemEval Oracle Results",
+        f"Potluck Memory Retriever — LongMemEval {title_label} Results",
         "=" * 72,
-        f"  Dataset:          longmemeval_oracle (500 questions, evidence sessions only)",
+        f"  Dataset:          {dataset_line}",
         f"  Instances run:    {n}",
         f"  Retrieval cutoff: k={k}",
         f"  Embedder:         {'BAAI/bge-small-en-v1.5 (ok)' if embedder_ok else 'UNAVAILABLE — results are random baseline'}",
@@ -109,10 +143,9 @@ def _format_summary(results: dict, wall_seconds: float) -> str:
         )
     lines.append("")
     lines.append(
-        "NOTE: These numbers measure retrieval layer only (does the right session\n"
-        "rank at top-k?), not answer generation accuracy. The oracle split uses\n"
-        "evidence sessions only — no filler noise. See docs/benchmarks.md for\n"
-        "full context and comparison to Mem0/Letta/Zep."
+        f"NOTE: These numbers measure retrieval layer only (does the right session\n"
+        f"rank at top-k?), not answer generation accuracy. {note}\n"
+        f"See docs/benchmarks.md for full context and comparison to Mem0/Letta/Zep."
     )
     lines.append("=" * 72)
     return "\n".join(lines)
@@ -140,8 +173,9 @@ async def main() -> int:
     else:
         out_dir = _make_out_dir(_REPO_ROOT / "bench")
 
+    split = _split_label(data_path)
     print(f"Output dir: {out_dir}")
-    print(f"Running LongMemEval oracle (k={args.k}, n={args.max_instances or len(dataset)})...")
+    print(f"Running LongMemEval {split} (k={args.k}, n={args.max_instances or len(dataset)})...")
     print("This embeds each session per instance — may take a few minutes on first run (model download).")
     print()
 
@@ -153,6 +187,7 @@ async def main() -> int:
         verbose=args.verbose,
     )
     wall_seconds = time.perf_counter() - wall_start
+    results["split"] = split
 
     # Write results
     results_path = out_dir / "longmemeval_results.json"
@@ -160,7 +195,7 @@ async def main() -> int:
     print(f"Results written: {results_path}")
 
     # Write summary
-    summary = _format_summary(results, wall_seconds)
+    summary = _format_summary(results, wall_seconds, split)
     summary_path = out_dir / "longmemeval_summary.txt"
     summary_path.write_text(summary)
     print(f"Summary written: {summary_path}")

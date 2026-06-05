@@ -1,0 +1,31 @@
+========================================================================
+Potluck Memory Retriever — LongMemEval S Results
+========================================================================
+  Dataset:          longmemeval_s (500 questions, ~48 sessions/instance with filler noise)
+  Instances run:    500
+  Retrieval cutoff: k=10
+  Embedder:         BAAI/bge-small-en-v1.5 (ok)
+  Wall time:        369.2s
+
+AGGREGATE
+----------------------------------------
+  recall_any@10:  0.9800
+  recall_all@10:  0.9380
+  nDCG@10:        0.8847
+  p50 latency:    12.9ms
+  p95 latency:    39.8ms
+  errors:         0
+
+BY QUESTION TYPE (recall_any@10)
+----------------------------------------
+  knowledge-update                    1.0000  (n=78)
+  multi-session                       1.0000  (n=133)
+  single-session-assistant            0.9643  (n=56)
+  single-session-preference           0.9333  (n=30)
+  single-session-user                 0.9857  (n=70)
+  temporal-reasoning                  0.9624  (n=133)
+
+NOTE: These numbers measure retrieval layer only (does the right session
+rank at top-k?), not answer generation accuracy. The S split mixes ~48 sessions per question with the gold evidence session(s) hidden among them. This is the split Zep and other systems benchmark on for comparable accuracy numbers.
+See docs/benchmarks.md for full context and comparison to Mem0/Letta/Zep.
+========================================================================

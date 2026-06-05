@@ -1,0 +1,29 @@
+========================================================================
+Potluck AI — Inference Benchmark Results
+========================================================================
+  Hardware:     Apple M2 Pro  16.0 GB RAM
+  OS:           macOS 15.7.3  (arm64)
+  Metal:        YES — n_gpu_layers=-1
+  llama-cpp-python: 0.3.23
+  Prompt suite: inference_v1
+  Runs/cell:    3
+  Date:         20260601T164914Z
+
+RESULTS TABLE
+------------------------------------------------------------------------
+Model                                       GenTok/s   PETok/s   TTFT(ms)  PeakRSS(MB)
+------------------------------------------------------------------------
+  Phi-3-mini-4k-instruct-Q4_K_M.gguf            19.1     404.6        824         5354
+  Qwen2.5-7B-Instruct-Q4_K_M.gguf               12.4     247.3       1214         4637
+  Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf        11.6     235.7       1374         5508
+------------------------------------------------------------------------
+
+Columns:
+  GenTok/s  — output tokens per second (generation speed; the headline number)
+  PETok/s   — prompt eval tokens per second (context ingestion speed)
+  TTFT(ms)  — time to first token in milliseconds
+  PeakRSS   — peak resident set size in MB (approximate; sampled at 100ms)
+
+All values are medians across 3 runs per (model x prompt) cell.
+Per-prompt detail: bench/results/<timestamp>/inference_results.json
+========================================================================

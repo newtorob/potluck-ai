@@ -100,7 +100,7 @@
   "devDependencies": {
     "concurrently": "^9.0.0",
     "cross-env": "^7.0.0",
-    "electron": "^33.0.0",
+    "electron": "^36.0.0",
     "electron-builder": "^25.0.0",
     "rimraf": "^6.0.0",
     "wait-on": "^8.0.0"

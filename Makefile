@@ -22,6 +22,7 @@ COMPOSE ?= $(shell \
         api-shell coord-shell test-api test-coordinator m3-smoke mesh-smoke lint install-hooks dev desktop frontend \
         sidecar sidecar-setup sidecar-go installer-deps installer-bundle installer-mac installer-win installer-linux installer-clean \
         coordinator coordinator-setup frontend-setup electron-setup ps status clean reset eval-retrieval bench \
+        bench-inference bench-inference-get-models \
         demo-setup demo-capture demo-video
 
 help: ## Show this help
@@ -154,6 +155,35 @@ bench: ## LongMemEval retrieval benchmark — scores Potluck retriever on 500 or
 		--data bench/longmemeval/data/longmemeval_oracle.json \
 		--k 10 \
 		--verbose
+
+bench-inference-get-models: ## Download GGUF models for inference bench (small models only; ~12 GB)
+	@if [ ! -x apps/desktop/python/.venv/bin/python ]; then \
+		echo "==> sidecar venv not found — run 'make sidecar-setup' first"; \
+		exit 1; \
+	fi
+	@echo "==> Downloading inference benchmark models (Phi-3-mini, Llama-3.1-8B, Qwen2.5-7B)..."
+	@PYTHONPATH=. apps/desktop/python/.venv/bin/python bench/scripts/get_models.py --model all-small
+
+bench-inference: ## Local-model inference benchmark — gen/prompt-eval tok/s, TTFT, RSS across 3 models (Mac only)
+	@if [ ! -x apps/desktop/python/.venv/bin/python ]; then \
+		echo "==> sidecar venv not found — run 'make sidecar-setup' first"; \
+		exit 1; \
+	fi
+	@if [ -z "$$(ls bench/models/*.gguf 2>/dev/null)" ]; then \
+		echo "==> No GGUF files found in bench/models/ — run 'make bench-inference-get-models' first"; \
+		exit 1; \
+	fi
+	@echo "==> Running inference benchmark..."
+	@if [ -n "$(MODEL)" ]; then \
+		PYTHONPATH=. PYTHONUNBUFFERED=1 apps/desktop/python/.venv/bin/python bench/run_inference.py \
+			--model "$(MODEL)" \
+			--prompts bench/prompts/inference_v1.json \
+			--runs 3; \
+	else \
+		PYTHONPATH=. PYTHONUNBUFFERED=1 apps/desktop/python/.venv/bin/python bench/run_inference.py \
+			--prompts bench/prompts/inference_v1.json \
+			--runs 3; \
+	fi
 
 lint: ## Run the privacy-invariant lint (member_id leaks + contributor in-memory-only). Free, local.
 	@python3 scripts/lint_privacy.py

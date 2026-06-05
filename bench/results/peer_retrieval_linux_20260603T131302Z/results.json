@@ -1,0 +1,178 @@
+{
+  "peer_name": "linux",
+  "peer_mesh_ip": "100.101.102.103",
+  "project_tag": "bench_peer_retrieval_1780492338",
+  "wall_time_s": 44.6,
+  "correctness": {
+    "n_queries": 10,
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_10": 1.0,
+    "per_query": [
+      {
+        "q": "how to configure nginx reverse proxy",
+        "expected_in_top1": true,
+        "expected_in_top3": true,
+        "expected_in_top10": true,
+        "latency_ms": 35.21,
+        "top_results": [
+          "a199363b-e0f4-4956-a3f6-27065058dd07",
+          "f2ef14b5-e68f-4bb1-82d1-43c5e1bf0ebf",
+          "2d100d2f-2ce8-4cfe-86ef-1f4834a530c0",
+          "0c23b0cd-b0ba-434f-ab3c-6ed8d4e25af9",
+          "fbd9bfe6-a2b3-47b0-87fa-a1e64c1f588c"
+        ]
+      },
+      {
+        "q": "TCP keepalive tuning on Linux",
+        "expected_in_top1": true,
+        "expected_in_top3": true,
+        "expected_in_top10": true,
+        "latency_ms": 32.44,
+        "top_results": [
+          "3ef38c06-7ec9-4453-8bdd-7b7b7acb2b9f",
+          "f2ef14b5-e68f-4bb1-82d1-43c5e1bf0ebf",
+          "fbd9bfe6-a2b3-47b0-87fa-a1e64c1f588c",
+          "b6c0281b-b1ce-489a-ba26-f707aa50d0d9",
+          "98617f90-7fb5-48c7-8ea9-e20290c79a88"
+        ]
+      },
+      {
+        "q": "Python asyncio event loop best practices",
+        "expected_in_top1": true,
+        "expected_in_top3": true,
+        "expected_in_top10": true,
+        "latency_ms": 31.27,
+        "top_results": [
+          "98617f90-7fb5-48c7-8ea9-e20290c79a88",
+          "5b92255f-c5a3-4e2d-a405-5baa4a4a45e1",
+          "b6c0281b-b1ce-489a-ba26-f707aa50d0d9",
+          "fbd9bfe6-a2b3-47b0-87fa-a1e64c1f588c",
+          "3ef38c06-7ec9-4453-8bdd-7b7b7acb2b9f"
+        ]
+      },
+      {
+        "q": "Postgres replication slot management",
+        "expected_in_top1": true,
+        "expected_in_top3": true,
+        "expected_in_top10": true,
+        "latency_ms": 26.55,
+        "top_results": [
+          "f2ef14b5-e68f-4bb1-82d1-43c5e1bf0ebf",
+          "b6c0281b-b1ce-489a-ba26-f707aa50d0d9",
+          "3ef38c06-7ec9-4453-8bdd-7b7b7acb2b9f",
+          "0c23b0cd-b0ba-434f-ab3c-6ed8d4e25af9",
+          "fe60a890-be8f-42b0-8641-6888b5d50f70"
+        ]
+      },
+      {
+        "q": "Redis cluster failover behavior",
+        "expected_in_top1": true,
+        "expected_in_top3": true,
+        "expected_in_top10": true,
+        "latency_ms": 20.19,
+        "top_results": [
+          "b6c0281b-b1ce-489a-ba26-f707aa50d0d9",
+          "f2ef14b5-e68f-4bb1-82d1-43c5e1bf0ebf",
+          "0c23b0cd-b0ba-434f-ab3c-6ed8d4e25af9",
+          "fbd9bfe6-a2b3-47b0-87fa-a1e64c1f588c",
+          "fe60a890-be8f-42b0-8641-6888b5d50f70"
+        ]
+      },
+      {
+        "q": "Kubernetes pod evicted reasons",
+        "expected_in_top1": true,
+        "expected_in_top3": true,
+        "expected_in_top10": true,
+        "latency_ms": 26.78,
+        "top_results": [
+          "0c23b0cd-b0ba-434f-ab3c-6ed8d4e25af9",
+          "b6c0281b-b1ce-489a-ba26-f707aa50d0d9",
+          "f2ef14b5-e68f-4bb1-82d1-43c5e1bf0ebf",
+          "fbd9bfe6-a2b3-47b0-87fa-a1e64c1f588c",
+          "fe60a890-be8f-42b0-8641-6888b5d50f70"
+        ]
+      },
+      {
+        "q": "Docker layer caching invalidation",
+        "expected_in_top1": true,
+        "expected_in_top3": true,
+        "expected_in_top10": true,
+        "latency_ms": 28.09,
+        "top_results": [
+          "fe60a890-be8f-42b0-8641-6888b5d50f70",
+          "0c23b0cd-b0ba-434f-ab3c-6ed8d4e25af9",
+          "f2ef14b5-e68f-4bb1-82d1-43c5e1bf0ebf",
+          "a199363b-e0f4-4956-a3f6-27065058dd07",
+          "b6c0281b-b1ce-489a-ba26-f707aa50d0d9"
+        ]
+      },
+      {
+        "q": "Go context cancellation propagation",
+        "expected_in_top1": true,
+        "expected_in_top3": true,
+        "expected_in_top10": true,
+        "latency_ms": 28.64,
+        "top_results": [
+          "5b92255f-c5a3-4e2d-a405-5baa4a4a45e1",
+          "b6c0281b-b1ce-489a-ba26-f707aa50d0d9",
+          "98617f90-7fb5-48c7-8ea9-e20290c79a88",
+          "f2ef14b5-e68f-4bb1-82d1-43c5e1bf0ebf",
+          "0c23b0cd-b0ba-434f-ab3c-6ed8d4e25af9"
+        ]
+      },
+      {
+        "q": "TLS handshake debugging openssl",
+        "expected_in_top1": true,
+        "expected_in_top3": true,
+        "expected_in_top10": true,
+        "latency_ms": 24.29,
+        "top_results": [
+          "2d100d2f-2ce8-4cfe-86ef-1f4834a530c0",
+          "0c23b0cd-b0ba-434f-ab3c-6ed8d4e25af9",
+          "fbd9bfe6-a2b3-47b0-87fa-a1e64c1f588c",
+          "3ef38c06-7ec9-4453-8bdd-7b7b7acb2b9f",
+          "b6c0281b-b1ce-489a-ba26-f707aa50d0d9"
+        ]
+      },
+      {
+        "q": "systemd unit auto-restart configuration",
+        "expected_in_top1": true,
+        "expected_in_top3": true,
+        "expected_in_top10": true,
+        "latency_ms": 23.15,
+        "top_results": [
+          "fbd9bfe6-a2b3-47b0-87fa-a1e64c1f588c",
+          "b6c0281b-b1ce-489a-ba26-f707aa50d0d9",
+          "f2ef14b5-e68f-4bb1-82d1-43c5e1bf0ebf",
+          "0c23b0cd-b0ba-434f-ab3c-6ed8d4e25af9",
+          "3ef38c06-7ec9-4453-8bdd-7b7b7acb2b9f"
+        ]
+      }
+    ],
+    "cleanup_deleted": 10
+  },
+  "latency_at_scale": [
+    {
+      "store_size": 10,
+      "n_samples": 30,
+      "p50_ms": 34.65,
+      "p95_ms": 39.23,
+      "min_ms": 17.4
+    },
+    {
+      "store_size": 100,
+      "n_samples": 30,
+      "p50_ms": 34.95,
+      "p95_ms": 40.51,
+      "min_ms": 20.03
+    },
+    {
+      "store_size": 500,
+      "n_samples": 30,
+      "p50_ms": 41.29,
+      "p95_ms": 50.37,
+      "min_ms": 22.94
+    }
+  ]
+}

@@ -1,0 +1,679 @@
+{
+  "benchmark": "potluck-inference-v1",
+  "timestamp": "20260601T161759Z",
+  "prompt_suite": "inference_v1",
+  "n_runs": 3,
+  "n_ctx": 4096,
+  "n_gpu_layers": -1,
+  "n_threads": 6,
+  "metal_enabled": true,
+  "llama_cpp_version": "0.3.23",
+  "system": {
+    "os": "Darwin",
+    "os_version": "15.7.3",
+    "arch": "arm64",
+    "cpu_chip": "Apple M2 Pro",
+    "cpu_logical_cores": 10,
+    "cpu_physical_cores": 10,
+    "ram_gb": 16.0,
+    "is_apple_silicon": true
+  },
+  "wall_time_total_s": 447.2,
+  "models": [
+    {
+      "model": "Phi-3-mini-4k-instruct-Q4_K_M.gguf",
+      "model_path": "bench/models/Phi-3-mini-4k-instruct-Q4_K_M.gguf",
+      "status": "ok",
+      "load_time_s": 1.12,
+      "load_meta": {
+        "model_path": "bench/models/Phi-3-mini-4k-instruct-Q4_K_M.gguf",
+        "n_ctx": 4096,
+        "n_gpu_layers": -1,
+        "n_threads": 6,
+        "load_time_s": 0.99,
+        "llama_cpp_version": "0.3.23"
+      },
+      "per_prompt": [
+        {
+          "prompt_id": "short_qa_1",
+          "category": "short_qa",
+          "max_tokens": 200,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 6.0,
+              "ttft_s": 0.199,
+              "prompt_eval_time_s": 0.199,
+              "generation_time_s": 5.802,
+              "prompt_tokens": 40,
+              "output_tokens": 127,
+              "prompt_eval_toks_per_s": 201.4,
+              "gen_toks_per_s": 21.9,
+              "peak_rss_bytes": 4056629248,
+              "output_text": " TCP (Transmission Control Protocol) is a connection-oriented protocol that ensures reliable, ordered delivery of data between devices. UDP (User Datagram Protocol) is a connectionless protocol with n"
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 5.91,
+              "ttft_s": 0.148,
+              "prompt_eval_time_s": 0.148,
+              "generation_time_s": 5.762,
+              "prompt_tokens": 40,
+              "output_tokens": 127,
+              "prompt_eval_toks_per_s": 269.6,
+              "gen_toks_per_s": 22.0,
+              "peak_rss_bytes": 4047601664,
+              "output_text": " TCP (Transmission Control Protocol) is a connection-oriented protocol that ensures reliable, ordered delivery of data between devices. UDP (User Datagram Protocol) is a connectionless protocol with n"
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 5.933,
+              "ttft_s": 0.147,
+              "prompt_eval_time_s": 0.147,
+              "generation_time_s": 5.785,
+              "prompt_tokens": 40,
+              "output_tokens": 127,
+              "prompt_eval_toks_per_s": 271.3,
+              "gen_toks_per_s": 22.0,
+              "peak_rss_bytes": 4038443008,
+              "output_text": " TCP (Transmission Control Protocol) is a connection-oriented protocol that ensures reliable, ordered delivery of data between devices. UDP (User Datagram Protocol) is a connectionless protocol with n"
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 22.0,
+            "median_prompt_eval_toks_per_s": 269.6,
+            "median_ttft_s": 0.148,
+            "median_ttft_ms": 148.0,
+            "median_wall_time_s": 5.933,
+            "median_output_tokens": 127,
+            "median_peak_rss_bytes": 4047601664,
+            "median_peak_rss_mb": 3860.1
+          }
+        },
+        {
+          "prompt_id": "short_qa_2",
+          "category": "short_qa",
+          "max_tokens": 200,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 7.31,
+              "ttft_s": 0.149,
+              "prompt_eval_time_s": 0.149,
+              "generation_time_s": 7.16,
+              "prompt_tokens": 45,
+              "output_tokens": 158,
+              "prompt_eval_toks_per_s": 301.8,
+              "gen_toks_per_s": 22.1,
+              "peak_rss_bytes": 4039933952,
+              "output_text": " The CAP theorem states that a distributed system can only simultaneously provide two out of the following three guarantees: Consistency (all nodes see the same data at the same time), Availability (e"
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 7.257,
+              "ttft_s": 0.149,
+              "prompt_eval_time_s": 0.149,
+              "generation_time_s": 7.108,
+              "prompt_tokens": 45,
+              "output_tokens": 158,
+              "prompt_eval_toks_per_s": 302.0,
+              "gen_toks_per_s": 22.2,
+              "peak_rss_bytes": 4040146944,
+              "output_text": " The CAP theorem states that a distributed system can only simultaneously provide two out of the following three guarantees: Consistency (all nodes see the same data at the same time), Availability (e"
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 7.321,
+              "ttft_s": 0.149,
+              "prompt_eval_time_s": 0.149,
+              "generation_time_s": 7.173,
+              "prompt_tokens": 45,
+              "output_tokens": 158,
+              "prompt_eval_toks_per_s": 302.9,
+              "gen_toks_per_s": 22.0,
+              "peak_rss_bytes": 4041146368,
+              "output_text": " The CAP theorem states that a distributed system can only simultaneously provide two out of the following three guarantees: Consistency (all nodes see the same data at the same time), Availability (e"
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 22.1,
+            "median_prompt_eval_toks_per_s": 302.0,
+            "median_ttft_s": 0.149,
+            "median_ttft_ms": 149.0,
+            "median_wall_time_s": 7.31,
+            "median_output_tokens": 158,
+            "median_peak_rss_bytes": 4040146944,
+            "median_peak_rss_mb": 3853.0
+          }
+        },
+        {
+          "prompt_id": "code_gen_1",
+          "category": "code_generation",
+          "max_tokens": 500,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 17.89,
+              "ttft_s": 0.368,
+              "prompt_eval_time_s": 0.368,
+              "generation_time_s": 17.522,
+              "prompt_tokens": 132,
+              "output_tokens": 377,
+              "prompt_eval_toks_per_s": 358.3,
+              "gen_toks_per_s": 21.5,
+              "peak_rss_bytes": 4050403328,
+              "output_text": " import time\nimport random\nimport logging\nfrom typing import Callable, Any, Type, List\n\nlogging.basicConfig(level=logging.INFO)\n\ndef retry_with_backoff(\n    func: Callable[..., Any],\n    max_attempts:"
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 17.674,
+              "ttft_s": 0.361,
+              "prompt_eval_time_s": 0.361,
+              "generation_time_s": 17.314,
+              "prompt_tokens": 132,
+              "output_tokens": 377,
+              "prompt_eval_toks_per_s": 366.1,
+              "gen_toks_per_s": 21.8,
+              "peak_rss_bytes": 3991928832,
+              "output_text": " import time\nimport random\nimport logging\nfrom typing import Callable, Any, Type, List\n\nlogging.basicConfig(level=logging.INFO)\n\ndef retry_with_backoff(\n    func: Callable[..., Any],\n    max_attempts:"
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 17.644,
+              "ttft_s": 0.359,
+              "prompt_eval_time_s": 0.359,
+              "generation_time_s": 17.285,
+              "prompt_tokens": 132,
+              "output_tokens": 377,
+              "prompt_eval_toks_per_s": 368.1,
+              "gen_toks_per_s": 21.8,
+              "peak_rss_bytes": 3992207360,
+              "output_text": " import time\nimport random\nimport logging\nfrom typing import Callable, Any, Type, List\n\nlogging.basicConfig(level=logging.INFO)\n\ndef retry_with_backoff(\n    func: Callable[..., Any],\n    max_attempts:"
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 21.8,
+            "median_prompt_eval_toks_per_s": 366.1,
+            "median_ttft_s": 0.361,
+            "median_ttft_ms": 361.0,
+            "median_wall_time_s": 17.674,
+            "median_output_tokens": 377,
+            "median_peak_rss_bytes": 3992207360,
+            "median_peak_rss_mb": 3807.3
+          }
+        },
+        {
+          "prompt_id": "code_gen_2",
+          "category": "code_generation",
+          "max_tokens": 500,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 23.623,
+              "ttft_s": 0.367,
+              "prompt_eval_time_s": 0.367,
+              "generation_time_s": 23.256,
+              "prompt_tokens": 151,
+              "output_tokens": 500,
+              "prompt_eval_toks_per_s": 411.2,
+              "gen_toks_per_s": 21.5,
+              "peak_rss_bytes": 3996286976,
+              "output_text": " ```python\nimport threading\nfrom typing import Union\nfrom time import time\n\nclass TokenBucket:\n    \"\"\"\n    Implements the token bucket rate limiting algorithm.\n    \n    This token bucket allows a cert"
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 23.651,
+              "ttft_s": 0.363,
+              "prompt_eval_time_s": 0.363,
+              "generation_time_s": 23.287,
+              "prompt_tokens": 151,
+              "output_tokens": 500,
+              "prompt_eval_toks_per_s": 415.6,
+              "gen_toks_per_s": 21.5,
+              "peak_rss_bytes": 3996794880,
+              "output_text": " ```python\nimport threading\nfrom typing import Union\nfrom time import time\n\nclass TokenBucket:\n    \"\"\"\n    Implements the token bucket rate limiting algorithm.\n    \n    This token bucket allows a cert"
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 23.626,
+              "ttft_s": 0.364,
+              "prompt_eval_time_s": 0.364,
+              "generation_time_s": 23.263,
+              "prompt_tokens": 151,
+              "output_tokens": 500,
+              "prompt_eval_toks_per_s": 415.3,
+              "gen_toks_per_s": 21.5,
+              "peak_rss_bytes": 3997696000,
+              "output_text": " ```python\nimport threading\nfrom typing import Union\nfrom time import time\n\nclass TokenBucket:\n    \"\"\"\n    Implements the token bucket rate limiting algorithm.\n    \n    This token bucket allows a cert"
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 21.5,
+            "median_prompt_eval_toks_per_s": 415.3,
+            "median_ttft_s": 0.364,
+            "median_ttft_ms": 364.0,
+            "median_wall_time_s": 23.626,
+            "median_output_tokens": 500,
+            "median_peak_rss_bytes": 3996794880,
+            "median_peak_rss_mb": 3811.6
+          }
+        },
+        {
+          "prompt_id": "code_gen_3",
+          "category": "code_generation",
+          "max_tokens": 500,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 24.081,
+              "ttft_s": 0.441,
+              "prompt_eval_time_s": 0.441,
+              "generation_time_s": 23.64,
+              "prompt_tokens": 187,
+              "output_tokens": 500,
+              "prompt_eval_toks_per_s": 424.5,
+              "gen_toks_per_s": 21.2,
+              "peak_rss_bytes": 4001693696,
+              "output_text": " import re\nfrom datetime import datetime\nfrom typing import Optional, Dict, Union\n\ndef parse_log_line(line: str) -> Optional[Dict[str, Union[datetime, str, Dict[str, Union[str, int, float, bool]]]]]:\n"
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 24.162,
+              "ttft_s": 0.435,
+              "prompt_eval_time_s": 0.435,
+              "generation_time_s": 23.727,
+              "prompt_tokens": 187,
+              "output_tokens": 500,
+              "prompt_eval_toks_per_s": 430.1,
+              "gen_toks_per_s": 21.1,
+              "peak_rss_bytes": 3999924224,
+              "output_text": " import re\nfrom datetime import datetime\nfrom typing import Optional, Dict, Union\n\ndef parse_log_line(line: str) -> Optional[Dict[str, Union[datetime, str, Dict[str, Union[str, int, float, bool]]]]]:\n"
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 23.968,
+              "ttft_s": 0.436,
+              "prompt_eval_time_s": 0.436,
+              "generation_time_s": 23.533,
+              "prompt_tokens": 187,
+              "output_tokens": 500,
+              "prompt_eval_toks_per_s": 429.0,
+              "gen_toks_per_s": 21.2,
+              "peak_rss_bytes": 3999875072,
+              "output_text": " import re\nfrom datetime import datetime\nfrom typing import Optional, Dict, Union\n\ndef parse_log_line(line: str) -> Optional[Dict[str, Union[datetime, str, Dict[str, Union[str, int, float, bool]]]]]:\n"
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 21.2,
+            "median_prompt_eval_toks_per_s": 429.0,
+            "median_ttft_s": 0.436,
+            "median_ttft_ms": 436.0,
+            "median_wall_time_s": 24.081,
+            "median_output_tokens": 500,
+            "median_peak_rss_bytes": 3999924224,
+            "median_peak_rss_mb": 3814.6
+          }
+        },
+        {
+          "prompt_id": "summarization_1",
+          "category": "summarization",
+          "max_tokens": 300,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 10.361,
+              "ttft_s": 1.347,
+              "prompt_eval_time_s": 1.347,
+              "generation_time_s": 9.014,
+              "prompt_tokens": 545,
+              "output_tokens": 161,
+              "prompt_eval_toks_per_s": 404.6,
+              "gen_toks_per_s": 17.9,
+              "peak_rss_bytes": 4033249280,
+              "output_text": " The Linux kernel's Completely Fair Scheduler (CFS) was introduced in 2007 to replace the O(1) scheduler, utilizing a red-black tree for tracking process runnability based on virtual runtime. CFS aims"
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 10.36,
+              "ttft_s": 1.324,
+              "prompt_eval_time_s": 1.324,
+              "generation_time_s": 9.036,
+              "prompt_tokens": 545,
+              "output_tokens": 161,
+              "prompt_eval_toks_per_s": 411.7,
+              "gen_toks_per_s": 17.8,
+              "peak_rss_bytes": 4034691072,
+              "output_text": " The Linux kernel's Completely Fair Scheduler (CFS) was introduced in 2007 to replace the O(1) scheduler, utilizing a red-black tree for tracking process runnability based on virtual runtime. CFS aims"
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 10.449,
+              "ttft_s": 1.334,
+              "prompt_eval_time_s": 1.334,
+              "generation_time_s": 9.115,
+              "prompt_tokens": 545,
+              "output_tokens": 161,
+              "prompt_eval_toks_per_s": 408.6,
+              "gen_toks_per_s": 17.7,
+              "peak_rss_bytes": 4033626112,
+              "output_text": " The Linux kernel's Completely Fair Scheduler (CFS) was introduced in 2007 to replace the O(1) scheduler, utilizing a red-black tree for tracking process runnability based on virtual runtime. CFS aims"
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 17.8,
+            "median_prompt_eval_toks_per_s": 408.6,
+            "median_ttft_s": 1.334,
+            "median_ttft_ms": 1334.0,
+            "median_wall_time_s": 10.361,
+            "median_output_tokens": 161,
+            "median_peak_rss_bytes": 4033626112,
+            "median_peak_rss_mb": 3846.8
+          }
+        },
+        {
+          "prompt_id": "summarization_2",
+          "category": "summarization",
+          "max_tokens": 300,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 8.021,
+              "ttft_s": 1.224,
+              "prompt_eval_time_s": 1.224,
+              "generation_time_s": 6.797,
+              "prompt_tokens": 513,
+              "output_tokens": 117,
+              "prompt_eval_toks_per_s": 419.0,
+              "gen_toks_per_s": 17.2,
+              "peak_rss_bytes": 4031922176,
+              "output_text": " Vector databases store high-dimensional vectors and enable approximate nearest neighbor (ANN) search, crucial for applications using large language models. Key algorithms include HNSW for efficient O"
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 7.984,
+              "ttft_s": 1.2,
+              "prompt_eval_time_s": 1.2,
+              "generation_time_s": 6.783,
+              "prompt_tokens": 513,
+              "output_tokens": 117,
+              "prompt_eval_toks_per_s": 427.4,
+              "gen_toks_per_s": 17.2,
+              "peak_rss_bytes": 4030873600,
+              "output_text": " Vector databases store high-dimensional vectors and enable approximate nearest neighbor (ANN) search, crucial for applications using large language models. Key algorithms include HNSW for efficient O"
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 7.994,
+              "ttft_s": 1.197,
+              "prompt_eval_time_s": 1.197,
+              "generation_time_s": 6.797,
+              "prompt_tokens": 513,
+              "output_tokens": 117,
+              "prompt_eval_toks_per_s": 428.6,
+              "gen_toks_per_s": 17.2,
+              "peak_rss_bytes": 4031447040,
+              "output_text": " Vector databases store high-dimensional vectors and enable approximate nearest neighbor (ANN) search, crucial for applications using large language models. Key algorithms include HNSW for efficient O"
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 17.2,
+            "median_prompt_eval_toks_per_s": 427.4,
+            "median_ttft_s": 1.2,
+            "median_ttft_ms": 1200.0,
+            "median_wall_time_s": 7.994,
+            "median_output_tokens": 117,
+            "median_peak_rss_bytes": 4031447040,
+            "median_peak_rss_mb": 3844.7
+          }
+        },
+        {
+          "prompt_id": "summarization_3",
+          "category": "summarization",
+          "max_tokens": 300,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 6.647,
+              "ttft_s": 1.188,
+              "prompt_eval_time_s": 1.188,
+              "generation_time_s": 5.459,
+              "prompt_tokens": 484,
+              "output_tokens": 91,
+              "prompt_eval_toks_per_s": 407.3,
+              "gen_toks_per_s": 16.7,
+              "peak_rss_bytes": 4031954944,
+              "output_text": " Rust's ownership system ensures memory safety and prevents data races by enforcing a single owner per value, which is dropped and its memory freed when the owner goes out of scope. Borrowing rules pr"
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 6.634,
+              "ttft_s": 1.179,
+              "prompt_eval_time_s": 1.179,
+              "generation_time_s": 5.455,
+              "prompt_tokens": 484,
+              "output_tokens": 91,
+              "prompt_eval_toks_per_s": 410.5,
+              "gen_toks_per_s": 16.7,
+              "peak_rss_bytes": 4033052672,
+              "output_text": " Rust's ownership system ensures memory safety and prevents data races by enforcing a single owner per value, which is dropped and its memory freed when the owner goes out of scope. Borrowing rules pr"
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 6.647,
+              "ttft_s": 1.174,
+              "prompt_eval_time_s": 1.174,
+              "generation_time_s": 5.473,
+              "prompt_tokens": 484,
+              "output_tokens": 91,
+              "prompt_eval_toks_per_s": 412.2,
+              "gen_toks_per_s": 16.6,
+              "peak_rss_bytes": 4033380352,
+              "output_text": " Rust's ownership system ensures memory safety and prevents data races by enforcing a single owner per value, which is dropped and its memory freed when the owner goes out of scope. Borrowing rules pr"
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 16.7,
+            "median_prompt_eval_toks_per_s": 410.5,
+            "median_ttft_s": 1.179,
+            "median_ttft_ms": 1179.0,
+            "median_wall_time_s": 6.647,
+            "median_output_tokens": 91,
+            "median_peak_rss_bytes": 4033052672,
+            "median_peak_rss_mb": 3846.2
+          }
+        },
+        {
+          "prompt_id": "long_context_1",
+          "category": "long_context",
+          "max_tokens": 500,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 11.336,
+              "ttft_s": 4.073,
+              "prompt_eval_time_s": 4.073,
+              "generation_time_s": 7.263,
+              "prompt_tokens": 1691,
+              "output_tokens": 56,
+              "prompt_eval_toks_per_s": 415.1,
+              "gen_toks_per_s": 7.7,
+              "peak_rss_bytes": 4043718656,
+              "output_text": " The three most important tradeoffs when choosing between a monolithic architecture and microservices are operational complexity, team autonomy, and scalability. The author recommends for teams smalle"
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 11.323,
+              "ttft_s": 4.059,
+              "prompt_eval_time_s": 4.059,
+              "generation_time_s": 7.264,
+              "prompt_tokens": 1691,
+              "output_tokens": 56,
+              "prompt_eval_toks_per_s": 416.6,
+              "gen_toks_per_s": 7.7,
+              "peak_rss_bytes": 4041555968,
+              "output_text": " The three most important tradeoffs when choosing between a monolithic architecture and microservices are operational complexity, team autonomy, and scalability. The author recommends for teams smalle"
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 11.312,
+              "ttft_s": 4.062,
+              "prompt_eval_time_s": 4.062,
+              "generation_time_s": 7.25,
+              "prompt_tokens": 1691,
+              "output_tokens": 56,
+              "prompt_eval_toks_per_s": 416.3,
+              "gen_toks_per_s": 7.7,
+              "peak_rss_bytes": 4041949184,
+              "output_text": " The three most important tradeoffs when choosing between a monolithic architecture and microservices are operational complexity, team autonomy, and scalability. The author recommends for teams smalle"
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 7.7,
+            "median_prompt_eval_toks_per_s": 416.3,
+            "median_ttft_s": 4.062,
+            "median_ttft_ms": 4062.0,
+            "median_wall_time_s": 11.323,
+            "median_output_tokens": 56,
+            "median_peak_rss_bytes": 4041949184,
+            "median_peak_rss_mb": 3854.7
+          }
+        },
+        {
+          "prompt_id": "long_context_2",
+          "category": "long_context",
+          "max_tokens": 500,
+          "runs": [
+            {
+              "run": 1,
+              "success": true,
+              "error": "",
+              "wall_time_s": 33.613,
+              "ttft_s": 4.54,
+              "prompt_eval_time_s": 4.54,
+              "generation_time_s": 29.073,
+              "prompt_tokens": 1881,
+              "output_tokens": 399,
+              "prompt_eval_toks_per_s": 414.3,
+              "gen_toks_per_s": 13.7,
+              "peak_rss_bytes": 4044259328,
+              "output_text": "<|assistant|> 1) The main reason a B-tree index becomes less effective for high-cardinality columns used in range queries vs. equality queries is due to the way B-tree indexes store data. In a B-tree "
+            },
+            {
+              "run": 2,
+              "success": true,
+              "error": "",
+              "wall_time_s": 33.606,
+              "ttft_s": 4.548,
+              "prompt_eval_time_s": 4.548,
+              "generation_time_s": 29.057,
+              "prompt_tokens": 1881,
+              "output_tokens": 399,
+              "prompt_eval_toks_per_s": 413.5,
+              "gen_toks_per_s": 13.7,
+              "peak_rss_bytes": 4045471744,
+              "output_text": "<|assistant|> 1) The main reason a B-tree index becomes less effective for high-cardinality columns used in range queries vs. equality queries is due to the way B-tree indexes store data. In a B-tree "
+            },
+            {
+              "run": 3,
+              "success": true,
+              "error": "",
+              "wall_time_s": 33.663,
+              "ttft_s": 4.538,
+              "prompt_eval_time_s": 4.538,
+              "generation_time_s": 29.125,
+              "prompt_tokens": 1881,
+              "output_tokens": 399,
+              "prompt_eval_toks_per_s": 414.5,
+              "gen_toks_per_s": 13.7,
+              "peak_rss_bytes": 4044718080,
+              "output_text": "<|assistant|> 1) The main reason a B-tree index becomes less effective for high-cardinality columns used in range queries vs. equality queries is due to the way B-tree indexes store data. In a B-tree "
+            }
+          ],
+          "summary": {
+            "n_successful": 3,
+            "median_gen_toks_per_s": 13.7,
+            "median_prompt_eval_toks_per_s": 414.3,
+            "median_ttft_s": 4.54,
+            "median_ttft_ms": 4540.0,
+            "median_wall_time_s": 33.613,
+            "median_output_tokens": 399,
+            "median_peak_rss_bytes": 4044718080,
+            "median_peak_rss_mb": 3857.3
+          }
+        }
+      ],
+      "model_summary": {
+        "model": "Phi-3-mini-4k-instruct-Q4_K_M.gguf",
+        "overall_median_gen_toks_per_s": 19.5,
+        "overall_median_prompt_eval_toks_per_s": 412.4,
+        "overall_median_ttft_ms": 807.0,
+        "overall_median_peak_rss_mb": 3846.5,
+        "n_prompts_run": 10,
+        "n_prompts_ok": 10
+      }
+    }
+  ]
+}

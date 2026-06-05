@@ -16,6 +16,8 @@
  */
 
 const { execFileSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 module.exports = async function notarize(context) {
@@ -47,7 +49,22 @@ module.exports = async function notarize(context) {
   const appName = packager.appInfo.productFilename;
   const appPath = path.join(appOutDir, `${appName}.app`);
 
-  console.log(`[notarize] Submitting ${appPath} for notarization...`);
+  // notarytool requires .zip / .pkg / .dmg — wrap the .app in a temp .zip.
+  // Stapling later targets the original .app; the staple carries through
+  // when electron-builder packages the .app into the final .dmg.
+  const zipPath = path.join(os.tmpdir(), `${appName}-${process.pid}-notarize.zip`);
+  console.log(`[notarize] Zipping ${appPath} -> ${zipPath} for submission...`);
+  try {
+    execFileSync(
+      'ditto',
+      ['-c', '-k', '--sequesterRsrc', '--keepParent', appPath, zipPath],
+      { stdio: ['ignore', 'pipe', 'pipe'] }
+    );
+  } catch (err) {
+    throw new Error(`Failed to zip ${appPath} for notarization: ${err.message}`);
+  }
+
+  console.log(`[notarize] Submitting for notarization...`);
   console.log(`[notarize] Apple ID: ${appleId} / Team: ${teamId}`);
 
   // Submit and wait for Apple's notarization service to approve.
@@ -57,7 +74,7 @@ module.exports = async function notarize(context) {
     submitOutput = execFileSync(
       'xcrun',
       [
-        'notarytool', 'submit', appPath,
+        'notarytool', 'submit', zipPath,
         '--apple-id', appleId,
         '--password', applePassword,
         '--team-id', teamId,
@@ -67,6 +84,9 @@ module.exports = async function notarize(context) {
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
     );
   } catch (err) {
+    // Clean up the temp zip even on failure.
+    try { fs.unlinkSync(zipPath); } catch (_) { /* ignore */ }
+
     const stderr = err.stderr || '';
     const stdout = err.stdout || '';
     console.error('[notarize] notarytool submit failed.');
@@ -91,6 +111,9 @@ module.exports = async function notarize(context) {
 
     throw new Error(`Notarization failed: ${err.message}`);
   }
+
+  // Clean up the temp zip now that submission is complete.
+  try { fs.unlinkSync(zipPath); } catch (_) { /* ignore */ }
 
   // Parse the JSON output to confirm status.
   let result;
