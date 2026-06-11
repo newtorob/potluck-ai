@@ -246,7 +246,18 @@ async def _handle_real_job(
     """
     started = time.monotonic()
 
-    if settings.model_slug != job.model_slug:
+    # Decide whether this peer can serve the requested model, per backend, and
+    # which slug to actually load. This must agree with _build_capabilities:
+    #   - ollama: the peer advertised EVERY installed Ollama model, so serve
+    #     whatever the coordinator routed (job.model_slug). Ollama loads it on
+    #     demand; the engine's _ensure_loaded reports if it isn't installed.
+    #   - llama-cpp: the peer has exactly one GGUF (settings.model_slug) and can
+    #     only serve that slug.
+    # Using settings.model_slug for the dispatch check (the old behaviour) made a
+    # multi-model Ollama peer decline every model except its one configured slug.
+    if settings.inference_backend == "ollama":
+        serve_slug = job.model_slug
+    elif settings.model_slug != job.model_slug:
         err = JobErrorMessage(
             job_id=job.job_id,
             error_category="declined",
@@ -260,6 +271,8 @@ async def _handle_real_job(
             job.job_id, settings.model_slug, job.model_slug,
         )
         return
+    else:
+        serve_slug = settings.model_slug
 
     # Lazy import so peers without inference enabled don't pay the
     # import cost at startup (and so a missing llama_cpp install doesn't
@@ -273,7 +286,7 @@ async def _handle_real_job(
         if settings.inference_backend == "ollama":
             engine = get_ollama_engine(
                 base_url=settings.ollama_url,
-                model_slug=settings.model_slug,
+                model_slug=serve_slug,
                 n_ctx=settings.n_ctx,
             )
         else:
@@ -287,7 +300,7 @@ async def _handle_real_job(
                 return
             engine = get_llamacpp_engine(
                 model_path=settings.model_path,
-                model_slug=settings.model_slug,
+                model_slug=serve_slug,
                 n_ctx=settings.n_ctx,
                 n_gpu_layers=settings.n_gpu_layers,
             )

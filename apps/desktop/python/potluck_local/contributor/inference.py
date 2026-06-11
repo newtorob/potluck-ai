@@ -323,7 +323,17 @@ def get_llamacpp_engine(
     """Module-level singleton for llama-cpp. Re-creating per job would
     re-load the GGUF every time."""
     global _engine
-    if not isinstance(_engine, LlamaCppInferenceEngine) or _engine.model_slug != model_slug:
+    # Recreate (which resets the lazily-loaded Llama, forcing a reload) whenever
+    # ANY identity field changes — not just the slug. Keying on slug alone left a
+    # stale GGUF loaded if model_path/n_ctx/n_gpu_layers changed under the same
+    # slug.
+    if (
+        not isinstance(_engine, LlamaCppInferenceEngine)
+        or _engine.model_slug != model_slug
+        or _engine.model_path != model_path
+        or _engine.n_ctx != n_ctx
+        or _engine.n_gpu_layers != n_gpu_layers
+    ):
         _engine = LlamaCppInferenceEngine(
             model_path=model_path,
             model_slug=model_slug,
