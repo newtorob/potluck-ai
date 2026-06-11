@@ -33,7 +33,7 @@ MemoryCategory = Literal[
     "instruction",
     "reference",  # ingested external content (vault notes, docs, code symbols)
 ]
-SourceType = Literal["extracted", "explicit", "agent_state"]
+SourceType = Literal["extracted", "explicit", "agent_state", "vault"]
 
 _CONFIDENCE_THRESHOLD = 0.7
 _JACCARD_THRESHOLD = 0.7

@@ -22,6 +22,42 @@ from potluck_local.utils.time import now_iso as _now_iso
 
 logger = logging.getLogger(__name__)
 
+# In-memory cache of the stacked embedding matrix, keyed by (project, model).
+# Value: (memory_ids, matrix, change_key). Avoids reloading and re-stacking
+# every active vector on every chat turn — the previous per-call cost was O(N)
+# blob reads plus a full np.stack. A cheap COUNT + MAX(updated_at) probe per call
+# decides whether the cached matrix is still valid.
+_MATRIX_CACHE: "dict[tuple[str | None, str], tuple[list[str], np.ndarray | None, tuple]]" = {}
+
+
+async def _embeddings_change_key(
+    project: str | None, model: str, db_path=None
+) -> tuple[int, str | None]:
+    """Cheap fingerprint of the model+project-scoped embedding set:
+    (count, max memories.updated_at). It changes when a row is added, removed,
+    re-embedded to this model, or its memory is updated — so the matrix cache
+    can be reused safely without rescanning every blob."""
+    from potluck_local.services.memory_db import get_memory_db_path
+
+    path = db_path or get_memory_db_path()
+    if project is not None:
+        proj_clause = "(m.project = ? OR m.project IS NULL)"
+        params: list = [model, project]
+    else:
+        proj_clause = "m.project IS NULL"
+        params = [model]
+    async with aiosqlite.connect(path) as db:
+        cur = await db.execute(
+            f"""SELECT COUNT(*), MAX(m.updated_at)
+                FROM memory_embeddings e
+                JOIN memories m ON m.id = e.memory_id
+                WHERE m.is_active = 1 AND e.model_used = ? AND {proj_clause}""",
+            params,
+        )
+        row = await cur.fetchone()
+    return (int(row[0] or 0), row[1])
+
+
 _STOPWORDS: frozenset[str] = frozenset({
     "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
     "have", "has", "had", "do", "does", "did", "will", "would", "could",
@@ -148,12 +184,26 @@ async def semantic_search(
         return []
 
     project = project or None
-    pairs = await load_all_embeddings(project=project)
-    if not pairs:
-        return []
+    model = embedder.MODEL_NAME
 
-    memory_ids = [p[0] for p in pairs]
-    matrix = np.stack([p[1] for p in pairs], axis=0)  # (n, DIM)
+    # Matrix cache — rebuild only when the model+project-scoped embedding set
+    # actually changed (cheap COUNT + MAX(updated_at) probe), instead of
+    # reloading and re-stacking every active vector on every call. Filtering by
+    # `model` also guarantees a single embedding dimension in the matrix, so a
+    # mixed-model table (after a model switch) can never crash np.stack.
+    change_key = await _embeddings_change_key(project, model)
+    cache_key = (project, model)
+    cached = _MATRIX_CACHE.get(cache_key)
+    if cached is not None and cached[2] == change_key:
+        memory_ids, matrix = cached[0], cached[1]
+    else:
+        pairs = await load_all_embeddings(project=project, model=model)
+        memory_ids = [p[0] for p in pairs]
+        matrix = np.stack([p[1] for p in pairs], axis=0) if pairs else None  # (n, DIM)
+        _MATRIX_CACHE[cache_key] = (memory_ids, matrix, change_key)
+
+    if not memory_ids:
+        return []
 
     # All vectors are L2-normalised at insert time, so dot product == cosine sim.
     scores = matrix @ query_vec  # (n,)
@@ -220,10 +270,13 @@ async def get_related(
     if embed_result is None:
         return []
 
-    target_vec, _ = embed_result
+    target_vec, target_model = embed_result
 
     # Load all embeddings without project filter so related-memory lookup
     # searches the broadest possible set (cross-project relatedness is useful).
+    # Restrict to the target's embedding model: vectors from a different model
+    # live in a different space (and may have a different dimension), so mixing
+    # them is both meaningless for cosine and would crash np.stack below.
     db_path = get_memory_db_path()
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
@@ -231,8 +284,8 @@ async def get_related(
             """SELECT e.memory_id, e.embedding
                FROM memory_embeddings e
                JOIN memories m ON m.id = e.memory_id
-               WHERE m.is_active = 1 AND e.memory_id != ?""",
-            (memory_id,),
+               WHERE m.is_active = 1 AND e.memory_id != ? AND e.model_used = ?""",
+            (memory_id, target_model),
         )
         rows = await cursor.fetchall()
 

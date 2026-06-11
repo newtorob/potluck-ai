@@ -31,15 +31,19 @@ async def run_embedding_backfill() -> None:
         save_embedding,
     )
 
-    missing_ids = await memories_missing_embeddings()
+    embedder = get_embedder()
+
+    # Re-embed memories that are missing an embedding OR were embedded by a
+    # different model (stale after an embedding-model switch). Passing the
+    # active model name makes the switch self-healing: stale rows are rebuilt
+    # with the current model so retrieval (which filters by model) sees them.
+    missing_ids = await memories_missing_embeddings(model=embedder.MODEL_NAME)
     n_total = len(missing_ids)
     logger.info("embedding_backfill_started n_memories=%d", n_total)
 
     if n_total == 0:
         logger.info("embedding_backfill_complete n_memories=0")
         return
-
-    embedder = get_embedder()
 
     # Attempt to load the model early so we can bail fast on failure.
     if not await embedder._ensure_loaded():

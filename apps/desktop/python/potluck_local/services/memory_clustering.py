@@ -207,12 +207,14 @@ async def compute_clusters(project: str | None) -> ClusterResponse:
     if cached is not None:
         return cached
 
+    from potluck_local.services.embeddings import get_embedder
     from potluck_local.services.memory_db import get_memory_db_path, load_all_embeddings
     from potluck_local.services.memory_retrieval import _row_to_memory
     import aiosqlite
 
-    # Load embeddings for scoped active memories
-    pairs = await load_all_embeddings(project=project)
+    # Load embeddings for scoped active memories, filtered to the active model so
+    # a mixed-model table (after an embedding-model switch) can't crash np.stack.
+    pairs = await load_all_embeddings(project=project, model=get_embedder().MODEL_NAME)
 
     now_iso = datetime.now(timezone.utc).isoformat()
 

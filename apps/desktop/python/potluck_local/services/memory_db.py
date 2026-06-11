@@ -579,6 +579,7 @@ async def get_embedding(
 
 async def load_all_embeddings(
     project: str | None = None,
+    model: str | None = None,
     db_path: Path | None = None,
 ) -> "list[tuple[str, np.ndarray]]":
     """Return [(memory_id, vector)] for all active memories that have embeddings.
@@ -586,6 +587,11 @@ async def load_all_embeddings(
     project filter: when project is given, loads embeddings for memories where
     project = X OR project IS NULL (same scoping as retrieval).
     When project is None, loads embeddings for global memories only (project IS NULL).
+
+    model filter: when `model` is given, only embeddings produced by that model
+    are returned. This is required — without it, a table containing vectors from
+    two embedding models (after a model switch / partial backfill) would be
+    stacked into one matrix with inconsistent dimensions and crash retrieval.
     """
     import numpy as np
 
@@ -598,6 +604,11 @@ async def load_all_embeddings(
         proj_clause = "m.project IS NULL"
         proj_params = []
 
+    model_clause = ""
+    if model is not None:
+        model_clause = " AND e.model_used = ?"
+        proj_params = proj_params + [model]
+
     async with aiosqlite.connect(path) as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
@@ -605,7 +616,7 @@ async def load_all_embeddings(
                 FROM memory_embeddings e
                 JOIN memories m ON m.id = e.memory_id
                 WHERE m.is_active = 1
-                  AND {proj_clause}""",
+                  AND {proj_clause}{model_clause}""",
             proj_params,
         )
         rows = await cursor.fetchall()
@@ -618,15 +629,30 @@ async def load_all_embeddings(
 
 
 async def memories_missing_embeddings(
+    model: str | None = None,
     db_path: Path | None = None,
 ) -> list[str]:
-    """Return IDs of active memories that have no entry in memory_embeddings."""
+    """Return IDs of active memories that need (re)embedding.
+
+    Without `model`: memories that have no embedding row at all.
+    With `model`: also includes memories whose existing embedding was produced
+    by a *different* model — i.e. stale rows after an embedding-model switch.
+    save_embedding uses INSERT OR REPLACE, so re-embedding these overwrites the
+    stale row in place. This is what makes a model switch self-healing.
+    """
     path = db_path or get_memory_db_path()
+    if model is not None:
+        where = "m.is_active = 1 AND (e.memory_id IS NULL OR e.model_used != ?)"
+        params: list = [model]
+    else:
+        where = "m.is_active = 1 AND e.memory_id IS NULL"
+        params = []
     async with aiosqlite.connect(path) as db:
         cursor = await db.execute(
-            """SELECT m.id FROM memories m
+            f"""SELECT m.id FROM memories m
                LEFT JOIN memory_embeddings e ON e.memory_id = m.id
-               WHERE m.is_active = 1 AND e.memory_id IS NULL"""
+               WHERE {where}""",
+            params,
         )
         rows = await cursor.fetchall()
     return [row[0] for row in rows]
