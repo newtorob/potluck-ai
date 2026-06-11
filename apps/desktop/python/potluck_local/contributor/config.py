@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     # WebSocket URL for the coordinator's /peers/connect endpoint.
     coordinator_url: str = "ws://localhost:8400/peers/connect"
 
+    # Optional coordinator token. When the coordinator enforces
+    # POTLUCK_COORDINATOR_TOKEN, the contributor must present it on the WS
+    # handshake (X-Potluck-Coordinator-Token header). Unset by default —
+    # dev/household coordinators run open.
+    coordinator_token: str | None = None
+
     # Which member this peer belongs to. Stub-UUID for m1 dev; real
     # membership integration lands in v0.5 (see roadmap memory 6d50b79d).
     member_id: uuid.UUID = uuid.UUID("00000000-0000-0000-0000-000000000001")

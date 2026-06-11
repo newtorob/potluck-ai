@@ -456,7 +456,17 @@ async def _receive_loop(
 
 async def _session(settings: Settings, priv: Ed25519PrivateKey) -> None:
     logger.info("connecting url=%s", settings.coordinator_url)
-    async with websockets.connect(settings.coordinator_url) as ws:
+    # Present the coordinator token on the WS upgrade when configured. The
+    # coordinator's /peers/connect gate is a no-op unless POTLUCK_COORDINATOR_TOKEN
+    # is set, so leaving this unset keeps tokenless household setups working.
+    extra_headers = (
+        [("X-Potluck-Coordinator-Token", settings.coordinator_token)]
+        if settings.coordinator_token
+        else None
+    )
+    async with websockets.connect(
+        settings.coordinator_url, extra_headers=extra_headers
+    ) as ws:
         try:
             accept = await _do_handshake(ws, settings, priv)
         except HandshakeFailed as e:

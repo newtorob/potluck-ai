@@ -17,6 +17,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from coordinator.db.database import get_db
+from coordinator.middleware.auth import coordinator_token_matches
 from coordinator.schemas.peer import (
     AcceptMessage,
     AttestationPayload,
@@ -80,6 +81,19 @@ async def peer_connect(
     db: AsyncSession = Depends(get_db),
 ) -> None:
     await ws.accept()
+
+    # ---- coordinator-token gate ----
+    # No-op when POTLUCK_COORDINATOR_TOKEN is unset, so tokenless household
+    # coordinators are unaffected. When a token IS configured, the contributor
+    # must present it on the WS upgrade (X-Potluck-Coordinator-Token header).
+    # Raises the bar for opening a contributor session from "anyone reachable"
+    # to "anyone holding the coordinator token" while full member<->key binding
+    # is built (v0.5). The Ed25519 signed-nonce challenge below still runs.
+    if not coordinator_token_matches(ws.headers.get("x-potluck-coordinator-token")):
+        logger.info("peer_rejected_bad_coordinator_token")
+        await _reject(ws, "unauthorized", code=1008)
+        return
+
     nonce_raw, nonce_b64 = _new_nonce()
 
     # ---- challenge ----
