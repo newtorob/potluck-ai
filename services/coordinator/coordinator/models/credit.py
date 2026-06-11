@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     DateTime,
     Float,
@@ -121,4 +122,12 @@ class CreditLedger(Base):
     row_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    # Operational flag — intentionally NOT part of row_hash (the chain proves
+    # credit amounts; escrow is mutable verification state). Earned credits from
+    # cross-member public-pool jobs are held escrowed (excluded from the
+    # spendable balance) until a verification result releases them (pass) or
+    # forfeits them (fail). Self-served / household jobs are never escrowed.
+    escrowed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
     )

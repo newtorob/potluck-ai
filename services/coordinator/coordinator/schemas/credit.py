@@ -15,12 +15,18 @@ class CreditBalanceByModel(BaseModel):
 
 
 class CreditBalanceResponse(BaseModel):
-    """Aggregated balance for the calling member."""
+    """Aggregated balance for the calling member.
+
+    `earned`/`net` count only released (spendable) credits. `pending` is the sum
+    of escrowed earned credits from cross-member public-pool work awaiting a
+    verification result — not yet spendable.
+    """
 
     member_id: uuid.UUID
     earned: Decimal
     spent: Decimal
     net: Decimal
+    pending: Decimal = Decimal("0")
     by_model: list[CreditBalanceByModel]
 
 

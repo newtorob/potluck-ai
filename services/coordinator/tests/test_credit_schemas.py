@@ -20,7 +20,9 @@ from coordinator.schemas.credit import (
 )
 
 # Fields the per-member credit response surface is allowed to carry.
-_BALANCE_FIELDS = frozenset({"member_id", "earned", "spent", "net", "by_model"})
+_BALANCE_FIELDS = frozenset(
+    {"member_id", "earned", "spent", "net", "pending", "by_model"}
+)
 _BALANCE_BY_MODEL_FIELDS = frozenset({"model_slug", "earned", "spent"})
 _HISTORY_ENTRY_FIELDS = frozenset(
     {

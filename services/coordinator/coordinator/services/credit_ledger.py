@@ -52,6 +52,10 @@ UNKNOWN_MODEL_MULTIPLIER = Decimal("1.0")
 # Constant used for the very first row in a member's chain.
 GENESIS_HASH = hashlib.sha256(b"potluck-credit-ledger-genesis").hexdigest()
 
+# Reputation nudge per verification outcome. A peer's reputation (0..1, default
+# 0.5) moves toward 1.0 on a passed verification and toward 0.0 on a failure.
+REPUTATION_STEP = 0.1
+
 
 def _compute_row_hash(
     member_id: uuid.UUID,
@@ -221,6 +225,12 @@ async def record_job_credits(
         prev_row_hash=earned_prev,
     )
 
+    # Escrow earned credits from cross-member (public-pool) jobs — they are not
+    # spendable until a verification result releases them. Self-served /
+    # household jobs (requester == contributor owner) are never escrowed: there
+    # is no one to defraud when you serve yourself.
+    is_public_pool = requester_member_id != contributor_owner_member_id
+
     earned_stmt = (
         pg_insert(CreditLedger)
         .values(
@@ -233,6 +243,7 @@ async def record_job_credits(
             credits=earned,
             prev_row_hash=earned_prev,
             row_hash=earned_hash,
+            escrowed=is_public_pool,
         )
         .on_conflict_do_nothing(index_elements=["job_id", "direction"])
         .returning(CreditLedger)
@@ -255,3 +266,60 @@ async def record_job_credits(
             "but existing rows not found"
         )
     return existing
+
+
+async def apply_verification_result(
+    db: AsyncSession,
+    *,
+    job_id: uuid.UUID,
+    passed: bool,
+    contributor_peer_id: uuid.UUID | None = None,
+) -> bool:
+    """Apply a verification outcome for a completed public-pool job — the
+    release/forfeit half of credit escrow.
+
+    A verification *source* (sampled re-execution on a second peer, or a
+    coordinator canary probe) decides pass/fail and calls this. That source is
+    intentionally not wired yet; see the credit-verification design. Until it
+    is, escrowed public-pool credits simply stay escrowed (the conservative
+    default — don't pay unverified work), which is safe because the public pool
+    is not live.
+
+      pass -> release the job's escrowed 'earned' row (escrowed=False) so the
+              credits become spendable; nudge the peer's reputation up.
+      fail -> leave the 'earned' row escrowed: the credits are forfeited and
+              never enter the spendable balance. The append-only ledger keeps
+              the row for audit; no clawback row is written. Nudge reputation
+              down.
+
+    Returns True if an escrowed earned row was released, else False. Safe to
+    call more than once — releasing an already-released row is a no-op.
+    """
+    earned = (
+        await db.execute(
+            select(CreditLedger).where(
+                CreditLedger.job_id == job_id,
+                CreditLedger.direction == "earned",
+            )
+        )
+    ).scalar_one_or_none()
+
+    released = False
+    if earned is not None and passed and earned.escrowed:
+        earned.escrowed = False  # release -> spendable
+        released = True
+
+    if contributor_peer_id is not None:
+        # reputation lives on the peer's heartbeat row (preserved across beats —
+        # apply_heartbeat's upsert never touches it).
+        from coordinator.models.peer import PeerHeartbeat
+
+        hb = await db.get(PeerHeartbeat, contributor_peer_id)
+        if hb is not None:
+            if passed:
+                hb.reputation = min(1.0, hb.reputation + REPUTATION_STEP)
+            else:
+                hb.reputation = max(0.0, hb.reputation - REPUTATION_STEP)
+
+    await db.flush()
+    return released

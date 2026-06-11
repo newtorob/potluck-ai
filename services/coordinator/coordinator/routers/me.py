@@ -46,20 +46,29 @@ async def credit_balance(
         select(
             CreditLedger.direction,
             CreditLedger.model_slug,
+            CreditLedger.escrowed,
             func.sum(CreditLedger.credits).label("total"),
         )
         .where(CreditLedger.member_id == _STUB_MEMBER_ID)
-        .group_by(CreditLedger.direction, CreditLedger.model_slug)
+        .group_by(
+            CreditLedger.direction, CreditLedger.model_slug, CreditLedger.escrowed
+        )
     )
 
     by_model: dict[str, dict[str, Decimal]] = {}
-    earned_total = Decimal("0")
+    earned_total = Decimal("0")  # spendable (released) earned only
     spent_total = Decimal("0")
+    pending_total = Decimal("0")  # escrowed earned — not yet spendable
 
-    for direction, model_slug, total in rows_result.all():
+    for direction, model_slug, escrowed, total in rows_result.all():
         amt = Decimal(total or 0)
+        # Escrowed earned credits (unverified public-pool work) are not part of
+        # the spendable balance — surface them separately as `pending`.
+        if direction == "earned" and escrowed:
+            pending_total += amt
+            continue
         by_model.setdefault(model_slug, {"earned": Decimal("0"), "spent": Decimal("0")})
-        by_model[model_slug][direction] = amt
+        by_model[model_slug][direction] = by_model[model_slug][direction] + amt
         if direction == "earned":
             earned_total += amt
         elif direction == "spent":
@@ -70,6 +79,7 @@ async def credit_balance(
         earned=earned_total,
         spent=spent_total,
         net=earned_total - spent_total,
+        pending=pending_total,
         by_model=[
             CreditBalanceByModel(
                 model_slug=slug,
