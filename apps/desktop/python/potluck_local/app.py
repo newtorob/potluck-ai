@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hmac
 import os
 import posixpath
 
@@ -86,6 +87,15 @@ def create_app() -> FastAPI:
     """
     dev_mode = os.environ.get("POTLUCK_DEV", "0") == "1"
 
+    # Shared-secret gate for the local API. When the desktop app spawns this
+    # sidecar it passes a random POTLUCK_SIDECAR_TOKEN, and the renderer attaches
+    # it as `Authorization: Bearer <token>` on every request. This stops other
+    # local processes on the machine from reading the user's memory, chat,
+    # tasks, and vault over the loopback socket. When unset (e.g. `make sidecar`
+    # standalone in dev), the gate is off and loopback callers get the full
+    # surface as before.
+    sidecar_token = os.environ.get("POTLUCK_SIDECAR_TOKEN") or None
+
     app = FastAPI(
         lifespan=_lifespan,
         title="Potluck Local",
@@ -117,17 +127,22 @@ def create_app() -> FastAPI:
     # Localhost source IPs (Electron, dev tools) get the full surface.
     @app.middleware("http")
     async def peer_access_middleware(request: Request, call_next):
+        raw_path = request.url.path
+        # Reject null bytes — they can confuse downstream parsers.
+        if "\x00" in raw_path:
+            return JSONResponse(status_code=400, content={"detail": "invalid path"})
+        # Normalise away any ../ traversal sequences once, up front, so both the
+        # peer-surface restriction and the token gate match the real target path.
+        normalised = posixpath.normpath(raw_path)
+
         client_host = request.client.host if request.client else ""
         is_loopback = client_host in ("127.0.0.1", "::1", "localhost")
+
+        # Non-loopback callers (household peers over the mesh) are restricted to
+        # the explicit peer-facing surface (/peer/* + /health). The local user's
+        # memory, tasks, conversation history, and agent observability are never
+        # reachable from another machine, even one in the same household.
         if not is_loopback:
-            raw_path = request.url.path
-            # Reject null bytes — they can confuse downstream parsers.
-            if "\x00" in raw_path:
-                return JSONResponse(status_code=400, content={"detail": "invalid path"})
-            # Normalise away any ../ traversal sequences.  posixpath.normpath
-            # collapses these; if the result no longer starts with /peer/ the
-            # caller is trying to escape the allowed surface.
-            normalised = posixpath.normpath(raw_path)
             if not (normalised.startswith("/peer/") or normalised == "/health"):
                 return JSONResponse(
                     status_code=403,
@@ -138,6 +153,28 @@ def create_app() -> FastAPI:
                         ),
                     },
                 )
+
+        # Shared-secret gate — applies to loopback callers too. When a token is
+        # configured, every non-exempt path must present a matching bearer token.
+        # This is what stops a malicious local process from reading the user's
+        # data over 127.0.0.1. Exempt: liveness (/health), peer routes (their own
+        # attestation auth + already remote-gated above), and /shutdown (Electron
+        # may call it from the main process during teardown).
+        if sidecar_token is not None:
+            exempt = (
+                normalised == "/health"
+                or normalised == "/shutdown"
+                or normalised.startswith("/peer/")
+            )
+            if not exempt:
+                auth = request.headers.get("authorization", "")
+                presented = auth[7:] if auth[:7].lower() == "bearer " else ""
+                if not (presented and hmac.compare_digest(presented, sidecar_token)):
+                    return JSONResponse(
+                        status_code=401,
+                        content={"detail": "missing or invalid sidecar token"},
+                    )
+
         return await call_next(request)
 
     # Routers — prefixes must match localApi.ts in the frontend

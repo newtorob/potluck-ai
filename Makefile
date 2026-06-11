@@ -127,10 +127,10 @@ test-coordinator: ## Run coordinator pytest suite (privacy invariants etc.) in i
 	@cd services/coordinator && ./.venv/bin/pytest -q
 
 m3-smoke: ## End-to-end Phase G m3 acceptance check (needs coordinator + at least one peer running)
-	@python3 scripts/m3-smoke.py $(M3_ARGS)
+	@python3 scripts/dev/m3-smoke.py $(M3_ARGS)
 
 mesh-smoke: ## End-to-end Phase G mesh week-1 acceptance (needs coordinator + Postgres)
-	@python3 scripts/mesh-smoke.py $(MESH_ARGS)
+	@python3 scripts/dev/mesh-smoke.py $(MESH_ARGS)
 
 eval-retrieval: ## Eval B — retrieval quality: RRF vs keyword-only on labeled corpus
 	@if [ ! -x apps/desktop/python/.venv/bin/python ]; then \
@@ -186,7 +186,7 @@ bench-inference: ## Local-model inference benchmark — gen/prompt-eval tok/s, T
 	fi
 
 lint: ## Run the privacy-invariant lint (member_id leaks + contributor in-memory-only). Free, local.
-	@python3 scripts/lint_privacy.py
+	@python3 scripts/dev/lint_privacy.py
 
 install-hooks: ## Install git hooks (pre-commit privacy lint) into .git/hooks/
 	@if [ ! -d .git ]; then \

@@ -61,7 +61,15 @@ async def require_admin(
 ) -> object:
     """Dependency that further asserts the authenticated member is an admin.
 
-    Full implementation in Task 6. For now re-raises 501 from get_current_member.
+    Fail-closed: if the member is not an admin, raise 403. This must stay a real
+    check (not a passthrough) so that when ``get_current_member`` is wired up in
+    Task 6, admin routes are not silently exposed to every authenticated member.
+    Until then ``get_current_member`` raises 501 and this is never reached, but
+    the assertion is in place now so the gate cannot be forgotten.
     """
-    # TODO (Task 6): check member.is_admin once get_current_member is real.
+    if not getattr(member, "is_admin", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required",
+        )
     return member

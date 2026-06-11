@@ -15,13 +15,13 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 # Only run if the lint script exists — keeps the hook safe in older
 # clones / on branches that pre-date the lint.
-if [ -x "$REPO_ROOT/scripts/lint_privacy.py" ]; then
-  python3 "$REPO_ROOT/scripts/lint_privacy.py" || {
+if [ -x "$REPO_ROOT/scripts/dev/lint_privacy.py" ]; then
+  python3 "$REPO_ROOT/scripts/dev/lint_privacy.py" || {
     echo
     echo "Privacy lint failed — commit aborted."
     echo "Fix the violations above, or use 'git commit --no-verify' to bypass"
     echo "(only do this if you're certain the flagged code is safe AND have"
-    echo "updated the whitelist in scripts/lint_privacy.py)."
+    echo "updated the whitelist in scripts/dev/lint_privacy.py)."
     exit 1
   }
 fi

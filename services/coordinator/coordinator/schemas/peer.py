@@ -109,12 +109,20 @@ class HeartbeatMessage(BaseModel):
 #     telemetry. In-memory only.
 
 
+# Hard ceiling on tokens a single job may request OR a peer may claim to have
+# served. Bounds requester-side resource exhaustion (A3) and caps the headline
+# number a peer can self-report toward credits (A2). This is a coarse guard, not
+# verification: a peer can still over-report up to this ceiling for a short job.
+# Real anti-fraud (sampled re-execution + reputation) is tracked separately.
+MAX_OUTPUT_TOKENS = 4096
+
+
 class SamplingParams(BaseModel):
     """Inference sampling parameters. Forward-compatible — add fields here
     rather than to JobAssignedMessage so older peers ignore unknown ones."""
 
-    max_tokens: int = 512
-    temperature: float = 0.7
+    max_tokens: int = Field(default=512, ge=1, le=MAX_OUTPUT_TOKENS)
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     top_p: float | None = 0.95
     top_k: int | None = None
     repeat_penalty: float | None = None

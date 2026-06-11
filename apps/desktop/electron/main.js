@@ -1,7 +1,8 @@
 'use strict';
 
-const { app, BrowserWindow, shell, ipcMain, dialog, Notification, nativeImage } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, dialog, Notification, nativeImage, session } = require('electron');
 const { spawn } = require('child_process');
+const crypto = require('crypto');
 const path = require('path');
 const http = require('http');
 const { autoUpdater } = require('electron-updater');
@@ -21,6 +22,13 @@ const SIDECAR_STARTUP_TIMEOUT_MS = 15_000; // 15 seconds
 const SIDECAR_POLL_INTERVAL_MS = 500;
 const MAX_RESTART_ATTEMPTS = 3;
 const SIGKILL_TIMEOUT_MS = 3_000;
+
+// Random shared secret handed to the spawned sidecar (production) and injected
+// into every renderer→sidecar request via onBeforeSendHeaders. Stops other local
+// processes on the machine from reading the user's memory/chat/tasks/vault over
+// 127.0.0.1. Generated fresh each launch. Unused in dev: there the sidecar is
+// started by dev:python without a token, so the gate is off and we inject nothing.
+const SIDECAR_TOKEN = crypto.randomBytes(32).toString('hex');
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -72,7 +80,11 @@ function startPythonSidecar() {
 
   pythonProcess = spawn(sidecarPath, ['--port', String(PYTHON_PORT)], {
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, POTLUCK_PORT: String(PYTHON_PORT) },
+    env: {
+      ...process.env,
+      POTLUCK_PORT: String(PYTHON_PORT),
+      POTLUCK_SIDECAR_TOKEN: SIDECAR_TOKEN,
+    },
   });
 
   pythonProcess.stdout.on('data', (data) => {
@@ -184,6 +196,26 @@ async function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
   });
+
+  // Inject the sidecar auth token into every renderer request to the local API.
+  // Production only: the same token is passed to the spawned sidecar via env, and
+  // the sidecar rejects non-exempt requests that lack it. In dev the sidecar is
+  // started by dev:python with no token (gate off), so injecting one here would
+  // mismatch and 401 every call — hence the app.isPackaged guard.
+  if (app.isPackaged) {
+    session.defaultSession.webRequest.onBeforeSendHeaders(
+      {
+        urls: [
+          `http://127.0.0.1:${PYTHON_PORT}/*`,
+          `http://localhost:${PYTHON_PORT}/*`,
+        ],
+      },
+      (details, callback) => {
+        details.requestHeaders['Authorization'] = `Bearer ${SIDECAR_TOKEN}`;
+        callback({ requestHeaders: details.requestHeaders });
+      }
+    );
+  }
 
   // Route all window.open() / anchor target="_blank" clicks to the system browser.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

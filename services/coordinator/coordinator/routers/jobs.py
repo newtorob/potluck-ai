@@ -37,6 +37,7 @@ from coordinator.db.database import get_db, get_session_factory
 from coordinator.middleware.auth import require_coordinator_token
 from coordinator.models.job import Job
 from coordinator.schemas.peer import (
+    MAX_OUTPUT_TOKENS,
     JobAssignedMessage,
     SamplingParams,
 )
@@ -337,6 +338,22 @@ async def _finalize_job_in_db(
 
     All errors are logged at WARN; nothing propagates (the client is
     already gone)."""
+    # Clamp the peer's self-reported output_tokens to the hard ceiling before it
+    # touches the jobs row or the credit ledger. The peer is outside the trust
+    # boundary (threat-model A2): nothing it reports is authoritative. This caps
+    # the fabrication ceiling; it does not verify the work was real (see the
+    # credit-verification design for sampled re-execution + reputation gating).
+    if output_tokens > MAX_OUTPUT_TOKENS:
+        logger.warning(
+            "output_tokens_clamped",
+            job_id=str(job_id),
+            reported=output_tokens,
+            clamped_to=MAX_OUTPUT_TOKENS,
+        )
+        output_tokens = MAX_OUTPUT_TOKENS
+    if output_tokens < 0:
+        output_tokens = 0
+
     try:
         async with get_session_factory()() as fresh_db:
             db_job = await fresh_db.get(Job, job_id)
