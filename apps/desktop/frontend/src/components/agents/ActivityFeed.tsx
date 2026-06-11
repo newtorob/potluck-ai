@@ -21,28 +21,11 @@ import { Bot } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { relativeTime } from '@/lib/timeFormat';
 import type { ToolCall, AgentSession } from '@/types/agents';
+import { formatArgsSummary } from '@/lib/argsSummary';
 
-// ---------------------------------------------------------------------------
-// Safe args fields to display
-// ---------------------------------------------------------------------------
-
-const SAFE_ARG_KEYS = ['category', 'project', 'limit', 'status', 'query', 'tool'] as const;
-
-function renderArgsSummary(args: Record<string, unknown> | null): string | null {
-  if (args === null) return null;
-  const parts: string[] = [];
-  for (const key of SAFE_ARG_KEYS) {
-    const val = args[key as string];
-    if (val === null || val === undefined) continue;
-    let display = String(val);
-    // Truncate long query strings to keep the row compact
-    if (key === 'query' && display.length > 30) {
-      display = `${display.slice(0, 30)}…`;
-    }
-    parts.push(`${key}=${display}`);
-  }
-  return parts.length > 0 ? parts.join(' · ') : null;
-}
+// Safe args rendering (the metadata-only privacy whitelist) lives in
+// lib/argsSummary.ts and is shared with the session-detail drawer so both
+// render sites enforce the same invariant.
 
 // ---------------------------------------------------------------------------
 // Client icon
@@ -85,7 +68,7 @@ interface ActivityRowProps {
 }
 
 function ActivityRow({ call, clientName, isHighlighted, isNew, onSelect }: ActivityRowProps) {
-  const argsSummary = renderArgsSummary(call.args_summary);
+  const argsSummary = formatArgsSummary(call.args_summary);
 
   return (
     <li

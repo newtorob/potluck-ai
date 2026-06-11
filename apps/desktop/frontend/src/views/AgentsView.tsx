@@ -45,10 +45,6 @@ function liveness(session: AgentSession): 'live' | 'idle' | 'stale' | 'disconnec
   return 'stale';
 }
 
-function isActive(session: AgentSession): boolean {
-  return liveness(session) === 'live';
-}
-
 function isDisconnected(session: AgentSession): boolean {
   return liveness(session) === 'disconnected';
 }
@@ -214,9 +210,6 @@ export function AgentsView() {
   const idleSessions = sessions.filter((s) => liveness(s) === 'idle');
   const staleSessions = sessions.filter((s) => liveness(s) === 'stale');
   const disconnectedSessions = sessions.filter(isDisconnected);
-  // Kept for the header chip naming. "Active" still means "live" in user-
-  // facing copy (live = heartbeating right now is the colloquial meaning).
-  const activeSessions = liveSessions;
 
   const hasEverHadSessions = sessions.length > 0;
 

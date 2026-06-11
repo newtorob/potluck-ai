@@ -139,18 +139,14 @@ function speedFor(tier: string | null | undefined, bucket: SizeBucket): SpeedBuc
 // Bucket aggregation
 // ---------------------------------------------------------------------------
 
-/** Combine two speed buckets, taking the better one. Used when multiple peers
- *  can serve the same size class — the network's effective speed is the BEST
- *  available peer (since dispatch picks the best peer for the request). */
+/** Ordinal rank of each speed bucket, so the higher (better) speed wins when
+ *  comparing peers — dispatch picks the best available peer for a request. */
 const SPEED_RANK: Record<SpeedBucket, number> = {
   unavailable: 0,
   slow: 1,
   good: 2,
   fast: 3,
 };
-function maxSpeed(a: SpeedBucket, b: SpeedBucket): SpeedBucket {
-  return SPEED_RANK[a] >= SPEED_RANK[b] ? a : b;
-}
 
 /** Drop one rung on the speed ladder. Used when a peer is forced to
  *  CPU/RAM-offload because the model doesn't fit in VRAM. */

@@ -13,6 +13,7 @@ import { cn } from '@/components/ui/cn';
 import { ProjectPill } from '@/components/memory/ProjectPill';
 import { relativeTime, fullDateTime } from '@/lib/timeFormat';
 import { localApi } from '@/lib/localApi';
+import { sanitizeArgsSummary } from '@/lib/argsSummary';
 import type { MemoryPreview, SessionDetail, ToolCall } from '@/types/agents';
 
 // ---------------------------------------------------------------------------
@@ -47,7 +48,11 @@ function TimelineRow({ call }: TimelineRowProps) {
   const [previewsLoading, setPreviewsLoading] = useState(false);
   const [previewsError, setPreviewsError] = useState<string | null>(null);
   const hasError = call.error !== null;
-  const hasArgs = call.args_summary !== null && Object.keys(call.args_summary).length > 0;
+  // Filter to the metadata-only whitelist BEFORE deciding whether to show the
+  // section, so a row whose args_summary contains only non-whitelisted keys
+  // renders the "stripped by the privacy whitelist" note rather than a header.
+  const safeArgs = sanitizeArgsSummary(call.args_summary);
+  const hasArgs = Object.keys(safeArgs).length > 0;
   const hasVersion = call.tool_schema_version !== null;
   const memoryIds = call.memory_ids_touched ?? [];
 
@@ -132,7 +137,7 @@ function TimelineRow({ call }: TimelineRowProps) {
             <div>
               <div className="mb-1 font-medium text-muted-foreground">Args (metadata only)</div>
               <pre className="overflow-x-auto whitespace-pre-wrap break-all font-mono text-[10.5px] text-foreground/90">
-                {JSON.stringify(call.args_summary, null, 2)}
+                {JSON.stringify(safeArgs, null, 2)}
               </pre>
             </div>
           ) : (
@@ -433,10 +438,13 @@ export function SessionDetailDrawer({ detail, onClose }: SessionDetailDrawerProp
                 <ul className="rounded-lg border border-border bg-background/50 px-3">
                   {detail.recent_tool_calls
                     .slice()
-                    .sort(
-                      (a, b) =>
-                        new Date(a.called_at).getTime() - new Date(b.called_at).getTime(),
-                    )
+                    .sort((a, b) => {
+                      // NaN-safe: a malformed/null called_at must not produce a
+                      // NaN comparator (unstable order). Treat invalid as epoch 0.
+                      const ta = new Date(a.called_at).getTime();
+                      const tb = new Date(b.called_at).getTime();
+                      return (Number.isNaN(ta) ? 0 : ta) - (Number.isNaN(tb) ? 0 : tb);
+                    })
                     .map((call) => (
                       <TimelineRow key={call.id} call={call} />
                     ))}

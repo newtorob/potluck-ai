@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { TitleBar } from '@/components/layout/TitleBar';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { StatusBar } from '@/components/layout/StatusBar';
 import { AuthGate } from '@/components/auth/AuthGate';
@@ -50,6 +51,10 @@ export default function App() {
   // Initialise theme from localStorage on mount so <html class> matches
   // user preference before paint (avoids cream-flash on dark startup).
   useTheme();
+
+  // Route path drives the per-view error boundary's reset: navigating to a
+  // different view clears a crashed boundary so the user is never stuck.
+  const location = useLocation();
 
   // Read model state directly from the store at the shell level.
   // useModels() is not used here to avoid triggering its auto-fetch inside the
@@ -115,6 +120,7 @@ export default function App() {
           <Sidebar />
 
           <main className="flex-1 overflow-hidden min-w-0">
+            <ErrorBoundary resetKey={location.pathname} scopeLabel="this view">
             <Routes>
               <Route path="/" element={<Navigate to="/chat" replace />} />
               <Route path="/chat" element={<ChatView />} />
@@ -130,6 +136,7 @@ export default function App() {
               {/* Catch-all: redirect unknown paths to chat */}
               <Route path="*" element={<Navigate to="/chat" replace />} />
             </Routes>
+            </ErrorBoundary>
           </main>
         </AuthGate>
       </div>

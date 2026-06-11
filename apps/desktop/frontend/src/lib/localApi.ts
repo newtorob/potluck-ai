@@ -70,6 +70,52 @@ async function handle204(res: Response): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Timed fetch — bounds every non-streaming sidecar/coordinator call
+// ---------------------------------------------------------------------------
+
+// Captured before any rewrite so the wrapper always calls the real global.
+const nativeFetch = fetch;
+
+// Default ceiling for fast local calls (health, lists, CRUD, settings). Without
+// it, a hung or still-starting sidecar leaves the promise pending forever, and a
+// polling loop then stacks a backlog of requests that all resolve at once.
+const DEFAULT_TIMEOUT_MS = 30_000;
+// Model load streams a large GGUF into VRAM; extraction runs model inference.
+// Give them generous ceilings so a legitimately slow op is not aborted.
+const LOAD_TIMEOUT_MS = 180_000;
+const EXTRACT_TIMEOUT_MS = 120_000;
+
+/**
+ * Wraps the native global with an automatic timeout. Streaming endpoints (SSE)
+ * MUST NOT use this — they are long-lived and call nativeFetch() directly with
+ * their own caller-provided abort signal. A signal passed in init is composed
+ * with the timeout: whichever aborts first wins.
+ */
+async function timedFetch(
+  input: string,
+  init: RequestInit = {},
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+): Promise<Response> {
+  const ctrl = new AbortController();
+  const incoming = init.signal ?? undefined;
+  const onIncomingAbort = () => ctrl.abort(incoming?.reason);
+  if (incoming) {
+    if (incoming.aborted) ctrl.abort(incoming.reason);
+    else incoming.addEventListener('abort', onIncomingAbort, { once: true });
+  }
+  const timer = setTimeout(
+    () => ctrl.abort(new DOMException(`[localApi] timed out after ${timeoutMs}ms`, 'TimeoutError')),
+    timeoutMs,
+  );
+  try {
+    return await nativeFetch(input, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+    if (incoming) incoming.removeEventListener('abort', onIncomingAbort);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Health
 // ---------------------------------------------------------------------------
 
@@ -296,7 +342,7 @@ export interface MyJobStats {
 export const localApi = {
   /** GET /health — liveness check; also tells us if a model is loaded */
   health(): Promise<HealthResponse> {
-    return fetch(`${LOCAL_BASE}/health`).then((r) => handleResponse<HealthResponse>(r));
+    return timedFetch(`${LOCAL_BASE}/health`).then((r) => handleResponse<HealthResponse>(r));
   },
 
   // ---- Chat ----------------------------------------------------------------
@@ -318,7 +364,8 @@ export const localApi = {
       }),
     };
     if (options.abortSignal) init.signal = options.abortSignal;
-    return fetch(`${LOCAL_BASE}/chat/completions`, init);
+    // Streaming SSE — raw fetch, no timeout (long-lived); caller owns the abort.
+    return nativeFetch(`${LOCAL_BASE}/chat/completions`, init);
   },
 
   /**
@@ -350,23 +397,24 @@ export const localApi = {
       }),
     };
     if (options.abortSignal) init.signal = options.abortSignal;
-    return fetch(`${coordinatorBase()}/jobs/stream`, init);
+    // Streaming SSE — raw fetch, no timeout (long-lived); caller owns the abort.
+    return nativeFetch(`${coordinatorBase()}/jobs/stream`, init);
   },
 
   // ---- Models --------------------------------------------------------------
 
   listModels(): Promise<Model[]> {
-    return fetch(`${LOCAL_BASE}/models`).then((r) => handleResponse<Model[]>(r));
+    return timedFetch(`${LOCAL_BASE}/models`).then((r) => handleResponse<Model[]>(r));
   },
 
   installModel(id: string): Promise<{ status: string }> {
-    return fetch(`${LOCAL_BASE}/models/${encodeURIComponent(id)}/install`, {
+    return timedFetch(`${LOCAL_BASE}/models/${encodeURIComponent(id)}/install`, {
       method: 'POST',
     }).then((r) => handleResponse<{ status: string }>(r));
   },
 
   deleteModel(id: string): Promise<{ status: string }> {
-    return fetch(`${LOCAL_BASE}/models/${encodeURIComponent(id)}`, {
+    return timedFetch(`${LOCAL_BASE}/models/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     }).then((r) => handleResponse<{ status: string }>(r));
   },
@@ -383,12 +431,12 @@ export const localApi = {
       options.rpc_servers && options.rpc_servers.length > 0
         ? { rpc_servers: options.rpc_servers }
         : null;
-    return fetch(`${LOCAL_BASE}/models/${encodeURIComponent(id)}/load`, {
+    return timedFetch(`${LOCAL_BASE}/models/${encodeURIComponent(id)}/load`, {
       method: 'POST',
       ...(body
         ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
         : {}),
-    }).then((r) =>
+    }, LOAD_TIMEOUT_MS).then((r) =>
       handleResponse<{
         model_path: string;
         load_time_seconds: number;
@@ -398,7 +446,7 @@ export const localApi = {
   },
 
   downloadProgress(id: string): Promise<DownloadProgress> {
-    return fetch(`${LOCAL_BASE}/models/${encodeURIComponent(id)}/download-progress`).then((r) =>
+    return timedFetch(`${LOCAL_BASE}/models/${encodeURIComponent(id)}/download-progress`).then((r) =>
       handleResponse<DownloadProgress>(r),
     );
   },
@@ -406,7 +454,7 @@ export const localApi = {
   // ---- Hardware ------------------------------------------------------------
 
   detectHardware(): Promise<Record<string, unknown>> {
-    return fetch(`${LOCAL_BASE}/hardware`).then((r) =>
+    return timedFetch(`${LOCAL_BASE}/hardware`).then((r) =>
       handleResponse<Record<string, unknown>>(r),
     );
   },
@@ -414,11 +462,11 @@ export const localApi = {
   // ---- Settings ------------------------------------------------------------
 
   getSettings(): Promise<PotluckSettings> {
-    return fetch(`${LOCAL_BASE}/settings`).then((r) => handleResponse<PotluckSettings>(r));
+    return timedFetch(`${LOCAL_BASE}/settings`).then((r) => handleResponse<PotluckSettings>(r));
   },
 
   updateSettings(patch: PotluckSettingsPatch): Promise<PotluckSettings> {
-    return fetch(`${LOCAL_BASE}/settings`, {
+    return timedFetch(`${LOCAL_BASE}/settings`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
@@ -442,19 +490,19 @@ export const localApi = {
       if (opts.project !== undefined && opts.project !== null) params.set('project', opts.project);
       if (opts.include_all !== undefined) params.set('include_all', opts.include_all ? 'true' : 'false');
       const qs = params.toString();
-      return fetch(`${LOCAL_BASE}/memory${qs ? `?${qs}` : ''}`).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/memory${qs ? `?${qs}` : ''}`).then((r) =>
         handleResponse<Memory[]>(r),
       );
     },
 
     projects(): Promise<ProjectSummary[]> {
-      return fetch(`${LOCAL_BASE}/memory/projects`).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/memory/projects`).then((r) =>
         handleResponse<ProjectSummary[]>(r),
       );
     },
 
     get(id: string): Promise<Memory> {
-      return fetch(`${LOCAL_BASE}/memory/${encodeURIComponent(id)}`).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/memory/${encodeURIComponent(id)}`).then((r) =>
         handleResponse<Memory>(r),
       );
     },
@@ -466,7 +514,7 @@ export const localApi = {
       confidence?: number;
       project?: string | null;
     }): Promise<Memory> {
-      return fetch(`${LOCAL_BASE}/memory`, {
+      return timedFetch(`${LOCAL_BASE}/memory`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -477,7 +525,7 @@ export const localApi = {
       id: string,
       patch: { content?: string; category?: MemoryCategory; confidence?: number; project?: string | null },
     ): Promise<Memory> {
-      return fetch(`${LOCAL_BASE}/memory/${encodeURIComponent(id)}`, {
+      return timedFetch(`${LOCAL_BASE}/memory/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
@@ -485,13 +533,13 @@ export const localApi = {
     },
 
     delete(id: string): Promise<void> {
-      return fetch(`${LOCAL_BASE}/memory/${encodeURIComponent(id)}`, {
+      return timedFetch(`${LOCAL_BASE}/memory/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       }).then((r) => handle204(r));
     },
 
     pin(id: string, pinned: boolean): Promise<{ id: string; pinned: boolean }> {
-      return fetch(`${LOCAL_BASE}/memory/${encodeURIComponent(id)}/pin`, {
+      return timedFetch(`${LOCAL_BASE}/memory/${encodeURIComponent(id)}/pin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pinned }),
@@ -506,7 +554,7 @@ export const localApi = {
       project?: string | null;
       semantic?: boolean;
     }): Promise<Memory[]> {
-      return fetch(`${LOCAL_BASE}/memory/search`, {
+      return timedFetch(`${LOCAL_BASE}/memory/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -530,21 +578,21 @@ export const localApi = {
       if (opts.project !== undefined && opts.project !== '') params.set('project', opts.project);
       if (opts.min_count !== undefined) params.set('min_count', String(opts.min_count));
       const qs = params.toString();
-      return fetch(`${LOCAL_BASE}/memory/keywords${qs ? `?${qs}` : ''}`).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/memory/keywords${qs ? `?${qs}` : ''}`).then((r) =>
         handleResponse<KeywordFrequency[]>(r),
       );
     },
 
     extract(body: { messages: ChatMessage[]; conversation_id: string }): Promise<Memory[]> {
-      return fetch(`${LOCAL_BASE}/memory/extract`, {
+      return timedFetch(`${LOCAL_BASE}/memory/extract`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }).then((r) => handleResponse<Memory[]>(r));
+      }, EXTRACT_TIMEOUT_MS).then((r) => handleResponse<Memory[]>(r));
     },
 
     wipe(): Promise<MemoryWipeResult> {
-      return fetch(`${LOCAL_BASE}/memory/wipe`, {
+      return timedFetch(`${LOCAL_BASE}/memory/wipe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirm: true }),
@@ -552,13 +600,13 @@ export const localApi = {
     },
 
     export(): Promise<MemoryExportResult> {
-      return fetch(`${LOCAL_BASE}/memory/export`).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/memory/export`).then((r) =>
         handleResponse<MemoryExportResult>(r),
       );
     },
 
     import(body: { memories: Memory[] }): Promise<MemoryImportResult> {
-      return fetch(`${LOCAL_BASE}/memory/import`, {
+      return timedFetch(`${LOCAL_BASE}/memory/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -569,7 +617,7 @@ export const localApi = {
       const params = new URLSearchParams();
       if (opts.project !== undefined && opts.project !== '') params.set('project', opts.project);
       const qs = params.toString();
-      return fetch(`${LOCAL_BASE}/memory/clusters${qs ? `?${qs}` : ''}`).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/memory/clusters${qs ? `?${qs}` : ''}`).then((r) =>
         handleResponse<ClusterResponse>(r),
       );
     },
@@ -584,19 +632,19 @@ export const localApi = {
       if (opts.project !== undefined && opts.project !== null) params.set('project', opts.project);
       if (opts.include_all !== undefined) params.set('include_all', opts.include_all ? 'true' : 'false');
       const qs = params.toString();
-      return fetch(`${LOCAL_BASE}/tasks${qs ? `?${qs}` : ''}`).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/tasks${qs ? `?${qs}` : ''}`).then((r) =>
         handleResponse<TaskState[]>(r),
       );
     },
 
     get(id: string): Promise<TaskState> {
-      return fetch(`${LOCAL_BASE}/tasks/${encodeURIComponent(id)}`).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/tasks/${encodeURIComponent(id)}`).then((r) =>
         handleResponse<TaskState>(r),
       );
     },
 
     create(body: TaskCreateInput): Promise<TaskState> {
-      return fetch(`${LOCAL_BASE}/tasks`, {
+      return timedFetch(`${LOCAL_BASE}/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -604,7 +652,7 @@ export const localApi = {
     },
 
     update(id: string, patch: TaskUpdateInput): Promise<TaskState> {
-      return fetch(`${LOCAL_BASE}/tasks/${encodeURIComponent(id)}`, {
+      return timedFetch(`${LOCAL_BASE}/tasks/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
@@ -612,7 +660,7 @@ export const localApi = {
     },
 
     completeStep(id: string, step: string): Promise<TaskState> {
-      return fetch(`${LOCAL_BASE}/tasks/${encodeURIComponent(id)}/complete-step`, {
+      return timedFetch(`${LOCAL_BASE}/tasks/${encodeURIComponent(id)}/complete-step`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ step }),
@@ -620,7 +668,7 @@ export const localApi = {
     },
 
     addError(id: string, body: { error: string; resolution?: string }): Promise<TaskState> {
-      return fetch(`${LOCAL_BASE}/tasks/${encodeURIComponent(id)}/add-error`, {
+      return timedFetch(`${LOCAL_BASE}/tasks/${encodeURIComponent(id)}/add-error`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -628,7 +676,7 @@ export const localApi = {
     },
 
     delete(id: string): Promise<void> {
-      return fetch(`${LOCAL_BASE}/tasks/${encodeURIComponent(id)}`, {
+      return timedFetch(`${LOCAL_BASE}/tasks/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       }).then((r) => handle204(r));
     },
@@ -644,13 +692,13 @@ export const localApi = {
       }
       if (opts.limit !== undefined) params.set('limit', String(opts.limit));
       const qs = params.toString();
-      return fetch(`${LOCAL_BASE}/agents/sessions${qs ? `?${qs}` : ''}`).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/agents/sessions${qs ? `?${qs}` : ''}`).then((r) =>
         handleResponse<AgentSession[]>(r),
       );
     },
 
     getSession(id: string): Promise<SessionDetail> {
-      return fetch(`${LOCAL_BASE}/agents/sessions/${encodeURIComponent(id)}`).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/agents/sessions/${encodeURIComponent(id)}`).then((r) =>
         handleResponse<SessionDetail>(r),
       );
     },
@@ -662,19 +710,19 @@ export const localApi = {
       if (opts.project) params.set('project', opts.project);
       if (opts.tool) params.set('tool', opts.tool);
       const qs = params.toString();
-      return fetch(`${LOCAL_BASE}/agents/activity${qs ? `?${qs}` : ''}`).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/agents/activity${qs ? `?${qs}` : ''}`).then((r) =>
         handleResponse<ToolCall[]>(r),
       );
     },
 
     deleteSession(id: string): Promise<void> {
-      return fetch(`${LOCAL_BASE}/agents/sessions/${encodeURIComponent(id)}`, {
+      return timedFetch(`${LOCAL_BASE}/agents/sessions/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       }).then((r) => handle204(r));
     },
 
     clearDisconnected(): Promise<{ removed: number }> {
-      return fetch(`${LOCAL_BASE}/agents/sessions`, { method: 'DELETE' }).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/agents/sessions`, { method: 'DELETE' }).then((r) =>
         handleResponse<{ removed: number }>(r),
       );
     },
@@ -686,7 +734,7 @@ export const localApi = {
      *  this is the immediate-feedback path from the AgentsView clean-up
      *  button. */
     sweep(): Promise<{ marked_disconnected: number; deleted_worthless: number }> {
-      return fetch(`${LOCAL_BASE}/agents/sessions/sweep`, { method: 'POST' }).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/agents/sessions/sweep`, { method: 'POST' }).then((r) =>
         handleResponse<{ marked_disconnected: number; deleted_worthless: number }>(r),
       );
     },
@@ -697,7 +745,7 @@ export const localApi = {
      *  "memory deleted since this call". */
     memoryPreviews(ids: string[]): Promise<MemoryPreview[]> {
       if (ids.length === 0) return Promise.resolve([]);
-      return fetch(`${LOCAL_BASE}/agents/memory-previews`, {
+      return timedFetch(`${LOCAL_BASE}/agents/memory-previews`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids }),
@@ -733,13 +781,13 @@ export const localApi = {
       if (opts.project !== undefined && opts.project !== null) params.set('project', opts.project);
       if (opts.limit !== undefined) params.set('limit', String(opts.limit));
       const qs = params.toString();
-      return fetch(`${LOCAL_BASE}/chat/conversations${qs ? `?${qs}` : ''}`).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/chat/conversations${qs ? `?${qs}` : ''}`).then((r) =>
         handleResponse<PersistedConversation[]>(r),
       );
     },
 
     get(id: string): Promise<PersistedConversationDetail> {
-      return fetch(`${LOCAL_BASE}/chat/conversations/${encodeURIComponent(id)}`).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/chat/conversations/${encodeURIComponent(id)}`).then((r) =>
         handleResponse<PersistedConversationDetail>(r),
       );
     },
@@ -751,7 +799,7 @@ export const localApi = {
       network_mode?: boolean;
       network_model_slug?: string | null;
     }): Promise<PersistedConversation> {
-      return fetch(`${LOCAL_BASE}/chat/conversations`, {
+      return timedFetch(`${LOCAL_BASE}/chat/conversations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -765,7 +813,7 @@ export const localApi = {
       project?: string | null;
       project_set?: boolean;
     }): Promise<PersistedConversation> {
-      return fetch(`${LOCAL_BASE}/chat/conversations/${encodeURIComponent(id)}`, {
+      return timedFetch(`${LOCAL_BASE}/chat/conversations/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
@@ -773,7 +821,7 @@ export const localApi = {
     },
 
     delete(id: string): Promise<void> {
-      return fetch(`${LOCAL_BASE}/chat/conversations/${encodeURIComponent(id)}`, {
+      return timedFetch(`${LOCAL_BASE}/chat/conversations/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       }).then((r) => handle204(r));
     },
@@ -788,7 +836,7 @@ export const localApi = {
       duration_ms?: number | null;
       finish_reason?: string | null;
     }): Promise<PersistedMessage> {
-      return fetch(`${LOCAL_BASE}/chat/conversations/${encodeURIComponent(conversationId)}/messages`, {
+      return timedFetch(`${LOCAL_BASE}/chat/conversations/${encodeURIComponent(conversationId)}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -803,7 +851,7 @@ export const localApi = {
       duration_ms?: number | null;
       finish_reason?: string | null;
     }): Promise<{ id: string; updated: boolean }> {
-      return fetch(`${LOCAL_BASE}/chat/messages/${encodeURIComponent(messageId)}`, {
+      return timedFetch(`${LOCAL_BASE}/chat/messages/${encodeURIComponent(messageId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
@@ -811,7 +859,7 @@ export const localApi = {
     },
 
     clearMessages(conversationId: string): Promise<{ removed: number }> {
-      return fetch(`${LOCAL_BASE}/chat/conversations/${encodeURIComponent(conversationId)}/messages`, {
+      return timedFetch(`${LOCAL_BASE}/chat/conversations/${encodeURIComponent(conversationId)}/messages`, {
         method: 'DELETE',
       }).then((r) => handleResponse<{ removed: number }>(r));
     },
@@ -823,7 +871,7 @@ export const localApi = {
     /** GET /transparency/fleet on the coordinator. Aggregate-only — no
      *  peer_id / hostname / individual peer fields, by manifesto rule. */
     fleet(): Promise<FleetSummary> {
-      return fetch(`${coordinatorBase()}/transparency/fleet`).then((r) =>
+      return timedFetch(`${coordinatorBase()}/transparency/fleet`).then((r) =>
         handleResponse<FleetSummary>(r),
       );
     },
@@ -837,7 +885,7 @@ export const localApi = {
     health(timeoutMs = 2000): Promise<boolean> {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
-      return fetch(`${coordinatorBase()}/health`, { signal: controller.signal })
+      return nativeFetch(`${coordinatorBase()}/health`, { signal: controller.signal })
         .then((r) => r.ok)
         .catch(() => false)
         .finally(() => clearTimeout(timer));
@@ -846,7 +894,7 @@ export const localApi = {
     /** GET /jobs/stats on the coordinator. Returns this member's
      *  requester-side counts + average latency for the last 24h. */
     myStats(): Promise<MyJobStats> {
-      return fetch(`${coordinatorBase()}/jobs/stats`).then((r) =>
+      return timedFetch(`${coordinatorBase()}/jobs/stats`).then((r) =>
         handleResponse<MyJobStats>(r),
       );
     },
@@ -859,7 +907,7 @@ export const localApi = {
      *  per-model breakdown. Decimal fields arrive as strings; keep them
      *  that way — parse/format only at the render layer. */
     balance(): Promise<CreditBalance> {
-      return fetch(`${coordinatorBase()}/me/credit-balance`).then((r) =>
+      return timedFetch(`${coordinatorBase()}/me/credit-balance`).then((r) =>
         handleResponse<CreditBalance>(r),
       );
     },
@@ -872,7 +920,7 @@ export const localApi = {
       if (opts.direction !== undefined) params.set('direction', opts.direction);
       if (opts.limit !== undefined) params.set('limit', String(opts.limit));
       const qs = params.toString();
-      return fetch(`${coordinatorBase()}/me/credit-history${qs ? `?${qs}` : ''}`).then((r) =>
+      return timedFetch(`${coordinatorBase()}/me/credit-history${qs ? `?${qs}` : ''}`).then((r) =>
         handleResponse<CreditHistory>(r),
       );
     },
@@ -882,19 +930,19 @@ export const localApi = {
 
   vault: {
     status(): Promise<VaultStatus> {
-      return fetch(`${LOCAL_BASE}/vault/status`).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/vault/status`).then((r) =>
         handleResponse<VaultStatus>(r),
       );
     },
 
     rescan(): Promise<VaultRescanResult> {
-      return fetch(`${LOCAL_BASE}/vault/rescan`, { method: 'POST' }).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/vault/rescan`, { method: 'POST' }).then((r) =>
         handleResponse<VaultRescanResult>(r),
       );
     },
 
     disconnect(): Promise<{ reaped_chunks: number }> {
-      return fetch(`${LOCAL_BASE}/vault`, { method: 'DELETE' }).then((r) =>
+      return timedFetch(`${LOCAL_BASE}/vault`, { method: 'DELETE' }).then((r) =>
         handleResponse<{ reaped_chunks: number }>(r),
       );
     },
