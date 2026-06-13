@@ -25,16 +25,20 @@ but bypasses the credit/finalize path entirely.
 from __future__ import annotations
 
 import asyncio
+import logging
+import random
 import uuid
 from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+logger = logging.getLogger(__name__)
+
 from coordinator.schemas.peer import JobAssignedMessage, SamplingParams
 from coordinator.services.credit_ledger import (
     RELEASE_REPUTATION_THRESHOLD,
-    REPUTATION_STEP,
+    nudge_reputation,
     release_escrow_for_peer,
 )
 
@@ -74,8 +78,7 @@ def evaluate_canary(output: str, canary: Canary) -> bool:
 
 
 def _pick_canary() -> Canary:
-    # Rotate via a fresh uuid's entropy (Math.random is unavailable here).
-    return CANARIES[uuid.uuid4().int % len(CANARIES)]
+    return random.choice(CANARIES)
 
 
 async def _peer_model_slug(db: AsyncSession, peer_id: uuid.UUID) -> str | None:
@@ -105,10 +108,7 @@ async def record_canary_result(
     hb = await db.get(PeerHeartbeat, peer_id)
     if hb is None:
         return 0
-    if passed:
-        hb.reputation = min(1.0, hb.reputation + REPUTATION_STEP)
-    else:
-        hb.reputation = max(0.0, hb.reputation - REPUTATION_STEP)
+    hb.reputation = nudge_reputation(hb.reputation, passed)
     await db.flush()
 
     if hb.reputation >= RELEASE_REPUTATION_THRESHOLD:
@@ -163,3 +163,85 @@ async def run_canary_probe(db: AsyncSession, peer_id: uuid.UUID) -> bool | None:
 
     await record_canary_result(db, peer_id, passed)
     return passed
+
+
+# --------------------------------------------------------------------------- #
+# Trigger — the background loop that decides WHEN to probe.
+# --------------------------------------------------------------------------- #
+
+# How often the loop wakes, and how many peers it probes per cycle (bounded so a
+# burst of escrowed peers can't hammer the fleet in one tick).
+PROBE_INTERVAL_S = 120.0
+PROBE_BATCH = 8
+
+
+async def _peers_with_escrowed_credits(
+    db: AsyncSession, online_ids: list[uuid.UUID]
+) -> list[uuid.UUID]:
+    """Online peers that currently hold escrowed earned credits — the set worth
+    probing (a passed canary releases their escrow once they cross the trust
+    threshold). Peers with nothing escrowed are skipped."""
+    if not online_ids:
+        return []
+    from coordinator.models.credit import CreditLedger
+    from coordinator.models.job import Job
+
+    rows = await db.execute(
+        select(Job.peer_id)
+        .distinct()
+        .join(CreditLedger, CreditLedger.job_id == Job.id)
+        .where(
+            CreditLedger.direction == "earned",
+            CreditLedger.escrowed.is_(True),
+            Job.peer_id.in_(online_ids),
+        )
+    )
+    return [r[0] for r in rows.all() if r[0] is not None]
+
+
+async def probe_due_peers(
+    db: AsyncSession, online_ids: list[uuid.UUID], batch: int = PROBE_BATCH
+) -> int:
+    """One verification cycle: probe up to `batch` online peers that hold
+    escrowed credits. Returns the number probed. A single probe failure is
+    logged and does not abort the cycle."""
+    due = await _peers_with_escrowed_credits(db, online_ids)
+    probed = 0
+    for peer_id in due[:batch]:
+        try:
+            await run_canary_probe(db, peer_id)
+            probed += 1
+        except Exception:
+            logger.exception("canary_probe_failed peer_id=%s", peer_id)
+    return probed
+
+
+async def run_verification_loop(
+    stop: asyncio.Event, interval_s: float = PROBE_INTERVAL_S
+) -> None:
+    """Background loop wired into the coordinator lifespan. Every `interval_s`
+    it probes online peers holding escrowed credits, releasing their credits as
+    they prove themselves. One DB session + transaction per cycle; an iteration
+    failure is logged and the loop keeps running. Stops promptly when `stop`
+    is set."""
+    from coordinator.db.database import get_session_factory
+    from coordinator.services.peer_registry import online_peer_ids
+
+    logger.info("verification_loop_started interval_s=%s", interval_s)
+    while not stop.is_set():
+        try:
+            online_ids = await online_peer_ids()
+            if online_ids:
+                async with get_session_factory()() as db:
+                    probed = await probe_due_peers(db, online_ids)
+                    await db.commit()
+                    if probed:
+                        logger.info("verification_cycle_probed n=%d", probed)
+        except Exception:
+            logger.exception("verification_loop_iteration_failed")
+        # Interruptible sleep so shutdown doesn't wait a full interval.
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=interval_s)
+        except asyncio.TimeoutError:
+            pass
+    logger.info("verification_loop_stopped")

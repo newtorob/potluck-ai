@@ -19,6 +19,18 @@ class Settings(BaseSettings):
     # Sentry — empty string disables SDK init
     sentry_dsn: str = ""
 
+    # Background verification probe loop (canary -> reputation -> escrow
+    # release). Set false to stop the coordinator initiating probes (e.g. in
+    # CI / single-purpose deployments).
+    verification_probe_enabled: bool = True
+
+    # Peer attestation: when true, a device key must already be registered in
+    # member_keys to attest (strict allowlist — for multi-member / production).
+    # When false (default), an unregistered key is bound trust-on-first-use to
+    # whatever member_id it claims. Either way a known key is pinned to its
+    # member and can't later claim a different one.
+    require_registered_keys: bool = False
+
     @field_validator("env")
     @classmethod
     def validate_env(cls, v: str) -> str:

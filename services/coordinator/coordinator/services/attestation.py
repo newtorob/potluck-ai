@@ -17,7 +17,14 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from coordinator.models import ContributorRelease, Peer, PeerCapability, PeerHeartbeat
+from coordinator.config import get_settings
+from coordinator.models import (
+    ContributorRelease,
+    MemberKey,
+    Peer,
+    PeerCapability,
+    PeerHeartbeat,
+)
 from coordinator.schemas.peer import AttestationPayload
 
 logger = structlog.get_logger(__name__)
@@ -78,6 +85,10 @@ async def verify_attestation(
     except InvalidSignature as e:
         raise AttestationError("nonce_signature: does not verify") from e
 
+    # binary_hash is a known-release gate, not proof the peer is actually
+    # running that binary — a peer can present any released hash it has seen.
+    # Treat it as advisory defence-in-depth; real binary attestation (TEE) is
+    # a later hardening item.
     release = await db.scalar(
         select(ContributorRelease).where(
             ContributorRelease.binary_hash == payload.binary_hash
@@ -91,11 +102,55 @@ async def verify_attestation(
     peer = await db.scalar(
         select(Peer).where(Peer.public_key == payload.peer_public_key)
     )
+
+    # ---- member <-> key binding ---- #
+    # The nonce signature above proved the peer holds the private key for
+    # peer_public_key. Bind that key to a member so member_id can't be freely
+    # self-asserted: a known key MUST attest as the member it is pinned to.
+    binding = await db.scalar(
+        select(MemberKey).where(MemberKey.public_key == payload.peer_public_key)
+    )
+    if binding is not None:
+        if binding.member_id != payload.member_id:
+            raise AttestationError(
+                "peer_public_key is registered to a different member"
+            )
+        bound_member_id = binding.member_id
+    elif peer is not None:
+        # Peer row predates the binding table: its established member_id is
+        # authoritative. Backfill the binding from it.
+        bound_member_id = peer.member_id
+        db.add(
+            MemberKey(
+                public_key=payload.peer_public_key,
+                member_id=bound_member_id,
+                added_via="backfill",
+            )
+        )
+        await db.flush()
+    elif get_settings().require_registered_keys:
+        raise AttestationError(
+            "peer_public_key is not registered for any member — "
+            "register this device key before connecting"
+        )
+    else:
+        # New key, lenient mode: trust-on-first-use, pin to the claimed member.
+        bound_member_id = payload.member_id
+        db.add(
+            MemberKey(
+                public_key=payload.peer_public_key,
+                member_id=bound_member_id,
+                added_via="tofu",
+            )
+        )
+        await db.flush()
+        logger.info("member_key_tofu_registered", member_id=str(bound_member_id))
+
     now = datetime.now(timezone.utc)
 
     if peer is None:
         peer = Peer(
-            member_id=payload.member_id,
+            member_id=bound_member_id,
             public_key=payload.peer_public_key,
             hostname=payload.hostname,
             hardware_summary=payload.hardware_summary,

@@ -162,6 +162,13 @@ async def get_peer(peer_id: uuid.UUID) -> PeerConnection | None:
         return _peers.get(peer_id)
 
 
+async def online_peer_ids() -> list[uuid.UUID]:
+    """Snapshot of currently-connected peer ids. Used by the verification loop
+    to intersect against peers that hold escrowed credits."""
+    async with _lock:
+        return list(_peers.keys())
+
+
 # ---- job buffer lifecycle -------------------------------------------- #
 
 

@@ -200,6 +200,10 @@ async def semantic_search(
         pairs = await load_all_embeddings(project=project, model=model)
         memory_ids = [p[0] for p in pairs]
         matrix = np.stack([p[1] for p in pairs], axis=0) if pairs else None  # (n, DIM)
+        # Drop any stale-model matrices cached for this project (e.g. after an
+        # embedding-model switch) so they don't linger keyed by the old model.
+        for stale in [c for c in _MATRIX_CACHE if c[0] == project and c[1] != model]:
+            del _MATRIX_CACHE[stale]
         _MATRIX_CACHE[cache_key] = (memory_ids, matrix, change_key)
 
     if not memory_ids:

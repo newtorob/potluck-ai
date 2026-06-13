@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
@@ -48,7 +49,27 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "unauthenticated dev mode. Set this env var before any network exposure."
         )
 
+    # Background credit-verification loop: periodically probe online peers that
+    # hold escrowed credits (canary -> reputation -> escrow release).
+    verification_stop = asyncio.Event()
+    verification_task: asyncio.Task | None = None
+    if settings.verification_probe_enabled:
+        from coordinator.services.verification import run_verification_loop
+
+        verification_task = asyncio.create_task(
+            run_verification_loop(verification_stop)
+        )
+        logger.info("verification_loop_scheduled")
+
     yield
+
+    verification_stop.set()
+    if verification_task is not None:
+        verification_task.cancel()
+        try:
+            await verification_task
+        except asyncio.CancelledError:
+            pass
 
     await close_db()
     logger.info("database_pool_closed")

@@ -62,6 +62,13 @@ REPUTATION_STEP = 0.1
 RELEASE_REPUTATION_THRESHOLD = 0.7
 
 
+def nudge_reputation(current: float, passed: bool) -> float:
+    """Move a reputation score (0..1) one REPUTATION_STEP toward 1.0 on a passed
+    verification, toward 0.0 on a failure. Clamped to [0, 1]."""
+    step = REPUTATION_STEP if passed else -REPUTATION_STEP
+    return max(0.0, min(1.0, current + step))
+
+
 def _compute_row_hash(
     member_id: uuid.UUID,
     direction: str,
@@ -321,10 +328,7 @@ async def apply_verification_result(
 
         hb = await db.get(PeerHeartbeat, contributor_peer_id)
         if hb is not None:
-            if passed:
-                hb.reputation = min(1.0, hb.reputation + REPUTATION_STEP)
-            else:
-                hb.reputation = max(0.0, hb.reputation - REPUTATION_STEP)
+            hb.reputation = nudge_reputation(hb.reputation, passed)
 
     await db.flush()
     return released

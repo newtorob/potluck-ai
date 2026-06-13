@@ -563,7 +563,7 @@ export const localApi = {
 
     related(id: string, limit = 8): Promise<RelatedMemory[]> {
       const params = new URLSearchParams({ limit: String(limit) });
-      return fetch(
+      return timedFetch(
         `${LOCAL_BASE}/memory/${encodeURIComponent(id)}/related?${params.toString()}`,
       ).then((r) => handleResponse<RelatedMemory[]>(r));
     },
@@ -760,7 +760,7 @@ export const localApi = {
     async exportSessionTrace(
       sessionId: string,
     ): Promise<{ blob: Blob; filename: string }> {
-      const res = await fetch(
+      const res = await timedFetch(
         `${LOCAL_BASE}/agents/sessions/${encodeURIComponent(sessionId)}/trace`,
       );
       if (!res.ok) throw new Error(`Trace export failed: HTTP ${res.status}`);

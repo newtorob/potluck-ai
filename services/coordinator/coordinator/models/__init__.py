@@ -8,6 +8,7 @@ from coordinator.models.credit import (  # noqa: F401
     CreditRate,
 )
 from coordinator.models.job import Job  # noqa: F401
+from coordinator.models.member_key import MemberKey  # noqa: F401
 from coordinator.models.release import ContributorRelease  # noqa: F401
 from coordinator.models.household import Household, HouseholdMember  # noqa: F401
 from coordinator.models.mesh_node import MeshNode  # noqa: F401

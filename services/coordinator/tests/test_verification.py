@@ -25,6 +25,7 @@ from coordinator.services.verification import (
     CANARIES,
     Canary,
     evaluate_canary,
+    probe_due_peers,
     record_canary_result,
     run_canary_probe,
 )
@@ -232,3 +233,64 @@ async def test_run_canary_probe_offline_peer_returns_none(
     # Peer exists in the DB but is not in the in-memory connection registry.
     peer = await _peer(db_session)
     assert await run_canary_probe(db_session, peer.id) is None
+
+
+async def _online_honest_peer(db: AsyncSession) -> Peer:
+    """A peer registered online with an honest canary-answering WS, a model
+    capability, and a heartbeat (reputation 0.5)."""
+    from coordinator.services.peer_registry import PeerConnection, register_peer
+
+    peer = await _peer(db)
+    db.add(PeerCapability(peer_id=peer.id, model_slug=_MODEL, quantization="q4_K_M"))
+    db.add(
+        PeerHeartbeat(
+            peer_id=peer.id,
+            last_beat_at=datetime.now(timezone.utc),
+            binary_hash="h",
+            client_version="v",
+        )
+    )
+    await db.flush()
+    await register_peer(
+        PeerConnection(
+            peer_id=peer.id,
+            session_id=uuid.uuid4(),
+            ws=_HonestPeerWS(),
+            member_id=peer.member_id,
+        )
+    )
+    return peer
+
+
+@pytest.mark.asyncio
+async def test_probe_due_peers_targets_escrowed_and_releases(
+    db_session: AsyncSession,
+) -> None:
+    from coordinator.services.peer_registry import unregister_peer
+
+    # peer_escrow holds escrowed credits; peer_clean has none.
+    peer_escrow = await _online_honest_peer(db_session)
+    peer_clean = await _online_honest_peer(db_session)
+    job_id = await _escrowed_job_for_peer(db_session, peer_escrow.id)
+    online = [peer_escrow.id, peer_clean.id]
+
+    async def _rep(peer_id: uuid.UUID) -> float:
+        hb = await db_session.get(PeerHeartbeat, peer_id)
+        await db_session.refresh(hb)
+        return hb.reputation
+
+    try:
+        # Cycle 1: only the escrowed peer is due. 0.5 -> 0.6, not yet released.
+        probed = await probe_due_peers(db_session, online)
+        assert probed == 1, "only the peer with escrowed credits should be probed"
+        assert await _rep(peer_escrow.id) == pytest.approx(0.6)
+        assert await _rep(peer_clean.id) == pytest.approx(0.5), "clean peer untouched"
+        assert await _is_escrowed(db_session, job_id) is True
+
+        # Cycle 2: 0.6 -> 0.7 >= threshold -> escrow released.
+        probed = await probe_due_peers(db_session, online)
+        assert probed == 1
+        assert await _is_escrowed(db_session, job_id) is False, "escrow released"
+    finally:
+        await unregister_peer(peer_escrow.id)
+        await unregister_peer(peer_clean.id)
