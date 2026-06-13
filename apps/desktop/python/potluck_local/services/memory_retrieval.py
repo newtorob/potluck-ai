@@ -17,6 +17,7 @@ import aiosqlite
 import numpy as np
 
 from potluck_local.services.ai_contracts import RETRIEVAL_PROFILE_VERSION
+from potluck_local.services.memory_db import project_clause
 from potluck_local.services.memory_extraction import Memory, MemoryCategory
 from potluck_local.utils.time import now_iso as _now_iso
 
@@ -40,12 +41,8 @@ async def _embeddings_change_key(
     from potluck_local.services.memory_db import get_memory_db_path
 
     path = db_path or get_memory_db_path()
-    if project is not None:
-        proj_clause = "(m.project = ? OR m.project IS NULL)"
-        params: list = [model, project]
-    else:
-        proj_clause = "m.project IS NULL"
-        params = [model]
+    proj_clause, proj_params = project_clause(project, alias="m.")
+    params = [model, *proj_params]
     async with aiosqlite.connect(path) as db:
         cur = await db.execute(
             f"""SELECT COUNT(*), MAX(m.updated_at)
@@ -128,15 +125,8 @@ def _extract_keywords(messages: list[dict], max_keywords: int = 15) -> list[str]
     return unique[:max_keywords]
 
 
-def _project_clause(project: str | None) -> tuple[str, list]:
-    """Return (SQL fragment, params) for project-scoped filtering.
-
-    When project is given: return rows where project = X OR project IS NULL.
-    When project is None: return only global rows (project IS NULL).
-    """
-    if project is not None:
-        return "(project = ? OR project IS NULL)", [project]
-    return "project IS NULL", []
+# project_clause(project, alias) is imported from memory_db — shared with
+# task_state + memory_clustering.
 
 
 from pydantic import BaseModel
@@ -240,7 +230,7 @@ async def semantic_search(
     if include_pinned:
         # Pinned memories always inject, regardless of cosine score or
         # min_confidence. Prepend them (deduped) and re-cap at `limit`.
-        pclause, pparams = _project_clause(project or None)
+        pclause, pparams = project_clause(project or None)
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
             cur = await db.execute(
@@ -340,7 +330,7 @@ async def get_keywords(
 
     project = project or None
     db_path = get_memory_db_path()
-    proj_clause, proj_params = _project_clause(project)
+    proj_clause, proj_params = project_clause(project)
 
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
@@ -432,7 +422,7 @@ class MemoryRetriever:
         always_budget = int(os.environ.get("POTLUCK_ALWAYS_BUDGET", str(_default_always)))
         always_budget = max(0, min(always_budget, max_memories))
 
-        proj_clause, proj_params = _project_clause(project)
+        proj_clause, proj_params = project_clause(project)
 
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
@@ -675,7 +665,7 @@ class MemoryRetriever:
                 params.append(category)
 
             if not include_all:
-                proj_clause, proj_params = _project_clause(project)
+                proj_clause, proj_params = project_clause(project)
                 conditions.append(proj_clause)
                 params.extend(proj_params)
 

@@ -79,16 +79,14 @@ class ClusterCache:
         self._store: dict[str | None, tuple[int, ClusterResponse]] = {}
 
     async def _count_active(self, project: str | None) -> int:
-        from potluck_local.services.memory_db import get_memory_db_path
+        from potluck_local.services.memory_db import (
+            get_memory_db_path,
+            project_clause,
+        )
         import aiosqlite
 
         db_path = get_memory_db_path()
-        if project is not None:
-            clause = "(project = ? OR project IS NULL)"
-            params: list = [project]
-        else:
-            clause = "project IS NULL"
-            params = []
+        clause, params = project_clause(project)
 
         async with aiosqlite.connect(db_path) as db:
             cursor = await db.execute(

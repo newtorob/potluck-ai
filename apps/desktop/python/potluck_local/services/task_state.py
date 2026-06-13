@@ -15,6 +15,8 @@ from typing import Literal
 import aiosqlite
 from pydantic import BaseModel, field_validator
 
+from potluck_local.services.memory_db import project_clause
+
 logger = logging.getLogger(__name__)
 
 TaskStatus = Literal["active", "paused", "completed", "abandoned"]
@@ -135,15 +137,8 @@ def _row_to_task(row: dict) -> TaskState:
     )
 
 
-def _project_clause(project: str | None) -> tuple[str, list]:
-    """Return (SQL fragment, params) for project-scoped filtering.
-
-    When project is given: return rows where project = X OR project IS NULL.
-    When project is None: return only global rows (project IS NULL).
-    """
-    if project is not None:
-        return "(project = ? OR project IS NULL)", [project]
-    return "project IS NULL", []
+# project_clause(project, alias) is imported from memory_db — shared with
+# memory_retrieval + memory_clustering.
 
 
 class TaskStateManager:
@@ -258,7 +253,7 @@ class TaskStateManager:
                 params.append(status)
 
             if not include_all:
-                proj_clause, proj_params = _project_clause(project)
+                proj_clause, proj_params = project_clause(project)
                 conditions.append(proj_clause)
                 params.extend(proj_params)
 

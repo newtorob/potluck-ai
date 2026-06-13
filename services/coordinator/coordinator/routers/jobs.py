@@ -42,6 +42,8 @@ from coordinator.schemas.peer import (
     SamplingParams,
 )
 from coordinator.services.peer_registry import (
+    JobBuffer,
+    PeerConnection,
     complete_job,
     pick_peer_for_model,
     register_job,
@@ -83,6 +85,74 @@ class JobErrorResponse(BaseModel):
     error_message: str
 
 
+async def _dispatch_to_peer(
+    db: AsyncSession, req: JobRequest
+) -> tuple[PeerConnection, Job, JobBuffer]:
+    """Shared dispatch preamble for the sync + streaming job endpoints.
+
+    Picks an eligible peer (503 if none), creates the Job row, registers the
+    in-memory buffer, and delivers the JobAssignedMessage (502 if the peer is
+    unreachable). Returns (peer_conn, job, buf); the caller awaits buf and logs
+    its own "dispatched" event.
+
+    CRITICAL PRIVACY POINT: JobAssignedMessage carries ONLY job_id + model_slug
+    + prompt + sampling. Adding member_id or any identifying field here is a
+    blinded-routing violation (the schema has no member_id field, so it's also
+    a type error, but the rule deserves the comment).
+    """
+    peer_conn = await pick_peer_for_model(db, req.model_slug)
+    if peer_conn is None:
+        # Distinguish "nobody online" from "nobody online serves this model"
+        # so the caller knows whether to wait or pick a different slug.
+        from coordinator.services.peer_registry import online_peer_count
+
+        online = await online_peer_count()
+        if online == 0:
+            detail = "No contributor peers connected. Bring at least one online and retry."
+        else:
+            detail = (
+                f"No online peer serves model '{req.model_slug}'. "
+                f"{online} peer(s) online but none advertise that capability. "
+                f"Either pick a different model_slug or wait for an eligible peer to connect."
+            )
+        raise HTTPException(status_code=503, detail=detail)
+
+    job = Job(
+        member_id=_STUB_MEMBER_ID,
+        peer_id=peer_conn.peer_id,
+        model_slug=req.model_slug,
+        privacy_mode="pseudonymous",
+        status="dispatched",
+    )
+    db.add(job)
+    await db.flush()  # populates job.id
+    await db.commit()
+
+    buf = await register_job(job.id)
+    assigned = JobAssignedMessage(
+        job_id=job.id,
+        model_slug=req.model_slug,
+        prompt=req.prompt,
+        sampling=req.sampling,
+    )
+    try:
+        await peer_conn.ws.send_json(assigned.model_dump(mode="json"))
+    except Exception as exc:
+        logger.warning(
+            "job_dispatch_send_failed",
+            job_id=str(job.id),
+            peer_id=str(peer_conn.peer_id),
+            reason=str(exc),
+        )
+        await complete_job(job.id)
+        raise HTTPException(
+            status_code=502,
+            detail=f"Couldn't deliver job to peer: {exc}",
+        ) from exc
+
+    return peer_conn, job, buf
+
+
 @router.post(
     "",
     response_model=JobResponse,
@@ -100,67 +170,9 @@ async def dispatch_job(
     JOB_TIMEOUT_S elapses). Good enough for the m3 stub smoke test.
     Streaming endpoints come in a follow-up.
     """
-    # ---- 1. Pick a peer that actually serves this model ---- #
-    peer_conn = await pick_peer_for_model(db, req.model_slug)
-    if peer_conn is None:
-        # Distinguish "nobody online" from "nobody online serves this model"
-        # so the caller knows whether to wait or pick a different slug.
-        from coordinator.services.peer_registry import online_peer_count
-        online = await online_peer_count()
-        if online == 0:
-            detail = "No contributor peers connected. Bring at least one online and retry."
-        else:
-            detail = (
-                f"No online peer serves model '{req.model_slug}'. "
-                f"{online} peer(s) online but none advertise that capability. "
-                f"Either pick a different model_slug or wait for an eligible peer to connect."
-            )
-        raise HTTPException(status_code=503, detail=detail)
-
-    # ---- 2. Create the Job DB row ---- #
-    job = Job(
-        member_id=_STUB_MEMBER_ID,
-        peer_id=peer_conn.peer_id,
-        model_slug=req.model_slug,
-        privacy_mode="pseudonymous",
-        status="dispatched",
-    )
-    db.add(job)
-    await db.flush()  # populates job.id
+    # ---- 1-3. Pick peer, create job, deliver (shared with the stream endpoint) ---- #
+    peer_conn, job, buf = await _dispatch_to_peer(db, req)
     job_id = job.id
-    await db.commit()
-
-    # ---- 3. Register the job buffer + send JobAssigned ---- #
-    buf = await register_job(job_id)
-
-    # CRITICAL PRIVACY POINT: JobAssignedMessage carries ONLY job_id +
-    # model_slug + prompt + sampling. Adding member_id or any identifying
-    # field here is a blinded-routing violation. The schema for
-    # JobAssignedMessage doesn't have a member_id field, so this is also
-    # caught at type-check time, but the rule deserves the comment.
-    assigned = JobAssignedMessage(
-        job_id=job_id,
-        model_slug=req.model_slug,
-        prompt=req.prompt,
-        sampling=req.sampling,
-    )
-
-    try:
-        await peer_conn.ws.send_json(assigned.model_dump(mode="json"))
-    except Exception as exc:
-        # Couldn't reach the peer — mark the job failed and bail.
-        logger.warning(
-            "job_dispatch_send_failed",
-            job_id=str(job_id),
-            peer_id=str(peer_conn.peer_id),
-            reason=str(exc),
-        )
-        await complete_job(job_id)
-        raise HTTPException(
-            status_code=502,
-            detail=f"Couldn't deliver job to peer: {exc}",
-        ) from exc
-
     logger.info(
         "job_dispatched",
         job_id=str(job_id),
@@ -412,51 +424,9 @@ async def dispatch_job_stream(
     blinded routing, 503 on no eligible peer) but the response is an
     SSE stream rather than a collected JSON body.
     """
-    # ---- 1. Pick a peer that serves this model ---- #
-    peer_conn = await pick_peer_for_model(db, req.model_slug)
-    if peer_conn is None:
-        from coordinator.services.peer_registry import online_peer_count
-        online = await online_peer_count()
-        if online == 0:
-            detail = "No contributor peers connected. Bring at least one online and retry."
-        else:
-            detail = (
-                f"No online peer serves model '{req.model_slug}'. "
-                f"{online} peer(s) online but none advertise that capability."
-            )
-        raise HTTPException(status_code=503, detail=detail)
-
-    # ---- 2. Create the Job DB row ---- #
-    job = Job(
-        member_id=_STUB_MEMBER_ID,
-        peer_id=peer_conn.peer_id,
-        model_slug=req.model_slug,
-        privacy_mode="pseudonymous",
-        status="dispatched",
-    )
-    db.add(job)
-    await db.flush()
+    # ---- 1-3. Pick peer, create job, deliver (shared with the sync endpoint) ---- #
+    peer_conn, job, buf = await _dispatch_to_peer(db, req)
     job_id = job.id
-    await db.commit()
-
-    # ---- 3. Register buffer + send JobAssigned ---- #
-    buf = await register_job(job_id)
-
-    assigned = JobAssignedMessage(
-        job_id=job_id,
-        model_slug=req.model_slug,
-        prompt=req.prompt,
-        sampling=req.sampling,
-    )
-    try:
-        await peer_conn.ws.send_json(assigned.model_dump(mode="json"))
-    except Exception as exc:
-        await complete_job(job_id)
-        raise HTTPException(
-            status_code=502,
-            detail=f"Couldn't deliver job to peer: {exc}",
-        ) from exc
-
     logger.info(
         "job_dispatched_stream",
         job_id=str(job_id),

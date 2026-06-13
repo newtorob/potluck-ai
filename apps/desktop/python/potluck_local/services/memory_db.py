@@ -577,6 +577,21 @@ async def get_embedding(
     return vec, row["model_used"]
 
 
+def project_clause(project: str | None, alias: str = "") -> "tuple[str, list]":
+    """Return (SQL fragment, params) for project-scoped filtering.
+
+    project given -> rows where project = X OR project IS NULL.
+    project None  -> only global rows (project IS NULL).
+
+    `alias` prefixes the column for JOIN queries, e.g. alias="m." emits
+    "(m.project = ? OR m.project IS NULL)".
+    """
+    col = f"{alias}project"
+    if project is not None:
+        return f"({col} = ? OR {col} IS NULL)", [project]
+    return f"{col} IS NULL", []
+
+
 async def load_all_embeddings(
     project: str | None = None,
     model: str | None = None,
@@ -597,12 +612,7 @@ async def load_all_embeddings(
 
     path = db_path or get_memory_db_path()
 
-    if project is not None:
-        proj_clause = "(m.project = ? OR m.project IS NULL)"
-        proj_params: list = [project]
-    else:
-        proj_clause = "m.project IS NULL"
-        proj_params = []
+    proj_clause, proj_params = project_clause(project, alias="m.")
 
     model_clause = ""
     if model is not None:
