@@ -31,7 +31,7 @@ import hashlib
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -55,6 +55,11 @@ GENESIS_HASH = hashlib.sha256(b"potluck-credit-ledger-genesis").hexdigest()
 # Reputation nudge per verification outcome. A peer's reputation (0..1, default
 # 0.5) moves toward 1.0 on a passed verification and toward 0.0 on a failure.
 REPUTATION_STEP = 0.1
+
+# Reputation at/above which a peer is trusted enough to release its escrowed
+# earned credits (built up via passed canary verifications). Default rep is 0.5,
+# so two consecutive passed canaries (0.5 -> 0.6 -> 0.7) cross it.
+RELEASE_REPUTATION_THRESHOLD = 0.7
 
 
 def _compute_row_hash(
@@ -323,3 +328,27 @@ async def apply_verification_result(
 
     await db.flush()
     return released
+
+
+async def release_escrow_for_peer(db: AsyncSession, peer_id: uuid.UUID) -> int:
+    """Release (escrowed -> spendable) every escrowed 'earned' row from jobs
+    this peer served. Returns the number of rows released.
+
+    Used by the verification source once a peer's reputation crosses the trust
+    threshold: the peer has proven itself, so the public-pool credits it earned
+    while unproven become spendable. The link from a credit row to a peer is via
+    the job (credit_ledger.job_id -> jobs.id -> jobs.peer_id).
+    """
+    from coordinator.models.job import Job
+
+    result = await db.execute(
+        update(CreditLedger)
+        .where(
+            CreditLedger.direction == "earned",
+            CreditLedger.escrowed.is_(True),
+            CreditLedger.job_id.in_(select(Job.id).where(Job.peer_id == peer_id)),
+        )
+        .values(escrowed=False)
+    )
+    await db.flush()
+    return result.rowcount or 0

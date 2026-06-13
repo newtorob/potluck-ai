@@ -154,6 +154,14 @@ async def online_peer_count() -> int:
         return len(_peers)
 
 
+async def get_peer(peer_id: uuid.UUID) -> PeerConnection | None:
+    """Return a specific peer's live connection, or None if it isn't online.
+    Used by coordinator-initiated probes (canary verification) that target a
+    known peer rather than picking one by model."""
+    async with _lock:
+        return _peers.get(peer_id)
+
+
 # ---- job buffer lifecycle -------------------------------------------- #
 
 
