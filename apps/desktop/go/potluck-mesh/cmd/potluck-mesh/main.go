@@ -256,10 +256,10 @@ func run() int {
 
 	// ---- local IPC server ---- //
 	ipcSrv := localapi.New(localapi.Config{
-		Bus:           bus,
-		PeerStore:     ps,
-		State:         ipcState,
-		PeerReachFn:   tun.PeerReachability,
+		Bus:         bus,
+		PeerStore:   ps,
+		State:       ipcState,
+		PeerReachFn: tun.PeerReachability,
 		IsDERPRoutedFn: func(pubkey string) bool {
 			if dBind == nil {
 				return false
@@ -271,6 +271,10 @@ func run() int {
 			var pub [32]byte
 			copy(pub[:], kb)
 			return dBind.IsPeerDERPRouted(pub)
+		},
+		IsPeerConfiguredFn: func(pubkey string) bool {
+			ok, _ := tun.IsPeerConfigured(pubkey)
+			return ok
 		},
 		CoordClient:   coordClient,
 		SignalRestart: signalRestart,
@@ -441,9 +445,9 @@ func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.
 	// true = reachable, false = unreachable.
 	// Peers not yet seen are treated as "unknown" (logged once as initial state).
 	type peerReachState struct {
-		reachable   bool
-		seenOnce    bool
-		derpRouted  bool // true if we've flipped this peer to DERP routing
+		reachable  bool
+		seenOnce   bool
+		derpRouted bool // true if we've flipped this peer to DERP routing
 	}
 	states := make(map[string]*peerReachState)
 
@@ -1192,7 +1196,6 @@ func makeDERPJWTFetcher(cfg *config.Config) derp.JWTFetcher {
 		return result.Token, nil
 	}
 }
-
 
 // setupLogging configures slog based on the log format in config.
 func setupLogging(cfg *config.Config) {

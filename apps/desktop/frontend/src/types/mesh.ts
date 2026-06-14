@@ -49,6 +49,13 @@ export interface MeshPeer {
   platform: string | null;
   reachable: boolean;
   reachability_mode: ReachabilityMode | null;
+  /** Age of the last WireGuard handshake, in seconds. Absent/null when no
+   *  handshake has ever completed — lets the UI tell "stale" from "never".
+   *  Optional: older mesh sidecars don't send it. */
+  handshake_age_seconds?: number | null;
+  /** Whether this peer's key is provisioned on the WG device. Absent = unknown
+   *  (older sidecar). `false` while unreachable = key drift, not a firewall. */
+  key_configured?: boolean | null;
 }
 
 export interface MeshPeersResponse {

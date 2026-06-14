@@ -12,13 +12,13 @@
 //
 // SetMeshIP platform implementation:
 //   - Linux:   shells out to `ip addr add <ip>/32 dev <iface>` (v0 acceptable;
-//              netlink post-launch polish is tracked in TODO below).
+//     netlink post-launch polish is tracked in TODO below).
 //   - macOS:   shells out to `ifconfig <iface> inet <ip> <ip>`.
 //   - Windows: NOT IMPLEMENTED in week 3 — IP assignment via iphlpapi/netsh is
-//              non-trivial in pure Go without cgo. The TUN device comes up without
-//              an address; WG session still initialises, but the mesh IP is not
-//              routable on Windows until this is resolved. A log.Warn is emitted.
-//              TODO(week4-windows): implement via netsh / iphlpapi or a small cgo shim.
+//     non-trivial in pure Go without cgo. The TUN device comes up without
+//     an address; WG session still initialises, but the mesh IP is not
+//     routable on Windows until this is resolved. A log.Warn is emitted.
+//     TODO(week4-windows): implement via netsh / iphlpapi or a small cgo shim.
 //
 // Privacy: this package handles WireGuard encrypted packets only.
 // It never inspects payload bytes and never logs anything beyond
@@ -74,12 +74,12 @@ type Peer struct {
 
 // Tunnel wraps a userspace WireGuard device and its associated TUN interface.
 type Tunnel struct {
-	mu      sync.Mutex // protects IpcSet calls (wg-go's IpcSet is not documented as thread-safe)
-	dev     *device.Device
-	tdev    tun.Device
-	ifName  string
-	meshIP  net.IP
-	wgPort  int
+	mu     sync.Mutex // protects IpcSet calls (wg-go's IpcSet is not documented as thread-safe)
+	dev    *device.Device
+	tdev   tun.Device
+	ifName string
+	meshIP net.IP
+	wgPort int
 }
 
 // Option configures optional behaviour for New.
@@ -434,6 +434,40 @@ func (t *Tunnel) PeerReachability(pubkeyBase64 string) (lastHandshake time.Time,
 	return lastHandshake, rx, tx, nil
 }
 
+// IsPeerConfigured reports whether the WG device currently has a peer with the
+// given public key configured. It lets callers distinguish "this peer's key
+// isn't provisioned on the tunnel" (a stale/drifted key after a re-pair — fixed
+// by a re-sync) from "the key is configured but no tunnel formed" (a firewall /
+// NAT / VPN block) — two unreachable cases with two different fixes.
+//
+// Privacy: like PeerReachability, this parses the UAPI but never logs it (the
+// output contains the device's private key in hex).
+func (t *Tunnel) IsPeerConfigured(pubkeyBase64 string) (bool, error) {
+	pubkeyHex, err := base64ToHex(pubkeyBase64)
+	if err != nil {
+		return false, fmt.Errorf("tunnel: decode pubkey for config check: %w", err)
+	}
+
+	t.mu.Lock()
+	uapiText, ipcErr := t.dev.IpcGet()
+	t.mu.Unlock()
+	if ipcErr != nil {
+		return false, fmt.Errorf("tunnel: IpcGet: %w", ipcErr)
+	}
+
+	for _, line := range strings.Split(uapiText, "\n") {
+		line = strings.TrimRight(line, "\r")
+		k, v, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		if k == "public_key" && strings.EqualFold(v, pubkeyHex) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // appendPeerConfig writes the UAPI stanza for a single peer to sb.
 // Format follows https://www.wireguard.com/xplatform/#configuration-protocol
 func appendPeerConfig(sb *strings.Builder, p Peer) {
@@ -515,4 +549,3 @@ func newWGLogger() *device.Logger {
 		},
 	}
 }
-

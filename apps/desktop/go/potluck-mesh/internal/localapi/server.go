@@ -3,14 +3,16 @@
 //
 // Transport: Unix domain socket on macOS/Linux, named pipe on Windows.
 // Protocol:  HTTP/1.1 over the socket. JSON request/response bodies.
-//            WebSocket upgrade for WS /events.
+//
+//	WebSocket upgrade for WS /events.
 //
 // Endpoints (all return JSON):
-//   GET  /status  — current sidecar state
-//   GET  /peers   — household roster with reachability
-//   POST /pair    — enroll this node using a pairing token
-//   POST /unpair  — wipe local keys + stop tunnel
-//   WS   /events  — subscribe to the event bus
+//
+//	GET  /status  — current sidecar state
+//	GET  /peers   — household roster with reachability
+//	POST /pair    — enroll this node using a pairing token
+//	POST /unpair  — wipe local keys + stop tunnel
+//	WS   /events  — subscribe to the event bus
 //
 // Every response includes X-Potluck-Protocol-Version: 1 per the spec.
 //
@@ -71,6 +73,10 @@ type PeerReachabilityFunc func(pubkeyBase64 string) (lastHandshake time.Time, rx
 
 // IsDERPRoutedFunc reports whether a peer is currently routed via the DERP relay.
 type IsDERPRoutedFunc func(pubkeyBase64 string) bool
+
+// IsPeerConfiguredFunc reports whether the WG device has the given peer's key
+// configured — used to tell a drifted/unprovisioned key from a firewall block.
+type IsPeerConfiguredFunc func(pubkeyBase64 string) bool
 
 // SignalRestartFunc is called after /pair to re-connect the signal client with
 // the newly enrolled WG key.
@@ -224,30 +230,32 @@ func (s *State) snapshot(peerCount int) statusResponse {
 
 // Config carries all dependencies wired in from main.go.
 type Config struct {
-	Bus            *events.Bus
-	PeerStore      *peerstate.Store
-	State          *State
-	PeerReachFn    PeerReachabilityFunc // may be nil if tunnel isn't up yet
-	IsDERPRoutedFn IsDERPRoutedFunc     // may be nil
-	CoordClient    *coordapi.Client
-	SignalRestart  SignalRestartFunc
-	WGPrivKeyPath  string // path to detect / generate the WG private key
-	SocketPath     string // "" → use platform default
-	Platform       string // runtime.GOOS
+	Bus                *events.Bus
+	PeerStore          *peerstate.Store
+	State              *State
+	PeerReachFn        PeerReachabilityFunc // may be nil if tunnel isn't up yet
+	IsDERPRoutedFn     IsDERPRoutedFunc     // may be nil
+	IsPeerConfiguredFn IsPeerConfiguredFunc // may be nil
+	CoordClient        *coordapi.Client
+	SignalRestart      SignalRestartFunc
+	WGPrivKeyPath      string // path to detect / generate the WG private key
+	SocketPath         string // "" → use platform default
+	Platform           string // runtime.GOOS
 }
 
 // Server is the local IPC HTTP+WS server.
 type Server struct {
-	bus            *events.Bus
-	ps             *peerstate.Store
-	state          *State
-	peerReachFn    PeerReachabilityFunc
-	isDERPRoutedFn IsDERPRoutedFunc
-	coordClient    *coordapi.Client
-	signalRestart  SignalRestartFunc
-	wgPrivKeyPath  string
-	platform       string
-	socketPath     string
+	bus                *events.Bus
+	ps                 *peerstate.Store
+	state              *State
+	peerReachFn        PeerReachabilityFunc
+	isDERPRoutedFn     IsDERPRoutedFunc
+	isPeerConfiguredFn IsPeerConfiguredFunc
+	coordClient        *coordapi.Client
+	signalRestart      SignalRestartFunc
+	wgPrivKeyPath      string
+	platform           string
+	socketPath         string
 
 	// pairingMu prevents concurrent /pair attempts.
 	pairingMu sync.Mutex
@@ -266,16 +274,17 @@ func New(cfg Config) *Server {
 	}
 
 	s := &Server{
-		bus:            cfg.Bus,
-		ps:             cfg.PeerStore,
-		state:          cfg.State,
-		peerReachFn:    cfg.PeerReachFn,
-		isDERPRoutedFn: cfg.IsDERPRoutedFn,
-		coordClient:    cfg.CoordClient,
-		signalRestart:  cfg.SignalRestart,
-		wgPrivKeyPath:  cfg.WGPrivKeyPath,
-		platform:       cfg.Platform,
-		socketPath:     sp,
+		bus:                cfg.Bus,
+		ps:                 cfg.PeerStore,
+		state:              cfg.State,
+		peerReachFn:        cfg.PeerReachFn,
+		isDERPRoutedFn:     cfg.IsDERPRoutedFn,
+		isPeerConfiguredFn: cfg.IsPeerConfiguredFn,
+		coordClient:        cfg.CoordClient,
+		signalRestart:      cfg.SignalRestart,
+		wgPrivKeyPath:      cfg.WGPrivKeyPath,
+		platform:           cfg.Platform,
+		socketPath:         sp,
 	}
 
 	mux := http.NewServeMux()
@@ -381,6 +390,12 @@ type peerResponse struct {
 	Platform         *string `json:"platform,omitempty"`
 	Reachable        bool    `json:"reachable"`
 	ReachabilityMode *string `json:"reachability_mode"`
+	// HandshakeAgeSeconds is the age of the last WireGuard handshake. nil when
+	// no handshake has ever completed (lets the UI tell "stale" from "never").
+	HandshakeAgeSeconds *float64 `json:"handshake_age_seconds,omitempty"`
+	// KeyConfigured reports whether this peer's key is provisioned on the WG
+	// device. nil when unknown (tunnel down). false + unreachable = key drift.
+	KeyConfigured *bool `json:"key_configured,omitempty"`
 }
 
 type peersResponse struct {
@@ -428,12 +443,25 @@ func (s *Server) handlePeers(w http.ResponseWriter, r *http.Request) {
 			pr.Platform = p.Platform
 		}
 
-		// Reachability: query the tunnel's last-handshake age.
+		// Reachability: query the tunnel's last-handshake age. We expose the
+		// age explicitly (not just the reachable bool) so the UI can tell a
+		// connection that dropped recently (stale) from one that never formed.
 		if s.peerReachFn != nil {
 			lastHS, _, _, err := s.peerReachFn(p.WGPublicKey)
 			if err == nil {
+				if !lastHS.IsZero() {
+					age := time.Since(lastHS).Seconds()
+					pr.HandshakeAgeSeconds = &age
+				}
 				pr.Reachable = !lastHS.IsZero() && time.Since(lastHS) < 3*time.Minute
 			}
+		}
+
+		// Key provisioned on the device? Distinguishes a drifted/unprovisioned
+		// key from a firewall/NAT block when the peer is unreachable.
+		if s.isPeerConfiguredFn != nil {
+			kc := s.isPeerConfiguredFn(p.WGPublicKey)
+			pr.KeyConfigured = &kc
 		}
 
 		// Reachability mode: DERP vs direct (only meaningful when reachable).

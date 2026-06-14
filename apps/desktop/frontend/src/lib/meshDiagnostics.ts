@@ -56,6 +56,7 @@ export type PeerState =
   | 'relayed' // connected, but via a relay (slower)
   | 'connecting' // known to coordinator, tunnel still coming up
   | 'no_data_plane' // coordinator sees them, but no encrypted tunnel (firewall/VPN/NAT)
+  | 'key_drift' // this peer's key isn't provisioned on our tunnel (stale key / re-pair)
   | 'status_unknown'; // we can't say — an upstream cause (e.g. coordinator down) suppresses this
 
 export interface PeerDiagnostic {
@@ -294,6 +295,22 @@ function derivePeer(peer: MeshPeer, coordinatorTrustworthy: boolean, now: number
     };
   }
 
+  // Key not provisioned on our tunnel → a stale/drifted key (e.g. the peer
+  // re-paired) or config that never applied. Different fix (re-sync) than a
+  // firewall block. `key_configured` is absent on older sidecars — only act on
+  // an explicit false.
+  if (peer.key_configured === false) {
+    return {
+      peerId: peer.node_id,
+      state: 'key_drift',
+      severity: 'warn',
+      label: 'Key out of date',
+      detail:
+        'This machine’s key isn’t provisioned on the tunnel — usually a stale key after it re-paired.',
+      fix: 'Restart the mesh on this machine to re-sync keys (or re-pair this machine).',
+    };
+  }
+
   // Coordinator sees this peer (it’s in the roster) but there’s no encrypted
   // tunnel. If it only just appeared, the tunnel may still be forming.
   const lastSeenMs = peer.last_seen_at ? Date.parse(peer.last_seen_at) : NaN;
@@ -308,13 +325,18 @@ function derivePeer(peer: MeshPeer, coordinatorTrustworthy: boolean, now: number
     };
   }
 
+  // No tunnel. Split "dropped recently" (a handshake existed, now stale) from
+  // "never formed" (no handshake ever) — usually a different story. Falls back
+  // to the "never" copy when the sidecar doesn't report handshake age.
+  const hadHandshake = typeof peer.handshake_age_seconds === 'number';
   return {
     peerId: peer.node_id,
     state: 'no_data_plane',
     severity: 'warn',
-    label: 'No tunnel',
-    detail:
-      'The coordinator can see this machine, but no encrypted tunnel formed — typically a firewall or VPN kill-switch blocking the mesh on one side.',
+    label: hadHandshake ? 'Tunnel dropped' : 'No tunnel',
+    detail: hadHandshake
+      ? 'The encrypted tunnel was up but has gone quiet — often a VPN reconnect, sleep/wake, or a network change broke the data path.'
+      : 'The coordinator can see this machine, but no encrypted tunnel ever formed — typically a firewall or VPN kill-switch blocking the mesh on one side.',
     fix: 'On both machines, allow the mesh interface past any VPN/firewall (a kill-switch will silently drop it).',
   };
 }

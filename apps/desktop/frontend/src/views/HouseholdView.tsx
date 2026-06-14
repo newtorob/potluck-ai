@@ -34,6 +34,7 @@ import {
   CheckCircle2,
   ArrowRight,
   Cpu,
+  KeyRound,
 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { ViewHeader } from '@/components/layout/ViewHeader';
@@ -1137,6 +1138,10 @@ function PeerStateBadge({ diag }: { diag?: PeerDiagnostic }) {
     no_data_plane: {
       icon: ShieldOff,
       cls: 'border-destructive/30 bg-destructive/10 text-destructive',
+    },
+    key_drift: {
+      icon: KeyRound,
+      cls: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
     },
     status_unknown: { icon: null, cls: 'border-border/60 bg-muted text-muted-foreground' },
   };
