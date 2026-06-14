@@ -22,6 +22,11 @@ WorkingDirectory=@REPO_PATH@/apps/desktop/python
 # /peer/* and /health. To force loopback-only set POTLUCK_BIND_HOST=127.0.0.1.
 ExecStart=@REPO_PATH@/apps/desktop/python/.venv/bin/python -m potluck_local.app --port @PORT@
 
+# CUDA runtime libs (LD_LIBRARY_PATH for GPU llama-cpp) and an optional model
+# auto-load are added by install-sidecar.sh as a drop-in
+# (potluck-sidecar.service.d/10-cuda-autoload.conf), not inline here — so the
+# base unit stays generic and re-install can re-detect the CUDA path.
+
 # Restart on crash. The Electron app does its own restart-and-bail dance
 # when running in dev; systemd does the same job here.
 Restart=on-failure

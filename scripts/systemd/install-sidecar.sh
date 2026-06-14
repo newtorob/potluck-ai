@@ -14,14 +14,21 @@
 # ------
 #   sudo ./install-sidecar.sh --install                 # uses ./.venv + port 8321
 #   sudo ./install-sidecar.sh --install --port 8321 --user rob
+#   sudo ./install-sidecar.sh --install --autoload-model llama-3.1-8b-instruct-q5
 #   sudo ./install-sidecar.sh --uninstall
 #   sudo ./install-sidecar.sh --status
 #
 # WHAT IT DOES (install)
 #   1. Renders potluck-sidecar.service.template, filling in the invoking
 #      user (or --user override), the repo path, and the bind port.
-#   2. Installs to /etc/systemd/system/, daemon-reloads, enables + starts.
-#   3. Polls /health on the configured port to confirm the service is live.
+#   2. Writes a drop-in (potluck-sidecar.service.d/10-cuda-autoload.conf):
+#        - auto-detects the venv's CUDA runtime libs and puts them on
+#          LD_LIBRARY_PATH so GPU llama-cpp finds libcudart/libcublas
+#          (no-op on a CPU-only venv);
+#        - if --autoload-model <slug> is given, loads that model on start so a
+#          headless node is inference-ready after boot (best-effort).
+#   3. Installs to /etc/systemd/system/, daemon-reloads, enables + starts.
+#   4. Polls /health on the configured port to confirm the service is live.
 #
 # WHAT IT DOES (uninstall)
 #   1. Stops + disables the unit, removes the unit file, daemon-reloads.
@@ -77,14 +84,16 @@ require_root() {
 ACTION=""
 PORT="$PORT_DEFAULT"
 SIDECAR_USER="$SIDECAR_USER_DEFAULT"
+AUTOLOAD_MODEL=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --install)   ACTION="install" ;;
-        --uninstall) ACTION="uninstall" ;;
-        --status)    ACTION="status" ;;
-        --port)      PORT="$2"; shift ;;
-        --user)      SIDECAR_USER="$2"; shift ;;
+        --install)         ACTION="install" ;;
+        --uninstall)       ACTION="uninstall" ;;
+        --status)          ACTION="status" ;;
+        --port)            PORT="$2"; shift ;;
+        --user)            SIDECAR_USER="$2"; shift ;;
+        --autoload-model)  AUTOLOAD_MODEL="$2"; shift ;;
         -h|--help)
             sed -n '2,/^set -euo/p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
@@ -106,6 +115,24 @@ fi
 resolve_group_of_user() {
     local user="$1"
     id -gn "$user" 2>/dev/null || echo "$user"
+}
+
+# Detect CUDA runtime lib dirs shipped by the venv's nvidia-* pip packages
+# (e.g. nvidia/cu13/lib holding libcudart.so.13). GPU llama-cpp links these and
+# needs them on LD_LIBRARY_PATH. Generalised — finds whatever CUDA major the
+# venv has (cu12/cu13/…) and any python version. Returns a ':'-joined list, or
+# empty on a CPU-only venv (in which case no LD_LIBRARY_PATH is set).
+detect_cuda_lib_path() {
+    local venv="$REPO_ROOT/apps/desktop/python/.venv"
+    local dirs=() d
+    for d in "$venv"/lib/python*/site-packages/nvidia/*/lib; do
+        [ -d "$d" ] || continue
+        if compgen -G "$d/*.so*" >/dev/null 2>&1; then
+            dirs+=("$d")
+        fi
+    done
+    local IFS=:
+    echo "${dirs[*]:-}"
 }
 
 render_unit() {
@@ -151,6 +178,37 @@ do_install() {
     chmod 0644 "$SIDECAR_UNIT_DST"
     ok "wrote $SIDECAR_UNIT_DST"
 
+    # CUDA libs + optional model auto-load, via a drop-in. Kept out of the base
+    # unit so re-install can re-detect the CUDA path and the base template stays
+    # generic. This is what a GPU contributor (e.g. a headless box) needs to be
+    # inference-ready on boot.
+    local dropin_dir="$SYSTEMD_DIR/potluck-sidecar.service.d"
+    local dropin="$dropin_dir/10-cuda-autoload.conf"
+    local cuda_path; cuda_path="$(detect_cuda_lib_path)"
+    if [ -n "$cuda_path" ] || [ -n "$AUTOLOAD_MODEL" ]; then
+        mkdir -p "$dropin_dir"
+        {
+            echo "[Service]"
+            if [ -n "$cuda_path" ]; then
+                echo "# Auto-detected CUDA runtime libs from the venv (GPU llama-cpp)."
+                echo "Environment=LD_LIBRARY_PATH=$cuda_path"
+            fi
+            if [ -n "$AUTOLOAD_MODEL" ]; then
+                echo "# Best-effort: load a model on start so a headless node is inference-ready."
+                echo "ExecStartPost=-/usr/bin/bash -c 'for i in \$(seq 1 30); do curl -sf -m 8 -X POST http://127.0.0.1:$PORT/models/$AUTOLOAD_MODEL/load -H \"Content-Type: application/json\" -d \"{}\" && exit 0; sleep 2; done'"
+            fi
+        } > "$dropin"
+        chmod 0644 "$dropin"
+        ok "wrote $dropin"
+        [ -n "$cuda_path" ] && log "  CUDA libs on LD_LIBRARY_PATH: $cuda_path"
+        [ -n "$AUTOLOAD_MODEL" ] && log "  auto-load model on start: $AUTOLOAD_MODEL"
+    else
+        # No CUDA + no autoload: ensure no stale drop-in lingers from a prior run.
+        rm -f "$dropin" 2>/dev/null || true
+        rmdir "$dropin_dir" 2>/dev/null || true
+        log "no CUDA libs detected and no --autoload-model — no drop-in needed"
+    fi
+
     log "Reloading systemd"
     systemctl daemon-reload
 
@@ -182,6 +240,11 @@ do_uninstall() {
     if systemctl list-unit-files potluck-sidecar.service >/dev/null 2>&1; then
         log "Stopping + disabling potluck-sidecar.service"
         systemctl disable --now potluck-sidecar.service 2>/dev/null || true
+    fi
+
+    if [ -d "$SYSTEMD_DIR/potluck-sidecar.service.d" ]; then
+        log "Removing drop-in $SYSTEMD_DIR/potluck-sidecar.service.d"
+        rm -rf "$SYSTEMD_DIR/potluck-sidecar.service.d"
     fi
 
     if [ -f "$SIDECAR_UNIT_DST" ]; then
