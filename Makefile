@@ -86,6 +86,51 @@ up: check-docker ## Start Postgres + API + Coordinator in the background (runs m
 	@echo "==> Coordinator: http://localhost:8400/health (LAN-reachable on this host's IP)"
 	@echo "==> Postgres:    localhost:5432 (potluck/potluck)"
 
+# ---------- tailnet (cross-machine Phase G mesh dev) ----------
+
+tailnet-ip: ## Print this host's Tailscale IPv4 (used by the tailnet targets)
+	@ip="$$(tailscale ip -4 2>/dev/null | head -1)"; \
+	if [ -z "$$ip" ]; then \
+		echo "error: 'tailscale ip -4' returned nothing. Is Tailscale up? (tailscale status)"; exit 1; \
+	fi; \
+	echo "$$ip"
+
+up-tailnet: check-docker ## Start the backend with coordinator+DERP published on the Tailscale IP (for peers like newtorob)
+	@ip="$$(tailscale ip -4 2>/dev/null | head -1)"; \
+	if [ -z "$$ip" ]; then \
+		echo "error: 'tailscale ip -4' returned nothing. Is Tailscale up? (tailscale status)"; exit 1; \
+	fi; \
+	echo "==> Publishing coordinator(8400) + DERP(8443/8444) on tailnet IP $$ip + 127.0.0.1"; \
+	POTLUCK_TAILNET_IP="$$ip" $(COMPOSE) -f docker-compose.yml -f docker-compose.tailnet.yml up -d --build
+	@echo
+	@$(MAKE) tailnet-check
+
+tailnet-check: ## Verify coordinator(8400)+DERP(8443) are reachable on localhost AND the tailnet IP
+	@ip="$$(tailscale ip -4 2>/dev/null | head -1)"; \
+	if [ -z "$$ip" ]; then echo "error: no tailscale IP"; exit 1; fi; \
+	echo "==> Reachability matrix (host = this Mac, peer = whatever can hit \$$ip):"; \
+	printf "    %-34s " "8400 coordinator @ 127.0.0.1:"; \
+	curl -s -o /dev/null -w "%{http_code}\n" --max-time 4 http://127.0.0.1:8400/health || echo "000"; \
+	printf "    %-34s " "8400 coordinator @ $$ip:"; \
+	curl -s -o /dev/null -w "%{http_code}\n" --max-time 4 http://$$ip:8400/health || echo "000"; \
+	printf "    %-34s " "8443 DERP tcp @ 127.0.0.1:"; \
+	(nc -z -w4 127.0.0.1 8443 >/dev/null 2>&1 && echo "OPEN") || echo "CLOSED"; \
+	printf "    %-34s " "8443 DERP tcp @ $$ip:"; \
+	(nc -z -w4 $$ip 8443 >/dev/null 2>&1 && echo "OPEN") || echo "CLOSED"; \
+	echo; \
+	echo "==> A tailnet PEER should also see 200/OPEN on $$ip. If the peer sees 000/CLOSED"; \
+	echo "    but localhost is 200/OPEN, the break is almost certainly on the PEER (a VPN"; \
+	echo "    like Mullvad hijacking the 100.64.0.0/10 tailnet range) — not this Mac."; \
+	echo "    Diagnose + fix: docs/runbooks/tailnet-coordinator-reachability.md"
+
+kill-stray-coordinator: ## Kill any NATIVE (non-Docker) uvicorn coordinator left running (e.g. the stray :8401)
+	@pids="$$(pgrep -f 'uvicorn coordinator.app:create_app' 2>/dev/null)"; \
+	if [ -z "$$pids" ]; then echo "==> no native coordinator processes running"; else \
+		echo "==> killing native coordinator uvicorn pids: $$pids"; \
+		echo "$$pids" | xargs kill 2>/dev/null || true; \
+		echo "==> done. (Docker coordinator on :8400 is unaffected.)"; \
+	fi
+
 down: check-docker ## Stop the backend stack (preserves data volume)
 	$(COMPOSE) down
 

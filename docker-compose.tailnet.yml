@@ -1,0 +1,44 @@
+# Tailnet override for cross-machine Phase G mesh dev.
+#
+# Purpose
+# -------
+# The base docker-compose.yml publishes the coordinator (8400) and DERP
+# (8443/8444) on 0.0.0.0, which makes them reachable on the Mac's *localhost*
+# and on any host interface that the OS will actually deliver inbound packets
+# to. On macOS with the Tailscale **cask** (the Network-Extension / "macsys"
+# build), inbound TCP to the host's tailnet IP (100.x) is dropped before it
+# reaches the published port, so tailnet peers (e.g. the Linux box "newtorob",
+# whose systemd unit is hardwired to http://100.101.102.103:8400 +
+# tcp+insecure://100.101.102.103:8443) see the coordinator/DERP as OFFLINE even
+# though `curl 127.0.0.1:8400/health` works on the Mac. See
+# docs/runbooks/tailnet-coordinator-reachability.md for the one-time admin step
+# that lifts that drop.
+#
+# This override makes the port publishing *explicit about the tailnet IP* so the
+# binding is self-documenting and so that, once the host-level inbound drop is
+# lifted, the services are reachable on the exact IP newtorob expects with no
+# further changes.
+#
+# Usage
+# -----
+#   export POTLUCK_TAILNET_IP=$(tailscale ip -4)     # e.g. 100.101.102.103
+#   docker compose -f docker-compose.yml -f docker-compose.tailnet.yml up -d
+#
+# or just:  make up-tailnet      (auto-detects the tailnet IP and verifies)
+#
+# Publishing on both the tailnet IP and 127.0.0.1 keeps localhost dev working
+# (the desktop app + smoke scripts hit 127.0.0.1) while exposing the exact
+# tailnet IP for peers.
+
+services:
+  coordinator:
+    ports:
+      - "127.0.0.1:8400:8400"
+      - "${POTLUCK_TAILNET_IP:?set POTLUCK_TAILNET_IP=$(tailscale ip -4) or run 'make up-tailnet'}:8400:8400"
+
+  derp:
+    ports:
+      - "127.0.0.1:8443:8443"
+      - "127.0.0.1:8444:8444"
+      - "${POTLUCK_TAILNET_IP:?set POTLUCK_TAILNET_IP=$(tailscale ip -4) or run 'make up-tailnet'}:8443:8443"
+      - "${POTLUCK_TAILNET_IP:?set POTLUCK_TAILNET_IP=$(tailscale ip -4) or run 'make up-tailnet'}:8444:8444"

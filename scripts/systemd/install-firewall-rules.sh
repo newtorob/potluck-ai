@@ -31,11 +31,24 @@
 #   $0 --install     # default: detect VPN(s), insert accept rules
 #   $0 --uninstall   # remove the rules we added
 #   $0 --status      # show whether our rules are present
+#   $0 --watch       # install, then self-heal: reapply whenever the VPN
+#                    # flushes our rules (e.g. Mullvad reconnect)
 #
 # Idempotency:
 #   --install is safe to re-run. We check for an existing rule with the
 #   same predicate before inserting. The systemd unit calls it on every
 #   boot; re-runs are no-ops.
+#
+# SELF-HEALING (--watch)
+# ----------------------
+# Mullvad/Proton/Nord recreate their entire nftables ruleset on every
+# (re)connect, silently wiping our accept rules. A one-shot install at boot
+# therefore breaks the moment the VPN cycles — the symptom is a mesh peer
+# that was reachable suddenly going dark ("No reachable peers"). --watch
+# treats rule disappearance as the primary firewall-block signal: it polls
+# the ruleset and reapplies our accepts within a few seconds of them
+# vanishing. Idle cost is one `nft list chain` per tick; reapply is the same
+# idempotent insert as --install.
 
 set -euo pipefail
 
@@ -99,19 +112,47 @@ mullvad_output_rule_present() {
 # Install / uninstall
 # ----------------------------------------------------------------------------
 
+# Counters set by do_install on each run, read back by the caller. We track
+# failures EXPLICITLY rather than leaning on `set -e`: do_install is invoked as
+# `do_install || log ...` inside the watch loop, and bash suppresses errexit for
+# the whole body of a function called in a `||`/`&&`/`if` condition. Without
+# explicit tracking, an early `nft insert` failure would neither abort nor be
+# caught — and a later success would make the function return 0 and log "done"
+# while a rule was actually missing. These let us attempt every rule, log each
+# failure by name, and return non-zero iff something genuinely failed.
+INSTALL_INSERTED=0
+INSTALL_FAILED=0
+
+# Attempt one nft insert. Logs the action, then success-implicit / failure
+# explicitly. Never aborts the caller regardless of set -e context. Bumps the
+# module-level counters so do_install can report an accurate aggregate.
+try_insert() {
+    local label="$1"; shift
+    log "$label: inserting"
+    if "$@"; then
+        INSTALL_INSERTED=$((INSTALL_INSERTED + 1))
+        return 0
+    fi
+    log "$label: FAILED to insert (rule still missing; will retry next tick)"
+    INSTALL_FAILED=$((INSTALL_FAILED + 1))
+    return 1
+}
+
+# Returns 0 if all owed rules are in place after the run, non-zero if any insert
+# failed. Safe to call from a `||` condition (see try_insert note above).
 do_install() {
     require_root
     require_nft
 
-    local any_inserted=0
+    INSTALL_INSERTED=0
+    INSTALL_FAILED=0
 
     if tailscale_present; then
         if tailscale_rule_present; then
             log "tailscale: ts-input accept for $POTLUCK_IFACE already present"
         else
-            log "tailscale: inserting ts-input accept for $POTLUCK_IFACE"
-            nft insert rule ip filter ts-input iifname "$POTLUCK_IFACE" accept
-            any_inserted=1
+            try_insert "tailscale ts-input accept for $POTLUCK_IFACE" \
+                nft insert rule ip filter ts-input iifname "$POTLUCK_IFACE" accept || true
         fi
     else
         log "tailscale: not detected (no ts-input chain) — skipping"
@@ -121,29 +162,31 @@ do_install() {
         if mullvad_input_rule_present; then
             log "mullvad: input accept for $POTLUCK_IFACE already present"
         else
-            log "mullvad: inserting input accept for $POTLUCK_IFACE"
             # iifname (not iif) — string match, doesn't require the interface
             # to exist at insert time. At boot, potluck0 isn't up yet.
-            nft insert rule inet mullvad input iifname "$POTLUCK_IFACE" accept
-            any_inserted=1
+            try_insert "mullvad input accept for $POTLUCK_IFACE" \
+                nft insert rule inet mullvad input iifname "$POTLUCK_IFACE" accept || true
         fi
 
         if mullvad_output_rule_present; then
             log "mullvad: output accept for $POTLUCK_IFACE already present"
         else
-            log "mullvad: inserting output accept for $POTLUCK_IFACE"
-            nft insert rule inet mullvad output oifname "$POTLUCK_IFACE" accept
-            any_inserted=1
+            try_insert "mullvad output accept for $POTLUCK_IFACE" \
+                nft insert rule inet mullvad output oifname "$POTLUCK_IFACE" accept || true
         fi
     else
         log "mullvad: not detected (no inet mullvad table) — skipping"
     fi
 
-    if [ "$any_inserted" -eq 0 ]; then
+    if [ "$INSTALL_FAILED" -ne 0 ]; then
+        log "completed with errors: $INSTALL_FAILED rule(s) failed to insert"
+        return 1
+    elif [ "$INSTALL_INSERTED" -eq 0 ]; then
         log "no changes needed"
     else
         log "done"
     fi
+    return 0
 }
 
 # Remove a rule by handle. We re-list the chain, find the handle for the
@@ -228,6 +271,48 @@ do_status() {
 }
 
 # ----------------------------------------------------------------------------
+# Self-healing watch
+# ----------------------------------------------------------------------------
+
+# Poll interval (seconds) between integrity checks. Override with
+# POTLUCK_FW_WATCH_INTERVAL. Reapply latency after a VPN reconnect is bounded
+# by this; 5s keeps a peer-dark window short without meaningful idle cost.
+WATCH_INTERVAL="${POTLUCK_FW_WATCH_INTERVAL:-5}"
+
+# Return 0 if every accept rule we OWE (for each VPN currently present) is in
+# place, 1 if any is missing. A VPN that isn't loaded owes nothing — so this
+# stays quiet when, e.g., Mullvad is disconnected, and fires the instant it
+# reconnects and recreates its table without our accept.
+rules_intact() {
+    if tailscale_present && ! tailscale_rule_present; then
+        return 1
+    fi
+    if mullvad_present; then
+        mullvad_input_rule_present  || return 1
+        mullvad_output_rule_present || return 1
+    fi
+    return 0
+}
+
+do_watch() {
+    require_root
+    require_nft
+
+    log "watch: installing initial rules"
+    # Don't let a transient nft error abort the whole watcher.
+    do_install || log "watch: initial install hit an error; will retry on next tick"
+
+    log "watch: self-heal loop active (interval ${WATCH_INTERVAL}s)"
+    while true; do
+        sleep "$WATCH_INTERVAL"
+        if ! rules_intact; then
+            log "watch: accept rule(s) missing (VPN likely reconnected) — reapplying"
+            do_install || log "watch: reapply hit an error; will retry on next tick"
+        fi
+    done
+}
+
+# ----------------------------------------------------------------------------
 # Entry
 # ----------------------------------------------------------------------------
 
@@ -236,10 +321,11 @@ case "$mode" in
     --install)   do_install ;;
     --uninstall) do_uninstall ;;
     --status)    do_status ;;
+    --watch)     do_watch ;;
     -h|--help)
         sed -n '2,38p' "$0" | sed 's/^# \?//'
         ;;
     *)
-        fail "unknown mode: $mode (try --install / --uninstall / --status)"
+        fail "unknown mode: $mode (try --install / --uninstall / --status / --watch)"
         ;;
 esac

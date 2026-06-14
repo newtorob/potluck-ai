@@ -155,6 +155,12 @@ services:
         condition: service_completed_successfully
     # Bind 0.0.0.0 so other LAN machines can hit the coordinator during
     # cross-machine peer-handshake testing (Phase G m1).
+    #
+    # NOTE: on macOS with the Tailscale *cask* (Network-Extension build),
+    # 0.0.0.0 does NOT make this reachable on the host's tailnet IP — inbound
+    # TCP to 100.x is dropped before it hits the published port. For tailnet
+    # peers, use the override + admin step: see docker-compose.tailnet.yml and
+    # docs/runbooks/tailnet-coordinator-reachability.md (or `make up-tailnet`).
     ports:
       - "0.0.0.0:8400:8400"
     environment:
@@ -195,6 +201,10 @@ services:
     container_name: potluck-derp
     # Bind 0.0.0.0 so LAN / Tailscale machines (media server, gaming PC) can
     # reach the relay during cross-machine mesh testing.
+    #
+    # NOTE: same macOS-cask caveat as the coordinator above — 0.0.0.0 is not
+    # enough for tailnet peers on the macsys Tailscale build. See
+    # docker-compose.tailnet.yml + the reachability runbook (`make up-tailnet`).
     ports:
       - "0.0.0.0:8443:8443"
       - "0.0.0.0:8444:8444"

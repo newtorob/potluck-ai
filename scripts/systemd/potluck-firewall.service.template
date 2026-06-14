@@ -8,13 +8,19 @@ After=network-online.target tailscaled.service mullvad-daemon.service
 Wants=network-online.target
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=@FIREWALL_SCRIPT@ --install
+# Long-running self-healing watcher, NOT a one-shot. Mullvad/Proton/Nord
+# recreate their nftables ruleset on every (re)connect, silently wiping our
+# accept rules — a one-shot install at boot breaks the moment the VPN cycles.
+# --watch installs the rules, then reapplies them within seconds of the VPN
+# flushing them. The accompanying potluck-mesh.service still depends on this
+# unit, so the mesh waits for the firewall to be ready.
+Type=exec
+ExecStart=@FIREWALL_SCRIPT@ --watch
 ExecStop=@FIREWALL_SCRIPT@ --uninstall
-# If the VPN daemon flushes its rules at runtime (e.g. Mullvad reconnect), our
-# accept gets wiped. The accompanying potluck-mesh.service depends on this
-# unit, so a `systemctl restart potluck-firewall.service` re-installs.
+# The watcher should never stay down — if it crashes, bring it back fast so a
+# VPN reconnect can't leave the mesh firewalled off.
+Restart=always
+RestartSec=2
 StandardOutput=journal
 StandardError=journal
 
