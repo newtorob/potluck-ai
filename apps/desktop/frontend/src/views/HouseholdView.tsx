@@ -18,7 +18,7 @@
  * unmount; the store handles polling cadence + visibility-pause.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Home,
   Plus,
@@ -55,6 +55,8 @@ import { meshClient, issuePairingToken, MeshApiError, CoordinatorError } from '@
 import { relativeTime } from '@/lib/timeFormat';
 import type { MeshPeer, MeshStatus } from '@/types/mesh';
 import { AddMachineWizard } from '@/components/household/AddMachineWizard';
+import { deriveDiagnostics, type PeerDiagnostic } from '@/lib/meshDiagnostics';
+import { PreflightBanner } from '@/components/household/PreflightBanner';
 
 // ---------------------------------------------------------------------------
 // Root
@@ -473,8 +475,17 @@ function PairedView({
   onAddMachine: () => void;
   onUnpaired: () => void;
 }) {
+  const bridge = useMeshStore((s) => s.bridge);
+  const report = useMemo(
+    () => deriveDiagnostics({ bridge, status, peers }),
+    [bridge, status, peers],
+  );
+
   return (
     <div className="space-y-8">
+      {/* Connectivity health — named, root-cause-suppressed (VPN-resilience Pillar #1). */}
+      <PreflightBanner report={report} />
+
       {/* Hero payoff — leads with the differentiator, not the status plumbing. */}
       <MeshPayoffCard peers={peers} onAddMachine={onAddMachine} />
 
@@ -534,7 +545,7 @@ function PairedView({
         ) : (
           <ul className="space-y-2">
             {peers.map((peer) => (
-              <PeerRow key={peer.node_id} peer={peer} />
+              <PeerRow key={peer.node_id} peer={peer} diag={report.perPeer[peer.node_id]} />
             ))}
           </ul>
         )}
@@ -1057,12 +1068,13 @@ function RoutingStrategyControl() {
 // Peer row
 // ---------------------------------------------------------------------------
 
-function PeerRow({ peer }: { peer: MeshPeer }) {
-  const isReachable = peer.reachable;
-  const mode = peer.reachability_mode;
+function PeerRow({ peer, diag }: { peer: MeshPeer; diag?: PeerDiagnostic }) {
+  // A specific, actionable reason replaces a bare "Offline" — the warn/error
+  // detail is shown inline so the user sees the fix without hovering.
+  const showDetail = diag && (diag.severity === 'warn' || diag.severity === 'error');
 
   return (
-    <li className="flex items-center gap-3 rounded-xl border border-border/60 bg-card p-3.5">
+    <li className="flex items-start gap-3 rounded-xl border border-border/60 bg-card p-3.5">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted ring-1 ring-border/60">
         <Monitor className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
       </div>
@@ -1086,59 +1098,68 @@ function PeerRow({ peer }: { peer: MeshPeer }) {
             </>
           )}
         </p>
+        {showDetail && (
+          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+            {diag.detail}
+            {diag.fix && (
+              <>
+                {' '}
+                <span className="text-foreground/80">Fix: {diag.fix}</span>
+              </>
+            )}
+          </p>
+        )}
       </div>
 
-      <ReachabilityBadge reachable={isReachable} mode={mode} />
+      <PeerStateBadge diag={diag} />
     </li>
   );
 }
 
-function ReachabilityBadge({
-  reachable,
-  mode,
-}: {
-  reachable: boolean;
-  mode: MeshPeer['reachability_mode'];
-}) {
-  if (!reachable) {
-    return (
-      <span
-        className={cn(
-          'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5',
-          'border-border/60 bg-muted text-[10px] font-medium text-muted-foreground',
-        )}
-        title="No recent WireGuard handshake; this peer may be offline."
-      >
-        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" aria-hidden="true" />
-        Offline
-      </span>
-    );
-  }
-  if (mode === 'direct') {
-    return (
-      <span
-        className={cn(
-          'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5',
-          'border-sage/30 bg-sage/10 text-[10px] font-medium text-sage',
-        )}
-        title="Direct WireGuard tunnel — peer-to-peer."
-      >
-        <Link2 className="h-2.5 w-2.5" aria-hidden="true" />
-        Direct
-      </span>
-    );
-  }
-  // DERP-relayed
+/** Status pill driven by the resolved per-peer diagnostic — never just "offline". */
+function PeerStateBadge({ diag }: { diag?: PeerDiagnostic }) {
+  if (!diag) return null;
+
+  const VISUAL: Record<
+    PeerDiagnostic['state'],
+    { icon: typeof Link2 | null; spin?: boolean; cls: string }
+  > = {
+    direct: { icon: Link2, cls: 'border-sage/30 bg-sage/10 text-sage' },
+    relayed: {
+      icon: RadioTower,
+      cls: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    },
+    connecting: {
+      icon: Loader2,
+      spin: true,
+      cls: 'border-border/60 bg-muted text-muted-foreground',
+    },
+    no_data_plane: {
+      icon: ShieldOff,
+      cls: 'border-destructive/30 bg-destructive/10 text-destructive',
+    },
+    status_unknown: { icon: null, cls: 'border-border/60 bg-muted text-muted-foreground' },
+  };
+
+  const v = VISUAL[diag.state];
+  const Icon = v.icon;
+  const title = diag.fix ? `${diag.detail} — ${diag.fix}` : diag.detail;
+
   return (
     <span
       className={cn(
         'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5',
-        'border-amber-500/30 bg-amber-500/10 text-[10px] font-medium text-amber-700 dark:text-amber-300',
+        'text-[10px] font-medium',
+        v.cls,
       )}
-      title="Relayed through Potluck's DERP servers — used when a direct tunnel isn't possible."
+      title={title}
     >
-      <RadioTower className="h-2.5 w-2.5" aria-hidden="true" />
-      Relayed
+      {Icon ? (
+        <Icon className={cn('h-2.5 w-2.5', v.spin && 'animate-spin')} aria-hidden="true" />
+      ) : (
+        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" aria-hidden="true" />
+      )}
+      {diag.label}
     </span>
   );
 }
