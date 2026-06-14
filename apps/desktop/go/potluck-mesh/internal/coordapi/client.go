@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -57,7 +58,7 @@ type EnrollRequest struct {
 // EnrolledPeer mirrors coordinator/schemas/mesh.py:EnrolledPeer.
 // Contains only mesh-layer metadata; no inference content.
 type EnrolledPeer struct {
-	NodeID       string  `json:"node_id"`       // UUID string
+	NodeID       string  `json:"node_id"` // UUID string
 	NodeName     string  `json:"node_name"`
 	MeshIP       string  `json:"mesh_ip"`
 	WGPublicKey  string  `json:"wg_public_key"`
@@ -140,4 +141,50 @@ func (c *Client) Enroll(ctx context.Context, req EnrollRequest) (*EnrollResponse
 		return nil, fmt.Errorf("coordapi: decode enroll response: %w", err)
 	}
 	return &result, nil
+}
+
+// ListPeers calls GET /mesh/peers?wg_public_key=... and returns the caller's
+// full household roster (which INCLUDES the caller's own node) on 200, or a
+// *CoordinatorError on any other status. v0 auth: possession of the
+// wg_public_key is the credential (mirrors POST /mesh/heartbeat + the signal WS).
+//
+// Used by the sidecar's roster-reconcile loop as a safety net for roster_update
+// broadcasts missed over the signal WS.
+func (c *Client) ListPeers(ctx context.Context, wgPublicKey string) ([]EnrolledPeer, error) {
+	endpoint := c.BaseURL + "/mesh/peers?wg_public_key=" + url.QueryEscape(wgPublicKey)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("coordapi: build list-peers request: %w", err)
+	}
+	httpReq.Header.Set("Accept", "application/json")
+
+	cl := c.HTTPClient
+	if cl == nil {
+		cl = &http.Client{Timeout: defaultHTTPTimeout}
+	}
+
+	resp, err := cl.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("coordapi: list-peers HTTP: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 256*1024))
+	if err != nil {
+		return nil, fmt.Errorf("coordapi: read list-peers response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		snippet := string(respBody)
+		if len(snippet) > 512 {
+			snippet = snippet[:512] + "…"
+		}
+		return nil, &CoordinatorError{StatusCode: resp.StatusCode, Body: snippet}
+	}
+
+	var peers []EnrolledPeer
+	if err := json.Unmarshal(respBody, &peers); err != nil {
+		return nil, fmt.Errorf("coordapi: decode list-peers response: %w", err)
+	}
+	return peers, nil
 }

@@ -296,6 +296,14 @@ func run() int {
 	// ---- reachability + DERP-fallback goroutine ---- //
 	go runReachabilityLoop(ctx, tun, ps, dBind, bus)
 
+	// ---- roster reconcile goroutine ---- //
+	// Safety net for roster_update broadcasts missed over the signal WS: the
+	// coordinator only pushes roster deltas to currently-connected nodes, so a
+	// node that was disconnected at the moment a peer enrolled stays stale until
+	// a manual restart. This pulls the authoritative roster periodically and
+	// reconciles against the local cache. See task 697458e9.
+	go runRosterRefreshLoop(ctx, coordClient, ps, handler, ipcState)
+
 	// ---- DERP relay Run loop (optional) ---- //
 	if derpClient != nil {
 		go func() {
@@ -424,6 +432,120 @@ func runSTUNLoop(
 // Chosen to be longer than handshakeFreshWindow (3 min) so that a single
 // missed keepalive doesn't immediately trigger DERP fallback.
 const derpFallbackThreshold = 30 * time.Second
+
+// rosterRefreshInterval is the cadence of the roster reconciliation safety net.
+// The signal WS is the fast path for real-time roster updates; this loop only
+// catches deltas a node missed while briefly disconnected. The design caps this
+// at 60s minimum to keep coordinator load low; 2 minutes balances freshness
+// against traffic.
+const rosterRefreshInterval = 2 * time.Minute
+
+// runRosterRefreshLoop periodically pulls the authoritative household roster
+// from the coordinator (GET /mesh/peers) and reconciles it against the local
+// peer cache, synthesizing OnRosterUpdate calls for additions, endpoint changes,
+// or removals that a WS broadcast missed. Diff-based: a clean cycle emits
+// nothing (no event-bus flood). Durable fix for "a peer enrolled while I was
+// disconnected and I never saw it without a restart" (task 697458e9).
+func runRosterRefreshLoop(ctx context.Context, client *coordapi.Client, ps *peerstate.Store, handler *rosterHandler, ipcState *localapi.State) {
+	ticker := time.NewTicker(rosterRefreshInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			reconcileRosterOnce(ctx, client, ps, handler, ipcState)
+		}
+	}
+}
+
+// reconcileRosterOnce pulls the coordinator roster once and applies any delta to
+// the local cache + tunnel. Safe to run concurrently with the signal client's
+// own OnRosterUpdate: the underlying cache/tunnel ops are mutex-guarded and
+// idempotent, and the diff is recomputed from the live cache each cycle.
+func reconcileRosterOnce(ctx context.Context, client *coordapi.Client, ps *peerstate.Store, handler *rosterHandler, ipcState *localapi.State) {
+	myKey := ipcState.WGPublicKey()
+	if myKey == "" {
+		return // not enrolled yet — OnWelcome handles the initial roster
+	}
+
+	reqCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	remote, err := client.ListPeers(reqCtx, myKey)
+	if err != nil {
+		slog.Debug("roster refresh: list-peers failed (will retry next cycle)", "err", err)
+		return
+	}
+
+	// Coordinator's view, keyed by node_id, excluding ourselves (the coordinator
+	// roster includes the caller; the local cache holds only OTHER peers).
+	remoteByID := make(map[string]msignal.RosterPeer, len(remote))
+	for _, ep := range remote {
+		if ep.WGPublicKey == myKey {
+			continue
+		}
+		remoteByID[ep.NodeID] = enrolledToRosterPeer(ep)
+	}
+
+	localByID := make(map[string]msignal.RosterPeer)
+	for _, p := range ps.All() {
+		localByID[p.NodeID] = p
+	}
+
+	var u msignal.RosterUpdate
+	for id, rp := range remoteByID {
+		existing, ok := localByID[id]
+		if !ok {
+			u.Added = append(u.Added, rp)
+		} else if rosterEndpointChanged(existing, rp) {
+			u.Updated = append(u.Updated, rp)
+		}
+		// A changed wg_public_key (key rotation) is intentionally NOT reconciled
+		// here: OnRosterUpdate's Updated path can't cleanly swap a peer's key,
+		// and emitting add+remove for one node_id in a single update races on the
+		// node_id-keyed cache. Key rotation still resolves on the next full
+		// Welcome; this safety net targets add / remove / endpoint only.
+	}
+	for id := range localByID {
+		if _, ok := remoteByID[id]; !ok {
+			u.Removed = append(u.Removed, id)
+		}
+	}
+
+	if len(u.Added) == 0 && len(u.Updated) == 0 && len(u.Removed) == 0 {
+		return // in sync — emit nothing
+	}
+
+	slog.Info("roster refresh: reconciling updates missed over the signal WS",
+		"added", len(u.Added), "updated", len(u.Updated), "removed", len(u.Removed))
+	handler.OnRosterUpdate(u)
+}
+
+// enrolledToRosterPeer maps the coordinator's EnrolledPeer wire shape to the
+// signal-layer RosterPeer used by the roster handler + peer cache.
+func enrolledToRosterPeer(ep coordapi.EnrolledPeer) msignal.RosterPeer {
+	return msignal.RosterPeer{
+		NodeID:       ep.NodeID,
+		NodeName:     ep.NodeName,
+		MeshIP:       ep.MeshIP,
+		WGPublicKey:  ep.WGPublicKey,
+		LastEndpoint: ep.LastEndpoint,
+		Platform:     ep.Platform,
+	}
+}
+
+// rosterEndpointChanged reports whether a peer's tunnel-relevant endpoint moved.
+// Only the endpoint is treated as an "update" so a steady poll emits no events.
+func rosterEndpointChanged(a, b msignal.RosterPeer) bool {
+	return derefStr(a.LastEndpoint) != derefStr(b.LastEndpoint)
+}
+
+func derefStr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
 
 // runReachabilityLoop polls the WG UAPI every 30s for each known peer's
 // last-handshake time. It logs a message only on state transitions
