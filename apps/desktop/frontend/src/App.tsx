@@ -18,6 +18,7 @@ import { MembershipView } from '@/views/MembershipView';
 import { FirstRun } from '@/views/FirstRun';
 import { useModelStore } from '@/stores/modelStore';
 import { useChatStore } from '@/stores/chatStore';
+import { useMeshStore } from '@/stores/meshStore';
 import { useTheme } from '@/hooks/useTheme';
 import { localApi } from '@/lib/localApi';
 import { autoLoadOnStartup } from '@/lib/appPrefs';
@@ -75,6 +76,14 @@ export default function App() {
     void useChatStore.getState().hydrate();
     // fetchModels is stable (Zustand action ref never changes)
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Start the mesh status poller app-wide so the StatusBar mesh pill reflects
+  // connectivity from any view, not just My Machines. start() is idempotent and
+  // the store pauses polling on document.hidden; we leave it running for the
+  // app's lifetime (no stop on unmount).
+  useEffect(() => {
+    useMeshStore.getState().start();
   }, []);
 
   // Make the default launch state "alive": once the model list has settled,

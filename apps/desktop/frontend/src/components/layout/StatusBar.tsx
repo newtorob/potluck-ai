@@ -25,13 +25,15 @@
  * Privacy note: never shows per-peer identity. Aggregate state only.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/components/ui/cn';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatStore } from '@/stores/chatStore';
+import { useMeshStore } from '@/stores/meshStore';
 import { ipc } from '@/lib/ipc';
 import { formatModelName } from '@/lib/modelName';
+import { deriveDiagnostics } from '@/lib/meshDiagnostics';
 
 export function StatusBar() {
   const { modelLoaded, activeModelId, sidecarUp } = useHealth();
@@ -82,6 +84,8 @@ export function StatusBar() {
           ? 'Local Python backend is responding on 127.0.0.1:8321.'
           : 'Local Python backend is unreachable.'}
       />
+
+      <MeshPill />
 
       <Divider />
 
@@ -193,6 +197,80 @@ function NetworkPill({ mode }: NetworkPillProps) {
       />
       {label}
     </Link>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MeshPill — aggregate mesh-health heartbeat, app-wide (VPN-resilience Pillar #1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Surfaces the overall mesh diagnostics (from deriveDiagnostics) as a single
+ * status entry — calm sage when healthy, ember/amber/red when something needs
+ * attention. Links to My Machines for the full per-peer breakdown.
+ *
+ * Privacy: aggregate-only. The headline + global diagnostics are count-based
+ * and carry no per-peer identity (per-peer reasons live behind the click on
+ * /household, never here). Hidden entirely until this machine is enrolled —
+ * an unpaired node has no mesh to report on.
+ */
+function MeshPill() {
+  const status = useMeshStore((s) => s.status);
+  const peers = useMeshStore((s) => s.peers);
+  const bridge = useMeshStore((s) => s.bridge);
+  const report = useMemo(
+    () => deriveDiagnostics({ bridge, status, peers }),
+    [bridge, status, peers],
+  );
+
+  // Only when this machine is actually part of a mesh. No node_id = unpaired,
+  // and "mesh stopped" there would be a false alarm.
+  if (!status?.node_id) return null;
+
+  const sev = report.overall;
+  const dotCls =
+    sev === 'ok'
+      ? 'bg-sage animate-hearth-pulse'
+      : sev === 'info'
+        ? 'bg-muted-foreground/50'
+        : sev === 'warn'
+          ? 'bg-amber-500'
+          : 'bg-destructive';
+  const textCls =
+    sev === 'warn'
+      ? 'text-amber-700 dark:text-amber-300'
+      : sev === 'error'
+        ? 'text-destructive'
+        : '';
+
+  // Tooltip carries the worst global (local/coordinator) cause + fix when there
+  // is one. report.global never contains per-peer entries, so this stays
+  // identity-free.
+  const worst = report.global.find((d) => d.severity === 'warn' || d.severity === 'error');
+  const tooltip = worst
+    ? `${report.headline}. ${worst.detail}${worst.fix ? ` Fix: ${worst.fix}` : ''}`
+    : report.headline;
+
+  return (
+    <>
+      <Divider />
+      <Link
+        to="/household"
+        className={cn(
+          'flex items-center gap-1.5 truncate max-w-[16rem] rounded transition-colors',
+          'hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          textCls,
+        )}
+        title={tooltip}
+        aria-label={tooltip}
+      >
+        <span
+          className={cn('inline-block h-1.5 w-1.5 shrink-0 rounded-full', dotCls)}
+          aria-hidden="true"
+        />
+        <span className="truncate">{report.headline}</span>
+      </Link>
+    </>
   );
 }
 

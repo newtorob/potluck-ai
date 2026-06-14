@@ -69,15 +69,16 @@ export function HouseholdView() {
   const bridge = useMeshStore((s) => s.bridge);
   const lastError = useMeshStore((s) => s.lastError);
   const start = useMeshStore((s) => s.start);
-  const stop = useMeshStore((s) => s.stop);
   const refresh = useMeshStore((s) => s.refresh);
 
   const [wizardOpen, setWizardOpen] = useState(false);
 
   useEffect(() => {
+    // The store is started app-wide (App.tsx) to keep the StatusBar mesh pill
+    // live across views; start() here is an idempotent safety net. We no longer
+    // stop() on unmount — that would kill the app-wide poll.
     start();
-    return () => stop();
-  }, [start, stop]);
+  }, [start]);
 
   // --- bridge-missing (running outside Electron) ---
   if (bridge === 'bridge_missing') {
