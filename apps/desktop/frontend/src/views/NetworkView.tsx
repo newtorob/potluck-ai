@@ -25,6 +25,7 @@ import { cn } from '@/components/ui/cn';
 import { localApi } from '@/lib/localApi';
 import type { FleetSummary, MyJobStats, CreditBalance, CreditHistory, CreditHistoryEntry } from '@/lib/localApi';
 import { relativeTime } from '@/lib/timeFormat';
+import { formatModelName } from '@/lib/modelName';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
 
@@ -152,7 +153,7 @@ export function NetworkView() {
               When members run the contributor sidecar, they show up here.
               You can also <span className="font-medium text-foreground">be the first peer</span> —
               flip on inference in <span className="font-medium text-foreground">Settings</span> and your
-              machine joins the cooperative.
+              machine joins the network.
             </>
           }
         />
@@ -190,7 +191,7 @@ export function NetworkView() {
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
         {/* Aggregate fleet card */}
         <section aria-label="Aggregate fleet stats">
-          <SectionHeader>The cooperative right now</SectionHeader>
+          <SectionHeader>The network right now</SectionHeader>
           <FleetCard fleet={fleet} />
         </section>
 
@@ -262,7 +263,7 @@ function NetworkHeader({
 
   return (
     <ViewHeader
-      eyebrow="Cooperative"
+      eyebrow="Member-operated"
       title="Network"
       description={
         <span className="flex items-center gap-3">
@@ -337,10 +338,8 @@ function FleetCard({ fleet }: { fleet: FleetSummary | null }) {
         label="Models served"
         value={fleet?.models.length}
         sub={
-          fleet && fleet.models.length > 0
-            ? fleet.models[0]
-              ? `top: ${fleet.models[0].slug.split(':')[0]}`
-              : undefined
+          fleet && fleet.models.length > 0 && fleet.models[0]
+            ? `top: ${formatModelName(fleet.models[0].slug)}`
             : undefined
         }
       />
@@ -375,23 +374,26 @@ function StatCard({ icon: Icon, label, value, sub, emphasize, formatLarge }: Sta
       : formatLarge && value >= 1000
         ? `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`
         : value.toLocaleString();
+  // An idle/zero metric should read quiet, not broken — mute it so a fresh
+  // network doesn't greet the user with bleak-loud zeros.
+  const isIdle = value === 0 || value === undefined;
   return (
     <div
       className={cn(
         'rounded-xl border bg-card p-4',
-        emphasize ? 'border-primary/30' : 'border-border/60',
+        emphasize && !isIdle ? 'border-primary/30' : 'border-border/60',
       )}
     >
       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <Icon className={cn('h-3 w-3', emphasize ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
+        <Icon className={cn('h-3 w-3', emphasize && !isIdle ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
         <span className="font-serif italic tracking-hearth-label">
           {label}
         </span>
       </div>
       <p
         className={cn(
-          'mt-1 font-serif tabular-nums leading-tight tracking-display',
-          emphasize ? 'text-3xl text-primary' : 'text-3xl text-foreground',
+          'mt-1 font-serif tabular-nums leading-tight tracking-display text-3xl',
+          isIdle ? 'text-muted-foreground/40' : emphasize ? 'text-primary' : 'text-foreground',
         )}
       >
         {display}
@@ -425,7 +427,7 @@ function ModelChips({ models }: { models: { slug: string; online_peer_count: num
           )}
           title={`${m.online_peer_count} peer${m.online_peer_count === 1 ? '' : 's'} currently serve ${m.slug}`}
         >
-          <span className="font-mono text-foreground">{m.slug}</span>
+          <span className="text-foreground">{formatModelName(m.slug)}</span>
           <span
             className={cn(
               'rounded-full px-1.5 text-[10px] font-medium tabular-nums',
@@ -540,7 +542,7 @@ function CreditBalanceCard({ balance, isLoading, error }: CreditBalanceCardProps
       <div className="rounded-xl border border-border/60 bg-card p-4">
         <p className="text-sm text-muted-foreground">
           No activity yet — toggle network mode in chat to start contributing
-          or consuming from the cooperative.
+          or consuming from the network.
         </p>
       </div>
     );
@@ -580,8 +582,8 @@ function CreditBalanceCard({ balance, isLoading, error }: CreditBalanceCardProps
           <div className="space-y-1.5">
             {balance.by_model.map((m) => (
               <div key={m.model_slug} className="flex items-center gap-3 text-xs">
-                <span className="font-mono text-foreground/80 truncate max-w-[14rem]" title={m.model_slug}>
-                  {m.model_slug}
+                <span className="text-foreground/80 truncate max-w-[14rem]" title={m.model_slug}>
+                  {formatModelName(m.model_slug)}
                 </span>
                 <span className="ml-auto flex items-center gap-3 shrink-0 tabular-nums text-muted-foreground">
                   {Number(m.earned) > 0 && (
@@ -720,10 +722,10 @@ function CreditHistoryRow({
       </td>
       <td className="px-3 py-2">
         <span
-          className="font-mono text-foreground/80 truncate block max-w-[12rem]"
+          className="text-foreground/80 truncate block max-w-[12rem]"
           title={entry.model_slug}
         >
-          {entry.model_slug}
+          {formatModelName(entry.model_slug)}
         </span>
       </td>
       <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">

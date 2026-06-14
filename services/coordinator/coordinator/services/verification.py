@@ -48,6 +48,15 @@ CANARY_TIMEOUT_S = 30.0
 CANARY_SEED = 7
 CANARY_MAX_TOKENS = 16
 
+# Canary outcome grades. Reputation treats these very differently (see
+# credit_ledger.nudge_reputation): only a clean wrong answer is an unambiguous
+# fabrication signal (hard reset); a timeout / delivery failure / peer-reported
+# error is an ambiguous miss (soft penalty), so we never nuke an honest-but-flaky
+# peer for what may be the network. Values match credit_ledger._OUTCOME_*.
+CANARY_PASS = "pass"
+CANARY_WRONG = "wrong"
+CANARY_INFRA = "infra"
+
 
 @dataclass(frozen=True)
 class Canary:
@@ -95,23 +104,25 @@ async def _peer_model_slug(db: AsyncSession, peer_id: uuid.UUID) -> str | None:
 
 
 async def record_canary_result(
-    db: AsyncSession, peer_id: uuid.UUID, passed: bool
+    db: AsyncSession, peer_id: uuid.UUID, outcome: str
 ) -> int:
-    """Apply a canary outcome to the peer's reputation, and release the peer's
-    escrowed credits once reputation crosses RELEASE_REPUTATION_THRESHOLD.
+    """Apply a canary `outcome` (CANARY_PASS / CANARY_WRONG / CANARY_INFRA) to the
+    peer's reputation, and release the peer's escrowed credits once reputation
+    crosses RELEASE_REPUTATION_THRESHOLD.
 
-    Returns the number of escrowed rows released (0 if none / threshold not yet
-    reached).
+    Only a clean PASS can trigger a release — a wrong/infra outcome lowers (or
+    hard-resets) reputation and never releases. Returns the number of escrowed
+    rows released (0 if none / threshold not yet reached).
     """
     from coordinator.models.peer import PeerHeartbeat
 
     hb = await db.get(PeerHeartbeat, peer_id)
     if hb is None:
         return 0
-    hb.reputation = nudge_reputation(hb.reputation, passed)
+    hb.reputation = nudge_reputation(hb.reputation, outcome)
     await db.flush()
 
-    if hb.reputation >= RELEASE_REPUTATION_THRESHOLD:
+    if outcome == CANARY_PASS and hb.reputation >= RELEASE_REPUTATION_THRESHOLD:
         return await release_escrow_for_peer(db, peer_id)
     return 0
 
@@ -151,18 +162,26 @@ async def run_canary_probe(db: AsyncSession, peer_id: uuid.UUID) -> bool | None:
     try:
         await peer.ws.send_json(assigned.model_dump(mode="json"))
         await asyncio.wait_for(buf.done.wait(), timeout=CANARY_TIMEOUT_S)
-        passed = buf.error_category is None and evaluate_canary(
-            "".join(buf.tokens), canary
-        )
+        if buf.error_category is not None:
+            # Peer reported it couldn't run the job (oom / declined / model not
+            # loaded / internal). It failed to do the work, but that is NOT a
+            # wrong-answer fabrication signal — grade it ambiguous.
+            outcome = CANARY_INFRA
+        elif evaluate_canary("".join(buf.tokens), canary):
+            outcome = CANARY_PASS
+        else:
+            # Clean completion with the wrong answer — the unambiguous junk /
+            # fabrication signal that hard-resets reputation.
+            outcome = CANARY_WRONG
     except Exception:
-        # Any failure to deliver or complete the probe counts as a fail — a
-        # peer that can't answer a canary doesn't get its credits released.
-        passed = False
+        # Delivery failure or timeout: we never got a clean answer to grade, so
+        # this is ambiguous (could be the network), not a fabrication.
+        outcome = CANARY_INFRA
     finally:
         await complete_job(job_id)  # idempotent cleanup
 
-    await record_canary_result(db, peer_id, passed)
-    return passed
+    await record_canary_result(db, peer_id, outcome)
+    return outcome == CANARY_PASS
 
 
 # --------------------------------------------------------------------------- #

@@ -28,6 +28,7 @@ the first call returned.
 from __future__ import annotations
 
 import hashlib
+import math
 import uuid
 from decimal import Decimal
 
@@ -52,21 +53,69 @@ UNKNOWN_MODEL_MULTIPLIER = Decimal("1.0")
 # Constant used for the very first row in a member's chain.
 GENESIS_HASH = hashlib.sha256(b"potluck-credit-ledger-genesis").hexdigest()
 
-# Reputation nudge per verification outcome. A peer's reputation (0..1, default
-# 0.5) moves toward 1.0 on a passed verification and toward 0.0 on a failure.
+# --- Reputation / escrow-release policy (Sarmenta spot-checking math) -------- #
+#
+# A peer's reputation is a bounded streak score in [0, 1]: it starts at the
+# NEUTRAL prior, gains REPUTATION_STEP per clean canary, takes a soft
+# REPUTATION_STEP penalty on an ambiguous miss (timeout / delivery / peer-side
+# error), and HARD-RESETS to 0 on a confirmed wrong answer. Because a confirmed
+# fabrication zeroes it, reputation reflects an unbroken run of clean passes.
+#
+# The release threshold is DERIVED from a target accepted-error budget, not
+# picked ad hoc. Sarmenta's worker credibility after k clean spot-checks is
+#       Cr(k) = 1 - (f/(1-f)) * 1/(k*e)
+# with f = the assumed fraction of bad peers. The Credibility-Threshold
+# Principle says: accept results only when Cr >= theta and the accepted-error
+# rate is bounded by <= 1 - theta. So for a target accepted-error eps we set
+# theta = 1 - eps and require enough clean passes to clear it:
+#       k* = smallest k with Cr(k) >= 1 - eps  =  ceil( f / ((1-f) * eps * e) )
+# f = 0.10, eps = 0.01  ->  k* = ceil(0.1 / (0.9 * 0.01 * e)) = ceil(4.09) = 5.
+#
+# We then size the streak scale so a *fresh* peer must show k* clean canaries
+# before its escrow releases. (A peer caught fabricating resets to 0 and faces a
+# steeper climb than a newcomer — intended: trust is cheap to lose, costly to
+# regain.) Reputation here is a streak accumulator, NOT a literal credibility
+# value — the curve is used only to choose how many clean passes we demand.
 REPUTATION_STEP = 0.1
+NEUTRAL_REPUTATION = 0.5  # fresh-peer prior; must match PeerHeartbeat.reputation default
 
-# Reputation at/above which a peer is trusted enough to release its escrowed
-# earned credits (built up via passed canary verifications). Default rep is 0.5,
-# so two consecutive passed canaries (0.5 -> 0.6 -> 0.7) cross it.
-RELEASE_REPUTATION_THRESHOLD = 0.7
+ASSUMED_BAD_PEER_FRACTION = 0.10  # f
+TARGET_ACCEPTED_ERROR = 0.01      # eps  -> release credibility target 1 - eps = 0.99
+RELEASE_MIN_PASSES = math.ceil(
+    ASSUMED_BAD_PEER_FRACTION
+    / ((1 - ASSUMED_BAD_PEER_FRACTION) * TARGET_ACCEPTED_ERROR * math.e)
+)  # = 5
+
+# Gate half a step into the final pass so float rounding on repeated +STEP can't
+# strand a peer that has met RELEASE_MIN_PASSES just below the line.
+# = 0.5 + (5 - 0.5)*0.1 = 0.95  (4 clean passes = 0.9 < 0.95 <= 5 passes = ~1.0)
+RELEASE_REPUTATION_THRESHOLD = NEUTRAL_REPUTATION + (RELEASE_MIN_PASSES - 0.5) * REPUTATION_STEP
+
+# Canary outcome grades (plain strings to avoid a verification->credit_ledger
+# import cycle; verification.py re-exports named constants for its own use).
+_OUTCOME_PASS = "pass"
+_OUTCOME_WRONG = "wrong"
+_OUTCOME_INFRA = "infra"
 
 
-def nudge_reputation(current: float, passed: bool) -> float:
-    """Move a reputation score (0..1) one REPUTATION_STEP toward 1.0 on a passed
-    verification, toward 0.0 on a failure. Clamped to [0, 1]."""
-    step = REPUTATION_STEP if passed else -REPUTATION_STEP
-    return max(0.0, min(1.0, current + step))
+def nudge_reputation(current: float, outcome: str) -> float:
+    """Update a reputation streak score (0..1) by canary `outcome`:
+
+      "pass"  -> +REPUTATION_STEP toward 1.0 (one more clean canary in the streak)
+      "infra" -> -REPUTATION_STEP toward 0.0 (ambiguous miss: timeout / delivery
+                 failure / peer-reported error — penalize lightly; do NOT nuke an
+                 honest-but-flaky peer for something that may be the network)
+      "wrong" -> HARD RESET to 0.0 (a clean completion with the WRONG answer is an
+                 unambiguous junk/fabrication signal; Sarmenta backtracking +
+                 BOINC adaptive-replication CV-reset-to-0)
+
+    Clamped to [0, 1]. Any unrecognized outcome is treated as the conservative
+    "infra" soft penalty."""
+    if outcome == _OUTCOME_PASS:
+        return min(1.0, current + REPUTATION_STEP)
+    if outcome == _OUTCOME_WRONG:
+        return 0.0
+    return max(0.0, current - REPUTATION_STEP)
 
 
 def _compute_row_hash(
@@ -156,6 +205,7 @@ async def record_job_credits(
     contributor_owner_member_id: uuid.UUID,
     model_slug: str,
     output_tokens: int,
+    contributor_peer_id: uuid.UUID | None = None,
 ) -> tuple[CreditLedger, CreditLedger]:
     """Write the two ledger rows for a completed job. Returns the
     (spent_row, earned_row) tuple.
@@ -243,6 +293,21 @@ async def record_job_credits(
     # is no one to defraud when you serve yourself.
     is_public_pool = requester_member_id != contributor_owner_member_id
 
+    # ...but a contributor that has already proven itself (reputation at/above
+    # the release threshold) does not need its credits held — escrowing them
+    # would just re-trap a trusted peer until the next canary cycle releases
+    # them again. Skip escrow when the serving peer is already trusted. Falls
+    # back to escrow-on when we weren't told which peer served the job, or the
+    # peer has no heartbeat row yet (untrusted by default). The escrowed flag is
+    # operational and NOT part of the row hash, so this never affects the chain.
+    escrow = is_public_pool
+    if escrow and contributor_peer_id is not None:
+        from coordinator.models.peer import PeerHeartbeat
+
+        hb = await db.get(PeerHeartbeat, contributor_peer_id)
+        if hb is not None and hb.reputation >= RELEASE_REPUTATION_THRESHOLD:
+            escrow = False
+
     earned_stmt = (
         pg_insert(CreditLedger)
         .values(
@@ -255,7 +320,7 @@ async def record_job_credits(
             credits=earned,
             prev_row_hash=earned_prev,
             row_hash=earned_hash,
-            escrowed=is_public_pool,
+            escrowed=escrow,
         )
         .on_conflict_do_nothing(index_elements=["job_id", "direction"])
         .returning(CreditLedger)
@@ -328,7 +393,12 @@ async def apply_verification_result(
 
         hb = await db.get(PeerHeartbeat, contributor_peer_id)
         if hb is not None:
-            hb.reputation = nudge_reputation(hb.reputation, passed)
+            # This generic per-job path isn't canary-grade-aware, so a False
+            # here is treated as an ambiguous miss (soft penalty), never the
+            # hard-reset reserved for a confirmed wrong canary answer.
+            hb.reputation = nudge_reputation(
+                hb.reputation, _OUTCOME_PASS if passed else _OUTCOME_INFRA
+            )
 
     await db.flush()
     return released

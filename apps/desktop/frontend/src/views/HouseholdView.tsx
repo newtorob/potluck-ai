@@ -32,6 +32,8 @@ import {
   ShieldOff,
   Maximize2,
   CheckCircle2,
+  ArrowRight,
+  Cpu,
 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { ViewHeader } from '@/components/layout/ViewHeader';
@@ -166,9 +168,9 @@ export function HouseholdView() {
             className="pt-2 text-[11px] text-muted-foreground/70 max-w-2xl"
             aria-label="Privacy note"
           >
-            Your household is private. Peer names, mesh IPs, and reachability
-            details on this page never leave your machines — the coordinator
-            knows your household exists but the cooperative network has no
+            Your machines stay private. Peer names, mesh IPs, and reachability
+            details on this page never leave your machines. The coordinator
+            knows this group exists but the wider network has no
             view into who's in it.
           </p>
         </div>
@@ -196,8 +198,8 @@ function HouseholdHeader({ status }: { status: MeshStatus | null }) {
 
   return (
     <ViewHeader
-      eyebrow="Cooperative"
-      title="Household"
+      eyebrow="Private mesh"
+      title="My Machines"
       description={
         <span className="flex items-center gap-3">
           <span className="flex items-center gap-1.5">
@@ -473,6 +475,9 @@ function PairedView({
 }) {
   return (
     <div className="space-y-8">
+      {/* Hero payoff — leads with the differentiator, not the status plumbing. */}
+      <MeshPayoffCard peers={peers} onAddMachine={onAddMachine} />
+
       {/* This machine + Add CTA */}
       <section aria-label="This machine">
         <SectionHeader>This machine</SectionHeader>
@@ -564,6 +569,100 @@ function PairedView({
         <SectionHeader>Leave this household</SectionHeader>
         <UnpairControl onUnpaired={onUnpaired} />
       </section>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mesh payoff hero — the "type small, run big" differentiator, up top
+// ---------------------------------------------------------------------------
+
+/**
+ * The hero card the My Machines view leads with. It states the one thing
+ * single-machine local-AI tools (LM Studio, Ollama) can't do — run a model
+ * too big for the machine you're typing on by routing to another machine you
+ * own — and shows the live route as named chips. Qualitative on purpose; the
+ * CapacityCard below carries the quantitative "what can it run" numbers.
+ */
+function MeshPayoffCard({
+  peers,
+  onAddMachine,
+}: {
+  peers: MeshPeer[];
+  onAddMachine: () => void;
+}) {
+  const reachable = peers.filter((p) => p.reachable);
+  const live = reachable.length > 0;
+  const shownNames = reachable.slice(0, 3).map((p) => p.node_name);
+  const extra = reachable.length - shownNames.length;
+
+  return (
+    <div className="rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/[0.07] via-card to-card p-6 shadow-hearth-sm">
+      <h2 className="font-serif text-2xl leading-tight tracking-display text-foreground">
+        Type small, run big.
+      </h2>
+      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+        {live ? (
+          <>
+            Ask from this machine and Potluck can run a model too big for it on{' '}
+            <span className="font-medium text-foreground">
+              {reachable.length === 1
+                ? shownNames[0]
+                : `${reachable.length} of your other machines`}
+            </span>
+            , privately over your own WireGuard mesh. No cloud, no one else's hardware.
+          </>
+        ) : peers.length > 0 ? (
+          <>
+            Your other machines are offline right now. Bring one online and you can run models
+            bigger than this machine can hold, privately over your own mesh.
+          </>
+        ) : (
+          <>
+            Right now it's just this machine. Pair a second one and your laptop can borrow your
+            desktop's GPU — run models bigger than any single box can hold, privately over your own
+            mesh.
+          </>
+        )}
+      </p>
+
+      {/* Mini route visual: this machine → your other machine(s) */}
+      <div className="mt-5 flex flex-wrap items-center gap-2.5">
+        <span className="inline-flex items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-foreground">
+          <Monitor className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+          This machine
+        </span>
+        <ArrowRight className="h-4 w-4 shrink-0 text-primary/70" aria-hidden="true" />
+        {live ? (
+          <>
+            {shownNames.map((name) => (
+              <span
+                key={name}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-card px-2.5 py-1.5 text-xs text-foreground"
+              >
+                <Cpu className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                {name}
+              </span>
+            ))}
+            {extra > 0 && (
+              <span className="text-xs text-muted-foreground">+{extra} more</span>
+            )}
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={onAddMachine}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-lg border border-dashed border-primary/40 px-2.5 py-1.5',
+              'text-xs font-medium text-primary hover:bg-primary/10 transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            )}
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+            Add a machine
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -122,7 +122,14 @@ interface ModelBadgeProps {
 
 function ModelBadge({ model, modelSource }: ModelBadgeProps) {
   if (model === null) {
-    return <span className="text-xs italic text-muted-foreground/60">unknown model</span>;
+    return (
+      <span
+        className="text-xs italic text-muted-foreground/50"
+        title="This client didn't declare its model in the MCP handshake."
+      >
+        Model not reported
+      </span>
+    );
   }
 
   const sourceLabel = modelSource === 'self-reported' ? 'self-reported' : 'inferred';

@@ -1,7 +1,7 @@
 {
   "name": "potluck-ai-desktop",
   "version": "0.1.0",
-  "description": "Potluck AI — member-owned local-first AI",
+  "description": "Potluck AI — local-first AI on a member-operated mesh network",
   "main": "main.js",
   "author": "Potluck AI",
   "license": "AGPL-3.0",
@@ -82,8 +82,8 @@
         { "target": "rpm", "arch": ["x64", "arm64"] }
       ],
       "category": "Utility",
-      "synopsis": "Member-owned cooperative AI infrastructure",
-      "description": "Potluck is a cooperative AI you actually own. Local-first memory for AI coding agents, a WireGuard mesh between your machines, and member-governed cooperative compute.",
+      "synopsis": "Member-operated mesh for local-first AI",
+      "description": "Potluck is local-first AI that runs on machines you own. Local-first memory for AI coding agents, a WireGuard mesh between your machines, and a member-operated compute network.",
       "maintainer": "Potluck AI <hello@trypotluck.ai>",
       "vendor": "Potluck AI"
     },

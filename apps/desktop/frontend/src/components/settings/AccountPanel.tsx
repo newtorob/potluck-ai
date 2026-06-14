@@ -52,7 +52,7 @@ export function AccountPanel() {
           </li>
           <li className="flex items-start gap-2">
             <span className="mt-0.5 text-primary">·</span>
-            Governance voting rights on model curation and cooperative direction
+            A voice in model curation and where the network goes
           </li>
           <li className="flex items-start gap-2">
             <span className="mt-0.5 text-primary">·</span>

@@ -55,7 +55,16 @@ export type MessageStatus = 'complete' | 'streaming' | 'partial' | 'error';
  *  MessageBubble as a small footer ("Served by a verified contributor
  *  ... duration / token count") under network-mode responses. */
 export interface MessageMeta {
-  served_by: 'contributor' | 'local';
+  // 'local'       — this machine's sidecar.
+  // 'household'   — one of YOUR machines, direct over the WireGuard mesh.
+  // 'contributor' — through the coordinator (open pool, or your own machine
+  //                 when served_scope === 'mine').
+  served_by: 'contributor' | 'local' | 'household';
+  /** Coordinator routing tier for the network path: 'mine' = one of your own
+   *  machines, 'pool' = an open-pool peer. Session-only (not persisted). */
+  served_scope?: 'mine' | 'pool';
+  /** Name of the machine that served a 'household' response. Session-only. */
+  served_peer?: string;
   output_tokens?: number;
   duration_ms?: number;
   finish_reason?: string;
@@ -456,13 +465,17 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       //   3. local     — this machine's Python sidecar
       const { networkMode, networkModelSlug, householdMode } = get();
       let response: Response;
+      // Name of the household machine that served this turn (My Machines path),
+      // captured so MessageBubble can render "Ran on <your machine>".
+      let householdPeerName: string | null = null;
       if (householdMode) {
         const peers = useMeshStore.getState().peers;
-        const { response: r } = await streamHouseholdInference(apiMessages, peers, {
+        const { response: r, peer } = await streamHouseholdInference(apiMessages, peers, {
           abortSignal: controller.signal,
           routingMode: get().routingMode,
         });
         response = r;
+        householdPeerName = peer.node_name;
       } else if (networkMode) {
         response = await localApi.streamNetworkJob(content, {
           modelSlug: networkModelSlug,
@@ -493,6 +506,30 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         );
       }
 
+      // The household path has no SSE meta envelope (the peer streams plain
+      // OpenAI deltas), so attach the routing meta ourselves — this is what
+      // renders "Ran on <your machine>" under the response.
+      if (householdPeerName) {
+        const peerName = householdPeerName;
+        set((s) => {
+          const target = s.conversations[conversationId];
+          if (!target) return s;
+          return {
+            conversations: {
+              ...s.conversations,
+              [conversationId]: {
+                ...target,
+                messages: target.messages.map((m) =>
+                  m.id === assistantId
+                    ? { ...m, meta: { served_by: 'household' as const, served_peer: peerName } }
+                    : m,
+                ),
+              },
+            },
+          };
+        });
+      }
+
       for await (const event of streamTokens(response)) {
         // Check abort between events
         if (controller.signal.aborted) break;
@@ -512,6 +549,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
                   messages: target.messages.map((m) => {
                     if (m.id !== assistantId) return m;
                     const meta: NonNullable<AppMessage['meta']> = { served_by: event.served_by };
+                    if (event.served_scope !== undefined) meta.served_scope = event.served_scope;
                     if (event.output_tokens !== undefined) meta.output_tokens = event.output_tokens;
                     if (event.duration_ms !== undefined) meta.duration_ms = event.duration_ms;
                     if (event.finish_reason !== undefined) meta.finish_reason = event.finish_reason;
@@ -578,7 +616,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
               role: 'assistant',
               content: finalMsg.content,
               status: 'complete',
-              served_by: finalMsg.meta?.served_by ?? null,
+              // 'household' is session-only — persist only the coordinator-known
+              // values so the history column stays 'contributor' | 'local' | null.
+              served_by:
+                finalMsg.meta?.served_by === 'contributor' || finalMsg.meta?.served_by === 'local'
+                  ? finalMsg.meta.served_by
+                  : null,
               output_tokens: finalMsg.meta?.output_tokens ?? null,
               duration_ms: finalMsg.meta?.duration_ms ?? null,
               finish_reason: finalMsg.meta?.finish_reason ?? null,

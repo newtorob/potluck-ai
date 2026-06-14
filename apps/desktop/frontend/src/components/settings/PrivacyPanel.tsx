@@ -78,10 +78,13 @@ export function PrivacyPanel({ settings, isSaving, saveError, onUpdate }: Privac
       <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
         <Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <div>
-          <p className="text-sm font-medium text-foreground">Your prompts never leave this device.</p>
+          <p className="text-sm font-medium text-foreground">Local by default. You choose when a prompt leaves this device.</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            All inference runs locally via llama.cpp. Potluck AI has no access to your
-            conversations regardless of the settings below.
+            Local mode runs entirely on this device via llama.cpp. My Machines routes to your own
+            hardware over your private WireGuard mesh. Open-pool routing passes the prompt through
+            the coordinator (in memory, never stored, with your identity stripped) to a volunteer
+            peer who sees the prompt but not who you are. Potluck's servers never store your
+            conversation content.
           </p>
         </div>
       </div>

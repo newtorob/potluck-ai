@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { TitleBar } from '@/components/layout/TitleBar';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -19,6 +19,8 @@ import { FirstRun } from '@/views/FirstRun';
 import { useModelStore } from '@/stores/modelStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useTheme } from '@/hooks/useTheme';
+import { localApi } from '@/lib/localApi';
+import { autoLoadOnStartup } from '@/lib/appPrefs';
 
 /**
  * Root application shell.
@@ -74,6 +76,35 @@ export default function App() {
     // fetchModels is stable (Zustand action ref never changes)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Make the default launch state "alive": once the model list has settled,
+  // auto-load the last-active model (fallback: smallest installed) so the user
+  // lands ready-to-chat instead of on "No model loaded". Runs once, only when
+  // nothing is already loaded and at least one model is installed (a fresh
+  // machine with no models falls through to the FirstRun wizard). Opt out via
+  // Settings → Advanced → Startup.
+  const autoLoadTried = useRef(false);
+  useEffect(() => {
+    if (autoLoadTried.current || !fetchSettled) return;
+    autoLoadTried.current = true;
+    if (!autoLoadOnStartup()) return;
+    void (async () => {
+      try {
+        const health = await localApi.health();
+        if (health.model_loaded) return; // already live — leave it
+        const installed = useModelStore.getState().models.filter((m) => m.installed);
+        if (installed.length === 0) return; // nothing to load — FirstRun handles this
+        const lastActive = health.active_model_id
+          ? installed.find((m) => m.slug === health.active_model_id)
+          : undefined;
+        const pick =
+          lastActive ?? [...installed].sort((a, b) => a.size_bytes - b.size_bytes)[0];
+        if (pick) void useModelStore.getState().load(pick.slug);
+      } catch {
+        // Sidecar unreachable — nothing to auto-load.
+      }
+    })();
+  }, [fetchSettled]);
 
   const onboardingCompleted = localStorage.getItem(ONBOARDING_KEY) === 'true';
   const hasInstalledModels = models.some((m) => m.installed);

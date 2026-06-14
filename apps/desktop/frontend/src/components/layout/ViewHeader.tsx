@@ -9,7 +9,7 @@
  * Slots:
  *   title       — the serif page title (required)
  *   eyebrow     — optional small italic-serif kicker above the title
- *                 (e.g. "Cooperative" above "Membership")
+ *                 (e.g. "The network" above "Membership")
  *   count       — optional numeric badge sitting beside the title
  *                 (e.g. "Memory 312")
  *   description — optional one-liner under the title; muted-foreground
@@ -38,7 +38,7 @@ import { cn } from '@/components/ui/cn';
 export interface ViewHeaderProps {
   /** Required page title — rendered in font-serif tracking-display */
   title: ReactNode;
-  /** Optional italic-serif eyebrow above the title (e.g. "Cooperative") */
+  /** Optional italic-serif eyebrow above the title (e.g. "The network") */
   eyebrow?: ReactNode;
   /** Optional numeric count badge beside the title */
   count?: number | null;

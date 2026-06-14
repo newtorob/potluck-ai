@@ -48,13 +48,13 @@ export function CooperativeConnectionPanel() {
     <section className="rounded-lg border border-border bg-card p-4">
       <div className="mb-3 flex items-center gap-2">
         <Globe className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-        <h3 className="text-sm font-semibold text-foreground">Cooperative connection</h3>
+        <h3 className="text-sm font-semibold text-foreground">Network connection</h3>
       </div>
 
       <p className="mb-3 text-xs text-muted-foreground">
         The coordinator URL points to the Phase G control plane. Default is the local
         docker-compose binding. Change this to point at a coordinator on another machine
-        in your fleet (LAN IP, Tailscale IP, or the cooperative's hosted endpoint).
+        in your fleet (LAN IP, Tailscale IP, or the network's hosted endpoint).
       </p>
 
       <div className="flex flex-col gap-2">

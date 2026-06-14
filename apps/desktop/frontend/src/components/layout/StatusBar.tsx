@@ -31,6 +31,7 @@ import { cn } from '@/components/ui/cn';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatStore } from '@/stores/chatStore';
 import { ipc } from '@/lib/ipc';
+import { formatModelName } from '@/lib/modelName';
 
 export function StatusBar() {
   const { modelLoaded, activeModelId, sidecarUp } = useHealth();
@@ -67,7 +68,7 @@ export function StatusBar() {
     >
       <StatusItem
         active={modelLoaded}
-        label={modelLoaded ? (activeModelId ?? 'Model loaded') : 'No model loaded'}
+        label={modelLoaded ? (activeModelId ? formatModelName(activeModelId) : 'Model loaded') : 'No model loaded'}
         tooltip={modelLoaded ? 'A local model is loaded and ready.' : 'No model loaded — pick one in Models.'}
         href="/models"
       />

@@ -107,6 +107,8 @@ async def pick_peer() -> PeerConnection | None:
 async def pick_peer_for_model(
     db,  # AsyncSession; typed loosely to avoid sqlalchemy at module load
     model_slug: str,
+    *,
+    owner_member_id: uuid.UUID | None = None,
 ) -> PeerConnection | None:
     """Pick a connected peer that advertises the requested model_slug.
 
@@ -143,10 +145,49 @@ async def pick_peer_for_model(
     # of any given session).
     async with _lock:
         # Walk in reverse (most-recent-first) and return the first eligible.
+        # When owner_member_id is set ("My Machines" scope), restrict to peers
+        # owned by that member. The connection already carries member_id, so
+        # this is an in-memory filter with no extra DB round-trip.
         for peer_id in reversed(_peers.keys()):
-            if peer_id in eligible_ids:
-                return _peers[peer_id]
+            if peer_id not in eligible_ids:
+                continue
+            if owner_member_id is not None and _peers[peer_id].member_id != owner_member_id:
+                continue
+            return _peers[peer_id]
     return None
+
+
+async def select_peer_for_request(
+    db,
+    *,
+    model_slug: str,
+    requester_member_id: uuid.UUID,
+    scope: str = "pool",
+) -> "tuple[PeerConnection | None, str | None]":
+    """Pick a peer honoring the routing scope. `scope` is the WIDEST tier the
+    requester accepts; we always try the closest/most-trusted tier first and
+    widen outward only up to `scope`. Returns (peer, served_scope) or
+    (None, None) if nothing in-scope is online.
+
+      "mine" -> only machines this member owns.
+      "pool" -> mine first, else the open pool.
+
+    The "circle" tier is rejected at the API layer until a trusted-circle data
+    model exists, so it never reaches here as a widening target.
+    """
+    # Tier 1 — My Machines (tried first for every scope).
+    peer = await pick_peer_for_model(
+        db, model_slug, owner_member_id=requester_member_id
+    )
+    if peer is not None:
+        return peer, "mine"
+    if scope == "mine":
+        return None, None
+    # Tier 3 — Open Pool.
+    peer = await pick_peer_for_model(db, model_slug)
+    if peer is not None:
+        return peer, "pool"
+    return None, None
 
 
 async def online_peer_count() -> int:

@@ -273,7 +273,7 @@ export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
                   haven't yet.)
                 </Step>
                 <Step n={2}>
-                  Go to <span className="font-medium text-foreground">Household</span>, then{' '}
+                  Go to <span className="font-medium text-foreground">My Machines</span>, then{' '}
                   <span className="font-medium text-foreground">"Join existing household"</span>.
                 </Step>
                 <Step n={3}>

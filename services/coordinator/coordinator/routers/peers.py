@@ -260,7 +260,25 @@ async def peer_connect(
                 buf = await get_job(cmp.job_id)
                 if buf is None:
                     continue
-                buf.output_tokens = cmp.output_tokens
+                # Bill on what the COORDINATOR actually forwarded, not the
+                # peer's self-reported count. The peer is outside the trust
+                # boundary (threat-model A2): its claimed output_tokens is
+                # advisory only. len(buf.tokens) is the number of JobTokenMessages
+                # we received and relayed — authoritative and conservative (a
+                # token the peer generated but failed to deliver to us shouldn't
+                # be paid for). Mirrors BOINC server-side credit: never trust
+                # client-claimed credit. A claim that exceeds what we counted is
+                # logged as a fraud signal.
+                counted = len(buf.tokens)
+                if cmp.output_tokens != counted:
+                    logger.warning(
+                        "peer_output_tokens_mismatch",
+                        peer_id=str(peer.id),
+                        job_id=str(cmp.job_id),
+                        peer_claimed=cmp.output_tokens,
+                        coordinator_counted=counted,
+                    )
+                buf.output_tokens = counted
                 buf.duration_ms = cmp.duration_ms
                 buf.finish_reason = cmp.finish_reason
                 await complete_job(cmp.job_id)
@@ -268,7 +286,8 @@ async def peer_connect(
                     "peer_job_complete",
                     peer_id=str(peer.id),
                     job_id=str(cmp.job_id),
-                    output_tokens=cmp.output_tokens,
+                    output_tokens=counted,
+                    peer_claimed_tokens=cmp.output_tokens,
                     duration_ms=cmp.duration_ms,
                 )
             elif msg_type == "job_error":

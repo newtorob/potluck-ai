@@ -228,7 +228,7 @@ function ComposerHint({ isStreaming, modelLoaded, householdMode, networkMode }: 
     // *does* see prompt content — be honest about that.
     body = (
       <>
-        Routed over your WireGuard mesh to a machine in your household — never the coordinator.
+        Routed over your WireGuard mesh to one of your own machines. Never the coordinator.
       </>
     );
   } else if (networkMode) {

@@ -13,6 +13,7 @@ import { cn } from '@/components/ui/cn';
 import { ModelPathPanel } from '@/components/settings/ModelPathPanel';
 import { McpIntegrationPanel } from '@/components/settings/McpIntegrationPanel';
 import { CooperativeConnectionPanel } from '@/components/settings/CooperativeConnectionPanel';
+import { autoLoadOnStartup, setAutoLoadOnStartup } from '@/lib/appPrefs';
 import { useProject } from '@/hooks/useProject';
 import { normaliseProjectName } from '@/lib/projectUtils';
 import type { PotluckSettingsPatch, PotluckSettings, MemorySettings } from '@/lib/localApi';
@@ -96,6 +97,32 @@ function ToggleRow({ id, label, description, checked, disabled, onChange }: Togg
           )}
         />
       </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Startup section — localStorage-backed app preference (not a backend setting)
+// ---------------------------------------------------------------------------
+
+function StartupSection() {
+  const [autoLoad, setAutoLoad] = useState<boolean>(() => autoLoadOnStartup());
+  return (
+    <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+      <h2 className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
+        Startup
+      </h2>
+      <ToggleRow
+        id="autoload-on-startup"
+        label="Load my last model on startup"
+        description="When Potluck launches, reload the model you last used so chat is ready immediately. Turn off to start with no model loaded."
+        checked={autoLoad}
+        disabled={false}
+        onChange={(v) => {
+          setAutoLoadOnStartup(v);
+          setAutoLoad(v);
+        }}
+      />
     </div>
   );
 }
@@ -385,6 +412,9 @@ export function AdvancedPanel({ settings, isSaving, saveError, onUpdate }: Advan
 
       {/* Model storage path */}
       <ModelPathPanel settings={settings} />
+
+      {/* Startup behavior (auto-load last model) */}
+      <StartupSection />
 
       {/* Memory tuning */}
       <MemoryTuningSection

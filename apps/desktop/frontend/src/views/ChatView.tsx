@@ -35,7 +35,7 @@ import { PotluckLogo } from '@/components/brand/PotluckLogo';
 const EXAMPLE_PROMPTS = [
   'What should I cook tonight with what’s already in my fridge?',
   'Help me draft an honest two-paragraph note to a friend I’ve been ignoring',
-  'Walk me through how a co-op differs from a corporation, plainly',
+  'Explain the tradeoffs of running AI locally versus in the cloud, plainly',
 ];
 
 // ---------------------------------------------------------------------------
@@ -204,7 +204,11 @@ export function ChatView() {
                 {!settingsLoaded || !settings ? (
                   <span className="inline-block h-3 w-6 animate-hearth-pulse rounded bg-muted" aria-hidden="true" />
                 ) : (
-                  `Temp ${settings.runtime.temperature.toFixed(1)}`
+                  // Temperatures above the valid 0–2 range are a "use the model's
+                  // own default" sentinel (e.g. 999) — show that, not the raw number.
+                  settings.runtime.temperature > 2
+                    ? 'Temp default'
+                    : `Temp ${settings.runtime.temperature.toFixed(1)}`
                 )}
               </InfoChip>
 
@@ -336,7 +340,7 @@ function EmptyState({ modelLoaded, onSelectPrompt, onGoToModels }: EmptyStatePro
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground reading-measure mx-auto">
             {modelLoaded
-              ? 'Ask anything. The conversation runs on your machine; nothing leaves it.'
+              ? 'Ask anything. Runs on your machine by default; the network is opt-in per message.'
               : 'Pick a model to load locally and we’ll be ready.'}
           </p>
         </div>

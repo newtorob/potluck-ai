@@ -24,6 +24,9 @@ export interface StreamToken {
 export interface StreamMeta {
   type: 'meta';
   served_by: 'contributor' | 'local';
+  /** Routing tier the coordinator served from: "mine" = one of the requester's
+   *  own machines, "pool" = an open-pool peer. Tier label only, never identity. */
+  served_scope?: 'mine' | 'pool';
   output_tokens?: number;
   duration_ms?: number;
   finish_reason?: string;
@@ -131,6 +134,8 @@ function extractMeta(parsed: unknown): StreamMeta | null {
   const served = m['served_by'];
   if (served !== 'contributor' && served !== 'local') return null;
   const result: StreamMeta = { type: 'meta', served_by: served };
+  const scope = m['served_scope'];
+  if (scope === 'mine' || scope === 'pool') result.served_scope = scope;
   if (typeof m['output_tokens'] === 'number') result.output_tokens = m['output_tokens'];
   if (typeof m['duration_ms'] === 'number') result.duration_ms = m['duration_ms'];
   if (typeof m['finish_reason'] === 'string') result.finish_reason = m['finish_reason'];

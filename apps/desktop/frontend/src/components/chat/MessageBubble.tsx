@@ -20,7 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { Network } from 'lucide-react';
+import { Network, Cpu } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import type { AppMessage } from '@/stores/chatStore';
 
@@ -74,38 +74,43 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             not the local sidecar. The wording deliberately doesn't
             expose peer identity (manifesto blinded-routing rule); only
             confirms it left the device + summarises the round trip. */}
-        {message.meta?.served_by === 'contributor' && !isStreaming && (
-          <ServedByFooter
-            {...(message.meta.duration_ms !== undefined ? { durationMs: message.meta.duration_ms } : {})}
-            {...(message.meta.output_tokens !== undefined ? { outputTokens: message.meta.output_tokens } : {})}
-          />
+        {message.meta && message.meta.served_by !== 'local' && !isStreaming && (
+          <ServedByFooter meta={message.meta} />
         )}
       </div>
     </article>
   );
 }
 
-function ServedByFooter({
-  durationMs,
-  outputTokens,
-}: {
-  durationMs?: number;
-  outputTokens?: number;
-}) {
+function ServedByFooter({ meta }: { meta: NonNullable<AppMessage['meta']> }) {
   const parts: string[] = [];
-  if (typeof durationMs === 'number' && durationMs > 0) {
-    parts.push(durationMs >= 1000 ? `${(durationMs / 1000).toFixed(1)}s` : `${durationMs}ms`);
+  if (typeof meta.duration_ms === 'number' && meta.duration_ms > 0) {
+    parts.push(meta.duration_ms >= 1000 ? `${(meta.duration_ms / 1000).toFixed(1)}s` : `${meta.duration_ms}ms`);
   }
-  if (typeof outputTokens === 'number' && outputTokens > 0) {
-    parts.push(`${outputTokens} tokens`);
+  if (typeof meta.output_tokens === 'number' && meta.output_tokens > 0) {
+    parts.push(`${meta.output_tokens} tokens`);
   }
+
+  // "Ran on your machine" for the My-Machines paths (household-direct, or the
+  // coordinator routing to one of your own peers). The open pool stays
+  // identity-blind — "Served by the network", never a peer name.
+  const ranOnMine =
+    meta.served_by === 'household' ||
+    (meta.served_by === 'contributor' && meta.served_scope === 'mine');
+  const Icon = ranOnMine ? Cpu : Network;
+  const label = ranOnMine
+    ? meta.served_peer
+      ? `Ran on ${meta.served_peer}`
+      : 'Ran on one of your machines'
+    : 'Served by the network';
+
   return (
     <div
       className="mt-3 flex items-center gap-1.5 border-t border-border/40 pt-2 text-[11px] text-muted-foreground/80"
       aria-label="Routing metadata"
     >
-      <Network className="h-3 w-3 text-primary/70" aria-hidden="true" />
-      <span className="font-serif italic">Served by a verified contributor</span>
+      <Icon className="h-3 w-3 text-primary/70" aria-hidden="true" />
+      <span className="font-serif italic">{label}</span>
       {parts.length > 0 && (
         <>
           <span aria-hidden="true">·</span>

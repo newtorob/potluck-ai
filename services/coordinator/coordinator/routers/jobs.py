@@ -25,6 +25,7 @@ import json
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
+from typing import Literal
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
@@ -45,8 +46,8 @@ from coordinator.services.peer_registry import (
     JobBuffer,
     PeerConnection,
     complete_job,
-    pick_peer_for_model,
     register_job,
+    select_peer_for_request,
 )
 
 logger = structlog.get_logger(__name__)
@@ -62,10 +63,21 @@ JOB_TIMEOUT_S = 120.0
 _STUB_MEMBER_ID = STUB_MEMBER_ID
 
 
+# Widest routing tier the requester will accept. The coordinator always tries
+# the closest/most-trusted tier first and widens outward only up to this limit.
+# "local" is never a coordinator scope — a local-served prompt never produces a
+# coordinator job at all.
+RoutingScope = Literal["mine", "circle", "pool"]
+
+
 class JobRequest(BaseModel):
     prompt: str
     model_slug: str = "stub-echo"  # m3 stub default; real models when llama-cpp lands
     sampling: SamplingParams = Field(default_factory=SamplingParams)
+    # "mine"   -> only machines this member owns (503 if none online)
+    # "circle" -> mine, then trusted circle (not yet available -> 422)
+    # "pool"   -> mine, then the open pool (default; backward-compatible)
+    scope: RoutingScope = "pool"
 
 
 class JobResponse(BaseModel):
@@ -74,9 +86,11 @@ class JobResponse(BaseModel):
     output_tokens: int
     duration_ms: int
     finish_reason: str
-    # peer_id is intentionally omitted from the response — exposing it to
-    # the requester would let them shop for a specific peer, which breaks
+    # Which tier actually served the job ("mine" / "pool"). A tier label only —
+    # never a peer_id. peer_id is intentionally omitted from the response:
+    # exposing it would let a requester shop for a specific peer, which breaks
     # the anonymity guarantee the manifesto promises.
+    served_scope: RoutingScope
 
 
 class JobErrorResponse(BaseModel):
@@ -87,7 +101,7 @@ class JobErrorResponse(BaseModel):
 
 async def _dispatch_to_peer(
     db: AsyncSession, req: JobRequest
-) -> tuple[PeerConnection, Job, JobBuffer]:
+) -> tuple[PeerConnection, Job, JobBuffer, RoutingScope]:
     """Shared dispatch preamble for the sync + streaming job endpoints.
 
     Picks an eligible peer (503 if none), creates the Job row, registers the
@@ -100,14 +114,30 @@ async def _dispatch_to_peer(
     blinded-routing violation (the schema has no member_id field, so it's also
     a type error, but the rule deserves the comment).
     """
-    peer_conn = await pick_peer_for_model(db, req.model_slug)
+    if req.scope == "circle":
+        raise HTTPException(
+            status_code=422,
+            detail="Trusted-circle routing is not yet available. Use scope=mine or scope=pool.",
+        )
+
+    peer_conn, served_scope = await select_peer_for_request(
+        db,
+        model_slug=req.model_slug,
+        requester_member_id=_STUB_MEMBER_ID,
+        scope=req.scope,
+    )
     if peer_conn is None:
-        # Distinguish "nobody online" from "nobody online serves this model"
-        # so the caller knows whether to wait or pick a different slug.
+        # Distinguish the scope-specific failure modes so the caller knows
+        # whether to widen scope, wait, or pick a different slug.
         from coordinator.services.peer_registry import online_peer_count
 
         online = await online_peer_count()
-        if online == 0:
+        if req.scope == "mine":
+            detail = (
+                f"No machine you own is online and serving '{req.model_slug}'. "
+                f"Bring one of your machines online, or use scope=pool to allow the open pool."
+            )
+        elif online == 0:
             detail = "No contributor peers connected. Bring at least one online and retry."
         else:
             detail = (
@@ -150,7 +180,7 @@ async def _dispatch_to_peer(
             detail=f"Couldn't deliver job to peer: {exc}",
         ) from exc
 
-    return peer_conn, job, buf
+    return peer_conn, job, buf, served_scope
 
 
 @router.post(
@@ -171,7 +201,7 @@ async def dispatch_job(
     Streaming endpoints come in a follow-up.
     """
     # ---- 1-3. Pick peer, create job, deliver (shared with the stream endpoint) ---- #
-    peer_conn, job, buf = await _dispatch_to_peer(db, req)
+    peer_conn, job, buf, served_scope = await _dispatch_to_peer(db, req)
     job_id = job.id
     logger.info(
         "job_dispatched",
@@ -225,6 +255,7 @@ async def dispatch_job(
         output_tokens=buf.output_tokens,
         duration_ms=buf.duration_ms,
         finish_reason=buf.finish_reason,
+        served_scope=served_scope,
     )
 
 
@@ -246,18 +277,21 @@ def _sse_done() -> str:
     return "data: [DONE]\n\n"
 
 
-def _sse_meta(output_tokens: int, duration_ms: int, finish_reason: str) -> str:
+def _sse_meta(
+    output_tokens: int, duration_ms: int, finish_reason: str, served_scope: str
+) -> str:
     """Encode a job-completion summary as an SSE chunk.
 
-    The frontend uses this to show "served by a verified contributor"
-    metadata under network-mode chat messages without exposing peer
-    identity. `served_by: "contributor"` is the only signal — peer_id,
-    hostname, and any other identifying fields are deliberately absent
-    per the manifesto's blinded-routing invariant (memory 42a7e671).
+    The frontend uses this to badge the response — `served_scope` ("mine" /
+    "pool") lets it show "ran on your machine" vs "served by the network"
+    without exposing peer identity. `served_by` + `served_scope` are tier
+    labels only; peer_id, hostname, and any other identifying fields are
+    deliberately absent per the blinded-routing invariant (memory 42a7e671).
     """
     payload = {
         "meta": {
             "served_by": "contributor",
+            "served_scope": served_scope,
             "output_tokens": output_tokens,
             "duration_ms": duration_ms,
             "finish_reason": finish_reason,
@@ -389,7 +423,15 @@ async def _finalize_job_in_db(
                     )
 
                     peer = await fresh_db.get(Peer, db_job.peer_id)
-                    if peer is not None:
+                    if peer is not None and peer.member_id == db_job.member_id:
+                        # Self-served (My Machines / household): running on your
+                        # own hardware is free — no spent/earned rows. Skipping
+                        # the ledger also closes the credit-printing path the
+                        # contribution bonus would open once My Machines is the
+                        # default-preferred route (requester == owner would
+                        # otherwise mint earned > spent for serving yourself).
+                        logger.info("self_served_job_no_ledger", job_id=str(job_id))
+                    elif peer is not None:
                         await record_job_credits(
                             fresh_db,
                             job_id=job_id,
@@ -397,6 +439,7 @@ async def _finalize_job_in_db(
                             contributor_owner_member_id=peer.member_id,
                             model_slug=db_job.model_slug,
                             output_tokens=output_tokens,
+                            contributor_peer_id=db_job.peer_id,
                         )
                         await fresh_db.commit()
                         logger.info(
@@ -425,7 +468,7 @@ async def dispatch_job_stream(
     SSE stream rather than a collected JSON body.
     """
     # ---- 1-3. Pick peer, create job, deliver (shared with the sync endpoint) ---- #
-    peer_conn, job, buf = await _dispatch_to_peer(db, req)
+    peer_conn, job, buf, served_scope = await _dispatch_to_peer(db, req)
     job_id = job.id
     logger.info(
         "job_dispatched_stream",
@@ -475,6 +518,7 @@ async def dispatch_job_stream(
                     output_tokens=buf.output_tokens,
                     duration_ms=buf.duration_ms,
                     finish_reason=buf.finish_reason or "stop",
+                    served_scope=served_scope,
                 )
                 yield _sse_done()
         finally:

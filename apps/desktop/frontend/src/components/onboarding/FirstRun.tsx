@@ -390,9 +390,9 @@ function WelcomeStep() {
           Welcome to Potluck AI
         </h1>
         <p className="text-sm text-muted-foreground leading-relaxed reading-measure mx-auto">
-          A member-owned cooperative that runs open-source AI models entirely on your device. Your
-          prompts never leave your machine — no subscriptions to corporate labs, no data harvesting,
-          just fast private inference you own and control.
+          Local-first AI that runs open-source models entirely on your device. By default your
+          prompts stay on your machine: no subscriptions to corporate labs, no data harvesting,
+          just fast private inference you own and control. Using the network is always opt-in.
         </p>
         <p className="text-xs italic text-muted-foreground/80 leading-relaxed">
           This setup detects your hardware and installs a model — about 2–10 minutes.
@@ -531,8 +531,8 @@ function ReadyStep() {
       <div className="space-y-2">
         <h2 className="font-serif text-2xl tracking-display text-foreground">You're all set</h2>
         <p className="text-sm leading-relaxed text-muted-foreground reading-measure mx-auto">
-          Your model is loaded and ready. All inference runs locally — your conversations stay on
-          this device.
+          Your model is loaded and ready. Inference runs locally by default, so your conversations
+          stay on this device unless you choose to use the network.
         </p>
       </div>
     </div>

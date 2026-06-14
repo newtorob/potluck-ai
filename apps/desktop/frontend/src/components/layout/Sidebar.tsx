@@ -71,14 +71,22 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-const NAV_ITEMS: NavItem[] = [
+// Primary: the product story in narrative order — chat → your own machines →
+// the wider network → models. "My Machines" (route /household) is the flagship
+// and sits at #2, not buried below the workspace tools.
+const PRIMARY_NAV: NavItem[] = [
   { to: '/chat', label: 'Chat', icon: MessageSquare },
+  { to: '/household', label: 'My Machines', icon: Home },
+  { to: '/network', label: 'Network', icon: Globe2 },
   { to: '/models', label: 'Models', icon: Package },
+];
+
+// Workspace: the coding-agent / memory on-ramp surfaces, grouped under a label
+// so they read as an optional cluster rather than co-equal product tabs.
+const WORKSPACE_NAV: NavItem[] = [
   { to: '/memory', label: 'Memory', icon: Brain },
   { to: '/tasks', label: 'Tasks', icon: ListTodo },
   { to: '/agents', label: 'Agents', icon: Activity },
-  { to: '/household', label: 'Household', icon: Home },
-  { to: '/network', label: 'Network', icon: Globe2 },
 ];
 
 const SECONDARY_NAV: NavItem[] = [
@@ -153,9 +161,21 @@ export function Sidebar() {
       {/* Project switcher */}
       {expanded && <ProjectSwitcher />}
 
-      {/* Primary nav */}
-      <div className={cn('flex flex-col gap-0.5 py-3', expanded ? 'px-2' : 'items-center px-3')}>
-        {NAV_ITEMS.map((item) => (
+      {/* Primary nav — the product story */}
+      <div className={cn('flex flex-col gap-0.5 pt-3 pb-2', expanded ? 'px-2' : 'items-center px-3')}>
+        {PRIMARY_NAV.map((item) => (
+          <NavItemLink key={item.to} item={item} expanded={expanded} />
+        ))}
+      </div>
+
+      {/* Workspace group — coding-agent / memory surfaces */}
+      <div className={cn('flex flex-col gap-0.5 border-t border-border/50 pt-2 pb-3', expanded ? 'px-2' : 'items-center px-3')}>
+        {expanded && (
+          <span className="px-2.5 pb-1 font-serif text-[11px] italic text-muted-foreground/70 tracking-hearth-label">
+            Workspace
+          </span>
+        )}
+        {WORKSPACE_NAV.map((item) => (
           <NavItemLink key={item.to} item={item} expanded={expanded} />
         ))}
       </div>

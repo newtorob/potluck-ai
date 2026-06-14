@@ -16,9 +16,9 @@ export function MembershipView() {
   return (
     <div className="flex h-full flex-col">
       <ViewHeader
-        eyebrow="Cooperative"
+        eyebrow="The network"
         title="Membership"
-        description="A founding membership in a cooperative being built from the ground up."
+        description="A founding membership in a member-operated network being built from the ground up."
       />
 
       <div className="relative flex flex-1 items-center justify-center p-8 grain">
@@ -60,10 +60,10 @@ export function MembershipView() {
             {/* Editorial heading block */}
             <div className="space-y-4">
               <h2 className="font-serif text-3xl leading-tight tracking-display text-foreground">
-                A cooperative for people who think AI should be owned differently.
+                For people who'd rather own their AI than rent it.
               </h2>
               <p className="text-[15px] leading-relaxed text-muted-foreground">
-                Potluck is member-owned. Founding members set the direction, share the compute, and hold the governance rights. Sign in to join before we announce publicly.
+                Potluck is member-operated. Founding members share the compute, earn credits for what they serve, and help steer where the network goes. Sign in to join before we announce publicly.
               </p>
             </div>
 
@@ -77,7 +77,7 @@ export function MembershipView() {
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-primary" aria-hidden="true" />
-                  Governance voting rights on model curation and cooperative direction
+                  A voice in model curation and where the network goes
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-primary" aria-hidden="true" />

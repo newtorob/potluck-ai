@@ -129,10 +129,12 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
   // Hover tooltip
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
 
-  // Pure black canvas — Obsidian-style. The graph deliberately breaks from the
-  // app's --background HSL so additive-blend halos read as luminous against
-  // true black rather than washing out against the dark-grey app chrome.
-  const bgColor = '#000000';
+  // Near-black canvas so the additive-blend halos read as luminous — but a WARM
+  // near-black on the Hearth hue rather than cold #000000, so the graph belongs
+  // to the palette instead of clashing as a cold seam against the warm-charcoal
+  // app chrome (the halos still pop against it). Light-mode graph theming is a
+  // separate call the design owner can make later.
+  const bgColor = '#0c0906';
 
   // ---------------------------------------------------------------------------
   // Resize observer

@@ -17,12 +17,16 @@ from coordinator.models.credit import CreditLedger
 from coordinator.models.job import Job
 from coordinator.models.peer import Peer, PeerCapability, PeerHeartbeat
 from coordinator.services.credit_ledger import (
+    RELEASE_MIN_PASSES,
     RELEASE_REPUTATION_THRESHOLD,
     record_job_credits,
     release_escrow_for_peer,
 )
 from coordinator.services.verification import (
     CANARIES,
+    CANARY_INFRA,
+    CANARY_PASS,
+    CANARY_WRONG,
     Canary,
     evaluate_canary,
     probe_due_peers,
@@ -134,23 +138,26 @@ async def test_canary_passes_build_reputation_then_release(
     job_id = await _escrowed_job_for_peer(db_session, peer.id)
     assert hb.reputation == pytest.approx(0.5)
 
-    # First pass: 0.5 -> 0.6, still below threshold -> not released.
-    released = await record_canary_result(db_session, peer.id, passed=True)
-    await db_session.refresh(hb)
-    assert hb.reputation == pytest.approx(0.6)
-    assert released == 0
-    assert await _is_escrowed(db_session, job_id) is True
+    # A fresh peer (neutral 0.5 prior) must show RELEASE_MIN_PASSES clean canaries
+    # before its escrow releases — the threshold is derived from the Sarmenta
+    # credibility curve, not a fixed two-pass gate.
+    for _ in range(1, RELEASE_MIN_PASSES):  # passes 1 .. k*-1: still below threshold
+        released = await record_canary_result(db_session, peer.id, CANARY_PASS)
+        assert released == 0, f"must not release before {RELEASE_MIN_PASSES} passes"
+        assert await _is_escrowed(db_session, job_id) is True
 
-    # Second pass: 0.6 -> 0.7 >= threshold -> release.
-    released = await record_canary_result(db_session, peer.id, passed=True)
+    # The k*-th clean pass crosses the threshold and releases.
+    released = await record_canary_result(db_session, peer.id, CANARY_PASS)
     await db_session.refresh(hb)
-    assert hb.reputation == pytest.approx(RELEASE_REPUTATION_THRESHOLD)
+    assert hb.reputation >= RELEASE_REPUTATION_THRESHOLD
     assert released == 1
     assert await _is_escrowed(db_session, job_id) is False
 
 
 @pytest.mark.asyncio
-async def test_canary_fail_lowers_reputation(db_session: AsyncSession) -> None:
+async def test_canary_infra_soft_penalty_wrong_hard_resets(
+    db_session: AsyncSession,
+) -> None:
     peer = await _peer(db_session)
     hb = PeerHeartbeat(
         peer_id=peer.id,
@@ -161,9 +168,22 @@ async def test_canary_fail_lowers_reputation(db_session: AsyncSession) -> None:
     db_session.add(hb)
     await db_session.flush()
 
-    released = await record_canary_result(db_session, peer.id, passed=False)
+    # Ambiguous miss (timeout / delivery / peer-reported error): soft -STEP,
+    # never a release. An honest-but-flaky peer must not be nuked.
+    released = await record_canary_result(db_session, peer.id, CANARY_INFRA)
     await db_session.refresh(hb)
     assert hb.reputation == pytest.approx(0.4)
+    assert released == 0
+
+    # Climb back up, then a confirmed WRONG answer hard-resets reputation to 0.
+    await record_canary_result(db_session, peer.id, CANARY_PASS)  # 0.4 -> 0.5
+    await record_canary_result(db_session, peer.id, CANARY_PASS)  # 0.5 -> 0.6
+    await db_session.refresh(hb)
+    assert hb.reputation == pytest.approx(0.6)
+
+    released = await record_canary_result(db_session, peer.id, CANARY_WRONG)
+    await db_session.refresh(hb)
+    assert hb.reputation == pytest.approx(0.0), "a wrong answer hard-resets reputation"
     assert released == 0
 
 
@@ -287,7 +307,12 @@ async def test_probe_due_peers_targets_escrowed_and_releases(
         assert await _rep(peer_clean.id) == pytest.approx(0.5), "clean peer untouched"
         assert await _is_escrowed(db_session, job_id) is True
 
-        # Cycle 2: 0.6 -> 0.7 >= threshold -> escrow released.
+        # Cycles 2 .. k*-1: still climbing, still escrowed.
+        for _ in range(2, RELEASE_MIN_PASSES):
+            assert await probe_due_peers(db_session, online) == 1
+            assert await _is_escrowed(db_session, job_id) is True
+
+        # The k*-th honest cycle crosses the threshold -> escrow released.
         probed = await probe_due_peers(db_session, online)
         assert probed == 1
         assert await _is_escrowed(db_session, job_id) is False, "escrow released"
