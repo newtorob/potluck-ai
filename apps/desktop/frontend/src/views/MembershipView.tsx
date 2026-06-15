@@ -81,7 +81,7 @@ export function MembershipView() {
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-primary" aria-hidden="true" />
-                  Access to the contributor network — share idle GPU compute, run larger models
+                  Access to the contributor network: share idle GPU compute, run larger models
                 </li>
               </ul>
             </div>
@@ -91,7 +91,7 @@ export function MembershipView() {
               <div className="h-11 w-full animate-hearth-pulse rounded-xl bg-muted" />
               <div className="h-11 w-full animate-hearth-pulse rounded-xl bg-primary/20" />
               <p className="text-xs italic text-muted-foreground/60">
-                Passwordless magic link — your email, nothing else.
+                Passwordless magic link. Your email, nothing else.
               </p>
             </div>
           </div>

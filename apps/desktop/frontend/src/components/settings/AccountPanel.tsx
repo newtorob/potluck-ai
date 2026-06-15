@@ -19,13 +19,13 @@ export function AccountPanel() {
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">Sign in coming soon</p>
-            <p className="text-xs text-muted-foreground">Passwordless magic link — no password needed</p>
+            <p className="text-xs text-muted-foreground">Passwordless magic link, no password needed</p>
           </div>
         </div>
 
         <p className="text-sm text-muted-foreground leading-relaxed">
           Membership features (founding member status, governance voting, and the contributor
-          network) are in active development. Sign-in is not required to use local chat — your
+          network) are in active development. Sign-in is not required to use local chat. Your
           models run entirely on this device today.
         </p>
 
@@ -33,7 +33,7 @@ export function AccountPanel() {
           type="button"
           disabled
           className="w-full rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm font-medium text-muted-foreground cursor-not-allowed"
-          aria-label="Sign in — coming soon"
+          aria-label="Sign in, coming soon"
         >
           Sign in with magic link
         </button>
@@ -56,7 +56,7 @@ export function AccountPanel() {
           </li>
           <li className="flex items-start gap-2">
             <span className="mt-0.5 text-primary">·</span>
-            Access to the contributor network — share idle GPU compute, run larger models
+            Access to the contributor network: share idle GPU compute, run larger models
           </li>
         </ul>
       </div>

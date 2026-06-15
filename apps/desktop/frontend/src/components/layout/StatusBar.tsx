@@ -71,7 +71,7 @@ export function StatusBar() {
       <StatusItem
         active={modelLoaded}
         label={modelLoaded ? (activeModelId ? formatModelName(activeModelId) : 'Model loaded') : 'No model loaded'}
-        tooltip={modelLoaded ? 'A local model is loaded and ready.' : 'No model loaded — pick one in Models.'}
+        tooltip={modelLoaded ? 'A local model is loaded and ready.' : 'No model loaded. Pick one in Models.'}
         href="/models"
       />
 
@@ -165,7 +165,7 @@ function NetworkPill({ mode }: NetworkPillProps) {
 
   const tooltip =
     mode === 'off'      ? 'Nothing leaves your machine. Toggle on in the chat composer.'
-    : mode === 'standby' ? 'Network ready but inactive — opt in per session.'
+    : mode === 'standby' ? 'Network ready but inactive. Opt in per session.'
     : 'Your next chat send routes through the contributor network. Aggregate stats in /network.';
 
   // Click-through goes to /network (the observability view), not

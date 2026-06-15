@@ -130,7 +130,7 @@ export function TagCloud({ activeProject, onKeywordClick }: TagCloudProps) {
             <div
               className="flex flex-wrap gap-x-3 gap-y-2"
               role="group"
-              aria-label="Keyword cloud — click to search"
+              aria-label="Keyword cloud, click to search"
             >
               {keywords.map(({ keyword, count }) => {
                 const fontSize = scaleFontSize(count, minCount, maxCount);

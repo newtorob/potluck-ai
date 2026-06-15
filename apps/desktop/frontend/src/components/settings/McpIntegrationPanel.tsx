@@ -247,7 +247,7 @@ function SnippetBlock({ editor, binaryConfig }: SnippetBlockProps) {
         <span className="text-muted-foreground/70">({statusText})</span>
         {!IS_DEV && (
           <span className="text-muted-foreground/60">
-            {' '}— macOS. Adjust path for your install location.
+            {' '}(macOS). Adjust path for your install location.
           </span>
         )}
       </p>
@@ -361,7 +361,7 @@ export function McpIntegrationPanel() {
 
       {/* Description */}
       <p className="text-xs text-muted-foreground leading-relaxed">
-        Potluck speaks the Model Context Protocol — your coding agent can search memories, save
+        Potluck speaks the Model Context Protocol. Your coding agent can search memories, save
         explicit ones, and manage long-running task state across sessions. Add the snippet below
         to your agent&rsquo;s MCP config to plug Potluck in.
       </p>

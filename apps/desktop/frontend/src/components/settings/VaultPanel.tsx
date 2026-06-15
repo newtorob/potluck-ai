@@ -207,7 +207,7 @@ export function VaultPanel({ settings, isSaving, saveError, onUpdate }: VaultPan
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-sage" aria-hidden="true" />
             <p className="text-xs text-foreground/80">
               Scanned {lastResult.files_scanned} file{lastResult.files_scanned === 1 ? '' : 's'}
-              {lastResult.files_added > 0 && ` — ${lastResult.files_added} new`}
+              {lastResult.files_added > 0 && `, ${lastResult.files_added} new`}
               {lastResult.files_updated > 0 && `, ${lastResult.files_updated} updated`}
               {lastResult.files_removed > 0 && `, ${lastResult.files_removed} removed`}
               {' · '}

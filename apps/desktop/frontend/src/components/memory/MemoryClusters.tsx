@@ -418,7 +418,7 @@ export function MemoryClusters({ activeProject, refreshKey }: MemoryClustersProp
         <div className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1.5 rounded-lg bg-background/80 px-2.5 py-1.5 backdrop-blur-sm">
           <RefreshCw className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
           <span className="text-[11px] text-muted-foreground">
-            Layout as of {formatAge(generatedAt)} — refresh
+            Layout as of {formatAge(generatedAt)} · refresh
           </span>
         </div>
       )}

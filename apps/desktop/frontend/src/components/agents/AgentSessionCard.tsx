@@ -136,7 +136,7 @@ function ModelBadge({ model, modelSource }: ModelBadgeProps) {
   const sourceTooltip =
     modelSource === 'self-reported'
       ? 'The client explicitly declared its model in the MCP handshake.'
-      : 'Model was inferred from request patterns or config files — not guaranteed.';
+      : 'Model was inferred from request patterns or config files, not guaranteed.';
 
   return (
     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -225,7 +225,7 @@ export function AgentSessionCard({
           {session.friendly_name !== null && (
             <span
               className="shrink-0 rounded-md border border-border/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground/80"
-              title="Auto-assigned nickname for this session — distinct per process"
+              title="Auto-assigned nickname for this session, distinct per process"
             >
               {session.friendly_name}
             </span>

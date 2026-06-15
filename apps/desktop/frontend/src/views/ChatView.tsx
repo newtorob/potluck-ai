@@ -140,15 +140,15 @@ export function ChatView() {
               disabled={isStreaming || !householdPeersReachable}
               aria-pressed={householdMode}
               aria-label={householdMode
-                ? 'Household mode on — serving via one of your paired machines. Click to go local.'
+                ? 'Household mode on, serving via one of your paired machines. Click to go local.'
                 : !householdPeersReachable
-                  ? 'Household mode unavailable — no paired machines reachable. Set one up in Household.'
+                  ? 'Household mode unavailable. No paired machines reachable. Set one up in Household.'
                   : 'Route to a machine in your household'}
               title={!householdPeersReachable
-                ? 'No household peers reachable — pair a machine in Household first'
+                ? 'No household peers reachable. Pair a machine in Household first.'
                 : householdMode
                   ? 'Routing to your household. Click to go local.'
-                  : 'Route to your household (private — no coordinator involved)'}
+                  : 'Route to your household (private, no coordinator involved)'}
               className={cn(
                 'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium',
                 'transition-colors duration-fast border',
@@ -174,10 +174,10 @@ export function ChatView() {
               aria-label={networkMode
                 ? `Network mode on - serving via ${networkModelSlug}. Click to switch back to local.`
                 : !coordinatorReachable
-                  ? 'Network mode unavailable — coordinator unreachable. Run `make up` to start it.'
+                  ? 'Network mode unavailable. Coordinator unreachable. Run `make up` to start it.'
                   : 'Switch to network mode (route via a contributor peer)'}
               title={!coordinatorReachable
-                ? 'Coordinator unreachable — start it with `make up`'
+                ? 'Coordinator unreachable. Start it with `make up`.'
                 : networkMode
                   ? `Network: ${networkModelSlug}. Click to go local.`
                   : 'Route via the contributor network'}

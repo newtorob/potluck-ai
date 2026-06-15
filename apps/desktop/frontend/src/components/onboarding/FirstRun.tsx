@@ -299,7 +299,7 @@ export function FirstRun({ models }: FirstRunProps) {
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
             )}
           >
-            {step === 'ready' ? '' : 'Skip — I\'ll pick later'}
+            {step === 'ready' ? '' : 'Skip, I\'ll pick later'}
           </button>
 
           {step === 'welcome' && (
@@ -395,7 +395,7 @@ function WelcomeStep() {
           just fast private inference you own and control. Using the network is always opt-in.
         </p>
         <p className="text-xs italic text-muted-foreground/80 leading-relaxed">
-          This setup detects your hardware and installs a model — about 2–10 minutes.
+          This setup detects your hardware and installs a model. Takes about 2–10 minutes.
         </p>
       </div>
     </div>

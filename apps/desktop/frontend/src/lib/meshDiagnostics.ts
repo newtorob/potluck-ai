@@ -271,7 +271,7 @@ function derivePeer(peer: MeshPeer, coordinatorTrustworthy: boolean, now: number
         severity: 'ok', // connected & working — the relay nuance lives on the peer pill, not the global banner
         label: 'Relayed',
         detail:
-          'Connected, but through a relay (slower). A direct peer-to-peer link hasn’t formed — usually a VPN or strict NAT on one side.',
+          'Connected, but through a relay (slower). A direct peer-to-peer link hasn’t formed yet, usually because of a VPN or strict NAT on one side.',
         fix: 'Often upgrades to direct on its own. Allowing the mesh range past a VPN can enable a direct link.',
       };
     }
@@ -306,7 +306,7 @@ function derivePeer(peer: MeshPeer, coordinatorTrustworthy: boolean, now: number
       severity: 'warn',
       label: 'Key out of date',
       detail:
-        'This machine’s key isn’t provisioned on the tunnel — usually a stale key after it re-paired.',
+        'This machine’s key isn’t provisioned on the tunnel, usually a stale key after it re-paired.',
       fix: 'Restart the mesh on this machine to re-sync keys (or re-pair this machine).',
     };
   }
@@ -335,8 +335,8 @@ function derivePeer(peer: MeshPeer, coordinatorTrustworthy: boolean, now: number
     severity: 'warn',
     label: hadHandshake ? 'Tunnel dropped' : 'No tunnel',
     detail: hadHandshake
-      ? 'The encrypted tunnel was up but has gone quiet — often a VPN reconnect, sleep/wake, or a network change broke the data path.'
-      : 'The coordinator can see this machine, but no encrypted tunnel ever formed — typically a firewall or VPN kill-switch blocking the mesh on one side.',
+      ? 'The encrypted tunnel was up but has gone quiet. Often a VPN reconnect, sleep/wake, or a network change broke the data path.'
+      : 'The coordinator can see this machine, but no encrypted tunnel ever formed. Typically a firewall or VPN kill-switch blocking the mesh on one side.',
     fix: 'On both machines, allow the mesh interface past any VPN/firewall (a kill-switch will silently drop it).',
   };
 }
@@ -367,10 +367,10 @@ function computeHeadline(
 
   if (worstGlobal && worstGlobal.severity === 'info') return worstGlobal.title;
 
-  if (peerCount === 0) return 'Mesh up — no other machines yet';
+  if (peerCount === 0) return 'Mesh up, no other machines yet';
   const relayed = peerStates.filter((p) => p.state === 'relayed').length;
   const direct = peerStates.filter((p) => p.state === 'direct').length;
-  if (relayed > 0 && direct === 0) return 'Mesh healthy — connected via relay';
+  if (relayed > 0 && direct === 0) return 'Mesh healthy, connected via relay';
   return 'Mesh healthy';
 }
 

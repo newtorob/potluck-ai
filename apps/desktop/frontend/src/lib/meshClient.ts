@@ -42,7 +42,7 @@ export class MeshBridgeUnavailableError extends Error {
   readonly kind = 'bridge_unavailable' as const;
   constructor() {
     super(
-      'Mesh bridge not available — Potluck must run inside the Electron app to talk to the sidecar.',
+      'Mesh bridge not available. Potluck must run inside the Electron app to talk to the sidecar.',
     );
     this.name = 'MeshBridgeUnavailableError';
   }

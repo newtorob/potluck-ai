@@ -259,7 +259,7 @@ export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
                 >
                   <Clock className="h-3 w-3" aria-hidden="true" />
                   {isExpired
-                    ? 'Token expired — close this dialog and issue a new one.'
+                    ? 'Token expired. Close this dialog and issue a new one.'
                     : minutesLeft === 0
                       ? 'Expires in under a minute.'
                       : `Expires in ${minutesLeft} minute${minutesLeft === 1 ? '' : 's'}.`}

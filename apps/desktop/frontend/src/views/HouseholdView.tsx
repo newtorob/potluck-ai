@@ -91,7 +91,7 @@ export function HouseholdView() {
           description={
             <>
               You're seeing this view in a regular browser. To set up a
-              household, open Potluck through the desktop app — the mesh
+              household, open Potluck through the desktop app. The mesh
               sidecar runs only there.
             </>
           }
@@ -120,8 +120,8 @@ export function HouseholdView() {
               <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
                 make run
               </code>
-              . In packaged builds, the system daemon should be running —
-              if it isn't, reinstall.
+              . In packaged builds, the system daemon should be running.
+              If it isn't, reinstall.
             </>
           }
         />
@@ -219,7 +219,7 @@ function HouseholdHeader({ status }: { status: MeshStatus | null }) {
               aria-hidden="true"
             />
             {meshUp
-              ? `Mesh up — ${onlineCount} peer${onlineCount === 1 ? '' : 's'} online`
+              ? `Mesh up · ${onlineCount} peer${onlineCount === 1 ? '' : 's'} online`
               : status?.mesh_status === 'error'
                 ? 'Mesh error'
                 : status?.mesh_status === 'starting'
@@ -314,7 +314,7 @@ function BeFirstPanel({ onPaired }: { onPaired: () => void }) {
       </div>
       <p className="text-sm text-muted-foreground leading-snug">
         This will be the first machine in your household. You can add more
-        later — any machine with Potluck installed can join.
+        later. Any machine with Potluck installed can join.
       </p>
 
       {error !== null && (
@@ -377,7 +377,7 @@ function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
             'This machine still has credentials from a previous setup. Click "Leave household" first, then try joining again.',
           );
         } else if (err.code === 'pair_in_progress') {
-          setError('A pairing attempt is already running — please wait a moment.');
+          setError('A pairing attempt is already running. Please wait a moment.');
         } else {
           setError(err.message);
         }
@@ -539,7 +539,7 @@ function PairedView({
             <p className="text-sm text-muted-foreground">
               You're the only machine in this household right now. Click{' '}
               <span className="font-medium text-foreground">Add another machine</span>{' '}
-              to invite one more — installations on the same Wi-Fi, on a
+              to invite one more. Installations on the same Wi-Fi, on a
               friend's house with Tailscale, or anywhere with internet all
               work.
             </p>
@@ -633,7 +633,7 @@ function MeshPayoffCard({
         ) : (
           <>
             Right now it's just this machine. Pair a second one and your laptop can borrow your
-            desktop's GPU — run models bigger than any single box can hold, privately over your own
+            desktop's GPU to run models bigger than any single box can hold, privately over your own
             mesh.
           </>
         )}
@@ -726,7 +726,7 @@ function CapacityCard({ peers }: { peers: MeshPeer[] }) {
   if (!snapshot || snapshot.peerCount === 0) {
     return (
       <div className="rounded-lg border border-border/60 bg-card p-4 text-sm text-muted-foreground">
-        No reachable peers — capacity unavailable.
+        No reachable peers. Capacity unavailable.
       </div>
     );
   }
@@ -749,12 +749,12 @@ function CapacityCard({ peers }: { peers: MeshPeer[] }) {
 }
 
 function CapacityPill({ result }: { result: CapacityResult }) {
-  const titleParts: string[] = [`${result.label} model — ${speedLabel(result.speed)} (${speedHint(result.speed)})`];
+  const titleParts: string[] = [`${result.label} model · ${speedLabel(result.speed)} (${speedHint(result.speed)})`];
   if (result.bestPeerHost && result.speed !== 'unavailable') {
     titleParts.push(`best peer: ${result.bestPeerHost}`);
   }
   if (result.bigModelEligible) {
-    titleParts.push('unlocked via Big Model Mode pooling — capacity, not speed');
+    titleParts.push('unlocked via Big Model Mode pooling (capacity, not speed)');
   }
   return (
     <li
@@ -827,7 +827,7 @@ function BigModelModeCard({ peers }: { peers: MeshPeer[] }) {
     setError(null);
     if (!sidecarUp || !activeModelId) {
       setError(
-        'Load a model in the Models view first — Big Model Mode reloads whatever is currently loaded with RPC peers participating.',
+        'Load a model in the Models view first. Big Model Mode reloads whatever is currently loaded with RPC peers participating.',
       );
       return;
     }
@@ -853,7 +853,7 @@ function BigModelModeCard({ peers }: { peers: MeshPeer[] }) {
       // 501 from the sidecar means stock (unpatched) llama-cpp-python.
       if (msg.includes('501') || msg.toLowerCase().includes('patched')) {
         setError(
-          'This sidecar is running stock llama-cpp-python. Install the Potluck-patched wheel — see docs/phase-g/household-contributor-headless.md.',
+          'This sidecar is running stock llama-cpp-python. Install the Potluck-patched wheel (see docs/phase-g/household-contributor-headless.md).',
         );
       } else {
         setError(msg);
@@ -905,7 +905,7 @@ function BigModelModeCard({ peers }: { peers: MeshPeer[] }) {
         ) : isOn ? (
           <div className="space-y-1.5">
             <p className="text-xs font-medium text-foreground">
-              Active — model split across {loadedRpcServers?.length ?? 0} peer
+              Active: model split across {loadedRpcServers?.length ?? 0} peer
               {(loadedRpcServers?.length ?? 0) === 1 ? '' : 's'} + this machine
             </p>
             <ul className="space-y-0.5">
@@ -1009,7 +1009,7 @@ function RoutingStrategyControl() {
       id: 'capability',
       title: 'Smart routing',
       blurb:
-        "Picks the best machine for each prompt — uses the busy/idle signal, hardware tier, and which model is loaded. Long or complex prompts go to higher-tier machines.",
+        "Picks the best machine for each prompt. Uses the busy/idle signal, hardware tier, and which model is loaded. Long or complex prompts go to higher-tier machines.",
     },
     {
       id: 'round_robin',
@@ -1149,7 +1149,7 @@ function PeerStateBadge({ diag }: { diag?: PeerDiagnostic }) {
 
   const v = VISUAL[diag.state];
   const Icon = v.icon;
-  const title = diag.fix ? `${diag.detail} — ${diag.fix}` : diag.detail;
+  const title = diag.fix ? `${diag.detail} · ${diag.fix}` : diag.detail;
 
   return (
     <span

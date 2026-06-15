@@ -142,7 +142,7 @@ function TimelineRow({ call }: TimelineRowProps) {
             </div>
           ) : (
             <div className="italic text-muted-foreground/70">
-              No args recorded — either none passed or all stripped by the privacy whitelist.
+              No args recorded: either none passed, or all stripped by the privacy whitelist.
             </div>
           )}
 
@@ -258,7 +258,7 @@ function ExportTraceButton({ sessionId }: { sessionId: string }) {
       title={
         error !== null
           ? `Export failed: ${error}`
-          : 'Download a portable JSON trace of this session — safe to share with bug reports.'
+          : 'Download a portable JSON trace of this session, safe to share with bug reports.'
       }
       aria-label="Export session trace"
       className={cn(
@@ -386,10 +386,10 @@ export function SessionDetailDrawer({ detail, onClose }: SessionDetailDrawerProp
               </h3>
               <div className="rounded-lg border border-border bg-background/50 px-3 py-1">
                 <MetaRow label="ID" value={<span className="font-mono text-[10px]">{detail.id}</span>} />
-                <MetaRow label="Client" value={detail.client_name ?? '—'} />
-                <MetaRow label="Version" value={detail.client_version ?? '—'} />
+                <MetaRow label="Client" value={detail.client_name ?? 'n/a'} />
+                <MetaRow label="Version" value={detail.client_version ?? 'n/a'} />
                 <MetaRow label="Transport" value={detail.transport} />
-                <MetaRow label="PID" value={detail.pid !== null ? String(detail.pid) : '—'} />
+                <MetaRow label="PID" value={detail.pid !== null ? String(detail.pid) : 'n/a'} />
                 <MetaRow label="Project" value={<ProjectPill project={detail.project} />} />
                 <MetaRow
                   label="Model"

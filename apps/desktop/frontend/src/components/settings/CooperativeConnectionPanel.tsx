@@ -119,7 +119,7 @@ export function CooperativeConnectionPanel() {
             <>
               <AlertCircle className="h-3 w-3 text-amber-500" aria-hidden="true" />
               <span className="text-muted-foreground">
-                Unreachable — verify the coordinator is running there (
+                Unreachable. Verify the coordinator is running there (
                 <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">make up</code>
                 ).
               </span>

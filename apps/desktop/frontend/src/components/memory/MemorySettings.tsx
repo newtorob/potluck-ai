@@ -234,7 +234,7 @@ export function MemorySettings({ settings, isSaving, onUpdate }: MemorySettingsP
           </label>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Potluck remembers facts, preferences, and project context across your conversations.
-            Memory lives entirely on your device — see Privacy.
+            Memory lives entirely on your device. See Privacy.
           </p>
         </div>
 

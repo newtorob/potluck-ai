@@ -151,8 +151,8 @@ export function NetworkView() {
           description={
             <>
               When members run the contributor sidecar, they show up here.
-              You can also <span className="font-medium text-foreground">be the first peer</span> —
-              flip on inference in <span className="font-medium text-foreground">Settings</span> and your
+              You can also <span className="font-medium text-foreground">be the first peer</span>.
+              Flip on inference in <span className="font-medium text-foreground">Settings</span> and your
               machine joins the network.
             </>
           }
@@ -233,8 +233,8 @@ export function NetworkView() {
           aria-label="Privacy note"
         >
           The network numbers above are aggregate. We never show which specific peer
-          served which prompt, by design — that's the manifesto's blinded-routing
-          rule. Credit rows reflect your own ledger only; hash-chain verification
+          served which prompt, by design. That's the manifesto's blinded-routing rule.
+          Credit rows reflect your own ledger only; hash-chain verification
           is coming in a future update.
         </p>
       </div>
@@ -277,7 +277,7 @@ function NetworkHeader({
             />
             {isAlive
               ? `${onlineNow} peer${onlineNow === 1 ? '' : 's'} online`
-              : 'Quiet — no peers online right now'}
+              : 'Quiet, no peers online right now'}
           </span>
           {netPill}
         </span>
@@ -370,7 +370,7 @@ interface StatCardProps {
 function StatCard({ icon: Icon, label, value, sub, emphasize, formatLarge }: StatCardProps) {
   const display =
     value === undefined
-      ? '—'
+      ? 'n/a'
       : formatLarge && value >= 1000
         ? `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`
         : value.toLocaleString();
@@ -524,7 +524,7 @@ function CreditBalanceCard({ balance, isLoading, error }: CreditBalanceCardProps
   if (error !== null && balance === null) {
     return (
       <p className="text-sm text-muted-foreground/70">
-        Coordinator unreachable — check connection.
+        Coordinator unreachable. Check connection.
       </p>
     );
   }
@@ -541,7 +541,7 @@ function CreditBalanceCard({ balance, isLoading, error }: CreditBalanceCardProps
     return (
       <div className="rounded-xl border border-border/60 bg-card p-4">
         <p className="text-sm text-muted-foreground">
-          No activity yet — toggle network mode in chat to start contributing
+          No activity yet. Toggle network mode in chat to start contributing
           or consuming from the network.
         </p>
       </div>
@@ -622,7 +622,7 @@ function CreditHistoryList({ history, isLoading, error }: CreditHistoryListProps
   if (error !== null && history === null) {
     return (
       <p className="text-sm text-muted-foreground/70">
-        Coordinator unreachable — check connection.
+        Coordinator unreachable. Check connection.
       </p>
     );
   }
@@ -630,7 +630,7 @@ function CreditHistoryList({ history, isLoading, error }: CreditHistoryListProps
   if (history === null || history.entries.length === 0) {
     return (
       <p className="text-sm text-muted-foreground/70">
-        No credit history yet — your ledger entries will appear here once
+        No credit history yet. Your ledger entries will appear here once
         you contribute to or consume from the network.
       </p>
     );

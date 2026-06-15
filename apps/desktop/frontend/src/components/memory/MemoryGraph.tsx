@@ -443,7 +443,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
           </div>
           <p className="text-sm font-serif italic text-paper">No memories to graph yet</p>
           <p className="max-w-xs text-xs text-paper/60 leading-relaxed">
-            As Potluck remembers things across conversations, they'll appear here as nodes — connected by what they have in common.
+            As Potluck remembers things across conversations, they'll appear here as nodes, connected by what they have in common.
           </p>
         </div>
       )}

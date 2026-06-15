@@ -971,7 +971,7 @@ function MemoryEmptyState() {
     <EmptyState
       icon={Brain}
       title="No memories yet"
-      description="Memories will appear here as Potluck learns from your conversations — facts, preferences, decisions, names. Nothing leaves your machine."
+      description="Memories will appear here as Potluck learns from your conversations: facts, preferences, decisions, names. Nothing leaves your machine."
       align="top"
     />
   );

@@ -238,13 +238,13 @@ function ComposerHint({ isStreaming, modelLoaded, householdMode, networkMode }: 
     // prompt content at inference time — say so.
     body = (
       <>
-        Blinded routing through the coordinator — the serving peer doesn’t see who you are.
+        Blinded routing through the coordinator. The serving peer doesn’t see who you are.
       </>
     );
   } else {
     body = (
       <>
-        Runs locally — your messages never leave this device.
+        Runs locally. Your messages never leave this device.
       </>
     );
   }

@@ -20,7 +20,7 @@ import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { Network, Cpu } from 'lucide-react';
+import { Network, Cpu, Home } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import type { AppMessage } from '@/stores/chatStore';
 
@@ -68,48 +68,71 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <CopyButton text={message.content} isUser={isUser} />
         )}
 
-        {/* Network-routed footer. Only renders when the SSE stream
-            attached a meta envelope with served_by=contributor — i.e.
-            this message came back through the coordinator/jobs path,
-            not the local sidecar. The wording deliberately doesn't
-            expose peer identity (manifesto blinded-routing rule); only
-            confirms it left the device + summarises the round trip. */}
-        {message.meta && message.meta.served_by !== 'local' && !isStreaming && (
-          <ServedByFooter meta={message.meta} />
+        {/* "What left my machine" receipt. Renders on every completed
+            assistant message so silence is never the only signal that a
+            prompt stayed home — the affirmative "stayed on this machine"
+            line is the trust guarantee. Local messages carry no meta
+            (the local /chat/completions path emits none), so an absent
+            meta is itself the local case. Open-pool routing stays
+            identity-blind (manifesto blinded-routing rule): never a peer
+            name, only that it left the device. */}
+        {!isUser && !isError && !isStreaming && message.content.length > 0 && (
+          <RouteReceipt meta={message.meta} />
         )}
       </div>
     </article>
   );
 }
 
-function ServedByFooter({ meta }: { meta: NonNullable<AppMessage['meta']> }) {
+/** Three honest privacy states for where a response was produced:
+ *   local — nothing left this machine (the local sidecar; no meta emitted).
+ *   mine  — left this box but only to your own hardware over the private mesh
+ *           (a household peer, or the coordinator routing to one of your peers).
+ *   pool  — left this machine to another member's machine in the open pool;
+ *           identity-blind, so never a peer name. */
+type RoutePrivacy = 'local' | 'mine' | 'pool';
+
+function classifyRoute(meta: AppMessage['meta']): RoutePrivacy {
+  if (!meta || meta.served_by === 'local') return 'local';
+  if (
+    meta.served_by === 'household' ||
+    (meta.served_by === 'contributor' && meta.served_scope === 'mine')
+  ) {
+    return 'mine';
+  }
+  return 'pool';
+}
+
+function RouteReceipt({ meta }: { meta: AppMessage['meta'] }) {
+  const route = classifyRoute(meta);
+
   const parts: string[] = [];
-  if (typeof meta.duration_ms === 'number' && meta.duration_ms > 0) {
+  if (meta && typeof meta.duration_ms === 'number' && meta.duration_ms > 0) {
     parts.push(meta.duration_ms >= 1000 ? `${(meta.duration_ms / 1000).toFixed(1)}s` : `${meta.duration_ms}ms`);
   }
-  if (typeof meta.output_tokens === 'number' && meta.output_tokens > 0) {
+  if (meta && typeof meta.output_tokens === 'number' && meta.output_tokens > 0) {
     parts.push(`${meta.output_tokens} tokens`);
   }
 
-  // "Ran on your machine" for the My-Machines paths (household-direct, or the
-  // coordinator routing to one of your own peers). The open pool stays
-  // identity-blind — "Served by the network", never a peer name.
-  const ranOnMine =
-    meta.served_by === 'household' ||
-    (meta.served_by === 'contributor' && meta.served_scope === 'mine');
-  const Icon = ranOnMine ? Cpu : Network;
-  const label = ranOnMine
-    ? meta.served_peer
-      ? `Ran on ${meta.served_peer}`
-      : 'Ran on one of your machines'
-    : 'Served by the network';
+  let Icon = Cpu;
+  let label = 'Stayed on this machine';
+  let tone = 'text-sage';
+  if (route === 'mine') {
+    Icon = Home;
+    label = meta?.served_peer ? `Ran on ${meta.served_peer}, your hardware` : 'Ran on your own hardware';
+    tone = 'text-primary/70';
+  } else if (route === 'pool') {
+    Icon = Network;
+    label = 'Left this machine, open pool';
+    tone = 'text-primary/70';
+  }
 
   return (
     <div
       className="mt-3 flex items-center gap-1.5 border-t border-border/40 pt-2 text-[11px] text-muted-foreground/80"
-      aria-label="Routing metadata"
+      aria-label="Privacy receipt"
     >
-      <Icon className="h-3 w-3 text-primary/70" aria-hidden="true" />
+      <Icon className={cn('h-3 w-3', tone)} aria-hidden="true" />
       <span className="font-serif italic">{label}</span>
       {parts.length > 0 && (
         <>

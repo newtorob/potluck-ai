@@ -31,7 +31,7 @@ export function ProjectPill({ project, className }: ProjectPillProps) {
           'inline-flex items-center text-[11px] italic text-muted-foreground/70',
           className,
         )}
-        title="Global — applies to all projects"
+        title="Global: applies to all projects"
       >
         Global
       </span>

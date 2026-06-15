@@ -175,7 +175,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
           <ActionButton
             onClick={handleTogglePin}
             aria-label={memory.pinned ? 'Unpin memory' : 'Pin memory'}
-            title={memory.pinned ? 'Unpin — stop always-injecting' : 'Pin — always inject into retrieval'}
+            title={memory.pinned ? 'Unpin: stop always-injecting' : 'Pin: always inject into retrieval'}
             className={memory.pinned ? 'text-primary' : undefined}
           >
             <Pin className={cn('h-3 w-3', memory.pinned && 'fill-current')} aria-hidden="true" />
@@ -371,7 +371,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
             {memory.pinned && (
               <span
                 className="inline-flex items-center gap-1 text-[10px] font-medium text-primary"
-                title="Pinned — always injected into retrieval, regardless of query"
+                title="Pinned: always injected into retrieval, regardless of query"
               >
                 <Pin className="h-3 w-3 fill-current" aria-hidden="true" />
                 pinned

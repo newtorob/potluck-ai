@@ -28,6 +28,7 @@ import {
   Activity,
   Globe2,
   Home,
+  Gauge,
   Settings,
   CreditCard,
   Plus,
@@ -77,6 +78,7 @@ interface NavItem {
 const PRIMARY_NAV: NavItem[] = [
   { to: '/chat', label: 'Chat', icon: MessageSquare },
   { to: '/household', label: 'My Machines', icon: Home },
+  { to: '/readiness', label: 'Readiness', icon: Gauge },
   { to: '/network', label: 'Network', icon: Globe2 },
   { to: '/models', label: 'Models', icon: Package },
 ];

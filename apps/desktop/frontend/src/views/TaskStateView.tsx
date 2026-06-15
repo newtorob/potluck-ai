@@ -498,7 +498,7 @@ export function TaskStateView() {
               icon={ListTodo}
               title={activeFilter === 'all' ? 'No tasks yet' : `No ${activeFilter} tasks`}
               description={activeFilter === 'all'
-                ? 'Tasks let an agent resume work across sessions — break a goal into steps and check them off as you go.'
+                ? 'Tasks let an agent resume work across sessions. Break a goal into steps and check them off as you go.'
                 : undefined}
               align="top"
             />

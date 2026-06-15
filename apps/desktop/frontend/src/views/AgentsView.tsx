@@ -226,7 +226,7 @@ export function AgentsView() {
           title="No agent sessions yet"
           description={
             <>
-              Configure Potluck as an MCP server in Claude Code, Cursor, Zed, or Windsurf — see{' '}
+              Configure Potluck as an MCP server in Claude Code, Cursor, Zed, or Windsurf. See{' '}
               <span className="font-medium text-foreground">Settings → Advanced → External agents (MCP)</span>.
             </>
           }
@@ -369,7 +369,7 @@ export function AgentsView() {
           {staleSessions.length > 0 && (
             <AgentSessionGroup
               label="Stale"
-              hint="no heartbeat for 5+ minutes — sweep will mark these disconnected"
+              hint="no heartbeat for 5+ minutes · sweep will mark these disconnected"
               sessions={staleSessions}
               activity={activity}
               sessionDetail={sessionDetail}
