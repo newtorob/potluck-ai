@@ -24,8 +24,8 @@ import (
 type LogFormat string
 
 const (
-	LogFormatJSON  LogFormat = "json"
-	LogFormatText  LogFormat = "text"
+	LogFormatJSON LogFormat = "json"
+	LogFormatText LogFormat = "text"
 )
 
 // Config holds all runtime configuration for the sidecar.
@@ -33,6 +33,11 @@ type Config struct {
 	// CoordinatorURL is the HTTP/WS base URL of the Potluck coordinator.
 	// Example: "http://127.0.0.1:8400" or "https://coordinator.potluck.ai"
 	CoordinatorURL string
+
+	// CoordinatorToken is the shared secret presented to the coordinator
+	// (X-Potluck-Coordinator-Token) on the signal WS and gated /mesh/* HTTP
+	// calls. Empty = dev mode (coordinator runs tokenless / passthrough).
+	CoordinatorToken string
 
 	// WGPrivateKeyPath is the path to the WireGuard private key file.
 	// If the file does not exist on first run, a new keypair is generated
@@ -102,6 +107,10 @@ func Load() (*Config, error) {
 	flag.StringVar(&cfg.CoordinatorURL, "coordinator-url",
 		envOr("POTLUCK_COORDINATOR_URL", "http://127.0.0.1:8400"),
 		"Potluck coordinator base URL (env: POTLUCK_COORDINATOR_URL)")
+
+	flag.StringVar(&cfg.CoordinatorToken, "coordinator-token",
+		envOr("POTLUCK_COORDINATOR_TOKEN", ""),
+		"Shared secret for the coordinator (X-Potluck-Coordinator-Token); empty = dev mode (env: POTLUCK_COORDINATOR_TOKEN)")
 
 	flag.StringVar(&cfg.WGPrivateKeyPath, "wg-private-key-path",
 		envOr("POTLUCK_WG_PRIVATE_KEY_PATH", defaultKeyPath),

@@ -34,6 +34,10 @@ const defaultHTTPTimeout = 30 * time.Second
 type Client struct {
 	BaseURL    string
 	HTTPClient *http.Client
+	// CoordinatorToken, when set, is sent as X-Potluck-Coordinator-Token on
+	// every coordinator request (the shared-secret gate on /mesh/* routes).
+	// Empty = dev mode (coordinator passthrough).
+	CoordinatorToken string
 }
 
 // New creates a Client with the given base URL and a default 30-second timeout.
@@ -110,6 +114,9 @@ func (c *Client) Enroll(ctx context.Context, req EnrollRequest) (*EnrollResponse
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json")
+	if c.CoordinatorToken != "" {
+		httpReq.Header.Set("X-Potluck-Coordinator-Token", c.CoordinatorToken)
+	}
 
 	cl := c.HTTPClient
 	if cl == nil {
@@ -157,6 +164,9 @@ func (c *Client) ListPeers(ctx context.Context, wgPublicKey string) ([]EnrolledP
 		return nil, fmt.Errorf("coordapi: build list-peers request: %w", err)
 	}
 	httpReq.Header.Set("Accept", "application/json")
+	if c.CoordinatorToken != "" {
+		httpReq.Header.Set("X-Potluck-Coordinator-Token", c.CoordinatorToken)
+	}
 
 	cl := c.HTTPClient
 	if cl == nil {

@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -64,9 +65,10 @@ type RosterHandler interface {
 // Client manages a persistent WebSocket connection to /mesh/signal.
 // It reconnects automatically with exponential backoff on any failure.
 type Client struct {
-	signalURL   string
-	wgPublicKey string
-	handler     RosterHandler
+	signalURL        string
+	wgPublicKey      string
+	coordinatorToken string
+	handler          RosterHandler
 
 	// sendCh is the channel used to enqueue outbound messages from any
 	// goroutine. A dedicated writer goroutine drains it, ensuring only
@@ -79,11 +81,12 @@ type Client struct {
 }
 
 // NewClient creates a Client. Call Run(ctx) to start the connection loop.
-func NewClient(signalURL, wgPublicKey string, handler RosterHandler) *Client {
+func NewClient(signalURL, wgPublicKey, coordinatorToken string, handler RosterHandler) *Client {
 	return &Client{
-		signalURL:   signalURL,
-		wgPublicKey: wgPublicKey,
-		handler:     handler,
+		signalURL:        signalURL,
+		wgPublicKey:      wgPublicKey,
+		coordinatorToken: coordinatorToken,
+		handler:          handler,
 	}
 }
 
@@ -212,7 +215,17 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 	dialCtx, dialCancel := context.WithTimeout(ctx, 15*time.Second)
 	defer dialCancel()
 
-	conn, _, err := websocket.Dial(dialCtx, c.signalURL, nil)
+	// Present the coordinator token (when configured) on the WS upgrade so the
+	// /mesh/signal gate accepts us; no-op in dev mode (token empty).
+	var dialOpts *websocket.DialOptions
+	if c.coordinatorToken != "" {
+		dialOpts = &websocket.DialOptions{
+			HTTPHeader: http.Header{
+				"X-Potluck-Coordinator-Token": {c.coordinatorToken},
+			},
+		}
+	}
+	conn, _, err := websocket.Dial(dialCtx, c.signalURL, dialOpts)
 	if err != nil {
 		return false, fmt.Errorf("signal: dial: %w", err)
 	}

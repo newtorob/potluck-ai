@@ -69,7 +69,10 @@ from coordinator.schemas.mesh import (
     SignalWelcome,
 )
 from coordinator.constants import STUB_MEMBER_ID
-from coordinator.middleware.auth import require_coordinator_token
+from coordinator.middleware.auth import (
+    coordinator_token_matches,
+    require_coordinator_token,
+)
 from coordinator.services.household_allocator import (
     HouseholdCIDRExhausted,
     allocate_household_cidr,
@@ -691,12 +694,30 @@ async def mesh_signal(ws: WebSocket) -> None:
       5. On disconnect: server removes the connection from the registry
          and broadcasts the node's `removed` to the household.
 
-    v0 auth: possession of a valid `wg_public_key` is the credential.
-    Consistent with GET /mesh/peers + POST /mesh/heartbeat. Stronger
-    auth (signed-nonce challenge mirroring /peers/connect) is a v1
+    v0 auth: a coordinator token (when configured) gates the WS upgrade, then
+    possession of a valid `wg_public_key` identifies the node. Stronger auth
+    (signed-nonce member<->key challenge mirroring /peers/connect) is a v0.5
     hardening item.
     """
     await ws.accept()
+
+    # ---- coordinator-token gate (mirrors /peers/connect) ---- #
+    # No-op when POTLUCK_COORDINATOR_TOKEN is unset (tokenless household
+    # coordinators unaffected). When configured, the mesh sidecar must present
+    # X-Potluck-Coordinator-Token on the WS upgrade. Raises the bar for joining
+    # the signaling channel from "anyone with any enrolled WG pubkey" (which the
+    # code's own comments call not-secret) to "anyone holding the coordinator
+    # token", while the full signed-nonce member<->key binding is built (v0.5).
+    if not coordinator_token_matches(ws.headers.get("x-potluck-coordinator-token")):
+        logger.info("mesh_signal_rejected_bad_coordinator_token")
+        await _safe_send(
+            ws,
+            SignalError(
+                code="unauthorized", message="coordinator token required"
+            ).model_dump(mode="json"),
+        )
+        await ws.close(code=1008)
+        return
 
     # ---- 1. Wait for hello ---- #
     try:

@@ -20,9 +20,9 @@ import (
 
 type noopHandler struct{}
 
-func (noopHandler) OnWelcome(Welcome)            {}
-func (noopHandler) OnRosterUpdate(RosterUpdate)  {}
-func (noopHandler) OnPunchCoord(PunchCoord)      {}
+func (noopHandler) OnWelcome(Welcome)           {}
+func (noopHandler) OnRosterUpdate(RosterUpdate) {}
+func (noopHandler) OnPunchCoord(PunchCoord)     {}
 
 // flakyWSServer is a WebSocket server that completes the hello/welcome
 // handshake then closes the connection after a short window, forcing the
@@ -70,7 +70,7 @@ func TestStressSignalSendDuringReconnect(t *testing.T) {
 	// Convert http://... to ws://...
 	url := "ws" + srv.URL[len("http"):] + "/mesh/signal"
 
-	c := NewClient(url, "test-wg-pubkey", noopHandler{})
+	c := NewClient(url, "test-wg-pubkey", "", noopHandler{})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

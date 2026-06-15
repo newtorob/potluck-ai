@@ -227,7 +227,7 @@ func run() int {
 		})
 	}
 
-	client := msignal.NewClient(cfg.SignalURL(), cfg.WGPublicKey, handler)
+	client := msignal.NewClient(cfg.SignalURL(), cfg.WGPublicKey, cfg.CoordinatorToken, handler)
 
 	// Give the handler a reference to the client so it can call
 	// SendRequestPunch from OnWelcome / OnRosterUpdate.
@@ -253,6 +253,7 @@ func run() int {
 
 	// ---- coordinator API client ---- //
 	coordClient := coordapi.New(cfg.CoordinatorURL)
+	coordClient.CoordinatorToken = cfg.CoordinatorToken
 
 	// ---- local IPC server ---- //
 	ipcSrv := localapi.New(localapi.Config{
@@ -1274,6 +1275,7 @@ type derpTokenResponse struct {
 func makeDERPJWTFetcher(cfg *config.Config) derp.JWTFetcher {
 	coordinatorURL := cfg.CoordinatorURL
 	wgPublicKey := cfg.WGPublicKey
+	coordinatorToken := cfg.CoordinatorToken
 
 	return func(ctx context.Context) (string, error) {
 		body := map[string]string{
@@ -1292,6 +1294,9 @@ func makeDERPJWTFetcher(cfg *config.Config) derp.JWTFetcher {
 			return "", fmt.Errorf("build derp-token request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
+		if coordinatorToken != "" {
+			req.Header.Set("X-Potluck-Coordinator-Token", coordinatorToken)
+		}
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
