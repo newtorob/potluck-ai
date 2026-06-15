@@ -270,6 +270,21 @@ async def peer_connect(
                 # client-claimed credit. A claim that exceeds what we counted is
                 # logged as a fraud signal.
                 counted = len(buf.tokens)
+                # Cap billing to the job's requested output budget. `counted` is
+                # already coordinator-authoritative (tokens we relayed, not the
+                # peer's self-report); this additionally bounds it to what the
+                # requester asked for, so a peer that ignores sampling.max_tokens
+                # and over-generates can't inflate credits beyond the budget.
+                billed = min(counted, buf.max_tokens)
+                if counted > buf.max_tokens:
+                    logger.warning(
+                        "peer_output_exceeds_budget",
+                        peer_id=str(peer.id),
+                        job_id=str(cmp.job_id),
+                        coordinator_counted=counted,
+                        job_max_tokens=buf.max_tokens,
+                        billed=billed,
+                    )
                 if cmp.output_tokens != counted:
                     logger.warning(
                         "peer_output_tokens_mismatch",
@@ -278,7 +293,7 @@ async def peer_connect(
                         peer_claimed=cmp.output_tokens,
                         coordinator_counted=counted,
                     )
-                buf.output_tokens = counted
+                buf.output_tokens = billed
                 buf.duration_ms = cmp.duration_ms
                 buf.finish_reason = cmp.finish_reason
                 await complete_job(cmp.job_id)
@@ -286,7 +301,8 @@ async def peer_connect(
                     "peer_job_complete",
                     peer_id=str(peer.id),
                     job_id=str(cmp.job_id),
-                    output_tokens=counted,
+                    output_tokens=billed,
+                    coordinator_counted=counted,
                     peer_claimed_tokens=cmp.output_tokens,
                     duration_ms=cmp.duration_ms,
                 )

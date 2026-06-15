@@ -26,6 +26,8 @@ from dataclasses import dataclass, field
 
 from fastapi import WebSocket
 
+from coordinator.schemas.peer import MAX_OUTPUT_TOKENS
+
 
 @dataclass
 class PeerConnection:
@@ -54,6 +56,10 @@ class JobBuffer:
     """
 
     job_id: uuid.UUID
+    # The job's requested output-token budget (sampling.max_tokens). Billing is
+    # capped to this so a peer that over-generates beyond the request can't
+    # inflate credits. Defaults to the hard ceiling when the budget is unknown.
+    max_tokens: int = MAX_OUTPUT_TOKENS
     tokens: list[str] = field(default_factory=list)
     token_stream: asyncio.Queue[str] = field(
         default_factory=lambda: asyncio.Queue(maxsize=512)
@@ -213,10 +219,15 @@ async def online_peer_ids() -> list[uuid.UUID]:
 # ---- job buffer lifecycle -------------------------------------------- #
 
 
-async def register_job(job_id: uuid.UUID) -> JobBuffer:
-    """Create + register a JobBuffer the dispatch endpoint can await on."""
+async def register_job(
+    job_id: uuid.UUID, max_tokens: int = MAX_OUTPUT_TOKENS
+) -> JobBuffer:
+    """Create + register a JobBuffer the dispatch endpoint can await on.
+
+    `max_tokens` is the job's requested output budget (sampling.max_tokens);
+    billing is capped to it so peer over-generation can't inflate credits."""
     async with _lock:
-        buf = JobBuffer(job_id=job_id)
+        buf = JobBuffer(job_id=job_id, max_tokens=max_tokens)
         _jobs[job_id] = buf
         return buf
 

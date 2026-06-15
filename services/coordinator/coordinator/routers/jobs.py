@@ -158,7 +158,7 @@ async def _dispatch_to_peer(
     await db.flush()  # populates job.id
     await db.commit()
 
-    buf = await register_job(job.id)
+    buf = await register_job(job.id, max_tokens=req.sampling.max_tokens)
     assigned = JobAssignedMessage(
         job_id=job.id,
         model_slug=req.model_slug,
