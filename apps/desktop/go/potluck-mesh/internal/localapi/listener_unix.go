@@ -4,6 +4,7 @@ package localapi
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"runtime"
@@ -34,26 +35,32 @@ func platformListen(socketPath string) (net.Listener, error) {
 		return nil, fmt.Errorf("localapi: chmod socket %s: %w", socketPath, err)
 	}
 
-	// Dev-mode workaround for the daemon-user vs Electron-user reconciliation
-	// (IPC doc open question #1). On macOS the sidecar needs root in dev to
-	// create utun, but Electron runs as the logged-in user. When started via
-	// sudo, $SUDO_UID points at that user — chown the socket so Electron can
-	// open it without us having to slacken mode to 0666.
+	// Dev-mode workaround for the daemon-user vs Electron-user reconciliation.
+	// On macOS the sidecar needs root in dev to create utun, but Electron runs
+	// as the logged-in user. When started via sudo, $SUDO_UID points at that
+	// user — chown the socket so Electron can open it without us having to
+	// slacken mode to 0666.
 	//
-	// Production daemon-install scripts (launchd / systemd) handle this
-	// differently — dedicated daemon user, socket-group membership — so this
-	// branch only fires when SUDO_UID is present.
-	if sudoUID := os.Getenv("SUDO_UID"); sudoUID != "" {
-		if uid, parseErr := strconv.Atoi(sudoUID); parseErr == nil {
-			gid := uid
-			if sudoGID := os.Getenv("SUDO_GID"); sudoGID != "" {
-				if g, parseErr := strconv.Atoi(sudoGID); parseErr == nil {
-					gid = g
+	// This only fires when we're ROOT: a non-root process can't chown to
+	// another uid (EPERM), and when the mesh runs as a dedicated service user
+	// (systemd: User=potluck + CAP_NET_ADMIN — which still exports SUDO_UID via
+	// the unit) the socket is already owned by the running user, so the chown is
+	// both impossible and unnecessary. Crucially, a chown failure must NEVER be
+	// fatal: the socket already works (chmod 0600, owned by us). Treating it as
+	// fatal here is what crash-looped the IPC server on headless service nodes.
+	if os.Geteuid() == 0 {
+		if sudoUID := os.Getenv("SUDO_UID"); sudoUID != "" {
+			if uid, parseErr := strconv.Atoi(sudoUID); parseErr == nil {
+				gid := uid
+				if sudoGID := os.Getenv("SUDO_GID"); sudoGID != "" {
+					if g, parseErr := strconv.Atoi(sudoGID); parseErr == nil {
+						gid = g
+					}
 				}
-			}
-			if err := os.Chown(socketPath, uid, gid); err != nil {
-				ln.Close()
-				return nil, fmt.Errorf("localapi: chown socket to SUDO_UID %s: %w", sudoUID, err)
+				if err := os.Chown(socketPath, uid, gid); err != nil {
+					slog.Warn("localapi: could not chown socket to SUDO_UID (non-fatal); a same-user desktop app may not reach this socket",
+						"sudo_uid", sudoUID, "socket", socketPath, "err", err)
+				}
 			}
 		}
 	}
