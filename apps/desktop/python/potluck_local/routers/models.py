@@ -37,6 +37,19 @@ async def list_models() -> list[dict]:
         return []
 
 
+@router.post("/benchmark")
+async def benchmark_loaded_model() -> dict:
+    """Benchmark the currently loaded model: tokens/sec + time-to-first-token."""
+    runtime = get_runtime()
+    if not runtime.is_loaded():
+        raise HTTPException(status_code=503, detail="No model loaded to benchmark.")
+    try:
+        return await runtime.benchmark()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("benchmark_failed")
+        raise HTTPException(status_code=500, detail=f"benchmark failed: {type(exc).__name__}")
+
+
 @router.get("/{slug}/manifest")
 async def get_manifest(slug: str) -> dict:
     manifest = model_registry.get_manifest(slug)

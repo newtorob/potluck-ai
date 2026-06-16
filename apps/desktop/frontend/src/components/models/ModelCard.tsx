@@ -12,8 +12,10 @@
  * detection hasn't completed yet — requirements are shown without colour.
  */
 
-import { CheckCircle2, AlertTriangle, XCircle, Loader2, HardDrive } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, AlertTriangle, XCircle, Loader2, HardDrive, Gauge } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
+import { localApi, type BenchmarkResult } from '@/lib/localApi';
 import { DownloadProgress } from './DownloadProgress';
 import type { CatalogModel, ModelTier } from '@/stores/modelStore';
 import type { HardwareInfo } from '@/hooks/useHardware';
@@ -113,6 +115,22 @@ export function ModelCard({
 
   const sufficiency = checkSufficiency(model, hardware);
 
+  const [benching, setBenching] = useState(false);
+  const [bench, setBench] = useState<BenchmarkResult | null>(null);
+  const [benchError, setBenchError] = useState<string | null>(null);
+
+  const runBenchmark = async () => {
+    setBenching(true);
+    setBenchError(null);
+    try {
+      setBench(await localApi.benchmarkModel());
+    } catch (e) {
+      setBenchError(e instanceof Error ? e.message : 'Benchmark failed.');
+    } finally {
+      setBenching(false);
+    }
+  };
+
   return (
     <article
       className={cn(
@@ -150,6 +168,22 @@ export function ModelCard({
 
       {/* Description */}
       <p className="text-xs leading-relaxed text-muted-foreground line-clamp-2">{description}</p>
+
+      {/* Live benchmark result (this machine) */}
+      {isActive && (bench || benchError) && (
+        <p className="text-[11px]">
+          {benchError ? (
+            <span className="text-destructive">{benchError}</span>
+          ) : bench ? (
+            <span className="inline-flex items-center gap-1 text-muted-foreground">
+              <Gauge className="h-3 w-3 text-sage" aria-hidden="true" />
+              <span className="font-medium text-foreground">{bench.tokens_per_sec} tok/s</span>
+              <span className="text-muted-foreground/40">·</span>
+              {Math.round(bench.ttft_ms)} ms to first token
+            </span>
+          ) : null}
+        </p>
+      )}
 
       {/* Requirements row */}
       <div className="flex items-center gap-1.5">
@@ -243,6 +277,27 @@ export function ModelCard({
 
         {isActive && (
           <>
+            <button
+              type="button"
+              onClick={() => void runBenchmark()}
+              disabled={benching || isLoading}
+              className={cn(
+                'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                'border border-border text-muted-foreground hover:text-foreground',
+                'disabled:opacity-50',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              )}
+              aria-label={`Benchmark ${name}`}
+            >
+              {benching ? (
+                <span className="flex items-center justify-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Benchmarking…
+                </span>
+              ) : (
+                'Benchmark'
+              )}
+            </button>
             <button
               type="button"
               onClick={onUnload}

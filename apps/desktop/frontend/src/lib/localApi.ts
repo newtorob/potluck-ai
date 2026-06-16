@@ -184,6 +184,14 @@ export interface GatewaySettings {
   api_key: string;
 }
 
+export interface BenchmarkResult {
+  model_id: string | null;
+  output_tokens: number;
+  ttft_ms: number;
+  duration_ms: number;
+  tokens_per_sec: number;
+}
+
 export type PotluckSettingsPatch = {
   [K in keyof PotluckSettings]?: PotluckSettings[K] extends object
     ? Partial<PotluckSettings[K]>
@@ -448,6 +456,13 @@ export const localApi = {
         load_time_seconds: number;
         rpc_servers?: string[] | null;
       }>(r),
+    );
+  },
+
+  /** Benchmark the currently loaded model: real tokens/sec + time-to-first-token. */
+  benchmarkModel(): Promise<BenchmarkResult> {
+    return timedFetch(`${LOCAL_BASE}/models/benchmark`, { method: 'POST' }, LOAD_TIMEOUT_MS).then(
+      (r) => handleResponse<BenchmarkResult>(r),
     );
   },
 

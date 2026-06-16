@@ -144,12 +144,15 @@ async def chat_completions_openai(req: ChatCompletionRequest):
                     ):
                         if isinstance(chunk, dict) and "__error__" in chunk:
                             yield f'data: {json.dumps({"error": {"message": chunk["__error__"], "type": "inference_error"}})}\n\n'
-                            return
+                            break
                         yield f"data: {json.dumps(chunk)}\n\n"
+                # Terminator on normal completion. Not in finally: a client
+                # disconnect aclose()s this generator (GeneratorExit), and
+                # yielding during that raises and can wedge the stream.
+                yield "data: [DONE]\n\n"
             except Exception as exc:  # noqa: BLE001
                 logger.exception("gateway_stream_failed")
                 yield f'data: {json.dumps({"error": {"message": str(exc), "type": "inference_error"}})}\n\n'
-            finally:
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(

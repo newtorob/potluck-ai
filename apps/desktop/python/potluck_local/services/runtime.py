@@ -198,27 +198,29 @@ class LLMRuntime:
                         break
                     token_count += 1
                     yield f'data: {json.dumps({"choices": [{"delta": {"content": item}}]})}\n\n'
+                # Terminator on NORMAL completion only. Never yield from finally:
+                # on a client disconnect the generator is aclose()'d (GeneratorExit)
+                # and yielding there raises "async generator ignored GeneratorExit"
+                # and can leave the inference lock held forever.
+                yield "data: [DONE]\n\n"
             except asyncio.CancelledError:
                 logger.info("stream_cancelled model_id=%s tokens_so_far=%d", model_id, token_count)
             finally:
                 # Stop the worker and wait for it to release the model BEFORE the
-                # inference lock drops. A client disconnect mid-stream cancels this
-                # generator; without this drain the lock would free while inference
-                # is still running on the non-thread-safe Llama, letting the next
-                # request race it.
+                # inference lock drops, so the next request can't race the
+                # non-thread-safe Llama. Awaiting here is safe during cleanup;
+                # yielding is not (see above).
                 cancel_event.set()
                 try:
                     await asyncio.shield(fut)
                 except Exception:
                     pass
-                elapsed = round(time.monotonic() - start, 3)
                 logger.info(
                     "stream_complete model_id=%s tokens=%d duration=%.3fs",
                     model_id,
                     token_count,
-                    elapsed,
+                    round(time.monotonic() - start, 3),
                 )
-                yield "data: [DONE]\n\n"
 
     async def chat(
         self,
@@ -237,7 +239,7 @@ class LLMRuntime:
             model_id = self._model_id
             start = time.monotonic()
 
-            result = await loop.run_in_executor(
+            fut = loop.run_in_executor(
                 None,
                 lambda: model.create_chat_completion(
                     messages=messages,
@@ -246,6 +248,18 @@ class LLMRuntime:
                     stream=False,
                 ),
             )
+            try:
+                result = await fut
+            finally:
+                # A cancelled request must not free the inference lock while the
+                # worker thread is still inside create_chat_completion (the model
+                # is not thread-safe). Wait for the thread to finish first. This
+                # is a blocking call with no early-stop hook, so we drain fully.
+                if not fut.done():
+                    try:
+                        await asyncio.shield(fut)
+                    except Exception:
+                        pass
 
             elapsed = round(time.monotonic() - start, 3)
             usage = result.get("usage", {})
@@ -425,6 +439,81 @@ class LLMRuntime:
                 }
 
             return await loop.run_in_executor(None, _score)
+
+    async def benchmark(
+        self,
+        *,
+        prompt: str = "Write a short paragraph about the ocean.",
+        max_tokens: int = 64,
+    ) -> dict:
+        """Measure real generation speed for the loaded model: time-to-first-token
+        and tokens/sec over a fixed short prompt. Serialised by the inference
+        lock; drains the worker on exit so it never races a chat (same pattern as
+        stream_chat). Returns model_id, output_tokens, ttft_ms, duration_ms,
+        tokens_per_sec."""
+        if self._model is None:
+            raise RuntimeError("No model loaded")
+
+        async with self._inference_lock:
+            loop = asyncio.get_running_loop()
+            queue: asyncio.Queue = asyncio.Queue()
+            model = self._model
+            model_id = self._model_id
+            cancel_event = threading.Event()
+
+            def _generate() -> None:
+                try:
+                    for chunk in model.create_chat_completion(
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.0,
+                        max_tokens=max_tokens,
+                        stream=True,
+                    ):
+                        if cancel_event.is_set():
+                            break
+                        delta = chunk["choices"][0].get("delta", {}).get("content")
+                        if delta:
+                            loop.call_soon_threadsafe(queue.put_nowait, delta)
+                    loop.call_soon_threadsafe(queue.put_nowait, None)
+                except Exception as exc:
+                    loop.call_soon_threadsafe(queue.put_nowait, {"__error__": str(exc)})
+                    loop.call_soon_threadsafe(queue.put_nowait, None)
+
+            start = time.monotonic()
+            ttft: float | None = None
+            n = 0
+            fut = loop.run_in_executor(None, _generate)
+            try:
+                while True:
+                    item = await queue.get()
+                    if item is None:
+                        break
+                    if isinstance(item, dict) and "__error__" in item:
+                        raise RuntimeError(item["__error__"])
+                    if ttft is None:
+                        ttft = time.monotonic() - start
+                    n += 1
+            finally:
+                cancel_event.set()
+                try:
+                    await asyncio.shield(fut)
+                except Exception:
+                    pass
+
+            total = time.monotonic() - start
+            tps = (n / total) if (total > 0 and n) else 0.0
+            result = {
+                "model_id": model_id,
+                "output_tokens": n,
+                "ttft_ms": round((ttft or 0.0) * 1000, 1),
+                "duration_ms": round(total * 1000, 1),
+                "tokens_per_sec": round(tps, 1),
+            }
+            logger.info(
+                "benchmark model_id=%s tokens=%d tok_s=%.1f ttft_ms=%.1f",
+                model_id, n, tps, (ttft or 0.0) * 1000,
+            )
+            return result
 
 
 _runtime: LLMRuntime | None = None
