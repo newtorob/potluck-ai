@@ -255,7 +255,7 @@ export function deriveDiagnostics(input: DiagnosticsInput, now: number = Date.no
   // --- Roll up ---------------------------------------------------------------
   let overall: DiagSeverity = 'ok';
   for (const d of global) overall = worstSeverity(overall, d.severity);
-  for (const id in perPeer) overall = worstSeverity(overall, perPeer[id].severity);
+  for (const d of Object.values(perPeer)) overall = worstSeverity(overall, d.severity);
 
   const headline = computeHeadline(global, perPeer, peers.length);
   return report(sortBySeverity(global), perPeer, headline, overall);
@@ -383,7 +383,7 @@ function report(
   let overall: DiagSeverity = overrideOverall ?? 'ok';
   if (overrideOverall === undefined) {
     for (const d of global) overall = worstSeverity(overall, d.severity);
-    for (const id in perPeer) overall = worstSeverity(overall, perPeer[id].severity);
+    for (const d of Object.values(perPeer)) overall = worstSeverity(overall, d.severity);
   }
   return { global, perPeer, overall, ok: overall === 'ok', headline };
 }

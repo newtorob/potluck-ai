@@ -149,7 +149,7 @@ export function deriveReadiness(input: ReadinessInput): ReadinessReport {
         severity: d.severity,
         title: d.title,
         detail: d.detail,
-        fix: d.fix,
+        ...(d.fix !== undefined ? { fix: d.fix } : {}),
       });
     }
     const peerChecks = Object.values(input.mesh.perPeer);
@@ -175,7 +175,7 @@ export function deriveReadiness(input: ReadinessInput): ReadinessReport {
         severity,
         title: `${name}: ${p.label}`,
         detail: p.detail,
-        fix: p.fix,
+        ...(p.fix !== undefined ? { fix: p.fix } : {}),
       });
     }
   }
@@ -192,7 +192,7 @@ export function deriveReadiness(input: ReadinessInput): ReadinessReport {
   let headline: string;
   if (!machineReady) {
     const worst = machineProblems.find((c) => c.severity === 'error') ?? machineProblems[0];
-    headline = worst.title;
+    headline = worst?.title ?? 'This machine needs attention';
   } else {
     headline = input.enrolled ? 'This machine is ready' : 'This machine is ready (running locally)';
   }

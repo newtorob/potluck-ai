@@ -135,6 +135,68 @@ function speedFor(tier: string | null | undefined, bucket: SizeBucket): SpeedBuc
   return SPEED_TABLE[t]?.[bucket] ?? 'unavailable';
 }
 
+// Map a real measured throughput to a speed bucket. Thresholds match the
+// labels rendered in the card (and ModelCard's speedGrade): fast > 20,
+// good 8-20, slow under 8. A peer that has actually benchmarked a model
+// can definitionally run it, so a positive measurement is never
+// 'unavailable' — the floor is 'slow'.
+function measuredSpeedBucket(tps: number): SpeedBucket {
+  if (tps >= 20) return 'fast';
+  if (tps >= 8) return 'good';
+  return 'slow';
+}
+
+// Honesty guard (memory 20fd8d9f). A measured model's speed is attributed
+// only to the LARGEST bucket whose representative size it actually meets
+// (within a small tolerance below). Because a model at least as big as the
+// bucket runs no faster than the bucket's representative model, this can
+// only ever UNDER-claim a bucket, never over-claim it. A smaller/faster
+// model (e.g. 0.5B, or a 21B that would otherwise be pulled toward the 32B
+// bucket) maps to a smaller bucket or to null, and the unmeasured bucket
+// falls back to the conservative table.
+//
+// The tolerance lets a model up to 15% under a bucket's representative size
+// still speak for it (so a real 7B counts for the "8B" bucket). A 21B will
+// NOT clear the 32B bucket's threshold (27.2B) and is attributed to medium
+// instead — the safe direction.
+const BUCKET_TOLERANCE = 0.15;
+
+/** The rendered size bucket to attribute a model of `paramsB` to — the
+ *  largest bucket whose representative size (minus tolerance) the model
+ *  meets, or null when the model is too small for even the smallest
+ *  bucket. SIZE_BUCKETS is ascending, so the last qualifying spec wins. */
+function bucketForParams(paramsB: number): SizeBucket | null {
+  let chosen: SizeBucket | null = null;
+  for (const spec of SIZE_BUCKETS) {
+    if (paramsB >= spec.paramsB * (1 - BUCKET_TOLERANCE)) {
+      chosen = spec.bucket;
+    }
+  }
+  return chosen;
+}
+
+/** The size bucket a peer's loaded model belongs to, plus its measured
+ *  speed — or null when we can't size the model or the peer hasn't
+ *  benchmarked. `slugParamsB` comes from the requester's own catalog
+ *  (all household machines ship the same models.json), so an unknown
+ *  slug (custom model) just falls through to the static table. The
+ *  measurement is mapped to a bucket by the model's REAL parameter count,
+ *  never its coarse tier, so a tiny model can't speak for a larger one. */
+function measuredForPeer(
+  caps: PeerCapabilities,
+  slugParamsB: ((slug: string) => number | null) | undefined,
+): { bucket: SizeBucket; speed: SpeedBucket } | null {
+  if (!slugParamsB) return null;
+  const slug = caps.loaded_model;
+  const tps = caps.loaded_model_detail?.tokens_per_sec;
+  if (!slug || tps == null || tps <= 0) return null;
+  const paramsB = slugParamsB(slug);
+  if (paramsB == null || paramsB <= 0) return null;
+  const bucket = bucketForParams(paramsB);
+  if (!bucket) return null;
+  return { bucket, speed: measuredSpeedBucket(tps) };
+}
+
 // ---------------------------------------------------------------------------
 // Bucket aggregation
 // ---------------------------------------------------------------------------
@@ -164,6 +226,10 @@ export interface CapacityResult {
   label: string;
   paramsB: number;
   speed: SpeedBucket;
+  /** True when the winning speed came from a peer's real benchmark of a
+   *  loaded model in this bucket, rather than the conservative static
+   *  table. Lets the UI mark a bucket as ground-truth vs estimate. */
+  measured: boolean;
   /** Best peer hostname for this bucket — used only in click-through. NOT
    *  rendered on the card. Null if no peer can run this size. */
   bestPeerHost: string | null;
@@ -181,8 +247,18 @@ export interface CapacitySnapshot {
 }
 
 /** Probe every reachable peer once and compute the capacity snapshot.
- *  Cheap — one GET /peer/capabilities per peer in parallel. */
-export async function computeCapacity(peers: MeshPeer[]): Promise<CapacitySnapshot> {
+ *  Cheap — one GET /peer/capabilities per peer in parallel.
+ *
+ *  `slugParamsB` maps a model slug to its real parameter count (billions)
+ *  using the requester's own catalog. When supplied, a peer that has
+ *  benchmarked its loaded model contributes a REAL measured speed for the
+ *  bucket that model actually belongs to (ground truth, overrides the
+ *  static table in either direction). When omitted, behaviour is the
+ *  original conservative-estimate path. */
+export async function computeCapacity(
+  peers: MeshPeer[],
+  slugParamsB?: (slug: string) => number | null,
+): Promise<CapacitySnapshot> {
   const reachable = peers.filter((p) => p.reachable);
   if (reachable.length === 0) {
     return {
@@ -190,7 +266,8 @@ export async function computeCapacity(peers: MeshPeer[]): Promise<CapacitySnapsh
         bucket: s.bucket,
         label: s.label,
         paramsB: s.paramsB,
-        speed: 'unavailable' as SpeedBucket,
+        speed: 'unavailable',
+        measured: false,
         bestPeerHost: null,
         bigModelEligible: false,
       })),
@@ -218,19 +295,41 @@ export async function computeCapacity(peers: MeshPeer[]): Promise<CapacitySnapsh
   const buckets: CapacityResult[] = SIZE_BUCKETS.map((spec) => {
     let best: SpeedBucket = 'unavailable';
     let bestHost: string | null = null;
+    let bestMeasured = false;
     for (const { peer, caps } of probePairs) {
-      const mode = peerFitMode(caps, spec.paramsB);
-      if (mode === 'none') continue;
-      let speed = speedFor(caps.hardware?.recommended_tier, spec.bucket);
-      // CPU/offload path: downgrade by one bucket. The hardware tier table
-      // assumes the model fits in GPU; once we start streaming from RAM,
-      // throughput drops ~5-10x. Honest framing > optimistic UX.
-      if (mode === 'cpu' && speed !== 'unavailable') {
-        speed = downgradeSpeed(speed);
+      let speed: SpeedBucket;
+      let measured = false;
+
+      // Ground truth first: if this peer has benchmarked a loaded model
+      // that lands in THIS bucket, use the measurement. It already
+      // reflects the real fit mode (GPU vs CPU offload), so we neither
+      // apply the static table nor the CPU downgrade, and we never skip
+      // the peer — a benchmarked model is by definition runnable.
+      const m = measuredForPeer(caps, slugParamsB);
+      if (m && m.bucket === spec.bucket) {
+        speed = m.speed;
+        measured = true;
+      } else {
+        const mode = peerFitMode(caps, spec.paramsB);
+        if (mode === 'none') continue;
+        speed = speedFor(caps.hardware?.recommended_tier, spec.bucket);
+        // CPU/offload path: downgrade by one bucket. The hardware tier table
+        // assumes the model fits in GPU; once we start streaming from RAM,
+        // throughput drops ~5-10x. Honest framing > optimistic UX.
+        if (mode === 'cpu' && speed !== 'unavailable') {
+          speed = downgradeSpeed(speed);
+        }
       }
-      if (SPEED_RANK[speed] > SPEED_RANK[best]) {
+
+      // Prefer the higher speed; on a tie, prefer a measured reading over
+      // an estimate so the card reflects real data when it's available.
+      const better =
+        SPEED_RANK[speed] > SPEED_RANK[best] ||
+        (SPEED_RANK[speed] === SPEED_RANK[best] && measured && !bestMeasured);
+      if (better) {
         best = speed;
         bestHost = caps.hostname || peer.node_name;
+        bestMeasured = measured;
       }
     }
 
@@ -249,6 +348,9 @@ export async function computeCapacity(peers: MeshPeer[]): Promise<CapacitySnapsh
       label: spec.label,
       paramsB: spec.paramsB,
       speed: best,
+      // Pooled (Big Model) capacity is an estimate, never a measurement,
+      // so bestMeasured is necessarily false on that path.
+      measured: bestMeasured,
       bestPeerHost: bestHost,
       bigModelEligible,
     };

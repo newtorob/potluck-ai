@@ -258,7 +258,7 @@ export interface PersistedMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
   status: 'complete' | 'streaming' | 'partial' | 'error';
-  served_by: 'contributor' | 'local' | null;
+  served_by: 'contributor' | 'local' | 'household' | null;
   output_tokens: number | null;
   duration_ms: number | null;
   finish_reason: string | null;
@@ -860,7 +860,7 @@ export const localApi = {
       role: 'user' | 'assistant' | 'system';
       content: string;
       status?: 'complete' | 'streaming' | 'partial' | 'error';
-      served_by?: 'contributor' | 'local' | null;
+      served_by?: 'contributor' | 'local' | 'household' | null;
       output_tokens?: number | null;
       duration_ms?: number | null;
       finish_reason?: string | null;
@@ -875,7 +875,7 @@ export const localApi = {
     updateMessage(messageId: string, patch: {
       content?: string;
       status?: 'complete' | 'streaming' | 'partial' | 'error';
-      served_by?: 'contributor' | 'local' | null;
+      served_by?: 'contributor' | 'local' | 'household' | null;
       output_tokens?: number | null;
       duration_ms?: number | null;
       finish_reason?: string | null;

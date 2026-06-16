@@ -52,6 +52,7 @@ import {
   type CapacitySnapshot,
   type CapacityResult,
 } from '@/lib/capacity';
+import { useModelStore, type ModelTier } from '@/stores/modelStore';
 import { meshClient, issuePairingToken, MeshApiError, CoordinatorError } from '@/lib/meshClient';
 import { relativeTime } from '@/lib/timeFormat';
 import { formatModelName } from '@/lib/modelName';
@@ -716,6 +717,15 @@ function MeshPayoffCard({
 // Capacity card — "your network can run X fast / Y good / Z slow"
 // ---------------------------------------------------------------------------
 
+// Fallback model size (billions of params) per catalog tier, used only
+// when a slug carries no explicit "Nb" token. Mirrors the representative
+// sizes in lib/capacity SIZE_BUCKETS.
+const TIER_REPRESENTATIVE_PARAMS_B: Record<ModelTier, number> = {
+  small: 3,
+  medium: 8,
+  large: 32,
+};
+
 /**
  * CapacityCard — surface what the household's live peer set can actually
  * run, bucketed by model size. Probes each reachable peer on mount and
@@ -725,13 +735,49 @@ function MeshPayoffCard({
 function CapacityCard({ peers }: { peers: MeshPeer[] }) {
   const [snapshot, setSnapshot] = useState<CapacitySnapshot | null>(null);
   const [probing, setProbing] = useState(true);
+  const models = useModelStore((s) => s.models);
+
+  // Content fingerprint of the catalog (slug + tier only). The store
+  // re-allocates the `models` array on every fetch — including the 1s
+  // download-progress poll — so depending on `models` directly would
+  // re-probe every peer each tick. Keying on this stable string rebuilds
+  // the resolver only when the catalog's relevant content actually changes.
+  const catalogKey = useMemo(
+    () => models.map((m) => `${m.slug}:${m.recommended_tier}`).join('|'),
+    [models],
+  );
+
+  // Map a model slug to its real parameter count (billions) using our own
+  // catalog. All household machines ship the same models.json, so a peer's
+  // loaded slug resolves here; an unknown slug returns null and
+  // computeCapacity falls back to the conservative static table for that
+  // peer. We size by the slug's explicit "Nb" token (exact, quant-agnostic)
+  // and fall back to the tier's representative size only when the slug
+  // carries no number (e.g. phi-3.5-mini). MoE slugs ("...-a3b") are sized
+  // by ACTIVE params, since they run at active-, not total-parameter speed.
+  const slugParamsB = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const m of models) {
+      const active = m.slug.match(/[-_]a(\d+(?:\.\d+)?)b\b/i);
+      const total = m.slug.match(/(\d+(?:\.\d+)?)b(?:[-_]|$)/i);
+      const params = active
+        ? parseFloat(active[1]!)
+        : total
+          ? parseFloat(total[1]!)
+          : TIER_REPRESENTATIVE_PARAMS_B[m.recommended_tier];
+      if (params != null && params > 0) map.set(m.slug, params);
+    }
+    return (slug: string): number | null => map.get(slug) ?? null;
+    // Rebuild only when catalog content changes, not on every array re-alloc.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogKey]);
 
   useEffect(() => {
     let cancelled = false;
     setProbing(true);
     void (async () => {
       try {
-        const result = await computeCapacity(peers);
+        const result = await computeCapacity(peers, slugParamsB);
         if (!cancelled) setSnapshot(result);
       } catch {
         if (!cancelled) setSnapshot(null);
@@ -742,7 +788,7 @@ function CapacityCard({ peers }: { peers: MeshPeer[] }) {
     return () => {
       cancelled = true;
     };
-  }, [peers]);
+  }, [peers, slugParamsB]);
 
   if (probing && !snapshot) {
     return (
@@ -772,6 +818,9 @@ function CapacityCard({ peers }: { peers: MeshPeer[] }) {
       </ul>
       <p className="mt-3 text-[11px] text-muted-foreground/70">
         Buckets reflect the best single peer for each model size. fast = &gt;20 tok/s, good = 8-20, slow = 1-8.
+        {snapshot.buckets.some((b) => b.measured) && (
+          <> A filled dot marks a live benchmark; the rest are conservative estimates.</>
+        )}
         {snapshot.bigModelPoolSize >= 2 && (
           <> {snapshot.bigModelPoolSize} peers can pool for Big Model Mode.</>
         )}
@@ -782,6 +831,11 @@ function CapacityCard({ peers }: { peers: MeshPeer[] }) {
 
 function CapacityPill({ result }: { result: CapacityResult }) {
   const titleParts: string[] = [`${result.label} model · ${speedLabel(result.speed)} (${speedHint(result.speed)})`];
+  if (result.measured) {
+    titleParts.push('measured from a live benchmark on a peer');
+  } else if (result.speed !== 'unavailable') {
+    titleParts.push('conservative estimate (no benchmark yet)');
+  }
   if (result.bestPeerHost && result.speed !== 'unavailable') {
     titleParts.push(`best peer: ${result.bestPeerHost}`);
   }
@@ -798,6 +852,12 @@ function CapacityPill({ result }: { result: CapacityResult }) {
     >
       <span className="font-semibold">{result.label}</span>
       <span className="opacity-80">{speedLabel(result.speed)}</span>
+      {result.measured && (
+        <span
+          className="h-1.5 w-1.5 self-center rounded-full bg-current opacity-90"
+          aria-hidden="true"
+        />
+      )}
       {result.bigModelEligible && (
         <span className="text-[10px] opacity-70" aria-label="via Big Model pooling">·pool</span>
       )}
@@ -1140,7 +1200,7 @@ function formatCtx(n: number | null | undefined): string | null {
   return n >= 1000 ? `${Math.round(n / 1000)}K ctx` : `${n} ctx`;
 }
 
-function PeerRow({ peer, diag, caps }: { peer: MeshPeer; diag?: PeerDiagnostic; caps?: PeerCapabilities }) {
+function PeerRow({ peer, diag, caps }: { peer: MeshPeer; diag?: PeerDiagnostic | undefined; caps?: PeerCapabilities | undefined }) {
   // A specific, actionable reason replaces a bare "Offline" — the warn/error
   // detail is shown inline so the user sees the fix without hovering.
   const showDetail = diag && (diag.severity === 'warn' || diag.severity === 'error');
@@ -1225,7 +1285,7 @@ function PeerRow({ peer, diag, caps }: { peer: MeshPeer; diag?: PeerDiagnostic; 
 }
 
 /** Status pill driven by the resolved per-peer diagnostic — never just "offline". */
-function PeerStateBadge({ diag }: { diag?: PeerDiagnostic }) {
+function PeerStateBadge({ diag }: { diag?: PeerDiagnostic | undefined }) {
   if (!diag) return null;
 
   const VISUAL: Record<
