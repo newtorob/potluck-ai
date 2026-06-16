@@ -1149,6 +1149,7 @@ function PeerRow({ peer, diag, caps }: { peer: MeshPeer; diag?: PeerDiagnostic; 
   const backend = hw ? deriveBackend(hw.gpu_name, hw.platform) : null;
   const ctx = formatCtx(caps?.loaded_model_detail?.context_size);
   const quant = deriveQuant(caps?.loaded_model);
+  const tps = caps?.loaded_model_detail?.tokens_per_sec;
   const hwLabel = hw
     ? hw.gpu_name
       ? `${hw.gpu_name}${hw.gpu_vram_gb ? ` · ${hw.gpu_vram_gb} GB` : ''}${backend ? ` · ${backend}` : ''}`
@@ -1191,6 +1192,7 @@ function PeerRow({ peer, diag, caps }: { peer: MeshPeer; diag?: PeerDiagnostic; 
                 {formatModelName(caps.loaded_model)}
                 {quant ? ` · ${quant}` : ''}
                 {ctx ? ` · ${ctx}` : ''}
+                {tps ? ` · ${tps} tok/s` : ''}
               </CapChip>
             ) : (
               <CapChip>No model loaded</CapChip>

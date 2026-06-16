@@ -63,6 +63,7 @@ export interface PeerHardware {
 export interface PeerLoadedModel {
   slug: string;
   context_size: number | null;
+  tokens_per_sec?: number | null;
 }
 
 export interface PeerInferenceLoad {

@@ -34,6 +34,10 @@ class LLMRuntime:
         self._loaded_rpc_servers: tuple[str, ...] | None = None  # Big Model Mode
         self._load_lock = threading.Lock()
         self._inference_lock = asyncio.Lock()
+        # Last benchmark result per model_id (tokens/sec + TTFT). Persists across
+        # loads so the Models page + peer rows can show "last bench" without
+        # re-running. Populated by benchmark().
+        self._benchmarks: dict[str, dict] = {}
 
     def is_loaded(self) -> bool:
         return self._model is not None
@@ -49,6 +53,10 @@ class LLMRuntime:
         """Return the RPC server endpoints the current model was loaded with.
         None when the model is loaded locally (or no model is loaded)."""
         return self._loaded_rpc_servers
+
+    def benchmarks(self) -> dict[str, dict]:
+        """Last benchmark result keyed by model_id (tokens/sec + TTFT)."""
+        return dict(self._benchmarks)
 
     def load_model(
         self,
@@ -513,6 +521,8 @@ class LLMRuntime:
                 "benchmark model_id=%s tokens=%d tok_s=%.1f ttft_ms=%.1f",
                 model_id, n, tps, (ttft or 0.0) * 1000,
             )
+            if model_id:
+                self._benchmarks[model_id] = result
             return result
 
 

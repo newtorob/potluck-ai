@@ -47,6 +47,14 @@ export interface CatalogModel {
   recommended_tier: ModelTier;
   is_featured: boolean;
   installed: boolean;
+  /** Last measured benchmark for this model, if one has been run. */
+  benchmark?: {
+    tokens_per_sec: number;
+    ttft_ms: number;
+    output_tokens: number;
+    duration_ms: number;
+    model_id: string | null;
+  };
   /** Populated by the polling loop — not present in the GET /models response */
   download_progress?: DownloadProgressRecord;
 }

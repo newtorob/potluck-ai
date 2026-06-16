@@ -31,10 +31,17 @@ router = APIRouter()
 @router.get("")
 async def list_models() -> list[dict]:
     try:
-        return model_registry.list_models()
+        models = model_registry.list_models()
     except Exception:
         logger.exception("model_registry.list_models failed")
         return []
+    # Merge in each model's last benchmark (tokens/sec + TTFT), if it has been run.
+    benches = get_runtime().benchmarks()
+    for m in models:
+        b = benches.get(m.get("slug"))
+        if b:
+            m["benchmark"] = b
+    return models
 
 
 @router.post("/benchmark")

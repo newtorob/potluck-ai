@@ -95,6 +95,7 @@ class PeerLoadedModel(BaseModel):
 
     slug: str
     context_size: int | None = None
+    tokens_per_sec: float | None = None  # last measured benchmark speed, if run
 
 
 class PeerInferenceLoad(BaseModel):
@@ -203,9 +204,11 @@ async def peer_capabilities() -> PeerCapabilities:
 
     loaded_detail: PeerLoadedModel | None = None
     if loaded:
+        bench = runtime.benchmarks().get(loaded)
         loaded_detail = PeerLoadedModel(
             slug=loaded,
             context_size=runtime.loaded_n_ctx(),
+            tokens_per_sec=(bench or {}).get("tokens_per_sec"),
         )
 
     # "busy" reflects whether the runtime's inference lock is currently

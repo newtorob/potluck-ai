@@ -71,6 +71,14 @@ const SUFFICIENCY_ICON: Record<Sufficiency, React.ReactNode> = {
   unknown: <HardDrive className="h-3.5 w-3.5 text-muted-foreground" aria-label="Hardware unknown" />,
 };
 
+// Speed grade from measured tokens/sec. Thresholds match the household capacity
+// buckets: fast > 20, good 8 to 20, slow under 8.
+function speedGrade(tps: number): { label: string; cls: string } {
+  if (tps >= 20) return { label: 'Fast', cls: 'text-sage' };
+  if (tps >= 8) return { label: 'Good', cls: 'text-amber-600 dark:text-amber-400' };
+  return { label: 'Slow', cls: 'text-muted-foreground' };
+}
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -131,6 +139,10 @@ export function ModelCard({
     }
   };
 
+  // Prefer a fresh in-session result, fall back to the cached one from /models.
+  const liveBench = bench ?? model.benchmark ?? null;
+  const grade = liveBench ? speedGrade(liveBench.tokens_per_sec) : null;
+
   return (
     <article
       className={cn(
@@ -169,17 +181,18 @@ export function ModelCard({
       {/* Description */}
       <p className="text-xs leading-relaxed text-muted-foreground line-clamp-2">{description}</p>
 
-      {/* Live benchmark result (this machine) */}
-      {isActive && (bench || benchError) && (
+      {/* Benchmark: real measured speed for this machine, when available */}
+      {(liveBench || benchError) && (
         <p className="text-[11px]">
           {benchError ? (
             <span className="text-destructive">{benchError}</span>
-          ) : bench ? (
-            <span className="inline-flex items-center gap-1 text-muted-foreground">
-              <Gauge className="h-3 w-3 text-sage" aria-hidden="true" />
-              <span className="font-medium text-foreground">{bench.tokens_per_sec} tok/s</span>
+          ) : liveBench && grade ? (
+            <span className="inline-flex flex-wrap items-center gap-1 text-muted-foreground">
+              <Gauge className={cn('h-3 w-3', grade.cls)} aria-hidden="true" />
+              <span className={cn('font-medium', grade.cls)}>{grade.label}</span>
+              <span className="text-foreground">{liveBench.tokens_per_sec} tok/s</span>
               <span className="text-muted-foreground/40">·</span>
-              {Math.round(bench.ttft_ms)} ms to first token
+              {Math.round(liveBench.ttft_ms)} ms to first token
             </span>
           ) : null}
         </p>
