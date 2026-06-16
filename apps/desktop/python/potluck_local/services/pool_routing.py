@@ -79,8 +79,10 @@ def coordinator_http_base() -> str | None:
 
     Order:
       1. POTLUCK_COORDINATOR_HTTP_URL — explicit http(s) base (e.g.
-         "http://100.64.0.1:8400"). Wins if set.
-      2. POTLUCK_COORDINATOR_URL — the contributor's websocket URL
+         "http://100.64.0.1:8400"). Env override, wins (tests / ops).
+      2. settings.network.coordinator_url — synced from the frontend's
+         connection setting; the normal source in the running app.
+      3. POTLUCK_COORDINATOR_URL — the contributor's websocket URL
          (e.g. "ws://100.64.0.1:8400/peers/connect"); converted ws->http and
          stripped of its path.
     Returns a base with no trailing slash, or None.
@@ -88,6 +90,10 @@ def coordinator_http_base() -> str | None:
     explicit = os.environ.get("POTLUCK_COORDINATOR_HTTP_URL", "").strip()
     if explicit:
         return explicit.rstrip("/")
+
+    from_settings = _settings_coordinator_url()
+    if from_settings:
+        return from_settings.rstrip("/")
 
     ws = os.environ.get("POTLUCK_COORDINATOR_URL", "").strip()
     if not ws:
@@ -98,6 +104,19 @@ def coordinator_http_base() -> str | None:
         return None
     # Drop the path (/peers/connect) and any query/fragment; keep scheme + host.
     return urlunsplit((scheme, parts.netloc, "", "", "")).rstrip("/")
+
+
+def _settings_coordinator_url() -> str | None:
+    """The coordinator HTTP base persisted in settings (network.coordinator_url),
+    synced from the frontend. None when empty/unavailable."""
+    try:
+        from potluck_local.services.settings_manager import get_settings
+
+        url = (get_settings().network.coordinator_url or "").strip()
+        return url or None
+    except Exception:
+        logger.debug("settings_coordinator_url_unavailable", exc_info=True)
+        return None
 
 
 def _coordinator_token() -> str | None:

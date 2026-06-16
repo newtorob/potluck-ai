@@ -32,6 +32,10 @@ class NetworkSettings(BaseModel):
     contributor_mode: bool = False       # Disabled in v0; reserved for v1
     contributor_schedule: dict[str, object] | None = None
     max_gpu_percent: int = 80
+    # HTTP base of the coordinator this node talks to (e.g. "http://127.0.0.1:8400").
+    # Synced from the frontend's connection setting so the sidecar can reach the
+    # open pool for gateway routing. Empty = not configured (pool unavailable).
+    coordinator_url: str = ""
 
 
 class AppSettings(BaseModel):

@@ -1,5 +1,5 @@
 /**
- * GatewayPanel — Settings → Connect tools.
+ * GatewayPanel - Settings, Connect tools.
  *
  * Turns Potluck into a drop-in OpenAI-compatible provider for external tools
  * (Cursor, Continue, aider, Open WebUI, the openai SDK). The user enables the
@@ -65,6 +65,10 @@ export function GatewayPanel({ settings, isSaving, saveError, onUpdate }: Gatewa
 
   const setEnabled = (enabled: boolean) => {
     void onUpdate({ gateway: { enabled } });
+  };
+
+  const setPoolRouting = (pool_routing: boolean) => {
+    void onUpdate({ gateway: { pool_routing } });
   };
 
   const generateKey = async () => {
@@ -144,6 +148,39 @@ export function GatewayPanel({ settings, isSaving, saveError, onUpdate }: Gatewa
             className={cn(
               'pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-200',
               gateway.enabled ? 'translate-x-[18px]' : 'translate-x-[3px]',
+            )}
+          />
+        </button>
+      </div>
+
+      {/* Open-pool routing */}
+      <div className="flex items-start justify-between gap-4 border-b border-border py-4">
+        <div className="flex flex-col gap-0.5 pr-2">
+          <span className="text-sm font-medium text-foreground">Allow open-pool routing</span>
+          <p className="text-xs text-muted-foreground">
+            When a tool asks for a model you do not have locally or on your own machines, send just
+            that one prompt through the network to another member's machine. Your machines are
+            always tried first. Off by default.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={gateway.pool_routing ?? false}
+          aria-label="Allow open-pool routing"
+          disabled={isSaving || !enabledAndReady}
+          onClick={() => setPoolRouting(!(gateway.pool_routing ?? false))}
+          className={cn(
+            'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            gateway.pool_routing ? 'bg-primary' : 'bg-muted',
+          )}
+        >
+          <span
+            className={cn(
+              'pointer-events-none inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-200',
+              gateway.pool_routing ? 'translate-x-[18px]' : 'translate-x-[3px]',
             )}
           />
         </button>
@@ -236,8 +273,11 @@ export function GatewayPanel({ settings, isSaving, saveError, onUpdate }: Gatewa
       <div className="flex items-start gap-2 text-[11px] leading-relaxed text-muted-foreground">
         <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sage" aria-hidden />
         <span>
-          The gateway is reachable only from this machine (loopback). Requests run on your loaded
-          model and never leave the device through this path. The key authorizes the gateway alone.
+          The gateway is reachable only from this machine (loopback), and the key authorizes the
+          gateway alone. Requests run on your loaded model by default. A request for a model you keep
+          on another of your own machines runs there over your private mesh. Open-pool routing, only
+          when you enable it above, sends a single prompt to another member's machine with no account
+          or identity attached.
         </span>
       </div>
     </div>

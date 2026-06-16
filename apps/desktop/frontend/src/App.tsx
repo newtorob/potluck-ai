@@ -20,6 +20,7 @@ import { FirstRun } from '@/views/FirstRun';
 import { useModelStore } from '@/stores/modelStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useMeshStore } from '@/stores/meshStore';
+import { useConnectionStore } from '@/stores/connectionStore';
 import { useTheme } from '@/hooks/useTheme';
 import { localApi } from '@/lib/localApi';
 import { autoLoadOnStartup } from '@/lib/appPrefs';
@@ -86,6 +87,19 @@ export default function App() {
   useEffect(() => {
     useMeshStore.getState().start();
   }, []);
+
+  // Keep the sidecar's coordinator URL in sync with the connection setting
+  // (the frontend's source of truth, persisted in localStorage). This is what
+  // lets the gateway's open-pool routing reach the coordinator from the Python
+  // side. Runs on boot and whenever the user edits the URL. Best-effort.
+  const coordinatorUrl = useConnectionStore((s) => s.coordinatorUrl);
+  useEffect(() => {
+    void localApi
+      .updateSettings({ network: { coordinator_url: coordinatorUrl } })
+      .catch(() => {
+        /* non-fatal: pool routing just stays unavailable until the next sync */
+      });
+  }, [coordinatorUrl]);
 
   // Make the default launch state "alive": once the model list has settled,
   // auto-load the last-active model (fallback: smallest installed) so the user

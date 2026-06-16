@@ -153,6 +153,9 @@ export interface NetworkSettings {
   contributor_mode: boolean;
   contributor_schedule: Record<string, unknown> | null;
   max_gpu_percent: number;
+  /** HTTP base of the coordinator this node talks to. Synced from the
+   *  connection setting so the sidecar can reach the open pool. */
+  coordinator_url: string;
 }
 
 export interface AppSettingsShape {
@@ -182,6 +185,9 @@ export interface VaultSettings {
 export interface GatewaySettings {
   enabled: boolean;
   api_key: string;
+  /** Route gateway requests for models not held locally or in the household
+   *  through the coordinator to the open pool. Opt-in, default off. */
+  pool_routing: boolean;
 }
 
 export interface BenchmarkResult {
