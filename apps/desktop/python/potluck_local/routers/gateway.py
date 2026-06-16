@@ -27,9 +27,10 @@ import logging
 import time
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from potluck_local.services import gateway_routing
 from potluck_local.services.model_registry import list_models
 from potluck_local.services.runtime import get_runtime
 
@@ -80,44 +81,71 @@ async def list_models_openai() -> dict:
     # Always include the currently loaded model, even if the catalog lookup missed it.
     cur = runtime.current_model_id()
     if cur and cur not in seen:
+        seen.add(cur)
         data.append({"id": cur, "object": "model", "created": created, "owned_by": "potluck"})
+    # Household peers' loaded models, so a tool sees the whole mesh's models and
+    # can pick one that lives on another machine.
+    try:
+        for slug in (await gateway_routing.household_model_map()).keys():
+            if slug not in seen:
+                seen.add(slug)
+                data.append({"id": slug, "object": "model", "created": created, "owned_by": "potluck-household"})
+    except Exception:
+        logger.exception("gateway_household_models_failed")
     return {"object": "list", "data": data}
 
 
 @router.post("/chat/completions")
 async def chat_completions_openai(req: ChatCompletionRequest):
-    """OpenAI /v1/chat/completions against this machine's loaded model."""
+    """OpenAI /v1/chat/completions. Serves the local model, or routes to a
+    household peer (your own machine over the mesh) that has the requested model
+    loaded. Routing is by model id: local first, then a reachable peer."""
     runtime = get_runtime()
-    if not runtime.is_loaded():
-        raise HTTPException(status_code=503, detail="No model loaded on this Potluck node.")
+    local = runtime.current_model_id() if runtime.is_loaded() else None
 
-    # OpenAI clients pass a model id; we serve whatever is loaded. Reject a
-    # mismatch loudly rather than silently serving a different model.
-    if req.model and req.model != runtime.current_model_id():
+    # Resolve the route. A requested model that isn't local is looked up across
+    # reachable household peers; if none has it, fail loudly (no silent swap).
+    peer = None
+    if req.model and req.model != local:
+        peer = await gateway_routing.peer_for_model(req.model)
+        if peer is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
+            )
+    if peer is None and local is None:
         raise HTTPException(
-            status_code=404,
-            detail=f"model '{req.model}' is not loaded (loaded: '{runtime.current_model_id()}')",
+            status_code=503,
+            detail="No model loaded on this node, and no household peer matched.",
         )
 
     messages = [m.model_dump() for m in req.messages]
     max_tokens = req.max_tokens or _DEFAULT_MAX_TOKENS
     stop = _normalise_stop(req.stop)
+    served_model = req.model if peer else local
+    served_by = f"peer:{peer['node_name']}" if peer else "local"
 
     logger.info(
-        "gateway_chat model_id=%s messages=%d stream=%s",
-        runtime.current_model_id(), len(messages), req.stream,
+        "gateway_chat served_by=%s model=%s messages=%d stream=%s",
+        served_by, served_model, len(messages), req.stream,
     )
 
     if req.stream:
         async def event_stream():
             try:
-                async for chunk in runtime.stream_chat_raw(
-                    messages, temperature=req.temperature, max_tokens=max_tokens, stop=stop
-                ):
-                    if isinstance(chunk, dict) and "__error__" in chunk:
-                        yield f'data: {json.dumps({"error": {"message": chunk["__error__"], "type": "inference_error"}})}\n\n'
-                        break
-                    yield f"data: {json.dumps(chunk)}\n\n"
+                if peer:
+                    async for chunk in gateway_routing.stream_peer_openai(
+                        peer, messages, served_model, req.temperature, max_tokens
+                    ):
+                        yield f"data: {json.dumps(chunk)}\n\n"
+                else:
+                    async for chunk in runtime.stream_chat_raw(
+                        messages, temperature=req.temperature, max_tokens=max_tokens, stop=stop
+                    ):
+                        if isinstance(chunk, dict) and "__error__" in chunk:
+                            yield f'data: {json.dumps({"error": {"message": chunk["__error__"], "type": "inference_error"}})}\n\n'
+                            return
+                        yield f"data: {json.dumps(chunk)}\n\n"
             except Exception as exc:  # noqa: BLE001
                 logger.exception("gateway_stream_failed")
                 yield f'data: {json.dumps({"error": {"message": str(exc), "type": "inference_error"}})}\n\n'
@@ -127,15 +155,23 @@ async def chat_completions_openai(req: ChatCompletionRequest):
         return StreamingResponse(
             event_stream(),
             media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+            headers={
+                "Cache-Control": "no-cache", "X-Accel-Buffering": "no",
+                "Connection": "keep-alive", "X-Potluck-Served-By": served_by,
+            },
         )
 
-    # Non-streaming: runtime.chat returns llama-cpp's native OpenAI-shaped dict.
+    # Non-streaming.
     try:
-        result = await runtime.chat(messages, temperature=req.temperature, max_tokens=max_tokens)
+        if peer:
+            result = await gateway_routing.complete_peer_openai(
+                peer, messages, served_model, req.temperature, max_tokens
+            )
+        else:
+            result = await runtime.chat(messages, temperature=req.temperature, max_tokens=max_tokens)
+            if isinstance(result, dict):
+                result.setdefault("model", local)
     except Exception as exc:  # noqa: BLE001
         logger.exception("gateway_chat_failed")
         raise HTTPException(status_code=500, detail=f"inference failed: {type(exc).__name__}")
-    if isinstance(result, dict):
-        result.setdefault("model", runtime.current_model_id())
-    return result
+    return JSONResponse(result, headers={"X-Potluck-Served-By": served_by})

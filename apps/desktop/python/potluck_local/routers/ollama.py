@@ -20,10 +20,11 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from potluck_local import __version__
+from potluck_local.services import gateway_routing
 from potluck_local.services.model_registry import list_models
 from potluck_local.services.runtime import get_runtime
 
@@ -96,10 +97,22 @@ async def tags() -> dict:
         logger.exception("ollama_tags_failed")
     cur = runtime.current_model_id()
     if cur and cur not in seen:
+        seen.add(cur)
         models.append({
             "name": cur, "model": cur, "modified_at": created,
             "size": 0, "digest": "", "details": {},
         })
+    # Household peers' loaded models, so an Ollama tool sees the whole mesh.
+    try:
+        for slug in (await gateway_routing.household_model_map()).keys():
+            if slug not in seen:
+                seen.add(slug)
+                models.append({
+                    "name": slug, "model": slug, "modified_at": created,
+                    "size": 0, "digest": "", "details": {},
+                })
+    except Exception:
+        logger.exception("ollama_household_tags_failed")
     return {"models": models}
 
 
@@ -117,26 +130,36 @@ async def show(body: dict) -> dict:
 
 @router.post("/chat")
 async def chat(req: OllamaChatRequest):
-    """Ollama /api/chat against this machine's loaded model."""
+    """Ollama /api/chat. Serves the local model, or routes to a household peer
+    that has the requested model loaded."""
     runtime = get_runtime()
-    if not runtime.is_loaded():
-        raise HTTPException(status_code=503, detail="No model loaded on this Potluck node.")
-    if req.model and req.model != runtime.current_model_id():
-        raise HTTPException(
-            status_code=404,
-            detail=f"model '{req.model}' is not loaded (loaded: '{runtime.current_model_id()}')",
-        )
+    local = runtime.current_model_id() if runtime.is_loaded() else None
+
+    peer = None
+    if req.model and req.model != local:
+        peer = await gateway_routing.peer_for_model(req.model)
+        if peer is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
+            )
+    if peer is None and local is None:
+        raise HTTPException(status_code=503, detail="No model loaded on this node, and no household peer matched.")
 
     messages = [m.model_dump() for m in req.messages]
     temperature, max_tokens = _opts(req)
-    model_name = runtime.current_model_id() or (req.model or "")
+    model_name = req.model if peer else local
+    served_by = f"peer:{peer['node_name']}" if peer else "local"
 
     if req.stream:
         async def ndjson_stream():
             try:
-                async for chunk in runtime.stream_chat_raw(
-                    messages, temperature=temperature, max_tokens=max_tokens
-                ):
+                source = (
+                    gateway_routing.stream_peer_openai(peer, messages, model_name, temperature, max_tokens)
+                    if peer
+                    else runtime.stream_chat_raw(messages, temperature=temperature, max_tokens=max_tokens)
+                )
+                async for chunk in source:
                     if isinstance(chunk, dict) and "__error__" in chunk:
                         yield json.dumps({"model": model_name, "created_at": _now_iso(), "error": chunk["__error__"]}) + "\n"
                         return
@@ -161,19 +184,25 @@ async def chat(req: OllamaChatRequest):
                 "done": True, "done_reason": "stop",
             }) + "\n"
 
-        return StreamingResponse(ndjson_stream(), media_type="application/x-ndjson")
+        return StreamingResponse(
+            ndjson_stream(), media_type="application/x-ndjson",
+            headers={"X-Potluck-Served-By": served_by},
+        )
 
     # Non-streaming: single JSON object.
     try:
-        result = await runtime.chat(messages, temperature=temperature, max_tokens=max_tokens)
+        if peer:
+            result = await gateway_routing.complete_peer_openai(peer, messages, model_name, temperature, max_tokens)
+        else:
+            result = await runtime.chat(messages, temperature=temperature, max_tokens=max_tokens)
         content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
     except Exception as exc:  # noqa: BLE001
         logger.exception("ollama_chat_failed")
         raise HTTPException(status_code=500, detail=f"inference failed: {type(exc).__name__}")
-    return {
+    return JSONResponse({
         "model": model_name,
         "created_at": _now_iso(),
         "message": {"role": "assistant", "content": content},
         "done": True,
         "done_reason": "stop",
-    }
+    }, headers={"X-Potluck-Served-By": served_by})
