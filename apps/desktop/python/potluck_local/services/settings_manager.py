@@ -95,6 +95,12 @@ class GatewaySettings(BaseModel):
 
     enabled: bool = False
     api_key: str = ""
+    # Open-pool routing: when a gateway request asks for a model that is neither
+    # local nor on a household peer, allow routing through the coordinator to the
+    # open pool (other members' machines, blinded + single-turn). Off by default
+    # — household routing serves your own machines automatically, but reaching
+    # strangers is the widest scope and stays an explicit opt-in.
+    pool_routing: bool = False
 
     @model_validator(mode="after")
     def _require_key_when_enabled(self) -> "GatewaySettings":
@@ -102,6 +108,9 @@ class GatewaySettings(BaseModel):
         # persisted state (the middleware also guards on both, this keeps disk clean).
         if self.enabled and not self.api_key:
             self.enabled = False
+        # Pool routing is meaningless without the gateway itself enabled.
+        if self.pool_routing and not self.enabled:
+            self.pool_routing = False
         return self
 
 

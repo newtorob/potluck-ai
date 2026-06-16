@@ -24,7 +24,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from potluck_local import __version__
-from potluck_local.services import gateway_routing
+from potluck_local.services import gateway_routing, pool_routing
 from potluck_local.services.model_registry import list_models
 from potluck_local.services.runtime import get_runtime
 
@@ -113,6 +113,18 @@ async def tags() -> dict:
                 })
     except Exception:
         logger.exception("ollama_household_tags_failed")
+    # Open-pool models (other members' machines), only when opted in.
+    if pool_routing.pool_enabled():
+        try:
+            for slug in await pool_routing.pool_model_slugs():
+                if slug not in seen:
+                    seen.add(slug)
+                    models.append({
+                        "name": slug, "model": slug, "modified_at": created,
+                        "size": 0, "digest": "", "details": {},
+                    })
+        except Exception:
+            logger.exception("ollama_pool_tags_failed")
     return {"models": models}
 
 
@@ -136,29 +148,36 @@ async def chat(req: OllamaChatRequest):
     local = runtime.current_model_id() if runtime.is_loaded() else None
 
     peer = None
+    use_pool = False
     if req.model and req.model != local:
         peer = await gateway_routing.peer_for_model(req.model)
         if peer is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
-            )
-    if peer is None and local is None:
+            if pool_routing.pool_enabled():
+                use_pool = True
+            else:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
+                )
+    if not use_pool and peer is None and local is None:
         raise HTTPException(status_code=503, detail="No model loaded on this node, and no household peer matched.")
 
     messages = [m.model_dump() for m in req.messages]
     temperature, max_tokens = _opts(req)
-    model_name = req.model if peer else local
-    served_by = f"peer:{peer['node_name']}" if peer else "local"
+    model_name = req.model if (peer or use_pool) else local
+    served_by = "pool" if use_pool else (f"peer:{peer['node_name']}" if peer else "local")
 
     if req.stream:
         async def ndjson_stream():
             try:
-                source = (
-                    gateway_routing.stream_peer_openai(peer, messages, model_name, temperature, max_tokens)
-                    if peer
-                    else runtime.stream_chat_raw(messages, temperature=temperature, max_tokens=max_tokens)
-                )
+                if use_pool:
+                    # Single-turn to the pool: only the latest user message.
+                    prompt = pool_routing.last_user_prompt(messages)
+                    source = pool_routing.stream_pool_openai(prompt, model_name, temperature, max_tokens)
+                elif peer:
+                    source = gateway_routing.stream_peer_openai(peer, messages, model_name, temperature, max_tokens)
+                else:
+                    source = runtime.stream_chat_raw(messages, temperature=temperature, max_tokens=max_tokens)
                 async for chunk in source:
                     if isinstance(chunk, dict) and "__error__" in chunk:
                         yield json.dumps({"model": model_name, "created_at": _now_iso(), "error": chunk["__error__"]}) + "\n"
@@ -191,11 +210,17 @@ async def chat(req: OllamaChatRequest):
 
     # Non-streaming: single JSON object.
     try:
-        if peer:
+        if use_pool:
+            prompt = pool_routing.last_user_prompt(messages)
+            result = await pool_routing.complete_pool_openai(prompt, model_name, temperature, max_tokens)
+        elif peer:
             result = await gateway_routing.complete_peer_openai(peer, messages, model_name, temperature, max_tokens)
         else:
             result = await runtime.chat(messages, temperature=temperature, max_tokens=max_tokens)
         content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+    except pool_routing.PoolDispatchError as exc:
+        status = exc.status_code if exc.status_code in (404, 503) else 502
+        raise HTTPException(status_code=status, detail=exc.detail)
     except Exception as exc:  # noqa: BLE001
         logger.exception("ollama_chat_failed")
         raise HTTPException(status_code=500, detail=f"inference failed: {type(exc).__name__}")

@@ -100,7 +100,12 @@ async def rotate_gateway_key() -> dict[str, Any]:
     current = get_settings()
     data = current.model_dump()
     new_key = "sk-potluck-" + secrets.token_hex(24)
-    data["gateway"] = GatewaySettings(enabled=True, api_key=new_key).model_dump()
+    # Carry forward existing gateway settings (e.g. pool_routing); only the key
+    # and enabled flag change on rotation. Rebuilding from scratch would silently
+    # drop a user's opt-ins.
+    data["gateway"] = current.gateway.model_copy(
+        update={"enabled": True, "api_key": new_key}
+    ).model_dump()
     updated = PotluckSettings(**data)
     save_settings(updated)
     logger.info("gateway_key_rotated")

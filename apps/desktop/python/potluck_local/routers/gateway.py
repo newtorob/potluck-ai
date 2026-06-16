@@ -30,7 +30,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from potluck_local.services import gateway_routing
+from potluck_local.services import gateway_routing, pool_routing
 from potluck_local.services.model_registry import list_models
 from potluck_local.services.runtime import get_runtime
 
@@ -92,6 +92,16 @@ async def list_models_openai() -> dict:
                 data.append({"id": slug, "object": "model", "created": created, "owned_by": "potluck-household"})
     except Exception:
         logger.exception("gateway_household_models_failed")
+    # Open-pool models (other members' machines), only when the user opted in.
+    # Lets a tool discover and request a model that lives only in the pool.
+    if pool_routing.pool_enabled():
+        try:
+            for slug in await pool_routing.pool_model_slugs():
+                if slug not in seen:
+                    seen.add(slug)
+                    data.append({"id": slug, "object": "model", "created": created, "owned_by": "potluck-pool"})
+        except Exception:
+            logger.exception("gateway_pool_models_failed")
     return {"object": "list", "data": data}
 
 
@@ -103,17 +113,23 @@ async def chat_completions_openai(req: ChatCompletionRequest):
     runtime = get_runtime()
     local = runtime.current_model_id() if runtime.is_loaded() else None
 
-    # Resolve the route. A requested model that isn't local is looked up across
-    # reachable household peers; if none has it, fail loudly (no silent swap).
+    # Resolve the route: local -> household peer -> open pool. A requested model
+    # that isn't local is looked up across reachable household peers; if none has
+    # it and open-pool routing is opted in, the coordinator finds a pool peer;
+    # otherwise fail loudly (no silent swap).
     peer = None
+    use_pool = False
     if req.model and req.model != local:
         peer = await gateway_routing.peer_for_model(req.model)
         if peer is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
-            )
-    if peer is None and local is None:
+            if pool_routing.pool_enabled():
+                use_pool = True
+            else:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
+                )
+    if not use_pool and peer is None and local is None:
         raise HTTPException(
             status_code=503,
             detail="No model loaded on this node, and no household peer matched.",
@@ -122,8 +138,8 @@ async def chat_completions_openai(req: ChatCompletionRequest):
     messages = [m.model_dump() for m in req.messages]
     max_tokens = req.max_tokens or _DEFAULT_MAX_TOKENS
     stop = _normalise_stop(req.stop)
-    served_model = req.model if peer else local
-    served_by = f"peer:{peer['node_name']}" if peer else "local"
+    served_model = req.model if (peer or use_pool) else local
+    served_by = "pool" if use_pool else (f"peer:{peer['node_name']}" if peer else "local")
 
     logger.info(
         "gateway_chat served_by=%s model=%s messages=%d stream=%s",
@@ -133,7 +149,15 @@ async def chat_completions_openai(req: ChatCompletionRequest):
     if req.stream:
         async def event_stream():
             try:
-                if peer:
+                if use_pool:
+                    # Single-turn to the pool: only the latest user message,
+                    # never the full conversation (privacy invariant).
+                    prompt = pool_routing.last_user_prompt(messages)
+                    async for chunk in pool_routing.stream_pool_openai(
+                        prompt, served_model, req.temperature, max_tokens
+                    ):
+                        yield f"data: {json.dumps(chunk)}\n\n"
+                elif peer:
                     async for chunk in gateway_routing.stream_peer_openai(
                         peer, messages, served_model, req.temperature, max_tokens
                     ):
@@ -166,7 +190,12 @@ async def chat_completions_openai(req: ChatCompletionRequest):
 
     # Non-streaming.
     try:
-        if peer:
+        if use_pool:
+            prompt = pool_routing.last_user_prompt(messages)
+            result = await pool_routing.complete_pool_openai(
+                prompt, served_model, req.temperature, max_tokens
+            )
+        elif peer:
             result = await gateway_routing.complete_peer_openai(
                 peer, messages, served_model, req.temperature, max_tokens
             )
@@ -174,6 +203,12 @@ async def chat_completions_openai(req: ChatCompletionRequest):
             result = await runtime.chat(messages, temperature=req.temperature, max_tokens=max_tokens)
             if isinstance(result, dict):
                 result.setdefault("model", local)
+    except pool_routing.PoolDispatchError as exc:
+        # Surface the coordinator's real status when it's meaningful (e.g. 503
+        # "no peer serves this model" — same condition as a local 404); any other
+        # upstream failure is a bad-gateway (502).
+        status = exc.status_code if exc.status_code in (404, 503) else 502
+        raise HTTPException(status_code=status, detail=exc.detail)
     except Exception as exc:  # noqa: BLE001
         logger.exception("gateway_chat_failed")
         raise HTTPException(status_code=500, detail=f"inference failed: {type(exc).__name__}")
