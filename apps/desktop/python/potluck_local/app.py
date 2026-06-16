@@ -22,7 +22,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from potluck_local import __version__
-from potluck_local.routers import agents, chat, hardware, health, memory, models, peer, settings, tasks, vault
+from potluck_local.routers import agents, chat, gateway, hardware, health, memory, models, ollama, peer, settings, tasks, vault, verify
 from potluck_local.utils.logging import setup_logging
 
 
@@ -96,6 +96,12 @@ def create_app() -> FastAPI:
     # surface as before.
     sidecar_token = os.environ.get("POTLUCK_SIDECAR_TOKEN") or None
 
+    # Separate opt-in key for the OpenAI-compatible gateway (/v1/*), so external
+    # tools (Cursor, etc.) authenticate without the internal sidecar token. Unset
+    # means: gateway off in production (sidecar token set), open on loopback in
+    # dev. Enforced in peer_access_middleware below.
+    gateway_key = os.environ.get("POTLUCK_GATEWAY_API_KEY") or None
+
     app = FastAPI(
         lifespan=_lifespan,
         title="Potluck Local",
@@ -134,6 +140,9 @@ def create_app() -> FastAPI:
         # Normalise away any ../ traversal sequences once, up front, so both the
         # peer-surface restriction and the token gate match the real target path.
         normalised = posixpath.normpath(raw_path)
+        # posixpath.normpath preserves a leading "//"; collapse it so the
+        # gateway prefix check and the exempt/peer checks see one canonical path.
+        normalised = "/" + normalised.lstrip("/")
 
         client_host = request.client.host if request.client else ""
         is_loopback = client_host in ("127.0.0.1", "::1", "localhost")
@@ -153,6 +162,46 @@ def create_app() -> FastAPI:
                         ),
                     },
                 )
+
+        # OpenAI/Ollama-compatible gateway (/v1/*) is for external tools that do
+        # not carry the internal sidecar token. It has its own opt-in key and
+        # bypasses the sidecar-token gate below. Already loopback-only via the
+        # non-loopback block above (remote callers get /peer/* + /health only).
+        if (
+            normalised.startswith("/v1/")
+            or normalised == "/v1"
+            or normalised.startswith("/api/")
+            or normalised == "/api"
+        ):
+            # Effective key: env override first, else the live setting (so the
+            # Settings toggle / key rotation take effect with no restart).
+            effective_key = gateway_key
+            if effective_key is None:
+                try:
+                    from potluck_local.services.settings_manager import get_settings as _gs
+
+                    gw = _gs().gateway
+                    if gw.enabled and gw.api_key:
+                        effective_key = gw.api_key
+                except Exception:
+                    effective_key = None
+            if effective_key is not None:
+                auth = request.headers.get("authorization", "")
+                presented = auth[7:] if auth[:7].lower() == "bearer " else ""
+                if not (presented and hmac.compare_digest(presented, effective_key)):
+                    return JSONResponse(
+                        status_code=401,
+                        content={"detail": "missing or invalid gateway API key"},
+                    )
+                return await call_next(request)
+            # Gateway not configured: open only when the sidecar gate is off (dev).
+            # In production (token set) it stays disabled until the user enables it.
+            if sidecar_token is not None:
+                return JSONResponse(
+                    status_code=404,
+                    content={"detail": "gateway disabled; enable it in Settings -> Connect tools"},
+                )
+            return await call_next(request)
 
         # Shared-secret gate — applies to loopback callers too. When a token is
         # configured, every non-exempt path must present a matching bearer token.
@@ -188,6 +237,9 @@ def create_app() -> FastAPI:
     app.include_router(agents.router, prefix="/agents", tags=["agents"])
     app.include_router(vault.router, prefix="/vault", tags=["vault"])
     app.include_router(peer.router, prefix="/peer", tags=["peer"])
+    app.include_router(verify.router, prefix="/verify", tags=["verify"])
+    app.include_router(gateway.router, prefix="/v1", tags=["gateway"])
+    app.include_router(ollama.router, prefix="/api", tags=["ollama"])
 
     return app
 

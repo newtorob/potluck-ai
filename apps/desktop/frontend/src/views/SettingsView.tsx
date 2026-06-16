@@ -19,6 +19,7 @@ import { PrivacyPanel } from '@/components/settings/PrivacyPanel';
 import { AccountPanel } from '@/components/settings/AccountPanel';
 import { AdvancedPanel } from '@/components/settings/AdvancedPanel';
 import { VaultPanel } from '@/components/settings/VaultPanel';
+import { GatewayPanel } from '@/components/settings/GatewayPanel';
 import { useSettings } from '@/hooks/useSettings';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
@@ -27,13 +28,14 @@ import { EmptyState } from '@/components/layout/EmptyState';
 // Tab definitions
 // ---------------------------------------------------------------------------
 
-type TabId = 'account' | 'hardware' | 'privacy' | 'vault' | 'advanced';
+type TabId = 'account' | 'hardware' | 'privacy' | 'vault' | 'connect' | 'advanced';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'account', label: 'Account' },
   { id: 'hardware', label: 'Hardware' },
   { id: 'privacy', label: 'Privacy' },
   { id: 'vault', label: 'Vault' },
+  { id: 'connect', label: 'Connect tools' },
   { id: 'advanced', label: 'Advanced' },
 ];
 
@@ -152,6 +154,7 @@ export function SettingsView() {
               { id: 'hardware', Panel: HardwarePanel },
               { id: 'privacy', Panel: PrivacyPanel },
               { id: 'vault', Panel: VaultPanel },
+              { id: 'connect', Panel: GatewayPanel },
               { id: 'advanced', Panel: AdvancedPanel },
             ] as const
           ).map(({ id, Panel }) => (

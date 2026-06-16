@@ -27,7 +27,7 @@ import { cn } from '@/components/ui/cn';
 import { useHealth } from '@/hooks/useHealth';
 import { useHardware } from '@/hooks/useHardware';
 import { useMeshStore } from '@/stores/meshStore';
-import { deriveDiagnostics, type DiagSeverity } from '@/lib/meshDiagnostics';
+import { deriveDiagnostics, worstSeverity, type DiagSeverity } from '@/lib/meshDiagnostics';
 import {
   deriveReadiness,
   type ReadinessCheck,
@@ -147,10 +147,14 @@ export function ReadinessView() {
 
   const machineChecks = report.checks.filter((c) => c.group === 'machine');
   const networkChecks = report.checks.filter((c) => c.group === 'network');
-  // The banner answers "is this machine ready", so it tracks machine readiness,
-  // not the optional network. A relayed peer (amber, below) shouldn't tint the
-  // headline when local inference is good to go.
-  const banner = SEV[report.machineReady ? 'ok' : report.overall];
+  // The banner answers "is this machine ready", so it tracks MACHINE severity
+  // only, never the optional network. A relayed or unreachable peer (amber/red
+  // below) must not tint the headline when local inference is fine.
+  const machineSeverity = machineChecks.reduce<DiagSeverity>(
+    (worst, c) => worstSeverity(worst, c.severity),
+    'ok',
+  );
+  const banner = SEV[report.machineReady ? 'ok' : machineSeverity];
   const BannerIcon = banner.icon;
 
   const onRecheck = () => {
@@ -168,7 +172,9 @@ export function ReadinessView() {
           <button
             type="button"
             onClick={onRecheck}
-            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-muted"
+            disabled={hwLoading}
+            aria-busy={hwLoading}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <RefreshCw className={cn('size-3.5', hwLoading && 'animate-spin')} aria-hidden />
             Re-check

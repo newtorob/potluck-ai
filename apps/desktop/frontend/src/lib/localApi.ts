@@ -179,6 +179,11 @@ export interface VaultSettings {
   chunk_count: number;
 }
 
+export interface GatewaySettings {
+  enabled: boolean;
+  api_key: string;
+}
+
 export type PotluckSettingsPatch = {
   [K in keyof PotluckSettings]?: PotluckSettings[K] extends object
     ? Partial<PotluckSettings[K]>
@@ -192,6 +197,7 @@ export interface PotluckSettings {
   app: AppSettingsShape;
   memory: MemorySettings;
   vault: VaultSettings;
+  gateway: GatewaySettings;
   models_path: string;
   active_model_id: string | null;
   active_project: string | null;
@@ -471,6 +477,14 @@ export const localApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
     }).then((r) => handleResponse<PotluckSettings>(r));
+  },
+
+  /** Generate + persist a fresh gateway API key (enables the gateway). Returns
+   *  the new key for one-time display. Invalidates the previous key. */
+  rotateGatewayKey(): Promise<{ enabled: boolean; api_key: string }> {
+    return timedFetch(`${LOCAL_BASE}/settings/gateway/rotate`, {
+      method: 'POST',
+    }).then((r) => handleResponse<{ enabled: boolean; api_key: string }>(r));
   },
 
   // ---- Memory --------------------------------------------------------------

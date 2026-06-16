@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException
 
 from potluck_local.services.settings_manager import (
     AppSettings,
+    GatewaySettings,
     MemorySettings,
     NetworkSettings,
     PrivacySettings,
@@ -34,6 +35,7 @@ _SUB_MODELS: dict[str, type] = {
     "app": AppSettings,
     "memory": MemorySettings,
     "vault": VaultSettings,
+    "gateway": GatewaySettings,
 }
 
 
@@ -84,3 +86,22 @@ async def update_settings(patch: dict[str, Any]) -> dict[str, Any]:
     save_settings(updated)
     logger.info("settings_updated")
     return updated.model_dump()
+
+
+@router.post("/gateway/rotate")
+async def rotate_gateway_key() -> dict[str, Any]:
+    """Generate a fresh gateway API key, enable the gateway, and persist it.
+
+    Returns the new key so the UI can show it once for copying. Rotating
+    invalidates the previous key. Gated by the same sidecar-token surface as the
+    rest of /settings, so only the local app can call it."""
+    import secrets
+
+    current = get_settings()
+    data = current.model_dump()
+    new_key = "sk-potluck-" + secrets.token_hex(24)
+    data["gateway"] = GatewaySettings(enabled=True, api_key=new_key).model_dump()
+    updated = PotluckSettings(**data)
+    save_settings(updated)
+    logger.info("gateway_key_rotated")
+    return {"enabled": True, "api_key": new_key}

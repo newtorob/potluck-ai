@@ -159,6 +159,7 @@ class LLMRuntime:
             queue: asyncio.Queue[str | None] = asyncio.Queue()
             model = self._model
             model_id = self._model_id
+            cancel_event = threading.Event()
 
             def _generate() -> None:
                 try:
@@ -170,6 +171,8 @@ class LLMRuntime:
                         stream=True,
                     )
                     for chunk in response:
+                        if cancel_event.is_set():
+                            break
                         delta = chunk["choices"][0].get("delta", {})
                         content = delta.get("content")
                         if content:
@@ -180,7 +183,7 @@ class LLMRuntime:
                     loop.call_soon_threadsafe(queue.put_nowait, f"\x00ERROR\x00{exc}")
                     loop.call_soon_threadsafe(queue.put_nowait, None)
 
-            loop.run_in_executor(None, _generate)
+            fut = loop.run_in_executor(None, _generate)
 
             token_count = 0
             start = time.monotonic()
@@ -198,6 +201,16 @@ class LLMRuntime:
             except asyncio.CancelledError:
                 logger.info("stream_cancelled model_id=%s tokens_so_far=%d", model_id, token_count)
             finally:
+                # Stop the worker and wait for it to release the model BEFORE the
+                # inference lock drops. A client disconnect mid-stream cancels this
+                # generator; without this drain the lock would free while inference
+                # is still running on the non-thread-safe Llama, letting the next
+                # request race it.
+                cancel_event.set()
+                try:
+                    await asyncio.shield(fut)
+                except Exception:
+                    pass
                 elapsed = round(time.monotonic() - start, 3)
                 logger.info(
                     "stream_complete model_id=%s tokens=%d duration=%.3fs",
@@ -244,6 +257,174 @@ class LLMRuntime:
                 elapsed,
             )
             return result
+
+    async def stream_chat_raw(
+        self,
+        messages: list[dict],
+        *,
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+        stop: list[str] | None = None,
+    ):
+        """Yield llama-cpp's native OpenAI-shaped streaming chunk dicts.
+
+        For the OpenAI-compatible gateway, which re-emits these verbatim as SSE
+        (no reshaping needed). Distinct from stream_chat(), which yields the
+        simplified delta-only SSE strings the desktop UI consumes. Serialised by
+        the same inference lock. An upstream error surfaces as a single dict
+        {"__error__": "..."} before the stream ends.
+        """
+        if self._model is None:
+            raise RuntimeError("No model loaded")
+
+        async with self._inference_lock:
+            loop = asyncio.get_running_loop()
+            queue: asyncio.Queue = asyncio.Queue()
+            model = self._model
+            model_id = self._model_id
+
+            cancel_event = threading.Event()
+
+            def _generate() -> None:
+                try:
+                    for chunk in model.create_chat_completion(
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        stop=stop or [],
+                        stream=True,
+                    ):
+                        if cancel_event.is_set():
+                            break
+                        loop.call_soon_threadsafe(queue.put_nowait, chunk)
+                    loop.call_soon_threadsafe(queue.put_nowait, None)
+                except Exception as exc:
+                    logger.error("gateway_stream_error model_id=%s error=%s", model_id, type(exc).__name__)
+                    loop.call_soon_threadsafe(queue.put_nowait, {"__error__": str(exc)})
+                    loop.call_soon_threadsafe(queue.put_nowait, None)
+
+            fut = loop.run_in_executor(None, _generate)
+
+            chunk_count = 0
+            start = time.monotonic()
+            try:
+                while True:
+                    item = await queue.get()
+                    if item is None:
+                        break
+                    chunk_count += 1
+                    yield item
+            except asyncio.CancelledError:
+                logger.info("gateway_stream_cancelled model_id=%s chunks_so_far=%d", model_id, chunk_count)
+            finally:
+                # Drain the worker before releasing the inference lock (see
+                # stream_chat) so a disconnect can't leave inference running on the
+                # non-thread-safe model while the next request acquires the lock.
+                cancel_event.set()
+                try:
+                    await asyncio.shield(fut)
+                except Exception:
+                    pass
+                logger.info(
+                    "gateway_stream_complete model_id=%s chunks=%d duration=%.3fs",
+                    model_id, chunk_count, round(time.monotonic() - start, 3),
+                )
+
+    async def score_sequence(
+        self,
+        text: str,
+        *,
+        prefix: str | None = None,
+        max_tokens: int = 2048,
+    ) -> dict:
+        """Teacher-forced log-probability of `text` (optionally conditional on
+        `prefix`) under the currently loaded model.
+
+        Used by closure / scoring-challenge verification (model-substitution
+        detection). Two important properties:
+
+        - Works WITHOUT loading the model with logits_all=True, so it runs on the
+          normal serving model with no extra memory (logits_all would allocate
+          ~n_ctx * vocab, multiple GB at serving context sizes). We force
+          per-token logits for each decode batch and read them straight from the
+          llama.cpp context buffer; verified to match a logits_all reference.
+        - Never mutates persistent serving state: serialised by the same
+          inference lock as chat, and resets + clears the KV cache before and
+          after, so an in-flight/next chat is unaffected.
+
+        Returns a dict with model_id, scored_tokens, sum_logprob,
+        avg_token_logprob, bits_per_byte, n_bytes.
+        """
+        if self._model is None:
+            raise RuntimeError("No model loaded")
+
+        async with self._inference_lock:
+            loop = asyncio.get_running_loop()
+            model = self._model
+            model_id = self._model_id
+
+            def _score() -> dict:
+                import math
+
+                import numpy as np
+
+                vocab = model._n_vocab
+                n_batch = getattr(model, "n_batch", 512) or 512
+
+                if prefix:
+                    pre = list(model.tokenize(prefix.encode("utf-8"), add_bos=True, special=True))
+                    cont = list(model.tokenize(text.encode("utf-8"), add_bos=False, special=False))
+                    toks = pre + cont
+                    start = len(pre)  # first scored token index
+                else:
+                    toks = list(model.tokenize(text.encode("utf-8"), add_bos=True, special=False))
+                    start = 1  # skip BOS (no predictor)
+
+                if len(toks) > max_tokens:
+                    toks = toks[:max_tokens]
+                start = min(start, len(toks))
+
+                model.reset()
+                model._ctx.kv_cache_clear()
+                try:
+                    sum_lp = 0.0
+                    n = 0
+                    pos = 0
+                    while pos < len(toks):
+                        window = toks[pos : pos + n_batch]
+                        # logits_all=True for THIS batch only -> per-token logits in
+                        # the C buffer; read before the next decode overwrites it.
+                        model._batch.set_batch(batch=window, n_past=pos, logits_all=True)
+                        model._ctx.decode(model._batch)
+                        flat = np.ctypeslib.as_array(
+                            model._ctx.get_logits(), shape=(len(window) * vocab,)
+                        )
+                        logits = flat.reshape(len(window), vocab)
+                        for j in range(len(window)):
+                            nxt = pos + j + 1  # token predicted by position pos+j
+                            if start <= nxt < len(toks):
+                                row = logits[j]
+                                m = float(row.max())
+                                logZ = m + float(np.log(np.exp(row - m).sum()))
+                                sum_lp += float(row[toks[nxt]]) - logZ
+                                n += 1
+                        pos += len(window)
+                finally:
+                    # Leave the serving model in a clean state no matter what.
+                    model.reset()
+                    model._ctx.kv_cache_clear()
+
+                nbytes = max(1, len(text.encode("utf-8")))
+                return {
+                    "model_id": model_id,
+                    "scored_tokens": n,
+                    "sum_logprob": sum_lp,
+                    "avg_token_logprob": (sum_lp / n) if n else None,
+                    "bits_per_byte": (-sum_lp / (math.log(2) * nbytes)) if n else None,
+                    "n_bytes": nbytes,
+                }
+
+            return await loop.run_in_executor(None, _score)
 
 
 _runtime: LLMRuntime | None = None
