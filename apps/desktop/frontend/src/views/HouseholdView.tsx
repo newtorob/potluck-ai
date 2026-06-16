@@ -18,7 +18,7 @@
  * unmount; the store handles polling cadence + visibility-pause.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Home,
   Plus,
@@ -43,7 +43,7 @@ import { useMeshStore } from '@/stores/meshStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useHealth } from '@/hooks/useHealth';
 import { localApi } from '@/lib/localApi';
-import { getBigModelEligiblePeers, type PeerCapabilities } from '@/lib/householdInference';
+import { getBigModelEligiblePeers, probePeer, type PeerCapabilities } from '@/lib/householdInference';
 import {
   computeCapacity,
   speedLabel,
@@ -54,6 +54,7 @@ import {
 } from '@/lib/capacity';
 import { meshClient, issuePairingToken, MeshApiError, CoordinatorError } from '@/lib/meshClient';
 import { relativeTime } from '@/lib/timeFormat';
+import { formatModelName } from '@/lib/modelName';
 import type { MeshPeer, MeshStatus } from '@/types/mesh';
 import { AddMachineWizard } from '@/components/household/AddMachineWizard';
 import { deriveDiagnostics, type PeerDiagnostic } from '@/lib/meshDiagnostics';
@@ -483,6 +484,32 @@ function PairedView({
     [bridge, status, peers],
   );
 
+  // Probe each reachable peer's live capabilities (model, hardware, load) so the
+  // roster shows what each machine can actually do, not just whether it's up.
+  // Reuses the same /peer/capabilities probe the capacity + big-model cards use.
+  const [capsByNode, setCapsByNode] = useState<Record<string, PeerCapabilities>>({});
+  useEffect(() => {
+    let cancelled = false;
+    const reachable = peers.filter((p) => p.reachable);
+    if (reachable.length === 0) {
+      setCapsByNode({});
+      return;
+    }
+    void (async () => {
+      const probes = await Promise.all(reachable.map((p) => probePeer(p)));
+      if (cancelled) return;
+      const map: Record<string, PeerCapabilities> = {};
+      reachable.forEach((p, i) => {
+        const caps = probes[i];
+        if (caps) map[p.node_id] = caps;
+      });
+      setCapsByNode(map);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [peers]);
+
   return (
     <div className="space-y-8">
       {/* Connectivity health — named, root-cause-suppressed (VPN-resilience Pillar #1). */}
@@ -547,7 +574,12 @@ function PairedView({
         ) : (
           <ul className="space-y-2">
             {peers.map((peer) => (
-              <PeerRow key={peer.node_id} peer={peer} diag={report.perPeer[peer.node_id]} />
+              <PeerRow
+                key={peer.node_id}
+                peer={peer}
+                diag={report.perPeer[peer.node_id]}
+                caps={capsByNode[peer.node_id]}
+              />
             ))}
           </ul>
         )}
@@ -1070,10 +1102,58 @@ function RoutingStrategyControl() {
 // Peer row
 // ---------------------------------------------------------------------------
 
-function PeerRow({ peer, diag }: { peer: MeshPeer; diag?: PeerDiagnostic }) {
+// ---- Per-peer capability truth (#12) ---------------------------------------
+
+function CapChip({ children, tone = 'default' }: { children: ReactNode; tone?: 'default' | 'sage' | 'amber' }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded px-1.5 py-0.5 text-[11px]',
+        tone === 'sage' && 'bg-sage/10 text-sage',
+        tone === 'amber' && 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+        tone === 'default' && 'bg-muted text-muted-foreground',
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** Best-effort inference backend from the advertised hardware. */
+function deriveBackend(gpuName: string | null | undefined, platform: string | null | undefined): string {
+  const g = (gpuName || '').toLowerCase();
+  if (platform === 'darwin' || g.includes('apple')) return 'Metal';
+  if (/nvidia|geforce|rtx|gtx|tesla|quadro/.test(g)) return 'CUDA';
+  if (/amd|radeon|\brx\b/.test(g)) return 'ROCm';
+  return gpuName ? 'GPU' : 'CPU';
+}
+
+/** Quantization level pulled from the model slug (e.g. ...-q4_k_m -> Q4). */
+function deriveQuant(slug: string | null | undefined): string | null {
+  if (!slug) return null;
+  const m = slug.match(/q(\d+)(?:[_-]?k[_-]?[ms]|[_-]?\d)?$/i);
+  return m ? `Q${m[1]}` : null;
+}
+
+function formatCtx(n: number | null | undefined): string | null {
+  if (!n || n <= 0) return null;
+  return n >= 1000 ? `${Math.round(n / 1000)}K ctx` : `${n} ctx`;
+}
+
+function PeerRow({ peer, diag, caps }: { peer: MeshPeer; diag?: PeerDiagnostic; caps?: PeerCapabilities }) {
   // A specific, actionable reason replaces a bare "Offline" — the warn/error
   // detail is shown inline so the user sees the fix without hovering.
   const showDetail = diag && (diag.severity === 'warn' || diag.severity === 'error');
+
+  const hw = caps?.hardware;
+  const backend = hw ? deriveBackend(hw.gpu_name, hw.platform) : null;
+  const ctx = formatCtx(caps?.loaded_model_detail?.context_size);
+  const quant = deriveQuant(caps?.loaded_model);
+  const hwLabel = hw
+    ? hw.gpu_name
+      ? `${hw.gpu_name}${hw.gpu_vram_gb ? ` · ${hw.gpu_vram_gb} GB` : ''}${backend ? ` · ${backend}` : ''}`
+      : `CPU${hw.ram_total_gb ? ` · ${Math.round(hw.ram_total_gb)} GB RAM` : ''}`
+    : null;
 
   return (
     <li className="flex items-start gap-3 rounded-xl border border-border/60 bg-card p-3.5">
@@ -1100,6 +1180,30 @@ function PeerRow({ peer, diag }: { peer: MeshPeer; diag?: PeerDiagnostic }) {
             </>
           )}
         </p>
+
+        {/* Capability truth: what this machine can actually do right now. Shown
+            when the peer answered a live /peer/capabilities probe; fields it
+            doesn't report are simply omitted. */}
+        {caps && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {caps.loaded_model ? (
+              <CapChip>
+                {formatModelName(caps.loaded_model)}
+                {quant ? ` · ${quant}` : ''}
+                {ctx ? ` · ${ctx}` : ''}
+              </CapChip>
+            ) : (
+              <CapChip>No model loaded</CapChip>
+            )}
+            {hwLabel && <CapChip>{hwLabel}</CapChip>}
+            {hw?.recommended_tier && <CapChip>{hw.recommended_tier} tier</CapChip>}
+            <CapChip tone={caps.inference_load?.busy ? 'amber' : 'sage'}>
+              {caps.inference_load?.busy ? 'Busy' : 'Idle'}
+            </CapChip>
+            {caps.available_for_big_model && <CapChip>Big Model ready</CapChip>}
+          </div>
+        )}
+
         {showDetail && (
           <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
             {diag.detail}
