@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
@@ -40,14 +39,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
         logger.info("sentry_initialized", dsn_prefix=settings.sentry_dsn[:20])
 
+    # Release-readiness preflight: logs the safety checklist every boot and, in
+    # staging/production, refuses to start on an operator-fixable insecure
+    # default (open token, TOFU keys, default DB creds). Advisory in development.
+    # Runs BEFORE init_db so a refusal doesn't open (and leak) the DB pool.
+    from coordinator.services.preflight import enforce_preflight
+
+    enforce_preflight(settings)
+
     await init_db()
     logger.info("database_pool_initialized")
-
-    if not os.environ.get("POTLUCK_COORDINATOR_TOKEN", "").strip():
-        logger.warning(
-            "POTLUCK_COORDINATOR_TOKEN not set — coordinator running in "
-            "unauthenticated dev mode. Set this env var before any network exposure."
-        )
 
     # Background credit-verification loop: periodically probe online peers that
     # hold escrowed credits (canary -> reputation -> escrow release).
