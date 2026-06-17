@@ -88,6 +88,7 @@ import (
 	"github.com/potluck-ai/potluck-mesh/internal/coordapi"
 	"github.com/potluck-ai/potluck-mesh/internal/derp"
 	"github.com/potluck-ai/potluck-mesh/internal/events"
+	"github.com/potluck-ai/potluck-mesh/internal/lanpair"
 	"github.com/potluck-ai/potluck-mesh/internal/localapi"
 	"github.com/potluck-ai/potluck-mesh/internal/peerstate"
 	msignal "github.com/potluck-ai/potluck-mesh/internal/signal"
@@ -255,6 +256,9 @@ func run() int {
 	coordClient := coordapi.New(cfg.CoordinatorURL)
 	coordClient.CoordinatorToken = cfg.CoordinatorToken
 
+	// ---- LAN pairing-token broadcast/listen ---- //
+	lanSvc := lanpair.New()
+
 	// ---- local IPC server ---- //
 	ipcSrv := localapi.New(localapi.Config{
 		Bus:         bus,
@@ -282,6 +286,7 @@ func run() int {
 		WGPrivKeyPath: cfg.WGPrivateKeyPath,
 		SocketPath:    cfg.LocalAPISocketPath,
 		Platform:      cfg.Platform,
+		LanPair:       lanSvc,
 	})
 
 	// Publish endpoint changes to the bus from STUN.
@@ -304,6 +309,9 @@ func run() int {
 	// a manual restart. This pulls the authoritative roster periodically and
 	// reconciles against the local cache. See task 697458e9.
 	go runRosterRefreshLoop(ctx, coordClient, ps, handler, ipcState)
+
+	// ---- LAN pairing-token listener (receive-only) ---- //
+	go lanSvc.RunListener(ctx)
 
 	// ---- DERP relay Run loop (optional) ---- //
 	if derpClient != nil {

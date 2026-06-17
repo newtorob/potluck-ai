@@ -41,6 +41,7 @@ import (
 
 	"github.com/potluck-ai/potluck-mesh/internal/coordapi"
 	"github.com/potluck-ai/potluck-mesh/internal/events"
+	"github.com/potluck-ai/potluck-mesh/internal/lanpair"
 	"github.com/potluck-ai/potluck-mesh/internal/peerstate"
 )
 
@@ -241,6 +242,7 @@ type Config struct {
 	WGPrivKeyPath      string // path to detect / generate the WG private key
 	SocketPath         string // "" → use platform default
 	Platform           string // runtime.GOOS
+	LanPair            *lanpair.Service // LAN pairing-token broadcast/listen; may be nil
 }
 
 // Server is the local IPC HTTP+WS server.
@@ -256,6 +258,7 @@ type Server struct {
 	wgPrivKeyPath      string
 	platform           string
 	socketPath         string
+	lanpair            *lanpair.Service
 
 	// pairingMu prevents concurrent /pair attempts.
 	pairingMu sync.Mutex
@@ -285,6 +288,7 @@ func New(cfg Config) *Server {
 		wgPrivKeyPath:      cfg.WGPrivKeyPath,
 		platform:           cfg.Platform,
 		socketPath:         sp,
+		lanpair:            cfg.LanPair,
 	}
 
 	mux := http.NewServeMux()
@@ -293,6 +297,8 @@ func New(cfg Config) *Server {
 	mux.HandleFunc("POST /pair", s.handlePair)
 	mux.HandleFunc("POST /unpair", s.handleUnpair)
 	mux.HandleFunc("GET /events", s.handleEvents)
+	mux.HandleFunc("POST /pairing/broadcast", s.handlePairingBroadcast)
+	mux.HandleFunc("GET /pairing/discovered", s.handlePairingDiscovered)
 
 	// Wrap every response with the protocol-version header.
 	versionMW := func(next http.Handler) http.Handler {
@@ -651,6 +657,67 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------
+// LAN pairing-token broadcast / discovery
+// ---------------------------------------------------------------------------
+
+const (
+	// How long an inviter broadcasts after the wizard opens. Short on purpose:
+	// the coordinator token may live an hour, but it only needs to be on the
+	// LAN for the moment the user is actively adding a machine.
+	pairingBroadcastWindow = 120 * time.Second
+	// A discovered token is only offered if heard within this window.
+	pairingDiscoveryMaxAge = 150 * time.Second
+)
+
+// handlePairingBroadcast starts broadcasting a pairing token on the LAN. Only an
+// enrolled machine can invite (it is the one that issued the token); an
+// unenrolled machine has no token to share.
+func (s *Server) handlePairingBroadcast(w http.ResponseWriter, r *http.Request) {
+	if s.lanpair == nil {
+		writeError(w, http.StatusServiceUnavailable, "lan_unavailable", "LAN pairing is not available")
+		return
+	}
+	if s.enrolled.Load() != 1 {
+		writeError(w, http.StatusConflict, "not_enrolled", "only an enrolled machine can broadcast a pairing token")
+		return
+	}
+	var body struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Token == "" {
+		writeError(w, http.StatusBadRequest, "bad_request", "token is required")
+		return
+	}
+	hostname, _ := os.Hostname()
+	s.lanpair.StartBroadcast(body.Token, hostname, pairingBroadcastWindow)
+	slog.Info("localapi: broadcasting pairing token on LAN", "window_s", int(pairingBroadcastWindow.Seconds()))
+	writeJSON(w, http.StatusOK, map[string]any{
+		"broadcasting":   true,
+		"window_seconds": int(pairingBroadcastWindow.Seconds()),
+	})
+}
+
+// handlePairingDiscovered returns a pairing token heard on the LAN, if any. Only
+// meaningful on an unenrolled machine that is looking to join; an enrolled
+// machine never acts on a discovered token.
+func (s *Server) handlePairingDiscovered(w http.ResponseWriter, r *http.Request) {
+	if s.lanpair == nil || s.enrolled.Load() == 1 {
+		writeJSON(w, http.StatusOK, map[string]any{"found": false})
+		return
+	}
+	token, hostname, ok := s.lanpair.Discovered(pairingDiscoveryMaxAge)
+	if !ok {
+		writeJSON(w, http.StatusOK, map[string]any{"found": false})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"found":    true,
+		"token":    token,
+		"hostname": hostname,
+	})
 }
 
 // ---------------------------------------------------------------------------

@@ -155,7 +155,27 @@ export const meshClient = {
 
   /** Wipe local keys + leave the household. Returns nothing. */
   unpair: () => meshRequest<void>('POST', '/unpair'),
+
+  /**
+   * Start broadcasting a pairing token on the local network so a machine on the
+   * same LAN can pick it up without manual copy-paste. Enrolled machine only;
+   * the sidecar stops after a short window. Token + hostname only on the wire.
+   */
+  broadcastPairingToken: (token: string) =>
+    meshRequest<{ broadcasting: boolean; window_seconds: number }>(
+      'POST',
+      '/pairing/broadcast',
+      { token },
+    ),
+
+  /** A pairing token heard on the LAN, if any (unenrolled machine only). */
+  discoveredPairing: () => meshRequest<DiscoveredPairing>('GET', '/pairing/discovered'),
 };
+
+/** Result of GET /pairing/discovered. */
+export type DiscoveredPairing =
+  | { found: false }
+  | { found: true; token: string; hostname: string };
 
 // ---------------------------------------------------------------------------
 // Coordinator helpers (direct HTTP, not via the bridge)

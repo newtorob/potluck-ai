@@ -18,9 +18,9 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { Copy, Check, X, Plus, AlertCircle, Clock } from 'lucide-react';
+import { Copy, Check, X, Plus, AlertCircle, Clock, RadioTower } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
-import { issuePairingToken, CoordinatorError } from '@/lib/meshClient';
+import { issuePairingToken, CoordinatorError, meshClient } from '@/lib/meshClient';
 import type { PairingTokenIssueResponse } from '@/types/mesh';
 
 interface AddMachineWizardProps {
@@ -33,6 +33,7 @@ export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
   const [error, setError] = useState<string | null>(null);
   const [isIssuing, setIsIssuing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [broadcasting, setBroadcasting] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -46,12 +47,26 @@ export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
     setToken(null);
     setError(null);
     setCopied(false);
+    setBroadcasting(false);
     setIsIssuing(true);
 
     void (async () => {
       try {
         const res = await issuePairingToken();
         if (!cancelled) setToken(res);
+        // Best-effort: also push the token onto the local network so a machine
+        // on the same LAN can pick it up without copy-paste. Failure (no mesh
+        // sidecar, no LAN) just falls back to manual paste.
+        if (!cancelled) {
+          void meshClient
+            .broadcastPairingToken(res.token)
+            .then(() => {
+              if (!cancelled) setBroadcasting(true);
+            })
+            .catch(() => {
+              /* LAN broadcast unavailable; manual token still works */
+            });
+        }
       } catch (err) {
         if (cancelled) return;
         if (err instanceof CoordinatorError) {
@@ -277,11 +292,20 @@ export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
                   <span className="font-medium text-foreground">"Join existing household"</span>.
                 </Step>
                 <Step n={3}>
-                  Paste this token. The two machines will discover each other
-                  on the local network or relay through Potluck's DERP servers
-                  if they can't reach each other directly.
+                  Paste this token, or if the other machine is on this network,
+                  pick this invite from its "Join existing household" panel. The
+                  two machines then connect directly on the LAN or relay through
+                  Potluck's DERP servers if they can't reach each other.
                 </Step>
               </ol>
+
+              {broadcasting && (
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <RadioTower className="h-3 w-3 text-sage" aria-hidden="true" />
+                  Also inviting machines on this network for 2 minutes, so a
+                  nearby machine can join without the token.
+                </p>
+              )}
             </>
           )}
         </div>

@@ -357,10 +357,30 @@ function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
   const [tokenInput, setTokenInput] = useState('');
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [discovered, setDiscovered] = useState<{ hostname: string; token: string } | null>(null);
 
-  async function handleJoin(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = tokenInput.trim();
+  // Poll the mesh sidecar for a pairing token broadcast on the local network,
+  // so a machine being invited from a nearby machine can join in one tap.
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const d = await meshClient.discoveredPairing();
+        if (!cancelled) setDiscovered(d.found ? { hostname: d.hostname, token: d.token } : null);
+      } catch {
+        if (!cancelled) setDiscovered(null);
+      }
+    };
+    void poll();
+    const id = setInterval(() => void poll(), 2500);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  async function join(rawToken: string) {
+    const trimmed = rawToken.trim();
     if (trimmed.length === 0) return;
     setError(null);
     setWorking(true);
@@ -391,9 +411,14 @@ function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
     }
   }
 
+  function handleJoin(e: React.FormEvent) {
+    e.preventDefault();
+    void join(tokenInput);
+  }
+
   return (
     <form
-      onSubmit={(e) => void handleJoin(e)}
+      onSubmit={handleJoin}
       className="rounded-2xl border border-border/60 bg-card p-5 space-y-3 shadow-hearth-sm"
     >
       <div className="flex items-center gap-2.5">
@@ -408,6 +433,32 @@ function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
         Paste the pairing token you generated on another machine. Tokens
         expire after an hour and can only be used once.
       </p>
+
+      {discovered && (
+        <div className="rounded-lg border border-sage/30 bg-sage/8 p-3 space-y-2">
+          <p className="flex items-center gap-1.5 text-sm text-foreground">
+            <RadioTower className="h-3.5 w-3.5 shrink-0 text-sage" aria-hidden="true" />
+            <span>
+              Found an invite on this network from{' '}
+              <span className="font-medium">{discovered.hostname || 'a nearby machine'}</span>.
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={() => void join(discovered.token)}
+            disabled={working}
+            className={cn(
+              'inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-3',
+              'bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'disabled:cursor-not-allowed disabled:opacity-60',
+            )}
+          >
+            {working ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}
+            Join {discovered.hostname || 'this machine'}
+          </button>
+        </div>
+      )}
 
       <div className="space-y-2">
         <label
