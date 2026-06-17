@@ -10,8 +10,13 @@ import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import type { PotluckSettings, PotluckSettingsPatch } from '@/lib/localApi';
 
-const CONTEXT_SIZE_OPTIONS = [2048, 4096, 8192, 16384, 32768] as const;
+// 0 = auto (sidecar picks n_ctx per model + available RAM).
+const CONTEXT_SIZE_OPTIONS = [0, 2048, 4096, 8192, 16384, 32768] as const;
 type ContextSize = (typeof CONTEXT_SIZE_OPTIONS)[number];
+
+function contextSizeLabel(v: ContextSize): string {
+  return v === 0 ? 'Auto (recommended)' : `${v.toLocaleString()} tokens`;
+}
 
 interface HardwarePanelProps {
   settings: PotluckSettings;
@@ -97,14 +102,14 @@ export function HardwarePanel({ settings, isSaving, saveError, onUpdate }: Hardw
         <FieldLabel
           htmlFor="context-size"
           label="Context window"
-          hint="Maximum number of tokens the model can consider in one inference."
+          hint="Maximum tokens per inference. Auto picks a size that fits each model and this machine's memory."
         />
         <select
           id="context-size"
           value={runtime.context_size}
           disabled={isSaving}
           onChange={(e) => {
-            void onUpdate({ runtime: { context_size: Number(e.target.value) as ContextSize } });
+            void onUpdate({ runtime: { context_size: Number(e.target.value) } });
           }}
           className={cn(
             'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm',
@@ -114,7 +119,7 @@ export function HardwarePanel({ settings, isSaving, saveError, onUpdate }: Hardw
         >
           {CONTEXT_SIZE_OPTIONS.map((v) => (
             <option key={v} value={v}>
-              {v.toLocaleString()} tokens
+              {contextSizeLabel(v)}
             </option>
           ))}
         </select>

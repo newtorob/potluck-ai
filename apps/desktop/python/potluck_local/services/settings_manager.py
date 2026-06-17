@@ -14,7 +14,9 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class RuntimeSettings(BaseModel):
-    context_size: int = 4096
+    # 0 = auto-tune n_ctx per model + available RAM (default). A value > 0 pins
+    # n_ctx, capped at the loaded model's maximum context window.
+    context_size: int = 0
     gpu_layers: int = -1   # -1 = offload all layers to GPU automatically
     threads: int = 0       # 0 = auto-detect
     temperature: float = 0.7

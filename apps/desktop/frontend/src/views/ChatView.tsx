@@ -238,7 +238,9 @@ export function ChatView() {
                     className="italic opacity-50"
                     title="Applies when a model is loaded"
                   >
-                    {`Ctx ${settings.runtime.context_size.toLocaleString()}`}
+                    {settings.runtime.context_size === 0
+                      ? 'Ctx auto'
+                      : `Ctx ${settings.runtime.context_size.toLocaleString()}`}
                   </span>
                 )}
               </InfoChip>

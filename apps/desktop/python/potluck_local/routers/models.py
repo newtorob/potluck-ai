@@ -17,10 +17,12 @@ import logging
 import os
 import shutil
 
+import psutil
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 
 from potluck_local.services import model_registry
+from potluck_local.services.context_tuning import resolve_context_size
 from potluck_local.services.model_downloader import get_downloader
 from potluck_local.services.runtime import get_runtime
 from potluck_local.services.settings_manager import get_settings
@@ -166,15 +168,35 @@ async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
 
     rpc_servers = body.rpc_servers if body and body.rpc_servers else None
 
+    # Resolve n_ctx: auto-tune from the model + RAM when context_size is 0,
+    # otherwise honor the user's pin (capped at the model's max). For a
+    # non-catalog model we have no manifest, so fall back to the pin or a
+    # safe default.
+    manifest = model_registry.get_manifest(slug)
+    ram_total_gb = psutil.virtual_memory().total / (1024 ** 3)
+    if manifest is not None:
+        n_ctx = resolve_context_size(
+            configured=settings.runtime.context_size,
+            model_max_ctx=int(manifest.get("context_window", 0) or 0),
+            size_bytes=int(manifest.get("size_bytes", 0) or 0),
+            num_layers=int(manifest.get("num_layers", 0) or 0),
+            ram_total_gb=ram_total_gb,
+        )
+    else:
+        n_ctx = settings.runtime.context_size or 4096
+
     logger.info(
-        "load_model_start slug=%s rpc_servers=%s",
+        "load_model_start slug=%s n_ctx=%d (configured=%d, ram_gb=%.1f) rpc_servers=%s",
         slug,
+        n_ctx,
+        settings.runtime.context_size,
+        ram_total_gb,
         ",".join(rpc_servers) if rpc_servers else "(none)",
     )
     try:
         result = runtime.load_model(
             str(model_path),
-            n_ctx=settings.runtime.context_size,
+            n_ctx=n_ctx,
             n_gpu_layers=settings.runtime.gpu_layers,
             n_threads=settings.runtime.threads or None,
             rpc_servers=rpc_servers,
