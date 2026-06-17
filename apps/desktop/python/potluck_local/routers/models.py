@@ -12,7 +12,9 @@ POST   /models/{slug}/cancel-download      — cancel an active download
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 import shutil
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
@@ -22,6 +24,7 @@ from potluck_local.services import model_registry
 from potluck_local.services.model_downloader import get_downloader
 from potluck_local.services.runtime import get_runtime
 from potluck_local.services.settings_manager import get_settings
+from potluck_local.utils.crypto import sha256_file
 from potluck_local.utils.paths import models_dir
 
 logger = logging.getLogger(__name__)
@@ -139,6 +142,24 @@ async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
             status_code=404,
             detail=f"Model '{slug}' is not installed. POST /models/{slug}/install first.",
         )
+
+    # Opt-in integrity re-check against the sha256 recorded at download time.
+    # Off by default: a full re-hash of a multi-GB model adds seconds to load.
+    # Enable with POTLUCK_VERIFY_MODEL_ON_LOAD=1 to catch post-download tampering
+    # or a manually-dropped file.
+    if os.environ.get("POTLUCK_VERIFY_MODEL_ON_LOAD") == "1":
+        sidecar = models_dir() / slug / "model.gguf.sha256"
+        if sidecar.exists():
+            expected = sidecar.read_text().strip().lower()
+            loop = asyncio.get_running_loop()
+            actual = await loop.run_in_executor(None, lambda: sha256_file(model_path))
+            if expected and actual != expected:
+                logger.error("load_verify_mismatch slug=%s", slug)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Model '{slug}' failed its integrity check (sha256 mismatch); refusing to load.",
+                )
+            logger.info("load_verify_ok slug=%s", slug)
 
     settings = get_settings()
     runtime = get_runtime()

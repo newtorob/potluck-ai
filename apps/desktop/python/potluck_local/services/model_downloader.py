@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import time
 from dataclasses import dataclass, field
@@ -86,9 +87,26 @@ class ModelDownloader:
         model_dir.mkdir(parents=True, exist_ok=True)
         file_path = model_dir / "model.gguf"
         partial_path = model_dir / "model.gguf.partial"
+        meta_path = model_dir / "model.gguf.partial.meta"
+        hash_sidecar = model_dir / "model.gguf.sha256"
 
         self._cancel_flags[model_id] = False
+
+        # Only resume a partial that belongs to THIS (url, expected_sha256). A
+        # leftover partial from an earlier attempt with a different source (e.g.
+        # the catalog url or quant changed for this slug) would otherwise be
+        # appended to and only fail the sha256 check at the very end, with no
+        # hint why. Discard it and start clean instead.
+        if partial_path.exists() and not _partial_meta_matches(meta_path, url, expected_sha256):
+            logger.info(
+                "download_partial_discarded model_id=%s reason=url_or_hash_changed", model_id
+            )
+            partial_path.unlink(missing_ok=True)
+            meta_path.unlink(missing_ok=True)
+
         existing_bytes = partial_path.stat().st_size if partial_path.exists() else 0
+        if existing_bytes == 0:
+            _write_partial_meta(meta_path, url, expected_sha256)
 
         # Seed progress immediately so poll-during-connection-setup returns real state.
         self._progress[model_id] = DownloadProgress(
@@ -178,6 +196,7 @@ class ModelDownloader:
         if not expected_sha256:
             logger.warning("sha256_skip model_id=%s reason=empty_hash", model_id)
             partial_path.rename(file_path)
+            meta_path.unlink(missing_ok=True)  # partial done; no hash to record
             self._progress[model_id] = DownloadProgress(
                 model_id=model_id,
                 bytes_downloaded=downloaded,
@@ -210,6 +229,13 @@ class ModelDownloader:
             raise ValueError(f"SHA256 mismatch for {model_id}")
 
         partial_path.rename(file_path)
+        # Record the verified hash next to the model so it can be re-checked at
+        # load time (opt-in), and drop the now-stale partial meta.
+        try:
+            hash_sidecar.write_text(actual_hash)
+        except OSError:
+            logger.warning("sha256_sidecar_write_failed model_id=%s", model_id)
+        meta_path.unlink(missing_ok=True)
         self._progress[model_id] = DownloadProgress(
             model_id=model_id,
             bytes_downloaded=downloaded,
@@ -238,6 +264,26 @@ class ModelDownloader:
 
     def get_progress(self, model_id: str) -> DownloadProgress | None:
         return self._progress.get(model_id)
+
+
+def _partial_meta_matches(meta_path: Path, url: str, expected_sha256: str) -> bool:
+    """True when the partial's recorded (url, sha256) matches this request, so it
+    is safe to resume. Missing/unreadable/mismatched meta returns False."""
+    try:
+        meta = json.loads(meta_path.read_text())
+    except (OSError, ValueError):
+        return False
+    return meta.get("url") == url and meta.get("sha256") == expected_sha256
+
+
+def _write_partial_meta(meta_path: Path, url: str, expected_sha256: str) -> None:
+    """Record what a fresh partial is being downloaded for, so a later resume can
+    confirm it still matches. Best-effort: a write failure just means the next
+    run can't resume and will start fresh."""
+    try:
+        meta_path.write_text(json.dumps({"url": url, "sha256": expected_sha256}))
+    except OSError:
+        logger.warning("partial_meta_write_failed path=%s", meta_path)
 
 
 def _sha256_file(path: Path) -> str:
