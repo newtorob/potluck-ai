@@ -6,10 +6,13 @@ swaps in here when v0.5 lands.
 """
 from __future__ import annotations
 
+import uuid
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import structlog
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +20,8 @@ from coordinator.constants import STUB_MEMBER_ID
 from coordinator.db.database import get_db
 from coordinator.middleware.auth import require_coordinator_token
 from coordinator.models.credit import CreditLedger
+from coordinator.models.job import Job
+from coordinator.models.peer import Peer
 from coordinator.schemas.credit import (
     CreditBalanceByModel,
     CreditBalanceResponse,
@@ -135,4 +140,126 @@ async def credit_history(
             )
             for row in rows
         ],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Contribution receipts — per-machine weekly "what my machines did"
+# ---------------------------------------------------------------------------
+
+
+class ContributionMachine(BaseModel):
+    """One of the member's own machines and what it did this window."""
+
+    peer_id: str
+    hostname: str | None
+    requests_served: int
+    output_tokens: int
+    credits_earned: Decimal
+
+
+class ContributionsResponse(BaseModel):
+    member_id: uuid.UUID
+    window_days: int
+    machines: list[ContributionMachine]
+    total_requests_served: int
+    total_output_tokens: int
+    total_credits_earned: Decimal
+
+
+@router.get(
+    "/me/contributions",
+    response_model=ContributionsResponse,
+    dependencies=[Depends(require_coordinator_token)],
+)
+async def my_contributions(
+    days: int = Query(default=7, ge=1, le=31),
+    db: AsyncSession = Depends(get_db),
+) -> ContributionsResponse:
+    """Per-machine contribution receipt for the calling member, over the last
+    `days`. For each machine the member OWNS: requests served (completed jobs the
+    machine ran) and credits earned (cross-member ledger; 0 for self-served /
+    household work). Only the member's own machines appear, never another
+    member's data."""
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(days=days)
+
+    # The member's own machines.
+    peers_res = await db.execute(
+        select(Peer.id, Peer.hostname).where(Peer.member_id == _STUB_MEMBER_ID)
+    )
+    peers = peers_res.all()
+    my_peer_ids = [row.id for row in peers]
+    if not my_peer_ids:
+        return ContributionsResponse(
+            member_id=_STUB_MEMBER_ID,
+            window_days=days,
+            machines=[],
+            total_requests_served=0,
+            total_output_tokens=0,
+            total_credits_earned=Decimal("0"),
+        )
+
+    # Requests served + tokens per machine (jobs the machine completed).
+    jobs_res = await db.execute(
+        select(
+            Job.peer_id,
+            func.count().label("n"),
+            func.coalesce(func.sum(Job.output_tokens), 0).label("tokens"),
+        )
+        .where(
+            Job.peer_id.in_(my_peer_ids),
+            Job.status == "completed",
+            Job.completed_at > since,
+        )
+        .group_by(Job.peer_id)
+    )
+    served: dict[uuid.UUID, tuple[int, int]] = {
+        row.peer_id: (int(row.n), int(row.tokens)) for row in jobs_res.all()
+    }
+
+    # Credits earned per machine: earned ledger rows joined to the job's peer.
+    # (The ledger has no peer column; it attributes via job_id -> jobs.peer_id,
+    # the same join release_escrow_for_peer uses.)
+    credits_res = await db.execute(
+        select(Job.peer_id, func.coalesce(func.sum(CreditLedger.credits), 0).label("c"))
+        .select_from(CreditLedger)
+        .join(Job, CreditLedger.job_id == Job.id)
+        .where(
+            CreditLedger.member_id == _STUB_MEMBER_ID,
+            CreditLedger.direction == "earned",
+            CreditLedger.created_at > since,
+            Job.peer_id.in_(my_peer_ids),
+        )
+        .group_by(Job.peer_id)
+    )
+    earned: dict[uuid.UUID, Decimal] = {
+        row.peer_id: Decimal(row.c or 0) for row in credits_res.all()
+    }
+
+    machines: list[ContributionMachine] = []
+    for row in peers:
+        n, tokens = served.get(row.id, (0, 0))
+        credits = earned.get(row.id, Decimal("0"))
+        # Keep the receipt tight: only machines that did something this window.
+        if n == 0 and credits == 0:
+            continue
+        machines.append(
+            ContributionMachine(
+                peer_id=str(row.id),
+                hostname=row.hostname,
+                requests_served=n,
+                output_tokens=tokens,
+                credits_earned=credits,
+            )
+        )
+
+    machines.sort(key=lambda m: (m.requests_served, m.output_tokens), reverse=True)
+    return ContributionsResponse(
+        member_id=_STUB_MEMBER_ID,
+        window_days=days,
+        machines=machines,
+        total_requests_served=sum(m.requests_served for m in machines),
+        total_output_tokens=sum(m.output_tokens for m in machines),
+        total_credits_earned=sum((m.credits_earned for m in machines), Decimal("0")),
     )

@@ -23,7 +23,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Globe2, Layers, Activity, Cpu, BarChart3, TrendingUp, TrendingDown, Minus, type LucideIcon } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { localApi } from '@/lib/localApi';
-import type { FleetSummary, MyJobStats, CreditBalance, CreditHistory, CreditHistoryEntry } from '@/lib/localApi';
+import type { FleetSummary, MyJobStats, CreditBalance, CreditHistory, CreditHistoryEntry, ContributionsResponse } from '@/lib/localApi';
 import { relativeTime } from '@/lib/timeFormat';
 import { formatModelName } from '@/lib/modelName';
 import { ViewHeader } from '@/components/layout/ViewHeader';
@@ -50,6 +50,7 @@ function fmtCredits(raw: string): string {
 export function NetworkView() {
   const [fleet, setFleet] = useState<FleetSummary | null>(null);
   const [myStats, setMyStats] = useState<MyJobStats | null>(null);
+  const [contributions, setContributions] = useState<ContributionsResponse | null>(null);
   const [fleetError, setFleetError] = useState<string | null>(null);
   const [isFetchingFleet, setIsFetchingFleet] = useState(true);
 
@@ -136,6 +137,30 @@ export function NetworkView() {
     };
   }, []);
 
+  // Per-machine contribution receipts (own machines only). Best-effort: a
+  // coordinator that's down just leaves the card empty.
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      localApi.network
+        .myContributions(7)
+        .then((c) => {
+          if (!cancelled) setContributions(c);
+        })
+        .catch(() => {
+          /* coordinator unreachable; card stays empty */
+        });
+    };
+    load();
+    const timer = setInterval(() => {
+      if (!document.hidden) load();
+    }, CREDIT_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
+
   const onlineNow = fleet?.peers.online_now ?? 0;
   const hasPeers = onlineNow > 0;
 
@@ -205,6 +230,12 @@ export function NetworkView() {
         <section aria-label="Your usage">
           <SectionHeader>Your usage in the last 24 hours</SectionHeader>
           <MyUsageCard stats={myStats} />
+        </section>
+
+        {/* Your contributions */}
+        <section aria-label="Your contributions">
+          <SectionHeader>What your machines served this week</SectionHeader>
+          <ContributionsCard data={contributions} />
         </section>
 
         {/* Credit balance */}
@@ -487,6 +518,70 @@ function MyUsageCard({ stats }: { stats: MyJobStats | null }) {
           />
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Contribution receipts — per-machine "what my machines served this week"
+// ---------------------------------------------------------------------------
+
+function ContributionsCard({ data }: { data: ContributionsResponse | null }) {
+  if (data === null) {
+    return (
+      <p className="text-sm text-muted-foreground/70">Loading your machines' activity...</p>
+    );
+  }
+  if (data.machines.length === 0) {
+    return (
+      <div className="rounded-xl border border-border/60 bg-card p-4 text-sm text-muted-foreground">
+        None of your machines served a request in the last {data.window_days} days.
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border/60 text-left text-[11px] uppercase tracking-hearth-label text-muted-foreground">
+            <th className="px-4 py-2 font-medium">Machine</th>
+            <th className="px-4 py-2 text-right font-medium">Requests</th>
+            <th className="px-4 py-2 text-right font-medium">Tokens</th>
+            <th className="px-4 py-2 text-right font-medium">Credits</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.machines.map((m) => (
+            <tr key={m.peer_id} className="border-b border-border/40 last:border-0">
+              <td className="px-4 py-2 text-foreground">
+                {m.hostname ?? (
+                  <span className="font-mono text-xs text-muted-foreground">{m.peer_id.slice(0, 8)}</span>
+                )}
+              </td>
+              <td className="px-4 py-2 text-right tabular-nums text-foreground">
+                {m.requests_served.toLocaleString()}
+              </td>
+              <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">
+                {m.output_tokens.toLocaleString()}
+              </td>
+              <td className="px-4 py-2 text-right tabular-nums text-sage">
+                {fmtCredits(m.credits_earned)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-t border-border/60 text-xs text-muted-foreground">
+            <td className="px-4 py-2 font-medium">Total</td>
+            <td className="px-4 py-2 text-right tabular-nums">{data.total_requests_served.toLocaleString()}</td>
+            <td className="px-4 py-2 text-right tabular-nums">{data.total_output_tokens.toLocaleString()}</td>
+            <td className="px-4 py-2 text-right tabular-nums">{fmtCredits(data.total_credits_earned)}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <p className="border-t border-border/40 px-4 py-2 text-[11px] text-muted-foreground/70">
+        Credits are earned by serving other members. Requests you run on your own machines do not earn credits.
+      </p>
     </div>
   );
 }

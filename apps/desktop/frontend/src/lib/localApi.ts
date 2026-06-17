@@ -349,6 +349,26 @@ export interface FleetSummary {
   };
 }
 
+/** One of the member's own machines in a contribution receipt. */
+export interface ContributionMachine {
+  peer_id: string;
+  hostname: string | null;
+  requests_served: number;
+  output_tokens: number;
+  /** Decimal-serialised string (e.g. "5.00"); format at the render layer. */
+  credits_earned: string;
+}
+
+/** GET /me/contributions — per-machine weekly served + earned, own machines. */
+export interface ContributionsResponse {
+  member_id: string;
+  window_days: number;
+  machines: ContributionMachine[];
+  total_requests_served: number;
+  total_output_tokens: number;
+  total_credits_earned: string;
+}
+
 export interface MyJobStats {
   jobs_24h: number;
   tokens_received_24h: number;
@@ -931,6 +951,14 @@ export const localApi = {
     myStats(): Promise<MyJobStats> {
       return timedFetch(`${coordinatorBase()}/jobs/stats`).then((r) =>
         handleResponse<MyJobStats>(r),
+      );
+    },
+
+    /** GET /me/contributions — per-machine served + earned for the member's
+     *  own machines over the last `days` (default 7). Own-machine data only. */
+    myContributions(days = 7): Promise<ContributionsResponse> {
+      return timedFetch(`${coordinatorBase()}/me/contributions?days=${days}`).then((r) =>
+        handleResponse<ContributionsResponse>(r),
       );
     },
   },
