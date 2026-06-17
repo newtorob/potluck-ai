@@ -110,11 +110,19 @@ async def pick_peer() -> PeerConnection | None:
         return next(reversed(_peers.values()))
 
 
+# A peer's reputation (0..1, neutral 0.5) hard-resets to 0.0 on a wrong-answer
+# canary (an unambiguous fabrication signal) and decays toward 0 on sustained
+# failures. Peers at this floor are excluded from serving the OPEN POOL. Never
+# applied to My Machines, where you already trust your own hardware.
+POOL_REPUTATION_FLOOR = 0.0
+
+
 async def pick_peer_for_model(
     db,  # AsyncSession; typed loosely to avoid sqlalchemy at module load
     model_slug: str,
     *,
     owner_member_id: uuid.UUID | None = None,
+    exclude_reputation_floor: bool = False,
 ) -> PeerConnection | None:
     """Pick a connected peer that advertises the requested model_slug.
 
@@ -123,7 +131,12 @@ async def pick_peer_for_model(
     at attestation time). Most-recently-connected eligible peer wins -
     same rolling-upgrade rationale as pick_peer().
 
-    Returns None if no online peer serves this model.
+    When exclude_reputation_floor is set (open-pool routing), peers whose
+    reputation has collapsed to POOL_REPUTATION_FLOOR are dropped first, so a
+    peer proven bad under its current identity cannot serve strangers. A peer
+    can still re-enter by rotating to a fresh device key; that Sybil churn is
+    bounded by require_registered_keys + the canary/escrow loop, not by this
+    gate. Returns None if no online peer serves this model.
     """
     from sqlalchemy import select
     from coordinator.models import PeerCapability
@@ -145,6 +158,24 @@ async def pick_peer_for_model(
 
     if not eligible_ids:
         return None
+
+    # Open-pool defense: drop peers whose reputation has collapsed to the floor
+    # (a wrong-answer canary hard-reset, or sustained failures) so a proven-bad
+    # peer never serves strangers. Honest-but-flaky peers (infra misses only
+    # nudge down a step) stay in; peers with no heartbeat row yet are treated as
+    # neutral and kept. Never runs for My Machines.
+    if exclude_reputation_floor:
+        from coordinator.models.peer import PeerHeartbeat
+
+        bad_rows = (await db.execute(
+            select(PeerHeartbeat.peer_id).where(
+                PeerHeartbeat.peer_id.in_(eligible_ids),
+                PeerHeartbeat.reputation <= POOL_REPUTATION_FLOOR,
+            )
+        )).all()
+        eligible_ids -= {row[0] for row in bad_rows}
+        if not eligible_ids:
+            return None
 
     # Re-acquire the lock to read the connection map (might have changed,
     # but the peer_id->PeerConnection mapping is stable for the lifetime
@@ -189,8 +220,9 @@ async def select_peer_for_request(
         return peer, "mine"
     if scope == "mine":
         return None, None
-    # Tier 3 — Open Pool.
-    peer = await pick_peer_for_model(db, model_slug)
+    # Tier 3 — Open Pool. Gate on reputation: a proven-bad peer (floor
+    # reputation) must not serve strangers.
+    peer = await pick_peer_for_model(db, model_slug, exclude_reputation_floor=True)
     if peer is not None:
         return peer, "pool"
     return None, None
