@@ -40,9 +40,11 @@ function MetaRow({ label, value }: MetaRowProps) {
 
 interface TimelineRowProps {
   call: ToolCall;
+  /** 1-based chronological position in the session (stable across filtering). */
+  step: number;
 }
 
-function TimelineRow({ call }: TimelineRowProps) {
+function TimelineRow({ call, step }: TimelineRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [previews, setPreviews] = useState<MemoryPreview[] | null>(null);
   const [previewsLoading, setPreviewsLoading] = useState(false);
@@ -103,6 +105,12 @@ function TimelineRow({ call }: TimelineRowProps) {
               )}
               aria-hidden="true"
             />
+            <span
+              className="shrink-0 tabular-nums text-[10px] text-muted-foreground/60"
+              aria-label={`Step ${step}`}
+            >
+              {step}.
+            </span>
             {call.tool_name}
           </span>
           <span className="shrink-0 text-[10px] text-muted-foreground/70">
@@ -275,6 +283,94 @@ function ExportTraceButton({ sessionId }: { sessionId: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Tool call timeline (step counter + summary + errors-only filter)
+// ---------------------------------------------------------------------------
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} s`;
+}
+
+function ToolCallTimeline({ calls }: { calls: ToolCall[] }) {
+  const [errorsOnly, setErrorsOnly] = useState(false);
+
+  // Chronological order with stable 1-based step numbers. NaN-safe sort; ties
+  // fall back to original order so numbering is deterministic.
+  const stepped = calls
+    .map((call, i) => ({ call, i }))
+    .sort((a, b) => {
+      const ta = new Date(a.call.called_at).getTime();
+      const tb = new Date(b.call.called_at).getTime();
+      const na = Number.isNaN(ta) ? 0 : ta;
+      const nb = Number.isNaN(tb) ? 0 : tb;
+      return na !== nb ? na - nb : a.i - b.i;
+    })
+    .map((x, idx) => ({ call: x.call, step: idx + 1 }));
+
+  const erroredCount = stepped.filter((s) => s.call.error !== null).length;
+  const totalMs = stepped.reduce((sum, s) => sum + (s.call.duration_ms ?? 0), 0);
+  const shown = errorsOnly ? stepped.filter((s) => s.call.error !== null) : stepped;
+
+  return (
+    <section aria-label="Tool call timeline">
+      <h3 className="mb-2 flex items-center gap-2 font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
+        Tool call timeline
+        <span className="font-sans not-italic text-muted-foreground/60">({calls.length} calls)</span>
+      </h3>
+
+      {calls.length === 0 ? (
+        <p className="text-xs text-muted-foreground/60 italic">No tool calls recorded for this session.</p>
+      ) : (
+        <>
+          {/* Summary bar */}
+          <div className="mb-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span className="tabular-nums">
+                {stepped.length} {stepped.length === 1 ? 'step' : 'steps'}
+              </span>
+              {erroredCount > 0 && (
+                <>
+                  <span className="text-muted-foreground/40">·</span>
+                  <span className="font-medium text-destructive tabular-nums">{erroredCount} errored</span>
+                </>
+              )}
+              {totalMs > 0 && (
+                <>
+                  <span className="text-muted-foreground/40">·</span>
+                  <span className="tabular-nums">{formatDuration(totalMs)} total</span>
+                </>
+              )}
+            </span>
+            {erroredCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setErrorsOnly((v) => !v)}
+                aria-pressed={errorsOnly}
+                className={cn(
+                  'shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  errorsOnly
+                    ? 'bg-destructive/10 text-destructive'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                )}
+              >
+                Errors only
+              </button>
+            )}
+          </div>
+
+          <ul className="rounded-lg border border-border bg-background/50 px-3">
+            {shown.map(({ call, step }) => (
+              <TimelineRow key={call.id} call={call} step={step} />
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // SessionDetailDrawer
 // ---------------------------------------------------------------------------
 
@@ -424,33 +520,7 @@ export function SessionDetailDrawer({ detail, onClose }: SessionDetailDrawerProp
             </section>
 
             {/* Tool call timeline */}
-            <section aria-label="Tool call timeline">
-              <h3 className="mb-2 flex items-center gap-2 font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
-                Tool call timeline
-                <span className="font-sans not-italic text-muted-foreground/60">
-                  ({detail.recent_tool_calls.length} calls)
-                </span>
-              </h3>
-
-              {detail.recent_tool_calls.length === 0 ? (
-                <p className="text-xs text-muted-foreground/60 italic">No tool calls recorded for this session.</p>
-              ) : (
-                <ul className="rounded-lg border border-border bg-background/50 px-3">
-                  {detail.recent_tool_calls
-                    .slice()
-                    .sort((a, b) => {
-                      // NaN-safe: a malformed/null called_at must not produce a
-                      // NaN comparator (unstable order). Treat invalid as epoch 0.
-                      const ta = new Date(a.called_at).getTime();
-                      const tb = new Date(b.called_at).getTime();
-                      return (Number.isNaN(ta) ? 0 : ta) - (Number.isNaN(tb) ? 0 : tb);
-                    })
-                    .map((call) => (
-                      <TimelineRow key={call.id} call={call} />
-                    ))}
-                </ul>
-              )}
-            </section>
+            <ToolCallTimeline calls={detail.recent_tool_calls} />
           </div>
         </>
       )}
