@@ -71,6 +71,16 @@ async def install_model(slug: str, background_tasks: BackgroundTasks) -> dict:
     if manifest is None:
         raise HTTPException(status_code=404, detail=f"Model '{slug}' not found in registry.")
 
+    # Integrity gate: a catalog entry must carry a sha256 so the download is
+    # verified. The downloader skips verification on an empty hash (a utility
+    # affordance for direct/test calls); refuse it here so a catalog regression
+    # can never install an unverified model.
+    if not str(manifest.get("sha256", "")).strip():
+        raise HTTPException(
+            status_code=500,
+            detail=f"Catalog entry for '{slug}' has no sha256; refusing to install unverified.",
+        )
+
     model_path = models_dir() / slug / "model.gguf"
     if model_path.exists():
         return {"status": "already_installed"}
