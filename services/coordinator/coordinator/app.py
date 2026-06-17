@@ -13,16 +13,33 @@ from coordinator.config import get_settings
 from coordinator.db.database import close_db, init_db
 from coordinator.routers import health, jobs, me, mesh, peers, transparency
 
-# Origins permitted to call the coordinator's HTTP endpoints from a
-# browser context (the Electron renderer counts). Curl + the WS handshake
-# are unaffected by CORS so this only matters for the desktop chat UI
-# hitting POST /jobs/stream from the renderer process.
-_CORS_ORIGINS: list[str] = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "app://.",
-    "file://",
-]
+# CORS controls which browser-context origins may call the coordinator's HTTP
+# endpoints (the Electron renderer hitting POST /jobs/stream). Curl + the WS
+# handshake are unaffected by CORS.
+#
+# The packaged Electron renderer loads from app://. / file:// in EVERY env, so
+# those are always allowed. The Vite dev server (localhost:5173) is a
+# development-only convenience and must not be shipped to staging/production.
+_BASE_CORS_ORIGINS: list[str] = ["app://.", "file://"]
+_DEV_CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+
+def resolve_cors_origins(settings) -> list[str]:
+    """Effective CORS allowlist for the current environment: the always-on
+    packaged-app origins, plus the Vite dev origins in development, plus any
+    operator-configured CORS_ORIGINS. Order-preserving, de-duplicated."""
+    origins = list(_BASE_CORS_ORIGINS)
+    if settings.env == "development":
+        origins += _DEV_CORS_ORIGINS
+    origins += [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+    seen: set[str] = set()
+    out: list[str] = []
+    for o in origins:
+        if o not in seen:
+            seen.add(o)
+            out.append(o)
+    return out
+
 
 logger = structlog.get_logger(__name__)
 
@@ -94,7 +111,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=_CORS_ORIGINS,
+        allow_origins=resolve_cors_origins(settings),
         allow_methods=["*"],
         allow_headers=["*"],
     )

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pytest
 
+from coordinator.app import resolve_cors_origins
 from coordinator.config import Settings
 from coordinator.services.preflight import enforce_preflight, run_preflight
 
@@ -21,8 +22,13 @@ _PROD_DB = "postgresql+asyncpg://app:s3cret@db.internal:5432/potluck"
 _STRONG_TOKEN = "coordinator-secret-0123456789"
 
 
-def _settings(env: str, *, registered_keys: bool, db_url: str) -> Settings:
-    return Settings(env=env, require_registered_keys=registered_keys, database_url=db_url)
+def _settings(env: str, *, registered_keys: bool, db_url: str, cors_origins: str = "") -> Settings:
+    return Settings(
+        env=env,
+        require_registered_keys=registered_keys,
+        database_url=db_url,
+        cors_origins=cors_origins,
+    )
 
 
 def _insecure(env: str) -> Settings:
@@ -83,11 +89,11 @@ def test_weak_token_warns_but_does_not_block(monkeypatch):
     assert tok.status == "warn"
 
 
-def test_permissive_cors_and_advisories_warn_in_prod_not_block(monkeypatch):
+def test_advisories_warn_in_prod_not_block(monkeypatch):
     monkeypatch.setenv("POTLUCK_COORDINATOR_TOKEN", _STRONG_TOKEN)
     names = _by_name(run_preflight(_remediated("production")))
-    # CORS dev origins present in the hardcoded allowlist -> warn in prod.
-    assert names["cors_dev_origins"].status == "warn"
+    # CORS is env-gated: a clean prod (no CORS_ORIGINS) carries no dev origins.
+    assert names["cors_dev_origins"].status == "ok"
     # _PROD_DB has no TLS param, _remediated has no Sentry DSN -> advisory warns.
     assert names["database_tls"].status == "warn"
     assert names["error_reporting"].status == "warn"
@@ -96,12 +102,41 @@ def test_permissive_cors_and_advisories_warn_in_prod_not_block(monkeypatch):
         assert names[n].blocking is False
 
 
+def test_cors_warns_when_localhost_configured_in_prod(monkeypatch):
+    monkeypatch.setenv("POTLUCK_COORDINATOR_TOKEN", _STRONG_TOKEN)
+    s = _settings(
+        "production", registered_keys=True, db_url=_PROD_DB,
+        cors_origins="http://localhost:9999",
+    )
+    names = _by_name(run_preflight(s))
+    assert names["cors_dev_origins"].status == "warn"
+    assert names["cors_dev_origins"].blocking is False
+
+
 def test_advisories_are_ok_in_development(monkeypatch):
     monkeypatch.delenv("POTLUCK_COORDINATOR_TOKEN", raising=False)
     names = _by_name(run_preflight(_insecure("development")))
     # Network-only advisories don't fire in development.
     for n in ("cors_dev_origins", "database_tls", "error_reporting", "verification_probe"):
         assert names[n].status == "ok"
+
+
+def test_resolve_cors_origins_env_gating():
+    base = {"app://.", "file://"}
+    vite = {"http://localhost:5173", "http://127.0.0.1:5173"}
+
+    dev = resolve_cors_origins(_settings("development", registered_keys=False, db_url=_DEFAULT_DB))
+    assert base <= set(dev) and vite <= set(dev)  # dev: base + vite
+
+    prod = resolve_cors_origins(_settings("production", registered_keys=True, db_url=_PROD_DB))
+    assert base <= set(prod) and not (vite & set(prod))  # prod: base, no vite
+
+    extra = resolve_cors_origins(
+        _settings("production", registered_keys=True, db_url=_PROD_DB,
+                  cors_origins="https://a.com, https://b.com")
+    )
+    assert {"https://a.com", "https://b.com"} <= set(extra)
+    assert len(extra) == len(set(extra))  # de-duplicated
 
 
 def test_member_auth_is_warn_not_blocking(monkeypatch):

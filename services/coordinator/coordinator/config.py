@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     port: int = 8400
     env: str = "development"
 
+    # Extra CORS origins (comma-separated) the coordinator should accept beyond
+    # the always-on packaged-app origins. The Vite dev origins are added
+    # automatically in development; set this for any production web client.
+    cors_origins: str = ""
+
     # Sentry — empty string disables SDK init
     sentry_dsn: str = ""
 

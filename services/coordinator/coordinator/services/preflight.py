@@ -151,15 +151,15 @@ def run_preflight(settings: Settings) -> list[Check]:
         )
     )
 
-    # --- CORS allowlist (advisory; needs a careful fix) ----------------------
-    # WARN, not FAIL, and not auto-fixed: the allowlist must keep app://. and
-    # file:// for the packaged Electron renderer, so this can't just be dropped
-    # in prod. Env-gating the Vite dev origins (localhost:5173) is a tracked
-    # follow-on; surface it here so it isn't forgotten.
+    # --- CORS allowlist -----------------------------------------------------
+    # The resolved allowlist drops the Vite dev origins outside development, so
+    # the clean prod posture passes. This still warns if an operator re-introduces
+    # a localhost origin via CORS_ORIGINS in a network env.
     try:
-        from coordinator.app import _CORS_ORIGINS
+        from coordinator.app import resolve_cors_origins
 
-        dev_origins = [o for o in _CORS_ORIGINS if "localhost" in o or "127.0.0.1" in o]
+        origins = resolve_cors_origins(settings)
+        dev_origins = [o for o in origins if "localhost" in o or "127.0.0.1" in o]
     except Exception:  # pragma: no cover - app import should always succeed at runtime
         dev_origins = []
     checks.append(
@@ -167,13 +167,13 @@ def run_preflight(settings: Settings) -> list[Check]:
             name="cors_dev_origins",
             status="warn" if (prod and dev_origins) else "ok",
             detail=(
-                f"CORS allowlist includes Vite dev origins {dev_origins} in a "
-                "network env."
+                f"CORS allowlist includes localhost dev origins {dev_origins} in a "
+                "network env (configured via CORS_ORIGINS)."
                 if (prod and dev_origins)
-                else "CORS allowlist carries no Vite dev origins for this env."
+                else "CORS allowlist carries no localhost dev origins for this env."
             ),
-            remedy="Env-gate _CORS_ORIGINS to drop localhost:5173 in staging/production "
-            "(keep app://. and file:// for the packaged app).",
+            remedy="Remove localhost origins from CORS_ORIGINS in staging/production "
+            "(app://. and file:// remain for the packaged app).",
             blocking=False,
         )
     )
