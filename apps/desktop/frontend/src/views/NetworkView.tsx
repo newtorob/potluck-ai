@@ -526,6 +526,14 @@ function MyUsageCard({ stats }: { stats: MyJobStats | null }) {
 // Contribution receipts — per-machine "what my machines served this week"
 // ---------------------------------------------------------------------------
 
+/** Map a machine's canary reputation to an honest standing label. */
+function standing(reputation: number | null): { label: string; cls: string } {
+  if (reputation === null) return { label: 'New', cls: 'text-muted-foreground/60' };
+  if (reputation <= 0) return { label: 'Flagged', cls: 'text-destructive' };
+  if (reputation >= 0.95) return { label: 'Trusted', cls: 'text-sage' };
+  return { label: 'Building', cls: 'text-muted-foreground' };
+}
+
 function ContributionsCard({ data }: { data: ContributionsResponse | null }) {
   if (data === null) {
     return (
@@ -545,6 +553,7 @@ function ContributionsCard({ data }: { data: ContributionsResponse | null }) {
         <thead>
           <tr className="border-b border-border/60 text-left text-[11px] uppercase tracking-hearth-label text-muted-foreground">
             <th className="px-4 py-2 font-medium">Machine</th>
+            <th className="px-4 py-2 text-left font-medium">Standing</th>
             <th className="px-4 py-2 text-right font-medium">Requests</th>
             <th className="px-4 py-2 text-right font-medium">Tokens</th>
             <th className="px-4 py-2 text-right font-medium">Credits</th>
@@ -557,6 +566,9 @@ function ContributionsCard({ data }: { data: ContributionsResponse | null }) {
                 {m.hostname ?? (
                   <span className="font-mono text-xs text-muted-foreground">{m.peer_id.slice(0, 8)}</span>
                 )}
+              </td>
+              <td className={cn('px-4 py-2 text-xs font-medium', standing(m.reputation).cls)}>
+                {standing(m.reputation).label}
               </td>
               <td className="px-4 py-2 text-right tabular-nums text-foreground">
                 {m.requests_served.toLocaleString()}
@@ -573,6 +585,7 @@ function ContributionsCard({ data }: { data: ContributionsResponse | null }) {
         <tfoot>
           <tr className="border-t border-border/60 text-xs text-muted-foreground">
             <td className="px-4 py-2 font-medium">Total</td>
+            <td className="px-4 py-2" />
             <td className="px-4 py-2 text-right tabular-nums">{data.total_requests_served.toLocaleString()}</td>
             <td className="px-4 py-2 text-right tabular-nums">{data.total_output_tokens.toLocaleString()}</td>
             <td className="px-4 py-2 text-right tabular-nums">{fmtCredits(data.total_credits_earned)}</td>

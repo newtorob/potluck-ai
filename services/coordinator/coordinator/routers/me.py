@@ -21,7 +21,7 @@ from coordinator.db.database import get_db
 from coordinator.middleware.auth import require_coordinator_token
 from coordinator.models.credit import CreditLedger
 from coordinator.models.job import Job
-from coordinator.models.peer import Peer
+from coordinator.models.peer import Peer, PeerHeartbeat
 from coordinator.schemas.credit import (
     CreditBalanceByModel,
     CreditBalanceResponse,
@@ -156,6 +156,9 @@ class ContributionMachine(BaseModel):
     requests_served: int
     output_tokens: int
     credits_earned: Decimal
+    # Canary trust score in [0,1] (neutral 0.5; 0.0 = flagged). None when the
+    # machine has no heartbeat row yet. The member's own machine only.
+    reputation: float | None
 
 
 class ContributionsResponse(BaseModel):
@@ -237,6 +240,16 @@ async def my_contributions(
         row.peer_id: Decimal(row.c or 0) for row in credits_res.all()
     }
 
+    # Trust standing per machine (canary reputation). Own peers only.
+    rep_res = await db.execute(
+        select(PeerHeartbeat.peer_id, PeerHeartbeat.reputation).where(
+            PeerHeartbeat.peer_id.in_(my_peer_ids)
+        )
+    )
+    reputations: dict[uuid.UUID, float] = {
+        row.peer_id: float(row.reputation) for row in rep_res.all()
+    }
+
     machines: list[ContributionMachine] = []
     for row in peers:
         n, tokens = served.get(row.id, (0, 0))
@@ -251,6 +264,7 @@ async def my_contributions(
                 requests_served=n,
                 output_tokens=tokens,
                 credits_earned=credits,
+                reputation=reputations.get(row.id),
             )
         )
 

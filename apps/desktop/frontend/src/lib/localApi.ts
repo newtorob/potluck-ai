@@ -357,6 +357,9 @@ export interface ContributionMachine {
   output_tokens: number;
   /** Decimal-serialised string (e.g. "5.00"); format at the render layer. */
   credits_earned: string;
+  /** Canary trust score in [0,1] (neutral 0.5; 0.0 = flagged). null when the
+   *  machine has no heartbeat yet. The member's own machine only. */
+  reputation: number | null;
 }
 
 /** GET /me/contributions — per-machine weekly served + earned, own machines. */

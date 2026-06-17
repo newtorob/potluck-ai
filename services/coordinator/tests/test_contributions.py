@@ -20,13 +20,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from coordinator.constants import STUB_MEMBER_ID
 from coordinator.models.credit import CreditLedger
 from coordinator.models.job import Job
-from coordinator.models.peer import Peer
+from coordinator.models.peer import Peer, PeerHeartbeat
 from coordinator.routers.me import my_contributions
 
 NOW = datetime.now(timezone.utc)
 
 
-async def _peer(db: AsyncSession, member_id: uuid.UUID, hostname: str) -> uuid.UUID:
+async def _peer(
+    db: AsyncSession, member_id: uuid.UUID, hostname: str, *, reputation: float | None = None
+) -> uuid.UUID:
     p = Peer(
         member_id=member_id,
         public_key=uuid.uuid4().hex,
@@ -36,6 +38,17 @@ async def _peer(db: AsyncSession, member_id: uuid.UUID, hostname: str) -> uuid.U
     )
     db.add(p)
     await db.flush()
+    if reputation is not None:
+        db.add(
+            PeerHeartbeat(
+                peer_id=p.id,
+                last_beat_at=NOW,
+                reputation=reputation,
+                binary_hash="testhash",
+                client_version="0.0.0",
+            )
+        )
+        await db.flush()
     return p.id
 
 
@@ -68,8 +81,8 @@ async def test_contributions_per_machine(db_session: AsyncSession) -> None:
     h_alpha, h_beta, h_other = f"alpha-{tag}", f"beta-{tag}", f"notmine-{tag}"
 
     other_member = uuid.uuid4()
-    alpha = await _peer(db_session, STUB_MEMBER_ID, h_alpha)
-    beta = await _peer(db_session, STUB_MEMBER_ID, h_beta)
+    alpha = await _peer(db_session, STUB_MEMBER_ID, h_alpha, reputation=0.5)
+    beta = await _peer(db_session, STUB_MEMBER_ID, h_beta)  # no heartbeat -> reputation None
     not_mine = await _peer(db_session, other_member, h_other)
 
     # alpha: 2 completed in-window (150 tokens), 1 dispatched (excluded),
@@ -113,6 +126,10 @@ async def test_contributions_per_machine(db_session: AsyncSession) -> None:
     assert by_host[h_beta].requests_served == 1
     assert by_host[h_beta].output_tokens == 200
     assert by_host[h_beta].credits_earned == Decimal("0")
+
+    # Trust standing: alpha has a heartbeat (0.5); beta has none (None).
+    assert by_host[h_alpha].reputation == 0.5
+    assert by_host[h_beta].reputation is None
 
     # Another member's machine is never in my receipt.
     assert h_other not in by_host
