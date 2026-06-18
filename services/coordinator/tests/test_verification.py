@@ -49,14 +49,17 @@ from coordinator.services.verification import (
 
 class _Rng:
     """Deterministic stand-in for random.Random in floor-reprobe tests: random()
-    returns a fixed value. _Rng(1.0) suppresses all floor probes; _Rng(0.0)
-    fires every one."""
+    returns a fixed value (_Rng(1.0) suppresses all floor probes, _Rng(0.0) fires
+    every one); sample() deterministically takes the first k."""
 
     def __init__(self, value: float) -> None:
         self._v = value
 
     def random(self) -> float:
         return self._v
+
+    def sample(self, population: list, k: int) -> list:
+        return list(population)[:k]
 
 _MODEL = "qwen2.5:3b-instruct-q4_K_M"
 
@@ -142,11 +145,13 @@ def test_reprobe_probability() -> None:
     assert _reprobe_probability(0.6) > _reprobe_probability(0.9)
 
 
-def test_select_reprobe_picks_suspect_first_and_respects_rng() -> None:
+def test_select_reprobe_draws_and_caps() -> None:
     ids = [uuid.uuid4() for _ in range(5)]
-    cands = [(ids[i], 0.5 + i * 0.1) for i in range(5)]  # reputations 0.5..0.9
-    # Always-fire rng: all are drawn; the lowest-reputation ones win the slots.
-    assert _select_reprobe(cands, 2, _Rng(0.0)) == [ids[0], ids[1]]
+    cands = [(ids[i], 0.9 - i * 0.1) for i in range(5)]  # reputations 0.9..0.5
+    # Always-fire rng: all 5 draw; capped to `slots` via a RANDOM subset (the
+    # stub's sample takes the first k). High-rep peers are NOT deprioritized.
+    picked = _select_reprobe(cands, 2, _Rng(0.0))
+    assert len(picked) == 2 and set(picked) <= set(ids)
     # Never-fire rng: none drawn.
     assert _select_reprobe(cands, 2, _Rng(1.0)) == []
     # No slots -> nothing.

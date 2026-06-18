@@ -391,17 +391,23 @@ def _select_reprobe(
     rng: random.Random,
 ) -> list[uuid.UUID]:
     """From online peers not otherwise due, pick which to floor-re-probe this
-    cycle: each is drawn independently with _reprobe_probability(rep); if more are
-    drawn than `slots`, the lowest-reputation (most-suspect) ones win."""
+    cycle: each is drawn independently with _reprobe_probability(rep). If more
+    draw than `slots`, pick a RANDOM subset.
+
+    Deliberately NOT lowest-reputation-first: the draw probability already weights
+    suspicion (lower rep draws more), and a low-rep bias here would let a flood of
+    cheap neutral decoys crowd out re-probing of the HIGH-reputation peers that
+    floor-reprobe exists to recheck (a trusted-then-bad peer sits at high rep
+    until it is caught). Random truncation keeps a high-rep peer's slot odds fair
+    instead of always last."""
     if slots <= 0:
         return []
     drawn = [
-        (pid, NEUTRAL_REPUTATION if rep is None else rep)
-        for pid, rep in candidates
-        if rng.random() < _reprobe_probability(rep)
+        pid for pid, rep in candidates if rng.random() < _reprobe_probability(rep)
     ]
-    drawn.sort(key=lambda t: t[1])  # lowest reputation (most suspect) first
-    return [pid for pid, _ in drawn[:slots]]
+    if len(drawn) <= slots:
+        return drawn
+    return rng.sample(drawn, slots)
 
 
 async def probe_due_peers(
