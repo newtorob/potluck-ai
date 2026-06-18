@@ -27,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import re
 import uuid
 from dataclasses import dataclass
 
@@ -45,9 +46,24 @@ from coordinator.services.credit_ledger import (
 
 # Seconds to wait for a canary response before failing the probe.
 CANARY_TIMEOUT_S = 30.0
-# Pinned seed + tiny token budget — probes should be cheap and deterministic.
-CANARY_SEED = 7
-CANARY_MAX_TOKENS = 16
+# Probe sampling is randomized per call (see _probe_sampling) so a peer cannot
+# fingerprint a canary by a constant seed / token budget and then answer probes
+# honestly while junking real jobs. temp stays 0 so grading is deterministic
+# (which also makes the seed cosmetic to the output, so randomizing it is free).
+# The token budget jitters within a range whose floor leaves headroom for the
+# answer PLUS a short preamble a chatty small model adds ("Sure, the code is
+# ABCDEF"): too tight and an honest peer's correct answer is truncated and graded
+# WRONG, which hard-resets its reputation.
+# Remaining tells -- chiefly temp 0 (real jobs default to a higher temperature),
+# plus the probe-shaped PROMPT a peer could still classify -- need canaries drawn
+# from a realistic prompt corpus, a deeper follow-up. temp 0 is the strongest
+# residual tell; randomizing the seed/budget does not touch it.
+CANARY_MIN_TOKENS = 32  # truncation-safe floor (answer + a short preamble)
+# Keep the ceiling modest: evaluate_canary matches the answer ANYWHERE in the
+# output, so a wide budget gives a rambling/junk peer more room to incidentally
+# emit a short numeric answer and false-PASS. 48 leaves preamble headroom while
+# staying tight (nonce answers are immune; arithmetic answers are the exposed case).
+CANARY_MAX_TOKENS = 48
 
 # Canary outcome grades. Reputation treats these very differently (see
 # credit_ledger.nudge_reputation): only a clean wrong answer is an unambiguous
@@ -62,33 +78,96 @@ CANARY_INFRA = "infra"
 @dataclass(frozen=True)
 class Canary:
     prompt: str
-    # Lowercased substring the correct answer must contain.
+    # The exact answer string the peer's output must contain (matched
+    # case-insensitively on a token boundary; see evaluate_canary).
     expected: str
-
-
-# Model-agnostic canaries: instructions / facts any competent model answers
-# identically at temp 0. Short by design. Per-model-class canaries that catch
-# model-spoofing specifically are a follow-up.
-CANARIES: tuple[Canary, ...] = (
-    Canary("What is 7 plus 5? Reply with only the number.", "12"),
-    Canary("Reply with exactly this word and nothing else: POTLUCK", "potluck"),
-    Canary("What is the capital of France? Reply with only the city name.", "paris"),
-    Canary("Complete with one word: the opposite of 'hot' is", "cold"),
-)
 
 
 def evaluate_canary(output: str, canary: Canary) -> bool:
     """True if the peer's output contains the canary's expected answer.
 
-    Case-insensitive substring match on stripped output — small models often
-    wrap a correct answer in punctuation/whitespace, and the expected tokens are
-    distinctive enough that a junk-returner won't hit them by chance.
+    Case-insensitive, but the expected answer must appear on a TOKEN BOUNDARY
+    (no [0-9a-z] immediately adjacent), not merely as a substring. That keeps the
+    tolerance for an answer wrapped in punctuation/whitespace ("the answer is
+    85.") while rejecting a wrong answer that happens to embed the expected one
+    (a peer replying "185" must not satisfy an expected "85"). A junk-returner
+    won't hit a distinctive token by chance.
     """
-    return canary.expected.lower() in output.strip().lower()
+    expected = canary.expected.strip().lower()
+    if not expected:
+        return False
+    haystack = output.strip().lower()
+    return re.search(rf"(?<![0-9a-z]){re.escape(expected)}(?![0-9a-z])", haystack) is not None
 
 
-def _pick_canary() -> Canary:
-    return random.choice(CANARIES)
+# Canaries are GENERATED, not drawn from a fixed list: a small fixed set can be
+# memorized (a fabricator learns the handful of answers, then passes every probe
+# while junking real work). Every variant below has an exact, computed answer
+# that any competent instruct model returns at temp 0 (no model-class-specific
+# difficulty), so honest peers -- including the small models Potluck runs -- never
+# false-fail, while a dead/junk peer fails.
+_NONCE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"  # uppercase, omit I/O for legibility
+_NONCE_LEN = 6  # 24**6 ~= 191M distinct codes -> nothing to memorize
+
+
+def _nonce_canary(rng: random.Random) -> Canary:
+    """Instruction-following probe: echo a random code. Unmemorizable, model-
+    agnostic, deterministic at temp 0."""
+    nonce = "".join(rng.choice(_NONCE_ALPHABET) for _ in range(_NONCE_LEN))
+    return Canary(f"Reply with exactly this code and nothing else: {nonce}", nonce)
+
+
+def _add_canary(a: int, b: int) -> Canary:
+    return Canary(f"What is {a} plus {b}? Reply with only the number.", str(a + b))
+
+
+def _sub_canary(a: int, b: int) -> Canary:
+    return Canary(f"What is {a} minus {b}? Reply with only the number.", str(a - b))
+
+
+def _mul_canary(a: int, b: int) -> Canary:
+    return Canary(f"What is {a} times {b}? Reply with only the number.", str(a * b))
+
+
+def generate_canary(rng: random.Random | None = None) -> Canary:
+    """Produce a fresh canary from a large generated space (no fixed set to
+    memorize). `rng` is injectable for deterministic tests; a fresh entropy-
+    seeded Random is used otherwise.
+
+    Scope: these catch a dead / junk / garbage-returning peer and cannot be
+    memorized (an unbounded generated space, vs the old fixed four). What they do
+    NOT catch -- same as the old fixed set -- is a peer that answers with a cheap
+    script instead of the advertised model (a calculator + echo passes both), or
+    one serving a smaller model than advertised. That is the per-model-class /
+    downgrade-spoofing follow-up, which needs per-model calibration to avoid
+    false-failing honest small-model peers, so the canaries here stay
+    deliberately model-agnostic."""
+    r = rng if rng is not None else random.Random()
+    # Keep every arithmetic result < 1000: evaluate_canary boundary-matches the
+    # bare digits, so a 4-digit answer a model formats with a thousands separator
+    # ("1,085") would false-fail. Current maxima: add 198, sub 88, mul 144.
+    # Weight nonce echoes higher: a 24**6 random code can't be matched
+    # incidentally in a peer's output, whereas a short arithmetic answer can, so
+    # nonce probes give the most reliable WRONG grade (match-anywhere evaluation).
+    kind = r.choice(("nonce", "nonce", "nonce", "add", "sub", "mul"))
+    if kind == "nonce":
+        return _nonce_canary(r)
+    if kind == "add":
+        return _add_canary(r.randint(11, 99), r.randint(11, 99))
+    if kind == "sub":
+        return _sub_canary(r.randint(50, 99), r.randint(11, 49))  # a > b -> positive
+    return _mul_canary(r.randint(3, 12), r.randint(3, 12))
+
+
+def _probe_sampling(rng: random.Random) -> SamplingParams:
+    """Randomized per-probe sampling so a peer can't fingerprint a canary by a
+    constant seed / token budget. temp stays 0 (deterministic grading); only the
+    seed and the token budget vary, the latter within a truncation-safe range."""
+    return SamplingParams(
+        temperature=0.0,
+        max_tokens=rng.randint(CANARY_MIN_TOKENS, CANARY_MAX_TOKENS),
+        seed=rng.randint(0, 2**31 - 1),
+    )
 
 
 async def _peer_model_slug(db: AsyncSession, peer_id: uuid.UUID) -> str | None:
@@ -148,16 +227,15 @@ async def run_canary_probe(db: AsyncSession, peer_id: uuid.UUID) -> bool | None:
     if model_slug is None:
         return None
 
-    canary = _pick_canary()
+    rng = random.Random()
+    canary = generate_canary(rng)
     job_id = uuid.uuid4()
     buf = await register_job(job_id)
     assigned = JobAssignedMessage(
         job_id=job_id,
         model_slug=model_slug,
         prompt=canary.prompt,
-        sampling=SamplingParams(
-            temperature=0.0, max_tokens=CANARY_MAX_TOKENS, seed=CANARY_SEED
-        ),
+        sampling=_probe_sampling(rng),
     )
 
     try:

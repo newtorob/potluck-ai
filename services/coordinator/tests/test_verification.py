@@ -6,6 +6,8 @@ up after themselves.
 """
 from __future__ import annotations
 
+import random
+import re
 import uuid
 from datetime import datetime, timezone
 
@@ -23,12 +25,18 @@ from coordinator.services.credit_ledger import (
     release_escrow_for_peer,
 )
 from coordinator.services.verification import (
-    CANARIES,
     CANARY_INFRA,
+    CANARY_MAX_TOKENS,
+    CANARY_MIN_TOKENS,
     CANARY_PASS,
     CANARY_WRONG,
     Canary,
+    _add_canary,
+    _mul_canary,
+    _probe_sampling,
+    _sub_canary,
     evaluate_canary,
+    generate_canary,
     probe_due_peers,
     record_canary_result,
     run_canary_probe,
@@ -55,6 +63,54 @@ def test_evaluate_canary_rejects_garbage() -> None:
     assert evaluate_canary("the the the the", c) is False
     assert evaluate_canary("", c) is False
     assert evaluate_canary("seven", c) is False
+
+
+def test_evaluate_canary_boundary_rejects_embedded_answer() -> None:
+    # The expected answer must land on a token boundary, so a wrong answer that
+    # merely embeds the expected one does NOT pass.
+    c = Canary("What is 40 plus 45? Reply with only the number.", "85")
+    assert evaluate_canary("85", c) is True
+    assert evaluate_canary("The answer is 85.", c) is True  # wrapped still passes
+    assert evaluate_canary("185", c) is False, "85 embedded in 185 must not pass"
+    assert evaluate_canary("850", c) is False
+    # Nonce / word answers match case-insensitively on a boundary too.
+    n = Canary("Reply with exactly this code and nothing else: ZXQKMR", "ZXQKMR")
+    assert evaluate_canary("zxqkmr", n) is True
+    assert evaluate_canary("AZXQKMR", n) is False  # embedded -> reject
+
+
+def test_generate_canary_is_varied_and_self_consistent() -> None:
+    rng = random.Random(12345)
+    canaries = [generate_canary(rng) for _ in range(200)]
+    # No tiny fixed set to memorize: many distinct prompts.
+    assert len({c.prompt for c in canaries}) > 100
+    # Each canary's own expected answer satisfies it, and an honest solver
+    # reproduces that answer from the prompt alone.
+    for c in canaries:
+        assert evaluate_canary(c.expected, c) is True
+        assert _solve_canary_prompt(c.prompt) == c.expected
+
+
+def test_generate_canary_arithmetic_is_correct() -> None:
+    assert _add_canary(47, 38).expected == "85"
+    assert _sub_canary(90, 33).expected == "57"
+    assert _mul_canary(7, 8).expected == "56"
+    # Subtraction operands are always a > b in generate_canary -> never negative.
+    rng = random.Random(99)
+    for _ in range(100):
+        c = generate_canary(rng)
+        assert not c.expected.startswith("-"), "no negative-answer canaries"
+
+
+def test_probe_sampling_randomized_and_truncation_safe() -> None:
+    # A peer must not be able to fingerprint a probe by a constant seed / budget.
+    samples = [_probe_sampling(random.Random(s)) for s in range(50)]
+    assert len({s.seed for s in samples}) > 1, "seed must vary across probes"
+    assert len({s.max_tokens for s in samples}) > 1, "token budget must vary"
+    for s in samples:
+        assert s.temperature == 0.0, "temp 0 keeps grading deterministic"
+        assert CANARY_MIN_TOKENS <= s.max_tokens <= CANARY_MAX_TOKENS
+        assert s.seed is not None and 0 <= s.seed <= 2**31 - 1
 
 
 def test_select_due_peers_policy() -> None:
@@ -220,18 +276,28 @@ async def test_canary_infra_soft_penalty_wrong_hard_resets(
 # --------------------------------------------------------------------------- #
 
 
+def _solve_canary_prompt(prompt: str) -> str:
+    """Compute the correct answer to a generated canary prompt (the honest-peer
+    side of a probe). Mirrors generate_canary's templates."""
+    p = prompt.strip()
+    if p.startswith("Reply with exactly this code"):
+        return p.rsplit(":", 1)[1].strip()
+    m = re.search(r"What is (\d+) (plus|minus|times) (\d+)", p)
+    assert m is not None, f"unrecognized canary prompt: {prompt!r}"
+    a, op, b = int(m.group(1)), m.group(2), int(m.group(3))
+    return str(a + b if op == "plus" else a - b if op == "minus" else a * b)
+
+
 class _HonestPeerWS:
-    """Fake peer WS that answers whatever canary it's sent, correctly."""
+    """Fake peer WS that solves whatever canary it's sent, correctly."""
 
     async def send_json(self, payload: dict) -> None:
         from coordinator.services.peer_registry import complete_job, get_job
 
         job_id = uuid.UUID(payload["job_id"])
-        prompt = payload["prompt"]
-        expected = next((c.expected for c in CANARIES if c.prompt == prompt), "")
         buf = await get_job(job_id)
         if buf is not None:
-            buf.tokens.append(expected)
+            buf.tokens.append(_solve_canary_prompt(payload["prompt"]))
             buf.error_category = None
             await complete_job(job_id)  # sets buf.done
 
