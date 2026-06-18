@@ -143,20 +143,22 @@ def generate_canary(rng: random.Random | None = None) -> Canary:
     false-failing honest small-model peers, so the canaries here stay
     deliberately model-agnostic."""
     r = rng if rng is not None else random.Random()
-    # Keep every arithmetic result < 1000: evaluate_canary boundary-matches the
-    # bare digits, so a 4-digit answer a model formats with a thousands separator
-    # ("1,085") would false-fail. Current maxima: add 198, sub 88, mul 144.
-    # Weight nonce echoes higher: a 24**6 random code can't be matched
-    # incidentally in a peer's output, whereas a short arithmetic answer can, so
-    # nonce probes give the most reliable WRONG grade (match-anywhere evaluation).
+    # Two bounds on arithmetic answers, both because evaluate_canary boundary-
+    # matches the bare digits ANYWHERE in the output:
+    #   - keep results < 1000, else a thousands separator ("1,085") false-fails;
+    #   - keep results >= 2 digits, else a single digit ("9") is easily emitted
+    #     incidentally by a rambling junk peer and would false-PASS.
+    # The operand ranges below satisfy both: add 22..198, sub 10..88, mul 16..144.
+    # Nonce echoes are weighted higher still: a 24**6 random code can't be matched
+    # incidentally at all, so nonce probes give the most reliable WRONG grade.
     kind = r.choice(("nonce", "nonce", "nonce", "add", "sub", "mul"))
     if kind == "nonce":
         return _nonce_canary(r)
     if kind == "add":
-        return _add_canary(r.randint(11, 99), r.randint(11, 99))
+        return _add_canary(r.randint(11, 99), r.randint(11, 99))  # 22..198
     if kind == "sub":
-        return _sub_canary(r.randint(50, 99), r.randint(11, 49))  # a > b -> positive
-    return _mul_canary(r.randint(3, 12), r.randint(3, 12))
+        return _sub_canary(r.randint(50, 99), r.randint(11, 40))  # 10..88, a > b
+    return _mul_canary(r.randint(4, 12), r.randint(4, 12))  # 16..144
 
 
 def _probe_sampling(rng: random.Random) -> SamplingParams:

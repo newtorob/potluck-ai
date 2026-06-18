@@ -95,11 +95,15 @@ def test_generate_canary_arithmetic_is_correct() -> None:
     assert _add_canary(47, 38).expected == "85"
     assert _sub_canary(90, 33).expected == "57"
     assert _mul_canary(7, 8).expected == "56"
-    # Subtraction operands are always a > b in generate_canary -> never negative.
+    # generate_canary keeps arithmetic answers positive AND >= 2 digits: a
+    # single-digit answer is too easily emitted incidentally by a rambling junk
+    # peer under match-anywhere grading (false-PASS).
     rng = random.Random(99)
-    for _ in range(100):
+    for _ in range(300):
         c = generate_canary(rng)
         assert not c.expected.startswith("-"), "no negative-answer canaries"
+        if c.expected.isdigit():
+            assert int(c.expected) >= 10, "arithmetic answers stay >= 2 digits"
 
 
 def test_probe_sampling_randomized_and_truncation_safe() -> None:
