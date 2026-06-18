@@ -32,6 +32,7 @@ from coordinator.services.verification import (
     probe_due_peers,
     record_canary_result,
     run_canary_probe,
+    select_due_peers,
 )
 
 _MODEL = "qwen2.5:3b-instruct-q4_K_M"
@@ -54,6 +55,33 @@ def test_evaluate_canary_rejects_garbage() -> None:
     assert evaluate_canary("the the the the", c) is False
     assert evaluate_canary("", c) is False
     assert evaluate_canary("seven", c) is False
+
+
+def test_select_due_peers_policy() -> None:
+    ids = [uuid.uuid4() for _ in range(20)]
+    esc = ids[:12]   # 12 escrowed peers
+    rec = ids[12:18]  # 6 recovering peers
+
+    # Escrow priority, but a large escrowed cohort cannot starve recovery: with
+    # batch 8, recovery is guaranteed batch//4 = 2 slots, escrow takes the rest.
+    due = select_due_peers(esc, rec, batch=8)
+    assert len(due) == 8
+    assert due[:6] == esc[:6], "escrowed peers fill priority slots"
+    assert set(due[6:]) == set(rec[:2]), "recovery keeps its reserved 2 slots"
+
+    # No recovering peers -> escrow takes the whole batch.
+    assert select_due_peers(esc, [], batch=8) == esc[:8]
+
+    # No escrowed peers -> recovery takes the whole batch.
+    assert select_due_peers([], rec, batch=8) == rec[:6]
+
+    # A peer in BOTH sets is probed once (via its escrowed slot), not twice.
+    dual = ids[0]
+    due2 = select_due_peers([dual], [dual], batch=8)
+    assert due2 == [dual]
+
+    # Tiny batch (<4): no reserve, escrow keeps strict priority.
+    assert select_due_peers(esc, rec, batch=1) == esc[:1]
 
 
 # --------------------------------------------------------------------------- #
@@ -319,3 +347,26 @@ async def test_probe_due_peers_targets_escrowed_and_releases(
     finally:
         await unregister_peer(peer_escrow.id)
         await unregister_peer(peer_clean.id)
+
+
+@pytest.mark.asyncio
+async def test_probe_due_peers_rehabilitates_sub_neutral_peer(
+    db_session: AsyncSession,
+) -> None:
+    # A peer quarantined below NEUTRAL (e.g. after a fabrication reset) that holds
+    # NO escrowed credits must still be probed, so it has a path back into the
+    # pool. Without _peers_below_reentry it would never be probed and could never
+    # recover.
+    from coordinator.services.peer_registry import unregister_peer
+
+    fallen = await _online_honest_peer(db_session)
+    hb = await db_session.get(PeerHeartbeat, fallen.id)
+    hb.reputation = 0.2  # below NEUTRAL (0.5), no escrowed credits
+    await db_session.flush()
+    try:
+        probed = await probe_due_peers(db_session, [fallen.id])
+        assert probed == 1, "a sub-neutral peer must be probed even with no escrow"
+        await db_session.refresh(hb)
+        assert hb.reputation == pytest.approx(0.3), "a clean rehab probe climbs +STEP"
+    finally:
+        await unregister_peer(fallen.id)

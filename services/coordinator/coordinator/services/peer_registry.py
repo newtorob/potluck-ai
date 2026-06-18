@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from fastapi import WebSocket
 
 from coordinator.schemas.peer import MAX_OUTPUT_TOKENS
+from coordinator.services.credit_ledger import NEUTRAL_REPUTATION
 
 
 @dataclass
@@ -112,9 +113,14 @@ async def pick_peer() -> PeerConnection | None:
 
 # A peer's reputation (0..1, neutral 0.5) hard-resets to 0.0 on a wrong-answer
 # canary (an unambiguous fabrication signal) and decays toward 0 on sustained
-# failures. Peers at this floor are excluded from serving the OPEN POOL. Never
-# applied to My Machines, where you already trust your own hardware.
-POOL_REPUTATION_FLOOR = 0.0
+# failures. Open-pool serving uses HYSTERESIS: a peer is dropped from the pool
+# once it falls below NEUTRAL, and must climb all the way back to NEUTRAL before
+# it can serve strangers again, not merely clear the 0.0 floor with one clean
+# canary. The span from the fabrication floor (0.0) up to the re-entry bar
+# (NEUTRAL 0.5) is the quarantine band: about five clean canaries to earn back.
+# Never applied to My Machines, where you already trust your own hardware.
+POOL_REPUTATION_FLOOR = 0.0  # where a confirmed fabrication lands
+POOL_REENTRY_THRESHOLD = NEUTRAL_REPUTATION  # bar to (re)enter the open pool
 
 
 async def pick_peer_for_model(
@@ -122,7 +128,7 @@ async def pick_peer_for_model(
     model_slug: str,
     *,
     owner_member_id: uuid.UUID | None = None,
-    exclude_reputation_floor: bool = False,
+    enforce_pool_trust: bool = False,
 ) -> PeerConnection | None:
     """Pick a connected peer that advertises the requested model_slug.
 
@@ -131,10 +137,12 @@ async def pick_peer_for_model(
     at attestation time). Most-recently-connected eligible peer wins -
     same rolling-upgrade rationale as pick_peer().
 
-    When exclude_reputation_floor is set (open-pool routing), peers whose
-    reputation has collapsed to POOL_REPUTATION_FLOOR are dropped first, so a
-    peer proven bad under its current identity cannot serve strangers. A peer
-    can still re-enter by rotating to a fresh device key; that Sybil churn is
+    When enforce_pool_trust is set (open-pool routing), peers whose reputation
+    sits below POOL_REENTRY_THRESHOLD are dropped, so a peer that fell below
+    neutral (a fabrication hard-reset, or sustained failures) cannot serve
+    strangers until it has earned its way back to neutral via clean canaries
+    (hysteresis: one clean pass off the 0.0 floor is not enough). A peer can
+    still re-enter by rotating to a fresh device key; that Sybil churn is
     bounded by require_registered_keys + the canary/escrow loop, not by this
     gate. Returns None if no online peer serves this model.
     """
@@ -159,18 +167,21 @@ async def pick_peer_for_model(
     if not eligible_ids:
         return None
 
-    # Open-pool defense: drop peers whose reputation has collapsed to the floor
-    # (a wrong-answer canary hard-reset, or sustained failures) so a proven-bad
-    # peer never serves strangers. Honest-but-flaky peers (infra misses only
-    # nudge down a step) stay in; peers with no heartbeat row yet are treated as
-    # neutral and kept. Never runs for My Machines.
-    if exclude_reputation_floor:
+    # Open-pool defense (hysteresis): drop peers whose reputation sits below the
+    # re-entry bar (NEUTRAL). A wrong-answer canary hard-resets to 0.0, and the
+    # peer stays out of the pool through the whole 0.0 -> NEUTRAL band until clean
+    # canaries earn it back, so a single pass off the floor cannot put a proven
+    # fabricator back in front of strangers. Honest-but-flaky peers (infra misses
+    # nudge down a step) recover with one clean pass back to neutral; peers with
+    # no heartbeat row yet are treated as neutral and kept. Never runs for My
+    # Machines.
+    if enforce_pool_trust:
         from coordinator.models.peer import PeerHeartbeat
 
         bad_rows = (await db.execute(
             select(PeerHeartbeat.peer_id).where(
                 PeerHeartbeat.peer_id.in_(eligible_ids),
-                PeerHeartbeat.reputation <= POOL_REPUTATION_FLOOR,
+                PeerHeartbeat.reputation < POOL_REENTRY_THRESHOLD,
             )
         )).all()
         eligible_ids -= {row[0] for row in bad_rows}
@@ -220,9 +231,10 @@ async def select_peer_for_request(
         return peer, "mine"
     if scope == "mine":
         return None, None
-    # Tier 3 — Open Pool. Gate on reputation: a proven-bad peer (floor
-    # reputation) must not serve strangers.
-    peer = await pick_peer_for_model(db, model_slug, exclude_reputation_floor=True)
+    # Tier 3 — Open Pool. Gate on reputation: a peer that fell below neutral
+    # (fabrication, or sustained failures) must earn its way back before it can
+    # serve strangers again.
+    peer = await pick_peer_for_model(db, model_slug, enforce_pool_trust=True)
     if peer is not None:
         return peer, "pool"
     return None, None

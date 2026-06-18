@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 from coordinator.schemas.peer import JobAssignedMessage, SamplingParams
 from coordinator.services.credit_ledger import (
+    NEUTRAL_REPUTATION,
     RELEASE_REPUTATION_THRESHOLD,
     nudge_reputation,
     release_escrow_for_peer,
@@ -218,15 +219,74 @@ async def _peers_with_escrowed_credits(
     return [r[0] for r in rows.all() if r[0] is not None]
 
 
+async def _peers_below_reentry(
+    db: AsyncSession, online_ids: list[uuid.UUID]
+) -> list[uuid.UUID]:
+    """Online peers whose reputation has fallen below NEUTRAL — quarantined out
+    of the open pool by the routing hysteresis (peer_registry). Probing them is
+    the rehabilitation path: clean canaries climb a fallen peer back to neutral
+    and out of quarantine. Without this a sub-neutral peer that holds no escrowed
+    credits would never be probed (the escrowed set wouldn't include it) and
+    could never earn its way back."""
+    if not online_ids:
+        return []
+    from coordinator.models.peer import PeerHeartbeat
+
+    rows = await db.execute(
+        select(PeerHeartbeat.peer_id).where(
+            PeerHeartbeat.peer_id.in_(online_ids),
+            PeerHeartbeat.reputation < NEUTRAL_REPUTATION,
+        )
+    )
+    return [r[0] for r in rows.all() if r[0] is not None]
+
+
+def _dedup(ids: list[uuid.UUID]) -> list[uuid.UUID]:
+    seen: set[uuid.UUID] = set()
+    out: list[uuid.UUID] = []
+    for i in ids:
+        if i not in seen:
+            seen.add(i)
+            out.append(i)
+    return out
+
+
+def select_due_peers(
+    escrowed: list[uuid.UUID], recovering: list[uuid.UUID], batch: int
+) -> list[uuid.UUID]:
+    """Choose which peers to probe this cycle from the two due sets, capped at
+    `batch`.
+
+    Escrowed peers (credits waiting on a release) take priority, BUT we reserve up
+    to batch//4 slots for recovering (sub-neutral) peers so a large escrowed
+    cohort can't permanently starve rehabilitation — a starved quarantined peer
+    could never earn its way back into the pool. A peer in both sets is probed
+    once, via its escrowed slot (the recovering list is filtered against it)."""
+    escrowed = _dedup(escrowed)
+    esc_set = set(escrowed)
+    recovering = [p for p in _dedup(recovering) if p not in esc_set]
+
+    recover_quota = min(len(recovering), batch // 4)  # 0 when batch < 4
+    escrow_take = escrowed[: batch - recover_quota]
+    recover_take = recovering[: batch - len(escrow_take)]
+    return escrow_take + recover_take
+
+
 async def probe_due_peers(
     db: AsyncSession, online_ids: list[uuid.UUID], batch: int = PROBE_BATCH
 ) -> int:
-    """One verification cycle: probe up to `batch` online peers that hold
-    escrowed credits. Returns the number probed. A single probe failure is
-    logged and does not abort the cycle."""
-    due = await _peers_with_escrowed_credits(db, online_ids)
+    """One verification cycle: probe up to `batch` online peers that are DUE —
+    peers holding escrowed credits (a clean canary moves them toward release) and
+    peers quarantined below neutral (a clean canary moves them toward pool
+    re-entry). See select_due_peers for the escrow-priority-with-rehab-reserve
+    policy. Returns the number probed. A single probe failure is logged and does
+    not abort the cycle."""
+    escrowed = await _peers_with_escrowed_credits(db, online_ids)
+    recovering = await _peers_below_reentry(db, online_ids)
+    due = select_due_peers(escrowed, recovering, batch)
+
     probed = 0
-    for peer_id in due[:batch]:
+    for peer_id in due:
         try:
             await run_canary_probe(db, peer_id)
             probed += 1
