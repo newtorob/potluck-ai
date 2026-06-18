@@ -273,6 +273,13 @@ async def run_canary_probe(db: AsyncSession, peer_id: uuid.UUID) -> bool | None:
 # burst of escrowed peers can't hammer the fleet in one tick).
 PROBE_INTERVAL_S = 120.0
 PROBE_BATCH = 8
+# Floor re-probe: every online peer is probed with at least this probability per
+# cycle, forever -- trust is never permanent, so a peer that earns trust then
+# starts fabricating is still caught (without it, a peer past the release
+# threshold with no escrow is never probed again). Lower-reputation peers are
+# probed more (see _reprobe_probability); this only spends batch capacity left
+# over after escrowed + recovering peers are served.
+PROBE_FLOOR = 0.1
 
 
 async def _peers_with_escrowed_credits(
@@ -321,6 +328,23 @@ async def _peers_below_reentry(
     return [r[0] for r in rows.all() if r[0] is not None]
 
 
+async def _reputations(
+    db: AsyncSession, peer_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, float]:
+    """Current reputation for each peer that has a heartbeat row. Peers absent
+    from the result have no heartbeat yet (callers treat that as neutral)."""
+    if not peer_ids:
+        return {}
+    from coordinator.models.peer import PeerHeartbeat
+
+    rows = await db.execute(
+        select(PeerHeartbeat.peer_id, PeerHeartbeat.reputation).where(
+            PeerHeartbeat.peer_id.in_(peer_ids)
+        )
+    )
+    return {pid: float(rep) for pid, rep in rows.all()}
+
+
 def _dedup(ids: list[uuid.UUID]) -> list[uuid.UUID]:
     seen: set[uuid.UUID] = set()
     out: list[uuid.UUID] = []
@@ -352,18 +376,70 @@ def select_due_peers(
     return escrow_take + recover_take
 
 
+def _reprobe_probability(reputation: float | None) -> float:
+    """Per-cycle probe probability for an online peer that is NOT otherwise due
+    (no escrow, at or above neutral). Lower reputation -> probed more often;
+    every peer floors at PROBE_FLOOR so trust is never permanent. A peer with no
+    heartbeat row yet is treated as neutral."""
+    rep = NEUTRAL_REPUTATION if reputation is None else reputation
+    return max(PROBE_FLOOR, 1.0 - rep)
+
+
+def _select_reprobe(
+    candidates: list[tuple[uuid.UUID, float | None]],
+    slots: int,
+    rng: random.Random,
+) -> list[uuid.UUID]:
+    """From online peers not otherwise due, pick which to floor-re-probe this
+    cycle: each is drawn independently with _reprobe_probability(rep); if more are
+    drawn than `slots`, the lowest-reputation (most-suspect) ones win."""
+    if slots <= 0:
+        return []
+    drawn = [
+        (pid, NEUTRAL_REPUTATION if rep is None else rep)
+        for pid, rep in candidates
+        if rng.random() < _reprobe_probability(rep)
+    ]
+    drawn.sort(key=lambda t: t[1])  # lowest reputation (most suspect) first
+    return [pid for pid, _ in drawn[:slots]]
+
+
 async def probe_due_peers(
-    db: AsyncSession, online_ids: list[uuid.UUID], batch: int = PROBE_BATCH
+    db: AsyncSession,
+    online_ids: list[uuid.UUID],
+    batch: int = PROBE_BATCH,
+    rng: random.Random | None = None,
 ) -> int:
-    """One verification cycle: probe up to `batch` online peers that are DUE —
-    peers holding escrowed credits (a clean canary moves them toward release) and
-    peers quarantined below neutral (a clean canary moves them toward pool
-    re-entry). See select_due_peers for the escrow-priority-with-rehab-reserve
-    policy. Returns the number probed. A single probe failure is logged and does
-    not abort the cycle."""
+    """One verification cycle. Probes up to `batch` peers in priority order:
+
+      1. DUE peers — holding escrowed credits (a clean canary moves them toward
+         release) or quarantined below neutral (toward pool re-entry). See
+         select_due_peers for the escrow-priority-with-rehab-reserve policy.
+      2. FLOOR re-probe — any leftover batch capacity surprise-probes
+         otherwise-not-due online peers so trust is never permanent (catch a peer
+         that earned trust then went bad). Adaptive: lower-reputation peers are
+         probed more, all flooring at PROBE_FLOOR (see _reprobe_probability).
+
+    Returns the number probed. A single probe failure is logged and does not abort
+    the cycle."""
+    rng = rng or random.Random()
+    online_ids = _dedup(online_ids)  # defensive: never probe a peer twice in a cycle
     escrowed = await _peers_with_escrowed_credits(db, online_ids)
     recovering = await _peers_below_reentry(db, online_ids)
     due = select_due_peers(escrowed, recovering, batch)
+
+    spare = batch - len(due)
+    if spare > 0:
+        # Floor-reprobe candidates are every OTHER online peer, deliberately not
+        # scoped to pool contributors: probing a My-Machines-only peer is harmless
+        # (a working peer passes, and reputation never gates My-Machines routing),
+        # so we skip the extra capability/scope join.
+        excluded = set(escrowed) | set(recovering) | set(due)
+        others = [pid for pid in online_ids if pid not in excluded]
+        if others:
+            reps = await _reputations(db, others)
+            candidates = [(pid, reps.get(pid)) for pid in others]
+            due = due + _select_reprobe(candidates, spare, rng)
 
     probed = 0
     for peer_id in due:

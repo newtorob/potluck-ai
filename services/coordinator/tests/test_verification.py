@@ -30,10 +30,13 @@ from coordinator.services.verification import (
     CANARY_MIN_TOKENS,
     CANARY_PASS,
     CANARY_WRONG,
+    PROBE_FLOOR,
     Canary,
     _add_canary,
     _mul_canary,
     _probe_sampling,
+    _reprobe_probability,
+    _select_reprobe,
     _sub_canary,
     evaluate_canary,
     generate_canary,
@@ -42,6 +45,18 @@ from coordinator.services.verification import (
     run_canary_probe,
     select_due_peers,
 )
+
+
+class _Rng:
+    """Deterministic stand-in for random.Random in floor-reprobe tests: random()
+    returns a fixed value. _Rng(1.0) suppresses all floor probes; _Rng(0.0)
+    fires every one."""
+
+    def __init__(self, value: float) -> None:
+        self._v = value
+
+    def random(self) -> float:
+        return self._v
 
 _MODEL = "qwen2.5:3b-instruct-q4_K_M"
 
@@ -115,6 +130,29 @@ def test_probe_sampling_randomized_and_truncation_safe() -> None:
         assert s.temperature == 0.0, "temp 0 keeps grading deterministic"
         assert CANARY_MIN_TOKENS <= s.max_tokens <= CANARY_MAX_TOKENS
         assert s.seed is not None and 0 <= s.seed <= 2**31 - 1
+
+
+def test_reprobe_probability() -> None:
+    assert _reprobe_probability(None) == pytest.approx(0.5)  # no heartbeat -> neutral
+    assert _reprobe_probability(0.5) == pytest.approx(0.5)
+    assert _reprobe_probability(0.95) == pytest.approx(PROBE_FLOOR)  # trusted -> floor
+    assert _reprobe_probability(1.0) == pytest.approx(PROBE_FLOOR)
+    assert _reprobe_probability(1.0) > 0, "trust is never permanent (never zero)"
+    # Lower reputation is probed more often.
+    assert _reprobe_probability(0.6) > _reprobe_probability(0.9)
+
+
+def test_select_reprobe_picks_suspect_first_and_respects_rng() -> None:
+    ids = [uuid.uuid4() for _ in range(5)]
+    cands = [(ids[i], 0.5 + i * 0.1) for i in range(5)]  # reputations 0.5..0.9
+    # Always-fire rng: all are drawn; the lowest-reputation ones win the slots.
+    assert _select_reprobe(cands, 2, _Rng(0.0)) == [ids[0], ids[1]]
+    # Never-fire rng: none drawn.
+    assert _select_reprobe(cands, 2, _Rng(1.0)) == []
+    # No slots -> nothing.
+    assert _select_reprobe(cands, 0, _Rng(0.0)) == []
+    # A no-heartbeat (None) candidate is treated as neutral and can be drawn.
+    assert _select_reprobe([(ids[0], None)], 1, _Rng(0.0)) == [ids[0]]
 
 
 def test_select_due_peers_policy() -> None:
@@ -399,7 +437,7 @@ async def test_probe_due_peers_targets_escrowed_and_releases(
 
     try:
         # Cycle 1: only the escrowed peer is due. 0.5 -> 0.6, not yet released.
-        probed = await probe_due_peers(db_session, online)
+        probed = await probe_due_peers(db_session, online, rng=_Rng(1.0))
         assert probed == 1, "only the peer with escrowed credits should be probed"
         assert await _rep(peer_escrow.id) == pytest.approx(0.6)
         assert await _rep(peer_clean.id) == pytest.approx(0.5), "clean peer untouched"
@@ -407,11 +445,11 @@ async def test_probe_due_peers_targets_escrowed_and_releases(
 
         # Cycles 2 .. k*-1: still climbing, still escrowed.
         for _ in range(2, RELEASE_MIN_PASSES):
-            assert await probe_due_peers(db_session, online) == 1
+            assert await probe_due_peers(db_session, online, rng=_Rng(1.0)) == 1
             assert await _is_escrowed(db_session, job_id) is True
 
         # The k*-th honest cycle crosses the threshold -> escrow released.
-        probed = await probe_due_peers(db_session, online)
+        probed = await probe_due_peers(db_session, online, rng=_Rng(1.0))
         assert probed == 1
         assert await _is_escrowed(db_session, job_id) is False, "escrow released"
     finally:
@@ -434,9 +472,38 @@ async def test_probe_due_peers_rehabilitates_sub_neutral_peer(
     hb.reputation = 0.2  # below NEUTRAL (0.5), no escrowed credits
     await db_session.flush()
     try:
-        probed = await probe_due_peers(db_session, [fallen.id])
+        probed = await probe_due_peers(db_session, [fallen.id], rng=_Rng(1.0))
         assert probed == 1, "a sub-neutral peer must be probed even with no escrow"
         await db_session.refresh(hb)
         assert hb.reputation == pytest.approx(0.3), "a clean rehab probe climbs +STEP"
     finally:
         await unregister_peer(fallen.id)
+
+
+@pytest.mark.asyncio
+async def test_probe_due_peers_floor_reprobes_trusted_peer(
+    db_session: AsyncSession,
+) -> None:
+    # A trusted peer (reputation >= release threshold, no escrow, at/above
+    # neutral) is NOT otherwise due. Without the floor re-probe it would never be
+    # probed again, so a peer that earns trust then goes bad would never be
+    # caught. The floor re-probe surprise-probes it.
+    from coordinator.services.peer_registry import unregister_peer
+
+    trusted = await _online_honest_peer(db_session)
+    hb = await db_session.get(PeerHeartbeat, trusted.id)
+    hb.reputation = 0.95
+    await db_session.flush()
+    try:
+        # rng fires -> the trusted peer is surprise-probed; an honest peer passes.
+        probed = await probe_due_peers(db_session, [trusted.id], rng=_Rng(0.0))
+        assert probed == 1, "a trusted peer must still be surprise-probed"
+        await db_session.refresh(hb)
+        assert hb.reputation == pytest.approx(1.0), "honest pass nudges up (capped)"
+
+        # rng does not fire -> the trusted peer is left alone this cycle.
+        hb.reputation = 0.95
+        await db_session.flush()
+        assert await probe_due_peers(db_session, [trusted.id], rng=_Rng(1.0)) == 0
+    finally:
+        await unregister_peer(trusted.id)
