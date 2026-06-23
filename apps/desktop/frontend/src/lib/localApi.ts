@@ -119,6 +119,17 @@ async function timedFetch(
 // Health
 // ---------------------------------------------------------------------------
 
+/** Pipeline-parallel engine status (mirror of PipelineParallelEngine.describe()). */
+export interface PipelineStatus {
+  model_id: string;
+  strategy: 'pipeline';
+  head_layers: number;
+  n_layers: number;
+  downstream: string;
+  device: string;
+  dtype: string;
+}
+
 export interface HealthResponse {
   status: 'ok';
   model_loaded: boolean;
@@ -128,6 +139,11 @@ export interface HealthResponse {
   /** Big Model Mode: list of llama.cpp RPC endpoints the current model
    *  is distributed across. Null when loaded locally or no model loaded. */
   loaded_rpc_servers?: string[] | null;
+  /** Pipeline-parallel: the distributed engine's status (head layers, the
+   *  downstream peer, device/dtype) when a model is loaded with the pipeline
+   *  strategy. Null otherwise. The other WAN-viable "big model" path,
+   *  sibling to loaded_rpc_servers. */
+  loaded_pipeline?: PipelineStatus | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -464,16 +480,31 @@ export const localApi = {
 
   loadModel(
     id: string,
-    options: { rpc_servers?: string[] } = {},
-  ): Promise<{ model_path: string; load_time_seconds: number; rpc_servers?: string[] | null }> {
-    // When `rpc_servers` is set, this triggers Big Model Mode — the
-    // sidecar reloads the model with remote llama.cpp RPC backends
-    // participating as ggml devices. Requires the Potluck-patched
-    // llama-cpp-python wheel; the sidecar surfaces a 501 if not.
-    const body =
-      options.rpc_servers && options.rpc_servers.length > 0
-        ? { rpc_servers: options.rpc_servers }
-        : null;
+    options: {
+      rpc_servers?: string[];
+      /** When set, loads with the pipeline-parallel strategy: the sidecar
+       *  auto-orchestrates the household (picks pipeline-eligible peers,
+       *  starts their stages) and runs the model split across them. `true`
+       *  uses defaults; pass an object to pin device/dtype/max nodes. */
+      pipeline?: boolean | { device?: string; dtype?: string; max_nodes?: number };
+    } = {},
+  ): Promise<{
+    model_path: string;
+    load_time_seconds: number;
+    rpc_servers?: string[] | null;
+    strategy?: string;
+    chain?: unknown;
+  }> {
+    // Two distributed strategies share this endpoint; an empty body loads locally.
+    let body: Record<string, unknown> | null = null;
+    if (options.pipeline) {
+      // Pipeline-parallel — the sidecar orchestrates the household chain itself.
+      body = { pipeline_auto: options.pipeline === true ? {} : options.pipeline };
+    } else if (options.rpc_servers && options.rpc_servers.length > 0) {
+      // Big Model Mode — remote llama.cpp RPC backends as ggml devices. Requires
+      // the Potluck-patched llama-cpp-python wheel; the sidecar surfaces a 501 if not.
+      body = { rpc_servers: options.rpc_servers };
+    }
     return timedFetch(`${LOCAL_BASE}/models/${encodeURIComponent(id)}/load`, {
       method: 'POST',
       ...(body
@@ -484,6 +515,8 @@ export const localApi = {
         model_path: string;
         load_time_seconds: number;
         rpc_servers?: string[] | null;
+        strategy?: string;
+        chain?: unknown;
       }>(r),
     );
   },

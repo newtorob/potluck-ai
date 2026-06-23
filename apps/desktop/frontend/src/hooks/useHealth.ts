@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { localApi } from '@/lib/localApi';
+import { localApi, type PipelineStatus } from '@/lib/localApi';
 
 export interface UseHealthReturn {
   modelLoaded: boolean;
@@ -25,6 +25,9 @@ export interface UseHealthReturn {
   /** Big Model Mode: list of RPC endpoints the current model is
    *  distributed across. Null when loaded locally or no model loaded. */
   loadedRpcServers: string[] | null;
+  /** Pipeline-parallel: the distributed engine's status, or null when the
+   *  current model isn't loaded with the pipeline strategy. */
+  loadedPipeline: PipelineStatus | null;
 }
 
 const POLL_INTERVAL_MS = 10_000;
@@ -35,6 +38,7 @@ const INITIAL_STATE: UseHealthReturn = {
   nCtxLoaded: null,
   sidecarUp: false,
   loadedRpcServers: null,
+  loadedPipeline: null,
 };
 
 export function useHealth(): UseHealthReturn {
@@ -56,6 +60,7 @@ export function useHealth(): UseHealthReturn {
           nCtxLoaded: health.n_ctx_loaded ?? null,
           sidecarUp: true,
           loadedRpcServers: health.loaded_rpc_servers ?? null,
+          loadedPipeline: health.loaded_pipeline ?? null,
         });
       } catch {
         if (cancelled) return;

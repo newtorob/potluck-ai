@@ -35,6 +35,7 @@ import {
   ArrowRight,
   Cpu,
   KeyRound,
+  Network,
 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { ViewHeader } from '@/components/layout/ViewHeader';
@@ -43,7 +44,12 @@ import { useMeshStore } from '@/stores/meshStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useHealth } from '@/hooks/useHealth';
 import { localApi } from '@/lib/localApi';
-import { getBigModelEligiblePeers, probePeer, type PeerCapabilities } from '@/lib/householdInference';
+import {
+  getBigModelEligiblePeers,
+  getPipelineEligiblePeers,
+  probePeer,
+  type PeerCapabilities,
+} from '@/lib/householdInference';
 import {
   computeCapacity,
   speedLabel,
@@ -653,6 +659,12 @@ function PairedView({
         <BigModelModeCard peers={peers} />
       </section>
 
+      {/* Pipeline mode — split a model's layers across machines (WAN-viable
+          sibling of Big Model Mode). Self-hides when no peer is eligible. */}
+      <section aria-label="Pipeline mode">
+        <PipelineModeCard peers={peers} />
+      </section>
+
       {/* Routing strategy — only matters when there's more than one peer */}
       {peers.length > 0 && (
         <section aria-label="Routing strategy">
@@ -1104,6 +1116,209 @@ function BigModelModeCard({ peers }: { peers: MeshPeer[] }) {
             ? 'Disabling reloads the model locally, dropping the peers.'
             : activeModelId
               ? `Will reload "${activeModelId}" across the peers above.`
+              : 'Load a model first in the Models view.'}
+        </p>
+        <button
+          type="button"
+          onClick={() => void handleToggle()}
+          disabled={working || probing || (!isOn && eligible.length === 0)}
+          className={cn(
+            'inline-flex shrink-0 h-9 items-center gap-1.5 rounded-lg px-3.5 text-sm font-medium',
+            'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            isOn
+              ? 'border border-border/60 bg-card text-foreground hover:bg-accent'
+              : 'bg-primary text-primary-foreground hover:bg-primary/90',
+            'disabled:cursor-not-allowed disabled:opacity-60',
+          )}
+        >
+          {working ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              {isOn ? 'Disabling…' : 'Enabling…'}
+            </>
+          ) : isOn ? (
+            'Disable'
+          ) : (
+            'Enable'
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline mode card
+// ---------------------------------------------------------------------------
+
+/**
+ * Pipeline mode — split a model's LAYERS across the local machine and household
+ * peers, with only activations crossing the wire. Sibling of Big Model Mode, but
+ * WAN-viable (works across the internet, not just the LAN) and torch-based rather
+ * than llama.cpp/RPC. The head sidecar orchestrates the chain itself.
+ *
+ * Honesty rule (memory e369308e): like Big Model Mode this is for CAPACITY
+ * (running a model bigger than any single machine), NOT speed.
+ */
+function PipelineModeCard({ peers }: { peers: MeshPeer[] }) {
+  const { activeModelId, loadedPipeline, sidecarUp } = useHealth();
+  const [eligible, setEligible] = useState<
+    { peer: MeshPeer; capabilities: PeerCapabilities }[]
+  >([]);
+  const [probing, setProbing] = useState(true);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Probe peers for available_for_pipeline on mount + whenever the roster
+  // changes. Same cheap GET /peer/capabilities the other cards use.
+  useEffect(() => {
+    let cancelled = false;
+    setProbing(true);
+    void (async () => {
+      try {
+        const result = await getPipelineEligiblePeers(peers);
+        if (!cancelled) setEligible(result);
+      } catch {
+        if (!cancelled) setEligible([]);
+      } finally {
+        if (!cancelled) setProbing(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [peers]);
+
+  const isOn = loadedPipeline !== null;
+
+  // Hide the card when nothing's eligible AND not already running.
+  if (!probing && eligible.length === 0 && !isOn) {
+    return null;
+  }
+
+  async function handleToggle() {
+    setError(null);
+    if (!sidecarUp || !activeModelId) {
+      setError(
+        'Load a model in the Models view first. Pipeline mode reloads it split across your machines.',
+      );
+      return;
+    }
+
+    setWorking(true);
+    try {
+      if (isOn) {
+        // Disable — reload locally (drops the peers).
+        await localApi.loadModel(activeModelId, {});
+      } else {
+        // Enable — the sidecar auto-orchestrates the household chain.
+        await localApi.loadModel(activeModelId, { pipeline: true });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('503')) {
+        setError(
+          'No peer accepted a stage. Each peer needs contributor mode on and POTLUCK_PIPELINE_ENABLED=1.',
+        );
+      } else if (msg.includes('502')) {
+        setError('Could not build a chain across the household. Check the peers are reachable.');
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <div
+      className={cn(
+        'rounded-2xl border p-5 space-y-4 shadow-hearth-sm',
+        isOn ? 'border-primary/25 bg-primary/5' : 'border-border/60 bg-card',
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={cn(
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1',
+            isOn ? 'bg-primary/15 ring-primary/30' : 'bg-muted ring-border/60',
+          )}
+        >
+          {isOn ? (
+            <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden="true" />
+          ) : (
+            <Network className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-serif text-base leading-tight tracking-display text-foreground">
+            Pipeline mode
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground leading-snug">
+            Split a model's layers across your machines, including over the
+            internet, so you can run one too big for any single box. Slower per
+            token, but it reaches machines the LAN-only Big Model Mode cannot.
+          </p>
+        </div>
+      </div>
+
+      {/* Status / peer list */}
+      <div className="rounded-lg border border-border/40 bg-background/40 p-3">
+        {probing ? (
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+            Probing household peers…
+          </p>
+        ) : isOn ? (
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-foreground">
+              Active: {loadedPipeline?.model_id} split across the household
+            </p>
+            <p className="font-mono text-[11px] text-muted-foreground">
+              head {loadedPipeline?.head_layers}/{loadedPipeline?.n_layers} layers on{' '}
+              {loadedPipeline?.device} · next hop {loadedPipeline?.downstream}
+            </p>
+          </div>
+        ) : eligible.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No eligible peers found. A peer is eligible when it's running
+            contributor mode, has the inference backend installed, and has{' '}
+            <code className="font-mono">POTLUCK_PIPELINE_ENABLED</code> set.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-foreground">
+              {eligible.length} peer{eligible.length === 1 ? '' : 's'} eligible
+            </p>
+            <ul className="space-y-0.5">
+              {eligible.map(({ peer, capabilities }) => (
+                <li key={peer.node_id} className="text-[11px] text-muted-foreground">
+                  <span className="font-medium text-foreground/85">{peer.node_name}</span>
+                  {capabilities.hardware?.gpu_vram_gb && (
+                    <>
+                      <span className="mx-1.5 text-muted-foreground/40">·</span>
+                      <span>{capabilities.hardware.gpu_vram_gb} GB VRAM</span>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {error !== null && (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] text-muted-foreground/80 leading-snug">
+          {isOn
+            ? 'Disabling reloads the model locally, dropping the peers.'
+            : activeModelId
+              ? `Will reload "${activeModelId}" split across the household.`
               : 'Load a model first in the Models view.'}
         </p>
         <button

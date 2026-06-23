@@ -89,6 +89,11 @@ export interface PeerCapabilities {
   // contributor mode is on.
   rpc_endpoint?: string | null;
   available_for_big_model?: boolean;
+  // Pipeline-parallel (protocol_version >= 4). True when this peer can serve a
+  // pipeline stage: torch present, contributor mode on, AND POTLUCK_PIPELINE_ENABLED
+  // set. The head sidecar does the actual orchestration + stage starts; the
+  // frontend only needs this flag to decide whether to offer the toggle.
+  available_for_pipeline?: boolean;
 }
 
 /** Routing mode for picking which household peer serves a request. */
@@ -113,6 +118,28 @@ export async function getBigModelEligiblePeers(
     const caps = probes[i];
     const peer = reachable[i];
     if (peer && caps && caps.available_for_big_model && caps.rpc_endpoint) {
+      out.push({ peer, capabilities: caps });
+    }
+  }
+  return out;
+}
+
+/** Probe all reachable household peers and return the subset eligible to serve a
+ *  pipeline-parallel stage (available_for_pipeline). Unlike Big Model Mode, the
+ *  head sidecar does the actual orchestration + stage starts — this is only used
+ *  by the UI to decide whether to offer the toggle and to show how many peers
+ *  could participate. */
+export async function getPipelineEligiblePeers(
+  peers: MeshPeer[],
+): Promise<{ peer: MeshPeer; capabilities: PeerCapabilities }[]> {
+  const reachable = peers.filter((p) => p.reachable);
+  if (reachable.length === 0) return [];
+  const probes = await Promise.all(reachable.map((p) => probePeer(p)));
+  const out: { peer: MeshPeer; capabilities: PeerCapabilities }[] = [];
+  for (let i = 0; i < reachable.length; i++) {
+    const caps = probes[i];
+    const peer = reachable[i];
+    if (peer && caps && caps.available_for_pipeline) {
       out.push({ peer, capabilities: caps });
     }
   }
