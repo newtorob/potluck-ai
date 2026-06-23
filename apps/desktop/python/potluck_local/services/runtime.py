@@ -32,6 +32,9 @@ class LLMRuntime:
         self._model_id: str | None = None
         self._loaded_n_ctx: int | None = None
         self._loaded_rpc_servers: tuple[str, ...] | None = None  # Big Model Mode
+        # Pipeline-parallel engine (transformers head-loop over the mesh) when a model
+        # is loaded with the "pipeline" strategy. Mutually exclusive with self._model.
+        self._pipeline = None
         self._load_lock = threading.Lock()
         self._inference_lock = asyncio.Lock()
         # Last benchmark result per model_id (tokens/sec + TTFT). Persists across
@@ -40,7 +43,7 @@ class LLMRuntime:
         self._benchmarks: dict[str, dict] = {}
 
     def is_loaded(self) -> bool:
-        return self._model is not None
+        return self._model is not None or self._pipeline is not None
 
     def current_model_id(self) -> str | None:
         return self._model_id
@@ -53,6 +56,11 @@ class LLMRuntime:
         """Return the RPC server endpoints the current model was loaded with.
         None when the model is loaded locally (or no model is loaded)."""
         return self._loaded_rpc_servers
+
+    def loaded_pipeline(self) -> dict | None:
+        """Describe the loaded pipeline-parallel engine (model, head layers, downstream
+        peer, device), or None when not in pipeline mode."""
+        return self._pipeline.describe() if self._pipeline is not None else None
 
     def benchmarks(self) -> dict[str, dict]:
         """Last benchmark result keyed by model_id (tokens/sec + TTFT)."""
@@ -127,6 +135,57 @@ class LLMRuntime:
                 "rpc_servers": list(rpc_servers) if rpc_servers else None,
             }
 
+    def load_pipeline(
+        self,
+        model_id: str,
+        *,
+        split: int,
+        peer: str,
+        port: int,
+        split2: int = 0,
+        device: str = "",
+        dtype: str | None = None,
+    ) -> dict:
+        """Load a model in PIPELINE-PARALLEL strategy: this node holds the head layer
+        block and drives generation across downstream peer stages (mid/tail) over the
+        mesh. Distinct from the llama.cpp path -- it is transformers-based, references an
+        HF model id (not a GGUF slug), and runs a model too big for any single peer.
+        Scope: my-machines / trusted-circle only (activation privacy unsolved). Blocks
+        until the head block is loaded; thread-safe swap via _load_lock.
+        """
+        # Lazy import: pulls in torch + transformers + accelerate, kept out of the base
+        # sidecar so a non-pipeline install stays light.
+        from .pipeline_parallel import PipelineParallelEngine
+
+        torch_dtype = None
+        if dtype:
+            import torch
+            torch_dtype = getattr(torch, dtype)
+
+        with self._load_lock:
+            if self._model is not None or self._pipeline is not None:
+                self._release_model()
+
+            start = time.monotonic()
+            engine = PipelineParallelEngine(
+                model_id, split=split, peer=peer, port=port,
+                split2=split2, device=device, dtype=torch_dtype,
+            )
+            self._pipeline = engine
+            self._model_id = model_id
+            elapsed = round(time.monotonic() - start, 2)
+
+            logger.info(
+                "pipeline_loaded model_id=%s split=%s split2=%s downstream=%s:%s load_time=%.2fs",
+                model_id, split, split2, peer, port, elapsed,
+            )
+            return {
+                "model_id": model_id,
+                "strategy": "pipeline",
+                "load_time_seconds": elapsed,
+                **engine.describe(),
+            }
+
     def unload_model(self) -> None:
         """Release the current model and free memory."""
         with self._load_lock:
@@ -143,6 +202,11 @@ class LLMRuntime:
             self._loaded_n_ctx = None
             self._loaded_rpc_servers = None
             logger.info("model_unloaded model_id=%s", model_id)
+        if self._pipeline is not None:
+            model_id = self._model_id
+            self._pipeline = None  # drops the head block + tokenizer; torch frees on GC
+            self._model_id = None
+            logger.info("pipeline_unloaded model_id=%s", model_id)
 
     async def stream_chat(
         self,
@@ -157,6 +221,12 @@ class LLMRuntime:
         Serialised by _inference_lock — llama-cpp-python is not thread-safe
         for concurrent inference on the same model instance.
         """
+        if self._pipeline is not None:
+            # Pipeline-parallel strategy: delegate to the distributed engine, same SSE shape.
+            async for chunk in self._stream_chat_pipeline(messages, max_tokens=max_tokens):
+                yield chunk
+            return
+
         if self._model is None:
             yield 'data: {"error":"No model loaded"}\n\n'
             yield "data: [DONE]\n\n"
@@ -230,6 +300,58 @@ class LLMRuntime:
                     round(time.monotonic() - start, 3),
                 )
 
+    async def _stream_chat_pipeline(self, messages: list[dict], *, max_tokens: int = 2048):
+        """Stream from the loaded PipelineParallelEngine. Runs the engine's blocking
+        stream_tokens generator in a worker thread, pumps text deltas onto an async queue,
+        and yields the same simplified SSE shape as the llama.cpp stream_chat path so the
+        chat UI is identical regardless of strategy. Serialized by _inference_lock."""
+        async with self._inference_lock:
+            loop = asyncio.get_running_loop()
+            queue: asyncio.Queue = asyncio.Queue()
+            engine = self._pipeline
+            model_id = self._model_id
+            cancel_event = threading.Event()
+
+            def _generate() -> None:
+                try:
+                    for delta in engine.stream_tokens(messages, max_new=max_tokens):
+                        if cancel_event.is_set():
+                            break
+                        loop.call_soon_threadsafe(queue.put_nowait, delta)
+                    loop.call_soon_threadsafe(queue.put_nowait, None)
+                except Exception as exc:
+                    logger.error("pipeline_inference_error model_id=%s error=%s", model_id, type(exc).__name__)
+                    loop.call_soon_threadsafe(queue.put_nowait, f"\x00ERROR\x00{exc}")
+                    loop.call_soon_threadsafe(queue.put_nowait, None)
+
+            fut = loop.run_in_executor(None, _generate)
+            token_count = 0
+            start = time.monotonic()
+            try:
+                while True:
+                    item = await queue.get()
+                    if item is None:
+                        break
+                    if isinstance(item, str) and item.startswith("\x00ERROR\x00"):
+                        err_msg = item[len("\x00ERROR\x00"):]
+                        yield f'data: {json.dumps({"error": str(err_msg)})}\n\n'
+                        break
+                    token_count += 1
+                    yield f'data: {json.dumps({"choices": [{"delta": {"content": item}}]})}\n\n'
+                yield "data: [DONE]\n\n"
+            except asyncio.CancelledError:
+                logger.info("pipeline_stream_cancelled model_id=%s tokens_so_far=%d", model_id, token_count)
+            finally:
+                cancel_event.set()
+                try:
+                    await asyncio.shield(fut)
+                except Exception:
+                    pass
+                logger.info(
+                    "pipeline_stream_complete model_id=%s tokens=%d duration=%.3fs",
+                    model_id, token_count, round(time.monotonic() - start, 3),
+                )
+
     async def chat(
         self,
         messages: list[dict],
@@ -238,6 +360,11 @@ class LLMRuntime:
         max_tokens: int = 2048,
     ) -> dict:
         """Non-streaming completion. Returns raw llama result dict."""
+        if self._pipeline is not None:
+            raise RuntimeError(
+                "pipeline-parallel mode supports the streaming chat path only; "
+                "the raw / non-streaming path is a follow-on"
+            )
         if self._model is None:
             raise RuntimeError("No model loaded")
 
@@ -296,6 +423,11 @@ class LLMRuntime:
         the same inference lock. An upstream error surfaces as a single dict
         {"__error__": "..."} before the stream ends.
         """
+        if self._pipeline is not None:
+            raise RuntimeError(
+                "pipeline-parallel mode supports the streaming chat path only; "
+                "the raw / non-streaming path is a follow-on"
+            )
         if self._model is None:
             raise RuntimeError("No model loaded")
 
@@ -377,6 +509,11 @@ class LLMRuntime:
         Returns a dict with model_id, scored_tokens, sum_logprob,
         avg_token_logprob, bits_per_byte, n_bytes.
         """
+        if self._pipeline is not None:
+            raise RuntimeError(
+                "pipeline-parallel mode supports the streaming chat path only; "
+                "the raw / non-streaming path is a follow-on"
+            )
         if self._model is None:
             raise RuntimeError("No model loaded")
 
@@ -459,6 +596,11 @@ class LLMRuntime:
         lock; drains the worker on exit so it never races a chat (same pattern as
         stream_chat). Returns model_id, output_tokens, ttft_ms, duration_ms,
         tokens_per_sec."""
+        if self._pipeline is not None:
+            raise RuntimeError(
+                "pipeline-parallel mode supports the streaming chat path only; "
+                "the raw / non-streaming path is a follow-on"
+            )
         if self._model is None:
             raise RuntimeError("No model loaded")
 

@@ -141,7 +141,7 @@ class PeerCapabilities(BaseModel):
     loaded_model: str | None
     contributor_mode: bool
     available_for_inference: bool
-    protocol_version: int = 3
+    protocol_version: int = 4
 
     # Additive fields (protocol_version >= 2)
     hardware: PeerHardware | None = None
@@ -151,6 +151,14 @@ class PeerCapabilities(BaseModel):
     # Big Model Mode (protocol_version >= 3)
     rpc_endpoint: str | None = None
     available_for_big_model: bool = False
+
+    # Pipeline-parallel stage worker (protocol_version >= 4): true when this node can
+    # serve a layer-block stage (tail/mid) for an upstream head -- contributor mode on
+    # AND torch is installed. The WAN-viable distributed path; sibling of big-model RPC.
+    # If a stage is already running, POST /peer/pipeline/stage returns 409 (the head
+    # checks GET /peer/pipeline/stage); kept out of this hot capability poll to avoid
+    # importing the torch-heavy engine module.
+    available_for_pipeline: bool = False
 
 
 # Cache the hardware detect — it shells out to system tools (lspci, system_profiler,
@@ -231,6 +239,15 @@ async def peer_capabilities() -> PeerCapabilities:
     rpc_endpoint = os.environ.get("POTLUCK_RPC_ENDPOINT", "").strip() or None
     available_for_big_model = bool(rpc_endpoint and contributor_on)
 
+    # Pipeline-parallel eligibility: contributor mode on + torch installed. Probed via
+    # find_spec so this hot capability poll never imports the torch-heavy engine module.
+    import importlib.util
+    available_for_pipeline = bool(
+        contributor_on
+        and importlib.util.find_spec("torch")
+        and os.environ.get("POTLUCK_PIPELINE_ENABLED") == "1"
+    )
+
     return PeerCapabilities(
         hostname=socket.gethostname(),
         loaded_model=loaded,
@@ -241,7 +258,100 @@ async def peer_capabilities() -> PeerCapabilities:
         inference_load=inference_load,
         rpc_endpoint=rpc_endpoint,
         available_for_big_model=available_for_big_model,
+        available_for_pipeline=available_for_pipeline,
     )
+
+
+# ---------------------------------------------------------------------------
+# Pipeline-parallel stage worker
+# ---------------------------------------------------------------------------
+#
+# This node serves a layer-block stage (tail or mid) for an UPSTREAM head running a model
+# too big for any single peer. The head orchestrates the chain: it assigns each peer a
+# contiguous block + a listen port (and, for a mid, the downstream tail). Reachable only
+# from the mesh via the peer access middleware; gated on contributor mode. Scope:
+# my-machines / trusted-circle (activation privacy unsolved -> never the open pool).
+
+
+class PipelineStageRequest(BaseModel):
+    """Ask this node to run a pipeline-parallel stage for an upstream head."""
+
+    model_id: str  # HF model id every node in the chain loads
+    role: Literal["tail", "mid"]
+    split: int  # this stage's layer range derives from split/split2 + role (see load_parts)
+    port: int  # the port this stage listens on for the upstream head/mid
+    split2: int = 0
+    device: str = ""  # cuda|mps|cpu|dml; autodetect if empty
+    dtype: str | None = None  # must match every node in the chain
+    peer2: str = ""  # mid only: downstream tail mesh IP
+    port2: int = 0   # mid only: downstream tail port
+
+
+def _to_torch_dtype(name: str | None):
+    """Lazily map a dtype string to torch.dtype (None => engine default)."""
+    if not name:
+        return None
+    import torch
+    return getattr(torch, name)
+
+
+def _pipeline_serving_enabled() -> bool:
+    """Pipeline stage serving needs contributor mode AND an explicit opt-in
+    (POTLUCK_PIPELINE_ENABLED=1). Starting a stage runs arbitrary model downloads + GPU
+    load for a remote head -- a higher-impact action than read-path inference dispatch --
+    so it is gated separately."""
+    return bool(get_settings().network.contributor_mode) and os.environ.get("POTLUCK_PIPELINE_ENABLED") == "1"
+
+
+@router.post("/pipeline/stage", status_code=200)
+async def pipeline_stage_start(request: PipelineStageRequest) -> dict:
+    """Start a pipeline stage on this node for an upstream head. 409 if one is already
+    running (a node hosts one stage at a time); 503 unless pipeline serving is enabled."""
+    if not _pipeline_serving_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="Pipeline stage serving is not enabled here (needs contributor mode + POTLUCK_PIPELINE_ENABLED=1).",
+        )
+    # Lazy import: pulls torch + transformers, kept off the hot capability path.
+    from potluck_local.services.pipeline_parallel import get_stage_worker
+
+    worker = get_stage_worker()
+    loop = asyncio.get_running_loop()
+    try:
+        info = await loop.run_in_executor(
+            None,
+            lambda: worker.start(
+                request.model_id, role=request.role, split=request.split, port=request.port,
+                split2=request.split2, device=request.device, dtype=_to_torch_dtype(request.dtype),
+                peer2=request.peer2, port2=request.port2,
+            ),
+        )
+    except RuntimeError as exc:  # already running, or failed to bind in time
+        raise HTTPException(status_code=409, detail=str(exc))
+    except Exception as exc:
+        logger.error("pipeline_stage_start_error error=%s", type(exc).__name__)
+        raise HTTPException(status_code=500, detail=f"pipeline stage failed to start: {exc}")
+    logger.info("pipeline_stage_started role=%s model_id=%s port=%s", request.role, request.model_id, request.port)
+    return {"status": "started", **info}
+
+
+@router.get("/pipeline/stage", status_code=200)
+async def pipeline_stage_status() -> dict:
+    """Status of this node's pipeline stage (running flag + role/model/port), if any."""
+    from potluck_local.services.pipeline_parallel import get_stage_worker
+    return get_stage_worker().status()
+
+
+@router.delete("/pipeline/stage", status_code=200)
+async def pipeline_stage_stop() -> dict:
+    """Stop this node's pipeline stage and free the device (also used by the head's
+    rollback path). 503 unless pipeline serving is enabled here."""
+    if not _pipeline_serving_enabled():
+        raise HTTPException(status_code=503, detail="Pipeline stage serving is not enabled here.")
+    from potluck_local.services.pipeline_parallel import get_stage_worker
+    worker = get_stage_worker()
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, worker.stop)
 
 
 # ---------------------------------------------------------------------------

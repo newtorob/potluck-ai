@@ -30,6 +30,10 @@ async def health() -> dict[str, object]:
         # or no model is loaded. Frontend uses this as the source of truth
         # for whether the toggle in HouseholdView shows on/off.
         "loaded_rpc_servers": list(rpc_servers) if rpc_servers else None,
+        # Pipeline-parallel status — describes the distributed engine (head layers,
+        # downstream peer, device) when a model is loaded with the pipeline strategy;
+        # null otherwise. The other WAN-viable "big model" path, sibling to RPC mode.
+        "loaded_pipeline": runtime.loaded_pipeline(),
     }
 
 

@@ -38,7 +38,7 @@ func addPeerHostRoute(ifName, peerIP string) error {
 	ps := fmt.Sprintf(
 		"$ErrorActionPreference='Stop'; "+
 			"if (-not (Get-NetRoute -DestinationPrefix '%[1]s/32' -InterfaceAlias '%[2]s' -ErrorAction SilentlyContinue)) "+
-			"{ New-NetRoute -DestinationPrefix '%[1]s/32' -InterfaceAlias '%[2]s' -NextHop 0.0.0.0 | Out-Null }",
+			"{ New-NetRoute -DestinationPrefix '%[1]s/32' -InterfaceAlias '%[2]s' -NextHop 0.0.0.0 -PolicyStore ActiveStore | Out-Null }",
 		peerIP, ifName,
 	)
 	out, err := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", ps).CombinedOutput()
@@ -61,7 +61,7 @@ func removePeerHostRoute(ifName, peerIP string) error {
 		return fmt.Errorf("removePeerHostRoute: invalid peer IP %q", peerIP)
 	}
 	ps := fmt.Sprintf(
-		"Remove-NetRoute -DestinationPrefix '%s/32' -InterfaceAlias '%s' -Confirm:$false -ErrorAction SilentlyContinue",
+		"Remove-NetRoute -DestinationPrefix '%s/32' -InterfaceAlias '%s' -PolicyStore ActiveStore -Confirm:$false -ErrorAction SilentlyContinue",
 		peerIP, ifName,
 	)
 	out, err := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", ps).CombinedOutput()

@@ -122,6 +122,33 @@ async def delete_model(slug: str) -> dict:
     return {"status": "deleted"}
 
 
+class PipelineConfig(BaseModel):
+    """Pipeline-parallel strategy. This node loads the HEAD layer block and drives
+    generation across one or more downstream peer stages (mid/tail) over the mesh: a
+    model too big for any single peer, moving activations (not weights) across the wire.
+
+    Distinct from rpc_servers (llama.cpp Big Model Mode, LAN-only weight-streaming):
+    pipeline is transformers-based and WAN-viable. Scope: my-machines / trusted-circle
+    only (activation privacy is unsolved -> never the open pool)."""
+
+    split: int = Field(..., description="first layer boundary; head holds layers [0:split]")
+    peer: str = Field(..., description="downstream next-hop mesh IP (the mid, or the tail in a 2-node chain)")
+    port: int = Field(..., description="downstream next-hop listen port")
+    split2: int = Field(default=0, description="second boundary for a 3-node chain (mid=[split:split2], tail=[split2:]); 0 => 2-node")
+    device: str = Field(default="", description="cuda|mps|cpu|dml; autodetect if empty")
+    dtype: str | None = Field(default=None, description="float16|bfloat16|float32; must match every node in the chain")
+
+
+class PipelineAutoConfig(BaseModel):
+    """Auto pipeline-parallel: orchestrate a chain across this node + available household
+    peers, no explicit addresses. The sidecar queries the roster, plans an even split
+    (capped at 3 nodes), starts each peer's stage, then head-loads."""
+
+    device: str = Field(default="", description="head device: cuda|mps|cpu|dml; autodetect if empty")
+    dtype: str = Field(default="float16", description="uniform dtype across the chain (fp16 = safe on every backend incl DirectML)")
+    max_nodes: int = Field(default=3, description="head + up to (max_nodes-1) peers; engine caps at 3")
+
+
 class LoadModelRequest(BaseModel):
     """Optional body for POST /models/{slug}/load.
 
@@ -131,13 +158,82 @@ class LoadModelRequest(BaseModel):
     alone, by spreading weights/KV/compute across household peers that
     are running `rpc-server`. Endpoints look like "100.64.0.6:50052".
     Requires the Potluck-patched llama-cpp-python wheel.
+
+    pipeline: when set, load in pipeline-parallel strategy instead (transformers head
+    block + downstream peer stages). Mutually exclusive with rpc_servers. Uses
+    hf_model_id (or the {slug} path param) as the HF model id, not a GGUF file.
     """
 
     rpc_servers: list[str] | None = Field(default=None)
+    pipeline: PipelineConfig | None = Field(default=None)
+    pipeline_auto: PipelineAutoConfig | None = Field(default=None)
+    hf_model_id: str | None = Field(
+        default=None,
+        description="pipeline strategy: HF model id to load (e.g. 'Qwen/Qwen2.5-32B-Instruct'); defaults to the {slug} path param",
+    )
 
 
 @router.post("/{slug}/load", status_code=200)
 async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
+    # Pipeline-parallel: explicit chain (body.pipeline) or auto-orchestrated across the
+    # household (body.pipeline_auto). Either path -> runtime.load_pipeline. Transformers
+    # head-loop on an HF model id (no GGUF on disk), so it bypasses the slug/GGUF path.
+    # Run the blocking, multi-second work off the event loop.
+    if body and (body.pipeline or body.pipeline_auto):
+        runtime = get_runtime()
+        model_id = body.hf_model_id or slug
+        loop = asyncio.get_running_loop()
+        chain_nodes = None
+        stage_peers = []  # peers whose stage we started; torn down if the head load fails
+
+        if body.pipeline_auto:
+            ac = body.pipeline_auto
+            from potluck_local.services.pipeline_parallel import orchestrate_household_pipeline
+            try:
+                chain = await loop.run_in_executor(
+                    None,
+                    lambda: orchestrate_household_pipeline(
+                        model_id, device=ac.device, dtype=ac.dtype, max_nodes=ac.max_nodes,
+                    ),
+                )
+            except Exception as exc:
+                logger.error("pipeline_orchestrate_error model_id=%s error=%s", model_id, exc)
+                raise HTTPException(status_code=502, detail=f"pipeline orchestration failed: {exc}")
+            split, split2, peer, port = chain["split"], chain["split2"], chain["peer"], chain["port"]
+            device, dtype = ac.device, chain["dtype"]
+            chain_nodes = chain.get("nodes")
+            stage_peers = chain.get("stage_peers", [])
+        else:
+            pc = body.pipeline
+            split, split2, peer, port = pc.split, pc.split2, pc.peer, pc.port
+            device, dtype = pc.device, pc.dtype
+
+        logger.info(
+            "load_pipeline_start model_id=%s split=%s split2=%s downstream=%s:%s",
+            model_id, split, split2, peer, port,
+        )
+        try:
+            result = await loop.run_in_executor(
+                None,
+                lambda: runtime.load_pipeline(
+                    model_id, split=split, peer=peer, port=port,
+                    split2=split2, device=device, dtype=dtype,
+                ),
+            )
+        except Exception as exc:
+            logger.error("load_pipeline_error model_id=%s error=%s", model_id, exc)
+            # Head load failed after peer stages were started -> tear them down so the
+            # peers aren't left wedged holding their devices.
+            if stage_peers:
+                from potluck_local.services.pipeline_parallel import _stop_peer_stage
+                for ip in reversed(stage_peers):
+                    await loop.run_in_executor(None, lambda ip=ip: _stop_peer_stage(ip))
+            raise HTTPException(status_code=500, detail=f"pipeline load failed: {exc}")
+        if chain_nodes is not None:
+            result["chain"] = chain_nodes
+        logger.info("load_pipeline_complete model_id=%s load_time=%.2f", model_id, result.get("load_time_seconds", 0))
+        return result
+
     model_path = models_dir() / slug / "model.gguf"
     if not model_path.exists():
         raise HTTPException(
