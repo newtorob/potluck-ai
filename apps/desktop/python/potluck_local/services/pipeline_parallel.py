@@ -215,7 +215,7 @@ def load_parts(model_id, split, role, device="cuda", dtype=torch.bfloat16, split
     }
     for j in range(n_layers):
         dmap[f"model.layers.{j}"] = load_dev if (lo <= j < hi) else off
-    print(f"[{role}] meta-loading {model_id} block [{lo}:{hi}] on {device} ...", flush=True)
+    logger.info("pipeline: meta-loading %s block [%d:%d] on %s as %s", model_id, lo, hi, device, role)
     model = AutoModelForCausalLM.from_pretrained(
         model_id, dtype=dtype, device_map=dmap, attn_implementation="eager"
     )
@@ -238,11 +238,8 @@ def load_parts(model_id, split, role, device="cuda", dtype=torch.bfloat16, split
     import gc
     gc.collect()
     _empty_cache(device)
-    print(
-        f"[{role}] loaded {len(parts['layers'])}/{n_layers} layers on {device}, "
-        f"mem={_mem_gb(device):.1f}GB",
-        flush=True,
-    )
+    logger.info("pipeline: %s loaded %d/%d layers on %s, mem=%.1fGB",
+                role, len(parts["layers"]), n_layers, device, _mem_gb(device))
     return parts
 
 
@@ -295,6 +292,28 @@ def _connect_with_retry(peer, port, timeout, tries=12):
             time.sleep(1.0)
 
 
+def _send_recv(sock, h, abs_start):
+    """One supervised round-trip to the next stage: send activations, receive the next
+    token. Returns (token, tail_compute_ms, bytes_sent). A dict response carries the tail's
+    own compute time; a bare int is an older tail (tail_ms unknown). `token` is an int for
+    a single stream or a list of ints for a batch."""
+    nbytes = send_msg(sock, (h.cpu(), abs_start))
+    resp = recv_msg(sock)
+    if isinstance(resp, dict):
+        return resp["tok"], float(resp.get("tail_ms", 0.0)), nbytes
+    return resp, 0.0, nbytes
+
+
+def _head_forward(parts, tokens, cache, start, dev, sync=False):
+    """Run the head's embed + layer block under the shared GPU lock. sync=True forces the
+    device to finish so the caller can time the wire leg separately from compute."""
+    with _COMPUTE:
+        h = run_layers(parts["embed"](tokens), parts, cache, start)
+        if sync:
+            _sync(dev)
+    return h
+
+
 def generate_one(parts, tok, peer, port, prompt, max_new, dev, timeout=30.0):
     """One full generation over a fresh connection (=> fresh caches on every node).
     Returns the decoded text plus timing + edge health. Opens and closes its own socket
@@ -312,23 +331,19 @@ def generate_one(parts, tok, peer, port, prompt, max_new, dev, timeout=30.0):
     out, start, t0, t_prefill = [], 0, time.time(), None
     bytes_up, rt_ms, head_ms, tail_ms_list, step = 0, [], [], [], 0
 
-    def edge_exchange(h, abs_start):  # one supervised round-trip through the tail
+    def edge_exchange(h, abs_start):  # one supervised round-trip through the tail, timed
         nonlocal bytes_up
         t = time.time()
-        bytes_up += send_msg(sock, (h.cpu(), abs_start))
-        resp = recv_msg(sock)
+        tok_id, tail_ms, nbytes = _send_recv(sock, h, abs_start)
         rt_ms.append((time.time() - t) * 1e3)
-        if isinstance(resp, dict):  # new tail: token + the tail's own compute time
-            tail_ms_list.append(float(resp.get("tail_ms", 0.0)))
-            return resp["tok"]
-        tail_ms_list.append(0.0)  # back-compat: an older tail sends a bare int
-        return resp
+        bytes_up += nbytes
+        tail_ms_list.append(tail_ms)
+        return tok_id
 
     try:
         with torch.no_grad():
             # prefill the whole prompt
-            with _COMPUTE:
-                h = run_layers(parts["embed"](ids), parts, cache, start)
+            h = _head_forward(parts, ids, cache, start, dev)
             nxt = edge_exchange(h, start)
             t_prefill = time.time()
             start += ids.shape[1]
@@ -339,10 +354,8 @@ def generate_one(parts, tok, peer, port, prompt, max_new, dev, timeout=30.0):
                     out.pop()
                     break
                 _th = time.time()
-                with _COMPUTE:
-                    h = run_layers(parts["embed"](torch.tensor([[nxt]], device=dev)), parts, cache, start)
-                    _sync(dev)  # finish head GPU work before timing the wire
-                head_ms.append((time.time() - _th) * 1e3)
+                h = _head_forward(parts, torch.tensor([[nxt]], device=dev), cache, start, dev, sync=True)
+                head_ms.append((time.time() - _th) * 1e3)  # compute incl. lock wait
                 nxt = edge_exchange(h, start)
                 start += 1
                 out.append(nxt)
@@ -400,14 +413,12 @@ def generate_batch(parts, tok, peer, port, prompt, batch, max_new, dev, timeout=
     start, t0, t_prefill = 0, time.time(), None
 
     def exchange(h, abs_start):
-        send_msg(sock, (h.cpu(), abs_start))
-        resp = recv_msg(sock)
-        return resp["tok"] if isinstance(resp, dict) else resp  # list of B tokens
+        tok_ids, _, _ = _send_recv(sock, h, abs_start)
+        return tok_ids  # list of B tokens
 
     try:
         with torch.no_grad():
-            with _COMPUTE:
-                h = run_layers(parts["embed"](ids), parts, cache, start)
+            h = _head_forward(parts, ids, cache, start, dev)
             nxt = exchange(h, start)  # [B]
             t_prefill = time.time()
             start += ids.shape[1]
@@ -419,9 +430,7 @@ def generate_batch(parts, tok, peer, port, prompt, batch, max_new, dev, timeout=
                         outs[b].pop()
                     break
                 col = torch.tensor([[t] for t in nxt], device=dev)  # [B, 1]
-                with _COMPUTE:
-                    h = run_layers(parts["embed"](col), parts, cache, start)
-                    _sync(dev)
+                h = _head_forward(parts, col, cache, start, dev, sync=True)
                 nxt = exchange(h, start)
                 start += 1
                 for b in range(batch):
@@ -499,14 +508,12 @@ class PipelineParallelEngine:
         produced, start, emitted = [], 0, 0
 
         def step(h, abs_start):
-            send_msg(sock, (h.cpu(), abs_start))
-            resp = recv_msg(sock)
-            return resp["tok"] if isinstance(resp, dict) else resp
+            tok_id, _, _ = _send_recv(sock, h, abs_start)
+            return tok_id
 
         try:
             with torch.no_grad():
-                with _COMPUTE:
-                    h = run_layers(self.parts["embed"](ids), self.parts, cache, start)
+                h = _head_forward(self.parts, ids, cache, start, self.device)
                 nxt = step(h, start)
                 start += ids.shape[1]
                 for _ in range(max_new):
@@ -517,11 +524,9 @@ class PipelineParallelEngine:
                     if len(text) > emitted:  # emit only the newly-decoded suffix
                         yield text[emitted:]
                         emitted = len(text)
-                    with _COMPUTE:
-                        h = run_layers(
-                            self.parts["embed"](torch.tensor([[nxt]], device=self.device)),
-                            self.parts, cache, start)
-                        _sync(self.device)
+                    h = _head_forward(
+                        self.parts, torch.tensor([[nxt]], device=self.device),
+                        cache, start, self.device, sync=True)
                     nxt = step(h, start)
                     start += 1
         except EDGE_ERRORS as e:
@@ -552,7 +557,7 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
     srv.settimeout(1.0)  # wake the accept loop periodically to honor stop_event
     if ready_event is not None:
         ready_event.set()
-    print(f"[tail] listening on :{port} (edge timeout {timeout:.0f}s, multi-stream)", flush=True)
+    logger.info("pipeline tail: listening on :%d (edge timeout %.0fs, multi-stream)", port, timeout)
     active = {"n": 0}
     active_lock = threading.Lock()
     stage_dtype = next(parts["layers"].parameters()).dtype  # cast inbound activations to ours
@@ -561,7 +566,7 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
         with active_lock:
             active["n"] += 1
             n = active["n"]
-        print(f"[tail] upstream connected from {addr} (active streams: {n})", flush=True)
+        logger.info("pipeline tail: upstream %s connected (active streams: %d)", addr, n)
         cache = DynamicCache()
         steps = 0
         try:
@@ -581,7 +586,7 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
                         send_msg(conn, {"tok": (toks[0] if len(toks) == 1 else toks), "tail_ms": tail_ms})
                     except EDGE_ERRORS as e:
                         why = "stalled" if isinstance(e, socket.timeout) else "closed"
-                        print(f"[tail] stream {addr} {why} after {steps} steps ({type(e).__name__})", flush=True)
+                        logger.info("pipeline tail: stream %s %s after %d steps (%s)", addr, why, steps, type(e).__name__)
                         try:
                             conn.close()
                         except OSError:
@@ -592,7 +597,7 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
             with active_lock:
                 active["n"] -= 1
                 left = active["n"]
-            print(f"[tail] stream {addr} ended after {steps} steps (active: {left})", flush=True)
+            logger.info("pipeline tail: stream %s ended after %d steps (active: %d)", addr, steps, left)
 
     try:
         while True:
@@ -609,7 +614,7 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
             srv.close()
         except OSError:
             pass
-        print(f"[tail] stage on :{port} stopped", flush=True)
+        logger.info("pipeline tail: stage on :%d stopped", port)
 
 
 def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", stop_event=None, ready_event=None):
@@ -625,20 +630,20 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
     srv.settimeout(1.0)  # wake the accept loop periodically to honor stop_event
     if ready_event is not None:
         ready_event.set()
-    print(f"[mid] listening on :{port}; relaying to tail {peer2}:{port2} (edge timeout {timeout:.0f}s)", flush=True)
+    logger.info("pipeline mid: listening on :%d; relaying to tail %s:%d (edge timeout %.0fs)", port, peer2, port2, timeout)
     stage_dtype = next(parts["layers"].parameters()).dtype  # cast inbound activations to ours
 
     def serve(conn, addr):
         try:
             tail_sock = _connect_with_retry(peer2, port2, timeout)
         except TransportError:
-            print(f"[mid] could not reach tail {peer2}:{port2}; dropping head {addr}", flush=True)
+            logger.warning("pipeline mid: could not reach tail %s:%d; dropping head %s", peer2, port2, addr)
             try:
                 conn.close()
             except OSError:
                 pass
             return
-        print(f"[mid] head {addr} connected; downstream tail open", flush=True)
+        logger.info("pipeline mid: head %s connected; downstream tail open", addr)
         cache = DynamicCache()
         steps = 0
         try:
@@ -653,7 +658,7 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
                         send_msg(conn, resp)  # relay it upstream to the head
                     except EDGE_ERRORS as e:
                         why = "stalled" if isinstance(e, socket.timeout) else "closed"
-                        print(f"[mid] stream {addr} {why} after {steps} steps ({type(e).__name__})", flush=True)
+                        logger.info("pipeline mid: stream %s %s after %d steps (%s)", addr, why, steps, type(e).__name__)
                         break
                     steps += 1
         finally:
@@ -662,7 +667,7 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
                     s.close()
                 except OSError:
                     pass
-            print(f"[mid] stream {addr} ended after {steps} steps", flush=True)
+            logger.info("pipeline mid: stream %s ended after %d steps", addr, steps)
 
     try:
         while True:
@@ -679,7 +684,7 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
             srv.close()
         except OSError:
             pass
-        print(f"[mid] stage on :{port} stopped", flush=True)
+        logger.info("pipeline mid: stage on :%d stopped", port)
 
 
 class PipelineStageWorker:
@@ -865,6 +870,9 @@ def orchestrate_household_pipeline(model_id, *, device="", dtype="float16",
 
 
 def main(argv=None):
+    # Standalone CLI: surface the module's log lines (load/serve) like the old prints.
+    # No-op inside the sidecar, which already configures logging.
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     ap = argparse.ArgumentParser(description="Potluck pipeline-parallel inference node")
     ap.add_argument("--role", required=True, choices=["head", "mid", "tail"])
     ap.add_argument("--model", default="Qwen/Qwen2.5-3B-Instruct")

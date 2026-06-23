@@ -222,8 +222,12 @@ class LLMRuntime:
         for concurrent inference on the same model instance.
         """
         if self._pipeline is not None:
-            # Pipeline-parallel strategy: delegate to the distributed engine, same SSE shape.
-            async for chunk in self._stream_chat_pipeline(messages, max_tokens=max_tokens):
+            # Pipeline-parallel strategy: distributed engine -> shared SSE machinery.
+            engine = self._pipeline
+            async for chunk in self._stream_sse_from_blocking(
+                lambda: engine.stream_tokens(messages, max_new=max_tokens),
+                label=f"pipeline_stream model_id={self._model_id}",
+            ):
                 yield chunk
             return
 
@@ -232,95 +236,42 @@ class LLMRuntime:
             yield "data: [DONE]\n\n"
             return
 
-        async with self._inference_lock:
-            loop = asyncio.get_running_loop()
-            queue: asyncio.Queue[str | None] = asyncio.Queue()
-            model = self._model
-            model_id = self._model_id
-            cancel_event = threading.Event()
+        # llama.cpp path: stream native chunks' delta content through the shared machinery.
+        model = self._model
+        model_id = self._model_id
 
-            def _generate() -> None:
-                try:
-                    response = model.create_chat_completion(
-                        messages=messages,
-                        temperature=temperature,
-                        max_tokens=max_tokens,
-                        stop=stop or [],
-                        stream=True,
-                    )
-                    for chunk in response:
-                        if cancel_event.is_set():
-                            break
-                        delta = chunk["choices"][0].get("delta", {})
-                        content = delta.get("content")
-                        if content:
-                            loop.call_soon_threadsafe(queue.put_nowait, content)
-                    loop.call_soon_threadsafe(queue.put_nowait, None)
-                except Exception as exc:
-                    logger.error("inference_error model_id=%s error=%s", model_id, type(exc).__name__)
-                    loop.call_soon_threadsafe(queue.put_nowait, f"\x00ERROR\x00{exc}")
-                    loop.call_soon_threadsafe(queue.put_nowait, None)
+        def produce():
+            for chunk in model.create_chat_completion(
+                messages=messages, temperature=temperature, max_tokens=max_tokens,
+                stop=stop or [], stream=True,
+            ):
+                yield chunk["choices"][0].get("delta", {}).get("content")
 
-            fut = loop.run_in_executor(None, _generate)
+        async for chunk in self._stream_sse_from_blocking(produce, label=f"stream model_id={model_id}"):
+            yield chunk
 
-            token_count = 0
-            start = time.monotonic()
-            try:
-                while True:
-                    item = await queue.get()
-                    if item is None:
-                        break
-                    if isinstance(item, str) and item.startswith("\x00ERROR\x00"):
-                        err_msg = item[len("\x00ERROR\x00"):]
-                        yield f'data: {json.dumps({"error": str(err_msg)})}\n\n'
-                        break
-                    token_count += 1
-                    yield f'data: {json.dumps({"choices": [{"delta": {"content": item}}]})}\n\n'
-                # Terminator on NORMAL completion only. Never yield from finally:
-                # on a client disconnect the generator is aclose()'d (GeneratorExit)
-                # and yielding there raises "async generator ignored GeneratorExit"
-                # and can leave the inference lock held forever.
-                yield "data: [DONE]\n\n"
-            except asyncio.CancelledError:
-                logger.info("stream_cancelled model_id=%s tokens_so_far=%d", model_id, token_count)
-            finally:
-                # Stop the worker and wait for it to release the model BEFORE the
-                # inference lock drops, so the next request can't race the
-                # non-thread-safe Llama. Awaiting here is safe during cleanup;
-                # yielding is not (see above).
-                cancel_event.set()
-                try:
-                    await asyncio.shield(fut)
-                except Exception:
-                    pass
-                logger.info(
-                    "stream_complete model_id=%s tokens=%d duration=%.3fs",
-                    model_id,
-                    token_count,
-                    round(time.monotonic() - start, 3),
-                )
-
-    async def _stream_chat_pipeline(self, messages: list[dict], *, max_tokens: int = 2048):
-        """Stream from the loaded PipelineParallelEngine. Runs the engine's blocking
-        stream_tokens generator in a worker thread, pumps text deltas onto an async queue,
-        and yields the same simplified SSE shape as the llama.cpp stream_chat path so the
-        chat UI is identical regardless of strategy. Serialized by _inference_lock."""
+    async def _stream_sse_from_blocking(self, produce, *, label):
+        """Shared SSE machinery for both backends (llama.cpp and the pipeline engine):
+        run the blocking content iterator produce() in a worker thread, pump pieces onto
+        an async queue, and yield the simplified OpenAI SSE shape. Serialised by
+        _inference_lock. Never yields from finally -- a client disconnect aclose()s the
+        generator (GeneratorExit) and yielding there would leave the lock held, so we drain
+        the worker there instead."""
         async with self._inference_lock:
             loop = asyncio.get_running_loop()
             queue: asyncio.Queue = asyncio.Queue()
-            engine = self._pipeline
-            model_id = self._model_id
             cancel_event = threading.Event()
 
             def _generate() -> None:
                 try:
-                    for delta in engine.stream_tokens(messages, max_new=max_tokens):
+                    for piece in produce():
                         if cancel_event.is_set():
                             break
-                        loop.call_soon_threadsafe(queue.put_nowait, delta)
+                        if piece:  # skip empty / None deltas
+                            loop.call_soon_threadsafe(queue.put_nowait, piece)
                     loop.call_soon_threadsafe(queue.put_nowait, None)
                 except Exception as exc:
-                    logger.error("pipeline_inference_error model_id=%s error=%s", model_id, type(exc).__name__)
+                    logger.error("%s error=%s", label, type(exc).__name__)
                     loop.call_soon_threadsafe(queue.put_nowait, f"\x00ERROR\x00{exc}")
                     loop.call_soon_threadsafe(queue.put_nowait, None)
 
@@ -340,17 +291,15 @@ class LLMRuntime:
                     yield f'data: {json.dumps({"choices": [{"delta": {"content": item}}]})}\n\n'
                 yield "data: [DONE]\n\n"
             except asyncio.CancelledError:
-                logger.info("pipeline_stream_cancelled model_id=%s tokens_so_far=%d", model_id, token_count)
+                logger.info("%s cancelled tokens_so_far=%d", label, token_count)
             finally:
                 cancel_event.set()
                 try:
                     await asyncio.shield(fut)
                 except Exception:
                     pass
-                logger.info(
-                    "pipeline_stream_complete model_id=%s tokens=%d duration=%.3fs",
-                    model_id, token_count, round(time.monotonic() - start, 3),
-                )
+                logger.info("%s complete tokens=%d duration=%.3fs",
+                            label, token_count, round(time.monotonic() - start, 3))
 
     async def chat(
         self,
