@@ -50,6 +50,7 @@ import {
   probePeer,
   type PeerCapabilities,
 } from '@/lib/householdInference';
+import { MeshMap } from '@/components/mesh/MeshMap';
 import {
   computeCapacity,
   speedLabel,
@@ -575,6 +576,13 @@ function PairedView({
 
       {/* Hero payoff — leads with the differentiator, not the status plumbing. */}
       <MeshPayoffCard peers={peers} onAddMachine={onAddMachine} />
+
+      {/* Household map — Deco-style radial view of the mesh, each machine
+          coloured by the same diagnostics the roster list uses. */}
+      <section aria-label="Household mesh map">
+        <SectionHeader>Your household mesh</SectionHeader>
+        <MeshMap status={status} peers={peers} report={report} />
+      </section>
 
       {/* This machine + Add CTA */}
       <section aria-label="This machine">
