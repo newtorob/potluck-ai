@@ -94,6 +94,12 @@ export interface PeerCapabilities {
   // set. The head sidecar does the actual orchestration + stage starts; the
   // frontend only needs this flag to decide whether to offer the toggle.
   available_for_pipeline?: boolean;
+  // Network link type (protocol_version >= 5). Populated from the peer's
+  // interface probe; null / undefined means the peer hasn't reported it yet.
+  // WiFi peers add latency and jitter in pipeline-parallel inference because
+  // activations cross the wire on every token — wiring them (Ethernet) is the
+  // single biggest real-world speedup the user can make.
+  link_type?: 'wired' | 'wifi' | 'unknown' | null;
 }
 
 /** Routing mode for picking which household peer serves a request. */

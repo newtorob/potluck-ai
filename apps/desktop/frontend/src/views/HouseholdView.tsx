@@ -36,6 +36,8 @@ import {
   Cpu,
   KeyRound,
   Network,
+  Wifi,
+  Cable,
 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { ViewHeader } from '@/components/layout/ViewHeader';
@@ -581,7 +583,7 @@ function PairedView({
           coloured by the same diagnostics the roster list uses. */}
       <section aria-label="Household mesh map">
         <SectionHeader>Your household mesh</SectionHeader>
-        <MeshMap status={status} peers={peers} report={report} />
+        <MeshMap status={status} peers={peers} report={report} capsByNode={capsByNode} />
       </section>
 
       {/* This machine + Add CTA */}
@@ -1537,8 +1539,31 @@ function PeerRow({ peer, diag, caps }: { peer: MeshPeer; diag?: PeerDiagnostic |
               {caps.inference_load?.busy ? 'Busy' : 'Idle'}
             </CapChip>
             {caps.available_for_big_model && <CapChip>Big Model ready</CapChip>}
+            {caps.link_type === 'wired' && (
+              <CapChip>
+                <Cable className="mr-1 h-3 w-3" aria-hidden="true" />
+                Wired
+              </CapChip>
+            )}
+            {caps.link_type === 'wifi' && (
+              <CapChip tone="amber">
+                <Wifi className="mr-1 h-3 w-3" aria-hidden="true" />
+                WiFi
+              </CapChip>
+            )}
           </div>
         )}
+
+        {/* Wiring nudge: shown when this peer is on WiFi AND eligible for
+            distributed inference. Shown per-peer so the user knows exactly
+            which machine to wire. Copy is plain + honest — no hype. */}
+        {caps?.link_type === 'wifi' &&
+          (caps.available_for_pipeline ?? caps.available_for_big_model) && (
+            <p className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-snug text-amber-700 dark:text-amber-300">
+              <Wifi className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+              On WiFi. Wiring it (Ethernet) makes distributed inference faster and steadier.
+            </p>
+          )}
 
         {showDetail && (
           <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">

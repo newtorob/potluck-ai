@@ -20,10 +20,11 @@
  * connection state). No new network calls.
  */
 
-import { AlertCircle, CheckCircle2, Cloud, Loader2, Monitor } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Cloud, Loader2, Monitor, Wifi } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import type { MeshPeer, MeshStatus } from '@/types/mesh';
 import type { DiagnosticsReport, PeerState } from '@/lib/meshDiagnostics';
+import type { PeerCapabilities } from '@/lib/householdInference';
 
 /** Per-state colour (Tailwind text-* so SVG strokes + dots use currentColor),
  *  mirroring the roster's PeerStateBadge palette. */
@@ -62,6 +63,7 @@ interface PeerNode {
   label: string;
   detail: string;
   pos: Pt;
+  linkType: 'wired' | 'wifi' | 'unknown' | null | undefined;
 }
 
 // Layout anchors, in a 0..100 square viewport.
@@ -81,10 +83,15 @@ export function MeshMap({
   status,
   peers,
   report,
+  capsByNode = {},
 }: {
   status: MeshStatus;
   peers: MeshPeer[];
   report: DiagnosticsReport;
+  /** Optional: live capabilities keyed by node_id. Used only for the WiFi
+   *  indicator glyph — no new network calls; PairedView passes its existing
+   *  probe results down. */
+  capsByNode?: Record<string, PeerCapabilities>;
 }) {
   const coord = coordState(status);
 
@@ -96,6 +103,7 @@ export function MeshMap({
       label: d?.label ?? 'Unknown',
       detail: d ? (d.fix ? `${d.detail} · ${d.fix}` : d.detail) : peer.mesh_ip,
       pos: peerPoint(i, peers.length),
+      linkType: capsByNode[peer.node_id]?.link_type,
     };
   });
 
@@ -191,6 +199,7 @@ export function MeshMap({
             stateColor={STATE_COLOR[n.state]}
             stateLabel={n.label}
             title2={n.detail}
+            linkType={n.linkType}
           />
         ))}
       </div>
@@ -216,6 +225,7 @@ function NodeCard({
   stateLabel,
   highlight = false,
   title2,
+  linkType,
 }: {
   pos: Pt;
   icon: IconType;
@@ -225,6 +235,7 @@ function NodeCard({
   stateLabel: string;
   highlight?: boolean;
   title2?: string | undefined;
+  linkType?: 'wired' | 'wifi' | 'unknown' | null | undefined;
 }) {
   return (
     <div
@@ -238,16 +249,27 @@ function NodeCard({
           highlight ? 'border-primary/40 ring-1 ring-primary/20' : 'border-border/60',
         )}
       >
-        <div
-          className={cn(
-            'flex h-7 w-7 items-center justify-center rounded-lg ring-1',
-            highlight ? 'bg-primary/12 ring-primary/20' : 'bg-muted ring-border/60',
+        <div className="relative">
+          <div
+            className={cn(
+              'flex h-7 w-7 items-center justify-center rounded-lg ring-1',
+              highlight ? 'bg-primary/12 ring-primary/20' : 'bg-muted ring-border/60',
+            )}
+          >
+            <Icon
+              className={cn('h-3.5 w-3.5', highlight ? 'text-primary' : 'text-muted-foreground')}
+              aria-hidden="true"
+            />
+          </div>
+          {linkType === 'wifi' && (
+            <span
+              className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-500/15 ring-1 ring-amber-500/30"
+              title="On WiFi"
+              aria-label="WiFi connection"
+            >
+              <Wifi className="h-2 w-2 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+            </span>
           )}
-        >
-          <Icon
-            className={cn('h-3.5 w-3.5', highlight ? 'text-primary' : 'text-muted-foreground')}
-            aria-hidden="true"
-          />
         </div>
         <span className="max-w-full truncate text-[11px] font-medium text-foreground">{title}</span>
         {subtitle && (
