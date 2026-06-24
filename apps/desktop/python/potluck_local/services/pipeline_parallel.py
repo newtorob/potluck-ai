@@ -811,6 +811,58 @@ _DEFAULT_TIER_VRAM_GB = 6.0
 _TIER_MODEL_GB = {"large": 20.0, "high": 20.0, "mid": 14.0, "medium": 14.0, "low": 8.0, "small": 8.0}
 _DEFAULT_MODEL_GB = 14.0
 
+# ---- Link cost (used for BOTH peer selection and chain ordering) ----------
+#
+# Every pipeline hop is on the per-token critical path, and a token relays through that
+# hop on EVERY step. So a link's cost isn't just its mean latency: jitter compounds (one
+# slow sample stalls that whole token) and a WiFi link -- especially a USB WiFi adapter
+# -- is both higher-latency AND jittery. We fold all three into one scalar so selection
+# and ordering use the same notion of "good link":
+#
+#     cost = median_rtt_ms + Kj * jitter_ms + link_penalty
+#
+# Kj weights jitter heavily because a jittery link hurts streaming smoothness out of
+# proportion to its median (a chain is only as steady as its worst hop). The penalties
+# are ADDITIVE constants in the same ms unit as RTT, sized so that on a typical LAN
+# (single-digit ms RTT) the wired/wifi distinction dominates ordering, while two wired
+# peers still sort by their actual measured RTT.
+_JITTER_WEIGHT = 2.0          # Kj: each ms of p90-p50 jitter counts as 2ms of cost
+_WIFI_PENALTY_MS = 50.0       # large: WiFi compounds per-token; only used when needed to fit
+_UNKNOWN_LINK_PENALTY_MS = 10.0  # mild: conservative nudge, never a hard exclusion
+_WIRED_PENALTY_MS = 0.0       # wired is the reference (no penalty)
+
+_LINK_PENALTY_MS = {
+    "wired": _WIRED_PENALTY_MS,
+    "wifi": _WIFI_PENALTY_MS,
+    "unknown": _UNKNOWN_LINK_PENALTY_MS,
+}
+
+
+def link_cost(node: dict) -> float:
+    """Scalar link cost for ordering + selecting pipeline nodes. PURE.
+
+        cost = median_rtt_ms + _JITTER_WEIGHT * jitter_ms + link penalty
+
+    Reads (with safe fallbacks) the fields the orchestrator attaches per node:
+      median_rtt_ms -- robust central RTT (falls back to legacy rtt_ms, else 0).
+      jitter_ms     -- p90 - p50 of the RTT burst (falls back to 0 == unknown jitter).
+      link_type     -- 'wired'|'wifi'|'unknown'; anything unrecognized => unknown penalty.
+
+    Wired => 0 penalty (reference). WiFi => a large additive penalty because the link is
+    re-traversed every token and jitter compounds; the head only falls to a WiFi peer when
+    it's needed to fit the model. Unknown => a mild penalty (conservative: we don't hard-
+    exclude a peer just because detection failed). The head itself has rtt 0 + jitter 0,
+    so its cost reduces to its own link penalty -- which never affects ordering since the
+    head is pinned at position 0, but is still recorded for visibility."""
+    median = node.get("median_rtt_ms")
+    if median is None:
+        median = node.get("rtt_ms", 0.0)  # back-compat with single-sample callers/tests
+    median = float(median)
+    jitter = float(node.get("jitter_ms", 0.0) or 0.0)
+    penalty = _LINK_PENALTY_MS.get((node.get("link_type") or "unknown").lower(),
+                                   _UNKNOWN_LINK_PENALTY_MS)
+    return median + _JITTER_WEIGHT * jitter + penalty
+
 
 def estimate_model_vram_bytes(n_params: int | None, *, dtype_bytes: int = 2,
                               fallback_tier: str | None = None) -> float:
@@ -854,25 +906,33 @@ def plan_pipeline_placement(
       n_layers   -- the model's transformer layer count.
       model_bytes-- conservative inference VRAM footprint (see estimate_model_vram_bytes).
       nodes      -- candidate nodes, HEAD FIRST then peers. Each:
-                    {"id": str, "vram_gb": float|None, "tier": str|None, "rtt_ms": float}.
-                    The head's rtt_ms is 0 (no link to itself).
+                    {"id": str, "vram_gb": float|None, "tier": str|None,
+                     "median_rtt_ms": float, "jitter_ms": float, "link_type": str}.
+                    The head's median_rtt_ms/jitter_ms are 0 (no link to itself), but its
+                    own link_type IS recorded. Legacy callers may pass "rtt_ms" instead of
+                    "median_rtt_ms"; link_cost() falls back to it, so old shapes still work.
       max_nodes  -- hard cap on chain length (engine is head/mid/tail => <=3).
 
     Returns one of:
       {"mode": "whole", "nodes": [head]}        -- the head alone fits the model;
                                                    skip the pipeline entirely (fastest).
       {"mode": "pipeline",                       -- a multi-node chain:
-       "order": [node, ...],                     -- chosen nodes in chain order (head first)
+       "order": [node, ...],                     -- chosen nodes in chain order (head first),
+                                                    each annotated with link_cost/link_type/
+                                                    median_rtt_ms/jitter_ms for visibility
        "layers": [count, ...],                   -- contiguous per-node layer counts (sum=n)
        "split": int, "split2": int}             -- the (split, split2) the rest expects.
 
     Decision rules:
       1. fits-on-one-box: if the head's own capacity >= model_bytes, return whole-model.
          No hop is faster than no hop.
-      2. otherwise build a chain: head first, then peers ordered by rtt ASCENDING
-         (lowest-latency links adjacent -- every hop is on the per-token critical path).
+      2. otherwise build a chain: head first, then peers ordered by LINK COST ascending
+         (see link_cost): cost = median_rtt + Kj*jitter + wifi/unknown penalty. Lowest-
+         cost links sit adjacent to the head -- every hop relays every token, so this
+         prefers wired + low-jitter peers and pushes WiFi/jittery ones to the far end.
       3. add only as many peers as needed for the cumulative capacity to cover the
-         model (fewest hops), capped at max_nodes.
+         model (fewest hops), capped at max_nodes. Because peers are pre-sorted by link
+         cost, a WiFi peer is admitted only when a cheaper-link peer can't make the fit.
       4. split layers PROPORTIONAL to each chosen node's capacity (big/fast node holds
          more), then CAP each node at what its VRAM can hold and spill the remainder to
          nodes with slack. Blocks stay contiguous: head=[0:a], mid=[a:b], tail=[b:n]."""
@@ -882,16 +942,19 @@ def plan_pipeline_placement(
     head = nodes[0]
     bytes_per_gb = 1e9
 
-    # Rule 1 -- fits-on-one-box short-circuit (the fastest option: no pipeline).
+    # Rule 1 -- fits-on-one-box short-circuit (the fastest option: no pipeline). The
+    # head still carries its own link_type for visibility, but no hop means no link cost.
     head_cap_bytes = _node_capacity_gb(head) * bytes_per_gb
     if head_cap_bytes >= model_bytes:
-        return {"mode": "whole", "nodes": [head]}
+        return {"mode": "whole", "nodes": [_annotate_link(head)]}
 
-    # Rule 2 -- order peers by link latency (lowest RTT first); head stays at position 0.
-    peers = sorted(nodes[1:], key=lambda p: (float(p.get("rtt_ms", 0.0)), str(p.get("id", ""))))
+    # Rule 2 -- order peers by LINK COST ascending (prefer wired/low-jitter, deprioritize
+    # WiFi/jittery), id as a deterministic tiebreak; head stays pinned at position 0.
+    peers = sorted(nodes[1:], key=lambda p: (link_cost(p), str(p.get("id", ""))))
 
-    # Rule 3 -- greedily admit the nearest peers until cumulative capacity covers the
-    # model OR we hit the node cap. Fewest hops that fit.
+    # Rule 3 -- greedily admit the lowest-cost-link peers until cumulative capacity covers
+    # the model OR we hit the node cap. Fewest hops that fit, best links first => a WiFi
+    # peer is only pulled in when a wired/closer peer can't complete the fit.
     chosen = [head]
     cum_bytes = head_cap_bytes
     for p in peers:
@@ -905,8 +968,24 @@ def plan_pipeline_placement(
 
     split = layers[0]
     split2 = (layers[0] + layers[1]) if len(layers) >= 3 else 0
-    return {"mode": "pipeline", "order": chosen, "layers": layers,
-            "split": split, "split2": split2}
+    return {"mode": "pipeline", "order": [_annotate_link(nd) for nd in chosen],
+            "layers": layers, "split": split, "split2": split2}
+
+
+def _annotate_link(node: dict) -> dict:
+    """Return a copy of `node` with its resolved link fields surfaced so the chosen chain
+    is self-describing: link_type, median_rtt_ms, jitter_ms, and the computed link_cost.
+    Pure; never mutates the caller's dict. Keeps the returned chain backward-compatible
+    (only ADDS fields; existing keys like id/vram_gb/tier/rtt_ms pass through unchanged)."""
+    out = dict(node)
+    median = node.get("median_rtt_ms")
+    if median is None:
+        median = node.get("rtt_ms", 0.0)
+    out["median_rtt_ms"] = float(median)
+    out["jitter_ms"] = float(node.get("jitter_ms", 0.0) or 0.0)
+    out["link_type"] = (node.get("link_type") or "unknown")
+    out["link_cost"] = link_cost(node)
+    return out
 
 
 def _proportional_contiguous_split(n_layers: int, caps_gb: list[float]) -> list[int]:
@@ -994,18 +1073,55 @@ def _stop_peer_stage(mesh_ip: str, timeout: float = 10.0) -> None:
         logger.warning("pipeline: failed to stop stage on %s during teardown: %s", mesh_ip, e)
 
 
-def _probe_peer(mesh_ip: str, timeout: float = 5.0) -> tuple[dict | None, float]:
-    """GET a peer's /peer/capabilities and TIME the round-trip. Returns (caps, rtt_ms);
-    (None, inf) on any failure. Reusing the capabilities call as the latency probe means
-    NO new endpoint -- the elapsed wall time of this request is a usable rtt signal for
-    ordering peers (lowest-latency links adjacent on the per-token critical path)."""
+def _probe_peer(mesh_ip: str, timeout: float = 5.0, samples: int = 7) -> tuple[dict | None, float, float]:
+    """GET a peer's /peer/capabilities N times and characterize the LINK, not just one
+    sample. Returns (caps, median_rtt_ms, jitter_ms); (None, inf, inf) on any failure.
+
+    Why N samples: a single RTT can't see JITTER, and jitter is what wrecks pipeline-
+    parallel -- every token relays through every hop, so one peer with occasional 60ms+
+    stalls makes the whole stream uneven even if its MEDIAN looks fine. We take a small
+    burst (default 7), use the MEDIAN as the central tendency (robust to a single outlier,
+    unlike the mean) and p90 - p50 as the JITTER metric (the size of the slow tail a token
+    can hit -- directly what hurts streaming, and bounded below by 0). Reusing the
+    capabilities call keeps this endpoint-free; first request also warms the connection.
+
+    Kept fast: small N, the caller's short timeout per request. A request that errors is
+    skipped (not counted as inf), so a transient blip doesn't poison the median; only a
+    peer that fails EVERY sample returns (None, inf, inf)."""
     import httpx
-    t0 = time.monotonic()
-    try:
-        caps = httpx.get(f"http://{mesh_ip}:8321/peer/capabilities", timeout=timeout).json()
-    except Exception:
-        return None, float("inf")
-    return caps, (time.monotonic() - t0) * 1e3
+
+    rtts: list[float] = []
+    caps: dict | None = None
+    with httpx.Client(timeout=timeout) as client:
+        for _ in range(max(1, samples)):
+            t0 = time.monotonic()
+            try:
+                r = client.get(f"http://{mesh_ip}:8321/peer/capabilities")
+                dt = (time.monotonic() - t0) * 1e3
+            except Exception:
+                continue
+            rtts.append(dt)
+            if caps is None:  # capabilities are static within a run; keep the first good one
+                caps = r.json()
+    if not rtts or caps is None:
+        return None, float("inf"), float("inf")
+    median = _percentile(rtts, 50)
+    jitter = max(0.0, _percentile(rtts, 90) - median)  # slow-tail size; >=0
+    return caps, median, jitter
+
+
+def _percentile(xs: list[float], pct: float) -> float:
+    """Nearest-rank percentile of a non-empty list (pure, no numpy on this path). pct in
+    [0,100]; clamps the rank into range so p100 -> max and p0 -> min. Small N here, so
+    the simple rank is plenty -- we only need a robust median + a slow-tail estimate."""
+    if not xs:
+        return 0.0
+    s = sorted(xs)
+    if len(s) == 1:
+        return s[0]
+    rank = int(round((pct / 100.0) * (len(s) - 1)))
+    rank = min(max(rank, 0), len(s) - 1)
+    return s[rank]
 
 
 def _collect_household_peers() -> list[dict]:
@@ -1038,8 +1154,10 @@ def orchestrate_household_pipeline(model_id, *, device="", dtype="float16",
 
     Selection: peers from the live roster whose /peer/capabilities reports
     available_for_pipeline. Layers are placed PROPORTIONAL to each node's VRAM and the
-    chain is ORDERED by link latency (lowest-RTT peers adjacent), using only as many
-    peers as needed to fit (fewest hops; capped at max_nodes). dtype is forced uniform
+    chain is ORDERED + SELECTED by LINK COST (median RTT + jitter + a WiFi/unknown-link
+    penalty), so wired, low-jitter peers sit adjacent to the head and a WiFi peer is only
+    pulled in when needed to fit. Uses only as many peers as needed to fit (fewest hops;
+    capped at max_nodes). dtype is forced uniform
     across the chain (default float16 -- the only dtype every backend including DirectML
     supports; bf16 is better for large models on non-DirectML chains). Stages start in
     REVERSE order (tail first) so a mid can dial its downstream tail. Raises if a split
@@ -1057,8 +1175,15 @@ def orchestrate_household_pipeline(model_id, *, device="", dtype="float16",
         from potluck_local.services.hardware_detect import detect_hardware
     hw = detect_hardware()
     head_tier = hw.get("recommended_tier")
+    # The head has no link to itself (rtt/jitter 0) but DOES record its own link type --
+    # carried through to the chain summary so an operator can see the head's link too.
+    try:
+        from .link_detect import detect_link_type
+    except ImportError:
+        from potluck_local.services.link_detect import detect_link_type
     head_node = {
-        "id": "this", "rtt_ms": 0.0,
+        "id": "this", "median_rtt_ms": 0.0, "jitter_ms": 0.0,
+        "link_type": detect_link_type(),
         "vram_gb": hw.get("gpu_vram_gb"), "tier": head_tier,
     }
 
@@ -1068,16 +1193,20 @@ def orchestrate_household_pipeline(model_id, *, device="", dtype="float16",
     n_params = estimate_params_from_config(cfg)
     model_bytes = estimate_model_vram_bytes(n_params, dtype_bytes=2, fallback_tier=head_tier)
 
-    # Eligible peers + per-peer RTT (timed capabilities probe; no new endpoint).
+    # Eligible peers + per-peer LINK characterization (N-sample capabilities probe; no
+    # new endpoint). We capture the median RTT, the jitter (p90-p50) and the peer's
+    # self-advertised link_type so the planner can prefer wired/low-jitter peers.
     candidates = [head_node]
     peer_meta: dict[str, dict] = {}  # id -> {mesh_ip, node_name} to resolve placement back
     for p in _collect_household_peers():
-        caps, rtt = _probe_peer(p["mesh_ip"])
+        caps, median_rtt, jitter = _probe_peer(p["mesh_ip"])
         if not caps or not caps.get("available_for_pipeline"):
             continue
         hwp = caps.get("hardware") or {}
         node = {
-            "id": p["mesh_ip"], "rtt_ms": rtt,
+            "id": p["mesh_ip"],
+            "median_rtt_ms": median_rtt, "jitter_ms": jitter,
+            "link_type": caps.get("link_type") or "unknown",
             "vram_gb": hwp.get("gpu_vram_gb"), "tier": hwp.get("recommended_tier"),
         }
         candidates.append(node)
@@ -1090,14 +1219,27 @@ def orchestrate_household_pipeline(model_id, *, device="", dtype="float16",
         logger.info("pipeline: model %s fits on the head alone -> whole-model (no split)", model_id)
         return {"mode": "whole", "model_id": model_id, "n_layers": n_layers, "dtype": dtype}
 
-    order = placement["order"]      # chosen nodes, head first, in chain order
+    order = placement["order"]      # chosen nodes, head first, in chain order (link-annotated)
     counts = placement["layers"]    # contiguous per-node layer counts
     split, split2 = placement["split"], placement["split2"]
     chain_peers = order[1:]         # everything after the head is a downstream stage
     if not chain_peers:
         raise RuntimeError("no household peers are available for pipeline-parallel inference")
 
-    nodes = [{"role": "head", "node": "this", "range": f"[0:{split}]"}]
+    by_id = {nd["id"]: nd for nd in order}  # resolve a chosen node's link fields by id
+
+    def _link_summary(nid: str) -> dict:
+        """Surface the chosen node's link characterization in the chain summary so an
+        operator/UI can see WHY the chain was ordered this way (wired vs wifi, jitter)."""
+        nd = by_id.get(nid, {})
+        return {
+            "link_type": nd.get("link_type", "unknown"),
+            "rtt_ms": round(float(nd.get("median_rtt_ms", 0.0)), 1),
+            "jitter_ms": round(float(nd.get("jitter_ms", 0.0)), 1),
+            "link_cost": round(float(nd.get("link_cost", 0.0)), 1),
+        }
+
+    nodes = [{"role": "head", "node": "this", "range": f"[0:{split}]", **_link_summary("this")}]
     started = []  # peer mesh IPs whose stage we've started, for rollback on partial failure
     try:
         if len(chain_peers) == 1:
@@ -1108,7 +1250,7 @@ def orchestrate_household_pipeline(model_id, *, device="", dtype="float16",
             }, timeout)
             started.append(tail_ip)
             nodes.append({"role": "tail", "node": peer_meta[tail_ip]["node_name"],
-                          "range": f"[{split}:{n_layers}]"})
+                          "range": f"[{split}:{n_layers}]", **_link_summary(tail_ip)})
             chain = {"split": split, "split2": 0, "peer": tail_ip, "port": stage_port}
         else:
             mid_ip, tail_ip = chain_peers[0]["id"], chain_peers[1]["id"]
@@ -1124,9 +1266,9 @@ def orchestrate_household_pipeline(model_id, *, device="", dtype="float16",
             }, timeout)
             started.append(mid_ip)
             nodes.append({"role": "mid", "node": peer_meta[mid_ip]["node_name"],
-                          "range": f"[{split}:{split2}]"})
+                          "range": f"[{split}:{split2}]", **_link_summary(mid_ip)})
             nodes.append({"role": "tail", "node": peer_meta[tail_ip]["node_name"],
-                          "range": f"[{split2}:{n_layers}]"})
+                          "range": f"[{split2}:{n_layers}]", **_link_summary(tail_ip)})
             chain = {"split": split, "split2": split2, "peer": mid_ip, "port": stage_port}
     except Exception:
         for ip in reversed(started):  # roll back stages already started so peers aren't wedged

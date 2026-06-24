@@ -160,6 +160,13 @@ class PeerCapabilities(BaseModel):
     # importing the torch-heavy engine module.
     available_for_pipeline: bool = False
 
+    # Link type (protocol_version >= 4): this node's primary network link, self-detected
+    # ('wired' | 'wifi' | 'unknown'). Pipeline-parallel round-trips through every hop on
+    # EVERY token, so a WiFi peer (esp. a USB adapter) hurts the per-token critical path
+    # with both higher latency and jitter; the orchestrator uses this to prefer wired,
+    # low-jitter peers. Detected once + cached; torch-free so it stays on this hot path.
+    link_type: str | None = None
+
 
 # Cache the hardware detect — it shells out to system tools (lspci, system_profiler,
 # GPUtil) on first call. Hardware doesn't change at runtime, so we re-detect once
@@ -248,6 +255,12 @@ async def peer_capabilities() -> PeerCapabilities:
         and os.environ.get("POTLUCK_PIPELINE_ENABLED") == "1"
     )
 
+    # Self-detected primary link type (wired/wifi/unknown). Cached after the first call;
+    # the link_detect module is stdlib-only + torch-free, safe for this hot path. The
+    # head reads this to deprioritize WiFi/jittery peers in pipeline-parallel placement.
+    from potluck_local.services.link_detect import detect_link_type
+    link_type = detect_link_type()
+
     return PeerCapabilities(
         hostname=socket.gethostname(),
         loaded_model=loaded,
@@ -259,6 +272,7 @@ async def peer_capabilities() -> PeerCapabilities:
         rpc_endpoint=rpc_endpoint,
         available_for_big_model=available_for_big_model,
         available_for_pipeline=available_for_pipeline,
+        link_type=link_type,
     )
 
 

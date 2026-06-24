@@ -21,14 +21,21 @@ from potluck_local.services.pipeline_parallel import (
     _proportional_contiguous_split,
     estimate_model_vram_bytes,
     estimate_params_from_config,
+    link_cost,
     plan_pipeline_placement,
 )
 
 GB = 1e9
 
 
-def _node(nid, vram_gb=None, tier=None, rtt_ms=0.0):
-    return {"id": nid, "vram_gb": vram_gb, "tier": tier, "rtt_ms": rtt_ms}
+def _node(nid, vram_gb=None, tier=None, rtt_ms=0.0, *, jitter_ms=0.0, link_type=None):
+    """Build a candidate node. `rtt_ms` maps to median_rtt_ms (link_cost falls back to
+    the legacy rtt_ms key too, so old call sites keep working). link_type defaults to
+    None -> 'unknown' penalty inside link_cost; pass 'wired'/'wifi' to exercise links."""
+    return {
+        "id": nid, "vram_gb": vram_gb, "tier": tier,
+        "median_rtt_ms": rtt_ms, "jitter_ms": jitter_ms, "link_type": link_type,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -42,7 +49,9 @@ def test_fits_on_one_box_returns_whole_model():
     peer = _node("10.0.0.2", vram_gb=24.0, tier="large", rtt_ms=5.0)
     placement = plan_pipeline_placement(48, model_bytes=10 * GB, nodes=[head, peer])
     assert placement["mode"] == "whole"
-    assert placement["nodes"] == [head]
+    # The returned head is link-annotated (additive); identity is keyed on id.
+    assert [n["id"] for n in placement["nodes"]] == ["this"]
+    assert placement["nodes"][0]["vram_gb"] == 24.0
 
 
 def test_whole_model_short_circuits_even_with_peers_available():
@@ -75,7 +84,7 @@ def test_split_raises_path_when_no_peers_but_too_big_returns_pipeline_with_no_ex
     head = _node("this", vram_gb=4.0, tier="low")
     placement = plan_pipeline_placement(32, model_bytes=20 * GB, nodes=[head])
     assert placement["mode"] == "pipeline"
-    assert placement["order"] == [head]
+    assert [n["id"] for n in placement["order"]] == ["this"]
     assert placement["layers"] == [32]
 
 
@@ -131,6 +140,100 @@ def test_fewest_hops_picks_the_nearest_sufficient_peer():
     assert placement["mode"] == "pipeline"
     order_ids = [n["id"] for n in placement["order"]]
     assert order_ids == ["this", "near"]  # second peer not needed
+
+
+# ---------------------------------------------------------------------------
+# Rule: link-aware + jitter-aware ordering / selection (link_cost)
+# ---------------------------------------------------------------------------
+
+
+def test_link_cost_pure_formula():
+    # cost = median_rtt + 2*jitter + penalty. wired=0, unknown=10, wifi=50.
+    assert link_cost(_node("a", rtt_ms=10.0, jitter_ms=0.0, link_type="wired")) == 10.0
+    assert link_cost(_node("b", rtt_ms=10.0, jitter_ms=5.0, link_type="wired")) == 20.0
+    assert link_cost(_node("c", rtt_ms=10.0, jitter_ms=0.0, link_type="wifi")) == 60.0
+    assert link_cost(_node("d", rtt_ms=10.0, jitter_ms=0.0, link_type=None)) == 20.0  # unknown=+10
+
+
+def test_link_cost_back_compat_legacy_rtt_key():
+    # A legacy single-sample caller passes rtt_ms (not median_rtt_ms); link_cost falls back.
+    legacy = {"id": "x", "rtt_ms": 7.0}
+    assert link_cost(legacy) == 7.0 + 10.0  # rtt + unknown-link penalty (no link_type set)
+
+
+def test_wired_beats_wifi_at_equal_rtt():
+    # Two peers, identical RTT + jitter, differ only by link type. The wired one is
+    # ordered first AND chosen first; both are needed to fit so both appear.
+    head = _node("this", vram_gb=4.0, tier="low", link_type="wired")
+    wifi = _node("wifi-peer", vram_gb=8.0, tier="mid", rtt_ms=5.0, link_type="wifi")
+    wired = _node("wired-peer", vram_gb=8.0, tier="mid", rtt_ms=5.0, link_type="wired")
+    placement = plan_pipeline_placement(48, model_bytes=18 * GB, nodes=[head, wifi, wired])
+    assert placement["mode"] == "pipeline"
+    order_ids = [n["id"] for n in placement["order"]]
+    assert order_ids.index("wired-peer") < order_ids.index("wifi-peer")
+
+
+def test_high_jitter_peer_is_deprioritized():
+    # Two wired peers, same median RTT; the high-jitter one is pushed later in the chain.
+    head = _node("this", vram_gb=4.0, tier="low", link_type="wired")
+    steady = _node("steady", vram_gb=8.0, tier="mid", rtt_ms=5.0, jitter_ms=1.0, link_type="wired")
+    jittery = _node("jittery", vram_gb=8.0, tier="mid", rtt_ms=5.0, jitter_ms=40.0, link_type="wired")
+    placement = plan_pipeline_placement(48, model_bytes=18 * GB, nodes=[head, jittery, steady])
+    assert placement["mode"] == "pipeline"
+    order_ids = [n["id"] for n in placement["order"]]
+    assert order_ids.index("steady") < order_ids.index("jittery")
+
+
+def test_wired_peer_chosen_over_wifi_when_either_alone_fits():
+    # Head can't fit; ONE peer is enough. A wired and a wifi peer both suffice -> the
+    # wired one is selected and the wifi one is left out (link cost drives selection,
+    # not just ordering).
+    head = _node("this", vram_gb=4.0, tier="low", link_type="wired")
+    wired = _node("wired", vram_gb=16.0, tier="large", rtt_ms=8.0, link_type="wired")
+    wifi = _node("wifi", vram_gb=16.0, tier="large", rtt_ms=3.0, link_type="wifi")
+    placement = plan_pipeline_placement(40, model_bytes=12 * GB, nodes=[head, wired, wifi])
+    assert placement["mode"] == "pipeline"
+    order_ids = [n["id"] for n in placement["order"]]
+    # Even though wifi has the lower raw RTT (3 vs 8), the wifi penalty makes wired cheaper.
+    assert order_ids == ["this", "wired"]
+
+
+def test_wifi_peer_still_used_when_only_way_to_fit():
+    # Head + a wifi peer are the ONLY nodes and the model needs both -> the wifi peer is
+    # still admitted (conservative: deprioritize, never hard-exclude).
+    head = _node("this", vram_gb=4.0, tier="low", link_type="wired")
+    wifi = _node("wifi", vram_gb=16.0, tier="large", rtt_ms=5.0, link_type="wifi")
+    placement = plan_pipeline_placement(40, model_bytes=15 * GB, nodes=[head, wifi])
+    assert placement["mode"] == "pipeline"
+    order_ids = [n["id"] for n in placement["order"]]
+    assert order_ids == ["this", "wifi"]  # used despite the WiFi penalty -- it's required
+
+
+def test_chosen_nodes_expose_link_fields():
+    # The returned chain annotates each chosen node with its resolved link characterization
+    # so the orchestrator/UI can show why the chain was ordered the way it was.
+    head = _node("this", vram_gb=4.0, tier="low", link_type="wired")
+    peer = _node("p", vram_gb=16.0, tier="large", rtt_ms=6.0, jitter_ms=2.0, link_type="wifi")
+    placement = plan_pipeline_placement(40, model_bytes=12 * GB, nodes=[head, peer])
+    chosen = {n["id"]: n for n in placement["order"]}
+    assert chosen["p"]["link_type"] == "wifi"
+    assert chosen["p"]["median_rtt_ms"] == 6.0
+    assert chosen["p"]["jitter_ms"] == 2.0
+    assert chosen["p"]["link_cost"] == 6.0 + 2.0 * 2.0 + 50.0  # rtt + Kj*jitter + wifi penalty
+    # head carries its own link type but cost reduces to its (wired) penalty == 0
+    assert chosen["this"]["link_type"] == "wired"
+    assert chosen["this"]["link_cost"] == 0.0
+
+
+def test_legacy_rtt_only_nodes_still_order_by_rtt():
+    # Back-compat: nodes that only carry the legacy rtt_ms key (no link fields) still get
+    # ordered by RTT (all share the same unknown-link penalty, so it cancels out).
+    head = {"id": "this", "vram_gb": 4.0, "tier": "low", "rtt_ms": 0.0}
+    far = {"id": "far", "vram_gb": 8.0, "tier": "mid", "rtt_ms": 120.0}
+    near = {"id": "near", "vram_gb": 8.0, "tier": "mid", "rtt_ms": 3.0}
+    placement = plan_pipeline_placement(48, model_bytes=18 * GB, nodes=[head, far, near])
+    order_ids = [n["id"] for n in placement["order"]]
+    assert order_ids.index("near") < order_ids.index("far")
 
 
 # ---------------------------------------------------------------------------
