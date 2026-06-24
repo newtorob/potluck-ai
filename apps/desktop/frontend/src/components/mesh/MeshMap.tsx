@@ -1,11 +1,16 @@
 /**
- * MeshMap — a Deco-style radial map of the household mesh: a central
- * "Household" hub with each machine (this one + peers) placed around it, the
- * spokes coloured by each machine's live connection state.
+ * MeshMap — a Deco-style topology of the household mesh, laid out to match the
+ * TP-Link Deco app's network map (Rob's confirmed reference):
  *
- * Deliberately a hand-laid radial layout, not a physics force-graph: a
- * household is a handful of nodes, and a static ring reads cleaner (and matches
- * the mental model of a router app like TP-Link Deco) than floating nodes.
+ *   - the COORDINATOR sits at the top as the uplink (the control plane this
+ *     household dials: Potluck's hosted one, or an org's on-prem one),
+ *   - THIS MACHINE is the center node (the "main unit"),
+ *   - OTHER MACHINES fan out below as satellites, each linked to this machine,
+ *   - a plain-language health line up top ("Everything looks good").
+ *
+ * Spokes carry the live connection state: direct = solid, relayed/connecting =
+ * dashed. It's a hand-laid radial layout, not a physics force-graph — a
+ * household is a handful of nodes and a static topology reads cleaner.
  *
  * Single source of truth: it consumes the SAME deriveDiagnostics() report the
  * roster list uses, so a machine's colour here always matches its status pill
@@ -15,7 +20,7 @@
  * connection state). No new network calls.
  */
 
-import { Home, Monitor } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Cloud, Loader2, Monitor } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import type { MeshPeer, MeshStatus } from '@/types/mesh';
 import type { DiagnosticsReport, PeerState } from '@/lib/meshDiagnostics';
@@ -32,42 +37,44 @@ const STATE_COLOR: Record<PeerState, string> = {
 };
 
 /** Direct links are solid; everything else is dashed (degraded or coming up). */
-function isSolid(state: PeerState): boolean {
-  return state === 'direct';
+const isSolid = (state: PeerState): boolean => state === 'direct';
+
+/** Map the coordinator connection into the shared PeerState palette + a label. */
+function coordState(status: MeshStatus): { state: PeerState; label: string } {
+  switch (status.coordinator_connection) {
+    case 'connected':
+      return { state: 'direct', label: 'Connected' };
+    case 'connecting':
+      return { state: 'connecting', label: 'Reconnecting' };
+    default:
+      return { state: 'no_data_plane', label: 'Offline' };
+  }
 }
 
-interface MapNode {
-  id: string;
-  name: string;
-  ip: string | null;
-  isSelf: boolean;
+interface Pt {
+  x: number;
+  y: number;
+}
+
+interface PeerNode {
+  peer: MeshPeer;
   state: PeerState;
   label: string;
   detail: string;
+  pos: Pt;
 }
 
-/** Map this machine's coordinator-connection into the shared PeerState palette. */
-function selfState(status: MeshStatus): PeerState {
-  if (status.mesh_status === 'error') return 'no_data_plane';
-  switch (status.coordinator_connection) {
-    case 'connected':
-      return 'direct';
-    case 'connecting':
-      return 'connecting';
-    default:
-      return 'no_data_plane';
-  }
-}
+// Layout anchors, in a 0..100 square viewport.
+const COORD: Pt = { x: 50, y: 13 };
+const SELF: Pt = { x: 50, y: 47 };
+const PEER_R = 34; // satellite distance from this machine
 
-function selfLabel(status: MeshStatus): string {
-  switch (status.coordinator_connection) {
-    case 'connected':
-      return 'Connected';
-    case 'connecting':
-      return 'Reconnecting';
-    default:
-      return 'Offline';
-  }
+/** Fan the peers across the lower arc below this machine. */
+function peerPoint(i: number, n: number): Pt {
+  const t = n === 1 ? 0.5 : i / (n - 1);
+  const deg = 140 - t * 100; // 140deg .. 40deg, all below center (sin > 0)
+  const a = (deg * Math.PI) / 180;
+  return { x: SELF.x + PEER_R * Math.cos(a), y: SELF.y + PEER_R * Math.sin(a) };
 }
 
 export function MeshMap({
@@ -79,127 +86,113 @@ export function MeshMap({
   peers: MeshPeer[];
   report: DiagnosticsReport;
 }) {
-  const nodes: MapNode[] = [
-    {
-      id: status.node_id ?? 'self',
-      name: 'This machine',
-      ip: status.mesh_ip,
-      isSelf: true,
-      state: selfState(status),
-      label: selfLabel(status),
-      detail: `This machine (${status.mesh_ip ?? 'no mesh IP'}) — ${selfLabel(status)} to the coordinator`,
-    },
-    ...peers.map((peer): MapNode => {
-      const d = report.perPeer[peer.node_id];
-      const state = d?.state ?? 'status_unknown';
-      return {
-        id: peer.node_id,
-        name: peer.node_name,
-        ip: peer.mesh_ip,
-        isSelf: false,
-        state,
-        label: d?.label ?? 'Unknown',
-        detail: d ? (d.fix ? `${d.detail} · ${d.fix}` : d.detail) : peer.mesh_ip,
-      };
-    }),
-  ];
+  const coord = coordState(status);
 
-  // Even radial placement, first node at the top (-90deg). R is a % of the
-  // square viewport; cards are transl-centered on each point.
-  const R = 34;
-  const positions = nodes.map((_, i) => {
-    const angle = ((-90 + (360 / nodes.length) * i) * Math.PI) / 180;
-    return { x: 50 + R * Math.cos(angle), y: 50 + R * Math.sin(angle) };
+  const peerNodes: PeerNode[] = peers.map((peer, i) => {
+    const d = report.perPeer[peer.node_id];
+    return {
+      peer,
+      state: d?.state ?? 'status_unknown',
+      label: d?.label ?? 'Unknown',
+      detail: d ? (d.fix ? `${d.detail} · ${d.fix}` : d.detail) : peer.mesh_ip,
+      pos: peerPoint(i, peers.length),
+    };
   });
 
-  const hubColor =
-    status.coordinator_connection === 'connected'
-      ? 'text-sage'
-      : status.coordinator_connection === 'connecting'
-        ? 'text-amber-500'
-        : 'text-destructive';
+  // Plain-language health line (Deco's "Everything looks good").
+  const offline = peerNodes.filter(
+    (n) => n.state === 'no_data_plane' || n.state === 'status_unknown',
+  ).length;
+  const relayed = peerNodes.filter((n) => n.state === 'relayed').length;
+  const health = deriveHealth({
+    coordConnected: status.coordinator_connection === 'connected',
+    coordConnecting: status.coordinator_connection === 'connecting',
+    machines: peers.length + 1,
+    offline,
+    relayed,
+  });
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-hearth-sm">
+      {/* Health line */}
+      <div className="mb-2 flex items-center justify-center gap-1.5 text-xs">
+        <health.Icon
+          className={cn('h-3.5 w-3.5', health.color, health.spin && 'animate-spin')}
+          aria-hidden="true"
+        />
+        <span className="font-medium text-foreground">{health.text}</span>
+      </div>
+
       <div className="relative mx-auto aspect-square w-full max-w-md">
-        {/* Spokes. preserveAspectRatio stays uniform because the box is square,
-            so each line lands exactly under its node card (positioned by %). */}
+        {/* Spokes. The box is square so viewBox 0..100 maps uniformly and each
+            line lands exactly under its node card (positioned by %). */}
         <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full" aria-hidden="true">
-          {nodes.map((node, i) => {
-            const p = positions[i];
-            return (
-              <line
-                key={node.id}
-                x1="50"
-                y1="50"
-                x2={p?.x}
-                y2={p?.y}
-                stroke="currentColor"
-                className={STATE_COLOR[node.state]}
-                strokeWidth={0.6}
-                strokeLinecap="round"
-                strokeDasharray={isSolid(node.state) ? undefined : '2 2'}
-                opacity={node.state === 'direct' ? 0.9 : 0.55}
-              />
-            );
-          })}
+          {/* uplink: coordinator -> this machine */}
+          <line
+            x1={COORD.x}
+            y1={COORD.y}
+            x2={SELF.x}
+            y2={SELF.y}
+            stroke="currentColor"
+            className={STATE_COLOR[coord.state]}
+            strokeWidth={0.6}
+            strokeLinecap="round"
+            strokeDasharray={isSolid(coord.state) ? undefined : '2 2'}
+            opacity={coord.state === 'direct' ? 0.9 : 0.55}
+          />
+          {/* satellites: this machine -> each peer */}
+          {peerNodes.map((n) => (
+            <line
+              key={n.peer.node_id}
+              x1={SELF.x}
+              y1={SELF.y}
+              x2={n.pos.x}
+              y2={n.pos.y}
+              stroke="currentColor"
+              className={STATE_COLOR[n.state]}
+              strokeWidth={0.6}
+              strokeLinecap="round"
+              strokeDasharray={isSolid(n.state) ? undefined : '2 2'}
+              opacity={n.state === 'direct' ? 0.9 : 0.55}
+            />
+          ))}
         </svg>
 
-        {/* Center hub — the household / coordinator. */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <div className="flex w-[96px] flex-col items-center gap-1 rounded-xl border border-primary/25 bg-background/70 px-2 py-2.5 text-center backdrop-blur">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/12 ring-1 ring-primary/20">
-              <Home className="h-4 w-4 text-primary" aria-hidden="true" />
-            </div>
-            <span className="text-[11px] font-medium text-foreground">Household</span>
-            <span className="flex items-center gap-1 text-[9px] text-muted-foreground">
-              <span className={cn('h-1.5 w-1.5 rounded-full bg-current', hubColor)} aria-hidden="true" />
-              Coordinator
-            </span>
-          </div>
-        </div>
+        {/* Coordinator (uplink) */}
+        <NodeCard
+          pos={COORD}
+          icon={Cloud}
+          title="Coordinator"
+          stateColor={STATE_COLOR[coord.state]}
+          stateLabel={coord.label}
+          title2={`Coordinator · ${coord.label}`}
+        />
 
-        {/* Machine nodes around the hub. */}
-        {nodes.map((node, i) => {
-          const p = positions[i];
-          return (
-            <div
-              key={node.id}
-              className="absolute -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${p?.x ?? 50}%`, top: `${p?.y ?? 50}%` }}
-              title={node.detail}
-            >
-              <div
-                className={cn(
-                  'flex w-[92px] flex-col items-center gap-1 rounded-xl border bg-card px-2 py-2 text-center shadow-hearth-sm',
-                  node.isSelf ? 'border-primary/40 ring-1 ring-primary/20' : 'border-border/60',
-                )}
-              >
-                <div
-                  className={cn(
-                    'flex h-7 w-7 items-center justify-center rounded-lg ring-1',
-                    node.isSelf ? 'bg-primary/12 ring-primary/20' : 'bg-muted ring-border/60',
-                  )}
-                >
-                  <Monitor
-                    className={cn('h-3.5 w-3.5', node.isSelf ? 'text-primary' : 'text-muted-foreground')}
-                    aria-hidden="true"
-                  />
-                </div>
-                <span className="max-w-full truncate text-[11px] font-medium text-foreground">
-                  {node.isSelf ? 'You' : node.name}
-                </span>
-                <span className="flex items-center gap-1 text-[9px] text-muted-foreground">
-                  <span
-                    className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-current', STATE_COLOR[node.state])}
-                    aria-hidden="true"
-                  />
-                  <span className="truncate">{node.label}</span>
-                </span>
-              </div>
-            </div>
-          );
-        })}
+        {/* This machine (center / main unit) */}
+        <NodeCard
+          pos={SELF}
+          icon={Monitor}
+          title="You"
+          subtitle={status.mesh_ip ?? undefined}
+          stateColor={STATE_COLOR[coord.state]}
+          stateLabel="This machine"
+          highlight
+          title2={`This machine${status.mesh_ip ? ` (${status.mesh_ip})` : ''}`}
+        />
+
+        {/* Peer satellites */}
+        {peerNodes.map((n) => (
+          <NodeCard
+            key={n.peer.node_id}
+            pos={n.pos}
+            icon={Monitor}
+            title={n.peer.node_name}
+            subtitle={n.peer.mesh_ip}
+            stateColor={STATE_COLOR[n.state]}
+            stateLabel={n.label}
+            title2={n.detail}
+          />
+        ))}
       </div>
 
       {/* Legend */}
@@ -207,10 +200,101 @@ export function MeshMap({
         <LegendDot className="text-sage" label="Direct" />
         <LegendDot className="text-amber-500" label="Relayed" />
         <LegendDot className="text-destructive" label="Offline" />
-        <span className="text-muted-foreground/70">Each machine and how it connects right now.</span>
       </div>
     </div>
   );
+}
+
+type IconType = typeof Monitor;
+
+function NodeCard({
+  pos,
+  icon: Icon,
+  title,
+  subtitle,
+  stateColor,
+  stateLabel,
+  highlight = false,
+  title2,
+}: {
+  pos: Pt;
+  icon: IconType;
+  title: string;
+  subtitle?: string | undefined;
+  stateColor: string;
+  stateLabel: string;
+  highlight?: boolean;
+  title2?: string | undefined;
+}) {
+  return (
+    <div
+      className="absolute -translate-x-1/2 -translate-y-1/2"
+      style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+      title={title2}
+    >
+      <div
+        className={cn(
+          'flex w-[96px] flex-col items-center gap-0.5 rounded-xl border bg-card px-2 py-2 text-center shadow-hearth-sm',
+          highlight ? 'border-primary/40 ring-1 ring-primary/20' : 'border-border/60',
+        )}
+      >
+        <div
+          className={cn(
+            'flex h-7 w-7 items-center justify-center rounded-lg ring-1',
+            highlight ? 'bg-primary/12 ring-primary/20' : 'bg-muted ring-border/60',
+          )}
+        >
+          <Icon
+            className={cn('h-3.5 w-3.5', highlight ? 'text-primary' : 'text-muted-foreground')}
+            aria-hidden="true"
+          />
+        </div>
+        <span className="max-w-full truncate text-[11px] font-medium text-foreground">{title}</span>
+        {subtitle && (
+          <span className="max-w-full truncate font-mono text-[9px] text-muted-foreground/80">
+            {subtitle}
+          </span>
+        )}
+        <span className="flex max-w-full items-center gap-1 text-[9px] text-muted-foreground">
+          <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-current', stateColor)} aria-hidden="true" />
+          <span className="truncate">{stateLabel}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function deriveHealth(args: {
+  coordConnected: boolean;
+  coordConnecting: boolean;
+  machines: number;
+  offline: number;
+  relayed: number;
+}): { text: string; Icon: IconType; color: string; spin?: boolean } {
+  if (args.coordConnecting) {
+    return { text: 'Connecting to the coordinator…', Icon: Loader2, color: 'text-muted-foreground', spin: true };
+  }
+  if (!args.coordConnected) {
+    return { text: 'Coordinator unreachable', Icon: AlertCircle, color: 'text-destructive' };
+  }
+  if (args.offline > 0) {
+    return {
+      text: `${args.offline} machine${args.offline === 1 ? '' : 's'} offline`,
+      Icon: AlertCircle,
+      color: 'text-amber-500',
+    };
+  }
+  if (args.relayed > 0) {
+    return {
+      text: `Mesh up · ${args.machines} machines · ${args.relayed} relayed`,
+      Icon: CheckCircle2,
+      color: 'text-amber-500',
+    };
+  }
+  if (args.machines === 1) {
+    return { text: 'Mesh up · just this machine', Icon: CheckCircle2, color: 'text-sage' };
+  }
+  return { text: `Everything looks good · ${args.machines} machines`, Icon: CheckCircle2, color: 'text-sage' };
 }
 
 function LegendDot({ className, label }: { className: string; label: string }) {
