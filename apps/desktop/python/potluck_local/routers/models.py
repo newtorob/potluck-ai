@@ -141,8 +141,11 @@ class PipelineConfig(BaseModel):
 
 class PipelineAutoConfig(BaseModel):
     """Auto pipeline-parallel: orchestrate a chain across this node + available household
-    peers, no explicit addresses. The sidecar queries the roster, plans an even split
-    (capped at 3 nodes), starts each peer's stage, then head-loads."""
+    peers, no explicit addresses. The sidecar queries the roster, runs TOPOLOGY-AWARE
+    placement (layers proportional to each node's VRAM; nodes ordered by link latency;
+    fewest hops that fit, capped at max_nodes), starts each peer's stage, then head-loads.
+    If the model fits on this machine alone, the split is skipped (strategy='whole-model')
+    and the response signals to load locally instead."""
 
     device: str = Field(default="", description="head device: cuda|mps|cpu|dml; autodetect if empty")
     dtype: str = Field(default="float16", description="uniform dtype across the chain (fp16 = safe on every backend incl DirectML)")
@@ -199,6 +202,24 @@ async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
             except Exception as exc:
                 logger.error("pipeline_orchestrate_error model_id=%s error=%s", model_id, exc)
                 raise HTTPException(status_code=502, detail=f"pipeline orchestration failed: {exc}")
+
+            # Topology-aware short-circuit: the planner found the model fits on THIS
+            # machine's VRAM alone, so it declined to build a pipeline (no hop is faster
+            # than no hop, and no peer stages were started). Signal the caller to load
+            # the model locally via the normal path instead of forcing a split.
+            if chain.get("mode") == "whole":
+                logger.info("load_pipeline_whole_model model_id=%s (fits on head; no split)", model_id)
+                return {
+                    "model_id": model_id,
+                    "strategy": "whole-model",
+                    "split_skipped": True,
+                    "n_layers": chain.get("n_layers"),
+                    "detail": (
+                        "Model fits on this machine's VRAM alone; the pipeline split was "
+                        "skipped. Load it locally (non-pipeline) for the fastest path."
+                    ),
+                }
+
             split, split2, peer, port = chain["split"], chain["split2"], chain["peer"], chain["port"]
             device, dtype = ac.device, chain["dtype"]
             chain_nodes = chain.get("nodes")

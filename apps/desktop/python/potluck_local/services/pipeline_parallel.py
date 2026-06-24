@@ -776,6 +776,205 @@ def plan_pipeline_chain(n_layers: int, n_nodes: int) -> tuple[int, int]:
     return per, 2 * per
 
 
+# ---------------------------------------------------------------------------
+# Topology-aware placement (pure, deterministic, unit-testable)
+# ---------------------------------------------------------------------------
+#
+# The even-split planner above is order-blind: it ignores how much VRAM each node
+# has and how far away it is. On a real household the nodes are heterogeneous (a
+# 24GB 3090 next to a 8GB laptop next to a Mac) and the links are heterogeneous
+# (a wired LAN peer vs a DERP-relayed one). Every pipeline hop is on the per-token
+# critical path, so two things matter: put the model on the FEWEST, LOWEST-LATENCY
+# nodes that can hold it, and give the big/fast node MORE layers. This planner does
+# both, while staying a pure function so it's testable without a mesh.
+
+# Conservative runtime overhead factor on top of raw weight bytes. A transformer
+# at inference needs more VRAM than just its weights: the KV cache grows with
+# context, activations are live during a forward, and the framework (CUDA context,
+# cuDNN workspaces, allocator fragmentation) reserves a slab. 1.3x is deliberately
+# pessimistic -- under-claiming a fit only costs us an unnecessary hop, while
+# OVER-claiming a fit wedges a node mid-load. When unsure we prefer to split.
+_VRAM_OVERHEAD = 1.3
+
+# Fallback per-node-tier VRAM weight estimate (GB) when a node advertises no
+# usable vram number (e.g. a CPU-only or detection-failed peer). Used both as the
+# capacity ceiling AND as the proportional weight, so a "high" node still pulls
+# more layers than a "low" one even without a hard VRAM reading. Conservative.
+_TIER_VRAM_GB = {"large": 16.0, "high": 16.0, "mid": 8.0, "medium": 8.0, "low": 4.0, "small": 4.0}
+_DEFAULT_TIER_VRAM_GB = 6.0
+
+# Fallback model footprint (GB, fp16 weights pre-overhead) keyed off the head's
+# recommended tier when we can't read the model's own param count. Picked so the
+# fits-on-one-box short-circuit stays conservative: assume a model roughly as big
+# as the biggest thing that tier is meant to run, so we don't claim a whole-model
+# fit we can't back up. fp16 bytes; the overhead factor is applied on top.
+_TIER_MODEL_GB = {"large": 20.0, "high": 20.0, "mid": 14.0, "medium": 14.0, "low": 8.0, "small": 8.0}
+_DEFAULT_MODEL_GB = 14.0
+
+
+def estimate_model_vram_bytes(n_params: int | None, *, dtype_bytes: int = 2,
+                              fallback_tier: str | None = None) -> float:
+    """Conservative inference-time VRAM footprint (BYTES) for a model.
+
+    Heuristic: weights ~= n_params * dtype_bytes (fp16 => 2 bytes/param), then a
+    runtime overhead factor (_VRAM_OVERHEAD) for KV cache + activations + framework
+    reservation. When n_params is unknown, fall back to a per-tier model-size guess
+    keyed off the HEAD's recommended tier (the requester's own machine). Pure.
+
+    Deliberately pessimistic -- see _VRAM_OVERHEAD. We would rather split a model
+    that would just barely have fit than claim a fit and wedge a node on load."""
+    if n_params and n_params > 0:
+        weight_bytes = float(n_params) * dtype_bytes
+    else:
+        gb = _TIER_MODEL_GB.get((fallback_tier or "").lower(), _DEFAULT_MODEL_GB)
+        weight_bytes = gb * 1e9  # the tier guesses are already fp16-weight GB
+    return weight_bytes * _VRAM_OVERHEAD
+
+
+def _node_capacity_gb(node: dict) -> float:
+    """USABLE VRAM (GB) for placing layers on a node. Prefer the advertised GPU
+    VRAM; fall back to the tier estimate when a node advertises none (CPU-only or
+    detection-failed peer). Never trusts a 0/None vram as 'tons of room'."""
+    vram = node.get("vram_gb")
+    if vram and vram > 0:
+        return float(vram)
+    return _TIER_VRAM_GB.get((node.get("tier") or "").lower(), _DEFAULT_TIER_VRAM_GB)
+
+
+def plan_pipeline_placement(
+    n_layers: int,
+    model_bytes: float,
+    nodes: list[dict],
+    *,
+    max_nodes: int = 3,
+) -> dict:
+    """Topology-aware placement for an AUTO pipeline run. PURE + DETERMINISTIC.
+
+    Inputs:
+      n_layers   -- the model's transformer layer count.
+      model_bytes-- conservative inference VRAM footprint (see estimate_model_vram_bytes).
+      nodes      -- candidate nodes, HEAD FIRST then peers. Each:
+                    {"id": str, "vram_gb": float|None, "tier": str|None, "rtt_ms": float}.
+                    The head's rtt_ms is 0 (no link to itself).
+      max_nodes  -- hard cap on chain length (engine is head/mid/tail => <=3).
+
+    Returns one of:
+      {"mode": "whole", "nodes": [head]}        -- the head alone fits the model;
+                                                   skip the pipeline entirely (fastest).
+      {"mode": "pipeline",                       -- a multi-node chain:
+       "order": [node, ...],                     -- chosen nodes in chain order (head first)
+       "layers": [count, ...],                   -- contiguous per-node layer counts (sum=n)
+       "split": int, "split2": int}             -- the (split, split2) the rest expects.
+
+    Decision rules:
+      1. fits-on-one-box: if the head's own capacity >= model_bytes, return whole-model.
+         No hop is faster than no hop.
+      2. otherwise build a chain: head first, then peers ordered by rtt ASCENDING
+         (lowest-latency links adjacent -- every hop is on the per-token critical path).
+      3. add only as many peers as needed for the cumulative capacity to cover the
+         model (fewest hops), capped at max_nodes.
+      4. split layers PROPORTIONAL to each chosen node's capacity (big/fast node holds
+         more), then CAP each node at what its VRAM can hold and spill the remainder to
+         nodes with slack. Blocks stay contiguous: head=[0:a], mid=[a:b], tail=[b:n]."""
+    if not nodes:
+        raise ValueError("plan_pipeline_placement: need at least the head node")
+    max_nodes = max(2, min(max_nodes, 3))
+    head = nodes[0]
+    bytes_per_gb = 1e9
+
+    # Rule 1 -- fits-on-one-box short-circuit (the fastest option: no pipeline).
+    head_cap_bytes = _node_capacity_gb(head) * bytes_per_gb
+    if head_cap_bytes >= model_bytes:
+        return {"mode": "whole", "nodes": [head]}
+
+    # Rule 2 -- order peers by link latency (lowest RTT first); head stays at position 0.
+    peers = sorted(nodes[1:], key=lambda p: (float(p.get("rtt_ms", 0.0)), str(p.get("id", ""))))
+
+    # Rule 3 -- greedily admit the nearest peers until cumulative capacity covers the
+    # model OR we hit the node cap. Fewest hops that fit.
+    chosen = [head]
+    cum_bytes = head_cap_bytes
+    for p in peers:
+        if cum_bytes >= model_bytes or len(chosen) >= max_nodes:
+            break
+        chosen.append(p)
+        cum_bytes += _node_capacity_gb(p) * bytes_per_gb
+
+    caps_gb = [_node_capacity_gb(nd) for nd in chosen]
+    layers = _proportional_contiguous_split(n_layers, caps_gb)
+
+    split = layers[0]
+    split2 = (layers[0] + layers[1]) if len(layers) >= 3 else 0
+    return {"mode": "pipeline", "order": chosen, "layers": layers,
+            "split": split, "split2": split2}
+
+
+def _proportional_contiguous_split(n_layers: int, caps_gb: list[float]) -> list[int]:
+    """Split n_layers across len(caps_gb) nodes PROPORTIONAL to capacity, with each
+    node getting >=1 layer and the counts summing EXACTLY to n_layers. Pure.
+
+    Largest-remainder (Hamilton) apportionment keeps the proportions honest and the
+    rounding deterministic; we then nudge the floor up so no node is starved of a
+    layer (a stage with 0 layers is pointless and breaks the contiguous mapping)."""
+    k = len(caps_gb)
+    if k <= 1:
+        return [n_layers]
+    n_layers = max(n_layers, k)  # need at least one layer per node
+    total_cap = sum(caps_gb) or float(k)
+    exact = [n_layers * c / total_cap for c in caps_gb]
+    floors = [max(1, int(f)) for f in exact]  # floor, but never below 1
+    # Distribute the leftover (or reclaim an overshoot from the >=1 flooring) by
+    # largest fractional remainder, so the split stays as proportional as integers allow.
+    diff = n_layers - sum(floors)
+    order = sorted(range(k), key=lambda i: exact[i] - int(exact[i]), reverse=True)
+    i = 0
+    while diff > 0:  # hand out remaining layers to the biggest remainders first
+        floors[order[i % k]] += 1
+        diff -= 1
+        i += 1
+    # If the >=1 minimum overshot (tiny model, many nodes), claw back from the
+    # nodes with the most layers so we never exceed n_layers.
+    while diff < 0:
+        j = max(range(k), key=lambda i: floors[i])
+        if floors[j] > 1:
+            floors[j] -= 1
+            diff += 1
+        else:
+            break  # everyone is at the floor of 1; can't reduce further
+    return floors
+
+
+def estimate_params_from_config(cfg) -> int | None:
+    """Best-effort parameter count from a HF config WITHOUT downloading weights.
+
+    Standard decoder-only transformer accounting: embeddings + per-layer (attention
+    projections + MLP) + final norm/head. Handles GQA (num_key_value_heads) and tied
+    embeddings. Returns None if the config lacks the fields we need, so the caller
+    falls back to the per-tier model-size guess. Pure (no I/O); the config read is
+    done by the caller. Approximate by design -- it feeds a conservative VRAM estimate,
+    not an exact memory plan."""
+    try:
+        h = int(cfg.hidden_size)
+        n_layers = int(cfg.num_hidden_layers)
+        vocab = int(cfg.vocab_size)
+        inter = int(getattr(cfg, "intermediate_size", 4 * h))
+        n_heads = int(getattr(cfg, "num_attention_heads", max(1, h // 128)))
+        n_kv = int(getattr(cfg, "num_key_value_heads", n_heads))
+    except (AttributeError, TypeError, ValueError):
+        return None
+    head_dim = h // n_heads if n_heads else h
+    # Attention: q [h,h] + k,v [h, n_kv*head_dim] each + o [h,h]
+    attn = h * h + 2 * (h * n_kv * head_dim) + h * h
+    # MLP: gate + up + down (gated SwiGLU-style; 3 matrices of ~h*inter). A plain
+    # 2-matrix MLP over-counts slightly, which is the safe direction here.
+    mlp = 3 * (h * inter)
+    per_layer = attn + mlp
+    embed = vocab * h
+    tied = bool(getattr(cfg, "tie_word_embeddings", False))
+    head = 0 if tied else vocab * h
+    return embed + n_layers * per_layer + head
+
+
 def _start_peer_stage(mesh_ip: str, body: dict, timeout: float) -> dict:
     """POST /peer/pipeline/stage on a household peer; raise on a non-200."""
     import httpx
@@ -795,69 +994,140 @@ def _stop_peer_stage(mesh_ip: str, timeout: float = 10.0) -> None:
         logger.warning("pipeline: failed to stop stage on %s during teardown: %s", mesh_ip, e)
 
 
-def orchestrate_household_pipeline(model_id, *, device="", dtype="float16",
-                                   max_nodes=3, stage_port=29900, timeout=30.0) -> dict:
-    """Build a pipeline chain across THIS node (head) + available household peers, start
-    each peer's stage, and return the chain config for runtime.load_pipeline:
-    {split, split2, peer, port, dtype, n_layers, nodes:[...]}.
-
-    Selection: peers from the live roster whose /peer/capabilities reports
-    available_for_pipeline. Even split, capped at 3 nodes. dtype is forced uniform across
-    the chain (default float16 -- the only dtype every backend including DirectML
-    supports; bf16 is better for large models on non-DirectML chains). Stages start in
-    REVERSE order (tail first) so a mid can dial its downstream tail. Raises if no peer
-    is eligible. Scope: my-machines / trusted-circle (never the open pool)."""
+def _probe_peer(mesh_ip: str, timeout: float = 5.0) -> tuple[dict | None, float]:
+    """GET a peer's /peer/capabilities and TIME the round-trip. Returns (caps, rtt_ms);
+    (None, inf) on any failure. Reusing the capabilities call as the latency probe means
+    NO new endpoint -- the elapsed wall time of this request is a usable rtt signal for
+    ordering peers (lowest-latency links adjacent on the per-token critical path)."""
     import httpx
-    from transformers import AutoConfig
+    t0 = time.monotonic()
+    try:
+        caps = httpx.get(f"http://{mesh_ip}:8321/peer/capabilities", timeout=timeout).json()
+    except Exception:
+        return None, float("inf")
+    return caps, (time.monotonic() - t0) * 1e3
+
+
+def _collect_household_peers() -> list[dict]:
+    """Roster of reachable household peers. household_peers() is async (gateway_routing),
+    and we run inside a thread off the event loop (load_model -> run_in_executor), so drive
+    it with asyncio.run(). [] on any failure (degrade to whole-model / no peers)."""
     try:
         from .gateway_routing import household_peers
     except ImportError:
         from potluck_local.services.gateway_routing import household_peers
+    import asyncio
+    try:
+        return asyncio.run(household_peers())
+    except Exception:
+        logger.debug("household_roster_unavailable_for_pipeline", exc_info=True)
+        return []
 
-    eligible = []
-    for p in household_peers():
-        try:
-            caps = httpx.get(f"http://{p['mesh_ip']}:8321/peer/capabilities", timeout=5.0).json()
-            if caps.get("available_for_pipeline"):
-                eligible.append(p)
-        except Exception:
+
+def orchestrate_household_pipeline(model_id, *, device="", dtype="float16",
+                                   max_nodes=3, stage_port=29900, timeout=30.0) -> dict:
+    """Build a pipeline chain across THIS node (head) + available household peers using
+    TOPOLOGY-AWARE placement (plan_pipeline_placement), start each peer's stage, and
+    return the chain config for runtime.load_pipeline:
+    {split, split2, peer, port, dtype, n_layers, nodes:[...]}.
+
+    Whole-model signal: when the head's own VRAM fits the model, the planner returns
+    mode="whole" and there is no fast path in placing a pipeline at all -- this function
+    returns {"mode": "whole", ...} (no split/peer/stage_peers). The caller (load_model)
+    sees mode=="whole" and loads the model LOCALLY instead of forcing a split.
+
+    Selection: peers from the live roster whose /peer/capabilities reports
+    available_for_pipeline. Layers are placed PROPORTIONAL to each node's VRAM and the
+    chain is ORDERED by link latency (lowest-RTT peers adjacent), using only as many
+    peers as needed to fit (fewest hops; capped at max_nodes). dtype is forced uniform
+    across the chain (default float16 -- the only dtype every backend including DirectML
+    supports; bf16 is better for large models on non-DirectML chains). Stages start in
+    REVERSE order (tail first) so a mid can dial its downstream tail. Raises if a split
+    is required but no peer is eligible. Scope: my-machines / trusted-circle (never the
+    open pool)."""
+    from transformers import AutoConfig
+
+    cfg = AutoConfig.from_pretrained(model_id)
+    n_layers = cfg.num_hidden_layers
+
+    # Head (self) resource signal from the local hardware detector.
+    try:
+        from .hardware_detect import detect_hardware
+    except ImportError:
+        from potluck_local.services.hardware_detect import detect_hardware
+    hw = detect_hardware()
+    head_tier = hw.get("recommended_tier")
+    head_node = {
+        "id": "this", "rtt_ms": 0.0,
+        "vram_gb": hw.get("gpu_vram_gb"), "tier": head_tier,
+    }
+
+    # Conservative model footprint: prefer the config-derived param count; fall back to
+    # the head's tier when the config is too sparse to estimate from (see the heuristic
+    # docstrings). fp16 (2 bytes/param) -- matches the default dtype the chain loads in.
+    n_params = estimate_params_from_config(cfg)
+    model_bytes = estimate_model_vram_bytes(n_params, dtype_bytes=2, fallback_tier=head_tier)
+
+    # Eligible peers + per-peer RTT (timed capabilities probe; no new endpoint).
+    candidates = [head_node]
+    peer_meta: dict[str, dict] = {}  # id -> {mesh_ip, node_name} to resolve placement back
+    for p in _collect_household_peers():
+        caps, rtt = _probe_peer(p["mesh_ip"])
+        if not caps or not caps.get("available_for_pipeline"):
             continue
-    if not eligible:
-        raise RuntimeError("no household peers are available for pipeline-parallel inference")
+        hwp = caps.get("hardware") or {}
+        node = {
+            "id": p["mesh_ip"], "rtt_ms": rtt,
+            "vram_gb": hwp.get("gpu_vram_gb"), "tier": hwp.get("recommended_tier"),
+        }
+        candidates.append(node)
+        peer_meta[p["mesh_ip"]] = {"mesh_ip": p["mesh_ip"], "node_name": p.get("node_name")}
 
-    n_layers = AutoConfig.from_pretrained(model_id).num_hidden_layers
-    use_peers = eligible[: max(1, max_nodes - 1)]
-    n_nodes = 1 + len(use_peers)
-    split, split2 = plan_pipeline_chain(n_layers, n_nodes)
+    placement = plan_pipeline_placement(n_layers, model_bytes, candidates, max_nodes=max_nodes)
+
+    # Fits-on-one-box: tell the caller to load locally; no pipeline, no peer stages.
+    if placement["mode"] == "whole":
+        logger.info("pipeline: model %s fits on the head alone -> whole-model (no split)", model_id)
+        return {"mode": "whole", "model_id": model_id, "n_layers": n_layers, "dtype": dtype}
+
+    order = placement["order"]      # chosen nodes, head first, in chain order
+    counts = placement["layers"]    # contiguous per-node layer counts
+    split, split2 = placement["split"], placement["split2"]
+    chain_peers = order[1:]         # everything after the head is a downstream stage
+    if not chain_peers:
+        raise RuntimeError("no household peers are available for pipeline-parallel inference")
 
     nodes = [{"role": "head", "node": "this", "range": f"[0:{split}]"}]
     started = []  # peer mesh IPs whose stage we've started, for rollback on partial failure
     try:
-        if n_nodes == 2:
-            tail = use_peers[0]
-            _start_peer_stage(tail["mesh_ip"], {
+        if len(chain_peers) == 1:
+            tail_ip = chain_peers[0]["id"]
+            _start_peer_stage(tail_ip, {
                 "model_id": model_id, "role": "tail", "split": split,
                 "port": stage_port, "device": device, "dtype": dtype,
             }, timeout)
-            started.append(tail["mesh_ip"])
-            nodes.append({"role": "tail", "node": tail["node_name"], "range": f"[{split}:{n_layers}]"})
-            chain = {"split": split, "split2": 0, "peer": tail["mesh_ip"], "port": stage_port}
+            started.append(tail_ip)
+            nodes.append({"role": "tail", "node": peer_meta[tail_ip]["node_name"],
+                          "range": f"[{split}:{n_layers}]"})
+            chain = {"split": split, "split2": 0, "peer": tail_ip, "port": stage_port}
         else:
-            mid, tail = use_peers[0], use_peers[1]
-            _start_peer_stage(tail["mesh_ip"], {  # tail first
+            mid_ip, tail_ip = chain_peers[0]["id"], chain_peers[1]["id"]
+            _start_peer_stage(tail_ip, {  # tail first
                 "model_id": model_id, "role": "tail", "split": split, "split2": split2,
                 "port": stage_port, "device": device, "dtype": dtype,
             }, timeout)
-            started.append(tail["mesh_ip"])
-            _start_peer_stage(mid["mesh_ip"], {  # then mid (dials the tail)
+            started.append(tail_ip)
+            _start_peer_stage(mid_ip, {  # then mid (dials the tail)
                 "model_id": model_id, "role": "mid", "split": split, "split2": split2,
                 "port": stage_port, "device": device, "dtype": dtype,
-                "peer2": tail["mesh_ip"], "port2": stage_port,
+                "peer2": tail_ip, "port2": stage_port,
             }, timeout)
-            started.append(mid["mesh_ip"])
-            nodes.append({"role": "mid", "node": mid["node_name"], "range": f"[{split}:{split2}]"})
-            nodes.append({"role": "tail", "node": tail["node_name"], "range": f"[{split2}:{n_layers}]"})
-            chain = {"split": split, "split2": split2, "peer": mid["mesh_ip"], "port": stage_port}
+            started.append(mid_ip)
+            nodes.append({"role": "mid", "node": peer_meta[mid_ip]["node_name"],
+                          "range": f"[{split}:{split2}]"})
+            nodes.append({"role": "tail", "node": peer_meta[tail_ip]["node_name"],
+                          "range": f"[{split2}:{n_layers}]"})
+            chain = {"split": split, "split2": split2, "peer": mid_ip, "port": stage_port}
     except Exception:
         for ip in reversed(started):  # roll back stages already started so peers aren't wedged
             _stop_peer_stage(ip)
@@ -865,7 +1135,7 @@ def orchestrate_household_pipeline(model_id, *, device="", dtype="float16",
 
     # stage_peers lets the caller (load endpoint) tear the chain down if the HEAD load
     # then fails -- otherwise the peer stages would be left running.
-    chain.update(dtype=dtype, n_layers=n_layers, nodes=nodes, stage_peers=started)
+    chain.update(mode="pipeline", dtype=dtype, n_layers=n_layers, nodes=nodes, stage_peers=started)
     return chain
 
 
