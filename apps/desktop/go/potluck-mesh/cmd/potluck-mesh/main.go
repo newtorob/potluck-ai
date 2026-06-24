@@ -929,7 +929,12 @@ func runReachabilityLoop(
 			}
 			if st.mode == modeLANDirect {
 				st.reachable = nowReachable
-				if handshakeStale {
+				// A live direct WG session only re-handshakes ~every 2min (REKEY_AFTER_TIME),
+				// with keepalives in between, so judge a direct link dead by the 3min fresh
+				// window (!nowReachable), NOT the 30s derpFallbackThreshold used for proactive
+				// DERP fallback -- otherwise a perfectly healthy idle direct link false-positives
+				// "stale" at 30s and bounces straight back to the relay.
+				if !nowReachable {
 					slog.Warn("lan_direct: direct LAN path went stale, restoring DERP floor",
 						"node_id", p.NodeID,
 						"pubkey_prefix", util.TruncatePubkey(pubkey),
