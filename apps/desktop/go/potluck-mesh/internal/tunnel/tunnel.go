@@ -509,6 +509,17 @@ func appendPeerConfig(sb *strings.Builder, p Peer) {
 		sb.WriteByte('\n')
 	}
 
+	// When the peer carries allowed-ips, clear any existing set before listing
+	// them so re-adding an already-configured peer REPLACES its allowed-ips
+	// rather than merging. This is the canonical wireguard UAPI idempotent-
+	// reconfig idiom: without it, a same-key rejoin (e.g. a peer that rebooted
+	// and re-paired) leaves stale allowed-ip entries behind and the data path
+	// never cleanly re-establishes. Harmless under replace_peers (SetPeers);
+	// required for the single-peer AddPeer re-add path.
+	if len(p.AllowedIPs) > 0 {
+		sb.WriteString("replace_allowed_ips=true\n")
+	}
+
 	for _, cidr := range p.AllowedIPs {
 		sb.WriteString("allowed_ip=")
 		sb.WriteString(cidr)

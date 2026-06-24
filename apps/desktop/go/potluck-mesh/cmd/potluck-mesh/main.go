@@ -680,7 +680,25 @@ func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.
 				// arrived via direct UDP (TX/RX counters on the inner bind vs.
 				// the DERP-inject path) and flip back only when there's
 				// evidence direct UDP actually works for this peer.
-				_ = peerDerpBind // intentionally not flipping back
+				_ = peerDerpBind // intentionally not flipping back to direct
+
+				// Same-key rejoin recovery: if this peer was already flipped to
+				// DERP and just produced a FRESH handshake after a stale gap
+				// (it went unreachable, then came back), the control plane
+				// (handshakes/keepalives) is up again but the rejoin may have
+				// disturbed the synthetic DERP endpoint + allowed-ip on the WG
+				// device, so the DATA path stays broken. Re-assert the DERP
+				// flip to re-install the synthetic endpoint and routing flag.
+				// Idempotent for the steady-state case (peer was reachable all
+				// along), so this only matters on the unreachable→reachable
+				// transition handled here.
+				if peerDerpBind != nil && st.derpRouted {
+					slog.Info("derp_fallback: re-asserting DERP route after peer recovered",
+						"node_id", p.NodeID,
+						"pubkey_prefix", util.TruncatePubkey(pubkey),
+					)
+					flipToDERP(tun, peerDerpBind, pubkey, pubkeyBytes)
+				}
 			} else {
 				slog.Warn("reachability: peer became unreachable",
 					"node_id", p.NodeID,
@@ -938,8 +956,33 @@ func (h *rosterHandler) OnWelcome(w msignal.Welcome) {
 func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
 	// Added peers: insert into cache + configure WG peer.
 	for _, p := range u.Added {
+		// A coordinator "added" event is NOT always a brand-new peer: when a
+		// peer reboots and rejoins with its SAME persisted WG key, the
+		// coordinator re-broadcasts it as `added`. If we already know this
+		// node locally, treat the event as a clean RE-SYNC rather than a
+		// fresh add: tear the WG peer down and re-add it (now safe — fix in
+		// appendPeerConfig emits replace_allowed_ips, so the re-add cleanly
+		// replaces the stale allowed-ips instead of merging) so the data path
+		// re-establishes. A plain re-add over stale state black-holes traffic.
+		_, alreadyKnown := h.ps.Get(p.NodeID)
 		h.ps.Upsert(p)
 		peer := rosterPeerToTunnelPeer(p)
+
+		if alreadyKnown {
+			slog.Info("roster update: same-key rejoin detected, re-syncing peer",
+				"node_id", p.NodeID,
+				"mesh_ip", p.MeshIP,
+			)
+			// Drop the stale WG peer first so the re-add starts from a clean
+			// slate (clears any stale endpoint/allowed-ip state on the device).
+			if err := h.tun.RemovePeer(p.WGPublicKey); err != nil {
+				slog.Warn("tunnel: RemovePeer during rejoin re-sync failed",
+					"node_id", p.NodeID,
+					"err", err,
+				)
+			}
+		}
+
 		if err := h.tun.AddPeer(peer); err != nil {
 			slog.Error("tunnel: AddPeer failed",
 				"node_id", p.NodeID,
@@ -947,7 +990,8 @@ func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
 				"err", err,
 			)
 		}
-		// Install the kernel route for the new peer's mesh IP.
+		// Install the kernel route for the new peer's mesh IP. Re-asserting an
+		// existing route on a rejoin is a no-op/idempotent at the OS layer.
 		if p.MeshIP != "" {
 			if err := h.tun.AddPeerRoute(p.MeshIP); err != nil {
 				slog.Warn("tunnel: AddPeerRoute failed for new peer",
@@ -957,16 +1001,18 @@ func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
 				)
 			}
 		}
-		// Proactively flip to DERP for the new peer (same rationale as
+		// Proactively flip to DERP for the peer (same rationale as
 		// OnWelcome — don't waste 30s on direct-UDP handshakes that
-		// can't succeed under hairpin/symmetric NAT).
+		// can't succeed under hairpin/symmetric NAT). On a rejoin re-sync
+		// this re-asserts the synthetic DERP endpoint + routing flag that the
+		// fresh AddPeer just cleared, so the relay data path comes back.
 		if h.flipPeerToDERPFn != nil {
 			h.flipPeerToDERPFn(p.WGPublicKey)
 		}
 		if h.bus != nil {
 			h.bus.Publish(events.NewPeerAdded(rosterPeerToSnapshot(p, false, false)))
 		}
-		// Newly added peer: punch if endpoint known.
+		// Newly added (or rejoined) peer: punch if endpoint known.
 		if p.LastEndpoint != nil && *p.LastEndpoint != "" {
 			h.maybeSendRequestPunch(p.NodeID)
 		}
