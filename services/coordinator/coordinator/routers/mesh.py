@@ -90,8 +90,18 @@ SIGNAL_HELLO_TIMEOUT_S = 10.0
 # coordinator-internal pub/sub. Out of scope for v0.
 _signal_connections: dict[uuid.UUID, WebSocket] = {}
 
+# In-memory map: mesh_node.id → last-reported private-LAN candidates
+# ("ip:port"). Populated from endpoint_update messages and read back in
+# _peer_to_enrolled so the list flows into Welcome / RosterUpdate /
+# EnrollResponse without a DB column. Deliberately NOT persisted: LAN
+# endpoints are volatile (DHCP, interface churn) and are only useful while
+# a node is connected. Single-process, like _signal_connections; a multi-
+# process deployment would lift this into shared state. Cleared on disconnect.
+_local_endpoints: dict[uuid.UUID, list[str]] = {}
+
 # Lock guarding `_signal_connections` so concurrent welcome / disconnect
-# / broadcast operations don't race on dict mutation.
+# / broadcast operations don't race on dict mutation. Also guards
+# `_local_endpoints`.
 _signal_lock = asyncio.Lock()
 
 logger = structlog.get_logger(__name__)
@@ -621,12 +631,18 @@ async def issue_derp_token(
 
 
 def _peer_to_enrolled(peer: MeshNode) -> EnrolledPeer:
+    # local_endpoints are not persisted; pull the last value reported over the
+    # signal WS from the in-memory map (empty if the node never reported any or
+    # isn't currently connected). Read without the lock: dict.get is atomic in
+    # CPython and a stale read is harmless (worst case a peer learns a slightly
+    # old LAN candidate, which this phase doesn't act on anyway).
     return EnrolledPeer(
         node_id=peer.id,
         node_name=peer.node_name,
         mesh_ip=str(peer.mesh_ip),
         wg_public_key=peer.wg_public_key,
         last_endpoint=peer.last_endpoint,
+        local_endpoints=list(_local_endpoints.get(peer.id, [])),
         last_seen_at=peer.last_seen_at,
         platform=peer.platform,
     )
@@ -854,6 +870,13 @@ async def mesh_signal(ws: WebSocket) -> None:
                     )
                     continue
 
+                # Store the last-reported LAN candidates in-memory (already
+                # filtered to private ip:port + capped by the schema validator)
+                # so they flow into roster snapshots via _peer_to_enrolled.
+                # No DB write — these are volatile and connection-scoped.
+                async with _signal_lock:
+                    _local_endpoints[node_id] = list(upd.local_endpoints)
+
                 async with get_session_factory()() as db:
                     db_node = await db.get(MeshNode, node_id)
                     if db_node is not None:
@@ -956,6 +979,10 @@ async def mesh_signal(ws: WebSocket) -> None:
         current = _signal_connections.get(node_id)
         if current is ws:
             _signal_connections.pop(node_id, None)
+            # Drop the node's LAN candidates: they're connection-scoped and
+            # meaningless once it's gone. Only clear if THIS ws is the live one
+            # (a newer reconnection may have already replaced it).
+            _local_endpoints.pop(node_id, None)
 
     try:
         async with get_session_factory()() as db:

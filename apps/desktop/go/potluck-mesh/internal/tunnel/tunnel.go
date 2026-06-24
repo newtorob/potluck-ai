@@ -191,6 +191,13 @@ func (t *Tunnel) Close() {
 	t.dev.Close()
 }
 
+// WGPort returns the UDP port the WireGuard device listens on (51820 by
+// default). Used by LAN direct-path discovery (internal/localep) to format
+// this node's private-LAN endpoints as "ip:<wgPort>".
+func (t *Tunnel) WGPort() int {
+	return t.wgPort
+}
+
 // AddPeerRoute installs a /32 host route for the given peer mesh IP via this
 // node's TUN interface. Required because the local mesh-IP /32 (installed by
 // SetMeshIP) only covers our own address — without explicit host routes for

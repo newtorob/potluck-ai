@@ -17,10 +17,66 @@ Privacy notes:
 """
 from __future__ import annotations
 
+import ipaddress
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+# Cap on how many LAN candidates a node may advertise. Multi-homed hosts have a
+# handful of RFC1918 addresses; more than this is almost certainly noise or
+# abuse. Mirrors the client-side cap in internal/localep (Go).
+MAX_LOCAL_ENDPOINTS = 4
+
+
+def _is_private_lan_endpoint(value: str) -> bool:
+    """Server-side defense in depth for LAN direct-path candidates.
+
+    Returns True only when `value` is "<ip>:<port>" where ip is an IPv4 RFC1918
+    address (10/8, 172.16/12, 192.168/16) and port is 1..65535. Loopback,
+    link-local, and the tailnet/CGNAT range (100.64.0.0/10) are rejected so a
+    Tailscale address can never be redistributed as a physical-LAN endpoint —
+    even if a malicious or buggy client claims one.
+    """
+    host, sep, port = value.rpartition(":")
+    if not sep or not host:
+        return False
+    if not port.isdigit():
+        return False
+    port_num = int(port)
+    if port_num < 1 or port_num > 65535:
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    if ip.version != 4:
+        return False
+    if ip.is_loopback or ip.is_link_local:
+        return False
+    # 100.64.0.0/10 — tailnet / CGNAT. is_private would say True, so check first.
+    if ip in ipaddress.ip_network("100.64.0.0/10"):
+        return False
+    return ip.is_private
+
+
+def _filter_local_endpoints(values: list[str]) -> list[str]:
+    """Drop any entry that isn't a private ip:port, dedup (preserving order),
+    and cap the list length. Applied server-side to inbound updates."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for v in values:
+        if not isinstance(v, str):
+            continue
+        if not _is_private_lan_endpoint(v):
+            continue
+        if v in seen:
+            continue
+        seen.add(v)
+        out.append(v)
+        if len(out) >= MAX_LOCAL_ENDPOINTS:
+            break
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -47,13 +103,21 @@ class EnrollRequest(BaseModel):
 
 
 class EnrolledPeer(BaseModel):
-    """One entry in the roster returned by enrollment."""
+    """One entry in the roster returned by enrollment.
+
+    `local_endpoints` carries the peer's private-LAN "ip:port" candidates
+    (RFC1918 only) so same-LAN peers can later attempt a direct connection
+    instead of relaying through DERP. Phase 0/1 distributes the list but no
+    routing decision uses it yet. The list is held in-memory only (last value
+    reported over the signal WS); it is NOT persisted to the DB.
+    """
 
     node_id: uuid.UUID
     node_name: str
     mesh_ip: str
     wg_public_key: str
     last_endpoint: str | None = None
+    local_endpoints: list[str] = Field(default_factory=list)
     last_seen_at: datetime | None = None
     platform: str | None = None
 
@@ -165,6 +229,18 @@ class SignalHello(BaseModel):
 class SignalEndpointUpdate(BaseModel):
     type: Literal["endpoint_update"] = "endpoint_update"
     external_endpoint: str = Field(..., max_length=64)  # "ip:port"
+    # Private-LAN "ip:port" candidates for same-LAN direct connections. The
+    # validator below re-applies the RFC1918 filter server-side (defense in
+    # depth): non-private entries are dropped and the list is capped, so a
+    # client cannot get a tailnet/public address redistributed to peers.
+    local_endpoints: list[str] = Field(default_factory=list)
+
+    @field_validator("local_endpoints", mode="before")
+    @classmethod
+    def _sanitize_local_endpoints(cls, v: object) -> list[str]:
+        if not isinstance(v, list):
+            return []
+        return _filter_local_endpoints(v)
 
 
 class SignalRequestPunch(BaseModel):

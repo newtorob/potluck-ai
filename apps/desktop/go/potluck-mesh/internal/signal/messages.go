@@ -28,14 +28,24 @@ func NewHello(pubKey string) Hello {
 
 // EndpointUpdate tells the coordinator about this node's current external
 // WireGuard endpoint (learned from STUN or interface enumeration).
-// Not yet sent in the week-2 bootstrap; scaffolded for week 3.
+//
+// LocalEndpoints carries this node's private-LAN "ip:port" candidates (RFC1918
+// only; never a tailnet address) so peers on the same LAN can later attempt a
+// direct connection instead of relaying through DERP. As of Phase 0/1 this is
+// additive plumbing only: the coordinator stores + redistributes the list but
+// no routing decision uses it yet.
 type EndpointUpdate struct {
-	Type             string `json:"type"`
-	ExternalEndpoint string `json:"external_endpoint"`
+	Type             string   `json:"type"`
+	ExternalEndpoint string   `json:"external_endpoint"`
+	LocalEndpoints   []string `json:"local_endpoints,omitempty"`
 }
 
-func NewEndpointUpdate(endpoint string) EndpointUpdate {
-	return EndpointUpdate{Type: "endpoint_update", ExternalEndpoint: endpoint}
+func NewEndpointUpdate(endpoint string, local []string) EndpointUpdate {
+	return EndpointUpdate{
+		Type:             "endpoint_update",
+		ExternalEndpoint: endpoint,
+		LocalEndpoints:   local,
+	}
 }
 
 // Ping is a keepalive sent every 30 seconds.
@@ -64,12 +74,13 @@ func NewRequestPunch(targetNodeID string) RequestPunch {
 // RosterPeer mirrors schemas/mesh.py:EnrolledPeer.
 // Only mesh-layer fields are present; no inference content, no member_id.
 type RosterPeer struct {
-	NodeID      string  `json:"node_id"`
-	NodeName    string  `json:"node_name"`
-	MeshIP      string  `json:"mesh_ip"`
-	WGPublicKey string  `json:"wg_public_key"`
-	LastEndpoint *string `json:"last_endpoint,omitempty"`
-	Platform    *string `json:"platform,omitempty"`
+	NodeID         string   `json:"node_id"`
+	NodeName       string   `json:"node_name"`
+	MeshIP         string   `json:"mesh_ip"`
+	WGPublicKey    string   `json:"wg_public_key"`
+	LastEndpoint   *string  `json:"last_endpoint,omitempty"`
+	LocalEndpoints []string `json:"local_endpoints,omitempty"`
+	Platform       *string  `json:"platform,omitempty"`
 }
 
 // Welcome is the first message the server sends after a valid Hello.
@@ -94,11 +105,11 @@ type RosterUpdate struct {
 // PunchCoord is delivered by the coordinator to both parties in a hole-punch.
 // Scaffolded here for later weeks; not acted on in week 2.
 type PunchCoord struct {
-	Type             string  `json:"type"`
-	PeerNodeID       string  `json:"peer_node_id"`
-	PeerWGPublicKey  string  `json:"peer_wg_public_key"`
-	PeerEndpoint     *string `json:"peer_endpoint,omitempty"`
-	Role             string  `json:"role"` // "initiator" | "responder"
+	Type            string  `json:"type"`
+	PeerNodeID      string  `json:"peer_node_id"`
+	PeerWGPublicKey string  `json:"peer_wg_public_key"`
+	PeerEndpoint    *string `json:"peer_endpoint,omitempty"`
+	Role            string  `json:"role"` // "initiator" | "responder"
 }
 
 // Pong is the server's reply to a Ping.
@@ -130,4 +141,3 @@ func knownType(t string) bool {
 	}
 	return false
 }
-

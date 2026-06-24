@@ -104,7 +104,11 @@ func (c *Client) loadSendCh() chan any {
 // active signaling connection. It is safe to call from any goroutine. If there
 // is no active connection (e.g. during reconnect backoff), the message is
 // dropped with a debug log — the next STUN refresh will retry.
-func (c *Client) SendEndpointUpdate(endpoint string) {
+//
+// local carries this node's private-LAN "ip:port" candidates (may be nil/empty)
+// so peers on the same LAN can later attempt a direct connection. Phase 0/1 is
+// plumbing only — distributing the list has no routing effect yet.
+func (c *Client) SendEndpointUpdate(endpoint string, local []string) {
 	ch := c.loadSendCh()
 	if ch == nil {
 		slog.Debug("signal: no active connection, dropping endpoint_update",
@@ -113,8 +117,9 @@ func (c *Client) SendEndpointUpdate(endpoint string) {
 		return
 	}
 	select {
-	case ch <- NewEndpointUpdate(endpoint):
-		slog.Debug("signal: queued endpoint_update", "endpoint", endpoint)
+	case ch <- NewEndpointUpdate(endpoint, local):
+		slog.Debug("signal: queued endpoint_update",
+			"endpoint", endpoint, "local_count", len(local))
 	default:
 		// Channel full — highly unlikely given the cap, but never block.
 		slog.Warn("signal: send channel full, dropping endpoint_update",

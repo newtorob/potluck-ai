@@ -98,7 +98,8 @@ type State struct {
 	meshIP               string
 	wgPublicKey          string
 	externalEndpoint     string
-	coordinatorConnState string // "connected"|"connecting"|"disconnected"
+	localEndpoints       []string // private-LAN "ip:port" candidates (observability)
+	coordinatorConnState string   // "connected"|"connecting"|"disconnected"
 	lastError            string
 }
 
@@ -135,6 +136,16 @@ func (s *State) SetExternalEndpoint(ep string) {
 	s.mu.Unlock()
 }
 
+// SetLocalEndpoints records this node's discovered private-LAN candidates
+// ("ip:port") for observability via GET /status. Observability only — no
+// routing effect in this phase. The slice is copied so the caller may reuse it.
+func (s *State) SetLocalEndpoints(eps []string) {
+	cp := append([]string(nil), eps...)
+	s.mu.Lock()
+	s.localEndpoints = cp
+	s.mu.Unlock()
+}
+
 func (s *State) SetCoordinatorConnState(st string) {
 	s.mu.Lock()
 	s.coordinatorConnState = st
@@ -167,6 +178,7 @@ func (s *State) ClearEnrollment() {
 	s.meshIP = ""
 	s.wgPublicKey = ""
 	s.externalEndpoint = ""
+	s.localEndpoints = nil
 	s.lastError = ""
 	s.meshStatus = StatusStopped
 	s.mu.Unlock()
@@ -218,6 +230,9 @@ func (s *State) snapshot(peerCount int) statusResponse {
 		v := s.externalEndpoint
 		resp.ExternalEndpoint = &v
 	}
+	if len(s.localEndpoints) > 0 {
+		resp.LocalEndpoints = append([]string(nil), s.localEndpoints...)
+	}
 	if s.lastError != "" {
 		v := s.lastError
 		resp.LastError = &v
@@ -239,9 +254,9 @@ type Config struct {
 	IsPeerConfiguredFn IsPeerConfiguredFunc // may be nil
 	CoordClient        *coordapi.Client
 	SignalRestart      SignalRestartFunc
-	WGPrivKeyPath      string // path to detect / generate the WG private key
-	SocketPath         string // "" → use platform default
-	Platform           string // runtime.GOOS
+	WGPrivKeyPath      string           // path to detect / generate the WG private key
+	SocketPath         string           // "" → use platform default
+	Platform           string           // runtime.GOOS
 	LanPair            *lanpair.Service // LAN pairing-token broadcast/listen; may be nil
 }
 
@@ -374,28 +389,30 @@ func (s *Server) Serve(ctx context.Context) error {
 // ---------------------------------------------------------------------------
 
 type statusResponse struct {
-	Version               string  `json:"version"`
-	MeshStatus            string  `json:"mesh_status"`
-	NodeID                *string `json:"node_id"`
-	HouseholdID           *string `json:"household_id"`
-	MeshIP                *string `json:"mesh_ip"`
-	WGPublicKey           *string `json:"wg_public_key"`
-	ExternalEndpoint      *string `json:"external_endpoint"`
-	CoordinatorConnection string  `json:"coordinator_connection"`
-	PeersOnlineCount      int     `json:"peers_online_count"`
-	LastError             *string `json:"last_error"`
+	Version               string   `json:"version"`
+	MeshStatus            string   `json:"mesh_status"`
+	NodeID                *string  `json:"node_id"`
+	HouseholdID           *string  `json:"household_id"`
+	MeshIP                *string  `json:"mesh_ip"`
+	WGPublicKey           *string  `json:"wg_public_key"`
+	ExternalEndpoint      *string  `json:"external_endpoint"`
+	LocalEndpoints        []string `json:"local_endpoints,omitempty"`
+	CoordinatorConnection string   `json:"coordinator_connection"`
+	PeersOnlineCount      int      `json:"peers_online_count"`
+	LastError             *string  `json:"last_error"`
 }
 
 type peerResponse struct {
-	NodeID           string  `json:"node_id"`
-	NodeName         string  `json:"node_name"`
-	MeshIP           string  `json:"mesh_ip"`
-	WGPublicKey      string  `json:"wg_public_key"`
-	LastEndpoint     *string `json:"last_endpoint,omitempty"`
-	LastSeenAt       *string `json:"last_seen_at,omitempty"`
-	Platform         *string `json:"platform,omitempty"`
-	Reachable        bool    `json:"reachable"`
-	ReachabilityMode *string `json:"reachability_mode"`
+	NodeID           string   `json:"node_id"`
+	NodeName         string   `json:"node_name"`
+	MeshIP           string   `json:"mesh_ip"`
+	WGPublicKey      string   `json:"wg_public_key"`
+	LastEndpoint     *string  `json:"last_endpoint,omitempty"`
+	LocalEndpoints   []string `json:"local_endpoints,omitempty"`
+	LastSeenAt       *string  `json:"last_seen_at,omitempty"`
+	Platform         *string  `json:"platform,omitempty"`
+	Reachable        bool     `json:"reachable"`
+	ReachabilityMode *string  `json:"reachability_mode"`
 	// HandshakeAgeSeconds is the age of the last WireGuard handshake. nil when
 	// no handshake has ever completed (lets the UI tell "stale" from "never").
 	HandshakeAgeSeconds *float64 `json:"handshake_age_seconds,omitempty"`
@@ -444,6 +461,9 @@ func (s *Server) handlePeers(w http.ResponseWriter, r *http.Request) {
 		}
 		if p.LastEndpoint != nil {
 			pr.LastEndpoint = p.LastEndpoint
+		}
+		if len(p.LocalEndpoints) > 0 {
+			pr.LocalEndpoints = append([]string(nil), p.LocalEndpoints...)
 		}
 		if p.Platform != nil {
 			pr.Platform = p.Platform

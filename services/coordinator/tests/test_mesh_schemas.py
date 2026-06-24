@@ -133,13 +133,19 @@ def test_enroll_response_round_trip() -> None:
                 mesh_ip="100.64.0.3",
                 wg_public_key="B" * 44,
                 last_endpoint="203.0.113.1:51820",
+                local_endpoints=["192.168.1.20:51820", "10.0.0.5:51820"],
                 last_seen_at=datetime.now(timezone.utc),
                 platform="linux",
             )
         ],
     )
     dumped = resp.model_dump(mode="json")
-    EnrollResponse.model_validate(dumped)  # round-trip, must not raise
+    parsed = EnrollResponse.model_validate(dumped)  # round-trip, must not raise
+    # local_endpoints survives the round-trip intact (it's a roster field now).
+    assert parsed.peers[0].local_endpoints == [
+        "192.168.1.20:51820",
+        "10.0.0.5:51820",
+    ]
 
 
 def test_heartbeat_request_minimal_shape() -> None:
@@ -151,6 +157,73 @@ def test_heartbeat_request_minimal_shape() -> None:
     fields = set(req.model_dump().keys())
     # external_endpoint is allowed to be None; field exists either way
     assert fields == {"node_id", "wg_public_key", "external_endpoint"}
+
+
+# ---------------------------------------------------------------------------
+# LAN direct-path candidates (local_endpoints) — Phase 0/1 plumbing
+# ---------------------------------------------------------------------------
+
+
+def test_enrolled_peer_has_local_endpoints_field() -> None:
+    """EnrolledPeer carries local_endpoints so LAN candidates flow through the
+    roster. The field name is mesh-layer metadata (no inference identity), so
+    the forbidden-substring invariant in test_no_inference_layer_identity_in_
+    mesh_schemas still holds — this just pins the field's presence + default."""
+    assert "local_endpoints" in EnrolledPeer.model_fields
+    for forbidden in _FORBIDDEN_SUBSTRINGS:
+        assert forbidden not in "local_endpoints"
+    peer = EnrolledPeer(
+        node_id=uuid.uuid4(),
+        node_name="laptop",
+        mesh_ip="100.64.0.2",
+        wg_public_key="A" * 44,
+    )
+    assert peer.local_endpoints == []  # default empty, never None
+
+
+def test_signal_endpoint_update_filters_non_private_endpoints() -> None:
+    """The server-side validator drops anything that isn't a private ip:port:
+    public, tailnet/CGNAT, loopback, link-local, IPv6, and malformed entries
+    are all rejected (defense in depth — a client cannot get a tailnet or
+    public address redistributed to peers)."""
+    upd = SignalEndpointUpdate(
+        external_endpoint="203.0.113.7:51820",
+        local_endpoints=[
+            "192.168.1.20:51820",      # keep — RFC1918
+            "10.0.0.5:51820",          # keep — RFC1918
+            "172.16.4.4:51820",        # keep — RFC1918
+            "8.8.8.8:51820",           # drop — public
+            "100.100.50.50:51820",     # drop — tailnet/CGNAT (100.64/10)
+            "127.0.0.1:51820",         # drop — loopback
+            "169.254.1.1:51820",       # drop — link-local
+            "[fe80::1]:51820",         # drop — IPv6
+            "192.168.1.20:51820",      # drop — duplicate
+            "not-an-endpoint",         # drop — malformed (no port)
+            "192.168.1.30:999999",     # drop — port out of range
+        ],
+    )
+    assert upd.local_endpoints == [
+        "192.168.1.20:51820",
+        "10.0.0.5:51820",
+        "172.16.4.4:51820",
+    ]
+
+
+def test_signal_endpoint_update_caps_local_endpoints() -> None:
+    """The list is capped server-side so a node can't flood the roster."""
+    many = [f"10.0.0.{i}:51820" for i in range(1, 20)]
+    upd = SignalEndpointUpdate(external_endpoint="203.0.113.7:51820", local_endpoints=many)
+    assert len(upd.local_endpoints) <= 4
+    # All survivors are still valid private ip:port.
+    for ep in upd.local_endpoints:
+        assert ep.startswith("10.0.0.")
+
+
+def test_signal_endpoint_update_defaults_empty() -> None:
+    """Omitting local_endpoints yields an empty list, never None — so older
+    clients that don't send the field still validate."""
+    upd = SignalEndpointUpdate(external_endpoint="203.0.113.7:51820")
+    assert upd.local_endpoints == []
 
 
 # ---------------------------------------------------------------------------

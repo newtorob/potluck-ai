@@ -34,6 +34,8 @@ import (
 	"time"
 
 	"golang.org/x/net/ipv4"
+
+	"github.com/potluck-ai/potluck-mesh/internal/util"
 )
 
 var (
@@ -91,23 +93,12 @@ func multicastIfaces() []net.Interface {
 // sweepable reports whether ip is a private LAN address we may broadcast on.
 // Only RFC1918 ranges qualify; loopback, link-local, and the tailnet/CGNAT
 // range (100.64.0.0/10) are excluded so pairing never leaves the physical LAN.
+//
+// The predicate now lives in internal/util as PrivateLAN so LAN pairing and
+// LAN direct-path discovery (internal/localep) share one definition. This is a
+// thin alias kept for the existing call sites + tests in this package.
 func sweepable(ip net.IP) bool {
-	ip4 := ip.To4()
-	if ip4 == nil || ip4.IsLoopback() || ip4.IsLinkLocalUnicast() {
-		return false
-	}
-	if ip4[0] == 100 && ip4[1] >= 64 && ip4[1] <= 127 { // 100.64.0.0/10 (Tailscale/CGNAT)
-		return false
-	}
-	switch {
-	case ip4[0] == 10:
-		return true
-	case ip4[0] == 172 && ip4[1] >= 16 && ip4[1] <= 31:
-		return true
-	case ip4[0] == 192 && ip4[1] == 168:
-		return true
-	}
-	return false
+	return util.PrivateLAN(ip)
 }
 
 // directedBroadcast returns the IPv4 broadcast address for ip4 under mask

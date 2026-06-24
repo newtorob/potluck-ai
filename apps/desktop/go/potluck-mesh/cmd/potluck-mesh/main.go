@@ -90,6 +90,7 @@ import (
 	"github.com/potluck-ai/potluck-mesh/internal/events"
 	"github.com/potluck-ai/potluck-mesh/internal/lanpair"
 	"github.com/potluck-ai/potluck-mesh/internal/localapi"
+	"github.com/potluck-ai/potluck-mesh/internal/localep"
 	"github.com/potluck-ai/potluck-mesh/internal/peerstate"
 	msignal "github.com/potluck-ai/potluck-mesh/internal/signal"
 	"github.com/potluck-ai/potluck-mesh/internal/stun"
@@ -249,7 +250,8 @@ func run() int {
 		// new key differs, the coordinator will close with node_not_enrolled and
 		// the client reconnects; on the next hello it uses cfg.WGPublicKey which
 		// was updated by the /pair handler via ipcState.SetWGPublicKey.
-		client.SendEndpointUpdate(ipcState.MeshIP())
+		// No LAN candidates needed for this prod; the next STUN refresh carries them.
+		client.SendEndpointUpdate(ipcState.MeshIP(), nil)
 	}
 
 	// ---- coordinator API client ---- //
@@ -289,11 +291,21 @@ func run() int {
 		LanPair:       lanSvc,
 	})
 
+	// Discover this node's private-LAN endpoints once at startup so they show
+	// in GET /status even before STUN resolves. Recomputed on every endpoint
+	// change below (interfaces come + go). Observability only in this phase —
+	// no routing decision uses these yet (Phase 2).
+	ipcState.SetLocalEndpoints(localep.LocalCandidates(tun.WGPort()))
+
 	// Publish endpoint changes to the bus from STUN.
 	onEndpointChange := func(ep string) {
 		ipcState.SetExternalEndpoint(ep)
+		// Recompute LAN candidates: an interface may have come up/down since
+		// the last refresh. RFC1918 only (never a tailnet address).
+		local := localep.LocalCandidates(tun.WGPort())
+		ipcState.SetLocalEndpoints(local)
 		bus.Publish(events.NewEndpointChanged(ep))
-		client.SendEndpointUpdate(ep)
+		client.SendEndpointUpdate(ep, local)
 	}
 
 	// ---- STUN goroutine ---- //
@@ -534,19 +546,37 @@ func reconcileRosterOnce(ctx context.Context, client *coordapi.Client, ps *peers
 // signal-layer RosterPeer used by the roster handler + peer cache.
 func enrolledToRosterPeer(ep coordapi.EnrolledPeer) msignal.RosterPeer {
 	return msignal.RosterPeer{
-		NodeID:       ep.NodeID,
-		NodeName:     ep.NodeName,
-		MeshIP:       ep.MeshIP,
-		WGPublicKey:  ep.WGPublicKey,
-		LastEndpoint: ep.LastEndpoint,
-		Platform:     ep.Platform,
+		NodeID:         ep.NodeID,
+		NodeName:       ep.NodeName,
+		MeshIP:         ep.MeshIP,
+		WGPublicKey:    ep.WGPublicKey,
+		LastEndpoint:   ep.LastEndpoint,
+		LocalEndpoints: ep.LocalEndpoints,
+		Platform:       ep.Platform,
 	}
 }
 
 // rosterEndpointChanged reports whether a peer's tunnel-relevant endpoint moved.
-// Only the endpoint is treated as an "update" so a steady poll emits no events.
+// Treats both the external endpoint and the private-LAN candidate list as
+// "update"-worthy so the safety-net reconcile keeps LAN candidates fresh, while
+// a steady poll (nothing changed) still emits no events.
 func rosterEndpointChanged(a, b msignal.RosterPeer) bool {
-	return derefStr(a.LastEndpoint) != derefStr(b.LastEndpoint)
+	return derefStr(a.LastEndpoint) != derefStr(b.LastEndpoint) ||
+		!sameStrSlice(a.LocalEndpoints, b.LocalEndpoints)
+}
+
+// sameStrSlice reports element-wise equality of two string slices (order
+// significant — LocalCandidates returns sorted output, so order is stable).
+func sameStrSlice(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func derefStr(s *string) string {

@@ -62,13 +62,14 @@ type EnrollRequest struct {
 // EnrolledPeer mirrors coordinator/schemas/mesh.py:EnrolledPeer.
 // Contains only mesh-layer metadata; no inference content.
 type EnrolledPeer struct {
-	NodeID       string  `json:"node_id"` // UUID string
-	NodeName     string  `json:"node_name"`
-	MeshIP       string  `json:"mesh_ip"`
-	WGPublicKey  string  `json:"wg_public_key"`
-	LastEndpoint *string `json:"last_endpoint,omitempty"`
-	LastSeenAt   *string `json:"last_seen_at,omitempty"` // RFC3339 or null
-	Platform     *string `json:"platform,omitempty"`
+	NodeID         string   `json:"node_id"` // UUID string
+	NodeName       string   `json:"node_name"`
+	MeshIP         string   `json:"mesh_ip"`
+	WGPublicKey    string   `json:"wg_public_key"`
+	LastEndpoint   *string  `json:"last_endpoint,omitempty"`
+	LocalEndpoints []string `json:"local_endpoints,omitempty"` // private-LAN candidates
+	LastSeenAt     *string  `json:"last_seen_at,omitempty"`    // RFC3339 or null
+	Platform       *string  `json:"platform,omitempty"`
 }
 
 // EnrollResponse mirrors coordinator/schemas/mesh.py:EnrollResponse.

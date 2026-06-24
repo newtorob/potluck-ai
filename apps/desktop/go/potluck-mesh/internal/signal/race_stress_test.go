@@ -91,7 +91,7 @@ func TestStressSignalSendDuringReconnect(t *testing.T) {
 			defer wg.Done()
 			for time.Now().Before(stopAt) {
 				if id%2 == 0 {
-					c.SendEndpointUpdate("1.2.3.4:51820")
+					c.SendEndpointUpdate("1.2.3.4:51820", []string{"192.168.1.5:51820"})
 				} else {
 					c.SendRequestPunch("11111111-1111-1111-1111-111111111111")
 				}
