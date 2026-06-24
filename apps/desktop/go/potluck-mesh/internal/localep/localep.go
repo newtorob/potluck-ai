@@ -66,6 +66,54 @@ func LocalCandidates(wgPort int) []string {
 	return candidatesFromIPs(ips, wgPort)
 }
 
+// LocalIPNets enumerates the host's network interfaces and returns its
+// private-LAN IPv4 *net.IPNet values (address + the interface's own netmask).
+// The mask matters: the Phase-2 co-subnet test compares a peer's advertised LAN
+// IP against MY interface mask, which is stricter than a coarse "both 192.168.x"
+// heuristic and correctly rejects two hosts that share a /16 prefix but sit on
+// different /24s.
+//
+// Same interface/address filtering as LocalCandidates: down + loopback
+// interfaces are skipped, and only addresses that pass util.PrivateLAN (RFC1918,
+// never tailnet/CGNAT/link-local) are returned. Each returned IPNet's IP is the
+// 4-byte form and its Mask is the interface's configured mask.
+func LocalIPNets() []net.IPNet {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+
+	var out []net.IPNet
+	for _, ifi := range ifaces {
+		if ifi.Flags&net.FlagUp == 0 || ifi.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := ifi.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, a := range addrs {
+			ipnet, ok := a.(*net.IPNet)
+			if !ok {
+				continue
+			}
+			ip4 := ipnet.IP.To4()
+			if ip4 == nil || !util.PrivateLAN(ip4) {
+				continue
+			}
+			// Normalise the mask to 4 bytes when the address is IPv4 — a
+			// dual-stack interface can report a 16-byte mask alongside a
+			// 4-byte IP, which would break net.IP.Mask.
+			mask := ipnet.Mask
+			if len(mask) == net.IPv6len {
+				mask = mask[12:]
+			}
+			out = append(out, net.IPNet{IP: ip4, Mask: mask})
+		}
+	}
+	return out
+}
+
 // candidatesFromIPs applies the RFC1918 filter, "ip:port" formatting,
 // dedup, sort, and cap to a raw list of interface addresses. Split out from
 // LocalCandidates so the filtering logic is unit-testable without depending on

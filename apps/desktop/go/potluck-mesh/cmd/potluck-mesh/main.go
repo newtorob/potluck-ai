@@ -74,6 +74,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -195,16 +196,33 @@ func run() int {
 	// ---- STUN resolver ---- //
 	resolver := stun.NewResolver(cfg.STUNServers)
 
+	// ---- per-peer routing-mode tracker (Phase 2) ---- //
+	// Shared between the reachability/verify loop (writer; owns the LAN trial
+	// state machine) and the roster/punch handler closures (readers; use it to
+	// skip raw-endpoint overwrites for any managed mode). When LAN direct is
+	// disabled the loop only ever records modeDERP, so this degrades to exactly
+	// the prior DERP-routed semantics.
+	modes := newModeTracker()
+
 	// ---- signaling client ---- //
 	handler := newRosterHandler(tun, ps, bus, ipcState)
+	handler.setModeTracker(modes)
 
-	// Wire DERP-routing introspection so the roster + punch_coord handlers
-	// know not to overwrite the synthetic derp:<pubkey> endpoint with a
-	// raw IP:port when a peer is currently being routed via the relay.
-	// nil-safe when --derp-url isn't set: dBind stays nil and the gate
-	// returns false (always allow direct updates).
+	// Wire managed-mode introspection so the roster + punch_coord handlers
+	// know not to overwrite a managed endpoint (synthetic derp:<pubkey> for
+	// modeDERP, or the LAN ip:port for lan-trial/lan-direct) with a raw IP:port
+	// from a signal-driven update. nil-safe when --derp-url isn't set: dBind
+	// stays nil and the gate returns false (always allow direct updates).
 	if dBind != nil {
 		handler.setIsDERPRoutedFn(func(pubkey string) bool {
+			// "Managed" subsumes the old "DERP-routed" check: a peer in
+			// lan-trial / lan-direct must ALSO be protected from raw-endpoint
+			// overwrites, not just a DERP-routed one. modes is the source of
+			// truth; dBind.IsPeerDERPRouted is folded in as a belt-and-braces
+			// check for the steady-state DERP case.
+			if modes.isManaged(pubkey) {
+				return true
+			}
 			kb, err := base64.StdEncoding.DecodeString(pubkey)
 			if err != nil || len(kb) != 32 {
 				return false
@@ -216,7 +234,9 @@ func run() int {
 
 		// Proactive flip-to-DERP on roster receive. Same decoding pattern as
 		// above; reuses the existing flipToDERP helper. Errors are logged
-		// inside flipToDERP, so this closure stays terse.
+		// inside flipToDERP, so this closure stays terse. Records modeDERP in
+		// the tracker so the peer starts on the relay floor; the reachability
+		// loop later promotes it to a LAN trial if a same-LAN candidate exists.
 		handler.setFlipPeerToDERPFn(func(pubkey string) {
 			kb, err := base64.StdEncoding.DecodeString(pubkey)
 			if err != nil || len(kb) != 32 {
@@ -226,6 +246,7 @@ func run() int {
 			var pub [32]byte
 			copy(pub[:], kb)
 			flipToDERP(tun, dBind, pubkey, pub)
+			modes.set(pubkey, modeDERP)
 		})
 	}
 
@@ -268,6 +289,14 @@ func run() int {
 		State:       ipcState,
 		PeerReachFn: tun.PeerReachability,
 		IsDERPRoutedFn: func(pubkey string) bool {
+			// UI semantics: "DERP-routed" means relayed, i.e. NOT direct. A
+			// peer promoted to lan-direct is NOT DERP-routed even though the
+			// dBind flag may still report stale state, so the tracker wins:
+			// modeLANDirect / modeLANTrial → false. Unknown / modeDERP falls
+			// through to the dBind flag (steady-state DERP).
+			if modes.get(pubkey) != modeDERP {
+				return false
+			}
 			if dBind == nil {
 				return false
 			}
@@ -311,8 +340,11 @@ func run() int {
 	// ---- STUN goroutine ---- //
 	go runSTUNLoop(ctx, resolver, onEndpointChange, cfg.STUNRefreshInterval)
 
-	// ---- reachability + DERP-fallback goroutine ---- //
-	go runReachabilityLoop(ctx, tun, ps, dBind, bus)
+	// ---- reachability + DERP-fallback + LAN-trial goroutine ---- //
+	// myLocalIPNets is recomputed on each LAN trial decision (interfaces come +
+	// go) via localep.LocalIPNets — passed as a provider so the loop always sees
+	// the current interface set rather than a startup snapshot.
+	go runReachabilityLoop(ctx, tun, ps, dBind, bus, modes, localep.LocalIPNets)
 
 	// ---- roster reconcile goroutine ---- //
 	// Safety net for roster_update broadcasts missed over the signal WS: the
@@ -601,16 +633,173 @@ func derefStr(s *string) string {
 //
 // Privacy: PeerReachability parses UAPI output internally and does not log
 // raw IpcGet output (which would include the device's own private key).
-func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.Store, dBind *derp.DerpBind, bus *events.Bus) {
+func runReachabilityLoop(
+	ctx context.Context,
+	tun *tunnel.Tunnel,
+	ps *peerstate.Store,
+	dBind *derp.DerpBind,
+	bus *events.Bus,
+	modes *modeTracker,
+	localIPNetsFn func() []net.IPNet,
+) {
 	// reachableState maps pubkey → last known reachable bool.
 	// true = reachable, false = unreachable.
 	// Peers not yet seen are treated as "unknown" (logged once as initial state).
+	//
+	// Phase 2 fields (only ever written when lanDirectEnabled()): mode tracks the
+	// per-peer managed routing mode; the trial* fields drive the verified LAN
+	// trial. When LAN direct is OFF, mode stays modeDERP and the trial code is
+	// never reached, so behaviour is byte-for-byte the legacy DERP path.
 	type peerReachState struct {
 		reachable  bool
 		seenOnce   bool
 		derpRouted bool // true if we've flipped this peer to DERP routing
+
+		// --- Phase 2 LAN-trial state ---
+		mode              routingMode // derp (default) | lan-trial | lan-direct
+		trialDeadline     time.Time   // when an in-progress trial gives up
+		preTrialHandshake time.Time   // last-handshake snapshot at trial start
+		backoffUntil      time.Time   // suppress re-trial until this time
+		trialLanEp        string      // the LAN ip:port being trialled
 	}
 	states := make(map[string]*peerReachState)
+
+	// maybeStartLANTrial promotes a modeDERP peer to a verified LAN trial when
+	// (a) LAN direct is enabled, (b) the peer advertises a candidate co-subnet
+	// with one of our interfaces, and (c) the peer is not in trial backoff. It
+	// snapshots the current last-handshake (so the verify step can detect a
+	// handshake NEWER than this, proving it completed over the LAN endpoint),
+	// turns DERP OFF for this peer, and points WG at the LAN endpoint. Any
+	// failure to set the endpoint rolls straight back to the DERP floor.
+	//
+	// No-op (and zero cost) when LAN direct is disabled: shouldStartLANTrial
+	// short-circuits on !enabled, so the legacy path is byte-for-byte unchanged.
+	maybeStartLANTrial := func(st *peerReachState, p msignal.RosterPeer, pubkey string) {
+		if !lanDirectEnabled() || dBind == nil {
+			return
+		}
+		myNets := localIPNetsFn()
+		lanEp, ok := sameLANEndpoint(myNets, p.LocalEndpoints)
+		if !shouldStartLANTrial(true, st.mode, ok, st.backoffUntil, time.Now()) {
+			return
+		}
+
+		kb, decErr := base64.StdEncoding.DecodeString(pubkey)
+		if decErr != nil || len(kb) != 32 {
+			return
+		}
+		var pub [32]byte
+		copy(pub[:], kb)
+
+		// Snapshot the pre-trial handshake from the live device so the verify
+		// step compares against the value as of trial start.
+		preHS, _, _, _ := tun.PeerReachability(pubkey)
+
+		// DERP OFF + point WG at the LAN endpoint. SetPeerRouting(false) must
+		// precede UpdatePeerEndpoint so outbound packets to the new endpoint go
+		// over the inner UDP bind (not the relay). On a UAPI failure, roll back
+		// to the DERP floor immediately rather than stranding the peer.
+		dBind.SetPeerRouting(pub, false)
+		if err := tun.UpdatePeerEndpoint(pubkey, lanEp); err != nil {
+			slog.Error("lan_trial: UpdatePeerEndpoint to LAN failed, rolling back to DERP",
+				"node_id", p.NodeID,
+				"pubkey_prefix", util.TruncatePubkey(pubkey),
+				"err", err,
+			)
+			flipToDERP(tun, dBind, pubkey, pub)
+			st.derpRouted = true
+			st.mode = modeDERP
+			modes.set(pubkey, modeDERP)
+			return
+		}
+
+		st.mode = modeLANTrial
+		st.preTrialHandshake = preHS
+		st.trialDeadline = time.Now().Add(lanTrialDuration)
+		st.trialLanEp = lanEp
+		st.derpRouted = false
+		modes.set(pubkey, modeLANTrial)
+
+		slog.Info("lan_trial: started — DERP off, trialling direct LAN endpoint",
+			"node_id", p.NodeID,
+			"pubkey_prefix", util.TruncatePubkey(pubkey),
+			"lan_endpoint", lanEp,
+			"deadline_ms", lanTrialDuration.Milliseconds(),
+		)
+	}
+
+	// verifyTrials runs on the fast ticker. For each peer currently in a LAN
+	// trial it checks whether a fresh handshake landed (→ promote to lan-direct)
+	// or the deadline passed (→ roll back to the DERP floor + backoff). Cheap
+	// when no peer is in trial: it scans the small states map and skips non-trial
+	// entries. Never runs when LAN direct is disabled (no peer reaches modeLANTrial).
+	verifyTrials := func() {
+		now := time.Now()
+		byKey := make(map[string]msignal.RosterPeer)
+		for _, p := range ps.All() {
+			byKey[p.WGPublicKey] = p
+		}
+		for pubkey, st := range states {
+			if st.mode != modeLANTrial {
+				continue
+			}
+			// If a rejoin re-sync reset the shared tracker to derp out from under
+			// an in-progress trial, abandon the trial without acting on now-stale
+			// device state — check() will reconcile the local st on its next tick.
+			if modes != nil && modes.get(pubkey) == modeDERP {
+				continue
+			}
+			p, inRoster := byKey[pubkey]
+			if !inRoster {
+				continue // peer left the roster; prune handles cleanup
+			}
+			lastHS, _, _, err := tun.PeerReachability(pubkey)
+			if err != nil {
+				continue
+			}
+			outcome := evaluateLANTrial(lastHS, st.preTrialHandshake, st.trialDeadline, now, handshakeFreshWindow)
+			switch outcome {
+			case trialPending:
+				continue
+			case trialVerified:
+				st.mode = modeLANDirect
+				st.reachable = true
+				st.derpRouted = false
+				modes.set(pubkey, modeLANDirect)
+				slog.Info("lan_trial: VERIFIED — peer reachable on direct LAN endpoint, staying direct",
+					"node_id", p.NodeID,
+					"pubkey_prefix", util.TruncatePubkey(pubkey),
+					"lan_endpoint", st.trialLanEp,
+					"handshake_age", formatHandshakeAge(lastHS),
+				)
+				if bus != nil {
+					bus.Publish(events.NewPeerUpdated(rosterPeerToSnapshot(p, true, false)))
+				}
+			case trialTimedOut:
+				kb, decErr := base64.StdEncoding.DecodeString(pubkey)
+				if decErr != nil || len(kb) != 32 {
+					continue
+				}
+				var pub [32]byte
+				copy(pub[:], kb)
+				slog.Warn("lan_trial: TIMEOUT — no fresh handshake on LAN endpoint, restoring DERP floor + backoff",
+					"node_id", p.NodeID,
+					"pubkey_prefix", util.TruncatePubkey(pubkey),
+					"lan_endpoint", st.trialLanEp,
+					"backoff_min", int(lanTrialBackoff.Minutes()),
+				)
+				if dBind != nil {
+					flipToDERP(tun, dBind, pubkey, pub)
+				}
+				st.mode = modeDERP
+				st.derpRouted = true
+				st.reachable = false
+				st.trialLanEp = ""
+				st.backoffUntil = now.Add(lanTrialBackoff)
+				modes.set(pubkey, modeDERP)
+			}
+		}
+	}
 
 	check := func() {
 		for _, p := range ps.All() {
@@ -633,6 +822,27 @@ func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.
 				states[pubkey] = st
 			}
 
+			// Rejoin re-sync reconciliation (Phase 2, requirement #5): a same-key
+			// rejoin in OnRosterUpdate tears down + re-adds the WG peer and
+			// re-asserts DERP, resetting the shared tracker to modeDERP. If the
+			// loop's local st still thinks the peer is lan-trial/lan-direct, the
+			// device state has been wiped out from under it — adopt modeDERP and
+			// clear ALL trial/backoff state so the trial re-runs cleanly against
+			// the fresh WG peer. Only meaningful when LAN direct is enabled (the
+			// only path that sets a non-derp local mode); a no-op otherwise.
+			if modes != nil && st.mode != modeDERP && modes.get(pubkey) == modeDERP {
+				slog.Info("lan_trial: rejoin re-sync detected, resetting peer to DERP + clearing trial state",
+					"node_id", p.NodeID,
+					"pubkey_prefix", util.TruncatePubkey(pubkey),
+				)
+				st.mode = modeDERP
+				st.trialDeadline = time.Time{}
+				st.preTrialHandshake = time.Time{}
+				st.backoffUntil = time.Time{}
+				st.trialLanEp = ""
+				st.derpRouted = true // OnRosterUpdate's flip re-asserted DERP
+			}
+
 			// Decode pubkey bytes once — needed for DERP flip operations.
 			// Only decode when dBind is active to avoid work when DERP is off.
 			var pubkeyBytes [32]byte
@@ -647,6 +857,45 @@ func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.
 				} else {
 					copy(pubkeyBytes[:], kb)
 				}
+			}
+
+			// Phase 2: peers in a LAN-managed mode are handled separately from the
+			// legacy DERP reachability/flip logic below.
+			//
+			//   - lan-trial: the fast verify ticker (verifyTrials) owns the
+			//     verify/rollback decision with backoff. Skip the legacy logic
+			//     entirely so a transiently-stale trial handshake doesn't get
+			//     double-handled (the legacy DERP-flip branch would clobber the
+			//     LAN endpoint mid-trial).
+			//   - lan-direct: the peer is confirmed direct. If its handshake goes
+			//     stale, the LAN path died — restore the DERP floor and apply
+			//     backoff so we don't immediately re-trial a flapping path. While
+			//     it stays fresh, leave it on the direct path (skip legacy flips).
+			if st.mode == modeLANTrial {
+				st.reachable = nowReachable
+				continue
+			}
+			if st.mode == modeLANDirect {
+				st.reachable = nowReachable
+				if handshakeStale {
+					slog.Warn("lan_direct: direct LAN path went stale, restoring DERP floor",
+						"node_id", p.NodeID,
+						"pubkey_prefix", util.TruncatePubkey(pubkey),
+						"last_handshake_ago", formatHandshakeAge(lastHS),
+					)
+					if peerDerpBind != nil {
+						flipToDERP(tun, peerDerpBind, pubkey, pubkeyBytes)
+						st.derpRouted = true
+					}
+					st.mode = modeDERP
+					st.trialLanEp = ""
+					st.backoffUntil = time.Now().Add(lanTrialBackoff)
+					modes.set(pubkey, modeDERP)
+					if bus != nil {
+						bus.Publish(events.NewPeerUpdated(rosterPeerToSnapshot(p, false, true)))
+					}
+				}
+				continue
 			}
 
 			if !st.seenOnce {
@@ -665,6 +914,8 @@ func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.
 					flipToDERP(tun, peerDerpBind, pubkey, pubkeyBytes)
 					st.derpRouted = true
 				}
+				// Even on first observation, consider starting a LAN trial.
+				maybeStartLANTrial(st, p, pubkey)
 				continue
 			}
 
@@ -675,6 +926,9 @@ func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.
 					flipToDERP(tun, peerDerpBind, pubkey, pubkeyBytes)
 					st.derpRouted = true
 				}
+				// Steady-state DERP peer: this is the main entry point for
+				// promoting a settled relay peer to a verified LAN trial.
+				maybeStartLANTrial(st, p, pubkey)
 				continue
 			}
 
@@ -729,6 +983,8 @@ func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.
 					)
 					flipToDERP(tun, peerDerpBind, pubkey, pubkeyBytes)
 				}
+				// Peer just recovered on DERP — eligible to attempt a LAN trial.
+				maybeStartLANTrial(st, p, pubkey)
 			} else {
 				slog.Warn("reachability: peer became unreachable",
 					"node_id", p.NodeID,
@@ -755,6 +1011,7 @@ func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.
 		for k := range states {
 			if !allNodePubkeys[k] {
 				delete(states, k)
+				modes.remove(k) // keep the shared tracker in sync with prune
 			}
 		}
 	}
@@ -764,12 +1021,26 @@ func runReachabilityLoop(ctx context.Context, tun *tunnel.Tunnel, ps *peerstate.
 
 	ticker := time.NewTicker(reachabilityCheckInterval)
 	defer ticker.Stop()
+
+	// Dedicated fast ticker for verifying in-progress LAN trials. Only started
+	// when LAN direct is enabled; otherwise it never fires and verifyTrials is
+	// unreachable, keeping the legacy path identical. The ticker channel is nil
+	// when disabled, so its select case blocks forever (no spurious wakeups).
+	var verifyC <-chan time.Time
+	if lanDirectEnabled() {
+		vt := time.NewTicker(lanVerifyInterval)
+		defer vt.Stop()
+		verifyC = vt.C
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			check()
+		case <-verifyC:
+			verifyTrials()
 		}
 	}
 }
@@ -849,6 +1120,12 @@ type rosterHandler struct {
 	// reachability loop still handles re-flipping on later state changes.
 	flipPeerToDERPFn func(pubkey string)
 
+	// modes is the shared per-peer routing-mode tracker (Phase 2). Used here
+	// only to RESET a peer's mode to derp on a same-key rejoin re-sync, so the
+	// LAN trial re-runs cleanly against the freshly re-added WG peer. nil when
+	// the tracker isn't wired (it always is in main; nil-safe regardless).
+	modes *modeTracker
+
 	// punchMu guards punchState.
 	punchMu    sync.Mutex
 	punchState map[string]*punchEntry // keyed by node_id
@@ -876,6 +1153,12 @@ func (h *rosterHandler) setIsDERPRoutedFn(fn func(pubkey string) bool) {
 // story as setIsDERPRoutedFn — left nil when DERP is disabled.
 func (h *rosterHandler) setFlipPeerToDERPFn(fn func(pubkey string)) {
 	h.flipPeerToDERPFn = fn
+}
+
+// setModeTracker wires the shared Phase-2 routing-mode tracker. Called in main
+// before client.Run (no data race). nil-safe everywhere it's read.
+func (h *rosterHandler) setModeTracker(m *modeTracker) {
+	h.modes = m
 }
 
 // setClient wires the signal client back into the handler after construction.

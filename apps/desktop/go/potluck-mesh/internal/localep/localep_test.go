@@ -81,6 +81,33 @@ func TestCandidatesFromIPs_NoTailnetEverAdvertised(t *testing.T) {
 	}
 }
 
+// TestLocalIPNets_HostInvariants runs against the real host interfaces and
+// asserts the invariants for the Phase-2 co-subnet input: every returned IPNet
+// has a 4-byte RFC1918 IP and a non-empty mask, and nothing loopback/link-local/
+// tailnet is included. Cannot assert specific addresses (host-dependent), only
+// the invariants every entry must satisfy.
+func TestLocalIPNets_HostInvariants(t *testing.T) {
+	got := LocalIPNets()
+	for _, n := range got {
+		ip4 := n.IP.To4()
+		if ip4 == nil {
+			t.Errorf("IPNet %v has non-IPv4 IP", n)
+			continue
+		}
+		if len(n.Mask) != net.IPv4len {
+			t.Errorf("IPNet %v mask is not 4 bytes (got %d)", n, len(n.Mask))
+		}
+		if ip4.IsLoopback() || ip4.IsLinkLocalUnicast() {
+			t.Errorf("IPNet %v is loopback/link-local — must be excluded", n)
+		}
+		if ip4[0] == 100 && ip4[1] >= 64 && ip4[1] <= 127 {
+			t.Errorf("IPNet %v is in tailnet/CGNAT range — must be excluded", n)
+		}
+		// Sanity: the IP must mask cleanly under its own mask (no panic, stable).
+		_ = ip4.Mask(n.Mask)
+	}
+}
+
 // TestLocalCandidates_HostInvariants runs against the real host interfaces and
 // asserts the invariants hold for whatever the machine actually has: every
 // entry is "<RFC1918 ip>:<wgPort>", and nothing is loopback/link-local/tailnet.
