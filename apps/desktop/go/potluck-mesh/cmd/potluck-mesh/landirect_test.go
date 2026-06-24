@@ -322,6 +322,76 @@ func TestRoutingModeString(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Force-rekey invariants: the timing relationships that make the fix work.
+//
+// These guard the constants that the (I/O-bound, not unit-testable) trial-start
+// side effects depend on. The fix re-adds the peer pinned to the LAN endpoint
+// with a SHORT keepalive so WG re-handshakes promptly; the trial deadline must
+// comfortably exceed that keepalive trigger plus a WG handshake retry, and the
+// verify ticker must fire several times inside the window so a success is caught
+// quickly. A verified peer is then re-pinned with the standard keepalive.
+// ---------------------------------------------------------------------------
+
+func TestForceRekeyTimingInvariants(t *testing.T) {
+	trialKeepalive := time.Duration(lanTrialKeepalive) * time.Second
+	directKeepalive := time.Duration(lanDirectKeepalive) * time.Second
+
+	// The trial keepalive must fire well inside the trial window: WG initiates a
+	// handshake when the keepalive is due, then verification needs the handshake
+	// round-trip to land. Require the deadline to leave headroom of at least one
+	// keepalive interval beyond the keepalive trigger itself (so: deadline >=
+	// 2 * keepalive) to absorb a WG handshake retry (~5s) plus jitter/clock skew.
+	if lanTrialDuration < 2*trialKeepalive {
+		t.Errorf("lanTrialDuration (%v) must be >= 2*lanTrialKeepalive (%v) so the forced handshake has room to complete",
+			lanTrialDuration, 2*trialKeepalive)
+	}
+
+	// The trial keepalive must be SHORTER than the standard keepalive — its whole
+	// purpose is to provoke a prompt handshake during the brief trial; a verified
+	// link is restored to the standard (less chatty) keepalive.
+	if trialKeepalive >= directKeepalive {
+		t.Errorf("lanTrialKeepalive (%v) must be < lanDirectKeepalive (%v) so verified links stop keepalive-spamming",
+			trialKeepalive, directKeepalive)
+	}
+
+	// The verify ticker must fire multiple times inside the trial window so a
+	// successful handshake is confirmed within a couple of seconds, not at the
+	// deadline. Require at least 3 ticks.
+	if ticks := lanTrialDuration / lanVerifyInterval; ticks < 3 {
+		t.Errorf("verify ticker fires only %d times within the trial window; want >= 3 (interval %v, window %v)",
+			ticks, lanVerifyInterval, lanTrialDuration)
+	}
+}
+
+// TestForceRekeyDeadlineExceedsKeepaliveTrigger walks the timing the loop drives:
+// the keepalive provokes a handshake around t=keepalive; that handshake (snapshot
+// is pre-trial) must be observable as trialVerified on a verify tick BEFORE the
+// deadline. Proves the chosen deadline gives the forced handshake room to verify.
+func TestForceRekeyDeadlineExceedsKeepaliveTrigger(t *testing.T) {
+	const fresh = 3 * time.Minute
+	start := time.Now()
+	preTrial := start // snapshot taken at trial start (session just cleared)
+	deadline := start.Add(lanTrialDuration)
+
+	// WG sends the first keepalive ~lanTrialKeepalive after the peer is re-added,
+	// which provokes a handshake that completes a short RTT later.
+	keepaliveAt := start.Add(time.Duration(lanTrialKeepalive) * time.Second)
+	handshakeAt := keepaliveAt.Add(50 * time.Millisecond) // sub-ms..low-ms on LAN
+
+	// The very next verify tick after the handshake must see it as verified, and
+	// that tick must land before the deadline.
+	verifyAt := handshakeAt.Add(lanVerifyInterval)
+	if !verifyAt.Before(deadline) {
+		t.Fatalf("verify tick at %v lands at/after deadline %v — no room to confirm the forced handshake",
+			verifyAt.Sub(start), deadline.Sub(start))
+	}
+	if got := evaluateLANTrial(handshakeAt, preTrial, deadline, verifyAt, fresh); got != trialVerified {
+		t.Fatalf("forced handshake at +%v not verified at tick +%v (deadline +%v): got %v",
+			handshakeAt.Sub(start), verifyAt.Sub(start), deadline.Sub(start), got)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Composed state-machine walk: derp → trial → direct, and derp → trial → derp.
 // Exercises the pure helpers in sequence the way the loop drives them.
 // ---------------------------------------------------------------------------

@@ -183,10 +183,10 @@ func New(privateKeyBase64 string, meshIPCIDR string, opts ...Option) (*Tunnel, e
 func (t *Tunnel) Close() {
 	slog.Info("tunnel: closing WireGuard device")
 	if t.ifName != "" {
-		// Remove the mesh inbound-allow rule we added on bring-up (Windows only;
-		// no-op elsewhere). Best-effort -- it's an ActiveStore rule that also
-		// vanishes on reboot, so a missed removal never lingers.
-		_ = removeMeshInbound(t.ifName)
+		// Remove the mesh inbound-allow rules we added on bring-up (Windows only;
+		// no-op elsewhere). Best-effort -- they're ActiveStore rules that also
+		// vanish on reboot, so a missed removal never lingers.
+		_ = removeMeshInbound(t.ifName, t.wgPort)
 	}
 	t.dev.Close()
 }
@@ -262,9 +262,10 @@ func (t *Tunnel) SetMeshIP(meshIP string) error {
 	// mesh (contributor mode / pipeline stages fail with no signal). No-op on
 	// macOS/Linux. Best-effort: a firewall failure must not stop the mesh from
 	// coming up -- we log it so it's diagnosable.
-	if err := allowMeshInbound(t.ifName); err != nil {
+	if err := allowMeshInbound(t.ifName, t.wgPort); err != nil {
 		slog.Warn("tunnel: could not open mesh inbound firewall; peers may be unable to reach this node",
 			"interface", t.ifName,
+			"wg_port", t.wgPort,
 			"error", err,
 		)
 	}

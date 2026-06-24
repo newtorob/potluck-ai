@@ -34,10 +34,12 @@ func lanDirectEnabled() bool { return lanDirectEnabledEnv }
 // routingMode is the per-peer managed routing state.
 //
 //   - modeDERP:      peer is relayed via the DERP relay (the default / floor).
-//   - modeLANTrial:  peer was just pointed at a same-LAN endpoint; we are
-//     waiting to VERIFY a fresh handshake before declaring success. DERP is OFF
-//     during the trial, so a dead LAN path means the peer is unreachable until
-//     the trial deadline rolls it back to DERP.
+//   - modeLANTrial:  the peer's WG session was CLEARED (RemovePeer) and the peer
+//     re-added pinned to a same-LAN endpoint with a short persistent keepalive,
+//     forcing wireguard-go to re-handshake on the LAN endpoint; we are waiting to
+//     VERIFY that fresh handshake before declaring success. DERP is OFF during
+//     the trial, so a dead LAN path means the peer is unreachable until the trial
+//     deadline rolls it back to DERP (RemovePeer + re-add for DERP + flip).
 //   - modeLANDirect: a fresh handshake was observed on the LAN endpoint; the
 //     peer is confirmed reachable directly and stays off the relay.
 //
@@ -64,21 +66,43 @@ func (m routingMode) String() string {
 	}
 }
 
+// lanTrialKeepalive is the persistent-keepalive (seconds) we pin onto the peer
+// for the DURATION of a LAN trial. This is the linchpin of the force-rekey fix.
+//
+// Why a SHORT keepalive is required: simply re-pointing a peer's endpoint
+// (UpdatePeerEndpoint) does NOT make wireguard-go re-handshake — the existing
+// DERP-established session stays valid for ~2 min (REKEY_AFTER_TIME), so on an
+// idle mesh no new handshake ever fires on the LAN endpoint and the trial always
+// times out. By REMOVING the peer (clearing the session) and re-ADDING it pinned
+// to the LAN endpoint WITH a short persistent keepalive, we force WG to bring up
+// a session promptly: a keepalive packet needs a live session, so WG initiates a
+// handshake to the LAN endpoint right away even with zero application traffic.
+// That handshake is what evaluateLANTrial verifies. 5s is short enough to fire
+// well inside the trial window yet not absurdly chatty for the few seconds the
+// trial runs. On VERIFIED we re-add with the standard keepalive so a confirmed
+// link is not keepalive-spammed.
+const lanTrialKeepalive = 5
+
+// lanDirectKeepalive is the persistent-keepalive (seconds) re-applied to a peer
+// once its LAN trial is VERIFIED. Matches the standard mesh keepalive (25s, see
+// rosterPeerToTunnelPeer) so a confirmed direct link behaves exactly like any
+// other peer and we stop the 5s trial-keepalive spam.
+const lanDirectKeepalive = 25
+
 // lanTrialDuration is how long a LAN-trial peer is given to produce a fresh
 // handshake before we give up and roll back to DERP.
 //
 // Trade-off (justified): during the trial DERP is OFF, so a DEAD LAN path means
-// the peer is unreachable for the whole trial window. WireGuard fires a
-// handshake-init the moment the endpoint changes and retries roughly every 5s
-// (REKEY_TIMEOUT); persistent keepalive is 25s. On a live LAN the first
-// handshake-init round-trips in ~1 RTT (sub-millisecond to low-ms), so a healthy
-// path is verified almost immediately. We pick 8s: long enough to absorb one
-// retry plus jitter and clock skew between the two nodes, short enough that a
-// dead LAN candidate only costs ~8s of (recoverable) unreachability before the
-// peer is restored to the working relay. We deliberately do NOT wait a full
-// keepalive interval — that would triple the dead-path outage for no gain on a
-// healthy path.
-const lanTrialDuration = 8 * time.Second
+// the peer is unreachable for the whole trial window. The trial pins a short
+// persistent keepalive (lanTrialKeepalive = 5s) on the freshly re-added peer,
+// which makes wireguard-go initiate a handshake to the LAN endpoint promptly
+// even on an idle mesh. On a live LAN the handshake round-trips in ~1 RTT
+// (sub-ms to low-ms) once the keepalive fires, so a healthy path verifies within
+// a few seconds. We pick 12s: comfortably longer than the 5s keepalive trigger
+// plus one WG handshake retry (~5s, REKEY_TIMEOUT) and clock skew/jitter between
+// the two nodes, while still bounding a dead LAN candidate to ~12s of
+// (recoverable) unreachability before the peer is restored to the working relay.
+const lanTrialDuration = 12 * time.Second
 
 // lanTrialBackoff is how long a peer whose LAN trial FAILED is kept on DERP
 // before another trial is allowed. Prevents thrashing: a LAN candidate that is

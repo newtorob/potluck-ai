@@ -666,14 +666,22 @@ func runReachabilityLoop(
 
 	// maybeStartLANTrial promotes a modeDERP peer to a verified LAN trial when
 	// (a) LAN direct is enabled, (b) the peer advertises a candidate co-subnet
-	// with one of our interfaces, and (c) the peer is not in trial backoff. It
-	// snapshots the current last-handshake (so the verify step can detect a
-	// handshake NEWER than this, proving it completed over the LAN endpoint),
-	// turns DERP OFF for this peer, and points WG at the LAN endpoint. Any
-	// failure to set the endpoint rolls straight back to the DERP floor.
+	// with one of our interfaces, and (c) the peer is not in trial backoff.
 	//
-	// No-op (and zero cost) when LAN direct is disabled: shouldStartLANTrial
-	// short-circuits on !enabled, so the legacy path is byte-for-byte unchanged.
+	// FORCE-REKEY (the crux of the fix): simply re-pointing the endpoint does NOT
+	// make wireguard-go re-handshake — the DERP-established session stays valid
+	// for ~2 min, so on an idle mesh no fresh handshake ever fires on the LAN
+	// endpoint and the trial always times out. Instead we (1) turn DERP off for
+	// this peer, (2) REMOVE the WG peer to clear the existing session, then (3)
+	// re-ADD it pinned to the LAN endpoint with a SHORT persistent keepalive
+	// (lanTrialKeepalive). The keepalive forces WG to bring up a session promptly
+	// (a keepalive needs a live session → WG initiates a handshake to the LAN
+	// endpoint right away), which the verify step can then observe as a handshake
+	// NEWER than the pre-trial snapshot.
+	//
+	// Any failure rolls straight back to the DERP floor. No-op (and zero cost)
+	// when LAN direct is disabled: shouldStartLANTrial short-circuits on
+	// !enabled, so the legacy path is byte-for-byte unchanged.
 	maybeStartLANTrial := func(st *peerReachState, p msignal.RosterPeer, pubkey string) {
 		if !lanDirectEnabled() || dBind == nil {
 			return
@@ -691,22 +699,40 @@ func runReachabilityLoop(
 		var pub [32]byte
 		copy(pub[:], kb)
 
-		// Snapshot the pre-trial handshake from the live device so the verify
-		// step compares against the value as of trial start.
+		// Snapshot the pre-trial handshake from the live device BEFORE we clear
+		// the session, so the verify step compares against the value as of trial
+		// start (RemovePeer wipes the device's handshake; the freshness window in
+		// evaluateLANTrial already guards the resulting zero-snapshot edge).
 		preHS, _, _, _ := tun.PeerReachability(pubkey)
 
-		// DERP OFF + point WG at the LAN endpoint. SetPeerRouting(false) must
-		// precede UpdatePeerEndpoint so outbound packets to the new endpoint go
-		// over the inner UDP bind (not the relay). On a UAPI failure, roll back
-		// to the DERP floor immediately rather than stranding the peer.
+		// (1) DERP OFF for this peer so outbound packets to the LAN endpoint go
+		// over the inner UDP bind, not the relay.
 		dBind.SetPeerRouting(pub, false)
-		if err := tun.UpdatePeerEndpoint(pubkey, lanEp); err != nil {
-			slog.Error("lan_trial: UpdatePeerEndpoint to LAN failed, rolling back to DERP",
+		// (2) Clear the existing (DERP-established) WG session.
+		if err := tun.RemovePeer(pubkey); err != nil {
+			slog.Warn("lan_trial: RemovePeer before re-pin failed, continuing",
 				"node_id", p.NodeID,
 				"pubkey_prefix", util.TruncatePubkey(pubkey),
 				"err", err,
 			)
-			flipToDERP(tun, dBind, pubkey, pub)
+		}
+		// (3) Re-add pinned to the LAN endpoint with a short keepalive so WG
+		// re-handshakes there PROMPTLY (even on an idle mesh). On a re-add failure,
+		// restore the DERP floor (re-add for DERP + flip) rather than strand the
+		// peer with no WG session at all.
+		trialPeer := tunnel.Peer{
+			PublicKey:           pubkey,
+			AllowedIPs:          []string{p.MeshIP + "/32"},
+			Endpoint:            lanEp,
+			PersistentKeepalive: lanTrialKeepalive,
+		}
+		if err := tun.AddPeer(trialPeer); err != nil {
+			slog.Error("lan_trial: AddPeer pinned to LAN failed, rolling back to DERP",
+				"node_id", p.NodeID,
+				"pubkey_prefix", util.TruncatePubkey(pubkey),
+				"err", err,
+			)
+			restoreDERPFloor(tun, dBind, p, pubkey, pub)
 			st.derpRouted = true
 			st.mode = modeDERP
 			modes.set(pubkey, modeDERP)
@@ -720,10 +746,11 @@ func runReachabilityLoop(
 		st.derpRouted = false
 		modes.set(pubkey, modeLANTrial)
 
-		slog.Info("lan_trial: started — DERP off, trialling direct LAN endpoint",
+		slog.Info("lan_trial: started — DERP off, peer re-pinned to direct LAN endpoint (force-rekey)",
 			"node_id", p.NodeID,
 			"pubkey_prefix", util.TruncatePubkey(pubkey),
 			"lan_endpoint", lanEp,
+			"keepalive_s", lanTrialKeepalive,
 			"deadline_ms", lanTrialDuration.Milliseconds(),
 		)
 	}
@@ -762,6 +789,25 @@ func runReachabilityLoop(
 			case trialPending:
 				continue
 			case trialVerified:
+				// Stop keepalive-spamming a confirmed link: re-add the peer with
+				// the standard mesh keepalive (25s), keeping it pinned to the
+				// verified LAN endpoint. appendPeerConfig overwrites the existing
+				// peer's keepalive (5s → 25s) without disturbing the live session,
+				// so the direct path is not interrupted. Best-effort: a failure
+				// here only means we keep the 5s trial keepalive, which is benign.
+				directPeer := tunnel.Peer{
+					PublicKey:           pubkey,
+					AllowedIPs:          []string{p.MeshIP + "/32"},
+					Endpoint:            st.trialLanEp,
+					PersistentKeepalive: lanDirectKeepalive,
+				}
+				if err := tun.AddPeer(directPeer); err != nil {
+					slog.Warn("lan_trial: restoring standard keepalive on verified peer failed (keeping trial keepalive)",
+						"node_id", p.NodeID,
+						"pubkey_prefix", util.TruncatePubkey(pubkey),
+						"err", err,
+					)
+				}
 				st.mode = modeLANDirect
 				st.reachable = true
 				st.derpRouted = false
@@ -789,7 +835,13 @@ func runReachabilityLoop(
 					"backoff_min", int(lanTrialBackoff.Minutes()),
 				)
 				if dBind != nil {
-					flipToDERP(tun, dBind, pubkey, pub)
+					// The trial cleared the session and re-added the peer pinned to
+					// the (dead) LAN endpoint with a short keepalive. A bare
+					// flipToDERP would only swap the endpoint/routing flag, leaving
+					// the 5s trial keepalive in place; restoreDERPFloor re-adds the
+					// peer with the standard config first, THEN flips, guaranteeing
+					// a clean working relay session.
+					restoreDERPFloor(tun, dBind, p, pubkey, pub)
 				}
 				st.mode = modeDERP
 				st.derpRouted = true
@@ -884,7 +936,11 @@ func runReachabilityLoop(
 						"last_handshake_ago", formatHandshakeAge(lastHS),
 					)
 					if peerDerpBind != nil {
-						flipToDERP(tun, peerDerpBind, pubkey, pubkeyBytes)
+						// The peer is still pinned to its (now-dead) LAN endpoint
+						// from the verified trial. Re-add it with the standard DERP
+						// config before flipping, so the relay session comes up
+						// cleanly rather than inheriting the stale LAN pin.
+						restoreDERPFloor(tun, peerDerpBind, p, pubkey, pubkeyBytes)
 						st.derpRouted = true
 					}
 					st.mode = modeDERP
@@ -1043,6 +1099,44 @@ func runReachabilityLoop(
 			verifyTrials()
 		}
 	}
+}
+
+// restoreDERPFloor brings a peer that was clobbered by a LAN trial back to a
+// clean, working DERP relay session — the SAFETY FLOOR after a failed (or
+// stale) direct-LAN attempt.
+//
+// Why a plain flipToDERP is not enough here: the LAN trial REMOVED the WG
+// session and re-ADDED the peer pinned to the LAN endpoint with a short (5s)
+// trial keepalive. flipToDERP alone would only swap the endpoint to the
+// synthetic address and set the routing flag, leaving that short keepalive (and
+// any half-formed LAN session state) in place. Instead we re-add the peer from
+// scratch with the standard mesh config (mesh-IP/32 allowed-ips, the standard
+// 25s keepalive that DERP-routed peers require, and the last-known real endpoint
+// as a hint), THEN flipToDERP to install the synthetic endpoint + routing flag.
+// The result is byte-for-byte the same WG peer config a fresh roster-add would
+// produce, so the relay path comes back exactly as it would on first contact.
+//
+// Correctness of the DERP floor: after this returns, (a) the peer exists on the
+// WG device with allowed-ips = mesh-IP/32, (b) dBind has the peer marked
+// DERP-routed, and (c) the WG endpoint is the synthetic DERP address so all
+// outbound packets dispatch through DerpBind.Send to the relay. That is exactly
+// the state a peer is in on normal DERP fallback, which is the proven-working
+// relay path. A peer therefore always ends up reachable over DERP again after a
+// failed trial.
+func restoreDERPFloor(tun *tunnel.Tunnel, dBind *derp.DerpBind, p msignal.RosterPeer, pubkeyBase64 string, pubkeyBytes [32]byte) {
+	// Re-add the peer with the standard mesh config (clears the trial's LAN pin
+	// and short keepalive). rosterPeerToTunnelPeer supplies mesh-IP/32 +
+	// 25s keepalive + the cached real endpoint; AddPeer's replace_allowed_ips
+	// keeps the re-add idempotent. Best-effort: if this fails we still flip, so
+	// the routing flag + synthetic endpoint are at least asserted.
+	if err := tun.AddPeer(rosterPeerToTunnelPeer(p)); err != nil {
+		slog.Warn("derp_fallback: re-add peer for DERP floor failed, flipping anyway",
+			"node_id", p.NodeID,
+			"pubkey_prefix", util.TruncatePubkey(pubkeyBase64),
+			"err", err,
+		)
+	}
+	flipToDERP(tun, dBind, pubkeyBase64, pubkeyBytes)
 }
 
 // flipToDERP marks the peer as DERP-routed in the bind and updates the WG
