@@ -182,6 +182,12 @@ func New(privateKeyBase64 string, meshIPCIDR string, opts ...Option) (*Tunnel, e
 // Close gracefully shuts down the WireGuard device and TUN interface.
 func (t *Tunnel) Close() {
 	slog.Info("tunnel: closing WireGuard device")
+	if t.ifName != "" {
+		// Remove the mesh inbound-allow rule we added on bring-up (Windows only;
+		// no-op elsewhere). Best-effort -- it's an ActiveStore rule that also
+		// vanishes on reboot, so a missed removal never lingers.
+		_ = removeMeshInbound(t.ifName)
+	}
 	t.dev.Close()
 }
 
@@ -242,6 +248,19 @@ func (t *Tunnel) SetMeshIP(meshIP string) error {
 		"interface", t.ifName,
 		"mesh_ip", meshIP,
 	)
+
+	// Open inbound on the mesh interface so household peers can actually reach
+	// this node's services. A fresh Windows Wintun adapter blocks inbound by
+	// default, which otherwise leaves a Windows node silently unreachable on the
+	// mesh (contributor mode / pipeline stages fail with no signal). No-op on
+	// macOS/Linux. Best-effort: a firewall failure must not stop the mesh from
+	// coming up -- we log it so it's diagnosable.
+	if err := allowMeshInbound(t.ifName); err != nil {
+		slog.Warn("tunnel: could not open mesh inbound firewall; peers may be unable to reach this node",
+			"interface", t.ifName,
+			"error", err,
+		)
+	}
 	return nil
 }
 
