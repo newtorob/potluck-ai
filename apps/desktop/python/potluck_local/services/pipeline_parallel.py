@@ -540,6 +540,89 @@ class PipelineParallelEngine:
                 pass
 
 
+class WholeModelEngine:
+    """Head-side engine for WHOLE-MODEL LOCAL LOAD: the model fits on this machine's own
+    VRAM, so there is no pipeline split and no peer chain -- plain local transformers
+    inference. It exists so the topology-aware planner's mode=="whole" short-circuit has
+    something real to load instead of merely signalling "load it elsewhere".
+
+    It presents the SAME surface as PipelineParallelEngine -- stream_tokens(messages,
+    *, max_new) (a blocking generator of text deltas) + describe() -- so LLMRuntime can
+    serve it through the identical slot/machinery with no special-casing (see
+    runtime.load_whole_model). The whole HF model is materialized here (no meta-load, no
+    layer split): AutoModelForCausalLM.from_pretrained fully onto the resolved device.
+
+    Greedy decode (argmax) in v0, matching the pipeline engine; temperature/sampling is a
+    follow-on. This path has no activation-on-the-wire, so it has no open-pool restriction
+    of its own -- it is just the local-serving fallback of the auto-pipeline path."""
+
+    def __init__(self, model_id, *, device="", dtype=None):
+        self.model_id = model_id
+        self.device = resolve_device(device)
+        self.dtype = dtype if dtype is not None else default_dtype(self.device)
+        # DirectML mirror of load_parts: device_map can't target a privateuseone device,
+        # so load on CPU then move the whole model onto the DML GPU.
+        is_dml = "privateuseone" in str(self.device)
+        if is_dml:
+            model = AutoModelForCausalLM.from_pretrained(self.model_id, dtype=self.dtype)
+            model = model.to(self.device)
+        else:
+            # device_map targets the resolved device directly (cuda|mps|cpu) -- the model
+            # fits, so the whole thing lands on one device, no offload/meta split.
+            model = AutoModelForCausalLM.from_pretrained(
+                self.model_id, dtype=self.dtype, device_map=str(self.device),
+            )
+        model.eval()
+        self.model = model
+        self.tokenizer = AutoTokenizer.from_pretrained(model_id)
+        # n_layers for /health parity with the pipeline engine's describe().
+        self.n_layers = int(getattr(model.config, "num_hidden_layers", 0) or 0)
+
+    def describe(self):
+        """Status for /health + the Models page (mirrors PipelineParallelEngine.describe)."""
+        return {
+            "model_id": self.model_id,
+            "strategy": "whole-model",
+            "n_layers": self.n_layers,
+            "device": str(self.device),
+            "dtype": str(self.dtype),
+        }
+
+    def stream_tokens(self, messages, *, max_new=512):
+        """Blocking generator yielding text DELTAS as each token is decoded -- the SAME
+        interface PipelineParallelEngine.stream_tokens exposes, so LLMRuntime serves it
+        identically. Manual greedy decode loop (no TextIteratorStreamer/threads needed:
+        the model is local and we already run inside the runtime's worker thread), emitting
+        only the newly-decoded suffix text each step."""
+        enc = self.tokenizer.apply_chat_template(
+            messages, add_generation_prompt=True, return_tensors="pt", return_dict=True)
+        ids = enc["input_ids"].to(self.device)
+        attn = enc.get("attention_mask")
+        attn = attn.to(self.device) if attn is not None else None
+        cache = DynamicCache()
+        produced, emitted = [], 0
+        eos_id = self.tokenizer.eos_token_id
+
+        def _argmax_next(logits):
+            return int(torch.argmax(logits[:, -1, :], dim=-1).item())
+
+        with torch.no_grad():
+            out = self.model(input_ids=ids, attention_mask=attn,
+                             past_key_values=cache, use_cache=True)
+            nxt = _argmax_next(out.logits)
+            for _ in range(max_new):
+                if eos_id is not None and nxt == eos_id:
+                    break
+                produced.append(nxt)
+                text = self.tokenizer.decode(produced, skip_special_tokens=True)
+                if len(text) > emitted:  # emit only the newly-decoded suffix
+                    yield text[emitted:]
+                    emitted = len(text)
+                step_ids = torch.tensor([[nxt]], device=self.device)
+                out = self.model(input_ids=step_ids, past_key_values=cache, use_cache=True)
+                nxt = _argmax_next(out.logits)
+
+
 def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=None, ready_event=None):
     """Run the tail stage: accept upstream connections (from a head or a mid), run this
     node's final block + norm + lm_head, and return the next token. One DynamicCache per

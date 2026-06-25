@@ -186,6 +186,59 @@ class LLMRuntime:
                 **engine.describe(),
             }
 
+    def load_whole_model(
+        self,
+        model_id: str,
+        *,
+        device: str = "",
+        dtype: str | None = None,
+    ) -> dict:
+        """Load a FULL HF model locally and serve it -- the WHOLE-MODEL path. This is
+        the auto-pipeline planner's mode=="whole" fallback: the model fits on this
+        machine's own VRAM, so there is no layer split and no peer chain, just plain
+        local transformers inference.
+
+        Slot choice: WholeModelEngine presents the IDENTICAL stream_tokens + describe
+        surface as PipelineParallelEngine, so it occupies the SAME self._pipeline slot.
+        stream_chat / _release_model / loaded_pipeline therefore all work unchanged --
+        no whole-model special-casing anywhere else in the runtime. The three backends
+        (llama _model / pipeline / whole-model) stay mutually exclusive because they
+        share that one slot pair (_model XOR _pipeline). describe()["strategy"] is the
+        discriminator ("pipeline" vs "whole-model") on the wire.
+
+        Blocks until the model is loaded; thread-safe swap via _load_lock.
+        """
+        # Lazy import: WholeModelEngine lives in pipeline_parallel, which top-imports
+        # torch + transformers. Mirrors load_pipeline -- keep the base sidecar light;
+        # only the path that actually loads a model drags torch in.
+        from .pipeline_parallel import WholeModelEngine
+
+        torch_dtype = None
+        if dtype:
+            import torch
+            torch_dtype = getattr(torch, dtype)
+
+        with self._load_lock:
+            if self._model is not None or self._pipeline is not None:
+                self._release_model()
+
+            start = time.monotonic()
+            engine = WholeModelEngine(model_id, device=device, dtype=torch_dtype)
+            self._pipeline = engine
+            self._model_id = model_id
+            elapsed = round(time.monotonic() - start, 2)
+
+            logger.info(
+                "whole_model_loaded model_id=%s device=%s dtype=%s load_time=%.2fs",
+                model_id, engine.device, engine.dtype, elapsed,
+            )
+            return {
+                "model_id": model_id,
+                "strategy": "whole-model",
+                "load_time_seconds": elapsed,
+                **engine.describe(),
+            }
+
     def unload_model(self) -> None:
         """Release the current model and free memory."""
         with self._load_lock:

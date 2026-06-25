@@ -205,20 +205,32 @@ async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
 
             # Topology-aware short-circuit: the planner found the model fits on THIS
             # machine's VRAM alone, so it declined to build a pipeline (no hop is faster
-            # than no hop, and no peer stages were started). Signal the caller to load
-            # the model locally via the normal path instead of forcing a split.
+            # than no hop, and no peer stages were started). Load the FULL model locally
+            # via the whole-model engine instead of forcing a split. Off the event loop
+            # (multi-second blocking load) like load_pipeline.
             if chain.get("mode") == "whole":
-                logger.info("load_pipeline_whole_model model_id=%s (fits on head; no split)", model_id)
-                return {
-                    "model_id": model_id,
-                    "strategy": "whole-model",
-                    "split_skipped": True,
-                    "n_layers": chain.get("n_layers"),
-                    "detail": (
-                        "Model fits on this machine's VRAM alone; the pipeline split was "
-                        "skipped. Load it locally (non-pipeline) for the fastest path."
-                    ),
-                }
+                logger.info("load_whole_model_start model_id=%s (fits on head; no split)", model_id)
+                try:
+                    result = await loop.run_in_executor(
+                        None,
+                        lambda: runtime.load_whole_model(
+                            model_id, device=ac.device, dtype=chain.get("dtype"),
+                        ),
+                    )
+                except Exception as exc:
+                    logger.error("load_whole_model_error model_id=%s error=%s", model_id, exc)
+                    raise HTTPException(status_code=500, detail=f"whole-model load failed: {exc}")
+                result["split_skipped"] = True
+                result["loaded"] = True
+                result["detail"] = (
+                    "Model fits on this machine's VRAM alone; the pipeline split was "
+                    "skipped and the full model was loaded locally."
+                )
+                logger.info(
+                    "load_whole_model_complete model_id=%s load_time=%.2f",
+                    model_id, result.get("load_time_seconds", 0),
+                )
+                return result
 
             split, split2, peer, port = chain["split"], chain["split2"], chain["peer"], chain["port"]
             device, dtype = ac.device, chain["dtype"]
