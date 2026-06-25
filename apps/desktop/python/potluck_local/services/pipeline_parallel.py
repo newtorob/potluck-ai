@@ -794,6 +794,70 @@ class WholeModelEngine:
                 nxt = _argmax_next(out.logits)
 
 
+def _cb_build_batched_cache(row_ids: list, cb_cache: dict,
+                            kv_max: int, n_layers: int, dev, dtype) -> "DynamicCache":
+    """Build a left-padded batched DynamicCache from per-row DynamicCaches.
+
+    Mirrors ContinuousBatcher._step()'s cache construction but operates on this
+    node's layers only (0-based reindexed, as load_parts sets layer_idx). Called by
+    the tail's cb_step handler; cb_cache maps row_id -> DynamicCache for this node.
+    Uses each row's actual cache depth (self-consistent with the tail's own state)."""
+    batched = DynamicCache()
+    for li in range(n_layers):
+        k_list, v_list = [], []
+        for i, rid in enumerate(row_ids):
+            row_cache = cb_cache[rid]
+            # Use the tail's actual cache depth as the authoritative source.
+            # This should match kv_depths[i] from the head (same tokens processed),
+            # but deriving it from the tail's own cache makes this self-consistent.
+            actual_depth = row_cache.get_seq_length()
+            if li < len(row_cache.layers):
+                k = row_cache.layers[li].keys    # [1, H, actual_depth, D]
+                v = row_cache.layers[li].values
+            else:
+                # Layer not yet in cache. Should not happen after a prefill, but
+                # guard defensively with a zero-size placeholder.
+                k = torch.zeros(1, 1, 0, 1, dtype=dtype, device=dev)
+                v = torch.zeros(1, 1, 0, 1, dtype=dtype, device=dev)
+                actual_depth = 0
+            pad_len = kv_max - actual_depth
+            if pad_len > 0:
+                pad_k = torch.zeros(1, k.shape[1], pad_len, k.shape[3],
+                                    dtype=k.dtype, device=k.device)
+                pad_v = torch.zeros(1, v.shape[1], pad_len, v.shape[3],
+                                    dtype=v.dtype, device=v.device)
+                k = torch.cat([pad_k, k], dim=2)
+                v = torch.cat([pad_v, v], dim=2)
+            k_list.append(k)
+            v_list.append(v)
+        kb = torch.cat(k_list, dim=0)  # [B, H, kv_max, D]
+        vb = torch.cat(v_list, dim=0)
+        batched.update(kb, vb, layer_idx=li)
+    return batched
+
+
+def _cb_slice_back(out_cache: "DynamicCache", row_ids: list, cb_cache: dict,
+                   kv_depths_pre: list, kv_max: int, n_layers: int) -> None:
+    """Slice the output batched cache back into per-row DynamicCaches in cb_cache.
+
+    out_cache.layers[li].keys has shape [B, H, kv_max+1, D] after the decode step.
+    For row i, real tokens start at index (kv_max - kv_depths_pre[i]) in the padded
+    axis; kv_depths_pre[i] is the row's tail-side KV depth BEFORE this step.
+    Mirrors ContinuousBatcher._step()'s slice-back logic."""
+    for i, rid in enumerate(row_ids):
+        real_start = kv_max - kv_depths_pre[i]
+        new_cache = DynamicCache()
+        for li in range(n_layers):
+            k_full = out_cache.layers[li].keys    # [B, H, kv_max+1, D]
+            v_full = out_cache.layers[li].values
+            new_cache.update(
+                k_full[i:i+1, :, real_start:, :].clone(),
+                v_full[i:i+1, :, real_start:, :].clone(),
+                layer_idx=li,
+            )
+        cb_cache[rid] = new_cache
+
+
 def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=None, ready_event=None):
     """Run the tail stage: accept upstream connections (from a head or a mid), run this
     node's final block + norm + lm_head, and return the next token. One DynamicCache per
@@ -803,7 +867,13 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
 
     stop_event: when set, the accept loop exits and the listen socket closes (so a
     PipelineStageWorker can shut a stage down). ready_event: set once bound + listening,
-    so a programmatic caller can wait for readiness. Blocks until stopped."""
+    so a programmatic caller can wait for readiness. Blocks until stopped.
+
+    DISTRIBUTED CONTINUOUS BATCHING (opt-in):
+    When the head sends op="cb_prefill" or op="cb_step", the tail switches into
+    continuous-batch mode for that connection, maintaining per-row KV caches keyed by
+    row_id. The existing single-stream, lockstep-batch, and speculative paths are
+    byte-for-byte unchanged."""
     srv = socket.socket()
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     srv.bind((host, port))
@@ -815,6 +885,7 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
     active = {"n": 0}
     active_lock = threading.Lock()
     stage_dtype = next(parts["layers"].parameters()).dtype  # cast inbound activations to ours
+    n_tail_layers = len(parts["layers"])
 
     def serve(conn, addr):
         with active_lock:
@@ -822,13 +893,115 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
             n = active["n"]
         logger.info("pipeline tail: upstream %s connected (active streams: %d)", addr, n)
         cache = DynamicCache()
+        # Per-row KV for distributed continuous batching (op="cb_prefill"/"cb_step").
+        # Populated lazily; only used when the head sends cb ops.
+        cb_cache: dict = {}  # row_id -> DynamicCache (this node's layers only)
         steps = 0
         try:
             with torch.no_grad():
                 while True:
                     try:
                         msg = recv_msg(conn)
-                        if isinstance(msg, dict) and msg.get("op") == "verify":
+                        op = msg.get("op") if isinstance(msg, dict) else None
+
+                        if op == "cb_prefill":
+                            # DISTRIBUTED CB — new row prefill. The head has already run
+                            # its layers; h [1, q, H] are the head's output activations.
+                            # We run our layer block to build this row's tail-side KV,
+                            # run norm+lm_head on the last position, return the first token.
+                            row_id = msg["row_id"]
+                            h = msg["h"].to(dev, dtype=stage_dtype)
+                            start = int(msg["start"])
+                            row_cache = DynamicCache()
+                            with _COMPUTE:
+                                _t = time.time()
+                                h = run_layers(h, parts, row_cache, start)
+                                logits = parts["lm_head"](parts["norm"](h))
+                                tok = int(logits[0, -1, :].argmax())
+                                tail_ms = (time.time() - _t) * 1e3
+                            cb_cache[row_id] = row_cache
+                            send_msg(conn, {"tok": tok, "tail_ms": tail_ms})
+                            steps += 1
+                            continue
+
+                        if op == "cb_step":
+                            # DISTRIBUTED CB — one decode step over the active batch.
+                            # h [B, 1, H]: the head's batched decode activations (left-padded,
+                            # attention_mask and position_ids already applied on the head side).
+                            # kv_depths[i]: the real KV depth of row i BEFORE this step
+                            # (== number of tokens the tail has seen for that row, i.e.
+                            # prompt_len + decode_steps_so_far).
+                            # kv_max: max across active rows (used to build the batched cache).
+                            # drop: row_ids to evict from cb_cache after this step.
+                            # attn_mask [B, kv_max+1]: forwarded from the head so our
+                            # run_layers sees the correct mask for the left-padded batch.
+                            # pos_ids [B, 1]: per-row absolute position, forwarded from head.
+                            row_ids = [int(r) for r in msg["rows"]]
+                            drop = [int(r) for r in msg.get("drop", [])]
+                            h = msg["h"].to(dev, dtype=stage_dtype)
+                            kv_max = int(msg["kv_max"])
+
+                            # Capture actual tail KV depths BEFORE the forward so
+                            # _cb_slice_back can compute the real_start slice offset.
+                            tail_kv_depths_pre = [
+                                cb_cache[rid].get_seq_length() for rid in row_ids
+                            ]
+
+                            with _COMPUTE:
+                                _t = time.time()
+                                # Build batched cache from per-row tail caches.
+                                batched = _cb_build_batched_cache(
+                                    row_ids, cb_cache, kv_max,
+                                    n_tail_layers, dev, stage_dtype)
+                                # Run this node's layer block. run_layers uses its own
+                                # position_ids/mask from start+q_len; for the decode step
+                                # we pass start=kv_depths[0] but the rows differ in depth.
+                                # We replicate the head's approach: build a per-layer
+                                # forward manually so we can supply the batched attn_mask
+                                # and per-row position_ids that the head already computed.
+                                # attn_mask from head is [B, kv_max+1] long (1=attend, 0=pad).
+                                # Convert to 4-D additive float mask [B, 1, 1, kv_max+1]
+                                # that transformers SDPA layers expect.
+                                attn_mask_wire = msg.get("attn_mask")
+                                pos_ids = msg.get("pos_ids")
+                                if pos_ids is not None:
+                                    pos_ids = pos_ids.to(dev)
+                                min_val = torch.finfo(h.dtype).min
+                                if attn_mask_wire is not None:
+                                    am = attn_mask_wire.to(dev).bool()  # [B, kv_max+1]
+                                    attn_mask_4d = torch.where(
+                                        am.unsqueeze(1).unsqueeze(2),
+                                        torch.zeros((), dtype=h.dtype, device=dev),
+                                        torch.full((), min_val, dtype=h.dtype, device=dev),
+                                    )  # [B, 1, 1, kv_max+1]
+                                else:
+                                    attn_mask_4d = None
+                                # Run layers with the ragged mask+positions.
+                                # We call each layer directly (not run_layers) because
+                                # run_layers computes a single-start causal mask internally,
+                                # which is wrong for ragged batches. The batched cache +
+                                # forwarded mask + position_ids from the head are correct.
+                                pe = parts["rotary"](h, pos_ids)
+                                for layer in parts["layers"]:
+                                    h = layer(h, attention_mask=attn_mask_4d,
+                                              position_ids=pos_ids,
+                                              past_key_values=batched,
+                                              use_cache=True,
+                                              position_embeddings=pe)
+                                h = parts["norm"](h)
+                                toks = parts["lm_head"](h[:, -1, :]).argmax(-1).tolist()
+                                tail_ms = (time.time() - _t) * 1e3
+                            # Slice batched output cache back to per-row caches.
+                            _cb_slice_back(batched, row_ids, cb_cache,
+                                           tail_kv_depths_pre, kv_max, n_tail_layers)
+                            # Evict finished rows.
+                            for rid in drop:
+                                cb_cache.pop(rid, None)
+                            send_msg(conn, {"toks": toks, "tail_ms": tail_ms})
+                            steps += 1
+                            continue
+
+                        if op == "verify":
                             # SPECULATIVE verify: K+1 candidate positions in, K+1 argmax
                             # tokens out (one per position). `crop` rolls this node's cache
                             # back to the prior round's COMMITTED length before running, so
@@ -847,6 +1020,7 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
                             send_msg(conn, {"toks": toks, "tail_ms": tail_ms})
                             steps += 1
                             continue
+
                         h, start = msg
                         with _COMPUTE:
                             _t = time.time()

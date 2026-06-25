@@ -1,7 +1,9 @@
-"""Continuous batching for WholeModelEngine — Phase 1 (single-node).
+"""Continuous batching — Phase 1 (single-node) and Phase 2 (distributed pipeline).
 
-Implements vLLM-style dynamic admit/evict with shared batched forward passes so many
-concurrent callers share ONE model instance rather than serialising behind a lock.
+PHASE 1 — ContinuousBatcher
+  Wraps a WholeModelEngine. Implements vLLM-style dynamic admit/evict with shared
+  batched forward passes so many concurrent callers share ONE model instance rather
+  than serialising behind a lock.
 
 Design overview
 ---------------
@@ -69,6 +71,38 @@ PUBLIC API
   batcher = ContinuousBatcher(whole_model_engine)
   gen = batcher.submit(messages, max_new=64)   # blocking generator of text deltas
   stats = batcher.stats()                       # forward-pass count, max batch, tokens
+
+PHASE 2 — DistributedContinuousBatcher
+  Drives a PipelineParallelEngine chain (head block + downstream tail) instead of a
+  local whole model. Uses the same scheduler (same _Sequence, same admit/evict loop),
+  but each step:
+
+    HEAD SIDE — same as Phase 1's _step() up through building the batched forward:
+      * Left-pad per-sequence KV caches -> batched DynamicCache for HEAD layers.
+      * Build input_ids [B,1], attention_mask [B, kv_max+1], position_ids [B,1].
+      * Run head's embed + layer block -> activations h [B, 1, H].
+      * Compute drop list (rows that finished last step).
+
+    WIRE — one round-trip to the tail per step:
+      * PREFILL: new row admitted -> send op="cb_prefill" with h [1, q, H] + row_id
+        -> tail creates that row's per-row KV for its layers, returns first token.
+      * DECODE: send op="cb_step" with h [B,1,H] + row_ids + kv_depths + kv_max +
+        attn_mask + pos_ids + drop list -> tail builds its own batched cache,
+        runs its layers, slices back per-row, evicts dropped rows, returns B tokens.
+
+    PER-ROW KV ACROSS NODES:
+      * HEAD: each sequence holds a DynamicCache for the head's layers (same as
+        Phase 1 — the existing _Sequence.cache covers head layers only).
+      * TAIL: the tail's serve() handler maintains cb_cache: dict[row_id, DynamicCache]
+        for the tail's layers. Admit adds an entry (via cb_prefill), evict removes it.
+      * CONSISTENCY: the drop list in cb_step is the tail's eviction signal. The head
+        evicts its own cache by removing the sequence from _active. Both happen in the
+        same step so they stay in sync: a row that finishes is dropped from the tail's
+        cb_cache in the SAME step it is removed from the head's _active list.
+
+    OPT-IN: DistributedContinuousBatcher is a separate class. Pass it a loaded
+    PipelineParallelEngine. The single-stream, lockstep-batch, and speculative paths
+    on PipelineParallelEngine are byte-for-byte unchanged when it is not used.
 """
 
 from __future__ import annotations
@@ -433,4 +467,460 @@ class ContinuousBatcher:
             if item is _DONE:
                 break
             # item is an int (token id from the step loop)
+            yield from _maybe_yield(item)
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: DistributedContinuousBatcher
+# ---------------------------------------------------------------------------
+
+class DistributedContinuousBatcher:
+    """Distributed continuous batcher — drives a pipeline chain (head + tail) with the
+    same dynamic admit/evict scheduler as ContinuousBatcher, but ONE shared chain
+    round-trip per step instead of one local model forward.
+
+    The head runs the same left-pad batching logic (Phase 1's _step structure) over
+    its own layer block, then sends batched activations to the tail in a single
+    op="cb_step" round-trip. The tail maintains per-row KV for its layers and returns
+    B next-tokens. Per-row KV consistency across nodes is managed via:
+      - ADMIT: op="cb_prefill" creates the row's tail-side KV before it joins decode.
+      - EVICT: a drop list piggybacked on the next cb_step tells the tail which
+        row_ids to discard from its cb_cache. The head evicts the row from _active
+        in the same step, keeping both sides in sync.
+
+    OPT-IN: only used when explicitly constructed. PipelineParallelEngine's existing
+    single-stream, lockstep-batch, and speculative paths are byte-for-byte unchanged.
+
+    PUBLIC API (mirrors ContinuousBatcher):
+      batcher = DistributedContinuousBatcher(pipeline_engine)
+      gen = batcher.submit(messages, max_new=64)
+      stats = batcher.stats()
+      batcher.stop()
+    """
+
+    def __init__(self, engine) -> None:
+        """engine: a loaded PipelineParallelEngine (has .parts, .tokenizer, .device,
+        .peer, .port, .timeout). Used for its head block; the tail is contacted over
+        the wire for each step."""
+        # Lazy import so continuous_batch.py stays importable without torch at module
+        # level (create_app torch-free invariant). torch is needed here because we
+        # drive a pipeline engine — which already required torch to load — so the
+        # import guard is already satisfied by the time this constructor runs.
+        from potluck_local.services import pipeline_parallel as pp
+        from potluck_local.services.pipeline_wire import send_msg, recv_msg
+
+        self._engine = engine
+        self._parts = engine.parts
+        self._tok = engine.tokenizer
+        self._device = engine.device
+        self._peer = engine.peer
+        self._port = engine.port
+        self._timeout = engine.timeout
+        self._pp = pp
+        self._send_msg = send_msg
+        self._recv_msg = recv_msg
+
+        self._admit_lock = threading.Lock()
+        self._prefill_lock = threading.Lock()
+        self._step_cond = threading.Condition(self._admit_lock)
+
+        self._active: list[_Sequence] = []
+        self._pending: list[_Sequence] = []
+        self._seq_id = 0
+
+        # drop_queue: row_ids evicted last step, piggybacked on the next cb_step.
+        # Written by _step (step thread only), so no extra lock needed.
+        self._drop_queue: list[int] = []
+
+        self._n_round_trips = 0   # chain round-trips (prefill + decode steps)
+        self._n_steps = 0         # decode steps only
+        self._max_batch = 0
+        self._n_generated = 0
+
+        self._stop = False
+        self._thread = threading.Thread(
+            target=self._loop, name="dcb-step-loop", daemon=True)
+        self._thread.start()
+
+        # One persistent TCP socket to the tail, opened lazily and re-opened on error.
+        # _wire_lock serializes ALL send+recv round-trips (prefill calls from caller
+        # threads + decode steps from the step thread share the same socket; interleaving
+        # them would garble the framing). Hold _wire_lock for the full send+recv pair.
+        self._sock = None
+        self._sock_lock = threading.Lock()
+        self._wire_lock = threading.Lock()
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def submit(self, messages: list[dict], *, max_new: int = 512) -> Iterator[str]:
+        """Prefill the prompt through the full chain, admit the sequence, and return a
+        blocking generator of text deltas. Same contract as ContinuousBatcher.submit."""
+        seq = self._prefill(messages, max_new=max_new)
+        self._admit(seq)
+        return self._drain(seq)
+
+    def stats(self) -> dict:
+        return {
+            "n_round_trips": self._n_round_trips,
+            "n_steps": self._n_steps,
+            "max_batch_size": self._max_batch,
+            "n_generated": self._n_generated,
+        }
+
+    def stop(self) -> None:
+        with self._step_cond:
+            self._stop = True
+            self._step_cond.notify_all()
+        self._thread.join(timeout=10.0)
+        with self._sock_lock:
+            if self._sock is not None:
+                try:
+                    self._sock.close()
+                except OSError:
+                    pass
+                self._sock = None
+
+    # ------------------------------------------------------------------
+    # Socket management — one persistent connection to the tail per batcher
+    # ------------------------------------------------------------------
+
+    def _get_sock(self):
+        """Return the persistent tail socket, connecting if needed."""
+        with self._sock_lock:
+            if self._sock is None:
+                self._sock = self._pp._connect_with_retry(
+                    self._peer, self._port, self._timeout)
+            return self._sock
+
+    def _reset_sock(self):
+        """Close and clear the socket so the next _get_sock() reconnects."""
+        with self._sock_lock:
+            if self._sock is not None:
+                try:
+                    self._sock.close()
+                except OSError:
+                    pass
+                self._sock = None
+
+    # ------------------------------------------------------------------
+    # Prefill: head layers locally + op="cb_prefill" to tail
+    # ------------------------------------------------------------------
+
+    def _prefill(self, messages: list[dict], *, max_new: int) -> _Sequence:
+        """Run the full-chain prefill for one new sequence.
+
+        Head side: embed + head layer block -> activations h [1, q, H].
+        Wire: op="cb_prefill" carries h + row_id; the tail builds that row's per-row
+              tail-side KV and returns the first decoded token.
+
+        Serialised by _prefill_lock: the head model forward is not safe for concurrent
+        calls (same as Phase 1). The step loop continues during a prefill — the new
+        sequence joins on the next iteration after _admit().
+
+        _Sequence.cache stores head-layer KV only. The tail's per-row KV is stored
+        on the tail side, keyed by row_id (== seq.request_id)."""
+        from transformers import DynamicCache
+
+        enc = self._tok.apply_chat_template(
+            messages, add_generation_prompt=True,
+            return_tensors="pt", return_dict=True,
+        )
+        input_ids = enc["input_ids"].to(self._device)
+        prompt_tokens = input_ids[0].tolist()
+
+        with self._prefill_lock:
+            with self._admit_lock:
+                self._seq_id += 1
+                seq_id = self._seq_id
+
+            # Head prefill. _head_forward acquires _COMPUTE internally; we must NOT
+            # hold _COMPUTE ourselves here (non-reentrant lock).
+            head_cache = DynamicCache()
+            with torch.no_grad():
+                h = self._pp._head_forward(
+                    self._parts, input_ids, head_cache, 0, self._device)
+
+            # Tail prefill — one round-trip. h is [1, q, H]; start=0 (absolute
+            # position of the prompt start at the tail, which also starts from 0).
+            # Hold _wire_lock for the full send+recv to prevent interleaving with
+            # concurrent prefill calls or the decode step thread.
+            with self._wire_lock:
+                sock = self._get_sock()
+                try:
+                    self._send_msg(sock, {
+                        "op": "cb_prefill",
+                        "row_id": seq_id,
+                        "h": h.cpu(),
+                        "start": 0,
+                    })
+                    resp = self._recv_msg(sock)
+                    self._n_round_trips += 1
+                except Exception as e:
+                    self._reset_sock()
+                    raise RuntimeError(f"distributed batcher prefill failed: {e}") from e
+
+            nxt = int(resp["tok"])
+
+        eos = self._tok.eos_token_id
+        return _Sequence(
+            request_id=seq_id,
+            token_ids=prompt_tokens + [nxt],
+            cache=head_cache,     # head layers' KV only
+            max_new=max_new,
+            generated=1,
+            done=(eos is not None and nxt == eos),
+        )
+
+    # ------------------------------------------------------------------
+    # Admit
+    # ------------------------------------------------------------------
+
+    def _admit(self, seq: _Sequence) -> None:
+        with self._step_cond:
+            self._pending.append(seq)
+            self._step_cond.notify_all()
+
+    # ------------------------------------------------------------------
+    # Step loop
+    # ------------------------------------------------------------------
+
+    def _loop(self) -> None:
+        while True:
+            with self._step_cond:
+                while not self._stop and not self._active and not self._pending:
+                    self._step_cond.wait(timeout=0.1)
+                if self._stop and not self._active and not self._pending:
+                    break
+                self._active.extend(self._pending)
+                self._pending.clear()
+
+            self._active = [s for s in self._active if not s.done]
+            if not self._active:
+                continue
+
+            try:
+                self._step()
+            except Exception as exc:
+                logger.exception("distributed_batcher step error: %s", exc)
+                with self._step_cond:
+                    for s in self._active:
+                        if not s.done:
+                            s.out.put(_ERROR)
+                            s.out.put(exc)
+                            s.out.put(_DONE)
+                    self._active.clear()
+                self._drop_queue.clear()
+                self._reset_sock()
+
+    def _step(self) -> None:
+        """Run ONE distributed decode step.
+
+        HEAD SIDE (mirrors Phase 1 _step):
+          1. Snapshot active sequences.
+          2. Left-pad per-sequence head-layer KV -> batched DynamicCache.
+          3. Build input_ids [B,1], attention_mask [B, kv_max+1], position_ids [B,1].
+          4. Run embed + head layer block (under _COMPUTE) -> h [B, 1, H].
+          5. Slice output batched cache back to per-sequence head caches.
+
+        WIRE (one cb_step round-trip to the tail):
+          6. Send op="cb_step" with h, row_ids, kv_depths, kv_max, attn_mask,
+             pos_ids, and the drop list accumulated from the previous step.
+          7. Tail rebuilds its batched per-row cache, runs its layers, slices back,
+             evicts dropped rows, returns B next-tokens.
+
+        EVICT:
+          8. Tokens distributed; finished rows added to _drop_queue for the NEXT
+             step's wire message. The head removes them from _active immediately.
+             The tail removes them when the next cb_step arrives with them in drop.
+
+        ADMIT:
+          9. Pending sequences absorbed at the end (join the batch next step)."""
+        from transformers import DynamicCache
+
+        seqs = self._active
+        B = len(seqs)
+        self._max_batch = max(self._max_batch, B)
+        eos_id = self._tok.eos_token_id
+
+        # --- Head-layer KV depths and max ---
+        kv_depths = [s.cache.get_seq_length() for s in seqs]
+        kv_max = max(kv_depths)
+        n_head_layers = len(seqs[0].cache.layers) if seqs[0].cache.layers else 0
+
+        # --- Build batched head DynamicCache (left-pad shorter sequences) ---
+        batched_head = DynamicCache()
+        for li in range(n_head_layers):
+            k_list, v_list = [], []
+            for i, s in enumerate(seqs):
+                k = s.cache.layers[li].keys    # [1, H, depth_i, D]
+                v = s.cache.layers[li].values
+                pad_len = kv_max - kv_depths[i]
+                if pad_len > 0:
+                    pad_k = torch.zeros(1, k.shape[1], pad_len, k.shape[3],
+                                        dtype=k.dtype, device=k.device)
+                    pad_v = torch.zeros(1, v.shape[1], pad_len, v.shape[3],
+                                        dtype=v.dtype, device=v.device)
+                    k = torch.cat([pad_k, k], dim=2)
+                    v = torch.cat([pad_v, v], dim=2)
+                k_list.append(k)
+                v_list.append(v)
+            batched_head.update(
+                torch.cat(k_list, dim=0),
+                torch.cat(v_list, dim=0),
+                layer_idx=li,
+            )
+
+        # --- input_ids [B, 1], attn_mask [B, kv_max+1], position_ids [B, 1] ---
+        input_ids = torch.tensor(
+            [s.token_ids[-1] for s in seqs],
+            dtype=torch.long, device=self._device,
+        ).unsqueeze(1)
+
+        attn_mask = torch.zeros(B, kv_max + 1, dtype=torch.long, device=self._device)
+        for i, depth in enumerate(kv_depths):
+            attn_mask[i, kv_max - depth:] = 1
+
+        position_ids = torch.tensor(
+            [[kv_depths[i]] for i in range(B)],
+            dtype=torch.long, device=self._device,
+        )
+
+        row_ids = [s.request_id for s in seqs]
+
+        # --- Head forward: embed + layers -> h [B, 1, H] ---
+        # Build 4-D attention mask expected by transformers SDPA layers:
+        # shape [B, 1, 1, kv_max+1]. True positions -> 0.0, padding -> -inf.
+        with torch.no_grad():
+            with self._pp._COMPUTE:
+                h = self._parts["embed"](input_ids)  # [B, 1, H]
+                pe = self._parts["rotary"](h, position_ids)
+                dtype_h = h.dtype
+                min_val = torch.finfo(dtype_h).min
+                # attn_mask [B, kv_max+1] -> [B, 1, 1, kv_max+1] additive mask
+                mask_4d = torch.where(
+                    attn_mask.bool().unsqueeze(1).unsqueeze(2),
+                    torch.zeros((), dtype=dtype_h, device=self._device),
+                    torch.full((), min_val, dtype=dtype_h, device=self._device),
+                )
+                for layer in self._parts["layers"]:
+                    h = layer(
+                        h,
+                        attention_mask=mask_4d,
+                        position_ids=position_ids,
+                        past_key_values=batched_head,
+                        use_cache=True,
+                        position_embeddings=pe,
+                    )
+
+        # --- Slice head output cache back to per-sequence caches ---
+        # batched_head was mutated in-place by the forward; it now has shape
+        # [B, H, kv_max+1, D]. Slice out each sequence's real [1, H, depth+1, D].
+        n_out = len(batched_head.layers)
+        for i, s in enumerate(seqs):
+            real_start = kv_max - kv_depths[i]
+            new_cache = DynamicCache()
+            for li in range(n_out):
+                kf = batched_head.layers[li].keys    # [B, H, kv_max+1, D]
+                vf = batched_head.layers[li].values
+                new_cache.update(
+                    kf[i:i+1, :, real_start:, :].clone(),
+                    vf[i:i+1, :, real_start:, :].clone(),
+                    layer_idx=li,
+                )
+            s.cache = new_cache
+
+        # --- Wire: one cb_step round-trip to the tail ---
+        # Include the drop list from the previous step (piggybacked eviction).
+        # Hold _wire_lock for the full send+recv; prefill round-trips from caller
+        # threads also hold this lock, so neither can interleave on the socket.
+        drop_now = list(self._drop_queue)
+        self._drop_queue.clear()
+
+        with self._wire_lock:
+            sock = self._get_sock()
+            try:
+                self._send_msg(sock, {
+                    "op": "cb_step",
+                    "rows": row_ids,
+                    "drop": drop_now,
+                    "h": h.cpu(),
+                    "kv_depths": kv_depths,
+                    "kv_max": kv_max,
+                    "attn_mask": attn_mask.cpu(),
+                    "pos_ids": position_ids.cpu(),
+                })
+                resp = self._recv_msg(sock)
+                self._n_round_trips += 1
+                self._n_steps += 1
+            except Exception as e:
+                self._reset_sock()
+                raise RuntimeError(f"distributed batcher step failed: {e}") from e
+
+        next_tokens = [int(t) for t in resp["toks"]]
+
+        # --- Distribute tokens; collect evictions for next step's drop list ---
+        finished_indices = []
+        for i, s in enumerate(seqs):
+            nxt = next_tokens[i]
+            is_eos = eos_id is not None and nxt == eos_id
+            s.token_ids.append(nxt)
+            s.generated += 1
+            self._n_generated += 1
+            if not is_eos:
+                s.out.put(nxt)
+            if is_eos or s.generated >= s.max_new:
+                s.done = True
+                s.out.put(_DONE)
+                finished_indices.append(i)
+                self._drop_queue.append(s.request_id)
+
+        for i in reversed(finished_indices):
+            self._active.pop(i)
+
+        # --- Absorb newly-admitted sequences (join next step) ---
+        with self._step_cond:
+            if self._pending:
+                self._active.extend(self._pending)
+                self._pending.clear()
+
+    # ------------------------------------------------------------------
+    # Output drain (identical structure to ContinuousBatcher._drain)
+    # ------------------------------------------------------------------
+
+    def _drain(self, seq: _Sequence) -> Iterator[str]:
+        """Decode token ids from the sequence queue and yield text deltas.
+        Emits the prefill's first token immediately (same as Phase 1)."""
+        eos_id = self._tok.eos_token_id
+        produced: list[int] = []
+        emitted = 0
+
+        def _maybe_yield(token_id: int) -> Iterator[str]:
+            nonlocal emitted
+            produced.append(token_id)
+            text = self._tok.decode(produced, skip_special_tokens=True)
+            if len(text) > emitted:
+                delta = text[emitted:]
+                emitted = len(text)
+                yield delta
+
+        if not seq.done:
+            first_token = seq.token_ids[-1]
+            if eos_id is None or first_token != eos_id:
+                yield from _maybe_yield(first_token)
+
+        if seq.done:
+            return
+
+        while True:
+            item = seq.out.get()
+            if item is _ERROR:
+                exc = seq.out.get()
+                seq.out.get()
+                raise RuntimeError(
+                    f"distributed batcher step error: {exc}"
+                ) from exc
+            if item is _DONE:
+                break
             yield from _maybe_yield(item)
