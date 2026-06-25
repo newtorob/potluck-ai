@@ -1093,13 +1093,121 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
             return
         logger.info("pipeline mid: head %s connected; downstream tail open", addr)
         cache = DynamicCache()
+        # Per-row KV for distributed continuous batching (op="cb_prefill"/"cb_step").
+        # The mid maintains its OWN per-row KV for ITS layer block, exactly like the
+        # tail does for its layers. Keyed by row_id, populated on cb_prefill, evicted
+        # via the drop list in cb_step.
+        cb_cache: dict = {}  # row_id -> DynamicCache (this node's layers only)
+        n_mid_layers = len(parts["layers"])
         steps = 0
         try:
             with torch.no_grad():
                 while True:
                     try:
                         msg = recv_msg(conn)
-                        if isinstance(msg, dict) and msg.get("op") == "verify":
+                        op = msg.get("op") if isinstance(msg, dict) else None
+
+                        if op == "cb_prefill":
+                            # DISTRIBUTED CB relay — mid path.
+                            # 1. Run the mid's layer block on the head's prefill activations,
+                            #    building this node's per-row KV for row_id.
+                            # 2. Forward the mid's output activations downstream as cb_prefill.
+                            # 3. Relay the tail's first-token response back upstream.
+                            row_id = msg["row_id"]
+                            h = msg["h"].to(dev, dtype=stage_dtype)
+                            start = int(msg["start"])
+                            row_cache = DynamicCache()
+                            with _COMPUTE:
+                                h = run_layers(h, parts, row_cache, start)
+                            cb_cache[row_id] = row_cache
+                            send_msg(tail_sock, {
+                                "op": "cb_prefill",
+                                "row_id": row_id,
+                                "h": h.cpu(),
+                                "start": start,
+                            })
+                            send_msg(conn, recv_msg(tail_sock))  # relay first token upstream
+                            steps += 1
+                            continue
+
+                        if op == "cb_step":
+                            # DISTRIBUTED CB relay — mid path.
+                            # 1. Apply the drop list to the mid's own cb_cache.
+                            # 2. Build mid's batched cache; run each layer with the forwarded
+                            #    attn_mask + pos_ids (same pattern as serve_tail's cb_step).
+                            # 3. Forward the mid's output activations downstream as cb_step
+                            #    with the SAME metadata (rows, kv_depths, kv_max, drop,
+                            #    attn_mask, pos_ids) so the tail's handler is unchanged.
+                            # 4. Relay the tail's [B] toks response back upstream.
+                            # 5. Slice mid's output cache back to per-row caches.
+                            row_ids = [int(r) for r in msg["rows"]]
+                            drop = [int(r) for r in msg.get("drop", [])]
+                            h = msg["h"].to(dev, dtype=stage_dtype)
+                            kv_max = int(msg["kv_max"])
+                            attn_mask_wire = msg.get("attn_mask")
+                            pos_ids = msg.get("pos_ids")
+
+                            # Evict dropped rows from the mid's own cache first (same step
+                            # they are dropped from head and tail — keep all three in sync).
+                            for rid in drop:
+                                cb_cache.pop(rid, None)
+
+                            # Capture mid's actual KV depths BEFORE the forward so
+                            # _cb_slice_back can compute the correct real_start offset.
+                            mid_kv_depths_pre = [
+                                cb_cache[rid].get_seq_length() for rid in row_ids
+                            ]
+
+                            with _COMPUTE:
+                                batched = _cb_build_batched_cache(
+                                    row_ids, cb_cache, kv_max,
+                                    n_mid_layers, dev, stage_dtype)
+
+                                if pos_ids is not None:
+                                    pos_ids_dev = pos_ids.to(dev)
+                                else:
+                                    pos_ids_dev = None
+
+                                min_val = torch.finfo(h.dtype).min
+                                if attn_mask_wire is not None:
+                                    am = attn_mask_wire.to(dev).bool()  # [B, kv_max+1]
+                                    attn_mask_4d = torch.where(
+                                        am.unsqueeze(1).unsqueeze(2),
+                                        torch.zeros((), dtype=h.dtype, device=dev),
+                                        torch.full((), min_val, dtype=h.dtype, device=dev),
+                                    )  # [B, 1, 1, kv_max+1]
+                                else:
+                                    attn_mask_4d = None
+
+                                pe = parts["rotary"](h, pos_ids_dev)
+                                for layer in parts["layers"]:
+                                    h = layer(h, attention_mask=attn_mask_4d,
+                                              position_ids=pos_ids_dev,
+                                              past_key_values=batched,
+                                              use_cache=True,
+                                              position_embeddings=pe)
+
+                            # Slice mid's output cache back to per-row caches.
+                            _cb_slice_back(batched, row_ids, cb_cache,
+                                           mid_kv_depths_pre, kv_max, n_mid_layers)
+
+                            # Forward downstream with identical metadata so the tail's
+                            # existing cb_step handler runs unchanged.
+                            send_msg(tail_sock, {
+                                "op": "cb_step",
+                                "rows": row_ids,
+                                "drop": drop,
+                                "h": h.cpu(),
+                                "kv_depths": msg.get("kv_depths"),
+                                "kv_max": kv_max,
+                                "attn_mask": attn_mask_wire,
+                                "pos_ids": pos_ids,
+                            })
+                            send_msg(conn, recv_msg(tail_sock))  # relay [B] toks upstream
+                            steps += 1
+                            continue
+
+                        if op == "verify":
                             # SPECULATIVE relay: crop THIS node's cache to the prior round's
                             # committed length, run our block on the K+1 candidates, forward
                             # downstream carrying the SAME crop (so the tail rolls back too),
@@ -1115,6 +1223,7 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
                             send_msg(conn, recv_msg(tail_sock))  # relay K+1 tokens upstream
                             steps += 1
                             continue
+
                         h, start = msg
                         with _COMPUTE:
                             h = run_layers(h.to(dev, dtype=stage_dtype), parts, cache, start)
