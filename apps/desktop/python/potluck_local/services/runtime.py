@@ -35,6 +35,9 @@ class LLMRuntime:
         # Pipeline-parallel engine (transformers head-loop over the mesh) when a model
         # is loaded with the "pipeline" strategy. Mutually exclusive with self._model.
         self._pipeline = None
+        # Optional ContinuousBatcher (whole-model opt-in only; None by default so the
+        # single-stream path is completely unchanged when continuous_batch=False).
+        self._batcher = None
         self._load_lock = threading.Lock()
         self._inference_lock = asyncio.Lock()
         # Last benchmark result per model_id (tokens/sec + TTFT). Persists across
@@ -200,6 +203,7 @@ class LLMRuntime:
         *,
         device: str = "",
         dtype: str | None = None,
+        continuous_batch: bool = False,
     ) -> dict:
         """Load a FULL HF model locally and serve it -- the WHOLE-MODEL path. This is
         the auto-pipeline planner's mode=="whole" fallback: the model fits on this
@@ -213,6 +217,11 @@ class LLMRuntime:
         (llama _model / pipeline / whole-model) stay mutually exclusive because they
         share that one slot pair (_model XOR _pipeline). describe()["strategy"] is the
         discriminator ("pipeline" vs "whole-model") on the wire.
+
+        continuous_batch=False (default): single-stream path, byte-for-byte unchanged.
+        continuous_batch=True: a ContinuousBatcher is created and stream_chat routes
+        concurrent requests through shared batched forward passes instead of the
+        inference lock. The batcher is shut down on unload_model().
 
         Blocks until the model is loaded; thread-safe swap via _load_lock.
         """
@@ -236,14 +245,27 @@ class LLMRuntime:
             self._model_id = model_id
             elapsed = round(time.monotonic() - start, 2)
 
+            # Opt-in continuous batcher: wraps the engine, intercepting stream_chat
+            # so concurrent requests share batched forward passes.  Default off so
+            # the existing single-stream path is byte-for-byte unchanged.
+            if continuous_batch:
+                from .continuous_batch import ContinuousBatcher
+                self._batcher = ContinuousBatcher(engine)
+                logger.info(
+                    "continuous_batcher_enabled model_id=%s", model_id,
+                )
+            else:
+                self._batcher = None
+
             logger.info(
-                "whole_model_loaded model_id=%s device=%s dtype=%s load_time=%.2fs",
-                model_id, engine.device, engine.dtype, elapsed,
+                "whole_model_loaded model_id=%s device=%s dtype=%s load_time=%.2fs continuous_batch=%s",
+                model_id, engine.device, engine.dtype, elapsed, continuous_batch,
             )
             return {
                 "model_id": model_id,
                 "strategy": "whole-model",
                 "load_time_seconds": elapsed,
+                "continuous_batch": continuous_batch,
                 **engine.describe(),
             }
 
@@ -263,6 +285,9 @@ class LLMRuntime:
             self._loaded_n_ctx = None
             self._loaded_rpc_servers = None
             logger.info("model_unloaded model_id=%s", model_id)
+        if self._batcher is not None:
+            self._batcher.stop()
+            self._batcher = None
         if self._pipeline is not None:
             model_id = self._model_id
             self._pipeline = None  # drops the head block + tokenizer; torch frees on GC
@@ -282,6 +307,19 @@ class LLMRuntime:
         Serialised by _inference_lock — llama-cpp-python is not thread-safe
         for concurrent inference on the same model instance.
         """
+        if self._batcher is not None:
+            # Continuous-batching opt-in: multiple concurrent stream_chat callers share
+            # batched forward passes through the ContinuousBatcher. Each submit() call
+            # returns a blocking generator that _stream_sse_from_blocking pumps into the
+            # standard async SSE queue — no inference lock (batcher serialises internally).
+            batcher = self._batcher
+            async for chunk in self._stream_sse_from_blocking(
+                lambda: batcher.submit(messages, max_new=max_tokens),
+                label=f"cb_stream model_id={self._model_id}",
+            ):
+                yield chunk
+            return
+
         if self._pipeline is not None:
             # Pipeline-parallel strategy: distributed engine -> shared SSE machinery.
             engine = self._pipeline
