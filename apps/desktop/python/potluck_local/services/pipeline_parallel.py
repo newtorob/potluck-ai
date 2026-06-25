@@ -304,6 +304,39 @@ def _send_recv(sock, h, abs_start):
     return resp, 0.0, nbytes
 
 
+def _send_recv_verify(sock, h, abs_start, crop):
+    """One SPECULATIVE round-trip: send the K+1 candidate activations plus the prior
+    round's rollback length (`crop`), receive the tail's K+1 argmax tokens. This is a
+    keyed dict message ({"op": "verify", ...}) distinct from the legacy positional
+    (h, abs_start) tuple _send_recv sends, so a spec head and a greedy head can hit the
+    SAME tail and the tail dispatches on shape -- the default greedy wire is untouched.
+    Returns (toks, tail_compute_ms, bytes_sent); toks is a python list of K+1 ints."""
+    nbytes = send_msg(sock, {"op": "verify", "h": h.cpu(), "start": abs_start, "crop": crop})
+    resp = recv_msg(sock)
+    if isinstance(resp, dict):
+        return resp["toks"], float(resp.get("tail_ms", 0.0)), nbytes
+    return resp, 0.0, nbytes  # tolerate a bare list from an older spec tail
+
+
+def accept_prefix(drafts, targets):
+    """Greedy speculative acceptance (PURE). drafts = the K tokens the draft proposed for
+    positions pos+1..pos+K; targets = the tail's K+1 argmax tokens for positions
+    pos..pos+K (targets[j] is the model's own next-token given the first j candidates).
+
+    Accept the longest prefix where draft[j] == target[j] (the target would itself have
+    produced that token), then take target[n] as the correction. The committed tokens are
+    drafts[:n] + [targets[n]] -- exactly what plain greedy decode would have emitted, which
+    is why speculative decoding is EXACT, not approximate. Returns (n_accepted, committed)."""
+    n = 0
+    for j in range(len(drafts)):
+        if drafts[j] == targets[j]:
+            n += 1
+        else:
+            break
+    committed = list(drafts[:n]) + [targets[n]]
+    return n, committed
+
+
 def _head_forward(parts, tokens, cache, start, dev, sync=False):
     """Run the head's embed + layer block under the shared GPU lock. sync=True forces the
     device to finish so the caller can time the wire leg separately from compute."""
@@ -469,7 +502,7 @@ class PipelineParallelEngine:
     (activation privacy unsolved -> never the open pool)."""
 
     def __init__(self, model_id, *, split, peer, port, split2=0,
-                 device="", dtype=None, timeout=30.0):
+                 device="", dtype=None, timeout=30.0, draft_model=None, draft_k=4):
         _ensure_wire_key()  # programmatic path skips main(); load SHARD_PSK before any I/O
         self.model_id = model_id
         self.split = split
@@ -483,10 +516,25 @@ class PipelineParallelEngine:
                                 device=self.device, dtype=self.dtype, split2=split2)
         self.n_layers = self.parts["n_layers"]
         self.tokenizer = AutoTokenizer.from_pretrained(model_id)
+        # OPT-IN speculative decoding. draft_model unset => the greedy path runs
+        # byte-for-byte unchanged. When set, a small local draft proposes draft_k tokens
+        # per round and the chain verifies all K+1 in ONE round-trip; output is identical
+        # to greedy (exact speculative decoding). The draft loads WHOLE locally on this
+        # node (it is small), independent of the head's layer split.
+        self.draft_k = max(1, int(draft_k))
+        self.draft = None
+        if draft_model is not None:
+            self.draft = AutoModelForCausalLM.from_pretrained(
+                draft_model, dtype=self.dtype, device_map=str(self.device),
+                attn_implementation="eager",
+            ).eval()
+            self.draft_model_id = draft_model
+            logger.info("pipeline head: speculative draft %s loaded on %s, K=%d",
+                        draft_model, self.device, self.draft_k)
 
     def describe(self):
         """Status for /health + the Models page (mirrors loaded_rpc_servers)."""
-        return {
+        d = {
             "model_id": self.model_id,
             "strategy": "pipeline",
             "head_layers": self.split,
@@ -495,11 +543,23 @@ class PipelineParallelEngine:
             "device": str(self.device),
             "dtype": str(self.dtype),
         }
+        if self.draft is not None:  # speculative-decoding opt-in is active
+            d["speculative"] = {"draft_model": self.draft_model_id, "K": self.draft_k}
+        return d
 
     def stream_tokens(self, messages, *, max_new=512):
         """Blocking generator yielding text DELTAS as each token is decoded. The caller
         (LLMRuntime.stream_chat) runs this in a worker thread and pumps it onto an async
-        queue. Raises TransportError on a dead/stalled edge instead of hanging."""
+        queue. Raises TransportError on a dead/stalled edge instead of hanging.
+
+        When a speculative draft is loaded (opt-in), this delegates to the spec path,
+        which amortizes the chain round-trip: a small draft proposes K tokens and the
+        chain verifies all K+1 in ONE round-trip per round. The emitted token sequence is
+        IDENTICAL to the greedy path -- only the number of round-trips changes. With no
+        draft set, the greedy loop below runs exactly as before."""
+        if self.draft is not None:
+            yield from self._stream_tokens_spec(messages, max_new=max_new)
+            return
         enc = self.tokenizer.apply_chat_template(
             messages, add_generation_prompt=True, return_tensors="pt", return_dict=True)
         ids = enc["input_ids"].to(self.device)
@@ -529,6 +589,117 @@ class PipelineParallelEngine:
                         cache, start, self.device, sync=True)
                     nxt = step(h, start)
                     start += 1
+        except EDGE_ERRORS as e:
+            kind = "timed out" if isinstance(e, socket.timeout) else "dropped"
+            raise TransportError(
+                f"pipeline edge {self.peer}:{self.port} {kind} -- {type(e).__name__}: {e}") from e
+        finally:
+            try:
+                sock.close()
+            except OSError:
+                pass
+
+    def _stream_tokens_spec(self, messages, *, max_new=512, _stats=None):
+        """SPECULATIVE-DECODING stream (opt-in). Per round: the local draft proposes K
+        tokens greedily; the head embeds [cur, d_1..d_K] (K+1 positions) and the chain
+        verifies them in ONE round-trip; accept the longest matching prefix and take the
+        target's correction. Output is token-for-token identical to the greedy path --
+        exact speculative decoding (accept_prefix only commits tokens the target itself
+        would have produced). Yields the SAME text-delta contract as stream_tokens.
+
+        KV rollback: after verifying K+1 positions every node's cache grew by K+1 but only
+        (accepted+1) are real. The head + draft crop their caches LOCALLY each round; the
+        downstream chain crops LAZILY -- the next verify message carries crop=committed_pos
+        and each node (mid, tail) truncates before running, so a round still costs exactly
+        one round-trip (no extra rollback trip). _stats: optional dict the caller passes to
+        collect round-trip + acceptance counters (used by tests; never affects output)."""
+        enc = self.tokenizer.apply_chat_template(
+            messages, add_generation_prompt=True, return_tensors="pt", return_dict=True)
+        ids = enc["input_ids"].to(self.device)
+        eos = self.tokenizer.eos_token_id
+        head_cache, draft_cache = DynamicCache(), DynamicCache()
+        sock = _connect_with_retry(self.peer, self.port, self.timeout)
+        produced, emitted = [], 0
+        K = self.draft_k
+        round_trips = 0
+
+        def emit_deltas():
+            nonlocal emitted
+            text = self.tokenizer.decode(produced, skip_special_tokens=True)
+            if len(text) > emitted:
+                out = text[emitted:]
+                emitted = len(text)
+                return out
+            return None
+
+        try:
+            with torch.no_grad():
+                # ---- prefill: chain processes the whole prompt; draft fills its cache ----
+                h = _head_forward(self.parts, ids, head_cache, 0, self.device)
+                preds, _, _ = _send_recv_verify(sock, h, 0, None)
+                round_trips += 1
+                self.draft(input_ids=ids, past_key_values=draft_cache, use_cache=True)
+                cur = preds[-1]  # the target's next token after the prompt
+                pos = ids.shape[1]
+                emitted_eos = False
+                tail_crop = None  # piggybacked downstream rollback (None on the first round)
+                steps = 0
+                # Emit the prefill token first -- the greedy path appends this same token
+                # (its first decode token) before its loop, so the spec path must too or it
+                # would drop the leading token. cur is the committed token at `pos`.
+                if cur == eos:
+                    emitted_eos = True
+                else:
+                    produced.append(cur)
+                    steps += 1
+                    d = emit_deltas()
+                    if d is not None:
+                        yield d
+                while not emitted_eos and steps < max_new:
+                    if cur == eos:
+                        emitted_eos = True
+                        break
+                    # 1. draft proposes K tokens greedily (feed cur, keep d_1..d_K)
+                    drafts, dtok = [], cur
+                    for i in range(K):
+                        dl = self.draft(input_ids=torch.tensor([[dtok]], device=self.device),
+                                        past_key_values=draft_cache, use_cache=True).logits
+                        dtok = int(dl[0, -1].argmax())
+                        drafts.append(dtok)
+                    # 2. verify [cur, d_1..d_K] (K+1 positions) in ONE chain round-trip,
+                    #    carrying the prior round's lazy rollback
+                    h = _head_forward(self.parts, torch.tensor([[cur] + drafts], device=self.device),
+                                      head_cache, pos, self.device, sync=True)
+                    targets, _, _ = _send_recv_verify(sock, h, pos, tail_crop)
+                    round_trips += 1
+                    # 3. greedy acceptance: longest prefix where draft[j] == target[j],
+                    #    then the target's correction -- identical to plain greedy output
+                    n, committed = accept_prefix(drafts, targets)
+                    # 4. roll caches back to the committed length: head + draft NOW
+                    #    (local, no round-trip), downstream LAZILY on the next verify
+                    pos += n + 1
+                    head_cache.crop(pos)
+                    draft_cache.crop(pos)
+                    tail_crop = pos
+                    cur = committed[-1]
+                    # 5. emit the committed tokens (stopping at eos), preserving the delta
+                    #    contract: append, decode, yield only the new suffix
+                    for t in committed:
+                        if t == eos:
+                            emitted_eos = True
+                            break
+                        produced.append(t)
+                        steps += 1
+                        d = emit_deltas()
+                        if d is not None:
+                            yield d
+                        if steps >= max_new:
+                            break
+                    if emitted_eos:
+                        break
+                if _stats is not None:
+                    _stats["round_trips"] = round_trips
+                    _stats["n_tokens"] = len(produced)
         except EDGE_ERRORS as e:
             kind = "timed out" if isinstance(e, socket.timeout) else "dropped"
             raise TransportError(
@@ -656,7 +827,27 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
             with torch.no_grad():
                 while True:
                     try:
-                        h, start = recv_msg(conn)
+                        msg = recv_msg(conn)
+                        if isinstance(msg, dict) and msg.get("op") == "verify":
+                            # SPECULATIVE verify: K+1 candidate positions in, K+1 argmax
+                            # tokens out (one per position). `crop` rolls this node's cache
+                            # back to the prior round's COMMITTED length before running, so
+                            # rejected speculation never persists. A greedy head never sends
+                            # this shape, so its wire is untouched.
+                            crop = msg.get("crop")
+                            h, start = msg["h"], msg["start"]
+                            with _COMPUTE:
+                                _t = time.time()
+                                if crop is not None:
+                                    cache.crop(crop)
+                                h = run_layers(h.to(dev, dtype=stage_dtype), parts, cache, start)
+                                h = parts["norm"](h)
+                                toks = parts["lm_head"](h).argmax(-1)[0].tolist()  # [q_len] argmax/pos
+                                tail_ms = (time.time() - _t) * 1e3
+                            send_msg(conn, {"toks": toks, "tail_ms": tail_ms})
+                            steps += 1
+                            continue
+                        h, start = msg
                         with _COMPUTE:
                             _t = time.time()
                             h = run_layers(h.to(dev, dtype=stage_dtype), parts, cache, start)
@@ -733,7 +924,24 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
             with torch.no_grad():
                 while True:
                     try:
-                        h, start = recv_msg(conn)
+                        msg = recv_msg(conn)
+                        if isinstance(msg, dict) and msg.get("op") == "verify":
+                            # SPECULATIVE relay: crop THIS node's cache to the prior round's
+                            # committed length, run our block on the K+1 candidates, forward
+                            # downstream carrying the SAME crop (so the tail rolls back too),
+                            # relay the tail's K+1 tokens back up. crop=None on the prefill /
+                            # first round, which both sides treat as "no rollback".
+                            crop = msg.get("crop")
+                            h, start = msg["h"], msg["start"]
+                            with _COMPUTE:
+                                if crop is not None:
+                                    cache.crop(crop)
+                                h = run_layers(h.to(dev, dtype=stage_dtype), parts, cache, start)
+                            send_msg(tail_sock, {"op": "verify", "h": h.cpu(), "start": start, "crop": crop})
+                            send_msg(conn, recv_msg(tail_sock))  # relay K+1 tokens upstream
+                            steps += 1
+                            continue
+                        h, start = msg
                         with _COMPUTE:
                             h = run_layers(h.to(dev, dtype=stage_dtype), parts, cache, start)
                         send_msg(tail_sock, (h.cpu(), start))  # forward downstream to the tail
@@ -1391,6 +1599,10 @@ def main(argv=None):
                     help="head: number of simultaneous generation streams to drive (throughput test)")
     ap.add_argument("--batch", type=int, default=1,
                     help="head: run N sequences in ONE batched forward per step (continuous-batching primitive)")
+    ap.add_argument("--draft", default="",
+                    help="head: HF id of a small DRAFT model -> SPECULATIVE DECODING (K+1 verified per "
+                         "chain round-trip, output identical to greedy). Empty => plain greedy decode.")
+    ap.add_argument("--draft-k", type=int, default=4, help="speculative: draft tokens proposed per round")
     args = ap.parse_args(argv)
 
     if args.mesh and args.role == "head":
@@ -1470,6 +1682,32 @@ def main(argv=None):
             print(f"[head] sample output [stream 1]: {ok[0]['text'][:160]!r}", flush=True)
         for e in errs:
             print(f"[head] stream error: {e['error']}", flush=True)
+        return
+
+    if args.draft:
+        # SPECULATIVE head: drive generation through the engine's spec path (loads the
+        # small draft locally). Reuse the already-loaded head block by attaching it.
+        print(f"[head] speculative decode: draft={args.draft} K={args.draft_k} against tail "
+              f"{args.peer}:{args.port} ...", flush=True)
+        eng = PipelineParallelEngine.__new__(PipelineParallelEngine)
+        eng.model_id, eng.split, eng.split2 = args.model, args.split, args.split2
+        eng.peer, eng.port, eng.timeout = args.peer, args.port, args.timeout
+        eng.device, eng.dtype, eng.parts = dev, dtype, parts
+        eng.n_layers, eng.tokenizer = parts["n_layers"], tok
+        eng.draft_k = max(1, args.draft_k)
+        eng.draft = AutoModelForCausalLM.from_pretrained(
+            args.draft, dtype=dtype, device_map=str(dev), attn_implementation="eager").eval()
+        eng.draft_model_id = args.draft
+        stats = {}
+        t0 = time.time()
+        text = "".join(eng._stream_tokens_spec(
+            [{"role": "user", "content": args.prompt}], max_new=args.max_new, _stats=stats))
+        dt = time.time() - t0
+        print(f"\n[head] === OUTPUT ===\n{text}\n", flush=True)
+        print(f"[head] {stats.get('n_tokens', 0)} tokens in {stats.get('round_trips', 0)} chain "
+              f"round-trips ({stats.get('n_tokens', 0)/max(stats.get('round_trips', 1),1):.2f} tok/round-trip "
+              f"vs 1.0 greedy) | {stats.get('n_tokens', 0)/max(dt, 1e-9):.2f} tok/s | "
+              f"draft={args.draft.split('/')[-1]} K={args.draft_k}", flush=True)
         return
 
     print(f"[head] generating against tail {args.peer}:{args.port} (edge timeout {args.timeout:.0f}s) ...", flush=True)

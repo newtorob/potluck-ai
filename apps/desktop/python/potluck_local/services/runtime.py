@@ -145,6 +145,8 @@ class LLMRuntime:
         split2: int = 0,
         device: str = "",
         dtype: str | None = None,
+        draft_model: str | None = None,
+        draft_k: int = 4,
     ) -> dict:
         """Load a model in PIPELINE-PARALLEL strategy: this node holds the head layer
         block and drives generation across downstream peer stages (mid/tail) over the
@@ -152,6 +154,11 @@ class LLMRuntime:
         HF model id (not a GGUF slug), and runs a model too big for any single peer.
         Scope: my-machines / trusted-circle only (activation privacy unsolved). Blocks
         until the head block is loaded; thread-safe swap via _load_lock.
+
+        draft_model (opt-in): an HF model id for a small DRAFT model loaded locally on the
+        head. When set, generation uses SPECULATIVE DECODING -- the draft proposes draft_k
+        tokens per round and the chain verifies all K+1 in one round-trip, amortizing WAN
+        latency. Output is identical to greedy. Unset => the default greedy path, unchanged.
         """
         # Lazy import: pulls in torch + transformers + accelerate, kept out of the base
         # sidecar so a non-pipeline install stays light.
@@ -170,6 +177,7 @@ class LLMRuntime:
             engine = PipelineParallelEngine(
                 model_id, split=split, peer=peer, port=port,
                 split2=split2, device=device, dtype=torch_dtype,
+                draft_model=draft_model, draft_k=draft_k,
             )
             self._pipeline = engine
             self._model_id = model_id
