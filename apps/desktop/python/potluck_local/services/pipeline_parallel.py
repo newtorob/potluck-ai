@@ -759,12 +759,29 @@ class WholeModelEngine:
             "dtype": str(self.dtype),
         }
 
-    def stream_tokens(self, messages, *, max_new=512):
+    def stream_tokens(self, messages, *, max_new=512,
+                      temperature=0.0, top_k=0, top_p=1.0, seed=None):
         """Blocking generator yielding text DELTAS as each token is decoded -- the SAME
         interface PipelineParallelEngine.stream_tokens exposes, so LLMRuntime serves it
-        identically. Manual greedy decode loop (no TextIteratorStreamer/threads needed:
-        the model is local and we already run inside the runtime's worker thread), emitting
-        only the newly-decoded suffix text each step."""
+        identically. Manual decode loop emitting only the newly-decoded suffix each step.
+
+        Sampling parameters
+        -------------------
+        temperature <= 0 (default 0.0)  ->  greedy argmax; identical to the original
+                                             argmax behavior and all existing tests.
+        temperature > 0                 ->  stochastic sampling via services.sampling.
+        top_k   : keep only the k highest-logit tokens before sampling (0 = disabled).
+        top_p   : nucleus probability threshold (1.0 = disabled).
+        seed    : integer seed for a per-call torch.Generator, giving deterministic
+                  sampled output across two calls with the same seed + temperature.
+                  None = use the default (global) RNG.  Ignored when temperature <= 0.
+
+        Scope note: PipelineParallelEngine (distributed) and the speculative path stay
+        greedy -- sampling applies only to this local whole-model path where logits are
+        fully available on this node.
+        """
+        from .sampling import sample_token
+
         enc = self.tokenizer.apply_chat_template(
             messages, add_generation_prompt=True, return_tensors="pt", return_dict=True)
         ids = enc["input_ids"].to(self.device)
@@ -774,13 +791,26 @@ class WholeModelEngine:
         produced, emitted = [], 0
         eos_id = self.tokenizer.eos_token_id
 
-        def _argmax_next(logits):
-            return int(torch.argmax(logits[:, -1, :], dim=-1).item())
+        # Build a seeded generator once per call when sampling is active.
+        # temperature <= 0 => greedy path in sample_token; no generator needed.
+        gen = None
+        if temperature > 0.0 and seed is not None:
+            gen = torch.Generator(device=self.device)
+            gen.manual_seed(seed)
+
+        def _next_token(logits):
+            return sample_token(
+                logits[0, -1, :],
+                temperature=temperature,
+                top_k=top_k,
+                top_p=top_p,
+                generator=gen,
+            )
 
         with torch.no_grad():
             out = self.model(input_ids=ids, attention_mask=attn,
                              past_key_values=cache, use_cache=True)
-            nxt = _argmax_next(out.logits)
+            nxt = _next_token(out.logits)
             for _ in range(max_new):
                 if eos_id is not None and nxt == eos_id:
                     break
@@ -791,7 +821,7 @@ class WholeModelEngine:
                     emitted = len(text)
                 step_ids = torch.tensor([[nxt]], device=self.device)
                 out = self.model(input_ids=step_ids, past_key_values=cache, use_cache=True)
-                nxt = _argmax_next(out.logits)
+                nxt = _next_token(out.logits)
 
 
 def _cb_build_batched_cache(row_ids: list, cb_cache: dict,

@@ -90,6 +90,9 @@ class ChatRequest(BaseModel):
     model: str | None = Field(default=None)
     stream: bool = Field(default=True)
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
+    top_p: float = Field(default=1.0, ge=0.0, le=1.0)
+    top_k: int = Field(default=0, ge=0)
+    seed: int | None = None
     max_tokens: int = Field(default=2048, ge=1, le=131072)
     stop: list[str] | None = None
     conversation_id: str | None = None
@@ -362,6 +365,9 @@ async def chat_completions(request: ChatRequest) -> object:
         upstream = runtime.stream_chat(
             messages=enhanced_messages,
             temperature=request.temperature,
+            top_p=request.top_p,
+            top_k=request.top_k,
+            seed=request.seed,
             max_tokens=request.max_tokens,
             stop=request.stop,
         )

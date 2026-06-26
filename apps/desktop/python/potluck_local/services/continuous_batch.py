@@ -133,6 +133,12 @@ class _Sequence:
     generated: int = 0        # decode tokens produced so far
     done: bool = False
     out: queue.Queue = field(default_factory=queue.Queue)
+    # Sampling params — per-request so mixed greedy/creative batches work correctly.
+    # temperature <= 0 => greedy argmax for this row; generator is then unused.
+    temperature: float = 0.0
+    top_k: int = 0
+    top_p: float = 1.0
+    generator: object = None  # torch.Generator | None (seeded per-request)
 
 
 class ContinuousBatcher:
@@ -174,11 +180,27 @@ class ContinuousBatcher:
     # Public API
     # ------------------------------------------------------------------
 
-    def submit(self, messages: list[dict], *, max_new: int = 512) -> Iterator[str]:
+    def submit(self, messages: list[dict], *, max_new: int = 512,
+               temperature: float = 0.0, top_k: int = 0, top_p: float = 1.0,
+               seed: int | None = None) -> Iterator[str]:
         """Prefill the prompt, admit the sequence, and return a blocking generator
         of text deltas. The generator is safe to consume from any thread. Same
-        contract as WholeModelEngine.stream_tokens()."""
-        seq = self._prefill(messages, max_new=max_new)
+        contract as WholeModelEngine.stream_tokens().
+
+        Sampling parameters
+        -------------------
+        temperature <= 0 (default 0.0)  ->  greedy argmax for this request.
+        temperature > 0                 ->  stochastic sampling per step.
+        top_k / top_p                   ->  same semantics as WholeModelEngine.
+        seed                            ->  seed for a per-request torch.Generator.
+                                            None = global RNG.  Ignored when greedy.
+
+        Each request carries its OWN generator, so a greedy and a sampled request
+        in the same batch step are fully independent (different seeds, different RNG
+        state; neither perturbs the other).
+        """
+        seq = self._prefill(messages, max_new=max_new,
+                            temperature=temperature, top_k=top_k, top_p=top_p, seed=seed)
         self._admit(seq)
         return self._drain(seq)
 
@@ -202,13 +224,20 @@ class ContinuousBatcher:
     # Prefill
     # ------------------------------------------------------------------
 
-    def _prefill(self, messages: list[dict], *, max_new: int) -> _Sequence:
+    def _prefill(self, messages: list[dict], *, max_new: int,
+                 temperature: float = 0.0, top_k: int = 0, top_p: float = 1.0,
+                 seed: int | None = None) -> _Sequence:
         """Run the prompt forward to populate the sequence's KV cache.
 
         Serialised by _prefill_lock so concurrent submitters don't call the
         model simultaneously. The prefill runs OUTSIDE the step loop's step,
         so the step loop keeps running while we prefill (it will pick up the
-        new sequence on the next iteration after _admit)."""
+        new sequence on the next iteration after _admit).
+
+        The first decode token (prefill argmax/sample) is drawn here from the
+        prefill logits, matching WholeModelEngine.stream_tokens() exactly.
+        """
+        from .sampling import sample_token
         from transformers import DynamicCache
 
         enc = self._tok.apply_chat_template(
@@ -221,6 +250,13 @@ class ContinuousBatcher:
             attn_mask = attn_mask.to(self._device)
 
         cache = DynamicCache()
+
+        # Build a seeded per-request generator BEFORE the prefill so the generator
+        # state is consistent whether or not the prefill forward is fast or slow.
+        gen = None
+        if temperature > 0.0 and seed is not None:
+            gen = torch.Generator(device=self._device)
+            gen.manual_seed(seed)
 
         with self._prefill_lock:
             with self._admit_lock:
@@ -236,7 +272,15 @@ class ContinuousBatcher:
                 )
             self._n_forward += 1
 
-        nxt = int(torch.argmax(out.logits[:, -1, :], dim=-1).item())
+        # First decode token: use sample_token so temperature/top_k/top_p apply
+        # here too, matching the step loop's per-row sampling.
+        nxt = sample_token(
+            out.logits[0, -1, :],
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p,
+            generator=gen,
+        )
         prompt_tokens = input_ids[0].tolist()
 
         eos = self._tok.eos_token_id
@@ -245,11 +289,15 @@ class ContinuousBatcher:
             token_ids=prompt_tokens + [nxt],
             cache=out.past_key_values,   # use the model's returned cache (has KV data)
             max_new=max_new,
-            # The prefill's first argmax token counts against the max_new budget,
+            # The prefill's first token counts against the max_new budget,
             # matching WholeModelEngine.stream_tokens() which runs the decode loop
             # for exactly max_new iterations, first of which processes this token.
             generated=1,
             done=(eos is not None and nxt == eos),
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p,
+            generator=gen,
         )
         return seq
 
@@ -366,8 +414,21 @@ class ContinuousBatcher:
             )
         self._n_forward += 1
 
-        # --- Next tokens [B] -----------------------------------------------
-        next_tokens = torch.argmax(out.logits[:, -1, :], dim=-1).tolist()
+        # --- Next tokens [B]: per-row sample (or argmax when temperature <= 0) ---
+        # Each sequence carries its own generator so a greedy row and a sampled row
+        # in the same batch step are fully independent and neither perturbs the other.
+        from .sampling import sample_token as _sample_token
+        logits_all = out.logits[:, -1, :]   # [B, vocab]
+        next_tokens = [
+            _sample_token(
+                logits_all[i],
+                temperature=seqs[i].temperature,
+                top_k=seqs[i].top_k,
+                top_p=seqs[i].top_p,
+                generator=seqs[i].generator,
+            )
+            for i in range(B)
+        ]
 
         # --- Slice output cache back to per-sequence caches ----------------
         #

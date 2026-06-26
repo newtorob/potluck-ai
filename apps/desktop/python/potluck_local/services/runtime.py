@@ -338,11 +338,30 @@ class LLMRuntime:
         temperature: float = 0.7,
         max_tokens: int = 2048,
         stop: list[str] | None = None,
+        top_p: float = 1.0,
+        top_k: int = 0,
+        seed: int | None = None,
     ):
         """Async generator yielding OpenAI-style SSE strings.
 
         Serialised by _inference_lock — llama-cpp-python is not thread-safe
         for concurrent inference on the same model instance.
+
+        Sampling parameters (temperature / top_p / top_k / seed) are forwarded
+        to WholeModelEngine and ContinuousBatcher when those backends are active.
+        For the distributed pipeline (PipelineParallelEngine) and the llama.cpp
+        backend, temperature is forwarded as-is; top_k/top_p/seed are noted below.
+
+        Backend routing:
+          - ContinuousBatcher (whole-model, continuous_batch=True): full per-request
+            sampling (temperature/top_k/top_p/seed) — each request keeps its own RNG.
+          - WholeModelEngine (whole-model, single-stream): same, via stream_tokens.
+          - PipelineParallelEngine (distributed): stays greedy — the tail samples
+            remotely via argmax; temperature/sampling params are silently ignored here.
+            This is documented as a follow-on (sampling requires logits at the head,
+            which aren't available in the distributed pipeline path).
+          - llama.cpp (_model): temperature is forwarded to create_chat_completion;
+            top_k/top_p are not in this path yet (llama.cpp has its own defaults).
         """
         if self._batcher is not None:
             # Continuous-batching opt-in: multiple concurrent stream_chat callers share
@@ -350,21 +369,54 @@ class LLMRuntime:
             # returns a blocking generator that _stream_sse_from_blocking pumps into the
             # standard async SSE queue — no inference lock (batcher serialises internally).
             batcher = self._batcher
-            async for chunk in self._stream_sse_from_blocking(
-                lambda: batcher.submit(messages, max_new=max_tokens),
-                label=f"cb_stream model_id={self._model_id}",
-            ):
-                yield chunk
+            is_cb = hasattr(batcher, "temperature") or hasattr(batcher, "submit")
+            # DistributedContinuousBatcher doesn't support per-request sampling yet
+            # (logits are on the tail); run greedy and log a note.
+            from .continuous_batch import ContinuousBatcher
+            if isinstance(batcher, ContinuousBatcher):
+                async for chunk in self._stream_sse_from_blocking(
+                    lambda: batcher.submit(messages, max_new=max_tokens,
+                                           temperature=temperature, top_k=top_k,
+                                           top_p=top_p, seed=seed),
+                    label=f"cb_stream model_id={self._model_id}",
+                ):
+                    yield chunk
+            else:
+                # DistributedContinuousBatcher: sampling not yet wired (tail owns logits)
+                logger.debug(
+                    "stream_chat: distributed batcher active; sampling params ignored, running greedy"
+                )
+                async for chunk in self._stream_sse_from_blocking(
+                    lambda: batcher.submit(messages, max_new=max_tokens),
+                    label=f"cb_stream model_id={self._model_id}",
+                ):
+                    yield chunk
             return
 
         if self._pipeline is not None:
-            # Pipeline-parallel strategy: distributed engine -> shared SSE machinery.
+            # Pipeline-parallel strategy: check if it is a WholeModelEngine (local) or
+            # a PipelineParallelEngine (distributed). Only the whole-model path supports
+            # sampling -- the distributed engine's tail does the argmax remotely.
+            from .pipeline_parallel import WholeModelEngine
             engine = self._pipeline
-            async for chunk in self._stream_sse_from_blocking(
-                lambda: engine.stream_tokens(messages, max_new=max_tokens),
-                label=f"pipeline_stream model_id={self._model_id}",
-            ):
-                yield chunk
+            if isinstance(engine, WholeModelEngine):
+                async for chunk in self._stream_sse_from_blocking(
+                    lambda: engine.stream_tokens(messages, max_new=max_tokens,
+                                                 temperature=temperature, top_k=top_k,
+                                                 top_p=top_p, seed=seed),
+                    label=f"pipeline_stream model_id={self._model_id}",
+                ):
+                    yield chunk
+            else:
+                # Distributed PipelineParallelEngine: greedy only (follow-on)
+                logger.debug(
+                    "stream_chat: distributed pipeline active; sampling params ignored, running greedy"
+                )
+                async for chunk in self._stream_sse_from_blocking(
+                    lambda: engine.stream_tokens(messages, max_new=max_tokens),
+                    label=f"pipeline_stream model_id={self._model_id}",
+                ):
+                    yield chunk
             return
 
         if self._model is None:
