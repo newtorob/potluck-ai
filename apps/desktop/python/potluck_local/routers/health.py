@@ -34,6 +34,12 @@ async def health() -> dict[str, object]:
         # downstream peer, device) when a model is loaded with the pipeline strategy;
         # null otherwise. The other WAN-viable "big model" path, sibling to RPC mode.
         "loaded_pipeline": runtime.loaded_pipeline(),
+        # Shared (continuous) batching — true when the loaded model is served through a
+        # continuous batcher so concurrent requests share batched forward passes. Only
+        # the transformers paths (whole-model / pipeline) can be loaded this way; always
+        # false on the single-stream + llama.cpp paths. The frontend reads this as the
+        # source of truth for the shared-batching toggle.
+        "continuous_batch": runtime.continuous_batch_active(),
     }
 
 

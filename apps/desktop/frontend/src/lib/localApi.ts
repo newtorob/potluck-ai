@@ -130,6 +130,18 @@ export interface PipelineStatus {
   dtype: string;
 }
 
+/** Whole-model engine status (mirror of WholeModelEngine.describe()). Surfaced on
+ *  /health under loaded_pipeline when a model fits on this machine alone (the
+ *  auto-pipeline planner's whole-model short-circuit); shares the same slot as
+ *  PipelineStatus, discriminated by `strategy`. */
+export interface WholeModelStatus {
+  model_id: string;
+  strategy: 'whole-model';
+  n_layers: number;
+  device: string;
+  dtype: string;
+}
+
 export interface HealthResponse {
   status: 'ok';
   model_loaded: boolean;
@@ -142,8 +154,15 @@ export interface HealthResponse {
   /** Pipeline-parallel: the distributed engine's status (head layers, the
    *  downstream peer, device/dtype) when a model is loaded with the pipeline
    *  strategy. Null otherwise. The other WAN-viable "big model" path,
-   *  sibling to loaded_rpc_servers. */
-  loaded_pipeline?: PipelineStatus | null;
+   *  sibling to loaded_rpc_servers. Also carries the whole-model engine's
+   *  status (strategy 'whole-model') when the model fits on this machine alone. */
+  loaded_pipeline?: PipelineStatus | WholeModelStatus | null;
+  /** Shared (continuous) batching: true when the loaded model is served through
+   *  a continuous batcher so concurrent requests share batched forward passes.
+   *  Only the transformers paths (whole-model / pipeline) can be loaded this way;
+   *  always false on the single-stream + llama.cpp paths. The frontend reads this
+   *  as the source of truth for the shared-batching toggle. */
+  continuous_batch?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -487,6 +506,11 @@ export const localApi = {
        *  starts their stages) and runs the model split across them. `true`
        *  uses defaults; pass an object to pin device/dtype/max nodes. */
       pipeline?: boolean | { device?: string; dtype?: string; max_nodes?: number };
+      /** Opt-in shared (continuous) batching for the transformers paths
+       *  (whole-model / pipeline): concurrent requests share batched forward
+       *  passes instead of serialising. Default off -> single-stream path is
+       *  byte-for-byte unchanged. Ignored on the llama.cpp/GGUF path. */
+      continuousBatch?: boolean;
     } = {},
   ): Promise<{
     model_path: string;
@@ -494,20 +518,25 @@ export const localApi = {
     rpc_servers?: string[] | null;
     strategy?: string;
     chain?: unknown;
+    continuous_batch?: boolean;
   }> {
     // Two distributed strategies share this endpoint; an empty body loads locally.
-    let body: Record<string, unknown> | null = null;
+    const body: Record<string, unknown> = {};
     if (options.pipeline) {
       // Pipeline-parallel — the sidecar orchestrates the household chain itself.
-      body = { pipeline_auto: options.pipeline === true ? {} : options.pipeline };
+      body['pipeline_auto'] = options.pipeline === true ? {} : options.pipeline;
     } else if (options.rpc_servers && options.rpc_servers.length > 0) {
       // Big Model Mode — remote llama.cpp RPC backends as ggml devices. Requires
       // the Potluck-patched llama-cpp-python wheel; the sidecar surfaces a 501 if not.
-      body = { rpc_servers: options.rpc_servers };
+      body['rpc_servers'] = options.rpc_servers;
     }
+    // Opt-in only — when off, omit it so a plain local load still sends NO body
+    // (byte-for-byte the previous behaviour). The sidecar ignores it on the GGUF path.
+    if (options.continuousBatch) body['continuous_batch'] = true;
+    const hasBody = Object.keys(body).length > 0;
     return timedFetch(`${LOCAL_BASE}/models/${encodeURIComponent(id)}/load`, {
       method: 'POST',
-      ...(body
+      ...(hasBody
         ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
         : {}),
     }, LOAD_TIMEOUT_MS).then((r) =>
@@ -517,6 +546,7 @@ export const localApi = {
         rpc_servers?: string[] | null;
         strategy?: string;
         chain?: unknown;
+        continuous_batch?: boolean;
       }>(r),
     );
   },

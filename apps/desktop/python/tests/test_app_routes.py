@@ -87,3 +87,23 @@ def test_health_shape() -> None:
         # RPC / pipeline toggles, so their absence is a contract break.
         assert "loaded_pipeline" in body
         assert "loaded_rpc_servers" in body
+        # Shared (continuous) batching flag — the frontend reads it as the source of
+        # truth for the shared-batching toggle. False when nothing is loaded that way.
+        assert "continuous_batch" in body
+        assert body["continuous_batch"] is False
+
+
+def test_load_request_accepts_continuous_batch() -> None:
+    """The load request body model accepts continuous_batch without a validation
+    error and defaults it to False — the wire contract the frontend depends on.
+
+    Validated at the Pydantic-model boundary (not by actually loading a model, which
+    needs torch + a model on disk): a malformed/absent field would 422 the request
+    before the runtime is ever touched.
+    """
+    from potluck_local.routers.models import LoadModelRequest
+
+    assert LoadModelRequest().continuous_batch is False
+    assert LoadModelRequest(continuous_batch=True).continuous_batch is True
+    # Round-trips through JSON the same way the frontend sends it.
+    assert LoadModelRequest.model_validate({"continuous_batch": True}).continuous_batch is True

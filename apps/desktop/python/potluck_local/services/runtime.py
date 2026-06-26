@@ -65,6 +65,13 @@ class LLMRuntime:
         peer, device), or None when not in pipeline mode."""
         return self._pipeline.describe() if self._pipeline is not None else None
 
+    def continuous_batch_active(self) -> bool:
+        """True when the loaded model is being served through a continuous batcher
+        (ContinuousBatcher for whole-model, DistributedContinuousBatcher for pipeline).
+        False for the single-stream path and when no model is loaded. /health reads this
+        so the frontend can show the shared-batching toggle as on/off."""
+        return self._batcher is not None
+
     def benchmarks(self) -> dict[str, dict]:
         """Last benchmark result keyed by model_id (tokens/sec + TTFT)."""
         return dict(self._benchmarks)
@@ -150,6 +157,7 @@ class LLMRuntime:
         dtype: str | None = None,
         draft_model: str | None = None,
         draft_k: int = 4,
+        continuous_batch: bool = False,
     ) -> dict:
         """Load a model in PIPELINE-PARALLEL strategy: this node holds the head layer
         block and drives generation across downstream peer stages (mid/tail) over the
@@ -162,7 +170,19 @@ class LLMRuntime:
         head. When set, generation uses SPECULATIVE DECODING -- the draft proposes draft_k
         tokens per round and the chain verifies all K+1 in one round-trip, amortizing WAN
         latency. Output is identical to greedy. Unset => the default greedy path, unchanged.
+
+        continuous_batch=False (default): single-stream chain path, byte-for-byte unchanged.
+        continuous_batch=True: a DistributedContinuousBatcher wraps the chain so concurrent
+        requests share one chain round-trip per decode step (the tail/mid stages already
+        speak the cb_prefill/cb_step protocol). Mutually exclusive with draft_model -- the
+        speculative path is single-stream only; passing both raises. Shut down on unload.
         """
+        if continuous_batch and draft_model:
+            raise ValueError(
+                "continuous_batch and draft_model are mutually exclusive: speculative "
+                "decoding is a single-stream path; continuous batching shares the chain "
+                "across concurrent requests instead."
+            )
         # Lazy import: pulls in torch + transformers + accelerate, kept out of the base
         # sidecar so a non-pipeline install stays light.
         from .pipeline_parallel import PipelineParallelEngine
@@ -184,16 +204,33 @@ class LLMRuntime:
             )
             self._pipeline = engine
             self._model_id = model_id
+
+            # Opt-in distributed continuous batcher: drives the same chain but shares one
+            # round-trip per decode step across concurrent requests. Built AFTER the chain
+            # is up (it needs the loaded engine's parts/tokenizer/peer/port). Default off so
+            # the existing single-stream + speculative chain paths are byte-for-byte
+            # unchanged. Stopped in _release_model (closes its persistent tail socket too).
+            if continuous_batch:
+                from .continuous_batch import DistributedContinuousBatcher
+                self._batcher = DistributedContinuousBatcher(engine)
+                logger.info(
+                    "distributed_continuous_batcher_enabled model_id=%s", model_id,
+                )
+            else:
+                self._batcher = None
+
             elapsed = round(time.monotonic() - start, 2)
 
             logger.info(
-                "pipeline_loaded model_id=%s split=%s split2=%s downstream=%s:%s load_time=%.2fs",
-                model_id, split, split2, peer, port, elapsed,
+                "pipeline_loaded model_id=%s split=%s split2=%s downstream=%s:%s "
+                "continuous_batch=%s load_time=%.2fs",
+                model_id, split, split2, peer, port, continuous_batch, elapsed,
             )
             return {
                 "model_id": model_id,
                 "strategy": "pipeline",
                 "load_time_seconds": elapsed,
+                "continuous_batch": continuous_batch,
                 **engine.describe(),
             }
 

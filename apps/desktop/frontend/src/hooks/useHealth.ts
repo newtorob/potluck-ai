@@ -28,6 +28,10 @@ export interface UseHealthReturn {
   /** Pipeline-parallel: the distributed engine's status, or null when the
    *  current model isn't loaded with the pipeline strategy. */
   loadedPipeline: PipelineStatus | null;
+  /** Shared (continuous) batching: true when the loaded model is served through
+   *  a continuous batcher (whole-model / pipeline). False on the single-stream
+   *  and llama.cpp paths, and when nothing is loaded. */
+  continuousBatch: boolean;
 }
 
 const POLL_INTERVAL_MS = 10_000;
@@ -39,6 +43,7 @@ const INITIAL_STATE: UseHealthReturn = {
   sidecarUp: false,
   loadedRpcServers: null,
   loadedPipeline: null,
+  continuousBatch: false,
 };
 
 export function useHealth(): UseHealthReturn {
@@ -60,7 +65,15 @@ export function useHealth(): UseHealthReturn {
           nCtxLoaded: health.n_ctx_loaded ?? null,
           sidecarUp: true,
           loadedRpcServers: health.loaded_rpc_servers ?? null,
-          loadedPipeline: health.loaded_pipeline ?? null,
+          // loaded_pipeline can carry either the pipeline-parallel engine or the
+          // whole-model engine (same slot, discriminated by `strategy`). The
+          // PipelineModeCard only wants the pipeline shape, so keep it null for
+          // whole-model. continuousBatch is the cross-cutting flag both paths share.
+          loadedPipeline:
+            health.loaded_pipeline?.strategy === 'pipeline'
+              ? health.loaded_pipeline
+              : null,
+          continuousBatch: health.continuous_batch ?? false,
         });
       } catch {
         if (cancelled) return;

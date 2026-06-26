@@ -37,6 +37,62 @@ from potluck_local.services.continuous_batch import ContinuousBatcher  # noqa: E
 MODEL_ID = "Qwen/Qwen2.5-0.5B-Instruct"
 
 
+# ---------------------------------------------------------------------------
+# Runtime wiring: load API -> ContinuousBatcher reachable through LLMRuntime
+# ---------------------------------------------------------------------------
+
+def test_runtime_load_whole_model_continuous_batch_wiring() -> None:
+    """The runtime wires continuous_batch end-to-end on the whole-model path:
+
+    - load_whole_model(continuous_batch=True) -> is_loaded() True and the new
+      continuous_batch_active() accessor reads True (what /health surfaces).
+    - The single batched stream produces non-empty text (batcher with 1 row ==
+      single-stream; correctness is already gated by the dedicated tests above).
+    - unload_model() stops the batcher: continuous_batch_active() flips back to
+      False and is_loaded() is False.
+    - The default (continuous_batch=False) load leaves continuous_batch_active()
+      False so the single-stream path is unchanged.
+    """
+    import asyncio
+
+    from potluck_local.services.runtime import LLMRuntime
+
+    rt = LLMRuntime()
+    try:
+        # Default load: NOT batched.
+        rt.load_whole_model(MODEL_ID, device="cpu", dtype="float32")
+        assert rt.is_loaded()
+        assert rt.continuous_batch_active() is False
+        rt.unload_model()
+        assert rt.is_loaded() is False
+
+        # Opt-in load: batched.
+        result = rt.load_whole_model(
+            MODEL_ID, device="cpu", dtype="float32", continuous_batch=True)
+        assert result["continuous_batch"] is True
+        assert rt.is_loaded()
+        assert rt.continuous_batch_active() is True
+
+        # Stream a single chat through the batcher-backed runtime path.
+        async def _collect_stream() -> str:
+            chunks: list[str] = []
+            async for sse in rt.stream_chat(
+                [{"role": "user", "content": "Reply with: hello"}], max_tokens=12
+            ):
+                chunks.append(sse)
+            return "".join(chunks)
+
+        out = asyncio.run(_collect_stream())
+        assert "[DONE]" in out
+        # At least one content delta was emitted (non-empty generation).
+        assert '"content"' in out
+    finally:
+        rt.unload_model()
+
+    assert rt.continuous_batch_active() is False
+    assert rt.is_loaded() is False
+
+
 @pytest.fixture(scope="module")
 def engine():
     """One WholeModelEngine shared across all tests in this module (heavy load)."""

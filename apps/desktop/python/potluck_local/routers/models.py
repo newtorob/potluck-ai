@@ -174,6 +174,15 @@ class LoadModelRequest(BaseModel):
         default=None,
         description="pipeline strategy: HF model id to load (e.g. 'Qwen/Qwen2.5-32B-Instruct'); defaults to the {slug} path param",
     )
+    continuous_batch: bool = Field(
+        default=False,
+        description=(
+            "Opt-in shared batching for the transformers paths (whole-model + pipeline): "
+            "concurrent requests share batched forward passes instead of serialising. "
+            "Default off -> single-stream path is byte-for-byte unchanged. Ignored on the "
+            "llama.cpp/GGUF path (no transformers batcher there)."
+        ),
+    )
 
 
 @router.post("/{slug}/load", status_code=200)
@@ -215,6 +224,7 @@ async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
                         None,
                         lambda: runtime.load_whole_model(
                             model_id, device=ac.device, dtype=chain.get("dtype"),
+                            continuous_batch=body.continuous_batch,
                         ),
                     )
                 except Exception as exc:
@@ -251,6 +261,7 @@ async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
                 lambda: runtime.load_pipeline(
                     model_id, split=split, peer=peer, port=port,
                     split2=split2, device=device, dtype=dtype,
+                    continuous_batch=body.continuous_batch,
                 ),
             )
         except Exception as exc:

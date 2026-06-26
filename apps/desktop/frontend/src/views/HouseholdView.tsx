@@ -1171,13 +1171,17 @@ function BigModelModeCard({ peers }: { peers: MeshPeer[] }) {
  * (running a model bigger than any single machine), NOT speed.
  */
 function PipelineModeCard({ peers }: { peers: MeshPeer[] }) {
-  const { activeModelId, loadedPipeline, sidecarUp } = useHealth();
+  const { activeModelId, loadedPipeline, continuousBatch, sidecarUp } = useHealth();
   const [eligible, setEligible] = useState<
     { peer: MeshPeer; capabilities: PeerCapabilities }[]
   >([]);
   const [probing, setProbing] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Desired shared-batching state for the NEXT enable. Default off. When the
+  // pipeline is already on, /health is the source of truth (continuousBatch),
+  // so we show that instead of the pending choice.
+  const [wantBatch, setWantBatch] = useState(false);
 
   // Probe peers for available_for_pipeline on mount + whenever the roster
   // changes. Same cheap GET /peer/capabilities the other cards use.
@@ -1221,8 +1225,9 @@ function PipelineModeCard({ peers }: { peers: MeshPeer[] }) {
         // Disable — reload locally (drops the peers).
         await localApi.loadModel(activeModelId, {});
       } else {
-        // Enable — the sidecar auto-orchestrates the household chain.
-        await localApi.loadModel(activeModelId, { pipeline: true });
+        // Enable — the sidecar auto-orchestrates the household chain. Carry the
+        // shared-batching choice through so the chain loads with the batcher when on.
+        await localApi.loadModel(activeModelId, { pipeline: true, continuousBatch: wantBatch });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1314,6 +1319,36 @@ function PipelineModeCard({ peers }: { peers: MeshPeer[] }) {
               ))}
             </ul>
           </div>
+        )}
+      </div>
+
+      {/* Advanced: shared batching. Secondary control under the status block.
+          When the chain is already up, /health is the source of truth; otherwise
+          this is the pending choice for the next enable. */}
+      <div className="rounded-lg border border-border/40 bg-background/40 p-3">
+        <label className="flex items-start justify-between gap-3 cursor-pointer">
+          <span className="min-w-0">
+            <span className="block text-xs font-medium text-foreground">Shared batching</span>
+            <span className="mt-0.5 block text-[11px] text-muted-foreground leading-snug">
+              Serve several agents at once through one shared pass. Helps when
+              multiple tools hit this machine together; no change for a single chat.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            role="switch"
+            checked={isOn ? continuousBatch : wantBatch}
+            disabled={working || isOn}
+            onChange={(e) => setWantBatch(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-primary disabled:cursor-not-allowed disabled:opacity-60"
+          />
+        </label>
+        {isOn && (
+          <p className="mt-1.5 text-[11px] text-muted-foreground/80 leading-snug">
+            {continuousBatch
+              ? 'On for the loaded chain.'
+              : 'Off for the loaded chain. Disable, toggle, then re-enable to change it.'}
+          </p>
         )}
       </div>
 
