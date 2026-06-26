@@ -547,19 +547,48 @@ class PipelineParallelEngine:
             d["speculative"] = {"draft_model": self.draft_model_id, "K": self.draft_k}
         return d
 
-    def stream_tokens(self, messages, *, max_new=512):
+    def stream_tokens(self, messages, *, max_new=512,
+                      temperature=0.0, top_k=0, top_p=1.0, seed=None):
         """Blocking generator yielding text DELTAS as each token is decoded. The caller
         (LLMRuntime.stream_chat) runs this in a worker thread and pumps it onto an async
         queue. Raises TransportError on a dead/stalled edge instead of hanging.
 
+        Sampling parameters
+        -------------------
+        temperature <= 0 (default 0.0)  ->  GREEDY: uses the existing tuple wire
+            (h, abs_start) -> tail argmaxes -> {tok}.  Zero behavior change, zero
+            wire format change.  This is the default and is byte-for-byte identical
+            to the pre-sampling code path.
+        temperature > 0                 ->  SAMPLING: sends op="sample_step" keyed
+            dict; tail returns top-K (values + indices); head runs sample_from_topk
+            with the per-request generator.  The generator is built once from seed.
+
+        K sizing: clamp(max(top_k, 64), 64, vocab).  For top_k <= 64 and a nucleus
+        that fits within the top-64 tokens (normal chat: top_p~0.9, top_k~40) the
+        result is identical to sampling over the full vocab.  Document the bound:
+        very large top_k > 64 is honored (K scales up to top_k); near-1.0 top_p over
+        a very flat distribution may be truncated to K tokens.
+
         When a speculative draft is loaded (opt-in), this delegates to the spec path,
-        which amortizes the chain round-trip: a small draft proposes K tokens and the
-        chain verifies all K+1 in ONE round-trip per round. The emitted token sequence is
-        IDENTICAL to the greedy path -- only the number of round-trips changes. With no
-        draft set, the greedy loop below runs exactly as before."""
+        which stays greedy (spec decoding is out of scope for sampling).
+        """
         if self.draft is not None:
             yield from self._stream_tokens_spec(messages, max_new=max_new)
             return
+
+        from .sampling import sample_from_topk
+
+        sampling = temperature > 0.0
+        # K for top-K logit return: at least 64, at least top_k, clamped to vocab size.
+        # Only used when sampling; computed once here, forwarded in each step message.
+        topk_k = max(top_k if (top_k and top_k > 0) else 0, 64) if sampling else 0
+
+        # Build a seeded per-call generator for deterministic sampling.
+        gen = None
+        if sampling and seed is not None:
+            gen = torch.Generator(device="cpu")  # logits arrive on CPU from tail
+            gen.manual_seed(seed)
+
         enc = self.tokenizer.apply_chat_template(
             messages, add_generation_prompt=True, return_tensors="pt", return_dict=True)
         ids = enc["input_ids"].to(self.device)
@@ -567,9 +596,28 @@ class PipelineParallelEngine:
         sock = _connect_with_retry(self.peer, self.port, self.timeout)
         produced, start, emitted = [], 0, 0
 
-        def step(h, abs_start):
+        def step_greedy(h, abs_start):
+            """Greedy: legacy tuple wire — tail argmaxes, returns int."""
             tok_id, _, _ = _send_recv(sock, h, abs_start)
             return tok_id
+
+        def step_sample(h, abs_start):
+            """Sampling: op=sample_step — tail returns top-K; head samples."""
+            nbytes = send_msg(sock, {
+                "op": "sample_step",
+                "h": h.cpu(),
+                "start": abs_start,
+                "topk_k": topk_k,
+            })
+            resp = recv_msg(sock)
+            vals = resp["topk_vals"]
+            ids_topk = resp["topk_ids"]
+            return sample_from_topk(
+                vals, ids_topk,
+                temperature=temperature, top_k=top_k, top_p=top_p, generator=gen,
+            )
+
+        step = step_sample if sampling else step_greedy
 
         try:
             with torch.no_grad():
@@ -939,18 +987,30 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
                             # its layers; h [1, q, H] are the head's output activations.
                             # We run our layer block to build this row's tail-side KV,
                             # run norm+lm_head on the last position, return the first token.
+                            # sample_k > 0: return top-K instead of argmax (head samples).
                             row_id = msg["row_id"]
                             h = msg["h"].to(dev, dtype=stage_dtype)
                             start = int(msg["start"])
+                            sample_k = int(msg.get("sample_k", 0))
                             row_cache = DynamicCache()
                             with _COMPUTE:
                                 _t = time.time()
                                 h = run_layers(h, parts, row_cache, start)
-                                logits = parts["lm_head"](parts["norm"](h))
-                                tok = int(logits[0, -1, :].argmax())
+                                logit_row = parts["lm_head"](parts["norm"](h))[0, -1, :].float()
+                                if sample_k > 0:
+                                    k_actual = min(sample_k, logit_row.size(-1))
+                                    topk_vals, topk_ids = torch.topk(logit_row, k_actual)
+                                    tok = None  # head samples
+                                else:
+                                    tok = int(logit_row.argmax())
+                                    topk_vals = topk_ids = None
                                 tail_ms = (time.time() - _t) * 1e3
                             cb_cache[row_id] = row_cache
-                            send_msg(conn, {"tok": tok, "tail_ms": tail_ms})
+                            resp = {"tok": tok, "tail_ms": tail_ms}
+                            if sample_k > 0:
+                                resp["topk_vals"] = topk_vals.cpu()
+                                resp["topk_ids"] = topk_ids.cpu()
+                            send_msg(conn, resp)
                             steps += 1
                             continue
 
@@ -1019,7 +1079,32 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
                                               use_cache=True,
                                               position_embeddings=pe)
                                 h = parts["norm"](h)
-                                toks = parts["lm_head"](h[:, -1, :]).argmax(-1).tolist()
+                                logits_all = parts["lm_head"](h[:, -1, :])  # [B, vocab]
+                                # sample_k: list of per-row K (0 = greedy argmax for that row).
+                                # When ALL rows are greedy (or sample_k not present), we fall
+                                # back to the identical all-argmax path.
+                                sample_k = msg.get("sample_k")
+                                if sample_k and any(k > 0 for k in sample_k):
+                                    # Mixed greedy/sampling batch: argmax greedy rows,
+                                    # return top-K for sampled rows (head samples on its side).
+                                    toks = []
+                                    topk_rows = []
+                                    for i in range(len(row_ids)):
+                                        ki = int(sample_k[i]) if sample_k and i < len(sample_k) else 0
+                                        if ki > 0:
+                                            k_actual = min(ki, logits_all.shape[-1])
+                                            vals, ids = torch.topk(logits_all[i].float(), k_actual)
+                                            toks.append(None)   # placeholder; head samples
+                                            topk_rows.append({
+                                                "vals": vals.cpu(),
+                                                "ids": ids.cpu(),
+                                            })
+                                        else:
+                                            toks.append(int(logits_all[i].argmax().item()))
+                                            topk_rows.append(None)
+                                else:
+                                    toks = logits_all.argmax(-1).tolist()
+                                    topk_rows = None
                                 tail_ms = (time.time() - _t) * 1e3
                             # Slice batched output cache back to per-row caches.
                             _cb_slice_back(batched, row_ids, cb_cache,
@@ -1027,7 +1112,10 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
                             # Evict finished rows.
                             for rid in drop:
                                 cb_cache.pop(rid, None)
-                            send_msg(conn, {"toks": toks, "tail_ms": tail_ms})
+                            resp = {"toks": toks, "tail_ms": tail_ms}
+                            if topk_rows is not None:
+                                resp["topk_rows"] = topk_rows
+                            send_msg(conn, resp)
                             steps += 1
                             continue
 
@@ -1048,6 +1136,35 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
                                 toks = parts["lm_head"](h).argmax(-1)[0].tolist()  # [q_len] argmax/pos
                                 tail_ms = (time.time() - _t) * 1e3
                             send_msg(conn, {"toks": toks, "tail_ms": tail_ms})
+                            steps += 1
+                            continue
+
+                        if op == "sample_step":
+                            # SAMPLING single-stream step: the head has set temperature>0 so
+                            # it needs the raw logits to sample on its side (where the
+                            # per-request generator lives).  Instead of returning a single
+                            # argmax token we return the top-K (values + indices) of the
+                            # final logits so the head can run sample_from_topk.
+                            # K is chosen by the head to fit top_k and the nucleus; typical
+                            # value is 64.  The greedy tuple wire is NOT used for this path
+                            # so legacy tails that don't know this op would raise -- which is
+                            # the correct behavior (they cannot do head-side sampling anyway).
+                            h_in = msg["h"]
+                            start = int(msg["start"])
+                            topk_k = int(msg.get("topk_k", 64))
+                            with _COMPUTE:
+                                _t = time.time()
+                                h = run_layers(h_in.to(dev, dtype=stage_dtype), parts, cache, start)
+                                h = parts["norm"](h)
+                                logit_row = parts["lm_head"](h[0, -1, :]).float()
+                                k = min(topk_k, logit_row.size(-1))
+                                topk_vals, topk_ids = torch.topk(logit_row, k)
+                                tail_ms = (time.time() - _t) * 1e3
+                            send_msg(conn, {
+                                "topk_vals": topk_vals.cpu(),
+                                "topk_ids": topk_ids.cpu(),
+                                "tail_ms": tail_ms,
+                            })
                             steps += 1
                             continue
 
@@ -1251,6 +1368,26 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
                                 h = run_layers(h.to(dev, dtype=stage_dtype), parts, cache, start)
                             send_msg(tail_sock, {"op": "verify", "h": h.cpu(), "start": start, "crop": crop})
                             send_msg(conn, recv_msg(tail_sock))  # relay K+1 tokens upstream
+                            steps += 1
+                            continue
+
+                        if op == "sample_step":
+                            # SAMPLING single-stream relay: mid runs its block on the
+                            # activations, then forwards op="sample_step" to the tail with
+                            # the mid's output activations.  The tail returns top-K; relay
+                            # that directly back to the head (head samples on its side).
+                            h_in = msg["h"]
+                            start = int(msg["start"])
+                            topk_k = int(msg.get("topk_k", 64))
+                            with _COMPUTE:
+                                h = run_layers(h_in.to(dev, dtype=stage_dtype), parts, cache, start)
+                            send_msg(tail_sock, {
+                                "op": "sample_step",
+                                "h": h.cpu(),
+                                "start": start,
+                                "topk_k": topk_k,
+                            })
+                            send_msg(conn, recv_msg(tail_sock))  # relay top-K upstream
                             steps += 1
                             continue
 

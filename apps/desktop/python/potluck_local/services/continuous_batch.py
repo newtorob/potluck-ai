@@ -615,10 +615,22 @@ class DistributedContinuousBatcher:
     # Public API
     # ------------------------------------------------------------------
 
-    def submit(self, messages: list[dict], *, max_new: int = 512) -> Iterator[str]:
+    def submit(self, messages: list[dict], *, max_new: int = 512,
+               temperature: float = 0.0, top_k: int = 0, top_p: float = 1.0,
+               seed: int | None = None) -> Iterator[str]:
         """Prefill the prompt through the full chain, admit the sequence, and return a
-        blocking generator of text deltas. Same contract as ContinuousBatcher.submit."""
-        seq = self._prefill(messages, max_new=max_new)
+        blocking generator of text deltas. Same contract as ContinuousBatcher.submit.
+
+        Sampling parameters
+        -------------------
+        temperature <= 0 (default 0.0)  ->  greedy: tail argmaxes, existing wire path.
+        temperature > 0                 ->  sampling: tail returns per-row top-K; head
+            samples with the per-request generator (built from seed).
+        top_k / top_p                   ->  same semantics as ContinuousBatcher.submit.
+        seed                            ->  reproducible sampling across calls.
+        """
+        seq = self._prefill(messages, max_new=max_new,
+                            temperature=temperature, top_k=top_k, top_p=top_p, seed=seed)
         self._admit(seq)
         return self._drain(seq)
 
@@ -669,12 +681,15 @@ class DistributedContinuousBatcher:
     # Prefill: head layers locally + op="cb_prefill" to tail
     # ------------------------------------------------------------------
 
-    def _prefill(self, messages: list[dict], *, max_new: int) -> _Sequence:
+    def _prefill(self, messages: list[dict], *, max_new: int,
+                 temperature: float = 0.0, top_k: int = 0, top_p: float = 1.0,
+                 seed: int | None = None) -> _Sequence:
         """Run the full-chain prefill for one new sequence.
 
         Head side: embed + head layer block -> activations h [1, q, H].
-        Wire: op="cb_prefill" carries h + row_id; the tail builds that row's per-row
-              tail-side KV and returns the first decoded token.
+        Wire: op="cb_prefill" carries h + row_id + sample_k (>0 when sampling).
+              The tail builds that row's per-row tail-side KV and returns either
+              the first decoded token (greedy) or top-K logits (sampling).
 
         Serialised by _prefill_lock: the head model forward is not safe for concurrent
         calls (same as Phase 1). The step loop continues during a prefill — the new
@@ -683,6 +698,11 @@ class DistributedContinuousBatcher:
         _Sequence.cache stores head-layer KV only. The tail's per-row KV is stored
         on the tail side, keyed by row_id (== seq.request_id)."""
         from transformers import DynamicCache
+        from .sampling import sample_from_topk
+
+        sampling = temperature > 0.0
+        # K for top-K return: same sizing rule as PipelineParallelEngine.stream_tokens.
+        sample_k = max(top_k if (top_k and top_k > 0) else 0, 64) if sampling else 0
 
         enc = self._tok.apply_chat_template(
             messages, add_generation_prompt=True,
@@ -690,6 +710,13 @@ class DistributedContinuousBatcher:
         )
         input_ids = enc["input_ids"].to(self._device)
         prompt_tokens = input_ids[0].tolist()
+
+        # Build a seeded per-request generator BEFORE the prefill so the generator
+        # state is consistent whether or not the prefill forward is fast or slow.
+        gen = None
+        if sampling and seed is not None:
+            gen = torch.Generator(device="cpu")  # top-K arrives on CPU from tail
+            gen.manual_seed(seed)
 
         with self._prefill_lock:
             with self._admit_lock:
@@ -715,6 +742,7 @@ class DistributedContinuousBatcher:
                         "row_id": seq_id,
                         "h": h.cpu(),
                         "start": 0,
+                        "sample_k": sample_k,
                     })
                     resp = self._recv_msg(sock)
                     self._n_round_trips += 1
@@ -722,7 +750,13 @@ class DistributedContinuousBatcher:
                     self._reset_sock()
                     raise RuntimeError(f"distributed batcher prefill failed: {e}") from e
 
-            nxt = int(resp["tok"])
+            if sampling and resp.get("topk_vals") is not None:
+                nxt = sample_from_topk(
+                    resp["topk_vals"], resp["topk_ids"],
+                    temperature=temperature, top_k=top_k, top_p=top_p, generator=gen,
+                )
+            else:
+                nxt = int(resp["tok"])
 
         eos = self._tok.eos_token_id
         return _Sequence(
@@ -732,6 +766,10 @@ class DistributedContinuousBatcher:
             max_new=max_new,
             generated=1,
             done=(eos is not None and nxt == eos),
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p,
+            generator=gen,
         )
 
     # ------------------------------------------------------------------
@@ -899,10 +937,22 @@ class DistributedContinuousBatcher:
         drop_now = list(self._drop_queue)
         self._drop_queue.clear()
 
+        # Per-row sample_k: 0 = greedy (tail argmaxes), >0 = tail returns top-K.
+        # K sizing: max(top_k, 64) for sampled rows, 0 for greedy rows.
+        sample_k_list = []
+        any_sampled = False
+        for s in seqs:
+            if s.temperature > 0.0:
+                ki = max(s.top_k if (s.top_k and s.top_k > 0) else 0, 64)
+                sample_k_list.append(ki)
+                any_sampled = True
+            else:
+                sample_k_list.append(0)
+
         with self._wire_lock:
             sock = self._get_sock()
             try:
-                self._send_msg(sock, {
+                msg_out = {
                     "op": "cb_step",
                     "rows": row_ids,
                     "drop": drop_now,
@@ -911,7 +961,10 @@ class DistributedContinuousBatcher:
                     "kv_max": kv_max,
                     "attn_mask": attn_mask.cpu(),
                     "pos_ids": position_ids.cpu(),
-                })
+                }
+                if any_sampled:
+                    msg_out["sample_k"] = sample_k_list
+                self._send_msg(sock, msg_out)
                 resp = self._recv_msg(sock)
                 self._n_round_trips += 1
                 self._n_steps += 1
@@ -919,7 +972,25 @@ class DistributedContinuousBatcher:
                 self._reset_sock()
                 raise RuntimeError(f"distributed batcher step failed: {e}") from e
 
-        next_tokens = [int(t) for t in resp["toks"]]
+        # Resolve next tokens: greedy rows have int in resp["toks"]; sampled rows
+        # have None in resp["toks"] and top-K in resp["topk_rows"][i].
+        from .sampling import sample_from_topk
+        raw_toks = resp["toks"]
+        topk_rows = resp.get("topk_rows")  # list[dict|None] or None
+        next_tokens = []
+        for i, s in enumerate(seqs):
+            if any_sampled and topk_rows is not None and topk_rows[i] is not None:
+                # Sampled row: head samples from tail's top-K.
+                entry = topk_rows[i]
+                tok = sample_from_topk(
+                    entry["vals"], entry["ids"],
+                    temperature=s.temperature, top_k=s.top_k, top_p=s.top_p,
+                    generator=s.generator,
+                )
+                next_tokens.append(tok)
+            else:
+                # Greedy row (or all-greedy batch): tail already argmaxed.
+                next_tokens.append(int(raw_toks[i]))
 
         # --- Distribute tokens; collect evictions for next step's drop list ---
         finished_indices = []

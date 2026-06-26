@@ -51,6 +51,94 @@ call because Python caches it in sys.modules.
 from __future__ import annotations
 
 
+def sample_from_topk(
+    values,
+    indices,
+    *,
+    temperature: float,
+    top_k: int = 0,
+    top_p: float = 1.0,
+    generator=None,
+) -> int:
+    """Sample one token from a PRE-REDUCED top-K set (values, indices).
+
+    Called on the HEAD after the tail returns the top-K logits for a sampling
+    step.  The tail returns the K largest logit values with their real vocab
+    positions (indices); this function reapplies temperature/top_k/top_p
+    filtering over those K entries and maps the sampled position back to the
+    real token id.
+
+    Parameters
+    ----------
+    values : torch.Tensor
+        1-D float tensor of shape [K]: the K largest raw logit values.
+    indices : torch.Tensor
+        1-D int64 tensor of shape [K]: the corresponding real vocab token ids.
+    temperature, top_k, top_p, generator
+        Same semantics as sample_token.
+
+    Returns
+    -------
+    int
+        The selected real token id.
+
+    Greedy path
+    -----------
+    temperature <= 0 returns indices[argmax(values)] -- the top-1 token from
+    the returned set.  Callers should never reach this branch (greedy uses the
+    tail-side argmax wire unchanged), but it is a safe fallback.
+
+    Exactness bound
+    ---------------
+    Sampling over the returned top-K is identical to sampling over the full
+    vocab when:
+      * top_k <= K  (the filter keeps at most K anyway), and
+      * the top-p nucleus fits within the K largest logits (i.e. the cumulative
+        probability of the K largest tokens >= top_p).
+    For normal chat parameters (top_k <= 64, top_p <= 0.95, K=64) this holds
+    with overwhelming probability.  Very large top_k > K or near-1.0 top_p
+    over a very flat distribution may truncate the nucleus to K entries;
+    document this at the call site.
+    """
+    import torch  # lazy: keeps the module importable without torch
+
+    # --- greedy fallback (temperature <= 0) ----------------------------------
+    if temperature <= 0.0:
+        return int(indices[int(torch.argmax(values).item())].item())
+
+    # Work in fp32 for numerical stability.
+    logits = values.float()
+
+    # --- temperature scaling -------------------------------------------------
+    logits = logits / temperature
+
+    # --- top-k filtering over the reduced set --------------------------------
+    # The reduced set already has at most K entries; top_k <= 0 means no filter.
+    if top_k is not None and top_k > 0:
+        k = min(top_k, logits.size(-1))
+        if k < logits.size(-1):
+            topk_vals, _ = torch.topk(logits, k)
+            threshold = topk_vals[..., -1]
+            logits = logits.masked_fill(logits < threshold, float("-inf"))
+
+    # --- top-p (nucleus) filtering -------------------------------------------
+    if top_p is not None and top_p < 1.0:
+        sorted_logits, sorted_positions = torch.sort(logits, descending=True)
+        probs_sorted = torch.softmax(sorted_logits, dim=-1)
+        cumprobs = torch.cumsum(probs_sorted, dim=-1)
+        beyond_nucleus = cumprobs - probs_sorted >= top_p
+        beyond_nucleus[0] = False  # always keep at least top-1
+        remove_mask = beyond_nucleus.scatter(0, sorted_positions, beyond_nucleus)
+        logits = logits.masked_fill(remove_mask, float("-inf"))
+
+    # --- softmax + multinomial sample ----------------------------------------
+    probs = torch.softmax(logits, dim=-1)
+    # Sample a LOCAL position (0..K-1) within the reduced set.
+    local_pos = int(torch.multinomial(probs, num_samples=1, generator=generator).item())
+    # Map back to the real vocab token id.
+    return int(indices[local_pos].item())
+
+
 def sample_token(
     logits_row,
     *,

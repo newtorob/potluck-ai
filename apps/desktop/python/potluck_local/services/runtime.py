@@ -382,12 +382,11 @@ class LLMRuntime:
                 ):
                     yield chunk
             else:
-                # DistributedContinuousBatcher: sampling not yet wired (tail owns logits)
-                logger.debug(
-                    "stream_chat: distributed batcher active; sampling params ignored, running greedy"
-                )
+                # DistributedContinuousBatcher: sampling now wired via top-K return.
                 async for chunk in self._stream_sse_from_blocking(
-                    lambda: batcher.submit(messages, max_new=max_tokens),
+                    lambda: batcher.submit(messages, max_new=max_tokens,
+                                           temperature=temperature, top_k=top_k,
+                                           top_p=top_p, seed=seed),
                     label=f"cb_stream model_id={self._model_id}",
                 ):
                     yield chunk
@@ -408,12 +407,11 @@ class LLMRuntime:
                 ):
                     yield chunk
             else:
-                # Distributed PipelineParallelEngine: greedy only (follow-on)
-                logger.debug(
-                    "stream_chat: distributed pipeline active; sampling params ignored, running greedy"
-                )
+                # Distributed PipelineParallelEngine: sampling now wired via top-K return.
                 async for chunk in self._stream_sse_from_blocking(
-                    lambda: engine.stream_tokens(messages, max_new=max_tokens),
+                    lambda: engine.stream_tokens(messages, max_new=max_tokens,
+                                                 temperature=temperature, top_k=top_k,
+                                                 top_p=top_p, seed=seed),
                     label=f"pipeline_stream model_id={self._model_id}",
                 ):
                     yield chunk
