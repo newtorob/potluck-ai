@@ -32,7 +32,7 @@ import uuid
 from dataclasses import dataclass
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 logger = logging.getLogger(__name__)
 
@@ -209,12 +209,20 @@ async def record_canary_result(
     return 0
 
 
-async def run_canary_probe(db: AsyncSession, peer_id: uuid.UUID) -> bool | None:
+async def run_canary_probe(
+    session_factory: async_sessionmaker[AsyncSession],
+    peer_id: uuid.UUID,
+) -> bool | None:
     """Send a canary to the given peer and record the result.
 
     Returns True (passed), False (wrong answer / error / timeout), or None if
     the probe couldn't run (peer offline, or advertises no model). The canary
     job is in-memory only — no DB Job row, no credit write.
+
+    Session lifetime is intentionally short: one session for the pre-wait read
+    (model slug lookup), released before the network wait, then a fresh session
+    for the post-wait writes (record_canary_result / release_escrow_for_peer).
+    No DB connection is held across the asyncio.wait_for network wait.
     """
     from coordinator.services.peer_registry import (
         complete_job,
@@ -225,7 +233,12 @@ async def run_canary_probe(db: AsyncSession, peer_id: uuid.UUID) -> bool | None:
     peer = await get_peer(peer_id)
     if peer is None:
         return None
-    model_slug = await _peer_model_slug(db, peer_id)
+
+    # --- Pre-wait read: fetch model slug, then release the connection. ---
+    async with session_factory() as pre_db:
+        model_slug = await _peer_model_slug(pre_db, peer_id)
+    # Connection returned to pool here — nothing held during the network wait.
+
     if model_slug is None:
         return None
 
@@ -240,6 +253,7 @@ async def run_canary_probe(db: AsyncSession, peer_id: uuid.UUID) -> bool | None:
         sampling=_probe_sampling(rng),
     )
 
+    # --- Network wait: no session held. ---
     try:
         await peer.ws.send_json(assigned.model_dump(mode="json"))
         await asyncio.wait_for(buf.done.wait(), timeout=CANARY_TIMEOUT_S)
@@ -261,7 +275,11 @@ async def run_canary_probe(db: AsyncSession, peer_id: uuid.UUID) -> bool | None:
     finally:
         await complete_job(job_id)  # idempotent cleanup
 
-    await record_canary_result(db, peer_id, outcome)
+    # --- Post-wait writes: fresh session, committed immediately. ---
+    async with session_factory() as post_db:
+        async with post_db.begin():
+            await record_canary_result(post_db, peer_id, outcome)
+
     return outcome == CANARY_PASS
 
 
@@ -411,7 +429,7 @@ def _select_reprobe(
 
 
 async def probe_due_peers(
-    db: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
     online_ids: list[uuid.UUID],
     batch: int = PROBE_BATCH,
     rng: random.Random | None = None,
@@ -426,31 +444,40 @@ async def probe_due_peers(
          that earned trust then went bad). Adaptive: lower-reputation peers are
          probed more, all flooring at PROBE_FLOOR (see _reprobe_probability).
 
+    `session_factory` is used for all DB access: one short-lived session for the
+    pre-probe reads (escrowed/recovering/reputation queries), then each
+    run_canary_probe opens its own short-lived sessions so no connection is held
+    across the network wait inside the probe.
+
     Returns the number probed. A single probe failure is logged and does not abort
     the cycle."""
     rng = rng or random.Random()
     online_ids = _dedup(online_ids)  # defensive: never probe a peer twice in a cycle
-    escrowed = await _peers_with_escrowed_credits(db, online_ids)
-    recovering = await _peers_below_reentry(db, online_ids)
-    due = select_due_peers(escrowed, recovering, batch)
 
-    spare = batch - len(due)
-    if spare > 0:
-        # Floor-reprobe candidates are every OTHER online peer, deliberately not
-        # scoped to pool contributors: probing a My-Machines-only peer is harmless
-        # (a working peer passes, and reputation never gates My-Machines routing),
-        # so we skip the extra capability/scope join.
-        excluded = set(escrowed) | set(recovering) | set(due)
-        others = [pid for pid in online_ids if pid not in excluded]
-        if others:
-            reps = await _reputations(db, others)
-            candidates = [(pid, reps.get(pid)) for pid in others]
-            due = due + _select_reprobe(candidates, spare, rng)
+    # Pre-probe reads: one session, released before any network wait begins.
+    async with session_factory() as db:
+        escrowed = await _peers_with_escrowed_credits(db, online_ids)
+        recovering = await _peers_below_reentry(db, online_ids)
+        due = select_due_peers(escrowed, recovering, batch)
+
+        spare = batch - len(due)
+        if spare > 0:
+            # Floor-reprobe candidates are every OTHER online peer, deliberately not
+            # scoped to pool contributors: probing a My-Machines-only peer is harmless
+            # (a working peer passes, and reputation never gates My-Machines routing),
+            # so we skip the extra capability/scope join.
+            excluded = set(escrowed) | set(recovering) | set(due)
+            others = [pid for pid in online_ids if pid not in excluded]
+            if others:
+                reps = await _reputations(db, others)
+                candidates = [(pid, reps.get(pid)) for pid in others]
+                due = due + _select_reprobe(candidates, spare, rng)
+    # Connection returned to pool here — all pre-probe reads done.
 
     probed = 0
     for peer_id in due:
         try:
-            await run_canary_probe(db, peer_id)
+            await run_canary_probe(session_factory, peer_id)
             probed += 1
         except Exception:
             logger.exception("canary_probe_failed peer_id=%s", peer_id)
@@ -462,9 +489,13 @@ async def run_verification_loop(
 ) -> None:
     """Background loop wired into the coordinator lifespan. Every `interval_s`
     it probes online peers holding escrowed credits, releasing their credits as
-    they prove themselves. One DB session + transaction per cycle; an iteration
-    failure is logged and the loop keeps running. Stops promptly when `stop`
-    is set."""
+    they prove themselves.
+
+    Session lifetime: probe_due_peers opens one short-lived session for the
+    pre-probe reads, releases it, then each run_canary_probe opens its own
+    short-lived sessions around the pre-wait read and the post-wait writes.
+    No DB connection is held across any network wait. An iteration failure is
+    logged and the loop keeps running. Stops promptly when `stop` is set."""
     from coordinator.db.database import get_session_factory
     from coordinator.services.peer_registry import online_peer_ids
 
@@ -473,11 +504,10 @@ async def run_verification_loop(
         try:
             online_ids = await online_peer_ids()
             if online_ids:
-                async with get_session_factory()() as db:
-                    probed = await probe_due_peers(db, online_ids)
-                    await db.commit()
-                    if probed:
-                        logger.info("verification_cycle_probed n=%d", probed)
+                factory = get_session_factory()
+                probed = await probe_due_peers(factory, online_ids)
+                if probed:
+                    logger.info("verification_cycle_probed n=%d", probed)
         except Exception:
             logger.exception("verification_loop_iteration_failed")
         # Interruptible sleep so shutdown doesn't wait a full interval.

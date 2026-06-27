@@ -3,6 +3,11 @@
 Requires a live Postgres via the db_session fixture (DB writes rolled back).
 The in-memory peer/job registry is module-global, so tests that touch it clean
 up after themselves.
+
+Tests that call run_canary_probe or probe_due_peers use the session_factory
+fixture (from conftest) instead of db_session: those functions open their own
+short-lived sessions internally, so fixture data must be committed before the
+call and assertions read from freshly opened sessions.
 """
 from __future__ import annotations
 
@@ -10,10 +15,14 @@ import random
 import re
 import uuid
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+if TYPE_CHECKING:
+    from conftest import FactoryFixture
 
 from coordinator.models.credit import CreditLedger
 from coordinator.models.job import Job
@@ -350,25 +359,28 @@ class _HonestPeerWS:
 
 
 @pytest.mark.asyncio
-async def test_run_canary_probe_honest_peer_passes(db_session: AsyncSession) -> None:
+async def test_run_canary_probe_honest_peer_passes(session_factory: "FactoryFixture") -> None:
     from coordinator.services.peer_registry import (
         PeerConnection,
         register_peer,
         unregister_peer,
     )
 
-    peer = await _peer(db_session)
-    db_session.add(
-        PeerCapability(peer_id=peer.id, model_slug=_MODEL, quantization="q4_K_M")
-    )
-    hb = PeerHeartbeat(
-        peer_id=peer.id,
-        last_beat_at=datetime.now(timezone.utc),
-        binary_hash="h",
-        client_version="v",
-    )
-    db_session.add(hb)
-    await db_session.flush()
+    # Commit fixture data so run_canary_probe's fresh internal sessions can see it.
+    async with session_factory.factory() as setup_db:
+        async with setup_db.begin():
+            peer = await _peer(setup_db)
+            setup_db.add(
+                PeerCapability(peer_id=peer.id, model_slug=_MODEL, quantization="q4_K_M")
+            )
+            setup_db.add(PeerHeartbeat(
+                peer_id=peer.id,
+                last_beat_at=datetime.now(timezone.utc),
+                binary_hash="h",
+                client_version="v",
+            ))
+    # Committed — track for teardown cleanup.
+    session_factory.track_peer(peer.id)
 
     conn = PeerConnection(
         peer_id=peer.id,
@@ -378,27 +390,37 @@ async def test_run_canary_probe_honest_peer_passes(db_session: AsyncSession) -> 
     )
     await register_peer(conn)
     try:
-        passed = await run_canary_probe(db_session, peer.id)
+        passed = await run_canary_probe(session_factory.factory, peer.id)
     finally:
         await unregister_peer(peer.id)
 
     assert passed is True
-    await db_session.refresh(hb)
+
+    # Read the post-probe reputation from the DB (committed by run_canary_probe).
+    async with session_factory.factory() as read_db:
+        hb = await read_db.get(PeerHeartbeat, peer.id)
+    assert hb is not None
     assert hb.reputation == pytest.approx(0.6), "an honest probe raises reputation"
 
 
 @pytest.mark.asyncio
 async def test_run_canary_probe_offline_peer_returns_none(
-    db_session: AsyncSession,
+    session_factory: "FactoryFixture",
 ) -> None:
     # Peer exists in the DB but is not in the in-memory connection registry.
-    peer = await _peer(db_session)
-    assert await run_canary_probe(db_session, peer.id) is None
+    # run_canary_probe returns None before touching the DB, so no commit needed;
+    # but we still create the peer to mirror real runtime conditions.
+    async with session_factory.factory() as setup_db:
+        async with setup_db.begin():
+            peer = await _peer(setup_db)
+    session_factory.track_peer(peer.id)
+    assert await run_canary_probe(session_factory.factory, peer.id) is None
 
 
 async def _online_honest_peer(db: AsyncSession) -> Peer:
     """A peer registered online with an honest canary-answering WS, a model
-    capability, and a heartbeat (reputation 0.5)."""
+    capability, and a heartbeat (reputation 0.5). Uses a shared session (for
+    tests that stay in one transaction)."""
     from coordinator.services.peer_registry import PeerConnection, register_peer
 
     peer = await _peer(db)
@@ -423,40 +445,88 @@ async def _online_honest_peer(db: AsyncSession) -> Peer:
     return peer
 
 
+async def _online_honest_peer_committed(
+    factory: "async_sessionmaker[AsyncSession]",
+) -> Peer:
+    """Like _online_honest_peer, but commits the fixture data so that functions
+    which open their own fresh sessions (run_canary_probe, probe_due_peers) can
+    read it. Returns the committed Peer object."""
+    from coordinator.services.peer_registry import PeerConnection, register_peer
+    from sqlalchemy.ext.asyncio import async_sessionmaker as _asm  # noqa: F401
+
+    async with factory() as setup_db:
+        async with setup_db.begin():
+            peer = await _peer(setup_db)
+            setup_db.add(
+                PeerCapability(peer_id=peer.id, model_slug=_MODEL, quantization="q4_K_M")
+            )
+            setup_db.add(
+                PeerHeartbeat(
+                    peer_id=peer.id,
+                    last_beat_at=datetime.now(timezone.utc),
+                    binary_hash="h",
+                    client_version="v",
+                )
+            )
+    await register_peer(
+        PeerConnection(
+            peer_id=peer.id,
+            session_id=uuid.uuid4(),
+            ws=_HonestPeerWS(),
+            member_id=peer.member_id,
+        )
+    )
+    return peer
+
+
 @pytest.mark.asyncio
 async def test_probe_due_peers_targets_escrowed_and_releases(
-    db_session: AsyncSession,
+    session_factory: "FactoryFixture",
 ) -> None:
     from coordinator.services.peer_registry import unregister_peer
 
-    # peer_escrow holds escrowed credits; peer_clean has none.
-    peer_escrow = await _online_honest_peer(db_session)
-    peer_clean = await _online_honest_peer(db_session)
-    job_id = await _escrowed_job_for_peer(db_session, peer_escrow.id)
+    # Commit fixture data so probe_due_peers' fresh internal sessions can see it.
+    peer_escrow = await _online_honest_peer_committed(session_factory.factory)
+    peer_clean = await _online_honest_peer_committed(session_factory.factory)
+    session_factory.track_peer(peer_escrow.id)
+    session_factory.track_peer(peer_clean.id)
+
+    # Create the escrowed job in a committed transaction.
+    async with session_factory.factory() as setup_db:
+        async with setup_db.begin():
+            job_id = await _escrowed_job_for_peer(setup_db, peer_escrow.id)
+
     online = [peer_escrow.id, peer_clean.id]
 
     async def _rep(peer_id: uuid.UUID) -> float:
-        hb = await db_session.get(PeerHeartbeat, peer_id)
-        await db_session.refresh(hb)
+        """Read current reputation from a fresh session (sees committed writes)."""
+        async with session_factory.factory() as read_db:
+            hb = await read_db.get(PeerHeartbeat, peer_id)
+        assert hb is not None
         return hb.reputation
+
+    async def _escrowed(jid: uuid.UUID) -> bool:
+        """Read current escrow flag from a fresh session."""
+        async with session_factory.factory() as read_db:
+            return await _is_escrowed(read_db, jid)
 
     try:
         # Cycle 1: only the escrowed peer is due. 0.5 -> 0.6, not yet released.
-        probed = await probe_due_peers(db_session, online, rng=_Rng(1.0))
+        probed = await probe_due_peers(session_factory.factory, online, rng=_Rng(1.0))
         assert probed == 1, "only the peer with escrowed credits should be probed"
         assert await _rep(peer_escrow.id) == pytest.approx(0.6)
         assert await _rep(peer_clean.id) == pytest.approx(0.5), "clean peer untouched"
-        assert await _is_escrowed(db_session, job_id) is True
+        assert await _escrowed(job_id) is True
 
         # Cycles 2 .. k*-1: still climbing, still escrowed.
         for _ in range(2, RELEASE_MIN_PASSES):
-            assert await probe_due_peers(db_session, online, rng=_Rng(1.0)) == 1
-            assert await _is_escrowed(db_session, job_id) is True
+            assert await probe_due_peers(session_factory.factory, online, rng=_Rng(1.0)) == 1
+            assert await _escrowed(job_id) is True
 
         # The k*-th honest cycle crosses the threshold -> escrow released.
-        probed = await probe_due_peers(db_session, online, rng=_Rng(1.0))
+        probed = await probe_due_peers(session_factory.factory, online, rng=_Rng(1.0))
         assert probed == 1
-        assert await _is_escrowed(db_session, job_id) is False, "escrow released"
+        assert await _escrowed(job_id) is False, "escrow released"
     finally:
         await unregister_peer(peer_escrow.id)
         await unregister_peer(peer_clean.id)
@@ -464,7 +534,7 @@ async def test_probe_due_peers_targets_escrowed_and_releases(
 
 @pytest.mark.asyncio
 async def test_probe_due_peers_rehabilitates_sub_neutral_peer(
-    db_session: AsyncSession,
+    session_factory: "FactoryFixture",
 ) -> None:
     # A peer quarantined below NEUTRAL (e.g. after a fabrication reset) that holds
     # NO escrowed credits must still be probed, so it has a path back into the
@@ -472,22 +542,31 @@ async def test_probe_due_peers_rehabilitates_sub_neutral_peer(
     # recover.
     from coordinator.services.peer_registry import unregister_peer
 
-    fallen = await _online_honest_peer(db_session)
-    hb = await db_session.get(PeerHeartbeat, fallen.id)
-    hb.reputation = 0.2  # below NEUTRAL (0.5), no escrowed credits
-    await db_session.flush()
+    fallen = await _online_honest_peer_committed(session_factory.factory)
+    session_factory.track_peer(fallen.id)
+
+    # Set sub-neutral reputation in a committed transaction.
+    async with session_factory.factory() as setup_db:
+        async with setup_db.begin():
+            hb = await setup_db.get(PeerHeartbeat, fallen.id)
+            hb.reputation = 0.2  # below NEUTRAL (0.5), no escrowed credits
+
     try:
-        probed = await probe_due_peers(db_session, [fallen.id], rng=_Rng(1.0))
+        probed = await probe_due_peers(session_factory.factory, [fallen.id], rng=_Rng(1.0))
         assert probed == 1, "a sub-neutral peer must be probed even with no escrow"
-        await db_session.refresh(hb)
-        assert hb.reputation == pytest.approx(0.3), "a clean rehab probe climbs +STEP"
+
+        # Read updated reputation from a fresh session (probe committed its write).
+        async with session_factory.factory() as read_db:
+            hb_after = await read_db.get(PeerHeartbeat, fallen.id)
+        assert hb_after is not None
+        assert hb_after.reputation == pytest.approx(0.3), "a clean rehab probe climbs +STEP"
     finally:
         await unregister_peer(fallen.id)
 
 
 @pytest.mark.asyncio
 async def test_probe_due_peers_floor_reprobes_trusted_peer(
-    db_session: AsyncSession,
+    session_factory: "FactoryFixture",
 ) -> None:
     # A trusted peer (reputation >= release threshold, no escrow, at/above
     # neutral) is NOT otherwise due. Without the floor re-probe it would never be
@@ -495,20 +574,36 @@ async def test_probe_due_peers_floor_reprobes_trusted_peer(
     # caught. The floor re-probe surprise-probes it.
     from coordinator.services.peer_registry import unregister_peer
 
-    trusted = await _online_honest_peer(db_session)
-    hb = await db_session.get(PeerHeartbeat, trusted.id)
-    hb.reputation = 0.95
-    await db_session.flush()
+    trusted = await _online_honest_peer_committed(session_factory.factory)
+    session_factory.track_peer(trusted.id)
+
+    # Set high reputation in a committed transaction.
+    async with session_factory.factory() as setup_db:
+        async with setup_db.begin():
+            hb = await setup_db.get(PeerHeartbeat, trusted.id)
+            hb.reputation = 0.95
+
     try:
         # rng fires -> the trusted peer is surprise-probed; an honest peer passes.
-        probed = await probe_due_peers(db_session, [trusted.id], rng=_Rng(0.0))
+        probed = await probe_due_peers(session_factory.factory, [trusted.id], rng=_Rng(0.0))
         assert probed == 1, "a trusted peer must still be surprise-probed"
-        await db_session.refresh(hb)
-        assert hb.reputation == pytest.approx(1.0), "honest pass nudges up (capped)"
 
-        # rng does not fire -> the trusted peer is left alone this cycle.
-        hb.reputation = 0.95
-        await db_session.flush()
-        assert await probe_due_peers(db_session, [trusted.id], rng=_Rng(1.0)) == 0
+        async with session_factory.factory() as read_db:
+            hb_after = await read_db.get(PeerHeartbeat, trusted.id)
+        assert hb_after is not None
+        assert hb_after.reputation == pytest.approx(1.0), "honest pass nudges up (capped)"
+
+        # Reset reputation and verify rng-suppressed cycle leaves it alone.
+        async with session_factory.factory() as setup_db2:
+            async with setup_db2.begin():
+                hb2 = await setup_db2.get(PeerHeartbeat, trusted.id)
+                hb2.reputation = 0.95
+
+        assert await probe_due_peers(session_factory.factory, [trusted.id], rng=_Rng(1.0)) == 0
+
+        async with session_factory.factory() as read_db2:
+            hb_unchanged = await read_db2.get(PeerHeartbeat, trusted.id)
+        assert hb_unchanged is not None
+        assert hb_unchanged.reputation == pytest.approx(0.95), "rng suppressed — untouched"
     finally:
         await unregister_peer(trusted.id)
