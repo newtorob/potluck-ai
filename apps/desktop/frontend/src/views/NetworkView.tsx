@@ -297,20 +297,23 @@ function NetworkHeader({
       eyebrow="Member-operated"
       title="Network"
       description={
-        <span className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5">
-            <span
-              className={cn(
-                'inline-block h-2 w-2 rounded-full',
-                isAlive ? 'bg-sage animate-hearth-pulse' : 'bg-muted-foreground/40',
-              )}
-              aria-hidden="true"
-            />
-            {isAlive
-              ? `${onlineNow} peer${onlineNow === 1 ? '' : 's'} online`
-              : 'Quiet, no peers online right now'}
+        <span className="flex flex-col gap-1">
+          <span>Compute other members are sharing right now, beyond your own machines.</span>
+          <span className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5">
+              <span
+                className={cn(
+                  'inline-block h-2 w-2 rounded-full',
+                  isAlive ? 'bg-sage animate-hearth-pulse' : 'bg-muted-foreground/40',
+                )}
+                aria-hidden="true"
+              />
+              {isAlive
+                ? `${onlineNow} member${onlineNow === 1 ? '' : 's'} online`
+                : 'Quiet, no members online right now'}
+            </span>
+            {netPill}
           </span>
-          {netPill}
         </span>
       }
     />
@@ -359,7 +362,7 @@ function FleetCard({ fleet }: { fleet: FleetSummary | null }) {
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard
         icon={Cpu}
-        label="Peers online"
+        label="Members online"
         value={fleet?.peers.online_now}
         sub={fleet ? `of ${fleet.peers.active_total} ever active` : undefined}
         emphasize

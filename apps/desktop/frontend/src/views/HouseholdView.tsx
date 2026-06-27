@@ -216,35 +216,38 @@ function HouseholdHeader({ status }: { status: MeshStatus | null }) {
       eyebrow="Private mesh"
       title="My Machines"
       description={
-        <span className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5">
-            <span
-              className={cn(
-                'inline-block h-2 w-2 rounded-full',
-                meshUp
-                  ? 'bg-sage animate-hearth-pulse'
-                  : status?.mesh_status === 'error'
-                    ? 'bg-destructive'
-                    : 'bg-muted-foreground/40',
-              )}
-              aria-hidden="true"
-            />
-            {meshUp
-              ? `Mesh up · ${onlineCount} peer${onlineCount === 1 ? '' : 's'} online`
-              : status?.mesh_status === 'error'
-                ? 'Mesh error'
-                : status?.mesh_status === 'starting'
-                  ? 'Starting…'
-                  : 'Mesh not set up'}
-          </span>
-          {status?.mesh_ip && (
-            <span
-              className="font-mono text-[11px] text-muted-foreground/70"
-              title="Your mesh IP within this household"
-            >
-              {status.mesh_ip}
+        <span className="flex flex-col gap-1">
+          <span>Your machines and how they connect to each other.</span>
+          <span className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5">
+              <span
+                className={cn(
+                  'inline-block h-2 w-2 rounded-full',
+                  meshUp
+                    ? 'bg-sage animate-hearth-pulse'
+                    : status?.mesh_status === 'error'
+                      ? 'bg-destructive'
+                      : 'bg-muted-foreground/40',
+                )}
+                aria-hidden="true"
+              />
+              {meshUp
+                ? `Mesh up · ${onlineCount} machine${onlineCount === 1 ? '' : 's'} online`
+                : status?.mesh_status === 'error'
+                  ? 'Mesh error'
+                  : status?.mesh_status === 'starting'
+                    ? 'Starting…'
+                    : 'Mesh not set up'}
             </span>
-          )}
+            {status?.mesh_ip && (
+              <span
+                className="font-mono text-[11px] text-muted-foreground/70"
+                title="Your mesh IP within this household"
+              >
+                {status.mesh_ip}
+              </span>
+            )}
+          </span>
         </span>
       }
     />
