@@ -14,6 +14,10 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: potluck-postgres
+    # Survive host reboots: the coordinator stack is the mesh control plane, so it
+    # must come back automatically. (migrate one-shots stay restart:"no"; the schema
+    # persists in the pgdata volume, so coordinator restarts fine without re-migrating.)
+    restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
@@ -148,6 +152,10 @@ services:
       context: ./services/coordinator
       dockerfile: Dockerfile
     container_name: potluck-coordinator
+    # Survive host reboots (mesh control plane). On a raw restart docker brings this
+    # back; depends_on only orders `compose up`, so if it starts before postgres is
+    # ready it crashes and unless-stopped retries until the DB is healthy.
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
