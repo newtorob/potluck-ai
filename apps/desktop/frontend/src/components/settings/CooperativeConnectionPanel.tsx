@@ -1,42 +1,55 @@
 /**
- * CooperativeConnectionPanel — runtime-editable coordinator URL.
+ * CooperativeConnectionPanel — coordinator URL configuration.
  *
- * Lives in Settings → Advanced. The coordinator URL is the address of
+ * Lives in Settings -> Advanced. The coordinator URL is the address of
  * the Phase G control plane (peer registry, mesh enrollment, blinded
- * inference dispatch, credit ledger). Defaults to the docker-compose
- * binding at `http://127.0.0.1:8400`; editable so members can point at
- * a coordinator on another machine in their fleet (LAN, Tailscale,
- * hosted) without rebuilding the app.
+ * inference dispatch, credit ledger).
  *
- * Persists to localStorage via `useConnectionStore`. Changes take
- * effect immediately — the next API call uses the new URL, and the
- * coordinator-health probe re-runs.
+ * Source-of-truth precedence (matches connectionStore):
+ *   1. Explicit user override (saved here) wins over everything.
+ *   2. The mesh sidecar's reported coordinator_url from its live /status.
+ *   3. VITE_COORDINATOR_URL build-time env.
+ *   4. http://127.0.0.1:8400 default.
+ *
+ * When no explicit override is set, the field reflects whichever
+ * coordinator the sidecar is actually dialing. If the user has an
+ * override that differs from what the sidecar reports, a brief note
+ * makes that visible so drift is never silent.
+ *
+ * Changes take effect immediately — the next API call uses the new URL,
+ * and the coordinator-health probe re-runs.
  */
 
 import { useEffect, useState } from 'react';
-import { CheckCircle2, AlertCircle, Globe } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Globe, Info } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useCoordinatorHealth } from '@/hooks/useCoordinatorHealth';
 
-const DEFAULT_URL = 'http://127.0.0.1:8400';
-
 export function CooperativeConnectionPanel() {
   const coordinatorUrl = useConnectionStore((s) => s.coordinatorUrl);
+  const hasExplicitOverride = useConnectionStore((s) => s.hasExplicitOverride);
+  const sidecarReportedUrl = useConnectionStore((s) => s.sidecarReportedUrl);
   const setCoordinatorUrl = useConnectionStore((s) => s.setCoordinatorUrl);
   const resetCoordinatorUrl = useConnectionStore((s) => s.resetCoordinatorUrl);
 
   const { reachable, lastCheckedAt } = useCoordinatorHealth();
 
-  // Local draft state so the user can type without thrashing localStorage
-  // + the health probe on every keystroke. Commit on blur or Enter.
+  // Local draft so the user can type without thrashing localStorage and the
+  // health probe on every keystroke. Committed on blur or Enter.
   const [draft, setDraft] = useState(coordinatorUrl);
   useEffect(() => {
     setDraft(coordinatorUrl);
   }, [coordinatorUrl]);
 
   const dirty = draft.trim().replace(/\/+$/, '') !== coordinatorUrl;
-  const isDefault = coordinatorUrl === DEFAULT_URL;
+
+  // Drift: user has an explicit override that does not match what the sidecar
+  // is actually dialing. Show a note so the mismatch is not silent.
+  const hasDrift =
+    hasExplicitOverride &&
+    sidecarReportedUrl !== null &&
+    sidecarReportedUrl !== coordinatorUrl;
 
   const commit = () => {
     const cleaned = draft.trim().replace(/\/+$/, '');
@@ -52,18 +65,31 @@ export function CooperativeConnectionPanel() {
       </div>
 
       <p className="mb-3 text-xs text-muted-foreground">
-        The coordinator URL points to the Phase G control plane. Default is the local
-        docker-compose binding. Change this to point at a coordinator on another machine
+        The coordinator URL points to the Phase G control plane. When no override is
+        set, the app follows whichever coordinator the mesh sidecar is actually
+        connected to. Set an override to point at a coordinator on another machine
         in your fleet (LAN IP, Tailscale IP, or the network's hosted endpoint).
       </p>
 
       <div className="flex flex-col gap-2">
-        <label
-          htmlFor="coordinator-url"
-          className="text-xs font-medium text-muted-foreground"
-        >
-          Coordinator URL
-        </label>
+        <div className="flex items-center justify-between">
+          <label
+            htmlFor="coordinator-url"
+            className="text-xs font-medium text-muted-foreground"
+          >
+            Coordinator URL
+          </label>
+          {!hasExplicitOverride && sidecarReportedUrl !== null && (
+            <span className="text-[10px] text-muted-foreground/60">
+              Following sidecar
+            </span>
+          )}
+          {hasExplicitOverride && (
+            <span className="text-[10px] text-muted-foreground/60">
+              User override active
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <input
             id="coordinator-url"
@@ -89,7 +115,7 @@ export function CooperativeConnectionPanel() {
               'placeholder:text-muted-foreground/50',
             )}
           />
-          {!isDefault && (
+          {hasExplicitOverride && (
             <button
               type="button"
               onClick={resetCoordinatorUrl}
@@ -98,18 +124,31 @@ export function CooperativeConnectionPanel() {
                 'text-muted-foreground hover:text-foreground hover:border-border',
                 'focus:outline-none focus:ring-2 focus:ring-ring',
               )}
-              title="Reset to localhost default"
+              title="Clear override — follow the sidecar's coordinator"
             >
               Reset
             </button>
           )}
         </div>
 
-        {/* Reachability indicator. Hidden until the first probe has settled
-            so we don't flash "unreachable" during the initial 0-1s of mount. */}
+        {/* Drift warning: explicit override differs from what sidecar is dialing */}
+        {hasDrift && (
+          <div className="flex items-start gap-1.5 rounded-md bg-amber-500/10 px-2 py-1.5 text-xs text-amber-600 dark:text-amber-400">
+            <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+            <span>
+              Your override differs from the sidecar's active coordinator (
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">
+                {sidecarReportedUrl}
+              </code>
+              ). The app is using your override. Reset to follow the sidecar.
+            </span>
+          </div>
+        )}
+
+        {/* Reachability indicator — hidden until the first probe settles */}
         <div className="flex items-center gap-1.5 text-xs">
           {lastCheckedAt === null ? (
-            <span className="text-muted-foreground/50">Checking…</span>
+            <span className="text-muted-foreground/50">Checking...</span>
           ) : reachable ? (
             <>
               <CheckCircle2 className="h-3 w-3 text-sage" aria-hidden="true" />

@@ -101,6 +101,7 @@ type State struct {
 	localEndpoints       []string // private-LAN "ip:port" candidates (observability)
 	coordinatorConnState string   // "connected"|"connecting"|"disconnected"
 	lastError            string
+	coordinatorURL       string // static launch-flag value; never empty
 }
 
 // NewState returns an idle State in the "starting" phase.
@@ -149,6 +150,15 @@ func (s *State) SetLocalEndpoints(eps []string) {
 func (s *State) SetCoordinatorConnState(st string) {
 	s.mu.Lock()
 	s.coordinatorConnState = st
+	s.mu.Unlock()
+}
+
+// SetCoordinatorURL records the coordinator URL the sidecar is dialing. This
+// is a static value (the --coordinator-url launch flag); call it once at
+// startup before the server begins serving.
+func (s *State) SetCoordinatorURL(u string) {
+	s.mu.Lock()
+	s.coordinatorURL = u
 	s.mu.Unlock()
 }
 
@@ -209,6 +219,7 @@ func (s *State) snapshot(peerCount int) statusResponse {
 		MeshStatus:            string(s.meshStatus),
 		CoordinatorConnection: s.coordinatorConnState,
 		PeersOnlineCount:      peerCount,
+		CoordinatorURL:        s.coordinatorURL,
 	}
 	if s.nodeID != "" {
 		v := s.nodeID
@@ -398,6 +409,7 @@ type statusResponse struct {
 	ExternalEndpoint      *string  `json:"external_endpoint"`
 	LocalEndpoints        []string `json:"local_endpoints,omitempty"`
 	CoordinatorConnection string   `json:"coordinator_connection"`
+	CoordinatorURL        string   `json:"coordinator_url"`
 	PeersOnlineCount      int      `json:"peers_online_count"`
 	LastError             *string  `json:"last_error"`
 }

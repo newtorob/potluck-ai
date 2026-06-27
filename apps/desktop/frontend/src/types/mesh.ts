@@ -29,6 +29,10 @@ export interface MeshStatus {
   wg_public_key: string | null;
   external_endpoint: string | null;
   coordinator_connection: CoordinatorConnState;
+  /** The coordinator URL the Go sidecar is actually dialing (from its launch
+   *  flag). Always present per the v2 local IPC contract. Use this as the
+   *  source of truth for which coordinator the mesh is connected to. */
+  coordinator_url: string;
   peers_online_count: number;
   last_error: string | null;
 }

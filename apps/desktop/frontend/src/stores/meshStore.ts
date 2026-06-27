@@ -28,6 +28,7 @@ import {
   MeshSidecarUnreachableError,
   MeshApiError,
 } from '@/lib/meshClient';
+import { useConnectionStore } from '@/stores/connectionStore';
 import type { MeshStatus, MeshPeer } from '@/types/mesh';
 
 const STATUS_POLL_MS = 2_000;
@@ -80,6 +81,7 @@ export const useMeshStore = create<MeshState>()((set, get) => ({
         meshClient.status(),
         meshClient.peers(),
       ]);
+      useConnectionStore.getState().adoptSidecarUrl(status.coordinator_url);
       set({
         status,
         peers: peersRes.peers,
@@ -105,31 +107,36 @@ export const useMeshStore = create<MeshState>()((set, get) => ({
     void get().refresh();
 
     const scheduleStatus = () => {
-      const timer = setTimeout(async () => {
-        if (typeof document === 'undefined' || !document.hidden) {
-          try {
-            const status = await meshClient.status();
-            set({ status, bridge: 'reachable', lastError: null });
-          } catch (err) {
-            handleError(err, set);
+      const timer = setTimeout(() => {
+        void (async () => {
+          if (typeof document === 'undefined' || !document.hidden) {
+            try {
+              const status = await meshClient.status();
+              useConnectionStore.getState().adoptSidecarUrl(status.coordinator_url);
+              set({ status, bridge: 'reachable', lastError: null });
+            } catch (err) {
+              handleError(err, set);
+            }
           }
-        }
-        scheduleStatus();
+          scheduleStatus();
+        })();
       }, STATUS_POLL_MS);
       set({ _statusTimer: timer });
     };
 
     const schedulePeers = () => {
-      const timer = setTimeout(async () => {
-        if (typeof document === 'undefined' || !document.hidden) {
-          try {
-            const peersRes = await meshClient.peers();
-            set({ peers: peersRes.peers, bridge: 'reachable' });
-          } catch (err) {
-            handleError(err, set);
+      const timer = setTimeout(() => {
+        void (async () => {
+          if (typeof document === 'undefined' || !document.hidden) {
+            try {
+              const peersRes = await meshClient.peers();
+              set({ peers: peersRes.peers, bridge: 'reachable' });
+            } catch (err) {
+              handleError(err, set);
+            }
           }
-        }
-        schedulePeers();
+          schedulePeers();
+        })();
       }, PEERS_POLL_MS);
       set({ _peersTimer: timer });
     };

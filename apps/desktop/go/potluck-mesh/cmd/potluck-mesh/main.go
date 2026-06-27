@@ -187,6 +187,9 @@ func run() int {
 
 	// ---- IPC state ---- //
 	ipcState := localapi.NewState()
+	// The coordinator URL is a static launch-flag value; expose it in /status
+	// so the frontend can verify it matches what it expects (drift prevention).
+	ipcState.SetCoordinatorURL(cfg.CoordinatorURL)
 	// Pre-populate the WG public key from config so /status can report it
 	// even before the first welcome arrives.
 	if cfg.WGPublicKey != "" {
