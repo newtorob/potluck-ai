@@ -49,9 +49,11 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, DynamicCache
 try:
     from . import pipeline_wire as wire
     from .pipeline_wire import send_msg, recv_msg
+    from .sampling import sample_token, sample_from_topk
 except ImportError:  # running this file directly rather than as a package module
     import pipeline_wire as wire
     from pipeline_wire import send_msg, recv_msg
+    from sampling import sample_token, sample_from_topk
 
 logger = logging.getLogger(__name__)
 
@@ -576,8 +578,6 @@ class PipelineParallelEngine:
             yield from self._stream_tokens_spec(messages, max_new=max_new)
             return
 
-        from .sampling import sample_from_topk
-
         sampling = temperature > 0.0
         # K for top-K logit return: at least 64, at least top_k, clamped to vocab size.
         # Only used when sampling; computed once here, forwarded in each step message.
@@ -828,8 +828,6 @@ class WholeModelEngine:
         greedy -- sampling applies only to this local whole-model path where logits are
         fully available on this node.
         """
-        from .sampling import sample_token
-
         enc = self.tokenizer.apply_chat_template(
             messages, add_generation_prompt=True, return_tensors="pt", return_dict=True)
         ids = enc["input_ids"].to(self.device)
