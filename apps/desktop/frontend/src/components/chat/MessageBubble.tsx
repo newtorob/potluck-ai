@@ -103,42 +103,153 @@ function classifyRoute(meta: AppMessage['meta']): RoutePrivacy {
   return 'pool';
 }
 
-function RouteReceipt({ meta }: { meta: AppMessage['meta'] }) {
-  const route = classifyRoute(meta);
+// ---------------------------------------------------------------------------
+// Receipt content per route — exact copy from spec, no embellishment.
+// ---------------------------------------------------------------------------
 
+interface ReceiptContent {
+  title: string;
+  body: string;
+}
+
+function buildReceiptContent(meta: AppMessage['meta']): ReceiptContent {
+  if (!meta || meta.served_by === 'local') {
+    return {
+      title: 'Stayed on this machine',
+      body: 'Your prompt, the reply, and the model all ran on this device. Nothing left your machine.',
+    };
+  }
+
+  if (meta.served_by === 'household') {
+    const peerSuffix = meta.served_peer ? ` ${meta.served_peer}` : '';
+    return {
+      title: `Ran on your machine${peerSuffix}`,
+      body: 'Sent encrypted over your private mesh to one of your own machines, and nowhere else. It never touched the open network, and no account or identity was attached.',
+    };
+  }
+
+  if (meta.served_by === 'contributor' && meta.served_scope === 'mine') {
+    return {
+      title: 'Ran on one of your machines',
+      body: 'Routed through the coordinator to one of your own machines. It stayed within your machines and did not go to the open pool.',
+    };
+  }
+
+  // contributor + pool (or contributor with no scope)
+  return {
+    title: 'Answered by the open pool',
+    body: 'A verified contributor\'s machine answered this. It processed your prompt to generate the reply, so that machine saw your request text. The request carried no account or identity, so they do not know it came from you, and it traveled over the encrypted mesh.',
+  };
+}
+
+function RouteReceipt({ meta }: { meta: AppMessage['meta'] }) {
+  const [expanded, setExpanded] = useState(false);
+  const route = classifyRoute(meta);
+  const { title, body } = buildReceiptContent(meta);
+
+  // Collapsed badge: icon + short label + optional stats
   const parts: string[] = [];
   if (meta && typeof meta.duration_ms === 'number' && meta.duration_ms > 0) {
     parts.push(meta.duration_ms >= 1000 ? `${(meta.duration_ms / 1000).toFixed(1)}s` : `${meta.duration_ms}ms`);
   }
   if (meta && typeof meta.output_tokens === 'number' && meta.output_tokens > 0) {
-    parts.push(`${meta.output_tokens} tokens`);
+    parts.push(`${meta.output_tokens} tok`);
   }
 
   let Icon = Cpu;
-  let label = 'Stayed on this machine';
-  let tone = 'text-sage';
+  let badgeTone = 'text-sage';
+  // Collapsed label mirrors the receipt title but stays short enough for the badge row.
+  let badgeLabel = 'This machine';
   if (route === 'mine') {
     Icon = Home;
-    label = meta?.served_peer ? `Ran on ${meta.served_peer}, your hardware` : 'Ran on your own hardware';
-    tone = 'text-primary/70';
+    badgeTone = 'text-primary/70';
+    badgeLabel = meta?.served_peer ? `Your machine · ${meta.served_peer}` : 'Your hardware';
   } else if (route === 'pool') {
     Icon = Network;
-    label = 'Left this machine, open pool';
-    tone = 'text-primary/70';
+    badgeTone = 'text-muted-foreground/70';
+    badgeLabel = 'Open pool';
   }
 
+  // Expanded panel tone: sage for local/mine (reassuring), muted for pool (honest, not alarming).
+  const panelTone =
+    route === 'pool'
+      ? 'border-border/50 bg-muted/30'
+      : 'border-sage/25 bg-sage/5';
+
+  const receiptId = `receipt-body-${Math.random().toString(36).slice(2, 9)}`;
+
   return (
-    <div
-      className="mt-3 flex items-center gap-1.5 border-t border-border/40 pt-2 text-[11px] text-muted-foreground/80"
-      aria-label="Privacy receipt"
-    >
-      <Icon className={cn('h-3 w-3', tone)} aria-hidden="true" />
-      <span className="font-serif italic">{label}</span>
-      {parts.length > 0 && (
-        <>
-          <span aria-hidden="true">·</span>
-          <span className="tabular-nums">{parts.join(' · ')}</span>
-        </>
+    <div className="mt-3 border-t border-border/40 pt-2">
+      {/* Collapsed badge row — always visible */}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        aria-controls={receiptId}
+        className={cn(
+          'flex w-full items-center gap-1.5 text-[11px] text-muted-foreground/80',
+          'rounded-sm transition-colors duration-fast',
+          'hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+          'cursor-pointer select-none',
+        )}
+      >
+        <Icon className={cn('h-3 w-3 shrink-0', badgeTone)} aria-hidden="true" />
+        <span className="font-serif italic">{badgeLabel}</span>
+        {parts.length > 0 && (
+          <>
+            <span aria-hidden="true" className="text-muted-foreground/40">·</span>
+            <span className="tabular-nums">{parts.join(' · ')}</span>
+          </>
+        )}
+        {/* Chevron rotates on expand */}
+        <svg
+          className={cn(
+            'ml-auto h-2.5 w-2.5 shrink-0 text-muted-foreground/40 transition-transform duration-base',
+            expanded && 'rotate-180',
+          )}
+          viewBox="0 0 10 10"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          aria-hidden="true"
+        >
+          <path d="M2 3.5 5 6.5 8 3.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {/* Expanded receipt panel */}
+      {expanded && (
+        <div
+          id={receiptId}
+          role="region"
+          aria-label="Privacy receipt detail"
+          className={cn(
+            'mt-2 rounded-md border px-3 py-2.5 text-[11.5px] leading-relaxed',
+            panelTone,
+          )}
+        >
+          <p className="mb-1 font-medium text-foreground/80">{title}</p>
+          <p className="text-muted-foreground">{body}</p>
+
+          {/* Stats detail line — only when values exist */}
+          {(parts.length > 0 || (meta?.finish_reason !== undefined && meta.finish_reason !== null)) && (
+            <p className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 tabular-nums text-[10.5px] text-muted-foreground/60">
+              {typeof meta?.output_tokens === 'number' && meta.output_tokens > 0 && (
+                <span>{meta.output_tokens} tokens</span>
+              )}
+              {typeof meta?.duration_ms === 'number' && meta.duration_ms > 0 && (
+                <span>
+                  {meta.duration_ms >= 1000
+                    ? `${(meta.duration_ms / 1000).toFixed(1)}s`
+                    : `${meta.duration_ms}ms`}
+                </span>
+              )}
+              {meta?.finish_reason !== undefined && meta.finish_reason !== null && (
+                <span>{meta.finish_reason}</span>
+              )}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
