@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Copy, Check } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { localApi } from '@/lib/localApi';
 import type {
@@ -164,6 +164,61 @@ function WeeklyChart({ weeks }: { weeks: ContributionWeek[] }) {
 }
 
 // ---------------------------------------------------------------------------
+// Copy summary button
+// ---------------------------------------------------------------------------
+
+/**
+ * Copies an aggregate-only, safe-to-share plain-text summary to the clipboard.
+ * Contains only totals + the time period label — no per-request, per-peer, or
+ * requester detail.
+ */
+function CopySummaryButton({
+  totalRequests,
+  totalCredits,
+}: {
+  totalRequests: number;
+  totalCredits: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    const text = `Potluck: my machines served ${formatCount(totalRequests)} ${totalRequests === 1 ? 'request' : 'requests'} and earned ${formatCredits(totalCredits)} credits this week.`;
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5',
+        'text-xs font-medium transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        copied
+          ? 'border-sage/30 bg-sage/10 text-sage'
+          : 'border-border/60 bg-background/40 text-muted-foreground hover:text-foreground hover:border-border',
+      )}
+      aria-label="Copy contribution summary to clipboard"
+    >
+      {copied ? (
+        <>
+          <Check className="h-3 w-3" aria-hidden="true" />
+          Copied
+        </>
+      ) : (
+        <>
+          <Copy className="h-3 w-3" aria-hidden="true" />
+          Copy summary
+        </>
+      )}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -246,8 +301,8 @@ export function ContributionReceiptsCard() {
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-5 shadow-hearth-sm">
-      {/* Headline */}
-      <div>
+      {/* Headline + copy button */}
+      <div className="flex items-start justify-between gap-3">
         <p className="font-serif text-base leading-tight tracking-display text-foreground">
           {total_requests_served === 0 ? (
             'Your machines served 0 requests this week.'
@@ -266,6 +321,12 @@ export function ContributionReceiptsCard() {
             </>
           )}
         </p>
+        {total_requests_served > 0 && (
+          <CopySummaryButton
+            totalRequests={total_requests_served}
+            totalCredits={total_credits_earned}
+          />
+        )}
       </div>
 
       {/* Per-machine breakdown */}

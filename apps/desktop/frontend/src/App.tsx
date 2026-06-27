@@ -24,6 +24,8 @@ import { useConnectionStore } from '@/stores/connectionStore';
 import { useTheme } from '@/hooks/useTheme';
 import { localApi } from '@/lib/localApi';
 import { autoLoadOnStartup } from '@/lib/appPrefs';
+import { useWeeklyReceiptToast } from '@/hooks/useWeeklyReceiptToast';
+import { WeeklyReceiptToast } from '@/components/household/WeeklyReceiptToast';
 
 /**
  * Root application shell.
@@ -56,6 +58,9 @@ export default function App() {
   // Initialise theme from localStorage on mount so <html class> matches
   // user preference before paint (avoids cream-flash on dark startup).
   useTheme();
+
+  // Weekly receipt toast — once per completed week, opt-out via Settings → Privacy.
+  const { toast: weeklyToast, dismiss: dismissWeeklyToast } = useWeeklyReceiptToast();
 
   // Route path drives the per-view error boundary's reset: navigating to a
   // different view clears a crashed boundary so the user is never stuck.
@@ -199,6 +204,11 @@ export default function App() {
 
       {/* Persistent bottom status strip — model loaded, sidecar, network mode */}
       <StatusBar />
+
+      {/* Weekly receipt toast — floats above the status bar */}
+      {weeklyToast.visible && weeklyToast.data !== null && (
+        <WeeklyReceiptToast data={weeklyToast.data} onDismiss={dismissWeeklyToast} />
+      )}
     </div>
   );
 }

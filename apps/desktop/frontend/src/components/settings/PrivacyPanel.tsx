@@ -5,10 +5,15 @@
  * Re-asserts the core Potluck AI privacy guarantee.
  */
 
+import { useState } from 'react';
 import { Shield } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import type { PotluckSettings, PotluckSettingsPatch } from '@/lib/localApi';
 import { MemorySettings } from '@/components/memory/MemorySettings';
+import {
+  contributionReceiptsEnabled,
+  setContributionReceiptsEnabled,
+} from '@/lib/appPrefs';
 
 interface PrivacyPanelProps {
   settings: PotluckSettings;
@@ -61,6 +66,28 @@ function ToggleRow({ id, label, description, checked, disabled, onChange }: Togg
           )}
         />
       </button>
+    </div>
+  );
+}
+
+function ContributionReceiptsSection() {
+  const [enabled, setEnabled] = useState<boolean>(() => contributionReceiptsEnabled());
+  return (
+    <div className="rounded-xl border border-border bg-card p-5 space-y-3">
+      <h2 className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
+        Contribution receipts
+      </h2>
+      <ToggleRow
+        id="contribution-receipts"
+        label="Contribution receipts"
+        description="Show what your machines have served and earned. On by default."
+        checked={enabled}
+        disabled={false}
+        onChange={(v) => {
+          setContributionReceiptsEnabled(v);
+          setEnabled(v);
+        }}
+      />
     </div>
   );
 }
@@ -121,6 +148,8 @@ export function PrivacyPanel({ settings, isSaving, saveError, onUpdate }: Privac
           onChange={(v) => update({ crash_reports_enabled: v })}
         />
       </div>
+
+      <ContributionReceiptsSection />
 
       <MemorySettings settings={settings} isSaving={isSaving} onUpdate={onUpdate} />
     </div>

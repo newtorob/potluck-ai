@@ -70,6 +70,7 @@ import { AddMachineWizard } from '@/components/household/AddMachineWizard';
 import { ContributionReceiptsCard } from '@/components/household/ContributionReceiptsCard';
 import { deriveDiagnostics, type PeerDiagnostic } from '@/lib/meshDiagnostics';
 import { PreflightBanner } from '@/components/household/PreflightBanner';
+import { contributionReceiptsEnabled } from '@/lib/appPrefs';
 
 // ---------------------------------------------------------------------------
 // Root
@@ -590,11 +591,14 @@ function PairedView({
         <MeshMap status={status} peers={peers} report={report} capsByNode={capsByNode} />
       </section>
 
-      {/* Contribution receipts — contributor side made visible. */}
-      <section aria-label="Contribution receipts">
-        <SectionHeader>What your machines contributed</SectionHeader>
-        <ContributionReceiptsCard />
-      </section>
+      {/* Contribution receipts — contributor side made visible. Hidden when
+          the user turns off the preference in Settings → Privacy. */}
+      {contributionReceiptsEnabled() && (
+        <section aria-label="Contribution receipts">
+          <SectionHeader>What your machines contributed</SectionHeader>
+          <ContributionReceiptsCard />
+        </section>
+      )}
 
       {/* This machine + Add CTA */}
       <section aria-label="This machine">
