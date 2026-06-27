@@ -53,6 +53,11 @@ from coordinator.services.peer_registry import (
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["jobs"])
 
+# Module-level strong reference to background tasks so CPython's GC (and the
+# Python 3.12 RuntimeWarning) never discards a pending Task before it completes.
+# Tasks self-remove via a done-callback; the set only holds running tasks.
+_background_tasks: set[asyncio.Task] = set()
+
 # Per-job hard ceiling. Even a 512-token completion at 5 tok/s on a slow
 # peer should finish well under this. If we hit it, the peer hung and we
 # should stop blocking the requesting client.
@@ -480,7 +485,7 @@ async def dispatch_job_stream(
 
     # ---- 4. Stream the response ---- #
     async def _generate() -> AsyncGenerator[str, None]:
-        deadline = asyncio.get_event_loop().time() + JOB_TIMEOUT_S
+        deadline = asyncio.get_running_loop().time() + JOB_TIMEOUT_S
         try:
             while True:
                 # Bail out cleanly when the peer has signalled completion
@@ -489,7 +494,7 @@ async def dispatch_job_stream(
                 if buf.done.is_set() and buf.token_stream.empty():
                     break
 
-                remaining = deadline - asyncio.get_event_loop().time()
+                remaining = deadline - asyncio.get_running_loop().time()
                 if remaining <= 0:
                     yield _sse_error("timeout", f"Peer didn't complete within {JOB_TIMEOUT_S}s")
                     break
@@ -550,7 +555,7 @@ async def dispatch_job_stream(
             captured_tokens = buf.output_tokens
             captured_duration = buf.duration_ms
 
-            asyncio.create_task(
+            _task = asyncio.create_task(
                 _finalize_job_in_db(
                     job_id=job_id,
                     error_category=captured_error,
@@ -559,6 +564,8 @@ async def dispatch_job_stream(
                     duration_ms=captured_duration,
                 )
             )
+            _background_tasks.add(_task)
+            _task.add_done_callback(_background_tasks.discard)
 
     return StreamingResponse(
         _generate(),

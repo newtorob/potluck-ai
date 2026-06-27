@@ -33,7 +33,7 @@
 //   - DERP relay client (internal/derp): TCP connection to the relay,
 //     JWT auth, reconnect with exponential backoff, Send/Receive framing.
 //   - DERP fallback trigger: when a peer's last handshake is older than
-//     derpFallbackThreshold (30s), outbound packets to that peer are sent
+//     handshakeFreshWindow (3min), outbound packets to that peer are sent
 //     via the relay instead of (or in addition to) direct UDP.
 //   - JWT fetcher: hits the coordinator's POST /mesh/derp-token endpoint
 //     to obtain a short-lived HMAC-signed token for DERP auth.
@@ -42,8 +42,8 @@
 //   - DerpBind (internal/derp/bind.go): custom conn.Bind that intercepts
 //     wg-go's send/receive paths. Inbound DERP packets are injected via
 //     Inject(); outbound to syntheticEndpoints are dispatched to the relay.
-//   - Automatic DERP fallback: runReachabilityLoop flips stale peers (no
-//     fresh handshake for derpFallbackThreshold) to DERP routing via
+//   - Automatic DERP fallback: runReachabilityLoop flips unreachable peers
+//     (no fresh handshake within handshakeFreshWindow) to DERP routing via
 //     DerpBind.SetPeerRouting + tunnel.UpdatePeerEndpoint with the synthetic
 //     endpoint. Peers that recover (fresh handshake seen) are flipped back.
 //
@@ -480,11 +480,13 @@ func runSTUNLoop(
 	}
 }
 
-// derpFallbackThreshold is the age of the last WG handshake after which we
-// consider a peer unreachable via direct UDP and flip it to DERP routing.
-// Chosen to be longer than handshakeFreshWindow (3 min) so that a single
-// missed keepalive doesn't immediately trigger DERP fallback.
-const derpFallbackThreshold = 30 * time.Second
+// derpFallbackThreshold is kept for reference in comments but is no longer
+// used as the DERP-flip trigger. The flip now uses handshakeFreshWindow
+// (!nowReachable, age >= 3min) so the DERP fallback condition is consistent
+// with the reachability judgment used everywhere else. Previously this was
+// 30s, which caused peers with handshake age 30s–3min to be incorrectly
+// flipped to DERP even when the direct path was still live.
+const derpFallbackThreshold = handshakeFreshWindow
 
 // rosterRefreshInterval is the cadence of the roster reconciliation safety net.
 // The signal WS is the fast path for real-time roster updates; this loop only
@@ -622,10 +624,10 @@ func derefStr(s *string) string {
 // last-handshake time. It logs a message only on state transitions
 // (unreachable→reachable or vice versa) and once per peer on startup.
 //
-// When dBind is non-nil (DERP relay is available), peers that have had no
-// fresh handshake for derpFallbackThreshold are flipped to DERP routing via
-// dBind.SetPeerRouting. When a peer recovers (fresh handshake observed), it is
-// flipped back to direct UDP.
+// When dBind is non-nil (DERP relay is available), peers that are not reachable
+// (no fresh handshake within handshakeFreshWindow) are flipped to DERP routing
+// via dBind.SetPeerRouting. When a peer recovers (fresh handshake observed), it
+// is flipped back to direct UDP.
 //
 // A peer is considered reachable when its last handshake is within
 // handshakeFreshWindow (3 minutes). WireGuard renegotiates every ~3 minutes
@@ -866,7 +868,6 @@ func runReachabilityLoop(
 			}
 
 			nowReachable := !lastHS.IsZero() && time.Since(lastHS) < handshakeFreshWindow
-			handshakeStale := lastHS.IsZero() || time.Since(lastHS) >= derpFallbackThreshold
 
 			st, known := states[pubkey]
 			if !known {
@@ -969,9 +970,9 @@ func runReachabilityLoop(
 					"reachable", nowReachable,
 					"last_handshake_ago", formatHandshakeAge(lastHS),
 				)
-				// On first observation, if the handshake is already stale and DERP
-				// is available, flip immediately.
-				if peerDerpBind != nil && handshakeStale && !st.derpRouted {
+				// On first observation, if the peer is not reachable (handshake
+				// age >= 3min or no handshake) and DERP is available, flip immediately.
+				if peerDerpBind != nil && !nowReachable && !st.derpRouted {
 					flipToDERP(tun, peerDerpBind, pubkey, pubkeyBytes)
 					st.derpRouted = true
 				}
@@ -982,8 +983,8 @@ func runReachabilityLoop(
 
 			if nowReachable == st.reachable {
 				// No reachability state transition — but still check DERP fallback
-				// in case handshake just crossed the threshold.
-				if peerDerpBind != nil && !nowReachable && handshakeStale && !st.derpRouted {
+				// in case the peer is not reachable and needs DERP.
+				if peerDerpBind != nil && !nowReachable && !st.derpRouted {
 					flipToDERP(tun, peerDerpBind, pubkey, pubkeyBytes)
 					st.derpRouted = true
 				}
@@ -1056,8 +1057,8 @@ func runReachabilityLoop(
 				if bus != nil {
 					bus.Publish(events.NewPeerUpdated(peerSnap))
 				}
-				// Peer lost: flip to DERP if available and handshake is stale.
-				if peerDerpBind != nil && handshakeStale && !st.derpRouted {
+				// Peer lost: flip to DERP if available.
+				if peerDerpBind != nil && !nowReachable && !st.derpRouted {
 					flipToDERP(tun, peerDerpBind, pubkey, pubkeyBytes)
 					st.derpRouted = true
 				}
@@ -1120,6 +1121,15 @@ func runReachabilityLoop(
 // as a hint), THEN flipToDERP to install the synthetic endpoint + routing flag.
 // The result is byte-for-byte the same WG peer config a fresh roster-add would
 // produce, so the relay path comes back exactly as it would on first contact.
+//
+// Kernel route invariant: maybeStartLANTrial calls tun.RemovePeer (which
+// removes the WG peer from the device) but does NOT call tun.RemovePeerRoute
+// (which would remove the kernel host route). The kernel route for this peer's
+// mesh IP therefore remains installed pointing at the TUN interface throughout
+// the trial and rollback. restoreDERPFloor does NOT need to call AddPeerRoute;
+// the existing route is always present. This invariant must hold: if anything
+// in the trial path ever starts calling RemovePeerRoute, a matching
+// AddPeerRoute call must be added here.
 //
 // Correctness of the DERP floor: after this returns, (a) the peer exists on the
 // WG device with allowed-ips = mesh-IP/32, (b) dBind has the peer marked

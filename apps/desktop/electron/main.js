@@ -87,6 +87,13 @@ function startPythonSidecar() {
     },
   });
 
+  pythonProcess.on('spawn', () => {
+    // Reset the crash-loop counter once the process successfully starts.
+    // This way only *consecutive* rapid failures count against the limit,
+    // not the total lifetime crash count across a long session.
+    restartAttempts = 0;
+  });
+
   pythonProcess.stdout.on('data', (data) => {
     String(data)
       .trim()
@@ -524,16 +531,18 @@ app.whenReady().then(async () => {
     return;
   }
 
-  // Reset the restart counter once we know the sidecar is healthy.
-  restartAttempts = 0;
-
   await createWindow();
   setupAutoUpdater();
 });
 
 app.on('activate', async () => {
   // macOS: re-create the window when the dock icon is clicked and no windows are open.
-  if (BrowserWindow.getAllWindows().length === 0) {
+  // Guard against a dead or restarting sidecar: if pythonProcess is null the sidecar
+  // is mid-restart; opening a window against 127.0.0.1:8321 would get ECONNREFUSED
+  // for every API call until the restart completes. Skip window creation in that case —
+  // the restart handler will not re-open a window, but the next crash-free activate
+  // (or the app.whenReady path after a future relaunch) will.
+  if (BrowserWindow.getAllWindows().length === 0 && (pythonProcess || !app.isPackaged)) {
     await createWindow();
   }
 });

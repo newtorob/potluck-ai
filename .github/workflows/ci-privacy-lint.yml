@@ -8,11 +8,24 @@ name: CI - Privacy invariants
 #
 # Runs on every push and PR. Fails the build on violations.
 
-on: []  # disabled — runs locally via `make lint` and the git pre-commit hook.
-        # Re-enable later (when GH Actions budget allows) by restoring:
-        #   push:
-        #     branches: [main]
-        #   pull_request:
+# Scoped to the privacy-relevant trees so the job (a static AST lint + a
+# couple of pytest cases) only runs when one of the surfaces it guards
+# changes. The local `make lint` + pre-commit hook still run on every
+# commit; this is the gate a contributor cannot bypass with --no-verify.
+on:
+  push:
+    branches: [main]
+    paths: &privacy_paths
+      - "scripts/dev/lint_privacy.py"
+      - "services/coordinator/coordinator/**"
+      - "services/coordinator/tests/**"
+      - "apps/desktop/python/potluck_local/contributor/**"
+      - "apps/desktop/python/potluck_local/routers/peer.py"
+      - "apps/desktop/python/potluck_local/services/pool_routing.py"
+      - "apps/desktop/python/potluck_local/services/gateway_routing.py"
+      - ".github/workflows/ci-privacy-lint.yml"
+  pull_request:
+    paths: *privacy_paths
 
 permissions:
   contents: read
@@ -35,7 +48,7 @@ jobs:
           python-version: "3.11"
 
       - name: Run privacy lint
-        run: python3 scripts/lint_privacy.py
+        run: python3 scripts/dev/lint_privacy.py
 
       - name: Run coordinator privacy-invariant tests
         # The static lint above checks call sites; this pytest checks

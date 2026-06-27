@@ -685,15 +685,19 @@ async def _broadcast_to_household(
             if nid in household_node_ids and nid != except_node_id
         ]
     # Send outside the lock so a slow peer doesn't block others.
-    dead: list[uuid.UUID] = []
+    dead: list[tuple[uuid.UUID, object]] = []
     for nid, ws in targets:
         ok = await _safe_send(ws, payload)
         if not ok:
-            dead.append(nid)
+            dead.append((nid, ws))
     if dead:
         async with _signal_lock:
-            for nid in dead:
-                _signal_connections.pop(nid, None)
+            for nid, ws in dead:
+                # Only evict if the registry still holds THIS ws — a peer
+                # that reconnected between the snapshot and here has already
+                # replaced the slot with a new live connection.
+                if _signal_connections.get(nid) is ws:
+                    _signal_connections.pop(nid, None)
 
 
 @router.websocket("/mesh/signal")

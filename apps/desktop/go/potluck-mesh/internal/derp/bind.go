@@ -284,6 +284,20 @@ func (b *DerpBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 		return nil, 0, err
 	}
 
+	// Drain any packets that arrived during the Close window (or were left in
+	// the buffer from the previous Open cycle). Without this drain, a stale
+	// WG handshake packet from a prior session could be replayed into the new
+	// session, confusing the WG state machine. Non-blocking: any packet that
+	// arrives after this loop is a legitimately new delivery for this cycle.
+	for {
+		select {
+		case <-b.injectCh:
+		default:
+			goto drained
+		}
+	}
+drained:
+
 	// Install a fresh closeState atomically. Any concurrent Close that
 	// happens to race with this Store will either:
 	//   (a) Load the previous closeState (already-fired Once → no-op), or

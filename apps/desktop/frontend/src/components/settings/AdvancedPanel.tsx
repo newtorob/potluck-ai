@@ -8,7 +8,7 @@
  * Each memory control is debounced ~300ms and persists via useSettings().update.
  */
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { cn } from '@/components/ui/cn';
 import { ModelPathPanel } from '@/components/settings/ModelPathPanel';
 import { McpIntegrationPanel } from '@/components/settings/McpIntegrationPanel';
@@ -146,6 +146,17 @@ function MemoryTuningSection({ memory, isSaving, onUpdate }: MemoryTuningProps) 
   const maxRetrievalTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const minConfidenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retentionDaysTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear all pending debounce timers on unmount so a slider drag followed by
+  // a navigation away within 300ms does not fire a stale PATCH /settings.
+  // Refs are stable across renders; the empty dep array is intentional.
+  useEffect(() => {
+    return () => {
+      [maxRetrievalTimer, minConfidenceTimer, retentionDaysTimer].forEach((r) => {
+        if (r.current !== null) clearTimeout(r.current);
+      });
+    };
+  }, []);
 
   const debounce = useCallback(
     (

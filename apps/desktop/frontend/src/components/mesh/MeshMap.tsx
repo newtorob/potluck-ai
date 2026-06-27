@@ -176,16 +176,20 @@ export function MeshMap({
           title2={`Coordinator · ${coord.label}`}
         />
 
-        {/* This machine (center / main unit) */}
+        {/* This machine (center / main unit).
+            The dot color tracks coordinator connection quality, not whether
+            this machine itself is offline. Show what the color actually means
+            so the legend's "Offline" label is never misread as "this machine
+            is down" when only the coordinator is unreachable. */}
         <NodeCard
           pos={SELF}
           icon={Monitor}
           title="You"
           subtitle={status.mesh_ip ?? undefined}
           stateColor={STATE_COLOR[coord.state]}
-          stateLabel="This machine"
+          stateLabel={`Coordinator ${coord.label.toLowerCase()}`}
           highlight
-          title2={`This machine${status.mesh_ip ? ` (${status.mesh_ip})` : ''}`}
+          title2={`This machine${status.mesh_ip ? ` (${status.mesh_ip})` : ''} · coordinator ${coord.label.toLowerCase()}`}
         />
 
         {/* Peer satellites */}

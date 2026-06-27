@@ -77,7 +77,11 @@ export function useHealth(): UseHealthReturn {
         });
       } catch {
         if (cancelled) return;
-        setState(INITIAL_STATE);
+        // Preserve the last known model and pipeline state on a transient
+        // error so a single timeout or 5xx doesn't flip PipelineModeCard to
+        // 'disabled' and briefly re-enable its Enable button. Only sidecarUp
+        // is authoritative from a failed poll — the model didn't unload.
+        setState((prev) => ({ ...prev, sidecarUp: false }));
       }
     }
 

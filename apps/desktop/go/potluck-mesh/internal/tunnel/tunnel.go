@@ -238,21 +238,23 @@ func (t *Tunnel) RemovePeerRoute(peerMeshIP string) error {
 //   - macOS: shells out to `ifconfig <iface> inet <ip> <ip>` (point-to-point)
 //   - Windows: logs a warning and returns without error — see TODO above.
 func (t *Tunnel) SetMeshIP(meshIP string) error {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
 	ip := net.ParseIP(meshIP)
 	if ip == nil {
 		return fmt.Errorf("tunnel: invalid mesh IP %q", meshIP)
 	}
-	t.meshIP = ip
 
-	if err := assignInterfaceAddress(t.ifName, meshIP); err != nil {
+	t.mu.Lock()
+	t.meshIP = ip
+	ifName := t.ifName
+	wgPort := t.wgPort
+	t.mu.Unlock()
+
+	if err := assignInterfaceAddress(ifName, meshIP); err != nil {
 		return fmt.Errorf("tunnel: assign interface address: %w", err)
 	}
 
 	slog.Info("tunnel: mesh IP assigned to interface",
-		"interface", t.ifName,
+		"interface", ifName,
 		"mesh_ip", meshIP,
 	)
 
@@ -262,10 +264,17 @@ func (t *Tunnel) SetMeshIP(meshIP string) error {
 	// mesh (contributor mode / pipeline stages fail with no signal). No-op on
 	// macOS/Linux. Best-effort: a firewall failure must not stop the mesh from
 	// coming up -- we log it so it's diagnosable.
-	if err := allowMeshInbound(t.ifName, t.wgPort); err != nil {
+	//
+	// allowMeshInbound is called outside t.mu because it shells out to
+	// PowerShell on Windows (200–600ms), and t.mu is also held by
+	// PeerReachability / IpcGet. Holding the lock for the full exec duration
+	// would stall the reachability loop on the very first check after welcome.
+	// ifName and wgPort are read-only after construction, so capturing them
+	// above and using the local copies here is safe.
+	if err := allowMeshInbound(ifName, wgPort); err != nil {
 		slog.Warn("tunnel: could not open mesh inbound firewall; peers may be unable to reach this node",
-			"interface", t.ifName,
-			"wg_port", t.wgPort,
+			"interface", ifName,
+			"wg_port", wgPort,
 			"error", err,
 		)
 	}

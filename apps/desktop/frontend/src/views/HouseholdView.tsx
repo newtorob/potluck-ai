@@ -1372,7 +1372,7 @@ function PipelineModeCard({ peers }: { peers: MeshPeer[] }) {
         <button
           type="button"
           onClick={() => void handleToggle()}
-          disabled={working || probing || (!isOn && eligible.length === 0)}
+          disabled={working || probing || !sidecarUp || (!isOn && eligible.length === 0)}
           className={cn(
             'inline-flex shrink-0 h-9 items-center gap-1.5 rounded-lg px-3.5 text-sm font-medium',
             'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',

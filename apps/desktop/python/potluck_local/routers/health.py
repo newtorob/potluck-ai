@@ -6,7 +6,7 @@ import asyncio
 import os
 import signal
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter
 
 from potluck_local import __version__
 from potluck_local.services.runtime import get_runtime
@@ -44,7 +44,7 @@ async def health() -> dict[str, object]:
 
 
 @router.post("/shutdown")
-async def shutdown(background_tasks: BackgroundTasks) -> dict[str, str]:
+async def shutdown() -> dict[str, str]:
     """Ask the sidecar to shut down cleanly.
 
     Electron posts here before sending SIGKILL so in-flight inference can finish.
@@ -53,5 +53,6 @@ async def shutdown(background_tasks: BackgroundTasks) -> dict[str, str]:
     def _terminate() -> None:
         os.kill(os.getpid(), signal.SIGTERM)
 
-    background_tasks.add_task(asyncio.get_event_loop().run_in_executor, None, _terminate)
+    loop = asyncio.get_running_loop()
+    loop.call_later(0.1, _terminate)
     return {"status": "shutting_down"}

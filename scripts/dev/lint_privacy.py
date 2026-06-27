@@ -1,23 +1,40 @@
 #!/usr/bin/env python3
 """Privacy-invariant linter.
 
-Enforces two manifesto-level rules at CI time (memory 42a7e671 + 1fc85a49):
+Enforces the manifesto-level privacy rules at CI time
+(memory 42a7e671 + 1fc85a49):
 
-  #20 — Coordinator-side: `member_id` MUST NOT appear in any payload
+  #20 — Coordinator-side: a per-peer identity token (member_id, peer_id,
+        node_name, mesh_ip, hostname) MUST NOT appear in any payload
         passed to a peer-bound message constructor or peer WebSocket send.
         Specifically scrutinized:
-          * JobAssignedMessage(...) — the schema doesn't have a member_id
-            field, but we still want to catch attempts to smuggle one in
+          * JobAssignedMessage(...) — the schema doesn't have these
+            fields, but we still want to catch attempts to smuggle one in
             via **kwargs or string content.
           * <anything>.ws.send_json(...) / .ws.send(...) / .ws.send_text(...)
             — these are the WS write paths to peers.
+
+  #20b — Public aggregate responses (transparency.py) MUST be pure
+        counts. A per-peer identity token MUST NOT appear in their
+        `return` payloads (only the return is scanned, so SQL aggregations
+        like func.count(Peer.peer_id) above the return are unaffected).
 
   #21 — Contributor-side: prompt content and generated tokens MUST NOT
         be written to disk, logs, or telemetry. The contributor sidecar
         (`apps/desktop/python/potluck_local/contributor/`) is the
         enforcement zone.
 
-Scope is deliberately tight. Both lints have whitelists for files that
+  #22 — Peer/pool-facing relay code MUST NOT write the strangers' prompt
+        or response content to disk, logs, or telemetry. These are the
+        runtime surfaces that actually receive and forward other people's
+        prompts/tokens — they live OUTSIDE the contributor tree:
+          * routers/peer.py — peer_chat_completions / peer_memory_search
+          * services/pool_routing.py — stream/complete_pool_openai
+          * services/gateway_routing.py — stream/complete_peer_openai
+        Same content-leak heuristic as #21 (sensitive name inside a
+        logger / dump / open-write context, unless metadata-wrapped).
+
+Scope is deliberately tight. The lints have whitelists for files that
 have a legitimate reason to violate the heuristic (keys.py writes Ed25519
 keys; the privacy-tests file references `member_id` in strings as part of
 the very assertion that it must not appear).
@@ -53,10 +70,27 @@ PEER_LINT_WHITELIST = {
 # WS-send method names we want to scrutinize.
 WS_SEND_METHODS = {"send_json", "send_text", "send_bytes", "send"}
 
+# Per-peer identity tokens that MUST NOT cross to a peer-bound message
+# constructor or WS send. `member_id` is the original (memory 42a7e671);
+# the rest are the broader peer-identity invariant the docs claim is
+# guarded — a peer learning another peer's node_name / mesh_ip / hostname
+# / peer_id from a job assignment is the same class of de-anonymization
+# leak. These are matched by bare name, attribute access (`x.peer_id`),
+# keyword arg (`peer_id=`), and string literal (dict key smuggled via
+# **kwargs).
+PEER_IDENTITY_TOKENS = {
+    "member_id",
+    "peer_id",
+    "node_name",
+    "mesh_ip",
+    "hostname",
+}
+
 
 class PeerBoundLeakChecker(ast.NodeVisitor):
     """Walks an AST and flags any call to JobAssignedMessage(...) or
-    *.ws.send_*(...) whose argument tree mentions `member_id` anywhere."""
+    *.ws.send_*(...) whose argument tree mentions a per-peer identity
+    token (member_id / peer_id / node_name / mesh_ip / hostname)."""
 
     def __init__(self, file: Path):
         self.file = file
@@ -95,27 +129,32 @@ class PeerBoundLeakChecker(ast.NodeVisitor):
         return False
 
     def _scan_subtree(self, node: ast.Call, ctx: str) -> None:
-        """Walk every node in the subtree and flag any reference to member_id."""
+        """Walk the subtree and flag any reference to a peer-identity token."""
         for sub in ast.walk(node):
-            # Bare name reference: member_id
-            if isinstance(sub, ast.Name) and sub.id == "member_id":
-                self.errors.append((node.lineno, ctx, "name reference 'member_id'"))
-            # Attribute access: foo.member_id, req.member_id, etc.
-            elif isinstance(sub, ast.Attribute) and sub.attr == "member_id":
-                self.errors.append((node.lineno, ctx, "attribute access '.member_id'"))
-            # Keyword argument: member_id=...
-            elif isinstance(sub, ast.keyword) and sub.arg == "member_id":
-                self.errors.append((node.lineno, ctx, "keyword argument 'member_id='"))
-            # String literal that contains 'member_id' (would catch dict
-            # literal keys passed via **kwargs or constructed payloads).
-            elif (
-                isinstance(sub, ast.Constant)
-                and isinstance(sub.value, str)
-                and "member_id" in sub.value
-            ):
+            # Bare name reference: peer_id
+            if isinstance(sub, ast.Name) and sub.id in PEER_IDENTITY_TOKENS:
                 self.errors.append(
-                    (node.lineno, ctx, f"string literal contains 'member_id'")
+                    (node.lineno, ctx, f"name reference '{sub.id}'")
                 )
+            # Attribute access: foo.peer_id, req.member_id, etc.
+            elif isinstance(sub, ast.Attribute) and sub.attr in PEER_IDENTITY_TOKENS:
+                self.errors.append(
+                    (node.lineno, ctx, f"attribute access '.{sub.attr}'")
+                )
+            # Keyword argument: peer_id=...
+            elif isinstance(sub, ast.keyword) and sub.arg in PEER_IDENTITY_TOKENS:
+                self.errors.append(
+                    (node.lineno, ctx, f"keyword argument '{sub.arg}='")
+                )
+            # String literal that exactly equals a token (would catch dict
+            # literal keys passed via **kwargs or constructed payloads).
+            elif isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+                for token in PEER_IDENTITY_TOKENS:
+                    if token in sub.value:
+                        self.errors.append(
+                            (node.lineno, ctx, f"string literal contains '{token}'")
+                        )
+                        break
 
 
 def lint_peer_bound() -> list[str]:
@@ -136,6 +175,72 @@ def lint_peer_bound() -> list[str]:
         checker.visit(tree)
         for line, ctx, what in checker.errors:
             errors.append(f"{rel}:{line}: peer-bound leak in {ctx}: {what}")
+    return errors
+
+
+# ---------------------------------------------------------------------------
+# Lint #20b — per-peer identity forbidden in public aggregate responses
+# ---------------------------------------------------------------------------
+
+# Public, unauthenticated aggregate surfaces. Their response bodies must be
+# pure counts/aggregates — never a per-peer identity field. We scan only the
+# `return` expressions (the response payload), NOT the SQL aggregation
+# expressions above them, because the latter legitimately reference
+# Peer.peer_id inside func.count(...) without exposing it.
+AGGREGATE_RESPONSE_FILES = (
+    "services/coordinator/coordinator/routers/transparency.py",
+)
+
+
+class AggregateResponseChecker(ast.NodeVisitor):
+    """Flag a per-peer identity token appearing inside a `return` payload
+    of a public aggregate endpoint. String-literal dict keys count too —
+    they are what a JSON consumer sees."""
+
+    def __init__(self) -> None:
+        self.errors: list[tuple[int, str]] = []
+
+    def visit_Return(self, node: ast.Return) -> None:
+        if node.value is None:
+            return
+        for sub in ast.walk(node.value):
+            if isinstance(sub, ast.Name) and sub.id in PEER_IDENTITY_TOKENS:
+                self.errors.append((node.lineno, f"name '{sub.id}'"))
+            elif isinstance(sub, ast.Attribute) and sub.attr in PEER_IDENTITY_TOKENS:
+                self.errors.append((node.lineno, f"attribute '.{sub.attr}'"))
+            elif isinstance(sub, ast.keyword) and sub.arg in PEER_IDENTITY_TOKENS:
+                self.errors.append((node.lineno, f"keyword '{sub.arg}='"))
+            elif isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+                # Exact dict-key match only — avoids flagging an aggregate
+                # key like "online_peer_count" that merely contains "peer".
+                if sub.value in PEER_IDENTITY_TOKENS:
+                    self.errors.append(
+                        (node.lineno, f"string-literal key '{sub.value}'")
+                    )
+        # Do not recurse into nested functions' returns here; generic_visit
+        # would, which is fine — they are still inside the public module.
+        self.generic_visit(node)
+
+
+def lint_aggregate_responses() -> list[str]:
+    errors: list[str] = []
+    for relpath in AGGREGATE_RESPONSE_FILES:
+        path = REPO_ROOT / relpath
+        if not path.is_file():
+            continue
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError as e:
+            errors.append(f"{rel}:{e.lineno}: parse error: {e.msg}")
+            continue
+        checker = AggregateResponseChecker()
+        checker.visit(tree)
+        for line, what in checker.errors:
+            errors.append(
+                f"{rel}:{line}: aggregate-response leak: per-peer identity {what} "
+                f"in a public response payload"
+            )
     return errors
 
 
@@ -186,9 +291,14 @@ class ContributorWriteChecker(ast.NodeVisitor):
     """AST-based check: find file writes / dump calls in the contributor
     module that pass any variable whose name is in SENSITIVE_VAR_TOKENS."""
 
-    def __init__(self, file: Path):
+    def __init__(self, file: Path, sensitive_tokens: set[str] | None = None):
         self.file = file
         self.errors: list[tuple[int, str]] = []
+        # The set of names that count as content. Defaults to the
+        # contributor set; lint #22 passes a wider set for relay surfaces.
+        self.sensitive_tokens = (
+            sensitive_tokens if sensitive_tokens is not None else SENSITIVE_VAR_TOKENS
+        )
 
     def visit_Call(self, node: ast.Call) -> None:
         # 1. open(..., 'w'|'a'|'x') with a sensitive var anywhere in the
@@ -233,11 +343,11 @@ class ContributorWriteChecker(ast.NodeVisitor):
 
         # Otherwise: walk the subtree and flag any sensitive reference.
         for sub in ast.walk(arg):
-            if isinstance(sub, ast.Name) and sub.id in SENSITIVE_VAR_TOKENS:
+            if isinstance(sub, ast.Name) and sub.id in self.sensitive_tokens:
                 return True
             if (
                 isinstance(sub, ast.Attribute)
-                and sub.attr in SENSITIVE_VAR_TOKENS
+                and sub.attr in self.sensitive_tokens
             ):
                 return True
         return False
@@ -273,6 +383,57 @@ class ContributorWriteChecker(ast.NodeVisitor):
 
 
 
+def _scan_content_leaks(
+    path: Path, label: str, sensitive_tokens: set[str]
+) -> list[str]:
+    """Scan one file for prompt/response content reaching a write/log sink.
+
+    Shared by lint #21 (contributor tree) and lint #22 (peer/pool relay
+    surfaces). `label` is the prefix used in the error message; the only
+    difference between the two lints is the file set + the sensitive-token
+    set, so the heuristic itself lives here once.
+    """
+    errors: list[str] = []
+    rel = path.relative_to(REPO_ROOT).as_posix()
+    source = path.read_text(encoding="utf-8")
+
+    # AST-level checks (logger calls + dump calls with sensitive names).
+    try:
+        tree = ast.parse(source)
+    except SyntaxError as e:
+        errors.append(f"{rel}:{e.lineno}: parse error: {e.msg}")
+        return errors
+    checker = ContributorWriteChecker(path, sensitive_tokens)
+    checker.visit(tree)
+    for line, what in checker.errors:
+        errors.append(f"{rel}:{line}: {label}: {what}")
+
+    # Line-level checks (catches things AST might miss — e.g. open()
+    # with a write mode immediately followed by .write() of a sensitive
+    # name on the next line).
+    split = source.splitlines()
+    for i, raw in enumerate(split, start=1):
+        line = raw.strip()
+        if line.startswith("#"):
+            continue
+        if OPEN_WRITE_PATTERN.search(raw):
+            # Look for sensitive var name on this line or the next 5
+            # lines (catches `with open(p, 'w') as f: f.write(prompt)`).
+            window = "\n".join(split[i - 1 : i + 5])
+            for token in sensitive_tokens:
+                if re.search(rf"\b{token}\b", window):
+                    errors.append(
+                        f"{rel}:{i}: {label}: open() with write-mode "
+                        f"near sensitive name '{token}' in surrounding lines"
+                    )
+                    break
+        if DUMP_PATTERN.search(raw):
+            # Allow if dump is of a variable NOT in the sensitive set
+            # (we already AST-check the args; the regex is a backstop).
+            pass
+    return errors
+
+
 def lint_contributor() -> list[str]:
     errors: list[str] = []
     contributor_root = (
@@ -284,42 +445,40 @@ def lint_contributor() -> list[str]:
         rel = path.relative_to(REPO_ROOT).as_posix()
         if rel in CONTRIBUTOR_LINT_WHITELIST:
             continue
-        source = path.read_text(encoding="utf-8")
+        errors.extend(
+            _scan_content_leaks(path, "contributor-leak", SENSITIVE_VAR_TOKENS)
+        )
+    return errors
 
-        # AST-level checks (logger calls + dump calls with sensitive names)
-        try:
-            tree = ast.parse(source)
-        except SyntaxError as e:
-            errors.append(f"{rel}:{e.lineno}: parse error: {e.msg}")
+
+# ---------------------------------------------------------------------------
+# Lint #22 — content-leak guard on peer/pool relay surfaces
+# ---------------------------------------------------------------------------
+
+# Runtime files (outside the contributor tree) that receive and forward
+# strangers'/peers' prompts and responses. The same "no content to a
+# write/log sink" rule applies here.
+PEER_RELAY_FILES = (
+    "apps/desktop/python/potluck_local/routers/peer.py",
+    "apps/desktop/python/potluck_local/services/pool_routing.py",
+    "apps/desktop/python/potluck_local/services/gateway_routing.py",
+)
+
+# Sensitive names for the relay surfaces: the contributor set plus the
+# request-field names these surfaces actually carry (the latest user
+# message and the memory-search query).
+PEER_RELAY_SENSITIVE_TOKENS = SENSITIVE_VAR_TOKENS | {"messages", "query"}
+
+
+def lint_peer_relay() -> list[str]:
+    errors: list[str] = []
+    for relpath in PEER_RELAY_FILES:
+        path = REPO_ROOT / relpath
+        if not path.is_file():
             continue
-        checker = ContributorWriteChecker(path)
-        checker.visit(tree)
-        for line, what in checker.errors:
-            errors.append(f"{rel}:{line}: contributor-leak: {what}")
-
-        # Line-level checks (catches things AST might miss — e.g. open()
-        # with a write mode immediately followed by .write() of a sensitive
-        # name on the next line).
-        for i, raw in enumerate(source.splitlines(), start=1):
-            line = raw.strip()
-            if line.startswith("#"):
-                continue
-            if OPEN_WRITE_PATTERN.search(raw):
-                # Look for sensitive var name on this line or the next 5
-                # lines (catches `with open(p, 'w') as f: f.write(prompt)`).
-                window_lines = source.splitlines()[i - 1 : i + 5]
-                window = "\n".join(window_lines)
-                for token in SENSITIVE_VAR_TOKENS:
-                    if re.search(rf"\b{token}\b", window):
-                        errors.append(
-                            f"{rel}:{i}: contributor-leak: open() with write-mode "
-                            f"near sensitive name '{token}' in surrounding lines"
-                        )
-                        break
-            if DUMP_PATTERN.search(raw):
-                # Allow if dump is of a variable NOT in SENSITIVE_VAR_TOKENS
-                # (we already AST-check the args; the regex is a backstop)
-                pass
+        errors.extend(
+            _scan_content_leaks(path, "relay-leak", PEER_RELAY_SENSITIVE_TOKENS)
+        )
     return errors
 
 
@@ -330,15 +489,33 @@ def lint_contributor() -> list[str]:
 
 def main() -> int:
     peer_errors = lint_peer_bound()
+    aggregate_errors = lint_aggregate_responses()
     contributor_errors = lint_contributor()
+    relay_errors = lint_peer_relay()
 
-    total = len(peer_errors) + len(contributor_errors)
+    total = (
+        len(peer_errors)
+        + len(aggregate_errors)
+        + len(contributor_errors)
+        + len(relay_errors)
+    )
 
     if peer_errors:
         print("=" * 72)
-        print(f"Lint #20 — peer-bound member_id leaks ({len(peer_errors)})")
+        print(f"Lint #20 — peer-bound identity leaks ({len(peer_errors)})")
         print("=" * 72)
         for e in peer_errors:
+            print(f"  {e}")
+        print()
+
+    if aggregate_errors:
+        print("=" * 72)
+        print(
+            f"Lint #20b — per-peer identity in aggregate responses "
+            f"({len(aggregate_errors)})"
+        )
+        print("=" * 72)
+        for e in aggregate_errors:
             print(f"  {e}")
         print()
 
@@ -350,8 +527,19 @@ def main() -> int:
             print(f"  {e}")
         print()
 
+    if relay_errors:
+        print("=" * 72)
+        print(f"Lint #22 — peer/pool relay content leaks ({len(relay_errors)})")
+        print("=" * 72)
+        for e in relay_errors:
+            print(f"  {e}")
+        print()
+
     if total == 0:
-        print("✓ privacy invariants pass: 0 peer-bound leaks, 0 contributor leaks")
+        print(
+            "✓ privacy invariants pass: 0 peer-bound leaks, "
+            "0 aggregate-response leaks, 0 contributor leaks, 0 relay leaks"
+        )
         return 0
 
     print(f"✗ privacy lint FAIL: {total} violation(s)")

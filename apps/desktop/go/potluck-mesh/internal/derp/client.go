@@ -111,8 +111,10 @@ type Client struct {
 	sendCh atomic.Pointer[chan sendItem]
 
 	// currentJWT caches the most recently fetched token.
-	// Only the refresh goroutine and runOnce write it; they don't race
-	// because runOnce is sequential and refresh updates between connects.
+	// jwtMu must be held for any read or write: jwtRefreshLoop runs concurrently
+	// with runOnce, so an unguarded string assignment is a two-word write-write
+	// race under the Go memory model.
+	jwtMu      sync.Mutex
 	currentJWT string
 }
 
@@ -232,7 +234,9 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 	if err != nil {
 		return false, fmt.Errorf("derp: fetch JWT: %w", err)
 	}
+	c.jwtMu.Lock()
 	c.currentJWT = jwt
+	c.jwtMu.Unlock()
 
 	// Dial the relay.
 	conn, err := c.dial(ctx)
@@ -471,7 +475,9 @@ func (c *Client) jwtRefreshLoop(ctx context.Context) {
 				slog.Warn("derp: proactive JWT refresh failed", "err", err)
 				continue
 			}
+			c.jwtMu.Lock()
 			c.currentJWT = newJWT
+			c.jwtMu.Unlock()
 			slog.Debug("derp: JWT refreshed proactively")
 		}
 	}

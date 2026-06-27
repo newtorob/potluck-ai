@@ -32,7 +32,7 @@ import math
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -222,6 +222,31 @@ async def record_job_credits(
         # in that case; we accept and silently no-op to be defensive.
         raise ValueError(
             f"refusing to credit job {job_id} with output_tokens={output_tokens}"
+        )
+
+    # --- Serialize per-member chain writes with Postgres advisory locks ------- #
+    #
+    # Two concurrent _finalize_job_in_db tasks for the SAME member both read
+    # _latest_row_hash_for_member before either INSERT commits, then both insert
+    # rows with the same prev_row_hash — forking the hash chain. The (job_id,
+    # direction) UNIQUE constraint catches duplicate jobs but NOT two DIFFERENT
+    # jobs racing on the same member's chain tip.
+    #
+    # pg_advisory_xact_lock is transaction-scoped: the lock is held until the
+    # caller's transaction commits or rolls back (i.e. when the outer `async with
+    # get_session_factory()() as db` block exits). Two tasks for the same member
+    # will serialize here — the second blocks until the first transaction
+    # completes, at which point it reads the now-correct chain tip.
+    #
+    # Acquire in sorted order to avoid deadlock when requester != contributor.
+    members_to_lock = sorted(
+        {requester_member_id, contributor_owner_member_id},
+        key=lambda m: m.int,
+    )
+    for _mid in members_to_lock:
+        await db.execute(
+            text("SELECT pg_advisory_xact_lock(hashtext(:mid))"),
+            {"mid": str(_mid)},
         )
 
     multiplier = await _resolve_multiplier(db, model_slug)

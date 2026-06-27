@@ -16,8 +16,9 @@
  *     attempts so the UI bounces back quickly after `make up`
  *   - Pauses entirely when document.hidden is true (battery + req budget)
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { localApi } from '@/lib/localApi';
+import { useConnectionStore } from '@/stores/connectionStore';
 
 export interface CoordinatorHealth {
   /** True if the most recent probe got a 2xx within the timeout window. */
@@ -36,6 +37,17 @@ export function useCoordinatorHealth(intervalMs: number = DEFAULT_INTERVAL_MS): 
     lastCheckedAt: null,
   });
 
+  // Subscribe to the coordinator URL so that when it changes the effect
+  // re-runs immediately, cancelling the old timer chain and probing the
+  // new URL without waiting up to 10s for the next scheduled tick.
+  const coordinatorUrl = useConnectionStore((s) => s.coordinatorUrl);
+
+  // Track the live reachability value in a ref so the check() closure can
+  // read it synchronously without capturing stale state from the initial
+  // render. This is the canonical pattern when effect logic needs to act on
+  // the current value before enqueuing a setState call.
+  const reachableRef = useRef<boolean>(false);
+
   useEffect(() => {
     let cancelled = false;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -43,7 +55,7 @@ export function useCoordinatorHealth(intervalMs: number = DEFAULT_INTERVAL_MS): 
 
     const scheduleNext = (delayMs: number) => {
       if (cancelled) return;
-      timeoutId = setTimeout(check, delayMs);
+      timeoutId = setTimeout(() => void check(), delayMs);
     };
 
     const check = async () => {
@@ -55,15 +67,18 @@ export function useCoordinatorHealth(intervalMs: number = DEFAULT_INTERVAL_MS): 
       }
       const ok = await localApi.network.health();
       if (cancelled) return;
-      setState((prev) => {
-        // On reachable → unreachable transition, kick off the fast-retry budget
-        // so we notice when the coordinator comes back without waiting a full
-        // interval.
-        if (prev.reachable && !ok) {
-          fastRetriesRemaining = FAST_RETRY_BUDGET;
-        }
-        return { reachable: ok, lastCheckedAt: Date.now() };
-      });
+      // On reachable → unreachable transition, kick off the fast-retry budget
+      // so we notice when the coordinator comes back without waiting a full
+      // interval. Reading from the ref gives us the live current value — the
+      // stale closure over `state` would always see the initial false, and
+      // the updater-callback form of setState runs asynchronously after this
+      // synchronous code, so by the time the updater ran, this check would
+      // already have completed with fastRetriesRemaining still at 0.
+      if (reachableRef.current && !ok) {
+        fastRetriesRemaining = FAST_RETRY_BUDGET;
+      }
+      reachableRef.current = ok;
+      setState({ reachable: ok, lastCheckedAt: Date.now() });
       if (!ok && fastRetriesRemaining > 0) {
         fastRetriesRemaining -= 1;
         scheduleNext(FAST_RETRY_INTERVAL_MS);
@@ -73,14 +88,14 @@ export function useCoordinatorHealth(intervalMs: number = DEFAULT_INTERVAL_MS): 
     };
 
     // Kick off the first probe immediately.
-    check();
+    void check();
 
     const onVisibility = () => {
       // Coming back from hidden → re-probe right away so the UI updates
       // without waiting for the next interval tick.
       if (!document.hidden) {
         if (timeoutId !== null) clearTimeout(timeoutId);
-        check();
+        void check();
       }
     };
     if (typeof document !== 'undefined') {
@@ -94,7 +109,11 @@ export function useCoordinatorHealth(intervalMs: number = DEFAULT_INTERVAL_MS): 
         document.removeEventListener('visibilitychange', onVisibility);
       }
     };
-  }, [intervalMs]);
+  // coordinatorUrl is included so the effect re-runs (cancels old timers,
+  // re-probes immediately) whenever the user edits the coordinator URL in
+  // CooperativeConnectionPanel. Without it the old URL's result stays on
+  // screen for up to intervalMs.
+  }, [intervalMs, coordinatorUrl]);
 
   return state;
 }

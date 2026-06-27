@@ -114,8 +114,6 @@ import time
 from dataclasses import dataclass, field
 from typing import Iterator
 
-import torch
-
 logger = logging.getLogger(__name__)
 
 # Sentinel values pushed into a sequence's output queue.
@@ -237,6 +235,7 @@ class ContinuousBatcher:
         The first decode token (prefill argmax/sample) is drawn here from the
         prefill logits, matching WholeModelEngine.stream_tokens() exactly.
         """
+        import torch
         from .sampling import sample_token
         from transformers import DynamicCache
 
@@ -344,6 +343,7 @@ class ContinuousBatcher:
 
     def _step(self) -> None:
         """Run ONE batched decode step over all active sequences."""
+        import torch
         from transformers import DynamicCache
 
         seqs = self._active
@@ -404,15 +404,21 @@ class ContinuousBatcher:
         )
 
         # --- Forward pass --------------------------------------------------
-        with torch.no_grad():
-            out = self._model(
-                input_ids=input_ids,
-                attention_mask=attn_mask,
-                past_key_values=batched,
-                position_ids=position_ids,
-                use_cache=True,
-            )
-        self._n_forward += 1
+        # _prefill_lock serialises this forward against concurrent _prefill calls.
+        # On CPU, PyTorch releases the GIL inside BLAS kernels, so without this
+        # lock a concurrent _prefill and _step can genuinely overlap, producing
+        # corrupted logit outputs for both.  On CUDA the CUDA stream already
+        # serialises ops, so this lock is a no-op in that path but harmless.
+        with self._prefill_lock:
+            with torch.no_grad():
+                out = self._model(
+                    input_ids=input_ids,
+                    attention_mask=attn_mask,
+                    past_key_values=batched,
+                    position_ids=position_ids,
+                    use_cache=True,
+                )
+            self._n_forward += 1
 
         # --- Next tokens [B]: per-row sample (or argmax when temperature <= 0) ---
         # Each sequence carries its own generator so a greedy row and a sampled row
@@ -697,6 +703,7 @@ class DistributedContinuousBatcher:
 
         _Sequence.cache stores head-layer KV only. The tail's per-row KV is stored
         on the tail side, keyed by row_id (== seq.request_id)."""
+        import torch
         from transformers import DynamicCache
         from .sampling import sample_from_topk
 
@@ -836,6 +843,7 @@ class DistributedContinuousBatcher:
 
         ADMIT:
           9. Pending sequences absorbed at the end (join the batch next step)."""
+        import torch
         from transformers import DynamicCache
 
         seqs = self._active

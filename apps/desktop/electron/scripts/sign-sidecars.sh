@@ -22,6 +22,15 @@
 
 set -euo pipefail
 
+# ── Platform guard ────────────────────────────────────────────────────────────
+# codesign and the `file` Mach-O detector are macOS-only tools.
+# On Linux or Windows (Git Bash / WSL) this script is a no-op; CI stages
+# the sidecar directly and never calls prepack:python on non-Mac hosts.
+if [[ "$(uname)" != "Darwin" ]]; then
+  echo "[sign-sidecars] Non-macOS platform ($(uname)) — skipping codesign."
+  exit 0
+fi
+
 # ── Args ──────────────────────────────────────────────────────────────────────
 if [ $# -lt 1 ]; then
   echo "Usage: $0 <bundle-dir>" >&2

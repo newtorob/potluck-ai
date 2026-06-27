@@ -891,11 +891,11 @@ def _cb_build_batched_cache(row_ids: list, cb_cache: dict,
                 k = row_cache.layers[li].keys    # [1, H, actual_depth, D]
                 v = row_cache.layers[li].values
             else:
-                # Layer not yet in cache. Should not happen after a prefill, but
-                # guard defensively with a zero-size placeholder.
-                k = torch.zeros(1, 1, 0, 1, dtype=dtype, device=dev)
-                v = torch.zeros(1, 1, 0, 1, dtype=dtype, device=dev)
-                actual_depth = 0
+                # Layer not yet in cache — this is a prefill bug if it ever triggers.
+                raise RuntimeError(
+                    f"row_id {rid} has no cache entry for layer {li}; "
+                    "this is a prefill bug (cb_cache was not populated before _step)"
+                )
             pad_len = kv_max - actual_depth
             if pad_len > 0:
                 pad_k = torch.zeros(1, k.shape[1], pad_len, k.shape[3],
@@ -1270,6 +1270,7 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
                                 "row_id": row_id,
                                 "h": h.cpu(),
                                 "start": start,
+                                "sample_k": msg.get("sample_k", 0),
                             })
                             send_msg(conn, recv_msg(tail_sock))  # relay first token upstream
                             steps += 1
@@ -1347,6 +1348,7 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
                                 "kv_max": kv_max,
                                 "attn_mask": attn_mask_wire,
                                 "pos_ids": pos_ids,
+                                "sample_k": msg.get("sample_k"),
                             })
                             send_msg(conn, recv_msg(tail_sock))  # relay [B] toks upstream
                             steps += 1
