@@ -102,6 +102,7 @@ type State struct {
 	coordinatorConnState string   // "connected"|"connecting"|"disconnected"
 	lastError            string
 	coordinatorURL       string // static launch-flag value; never empty
+	wgPort               int    // UDP port the WireGuard device listens on (default 51820)
 }
 
 // NewState returns an idle State in the "starting" phase.
@@ -162,6 +163,15 @@ func (s *State) SetCoordinatorURL(u string) {
 	s.mu.Unlock()
 }
 
+// SetWGPort records the UDP port the WireGuard device is listening on. Call
+// once at startup after the tunnel is created. Used by the /status readiness
+// probe to check whether the WG transport socket is actually bound.
+func (s *State) SetWGPort(port int) {
+	s.mu.Lock()
+	s.wgPort = port
+	s.mu.Unlock()
+}
+
 func (s *State) SetLastError(msg string) {
 	s.mu.Lock()
 	s.lastError = msg
@@ -210,14 +220,21 @@ func (s *State) MeshIP() string {
 
 // snapshot returns a JSON-serialisable view. peerCount is supplied by the
 // caller (from peerstate.Store.All()) to avoid a nested lock.
+//
+// The readiness probes (vpn_conflict, wg_port_listening) are computed here
+// outside the read-lock because they call net.Interfaces / net.ListenPacket,
+// which may themselves acquire internal locks. Capturing the relevant state
+// fields under the lock and computing the probes after releasing it avoids
+// any risk of lock ordering issues.
 func (s *State) snapshot(peerCount int) statusResponse {
+	// Capture mutable fields under the read-lock.
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+	coordConnState := s.coordinatorConnState
+	wgPort := s.wgPort
 	resp := statusResponse{
 		Version:               "0.1.0",
 		MeshStatus:            string(s.meshStatus),
-		CoordinatorConnection: s.coordinatorConnState,
+		CoordinatorConnection: coordConnState,
 		PeersOnlineCount:      peerCount,
 		CoordinatorURL:        s.coordinatorURL,
 	}
@@ -248,6 +265,25 @@ func (s *State) snapshot(peerCount int) statusResponse {
 		v := s.lastError
 		resp.LastError = &v
 	}
+	s.mu.RUnlock()
+
+	// Readiness probes — computed after releasing the lock (no network calls
+	// under a lock; these are cheap stdlib operations only).
+
+	// VPN conflict probe: enumerate interfaces for known third-party VPN
+	// names. Conflict is only flagged when the VPN is up AND the coordinator
+	// is not connected (the Mullvad kill-switch failure pattern).
+	vpn := checkVPNConflict(coordConnState)
+	resp.VPNConflict = vpn.Conflict
+	resp.VPNDetail = vpn.Detail
+
+	// WireGuard port probe: is our UDP transport socket actually bound?
+	// When wgPort is 0 (SetWGPort not yet called — tunnel not yet up),
+	// report false rather than probing port 0.
+	if wgPort > 0 {
+		resp.WGPortListening = checkWGPortListening(wgPort)
+	}
+
 	return resp
 }
 
@@ -412,6 +448,24 @@ type statusResponse struct {
 	CoordinatorURL        string   `json:"coordinator_url"`
 	PeersOnlineCount      int      `json:"peers_online_count"`
 	LastError             *string  `json:"last_error"`
+
+	// Readiness probes (added for netcheck view).
+
+	// VPNConflict is true when a known third-party VPN interface (e.g. Mullvad)
+	// is detected AND the coordinator connection is not "connected". This
+	// combination is the Mullvad kill-switch failure pattern that took down the
+	// mesh in a real incident. False when the VPN is up but the mesh is still
+	// connected (low-severity; surfaced in VPNDetail only).
+	VPNConflict bool `json:"vpn_conflict"`
+	// VPNDetail is a human-readable sentence describing what was found.
+	// Empty when no third-party VPN is detected.
+	VPNDetail string `json:"vpn_detail"`
+
+	// WGPortListening is true when the WireGuard UDP transport port (51820 by
+	// default) is observed as bound on the local machine. A false value means
+	// the tunnel socket is not up — either the WireGuard device failed to start
+	// or the port was stolen by another process.
+	WGPortListening bool `json:"wg_port_listening"`
 }
 
 type peerResponse struct {

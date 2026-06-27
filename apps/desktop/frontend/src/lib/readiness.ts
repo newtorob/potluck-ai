@@ -54,6 +54,17 @@ export interface ReadinessInput {
   mesh: DiagnosticsReport;
   /** Peer roster, used to label per-peer network checks by name. */
   peers: MeshPeer[];
+  /**
+   * VPN-conflict probe from the mesh status poll. Optional — when absent
+   * (sidecar offline, older sidecar, mesh not enrolled) the check is omitted
+   * rather than shown as an error.
+   */
+  vpnConflict?: { conflict: boolean; detail: string };
+  /**
+   * Whether the WireGuard listen port is bound and accepting connections.
+   * Optional — omitted when mesh sidecar hasn't reported it yet.
+   */
+  wgPortListening?: boolean;
 }
 
 export function deriveReadiness(input: ReadinessInput): ReadinessReport {
@@ -129,6 +140,54 @@ export function deriveReadiness(input: ReadinessInput): ReadinessReport {
       title: 'No GPU detected',
       detail: `Inference runs on CPU (${hw.cpu_name}), which is slower. Small models still work.`,
     });
+  }
+
+  // ---- Network passive probes — drawn from the mesh status poll -----------
+  // These are emitted regardless of enrollment: a VPN conflict matters even
+  // before pairing, and the port check is the first thing to fix when pairing
+  // fails. Both are gated on the signal being present — an absent field (sidecar
+  // offline, older version) renders nothing rather than a false alarm.
+
+  if (input.vpnConflict !== undefined) {
+    if (input.vpnConflict.conflict) {
+      checks.push({
+        code: 'VPN_CONFLICT',
+        group: 'network',
+        severity: 'warn',
+        title: 'VPN may be blocking the mesh',
+        detail: input.vpnConflict.detail || 'A VPN is active that may prevent direct mesh connections.',
+        fix: 'Turn off the VPN, or allow LAN and mesh routes through it. For Mullvad, stop the daemon (sudo systemctl stop mullvad-daemon). Do not just disconnect: a plain disconnect leaves the kill-switch on and can cut the mesh entirely.',
+      });
+    } else {
+      checks.push({
+        code: 'VPN_CONFLICT',
+        group: 'network',
+        severity: 'ok',
+        title: 'No VPN conflict detected',
+        detail: 'No VPN interference found on this machine.',
+      });
+    }
+  }
+
+  if (input.wgPortListening !== undefined) {
+    if (input.wgPortListening) {
+      checks.push({
+        code: 'WG_PORT',
+        group: 'network',
+        severity: 'ok',
+        title: 'Mesh port open',
+        detail: 'The WireGuard port is bound and ready to accept peer connections.',
+      });
+    } else {
+      checks.push({
+        code: 'WG_PORT',
+        group: 'network',
+        severity: 'warn',
+        title: 'Mesh port not open',
+        detail: 'The WireGuard port is not listening on this machine. Peers may not be able to connect directly.',
+        fix: 'Check that your firewall allows UDP on the mesh port (default 51820). If another WireGuard instance is running, stop it first.',
+      });
+    }
   }
 
   // ---- Network (mesh) — optional ------------------------------------------

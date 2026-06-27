@@ -195,6 +195,9 @@ func run() int {
 	if cfg.WGPublicKey != "" {
 		ipcState.SetWGPublicKey(cfg.WGPublicKey)
 	}
+	// Record the WG transport port so the /status readiness probe can verify
+	// the UDP socket is actually bound (wg_port_listening field).
+	ipcState.SetWGPort(tun.WGPort())
 
 	// ---- STUN resolver ---- //
 	resolver := stun.NewResolver(cfg.STUNServers)

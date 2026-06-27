@@ -116,6 +116,26 @@ async function timedFetch(
 }
 
 // ---------------------------------------------------------------------------
+// Readiness probes
+// ---------------------------------------------------------------------------
+
+/**
+ * Response from GET /readiness/gpu-test.
+ *
+ * Runs a real device op (matrix multiply or equivalent) on the selected
+ * runtime. ok=true means the GPU/runtime actually computed — not just
+ * "a GPU is detected". This is an ACTION, not a passive poll: it may take
+ * a moment and should never be called on a polling interval.
+ */
+export interface GpuTestResult {
+  ok: boolean;
+  device: 'cuda' | 'mps' | 'dml' | 'cpu';
+  ran: 'inference' | 'compute' | 'none';
+  latency_ms: number;
+  detail: string;
+}
+
+// ---------------------------------------------------------------------------
 // Health
 // ---------------------------------------------------------------------------
 
@@ -587,6 +607,19 @@ export const localApi = {
   detectHardware(): Promise<Record<string, unknown>> {
     return timedFetch(`${LOCAL_BASE}/hardware`).then((r) =>
       handleResponse<Record<string, unknown>>(r),
+    );
+  },
+
+  /**
+   * GET /readiness/gpu-test — run a real device op and return whether the
+   * GPU/runtime actually computed. Uses LOAD_TIMEOUT_MS because an inference
+   * test can take several seconds on a cold runtime.
+   *
+   * This is an ACTION: call only on explicit user gesture, never on a poll.
+   */
+  gpuTest(): Promise<GpuTestResult> {
+    return timedFetch(`${LOCAL_BASE}/readiness/gpu-test`, {}, LOAD_TIMEOUT_MS).then((r) =>
+      handleResponse<GpuTestResult>(r),
     );
   },
 

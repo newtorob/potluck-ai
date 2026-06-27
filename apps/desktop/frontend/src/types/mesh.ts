@@ -35,6 +35,15 @@ export interface MeshStatus {
   coordinator_url: string;
   peers_online_count: number;
   last_error: string | null;
+  /** True when the sidecar detects a VPN that may interfere with mesh routing.
+   *  Passive — no op is triggered; sampled each status poll. */
+  vpn_conflict: boolean;
+  /** Human-readable detail for the VPN conflict, e.g. "Mullvad detected
+   *  (tun0 present)". Empty string when vpn_conflict is false. */
+  vpn_detail: string;
+  /** True when the WireGuard listen port (51820 by default) is bound and
+   *  accepting connections on this machine. Passive poll. */
+  wg_port_listening: boolean;
 }
 
 // ---------------------------------------------------------------------------

@@ -22,7 +22,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from potluck_local import __version__
-from potluck_local.routers import agents, chat, gateway, hardware, health, memory, models, ollama, peer, settings, tasks, vault, verify
+from potluck_local.routers import agents, chat, gateway, hardware, health, memory, models, ollama, peer, readiness, settings, tasks, vault, verify
 from potluck_local.utils.logging import setup_logging
 
 
@@ -228,6 +228,7 @@ def create_app() -> FastAPI:
 
     # Routers — prefixes must match localApi.ts in the frontend
     app.include_router(health.router, tags=["health"])
+    app.include_router(readiness.router, tags=["readiness"])
     app.include_router(chat.router, prefix="/chat", tags=["chat"])
     app.include_router(models.router, prefix="/models", tags=["models"])
     app.include_router(settings.router, prefix="/settings", tags=["settings"])

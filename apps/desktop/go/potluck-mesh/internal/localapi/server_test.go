@@ -141,6 +141,68 @@ func TestHandleStatus_Starting(t *testing.T) {
 	if body["version"] != "0.1.0" {
 		t.Errorf("version: got %v want 0.1.0", body["version"])
 	}
+
+	// Readiness probes must always be present (even before the tunnel is up).
+
+	// vpn_conflict: bool field must be present. Its value depends on the test
+	// environment; we only assert the key exists and is a bool.
+	if _, ok := body["vpn_conflict"]; !ok {
+		t.Error("vpn_conflict field missing from /status response")
+	}
+	if _, ok := body["vpn_conflict"].(bool); !ok {
+		t.Errorf("vpn_conflict: expected bool, got %T", body["vpn_conflict"])
+	}
+
+	// vpn_detail: must be a string (may be empty).
+	if _, ok := body["vpn_detail"]; !ok {
+		t.Error("vpn_detail field missing from /status response")
+	}
+	if _, ok := body["vpn_detail"].(string); !ok {
+		t.Errorf("vpn_detail: expected string, got %T", body["vpn_detail"])
+	}
+
+	// wg_port_listening: bool field must be present. wgPort was not set via
+	// SetWGPort in this test, so the probe skips the bind check → false.
+	if _, ok := body["wg_port_listening"]; !ok {
+		t.Error("wg_port_listening field missing from /status response")
+	}
+	if v, ok := body["wg_port_listening"].(bool); !ok {
+		t.Errorf("wg_port_listening: expected bool, got %T", body["wg_port_listening"])
+	} else if v {
+		// wgPort=0 means SetWGPort was never called; probe must return false.
+		t.Error("wg_port_listening: expected false when wgPort not set, got true")
+	}
+}
+
+// TestHandleStatus_WGPortListening verifies that wg_port_listening=true when
+// the test pre-binds a UDP socket on the configured port (simulating what the
+// WireGuard device does) and SetWGPort is called with that port.
+func TestHandleStatus_WGPortListening(t *testing.T) {
+	// Bind a UDP socket on an ephemeral port to simulate the WG device.
+	pc, err := net.ListenPacket("udp4", "0.0.0.0:0")
+	if err != nil {
+		t.Fatalf("pre-bind: %v", err)
+	}
+	defer pc.Close()
+
+	// Extract the port that was actually allocated.
+	boundPort := pc.LocalAddr().(*net.UDPAddr).Port
+
+	cfg := defaultCfg(t)
+	cfg.State.SetWGPort(boundPort)
+	client, _ := testServer(t, cfg)
+
+	resp := get(t, client, "/status")
+	defer resp.Body.Close()
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if v, ok := body["wg_port_listening"].(bool); !ok || !v {
+		t.Errorf("wg_port_listening: expected true (port pre-bound), got %v", body["wg_port_listening"])
+	}
 }
 
 func TestHandleStatus_Running(t *testing.T) {

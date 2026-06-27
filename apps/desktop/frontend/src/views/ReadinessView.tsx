@@ -5,12 +5,13 @@
  * hand over SSH: (1) can this machine run inference locally, and (2) is it
  * reachable on the mesh — each gap named with a fix.
  *
- * Pure composition of signals already polled elsewhere (useHealth, useHardware,
- * meshStore + deriveDiagnostics). No new backend. Deeper probes (real GPU test,
- * port scan, VPN-conflict probe, token validity) are a tracked follow-on.
+ * Composes signals from useHealth, useHardware, meshStore + deriveDiagnostics.
+ * Two passive network probes (VPN conflict, WG port) are now fed from the mesh
+ * status poll. The GPU verify button runs a real device op on demand via
+ * GET /readiness/gpu-test — never auto-runs on mount.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CheckCircle2,
@@ -20,6 +21,7 @@ import {
   RefreshCw,
   Cpu,
   Network,
+  Loader2,
   type LucideIcon,
 } from 'lucide-react';
 import { ViewHeader } from '@/components/layout/ViewHeader';
@@ -33,6 +35,7 @@ import {
   type ReadinessCheck,
   type ReadinessReport,
 } from '@/lib/readiness';
+import { localApi, type GpuTestResult } from '@/lib/localApi';
 
 // ---------------------------------------------------------------------------
 // Severity presentation
@@ -120,6 +123,16 @@ function Group({
 }
 
 // ---------------------------------------------------------------------------
+// GPU verify state
+// ---------------------------------------------------------------------------
+
+type GpuVerifyState =
+  | { phase: 'idle' }
+  | { phase: 'running' }
+  | { phase: 'done'; result: GpuTestResult }
+  | { phase: 'error'; message: string };
+
+// ---------------------------------------------------------------------------
 // View
 // ---------------------------------------------------------------------------
 
@@ -131,8 +144,19 @@ export function ReadinessView() {
   const bridge = useMeshStore((s) => s.bridge);
   const refreshMesh = useMeshStore((s) => s.refresh);
 
+  const [gpuVerify, setGpuVerify] = useState<GpuVerifyState>({ phase: 'idle' });
+
   const report: ReadinessReport = useMemo(() => {
     const mesh = deriveDiagnostics({ bridge, status, peers });
+    // exactOptionalPropertyTypes: spread optional fields only when the signal
+    // is present — passing `prop: undefined` would fail the strict type check.
+    // VPN/port are derived inline here so useMemo's dep array stays stable
+    // (no new-object intermediary consts that reconstruct on every render).
+    const vpnConflict =
+      status !== null
+        ? { conflict: status.vpn_conflict, detail: status.vpn_detail }
+        : undefined;
+    const wgPortListening = status !== null ? status.wg_port_listening : undefined;
     return deriveReadiness({
       sidecarUp,
       modelLoaded,
@@ -142,6 +166,8 @@ export function ReadinessView() {
       enrolled: !!status?.node_id,
       mesh,
       peers,
+      ...(vpnConflict !== undefined ? { vpnConflict } : {}),
+      ...(wgPortListening !== undefined ? { wgPortListening } : {}),
     });
   }, [bridge, status, peers, sidecarUp, modelLoaded, activeModelId, nCtxLoaded, hardware]);
 
@@ -160,6 +186,20 @@ export function ReadinessView() {
   const onRecheck = () => {
     refreshHardware();
     void refreshMesh();
+  };
+
+  const onVerifyGpu = () => {
+    if (gpuVerify.phase === 'running') return;
+    setGpuVerify({ phase: 'running' });
+    localApi.gpuTest().then(
+      (result) => { setGpuVerify({ phase: 'done', result }); },
+      (err: unknown) => {
+        setGpuVerify({
+          phase: 'error',
+          message: err instanceof Error ? err.message : 'GPU test failed.',
+        });
+      },
+    );
   };
 
   return (
@@ -205,7 +245,8 @@ export function ReadinessView() {
             </div>
           </div>
 
-          <Group title="This machine" icon={Cpu} checks={machineChecks} />
+          {/* Machine group — GPU verify button is injected after the HARDWARE row */}
+          <MachineGroup checks={machineChecks} gpuVerify={gpuVerify} onVerifyGpu={onVerifyGpu} />
           <Group title="Network" icon={Network} checks={networkChecks} />
 
           <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
@@ -219,6 +260,131 @@ export function ReadinessView() {
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Machine group — wraps the standard Group but inserts the GPU verify widget
+// after the HARDWARE check row.
+// ---------------------------------------------------------------------------
+
+function MachineGroup({
+  checks,
+  gpuVerify,
+  onVerifyGpu,
+}: {
+  checks: ReadinessCheck[];
+  gpuVerify: GpuVerifyState;
+  onVerifyGpu: () => void;
+}) {
+  if (checks.length === 0) return null;
+  return (
+    <section className="overflow-hidden rounded-xl border border-border bg-card">
+      <header className="flex items-center gap-2 border-b border-border px-4 py-2.5">
+        <Cpu className="size-3.5 text-muted-foreground" aria-hidden />
+        <h2 className="text-[11px] font-medium uppercase tracking-hearth-label text-muted-foreground">
+          This machine
+        </h2>
+      </header>
+      <ul className="divide-y divide-border">
+        {checks.map((c) => (
+          <li key={c.code}>
+            <CheckRow check={c} />
+            {c.code === 'HARDWARE' && (
+              <GpuVerifyWidget state={gpuVerify} onVerify={onVerifyGpu} />
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// GPU verify widget — rendered inside the HARDWARE list item, below the row.
+// ---------------------------------------------------------------------------
+
+function GpuVerifyWidget({
+  state,
+  onVerify,
+}: {
+  state: GpuVerifyState;
+  onVerify: () => void;
+}) {
+  return (
+    <div className="border-t border-border/50 bg-muted/30 px-4 py-2.5">
+      {state.phase === 'idle' && (
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onVerify}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Verify GPU
+          </button>
+          <span className="text-xs text-muted-foreground">
+            Runs a real compute op to confirm the GPU or runtime works.
+          </span>
+        </div>
+      )}
+
+      {state.phase === 'running' && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+          Running GPU test...
+        </div>
+      )}
+
+      {state.phase === 'done' && (
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            {state.result.ok ? (
+              <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                <span className="font-medium">GPU verified:</span>{' '}
+                {state.result.device}, ran a real {state.result.ran} in{' '}
+                {state.result.latency_ms.toLocaleString()}ms.
+              </p>
+            ) : (
+              <>
+                <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                  GPU test did not succeed
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{state.result.detail}</p>
+              </>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onVerify}
+            className="shrink-0 text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none"
+          >
+            Re-run
+          </button>
+        </div>
+      )}
+
+      {state.phase === 'error' && (
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-red-700 dark:text-red-300">
+              GPU test could not run
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{state.message}</p>
+            <p className="mt-1 text-xs text-foreground/80">
+              <span className="text-muted-foreground">Fix: </span>
+              The sidecar may not support this probe yet. Make sure Potluck is up to date.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onVerify}
+            className="shrink-0 text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none"
+          >
+            Re-run
+          </button>
+        </div>
+      )}
     </div>
   );
 }
