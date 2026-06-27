@@ -413,6 +413,24 @@ export interface MyJobStats {
   avg_duration_ms: number;
 }
 
+/** One week bucket in a weekly contribution history. */
+export interface ContributionWeek {
+  /** ISO date of the Monday that starts this week, e.g. "2026-06-16". */
+  week_start: string;
+  requests_served: number;
+  output_tokens: number;
+  /** Decimal-serialised string (e.g. "3.50"); format at the render layer. */
+  credits_earned: string;
+}
+
+/** GET /me/contributions/weekly — week-by-week history, oldest-first. */
+export interface ContributionsWeeklyResponse {
+  member_id: string;
+  window_weeks: number;
+  /** Length == window_weeks; zero-filled weeks are included. */
+  weeks: ContributionWeek[];
+}
+
 // ---------------------------------------------------------------------------
 // API surface
 // ---------------------------------------------------------------------------
@@ -1025,6 +1043,14 @@ export const localApi = {
     myContributions(days = 7): Promise<ContributionsResponse> {
       return timedFetch(`${coordinatorBase()}/me/contributions?days=${days}`).then((r) =>
         handleResponse<ContributionsResponse>(r),
+      );
+    },
+
+    /** GET /me/contributions/weekly — week-by-week history, oldest-first.
+     *  Returns `weeks` weeks of data (zero-filled); default 8. */
+    myContributionsWeekly(weeks = 8): Promise<ContributionsWeeklyResponse> {
+      return timedFetch(`${coordinatorBase()}/me/contributions/weekly?weeks=${weeks}`).then((r) =>
+        handleResponse<ContributionsWeeklyResponse>(r),
       );
     },
   },

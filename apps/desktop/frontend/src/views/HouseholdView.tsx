@@ -67,6 +67,7 @@ import { relativeTime } from '@/lib/timeFormat';
 import { formatModelName } from '@/lib/modelName';
 import type { MeshPeer, MeshStatus } from '@/types/mesh';
 import { AddMachineWizard } from '@/components/household/AddMachineWizard';
+import { ContributionReceiptsCard } from '@/components/household/ContributionReceiptsCard';
 import { deriveDiagnostics, type PeerDiagnostic } from '@/lib/meshDiagnostics';
 import { PreflightBanner } from '@/components/household/PreflightBanner';
 
@@ -587,6 +588,12 @@ function PairedView({
       <section aria-label="Household mesh map">
         <SectionHeader>Your household mesh</SectionHeader>
         <MeshMap status={status} peers={peers} report={report} capsByNode={capsByNode} />
+      </section>
+
+      {/* Contribution receipts — contributor side made visible. */}
+      <section aria-label="Contribution receipts">
+        <SectionHeader>What your machines contributed</SectionHeader>
+        <ContributionReceiptsCard />
       </section>
 
       {/* This machine + Add CTA */}

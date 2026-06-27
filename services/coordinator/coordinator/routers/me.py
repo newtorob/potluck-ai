@@ -7,13 +7,13 @@ swaps in here when v0.5 lands.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 import structlog
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from coordinator.constants import STUB_MEMBER_ID
@@ -276,4 +276,164 @@ async def my_contributions(
         total_requests_served=sum(m.requests_served for m in machines),
         total_output_tokens=sum(m.output_tokens for m in machines),
         total_credits_earned=sum((m.credits_earned for m in machines), Decimal("0")),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Weekly contribution time-series — household-wide bar-chart data
+# ---------------------------------------------------------------------------
+# Week boundary: Monday 00:00 UTC (ISO week convention).
+# date_trunc('week', ...) in Postgres uses Monday as the start of the week
+# when the session timezone is UTC — confirmed by PostgreSQL docs §9.9.
+# ---------------------------------------------------------------------------
+
+
+class WeeklyContributionBucket(BaseModel):
+    """Household-wide contribution aggregate for one UTC week bucket."""
+
+    # ISO date string for the Monday that opens this week (YYYY-MM-DD).
+    week_start: str
+    requests_served: int
+    output_tokens: int
+    # Decimal serialised as a string to preserve two decimal places across
+    # JSON without floating-point rounding (mirrors CreditHistoryEntry.credits).
+    credits_earned: str
+
+
+class WeeklyContributionsResponse(BaseModel):
+    member_id: uuid.UUID
+    window_weeks: int
+    # Ordered oldest first, length exactly window_weeks.
+    weeks: list[WeeklyContributionBucket]
+
+
+def _week_start_utc(n_weeks_ago: int, now: datetime) -> date:
+    """Monday 00:00 UTC for the week that is `n_weeks_ago` before `now`.
+
+    n_weeks_ago=0  → the current (possibly partial) week.
+    n_weeks_ago=1  → last week, etc.
+    """
+    # weekday(): Monday=0 … Sunday=6
+    monday_this_week = (now - timedelta(days=now.weekday())).date()
+    return monday_this_week - timedelta(weeks=n_weeks_ago)
+
+
+@router.get(
+    "/me/contributions/weekly",
+    response_model=WeeklyContributionsResponse,
+    dependencies=[Depends(require_coordinator_token)],
+)
+async def my_contributions_weekly(
+    weeks: int = Query(default=8, ge=1, le=26),
+    db: AsyncSession = Depends(get_db),
+) -> WeeklyContributionsResponse:
+    """Household-wide weekly contribution time-series for the calling member.
+
+    Returns the last `weeks` UTC week buckets (Monday 00:00 UTC boundary),
+    ordered oldest first.  The current partial week is always included as
+    the final bucket.  Weeks with no activity are zero-filled — the response
+    always has exactly `weeks` entries.
+
+    Aggregates ACROSS all of the member's own machines; never exposes
+    per-machine identity, prompt content, or requester identity."""
+    now = datetime.now(timezone.utc)
+
+    # Build the ordered list of week-start dates: oldest first.
+    week_starts: list[date] = [
+        _week_start_utc(i, now) for i in range(weeks - 1, -1, -1)
+    ]
+    # The overall window begins at the start of the oldest week.
+    window_start = datetime(
+        week_starts[0].year, week_starts[0].month, week_starts[0].day,
+        tzinfo=timezone.utc,
+    )
+
+    # The member's own peer IDs — the scope fence that ensures own-only data.
+    peers_res = await db.execute(
+        select(Peer.id).where(Peer.member_id == _STUB_MEMBER_ID)
+    )
+    my_peer_ids = [row.id for row in peers_res.all()]
+
+    if not my_peer_ids:
+        return WeeklyContributionsResponse(
+            member_id=_STUB_MEMBER_ID,
+            window_weeks=weeks,
+            weeks=[
+                WeeklyContributionBucket(
+                    week_start=ws.isoformat(),
+                    requests_served=0,
+                    output_tokens=0,
+                    credits_earned="0.00",
+                )
+                for ws in week_starts
+            ],
+        )
+
+    # --- Jobs: requests_served + output_tokens bucketed by completed_at week ---
+    # Selects ONLY aggregate counts/sums; no prompt content, no requester
+    # identity, no per-request rows — peer_id is used as the JOIN key to
+    # scope to own machines and is not included in the SELECT list.
+    jobs_res = await db.execute(
+        select(
+            func.date_trunc("week", Job.completed_at).label("bucket"),
+            func.count().label("n"),
+            func.coalesce(func.sum(Job.output_tokens), 0).label("tokens"),
+        )
+        .where(
+            Job.peer_id.in_(my_peer_ids),
+            Job.status == "completed",
+            Job.completed_at >= window_start,
+        )
+        .group_by(text("1"))
+    )
+    # Map truncated-to-Monday datetime → (count, tokens).
+    jobs_by_week: dict[date, tuple[int, int]] = {}
+    for row in jobs_res.all():
+        bucket_date = row.bucket.date() if row.bucket else None
+        if bucket_date is not None:
+            jobs_by_week[bucket_date] = (int(row.n), int(row.tokens))
+
+    # --- Credits earned: bucketed by ledger created_at week ---
+    # Same scope: member's own peers via job_id -> Job.peer_id join.
+    # Selects ONLY aggregate sums; no per-row data.
+    credits_res = await db.execute(
+        select(
+            func.date_trunc("week", CreditLedger.created_at).label("bucket"),
+            func.coalesce(func.sum(CreditLedger.credits), 0).label("c"),
+        )
+        .select_from(CreditLedger)
+        .join(Job, CreditLedger.job_id == Job.id)
+        .where(
+            CreditLedger.member_id == _STUB_MEMBER_ID,
+            CreditLedger.direction == "earned",
+            CreditLedger.created_at >= window_start,
+            Job.peer_id.in_(my_peer_ids),
+        )
+        .group_by(text("1"))
+    )
+    credits_by_week: dict[date, Decimal] = {}
+    for row in credits_res.all():
+        bucket_date = row.bucket.date() if row.bucket else None
+        if bucket_date is not None:
+            credits_by_week[bucket_date] = Decimal(row.c or 0)
+
+    # Zero-fill: iterate the pre-built week_starts list to produce exactly
+    # `weeks` buckets in oldest-first order.
+    result_weeks: list[WeeklyContributionBucket] = []
+    for ws in week_starts:
+        n, tokens = jobs_by_week.get(ws, (0, 0))
+        c = credits_by_week.get(ws, Decimal("0"))
+        result_weeks.append(
+            WeeklyContributionBucket(
+                week_start=ws.isoformat(),
+                requests_served=n,
+                output_tokens=tokens,
+                credits_earned=f"{c:.2f}",
+            )
+        )
+
+    return WeeklyContributionsResponse(
+        member_id=_STUB_MEMBER_ID,
+        window_weeks=weeks,
+        weeks=result_weeks,
     )
