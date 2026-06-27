@@ -26,6 +26,7 @@ import { cn } from '@/components/ui/cn';
 import { PotluckLogo } from '@/components/brand/PotluckLogo';
 import { HardwareDetect } from './HardwareDetect';
 import { ModelPick } from './ModelPick';
+import { ConnectStep } from './ConnectStep';
 import { useHardware } from '@/hooks/useHardware';
 import { useModelStore } from '@/stores/modelStore';
 import type { CatalogModel, ModelTier } from '@/stores/modelStore';
@@ -35,15 +36,16 @@ import type { DownloadProgressRecord } from '@/stores/modelStore';
 // Step definitions
 // ---------------------------------------------------------------------------
 
-type Step = 'welcome' | 'hardware' | 'pick' | 'loading' | 'ready';
+type Step = 'welcome' | 'hardware' | 'pick' | 'loading' | 'connect' | 'ready';
 
-const STEP_ORDER: Step[] = ['welcome', 'hardware', 'pick', 'loading', 'ready'];
+const STEP_ORDER: Step[] = ['welcome', 'hardware', 'pick', 'loading', 'connect', 'ready'];
 
 const STEP_LABELS: Record<Step, string> = {
   welcome: 'Welcome',
   hardware: 'Hardware',
   pick: 'Choose model',
   loading: 'Loading',
+  connect: 'Your machines',
   ready: 'Ready',
 };
 
@@ -112,7 +114,7 @@ export function FirstRun({ models }: FirstRunProps) {
       setStep('loading');
       setLoadError(null);
       void store.load(selectedSlug).then(() => {
-        setStep('ready');
+        setStep('connect');
       }).catch((err) => {
         setLoadError(err instanceof Error ? err.message : 'Failed to load model');
         // Stay on loading step so user sees the error
@@ -120,10 +122,10 @@ export function FirstRun({ models }: FirstRunProps) {
     }
   }, [step, selectedSlug, selectedProgress, store]);
 
-  // Auto-advance from loading to ready when activeModelSlug is set
+  // Auto-advance from loading to connect when activeModelSlug is set
   useEffect(() => {
     if (step === 'loading' && store.activeModelSlug === selectedSlug && selectedSlug !== null) {
-      setStep('ready');
+      setStep('connect');
     }
   }, [step, store.activeModelSlug, selectedSlug]);
 
@@ -285,6 +287,7 @@ export function FirstRun({ models }: FirstRunProps) {
             />
           )}
           {step === 'loading' && <LoadingStep error={loadError} />}
+          {step === 'connect' && <ConnectStep />}
           {step === 'ready' && <ReadyStep />}
         </div>
 
@@ -292,14 +295,18 @@ export function FirstRun({ models }: FirstRunProps) {
         <div className="flex items-center justify-between border-t border-border px-6 py-4">
           <button
             type="button"
-            onClick={handleSkip}
+            onClick={step === 'connect' ? () => setStep('ready') : handleSkip}
             className={cn(
               'text-xs text-muted-foreground/80 hover:text-foreground',
               'transition-colors duration-fast rounded-sm',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
             )}
           >
-            {step === 'ready' ? '' : 'Skip, I\'ll pick later'}
+            {step === 'ready'
+              ? ''
+              : step === 'connect'
+                ? 'Skip for now'
+                : 'Skip, I\'ll pick later'}
           </button>
 
           {step === 'welcome' && (
@@ -333,7 +340,7 @@ export function FirstRun({ models }: FirstRunProps) {
                   setLoadError(null);
                   if (selectedSlug) {
                     void store.load(selectedSlug).then(() => {
-                      setStep('ready');
+                      setStep('connect');
                     }).catch((err) => {
                       setLoadError(err instanceof Error ? err.message : 'Failed to load model');
                     });
@@ -350,13 +357,19 @@ export function FirstRun({ models }: FirstRunProps) {
               if (selectedSlug) {
                 setLoadError(null);
                 void store.load(selectedSlug).then(() => {
-                  setStep('ready');
+                  setStep('connect');
                 }).catch((err) => {
                   setLoadError(err instanceof Error ? err.message : 'Failed to load model');
                 });
               }
             }}>
               Retry
+            </PrimaryButton>
+          )}
+
+          {step === 'connect' && (
+            <PrimaryButton onClick={() => setStep('ready')}>
+              Continue <ArrowRight className="h-4 w-4" />
             </PrimaryButton>
           )}
 
