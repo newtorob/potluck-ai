@@ -2,8 +2,8 @@
 
 Most modern tools accept an OpenAI-compatible base URL (use the /v1 gateway for
 those). This module covers the long tail of tools that speak only the Ollama API
-(/api/tags, /api/chat, /api/show, /api/version). It maps onto the same runtime
-as the /v1 gateway.
+(/api/tags, /api/chat, /api/show, /api/version, /api/generate, /api/embeddings,
+/api/embed). It maps onto the same runtime as the /v1 gateway.
 
 Auth: gated identically to /v1 by the gateway key (see app.py middleware), so the
 tool must be pointed at this base URL and given the key. We are not on Ollama's
@@ -231,3 +231,167 @@ async def chat(req: OllamaChatRequest):
         "done": True,
         "done_reason": "stop",
     }, headers={"X-Potluck-Served-By": served_by})
+
+
+# ---------------------------------------------------------------------------
+# POST /api/generate  — Ollama legacy single-prompt generate
+# ---------------------------------------------------------------------------
+
+class OllamaGenerateRequest(BaseModel):
+    model: str | None = None
+    prompt: str = ""
+    stream: bool = True  # Ollama defaults to streaming
+    options: dict | None = None
+
+
+@router.post("/generate")
+async def generate(req: OllamaGenerateRequest):
+    """Ollama /api/generate. Accepts {model, prompt, stream, options}. Converts
+    the prompt to a user message and reuses the same local→household→pool routing
+    path as /api/chat. Returns Ollama's generate NDJSON shape."""
+    runtime = get_runtime()
+    local = runtime.current_model_id() if runtime.is_loaded() else None
+
+    peer = None
+    use_pool = False
+    if req.model and req.model != local:
+        peer = await gateway_routing.peer_for_model(req.model)
+        if peer is None:
+            if pool_routing.pool_enabled():
+                use_pool = True
+            else:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
+                )
+    if not use_pool and peer is None and local is None:
+        raise HTTPException(status_code=503, detail="No model loaded on this node, and no household peer matched.")
+
+    opts = req.options or {}
+    temperature = float(opts.get("temperature", 0.7))
+    max_tokens = int(opts.get("num_predict", _DEFAULT_MAX_TOKENS))
+    if max_tokens <= 0:
+        max_tokens = _DEFAULT_MAX_TOKENS
+
+    messages = [{"role": "user", "content": req.prompt}]
+    model_name = req.model if (peer or use_pool) else local
+    served_by = "pool" if use_pool else (f"peer:{peer['node_name']}" if peer else "local")
+
+    if req.stream:
+        async def ndjson_stream():
+            try:
+                if use_pool:
+                    source = pool_routing.stream_pool_openai(req.prompt, model_name, temperature, max_tokens)
+                elif peer:
+                    source = gateway_routing.stream_peer_openai(peer, messages, model_name, temperature, max_tokens)
+                else:
+                    source = runtime.stream_chat_raw(messages, temperature=temperature, max_tokens=max_tokens)
+                async for chunk in source:
+                    if isinstance(chunk, dict) and "__error__" in chunk:
+                        yield json.dumps({"model": model_name, "created_at": _now_iso(), "error": chunk["__error__"]}) + "\n"
+                        return
+                    try:
+                        token = chunk["choices"][0].get("delta", {}).get("content") or ""
+                    except (KeyError, IndexError, AttributeError):
+                        token = ""
+                    if token:
+                        yield json.dumps({
+                            "model": model_name,
+                            "created_at": _now_iso(),
+                            "response": token,
+                            "done": False,
+                        }) + "\n"
+            except Exception as exc:  # noqa: BLE001
+                logger.exception("ollama_generate_stream_failed")
+                yield json.dumps({"model": model_name, "created_at": _now_iso(), "error": str(exc)}) + "\n"
+                return
+            yield json.dumps({
+                "model": model_name,
+                "created_at": _now_iso(),
+                "response": "",
+                "done": True,
+                "done_reason": "stop",
+            }) + "\n"
+
+        return StreamingResponse(
+            ndjson_stream(), media_type="application/x-ndjson",
+            headers={"X-Potluck-Served-By": served_by},
+        )
+
+    # Non-streaming: single aggregated object.
+    try:
+        if use_pool:
+            result = await pool_routing.complete_pool_openai(req.prompt, model_name, temperature, max_tokens)
+        elif peer:
+            result = await gateway_routing.complete_peer_openai(peer, messages, model_name, temperature, max_tokens)
+        else:
+            result = await runtime.chat(messages, temperature=temperature, max_tokens=max_tokens)
+        content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+    except pool_routing.PoolDispatchError as exc:
+        status = exc.status_code if exc.status_code in (404, 503) else 502
+        raise HTTPException(status_code=status, detail=exc.detail)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("ollama_generate_failed")
+        raise HTTPException(status_code=500, detail=f"inference failed: {type(exc).__name__}")
+    return JSONResponse({
+        "model": model_name,
+        "created_at": _now_iso(),
+        "response": content,
+        "done": True,
+        "done_reason": "stop",
+    }, headers={"X-Potluck-Served-By": served_by})
+
+
+# ---------------------------------------------------------------------------
+# POST /api/embeddings  — Ollama legacy single-input embedding
+# POST /api/embed       — Ollama newer batch embedding
+# ---------------------------------------------------------------------------
+
+async def _embed_texts(texts: list[str]) -> list[list[float]]:
+    """Embed texts using the local embedding service. Raises HTTPException on failure."""
+    try:
+        from potluck_local.services.embeddings import get_embedder
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"embedding service unavailable: {exc}")
+
+    embedder = get_embedder()
+    try:
+        vecs = await embedder.embed_many(texts)
+    except Exception as exc:
+        logger.exception("ollama_embeddings_failed")
+        raise HTTPException(status_code=503, detail=f"embedding failed: {exc}")
+
+    if vecs is None:
+        raise HTTPException(
+            status_code=503,
+            detail="embedding model is not available (sentence-transformers not installed or failed to load)",
+        )
+    return [vecs[i].tolist() for i in range(len(texts))]
+
+
+@router.post("/embeddings")
+async def embeddings_ollama(body: dict) -> dict:
+    """Ollama /api/embeddings. Accepts {model, prompt} (legacy single-input shape).
+    Returns {embedding: [...]}. Embeddings are local-only; no peer/pool routing."""
+    prompt = body.get("prompt", "")
+    if not isinstance(prompt, str) or not prompt:
+        raise HTTPException(status_code=400, detail="prompt must be a non-empty string")
+    vecs = await _embed_texts([prompt])
+    return {"embedding": vecs[0]}
+
+
+@router.post("/embed")
+async def embed_ollama(body: dict) -> dict:
+    """Ollama /api/embed. Accepts {model, input} where input is a string or list of
+    strings (newer batch shape). Returns {embeddings: [[...]]}."""
+    raw = body.get("input", "")
+    if isinstance(raw, str):
+        texts = [raw] if raw else []
+    elif isinstance(raw, list):
+        texts = [t for t in raw if isinstance(t, str) and t]
+    else:
+        texts = []
+    if not texts:
+        raise HTTPException(status_code=400, detail="input must be a non-empty string or list of strings")
+    vecs = await _embed_texts(texts)
+    return {"embeddings": vecs}
