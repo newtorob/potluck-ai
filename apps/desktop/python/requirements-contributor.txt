@@ -12,6 +12,10 @@
 pydantic==2.10.*
 pydantic-settings==2.7.*
 platformdirs==4.*
+# Pinned <14 on purpose: contributor/client.py uses the legacy
+# websockets.connect(extra_headers=...) API. websockets 14+ switched connect() to the
+# asyncio client, which renamed the kwarg to additional_headers and raises TypeError on
+# extra_headers. Do not bump past 13.x without migrating client.py's _session().
 websockets==13.*
 cryptography==44.*
 # httpx for the Ollama inference backend (m3+). Small async HTTP client.
