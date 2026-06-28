@@ -134,6 +134,12 @@ class PotluckSettings(BaseModel):
     active_model_id: str | None = None
     active_project: str | None = None
 
+    # Generic string→string bag for frontend UI preferences (theme, routing
+    # scope, sidebar state, etc.). The frontend owns the key namespace; the
+    # backend treats this as an opaque dict and deep-merges patches so writing
+    # one key never silently drops another.
+    ui: dict[str, str] = Field(default_factory=dict)
+
 
 _CONFIG_PATH = Path.home() / ".potluck" / "config.json"
 

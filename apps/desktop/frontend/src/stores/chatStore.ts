@@ -31,6 +31,7 @@ import { streamTokens } from '@/lib/streaming';
 import { streamHouseholdInference } from '@/lib/householdInference';
 import type { RoutingMode } from '@/lib/householdInference';
 import { useMeshStore } from '@/stores/meshStore';
+import { persistUiPref } from '@/lib/sidecarPersist';
 
 const ROUTING_MODE_KEY = 'potluck.household_routing_mode';
 
@@ -832,6 +833,9 @@ export const useChatStore = create<ChatState>()((set, get) => {
       networkMode: scope === 'cooperative',
       householdMode: scope === 'household',
     });
+    // Write-through to sidecar durable config so the scope survives
+    // localStorage wipes, reinstalls, and dev-vs-packaged launches.
+    persistUiPref(ROUTING_SCOPE_KEY, scope);
   },
 
   setActiveCircleId(id) {
@@ -853,6 +857,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       window.localStorage.setItem(ROUTING_MODE_KEY, mode);
     }
     set({ routingMode: mode });
+    persistUiPref(ROUTING_MODE_KEY, mode);
   },
 
   setNetworkModelSlug(slug) {

@@ -2,7 +2,18 @@
  * App-level UI preferences persisted in localStorage (frontend-only, like the
  * theme + onboarding flags). Distinct from backend settings (privacy, memory
  * tuning) which round-trip through the sidecar.
+ *
+ * The durable setters (setAutoLoadOnStartup, setContributionReceiptsEnabled)
+ * also fire a write-through to the Python sidecar config so the values survive
+ * localStorage wipes, reinstalls, and dev-vs-packaged launches. See
+ * lib/sidecarPersist.ts for the merge semantics.
+ *
+ * The two ephemeral keys (weeklyReceiptToastShownFor, active_conversation_id)
+ * are intentionally NOT persisted to the sidecar — they are per-session/per-week
+ * tracking state, not cross-surface preferences.
  */
+
+import { persistUiPref } from '@/lib/sidecarPersist';
 
 const AUTOLOAD_KEY = 'potluck.autoload_on_startup';
 
@@ -13,7 +24,9 @@ export function autoLoadOnStartup(): boolean {
 }
 
 export function setAutoLoadOnStartup(on: boolean): void {
-  localStorage.setItem(AUTOLOAD_KEY, on ? 'true' : 'false');
+  const v = on ? 'true' : 'false';
+  localStorage.setItem(AUTOLOAD_KEY, v);
+  persistUiPref(AUTOLOAD_KEY, v);
 }
 
 // ---------------------------------------------------------------------------
@@ -31,11 +44,13 @@ export function contributionReceiptsEnabled(): boolean {
 }
 
 export function setContributionReceiptsEnabled(on: boolean): void {
-  localStorage.setItem(RECEIPTS_KEY, on ? 'true' : 'false');
+  const v = on ? 'true' : 'false';
+  localStorage.setItem(RECEIPTS_KEY, v);
+  persistUiPref(RECEIPTS_KEY, v);
 }
 
 // ---------------------------------------------------------------------------
-// Weekly receipt toast — once-per-week shown tracking
+// Weekly receipt toast — once-per-week shown tracking (ephemeral, not durable)
 // ---------------------------------------------------------------------------
 
 const WEEKLY_TOAST_KEY = 'potluck.weekly_receipt_toast_shown_for';

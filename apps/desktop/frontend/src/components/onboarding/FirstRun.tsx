@@ -16,6 +16,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useUiPrefsStore } from '@/stores/uiPrefsStore';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
@@ -63,10 +64,12 @@ const STEP_LABELS: Record<Step, string> = {
 // Onboarding completion helper
 // ---------------------------------------------------------------------------
 
-const ONBOARDING_KEY = 'potluck.onboarding_completed';
-
 function markOnboardingComplete() {
-  localStorage.setItem(ONBOARDING_KEY, 'true');
+  // Writes localStorage + fires a durable PATCH to the sidecar config so the
+  // flag survives localStorage wipes, reinstalls, and dev-vs-packaged launches.
+  // Also updates the live uiPrefsStore so App.tsx re-evaluates showFirstRun
+  // reactively without a reload.
+  useUiPrefsStore.getState().setOnboardingCompleted(true);
 }
 
 // ---------------------------------------------------------------------------

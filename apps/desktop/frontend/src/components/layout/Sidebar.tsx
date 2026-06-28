@@ -20,6 +20,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useUiPrefsStore } from '@/stores/uiPrefsStore';
 import {
   MessageSquare,
   Package,
@@ -51,17 +52,6 @@ import { ProjectSwitcher } from '@/components/layout/ProjectSwitcher';
 import { PotluckLogo } from '@/components/brand/PotluckLogo';
 import { relativeTimeFromMs } from '@/lib/timeFormat';
 import type { AppConversation } from '@/stores/chatStore';
-
-// ---------------------------------------------------------------------------
-// Persistence — collapsed state survives reload
-// ---------------------------------------------------------------------------
-
-const COLLAPSE_KEY = 'potluck.sidebar_collapsed';
-
-function readCollapsed(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.localStorage.getItem(COLLAPSE_KEY) === 'true';
-}
 
 // ---------------------------------------------------------------------------
 // Nav config
@@ -105,12 +95,8 @@ const SECONDARY_NAV: NavItem[] = [
 export function Sidebar() {
   const location = useLocation();
   const isChat = location.pathname === '/chat' || location.pathname.startsWith('/chat');
-  const [collapsed, setCollapsedState] = useState<boolean>(readCollapsed);
-
-  function setCollapsed(v: boolean) {
-    setCollapsedState(v);
-    window.localStorage.setItem(COLLAPSE_KEY, String(v));
-  }
+  const sidebarCollapsed = useUiPrefsStore((s) => s.sidebarCollapsed);
+  const setSidebarCollapsed = useUiPrefsStore((s) => s.setSidebarCollapsed);
 
   // ⌘\ / Ctrl+\ — global collapse toggle
   useEffect(() => {
@@ -118,15 +104,14 @@ export function Sidebar() {
       const meta = e.metaKey || e.ctrlKey;
       if (meta && e.key === '\\') {
         e.preventDefault();
-        setCollapsed(!collapsed);
+        setSidebarCollapsed(!sidebarCollapsed);
       }
     }
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collapsed]);
+  }, [sidebarCollapsed, setSidebarCollapsed]);
 
-  const expanded = !collapsed;
+  const expanded = !sidebarCollapsed;
 
   const {
     conversations,
@@ -213,7 +198,7 @@ export function Sidebar() {
       {/* Chrome controls — collapse + theme */}
       <ChromeControls
         expanded={expanded}
-        onToggleCollapse={() => setCollapsed(!collapsed)}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
     </nav>
   );

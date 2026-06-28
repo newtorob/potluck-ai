@@ -38,6 +38,11 @@ _SUB_MODELS: dict[str, type] = {
     "gateway": GatewaySettings,
 }
 
+# Top-level keys that are plain dicts (no Pydantic sub-model) and must be
+# key-merged rather than replaced when a PATCH arrives. Without this,
+# PATCH {ui: {k: v}} would wipe every other key already in the dict.
+_DICT_MERGE_FIELDS: frozenset[str] = frozenset({"ui"})
+
 
 @router.get("")
 async def read_settings() -> dict[str, Any]:
@@ -54,7 +59,8 @@ async def update_settings(patch: dict[str, Any]) -> dict[str, Any]:
             continue  # silently drop unknown top-level keys
 
         if key in _SUB_MODELS and isinstance(value, dict):
-            # Shallow-merge into the existing sub-model.
+            # Shallow-merge into the existing Pydantic sub-model so callers
+            # can update a single field without supplying the full object.
             existing_sub = current_data.get(key, {})
             merged_sub = {**existing_sub, **value}
             try:
@@ -68,6 +74,15 @@ async def update_settings(patch: dict[str, Any]) -> dict[str, Any]:
                     status_code=422,
                     detail=f"Invalid value for settings key '{key}' — check sidecar logs",
                 )
+        elif key in _DICT_MERGE_FIELDS and isinstance(value, dict):
+            # Plain-dict merge: graft incoming keys into the existing dict
+            # without replacing the whole dict.  PATCH {ui: {k: v}} must
+            # never silently drop other keys already in ui.
+            existing_dict = current_data.get(key) or {}
+            if isinstance(existing_dict, dict):
+                current_data[key] = {**existing_dict, **value}
+            else:
+                current_data[key] = value
         else:
             current_data[key] = value
 

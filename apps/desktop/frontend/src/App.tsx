@@ -21,10 +21,10 @@ import { FirstRun } from '@/views/FirstRun';
 import { useModelStore } from '@/stores/modelStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useMeshStore } from '@/stores/meshStore';
-import { useConnectionStore } from '@/stores/connectionStore';
-import { useTheme } from '@/hooks/useTheme';
+import { useUiPrefsStore } from '@/stores/uiPrefsStore';
 import { localApi } from '@/lib/localApi';
 import { autoLoadOnStartup } from '@/lib/appPrefs';
+import { hydrateDurablePrefs } from '@/lib/durablePrefs';
 import { useWeeklyReceiptToast } from '@/hooks/useWeeklyReceiptToast';
 import { WeeklyReceiptToast } from '@/components/household/WeeklyReceiptToast';
 
@@ -44,21 +44,18 @@ import { WeeklyReceiptToast } from '@/components/household/WeeklyReceiptToast';
  * On mount we fetch the model catalog from the sidecar. We show the FirstRun
  * wizard only when ALL of the following are true after the fetch settles:
  *   1. No installed models (none with installed === true)
- *   2. localStorage key `potluck.onboarding_completed` is not 'true'
+ *   2. potluck.onboarding_completed is not true in uiPrefsStore (backed by
+ *      localStorage + the sidecar durable config)
  *
  * We wait for the initial fetch to complete before deciding so that users
  * who already have models installed never see the wizard on startup.
  *
- * The wizard sets localStorage on completion or skip — the gate is never
- * re-entered in the same session, and never re-appears on subsequent launches.
+ * The wizard marks completion via uiPrefsStore.setOnboardingCompleted(true),
+ * which writes localStorage AND persists to the sidecar config so the flag
+ * survives reinstalls and dev-vs-packaged launches.
  */
 
-const ONBOARDING_KEY = 'potluck.onboarding_completed';
-
 export default function App() {
-  // Initialise theme from localStorage on mount so <html class> matches
-  // user preference before paint (avoids cream-flash on dark startup).
-  useTheme();
 
   // Weekly receipt toast — once per completed week, opt-out via Settings → Privacy.
   const { toast: weeklyToast, dismiss: dismissWeeklyToast } = useWeeklyReceiptToast();
@@ -82,24 +79,13 @@ export default function App() {
     // Hydrate chat history from the sidecar's SQLite. Runs once on mount;
     // failures are non-fatal (chat still works in memory). See chatStore.hydrate().
     void useChatStore.getState().hydrate();
-    // Hydrate the coordinator URL from the Python sidecar's durable config
-    // (~/.potluck/config.json → network.coordinator_url). When non-empty the
-    // durable value is adopted as the explicit override even if localStorage
-    // was wiped. The store's localStorage fast-path still loads synchronously
-    // at init, so there is no startup flash; this corrects any mismatch once
-    // the sidecar responds. Best-effort: localStorage/default stays if the
-    // sidecar is not yet ready.
-    void localApi
-      .getSettings()
-      .then((s) => {
-        const url = s.network.coordinator_url;
-        if (url.trim().length > 0) {
-          useConnectionStore.getState().hydrateFromSidecar(url);
-        }
-      })
-      .catch(() => {
-        /* non-fatal: coordinator URL stays as localStorage/default for this launch */
-      });
+    // Hydrate all durable preferences from the Python sidecar config
+    // (~/.potluck/config.json). Covers the coordinator URL, theme, routing
+    // scope, sidebar state, onboarding flag, and more. One GET /settings call;
+    // values are applied to the live stores so they survive localStorage wipes,
+    // reinstalls, and dev-vs-packaged launches. Degrades gracefully when the
+    // sidecar is not yet ready (localStorage defaults stay in effect).
+    void hydrateDurablePrefs();
     // fetchModels is stable (Zustand action ref never changes)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -141,7 +127,7 @@ export default function App() {
     })();
   }, [fetchSettled]);
 
-  const onboardingCompleted = localStorage.getItem(ONBOARDING_KEY) === 'true';
+  const onboardingCompleted = useUiPrefsStore((s) => s.onboardingCompleted);
   const hasInstalledModels = models.some((m) => m.installed);
 
   // Only gate once the fetch has settled to avoid a false-positive flash

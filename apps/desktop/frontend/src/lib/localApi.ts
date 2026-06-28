@@ -270,6 +270,10 @@ export interface PotluckSettings {
   models_path: string;
   active_model_id: string | null;
   active_project: string | null;
+  /** Generic string→string bag for frontend UI preferences (theme, routing
+   *  scope, sidebar state, onboarding flag, etc.). The backend deep-merges
+   *  patches so writing one key never drops another. */
+  ui: Record<string, string>;
 }
 
 export interface VaultStatus {
