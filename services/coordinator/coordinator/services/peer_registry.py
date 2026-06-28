@@ -17,12 +17,31 @@ Privacy: this module ONLY traffics in routing metadata (peer_id, job_id,
 session_id) and the streaming token text in JobBuffer. Token text lives
 in process memory for the duration of a job and is dropped after the
 caller pulls the result. No persistence, no logging of token content.
+
+Peer selection (pick_peer_for_model):
+  Eligible peers (model match + trust gates) are ranked by a composite score:
+
+      score = compute_score / (1 + current_jobs) * (0.5 + reputation)
+
+  compute_score = PeerCapability.tokens_per_second for this model_slug when
+  available; otherwise a coarse hardware-tier proxy derived from
+  Peer.hardware_summary (see _hardware_tier_score). current_jobs and
+  reputation come from the latest PeerHeartbeat row; missing heartbeat
+  defaults to 0 jobs / neutral reputation. Stable tiebreak on equal scores:
+  most-recently-connected peer wins (preserves pre-scoring behaviour when all
+  signals are absent or equal).
+
+  RTT extension point: a latency factor can be multiplied into the score
+  once a coordinator<->peer RTT measurement exists (see TODO in
+  _score_peers). Geography is the small term per measurement (~+15 ms
+  cross-country); do not invent a signal before it is measured.
 """
 from __future__ import annotations
 
 import asyncio
 import uuid
 from dataclasses import dataclass, field
+from typing import Any
 
 from fastapi import WebSocket
 
@@ -121,6 +140,143 @@ async def pick_peer() -> PeerConnection | None:
 # Never applied to My Machines, where you already trust your own hardware.
 POOL_REPUTATION_FLOOR = 0.0  # where a confirmed fabrication lands
 POOL_REENTRY_THRESHOLD = NEUTRAL_REPUTATION  # bar to (re)enter the open pool
+
+# ---------------------------------------------------------------------------
+# Compute-tier proxy (used when PeerCapability.tokens_per_second is NULL)
+# ---------------------------------------------------------------------------
+#
+# Tier constants (arbitrary scale; only relative ordering matters).
+# These map the coarse hardware bucket to an approximate compute score so the
+# same formula (score = compute / (1 + jobs) * (0.5 + rep)) works whether TPS
+# is measured or estimated.
+#
+# Hierarchy: _HW_TIER_HIGH >> _HW_TIER_MEDIUM > _HW_TIER_LOW > _HW_TIER_CPU
+_HW_TIER_HIGH   = 4.0   # Large dedicated GPU (VRAM >= 24 GB); future path
+_HW_TIER_MEDIUM = 2.0   # Mid-tier GPU (VRAM >= 8 GB) OR Apple Silicon (current proxy)
+_HW_TIER_LOW    = 1.5   # Small dedicated GPU (VRAM < 8 GB); future path
+_HW_TIER_CPU    = 1.0   # CPU-only or unrecognised hardware
+
+
+def _hardware_tier_score(hw: dict[str, Any]) -> float:
+    """Derive a coarse compute-tier score from a Peer.hardware_summary dict.
+
+    Primary path (extended hardware_summary — not yet sent by the coordinator
+    attestation path, but will be once the sidecar upgrades detect_hardware_summary
+    to forward full detect_hardware() output):
+      recommended_tier: "large" | "medium" | "small"
+      gpu_name        : str | None      -- any truthy value = some GPU
+      gpu_vram_gb     : float | None    -- VRAM in gigabytes
+
+    Current fallback path (fields actually present in the coordinator DB today,
+    from contributor/client.py detect_hardware_summary()):
+      system  : "Darwin" | "Linux" | "Windows"
+      machine : "arm64" | "x86_64" | "AMD64" | ...
+
+    TODO: remove the fallback paths when the attestation path sends full
+    hardware_detect() output and the coordinator DB backfills existing rows.
+    """
+    # --- Extended fields (future; use when present) ---
+    recommended_tier = hw.get("recommended_tier")
+    if recommended_tier == "large":
+        return _HW_TIER_HIGH
+    if recommended_tier == "medium":
+        return _HW_TIER_MEDIUM
+    if recommended_tier == "small":
+        return _HW_TIER_CPU
+
+    gpu_name = hw.get("gpu_name")
+    if gpu_name:
+        vram = float(hw.get("gpu_vram_gb") or 0.0)
+        if vram >= 24.0:
+            return _HW_TIER_HIGH
+        if vram >= 8.0:
+            return _HW_TIER_MEDIUM
+        return _HW_TIER_LOW
+
+    # --- Current fallback: system + machine only ---
+    # Apple Silicon is the one architecture where the coordinator reliably
+    # knows there is strong GPU-class inference hardware (Metal unified memory)
+    # without a dedicated GPU record.
+    system  = hw.get("system", "")
+    machine = hw.get("machine", "")
+    if system == "Darwin" and machine == "arm64":
+        return _HW_TIER_MEDIUM
+
+    return _HW_TIER_CPU
+
+
+async def _score_peers(
+    db,  # AsyncSession — typed loosely to avoid sqlalchemy at module load
+    peer_ids: list[uuid.UUID],
+    model_slug: str,
+) -> list[float]:
+    """Batch-fetch compute + load signals and return a score per peer.
+
+    Queries (2 total, each with an IN over the candidate set):
+      1. PeerCapability: tokens_per_second for this model_slug.
+      2. Peer LEFT JOIN PeerHeartbeat: hardware_summary + current_jobs + reputation.
+
+    Score formula:
+        score = compute_score / (1 + current_jobs) * (0.5 + reputation)
+
+    Missing heartbeat -> current_jobs=0, reputation=NEUTRAL_REPUTATION.
+    tokens_per_second=NULL -> compute_score from _hardware_tier_score().
+
+    RTT extension point: multiply the final score by
+        rtt_factor = 1 / (1 + rtt_ms / REF_RTT_MS)
+    once a coordinator<->peer RTT measurement is available.  The geography
+    term is small (~+15 ms cross-country per measurement) so it intentionally
+    has no weight here yet.  Do NOT invent a latency signal.
+    """
+    from sqlalchemy import select
+    from coordinator.models.peer import Peer, PeerCapability, PeerHeartbeat
+
+    # Query 1: tokens_per_second per peer for this model slug.
+    tps_rows = (await db.execute(
+        select(PeerCapability.peer_id, PeerCapability.tokens_per_second).where(
+            PeerCapability.peer_id.in_(peer_ids),
+            PeerCapability.model_slug == model_slug,
+        )
+    )).all()
+    tps_map: dict[uuid.UUID, float | None] = {row[0]: row[1] for row in tps_rows}
+
+    # Query 2: hardware_summary + latest heartbeat (LEFT JOIN; NULL when no heartbeat).
+    hw_hb_rows = (await db.execute(
+        select(
+            Peer.id,
+            Peer.hardware_summary,
+            PeerHeartbeat.current_jobs,
+            PeerHeartbeat.reputation,
+        )
+        .join(PeerHeartbeat, PeerHeartbeat.peer_id == Peer.id, isouter=True)
+        .where(Peer.id.in_(peer_ids))
+    )).all()
+    hw_hb_map: dict[uuid.UUID, tuple[dict, int | None, float | None]] = {
+        row[0]: (row[1], row[2], row[3]) for row in hw_hb_rows
+    }
+
+    scores: list[float] = []
+    for pid in peer_ids:
+        tps = tps_map.get(pid)
+        hw_summary, raw_jobs, raw_rep = hw_hb_map.get(pid, ({}, None, None))
+
+        # Compute signal: measured TPS when available; hardware tier proxy otherwise.
+        if tps is not None and tps > 0.0:
+            compute_score = tps
+        else:
+            compute_score = _hardware_tier_score(hw_summary or {})
+
+        # Load signal: default to idle when no heartbeat row exists yet.
+        current_jobs = raw_jobs if raw_jobs is not None else 0
+
+        # Reputation signal: default to neutral for brand-new peers.
+        reputation = raw_rep if raw_rep is not None else NEUTRAL_REPUTATION
+
+        # TODO RTT: score *= 1 / (1 + rtt_ms / REF_RTT_MS)  when RTT is measured.
+        score = compute_score / (1 + current_jobs) * (0.5 + reputation)
+        scores.append(score)
+
+    return scores
 
 
 async def pick_peer_for_model(
@@ -225,21 +381,34 @@ async def pick_peer_for_model(
         if not eligible_ids:
             return None
 
-    # Re-acquire the lock to read the connection map (might have changed,
-    # but the peer_id->PeerConnection mapping is stable for the lifetime
-    # of any given session).
+    # Collect candidates in most-recent-first order (the stable tiebreak when
+    # scores are equal — preserves pre-scoring behaviour for identical peers).
+    # Apply the owner_member_id filter here; it is an in-memory check against
+    # PeerConnection.member_id with no extra DB round-trip.
     async with _lock:
-        # Walk in reverse (most-recent-first) and return the first eligible.
-        # When owner_member_id is set ("My Machines" scope), restrict to peers
-        # owned by that member. The connection already carries member_id, so
-        # this is an in-memory filter with no extra DB round-trip.
+        if not _peers:
+            return None
+        candidates: list[uuid.UUID] = []
         for peer_id in reversed(_peers.keys()):
             if peer_id not in eligible_ids:
                 continue
             if owner_member_id is not None and _peers[peer_id].member_id != owner_member_id:
                 continue
-            return _peers[peer_id]
-    return None
+            candidates.append(peer_id)
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return _peers[candidates[0]]
+        # Snapshot the connection map so we can return the winner without
+        # holding the lock across the DB scoring queries.
+        peer_map = {pid: _peers[pid] for pid in candidates}
+
+    # Score all candidates with batched DB queries (2 round-trips regardless
+    # of candidate count).  Pick the highest score; tiebreak = smallest index
+    # in `candidates` (= most-recently-connected, matching the old behaviour).
+    scores = await _score_peers(db, candidates, model_slug)
+    best_idx = max(range(len(candidates)), key=lambda i: (scores[i], -i))
+    return peer_map[candidates[best_idx]]
 
 
 async def select_peer_for_request(
