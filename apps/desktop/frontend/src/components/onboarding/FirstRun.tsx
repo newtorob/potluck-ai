@@ -6,7 +6,8 @@
  *   2. Hardware      — detect specs + recommend tier
  *   3. ModelPick     — choose and install a model
  *   4. Loading       — wait for model to load into runtime
- *   5. Ready         — navigate to /chat
+ *   5. Connect       — mesh / machines
+ *   6. Ready         — compact readiness netcheck + navigate to /chat
  *
  * Completion flag: localStorage key `potluck.onboarding_completed = 'true'`
  * This key is read by App.tsx to gate whether to show FirstRun.
@@ -14,13 +15,18 @@
  * Keyboard: Enter advances (unless a button has focus), Esc shows confirm exit.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
   Loader2,
   CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Info,
   X,
+  Cpu,
+  Network,
 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { PotluckLogo } from '@/components/brand/PotluckLogo';
@@ -28,7 +34,11 @@ import { HardwareDetect } from './HardwareDetect';
 import { ModelPick } from './ModelPick';
 import { ConnectStep } from './ConnectStep';
 import { useHardware } from '@/hooks/useHardware';
+import { useHealth } from '@/hooks/useHealth';
 import { useModelStore } from '@/stores/modelStore';
+import { useMeshStore } from '@/stores/meshStore';
+import { deriveDiagnostics } from '@/lib/meshDiagnostics';
+import { deriveReadiness, type ReadinessReport } from '@/lib/readiness';
 import type { CatalogModel, ModelTier } from '@/stores/modelStore';
 import type { DownloadProgressRecord } from '@/stores/modelStore';
 
@@ -75,6 +85,11 @@ interface FirstRunProps {
 export function FirstRun({ models }: FirstRunProps) {
   const navigate = useNavigate();
   const { hardware, isLoading: hwLoading, error: hwError } = useHardware();
+  const { sidecarUp, modelLoaded, activeModelId, nCtxLoaded } = useHealth();
+
+  const meshStatus = useMeshStore((s) => s.status);
+  const meshPeers = useMeshStore((s) => s.peers);
+  const meshBridge = useMeshStore((s) => s.bridge);
 
   const store = useModelStore();
 
@@ -183,6 +198,40 @@ export function FirstRun({ models }: FirstRunProps) {
   const downloadComplete =
     selectedProgress?.status === 'complete' || selectedModel?.installed === true;
 
+  // Compute readiness for the ready step — mirrors ReadinessView's useMemo
+  // exactly, including exactOptionalPropertyTypes-safe conditional spreads.
+  const readinessReport: ReadinessReport = useMemo(() => {
+    const mesh = deriveDiagnostics({ bridge: meshBridge, status: meshStatus, peers: meshPeers });
+    // Only spread optional fields when the signal is present — passing
+    // `prop: undefined` fails exactOptionalPropertyTypes.
+    const vpnConflict =
+      meshStatus !== null
+        ? { conflict: meshStatus.vpn_conflict, detail: meshStatus.vpn_detail }
+        : undefined;
+    const wgPortListening = meshStatus !== null ? meshStatus.wg_port_listening : undefined;
+    return deriveReadiness({
+      sidecarUp,
+      modelLoaded,
+      activeModelId,
+      nCtxLoaded,
+      hardware,
+      enrolled: meshStatus?.node_id != null,
+      mesh,
+      peers: meshPeers,
+      ...(vpnConflict !== undefined ? { vpnConflict } : {}),
+      ...(wgPortListening !== undefined ? { wgPortListening } : {}),
+    });
+  }, [
+    meshBridge,
+    meshStatus,
+    meshPeers,
+    sidecarUp,
+    modelLoaded,
+    activeModelId,
+    nCtxLoaded,
+    hardware,
+  ]);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-background"
@@ -288,7 +337,9 @@ export function FirstRun({ models }: FirstRunProps) {
           )}
           {step === 'loading' && <LoadingStep error={loadError} />}
           {step === 'connect' && <ConnectStep />}
-          {step === 'ready' && <ReadyStep />}
+          {step === 'ready' && (
+            <ReadyStep report={readinessReport} onFinish={handleFinish} />
+          )}
         </div>
 
         {/* Footer actions */}
@@ -531,23 +582,150 @@ function LoadingStep({ error }: { error: string | null }) {
   );
 }
 
-function ReadyStep() {
+// ---------------------------------------------------------------------------
+// Severity style map for compact readiness rows — a minimal subset of the
+// full SEV table in ReadinessView (which is file-private there).
+// ---------------------------------------------------------------------------
+
+const COMPACT_SEV = {
+  ok: {
+    Icon: CheckCircle2,
+    tone: 'text-emerald-600 dark:text-emerald-400',
+  },
+  info: {
+    Icon: Info,
+    tone: 'text-muted-foreground',
+  },
+  warn: {
+    Icon: AlertTriangle,
+    tone: 'text-amber-600 dark:text-amber-400',
+  },
+  error: {
+    Icon: XCircle,
+    tone: 'text-red-600 dark:text-red-400',
+  },
+} as const;
+
+function ReadyStep({
+  report,
+  onFinish,
+}: {
+  report: ReadinessReport;
+  onFinish: () => void;
+}) {
+  const navigate = useNavigate();
+
+  const machineChecks = report.checks.filter((c) => c.group === 'machine');
+  const networkChecks = report.checks.filter((c) => c.group === 'network');
+
+  // Gaps are any check that isn't 'ok' — shown with label + fix.
+  const hasGaps = report.checks.some((c) => c.severity === 'warn' || c.severity === 'error');
+
+  function handleViewReadiness() {
+    onFinish(); // marks onboarding complete
+    navigate('/readiness');
+  }
+
   return (
-    <div className="flex flex-col items-center gap-4 py-4 text-center animate-fade-in-up">
-      {/* Sage halo for the "alive and ready" terminal state */}
-      <div className="relative h-16 w-16">
-        <div className="absolute inset-0 rounded-full bg-sage/25 blur-xl animate-hearth-pulse" aria-hidden="true" />
-        <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-sage/15 ring-1 ring-sage/30">
-          <CheckCircle2 className="h-8 w-8 text-sage" aria-hidden="true" />
+    <div className="flex flex-col gap-4 animate-fade-in-up">
+      {/* Header */}
+      <div className="flex flex-col items-center gap-3 text-center">
+        <div className="relative h-14 w-14">
+          <div
+            className="absolute inset-0 rounded-full bg-sage/25 blur-xl animate-hearth-pulse"
+            aria-hidden="true"
+          />
+          <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-sage/15 ring-1 ring-sage/30">
+            <CheckCircle2 className="h-7 w-7 text-sage" aria-hidden="true" />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <h2 className="font-serif text-2xl tracking-display text-foreground">
+            {report.machineReady ? 'Your machine is ready' : 'Almost there'}
+          </h2>
+          <p className="text-sm leading-relaxed text-muted-foreground reading-measure mx-auto">
+            {report.machineReady && !hasGaps
+              ? 'Inference runs locally by default. Your conversations stay on this device unless you choose to use the network.'
+              : 'Inference runs locally by default. Any gaps below are non-blocking — you can fix them after you start.'}
+          </p>
         </div>
       </div>
+
+      {/* Compact readiness summary */}
       <div className="space-y-2">
-        <h2 className="font-serif text-2xl tracking-display text-foreground">You're all set</h2>
-        <p className="text-sm leading-relaxed text-muted-foreground reading-measure mx-auto">
-          Your model is loaded and ready. Inference runs locally by default, so your conversations
-          stay on this device unless you choose to use the network.
-        </p>
+        <ReadinessGroup
+          icon={<Cpu className="size-3 text-muted-foreground" aria-hidden />}
+          label="This machine"
+          checks={machineChecks}
+        />
+        {networkChecks.length > 0 && (
+          <ReadinessGroup
+            icon={<Network className="size-3 text-muted-foreground" aria-hidden />}
+            label="Network"
+            checks={networkChecks}
+          />
+        )}
       </div>
+
+      {/* Pointer to full Readiness view — only after onboarding completes */}
+      <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
+        Run a full netcheck anytime from{' '}
+        <button
+          type="button"
+          onClick={handleViewReadiness}
+          className="underline underline-offset-2 hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-sm"
+        >
+          Readiness
+        </button>
+        .
+      </p>
+    </div>
+  );
+}
+
+function ReadinessGroup({
+  icon,
+  label,
+  checks,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  checks: ReadinessReport['checks'];
+}) {
+  if (checks.length === 0) return null;
+  return (
+    <div className="overflow-hidden rounded-lg border border-border/70 bg-card">
+      <div className="flex items-center gap-1.5 border-b border-border/70 px-3 py-1.5">
+        {icon}
+        <span className="text-[10px] font-medium uppercase tracking-hearth-label text-muted-foreground">
+          {label}
+        </span>
+      </div>
+      <ul className="divide-y divide-border/50">
+        {checks.map((check) => {
+          const sev = COMPACT_SEV[check.severity];
+          const Icon = sev.Icon;
+          return (
+            <li key={check.code} className="flex items-start gap-2.5 px-3 py-2">
+              <Icon
+                className={cn('mt-0.5 size-3.5 shrink-0', sev.tone)}
+                aria-hidden
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-foreground leading-snug">
+                  {check.title}
+                </p>
+                {(check.severity === 'warn' || check.severity === 'error') && check.fix && (
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+                    <span className="text-foreground/60">Fix: </span>
+                    {check.fix}
+                  </p>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
