@@ -82,6 +82,24 @@ export default function App() {
     // Hydrate chat history from the sidecar's SQLite. Runs once on mount;
     // failures are non-fatal (chat still works in memory). See chatStore.hydrate().
     void useChatStore.getState().hydrate();
+    // Hydrate the coordinator URL from the Python sidecar's durable config
+    // (~/.potluck/config.json → network.coordinator_url). When non-empty the
+    // durable value is adopted as the explicit override even if localStorage
+    // was wiped. The store's localStorage fast-path still loads synchronously
+    // at init, so there is no startup flash; this corrects any mismatch once
+    // the sidecar responds. Best-effort: localStorage/default stays if the
+    // sidecar is not yet ready.
+    void localApi
+      .getSettings()
+      .then((s) => {
+        const url = s.network.coordinator_url;
+        if (url.trim().length > 0) {
+          useConnectionStore.getState().hydrateFromSidecar(url);
+        }
+      })
+      .catch(() => {
+        /* non-fatal: coordinator URL stays as localStorage/default for this launch */
+      });
     // fetchModels is stable (Zustand action ref never changes)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -93,19 +111,6 @@ export default function App() {
   useEffect(() => {
     useMeshStore.getState().start();
   }, []);
-
-  // Keep the sidecar's coordinator URL in sync with the connection setting
-  // (the frontend's source of truth, persisted in localStorage). This is what
-  // lets the gateway's open-pool routing reach the coordinator from the Python
-  // side. Runs on boot and whenever the user edits the URL. Best-effort.
-  const coordinatorUrl = useConnectionStore((s) => s.coordinatorUrl);
-  useEffect(() => {
-    void localApi
-      .updateSettings({ network: { coordinator_url: coordinatorUrl } })
-      .catch(() => {
-        /* non-fatal: pool routing just stays unavailable until the next sync */
-      });
-  }, [coordinatorUrl]);
 
   // Make the default launch state "alive": once the model list has settled,
   // auto-load the last-active model (fallback: smallest installed) so the user
