@@ -34,6 +34,34 @@ import { useMeshStore } from '@/stores/meshStore';
 
 const ROUTING_MODE_KEY = 'potluck.household_routing_mode';
 
+// ---------------------------------------------------------------------------
+// RoutingScope — the four-tier trust gradient
+// ---------------------------------------------------------------------------
+
+/** The user-facing routing tier. This is the primary setting; networkMode /
+ *  householdMode are derived from it for backward-compat with existing
+ *  readers (StatusBar, NetworkView, etc.).
+ *
+ *  local       → local sidecar, nothing leaves this machine.
+ *  household   → direct to a paired peer over the WireGuard mesh.
+ *  circle      → reserved for Phase 2 trusted-circle membership infra.
+ *                Selectable in the UI but NOT wired; falls back to local.
+ *  cooperative → coordinator blinded-dispatch to the open pool.
+ */
+export type RoutingScope = 'local' | 'household' | 'circle' | 'cooperative';
+
+const ROUTING_SCOPE_KEY = 'potluck.routing_scope';
+
+function readBootstrapRoutingScope(): RoutingScope {
+  if (typeof window === 'undefined') return 'local';
+  const v = window.localStorage.getItem(ROUTING_SCOPE_KEY);
+  if (v === 'local' || v === 'household' || v === 'circle' || v === 'cooperative') return v;
+  // Migrate from the old boolean pair: if networkMode was on, map to cooperative;
+  // if householdMode was on, map to household; otherwise local.
+  // (These keys are no longer written, so this handles first-run-after-upgrade.)
+  return 'local';
+}
+
 function readBootstrapRoutingMode(): RoutingMode {
   if (typeof window === 'undefined') return 'capability';
   const v = window.localStorage.getItem(ROUTING_MODE_KEY);
@@ -103,18 +131,22 @@ interface ChatState {
   /** Not serialised — held only for abort() */
   abortController: AbortController | null;
 
+  // ---- Four-tier routing scope (Phase 1) ---- //
+  // Primary setting — persisted to localStorage. The legacy networkMode /
+  // householdMode fields below are kept for backward-compat with existing
+  // readers (StatusBar, NetworkView, HouseholdView …) and are always
+  // consistent with routingScope via the setRoutingScope setter.
+  routingScope: RoutingScope;
+
   // ---- Phase G m3 #19: contributor-network routing ---- //
-  // When true, sendMessage() routes the latest user prompt through the
-  // coordinator's POST /jobs/stream instead of the local /chat/completions.
-  // Single-turn for now (history not forwarded — see localApi.streamNetworkJob).
+  // Derived from routingScope === 'cooperative'. Kept as explicit state so
+  // all existing readers (StatusBar etc.) work without changes.
   networkMode: boolean;
   networkModelSlug: string;
 
   // ---- Household routing (post-mesh-launch addition) ---- //
-  // When true, sendMessage() routes directly to a peer in the user's
-  // household mesh (POST /peer/chat/completions over the WireGuard IP).
-  // Strictly more private than networkMode — bypasses the coordinator
-  // entirely. Mutually exclusive with networkMode (the setters enforce).
+  // Derived from routingScope === 'household'. Mutually exclusive with
+  // networkMode; setRoutingScope enforces consistency.
   householdMode: boolean;
 
   // How to pick which household peer serves the request. 'capability'
@@ -133,6 +165,9 @@ interface ChatState {
   sendMessage: (content: string) => Promise<void>;
   abort: () => void;
   clearConversations: () => void;
+  /** Primary setter — persists scope and keeps networkMode/householdMode in sync. */
+  setRoutingScope: (scope: RoutingScope) => void;
+  /** Legacy setters — kept for backward-compat; delegate to setRoutingScope. */
   setNetworkMode: (on: boolean) => void;
   setNetworkModelSlug: (slug: string) => void;
   setHouseholdMode: (on: boolean) => void;
@@ -187,7 +222,14 @@ function persist<T>(p: Promise<T>, label: string): void {
 // Store
 // ---------------------------------------------------------------------------
 
-export const useChatStore = create<ChatState>()((set, get) => ({
+export const useChatStore = create<ChatState>()((set, get) => {
+  // Derive the initial boolean pair from the persisted scope so all existing
+  // readers see consistent values from the very first render.
+  const _initScope = readBootstrapRoutingScope();
+  const _initNetworkMode = _initScope === 'cooperative';
+  const _initHouseholdMode = _initScope === 'household';
+
+  return {
   conversations: {},
   hydratedIds: new Set(),
   isHydrated: false,
@@ -195,12 +237,13 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   isStreaming: false,
   streamingMessageId: null,
   abortController: null,
-  networkMode: false,
+  routingScope: _initScope,
+  networkMode: _initNetworkMode,
   // Default slug — qwen2.5:3b-instruct-q4_K_M is what both the Linux
   // media server and the Windows gaming PC advertise via Ollama.
   // Configurable via the model picker in /network (task 776cf3a7).
   networkModelSlug: 'qwen2.5:3b-instruct-q4_K_M',
-  householdMode: false,
+  householdMode: _initHouseholdMode,
   routingMode: readBootstrapRoutingMode(),
 
   async hydrate() {
@@ -456,19 +499,22 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       .map((m): ChatMessage => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt }));
 
     try {
-      // Branch on routing mode. Three paths:
-      //   1. household — direct to a household peer over the mesh
-      //      (full history forwarded; trusted machines we own)
-      //   2. network   — through the coordinator to a cooperative peer
-      //      (single-turn only — JobAssignedMessage has no history slot
-      //      and bolting one on is a privacy-design exercise)
-      //   3. local     — this machine's Python sidecar
-      const { networkMode, networkModelSlug, householdMode } = get();
+      // Branch on routing scope. Four tiers, three active dispatch paths:
+      //   household   — direct to a household peer over the mesh
+      //                 (full history forwarded; trusted machines we own)
+      //   cooperative — through the coordinator to an open-pool peer
+      //                 (single-turn only — JobAssignedMessage has no history slot
+      //                 and bolting one on is a privacy-design exercise)
+      //   circle      — NOT wired in Phase 1; falls back to local with a
+      //                 'circle_unavailable' signal on the message. Must never
+      //                 silently route to cooperative or household.
+      //   local       — this machine's Python sidecar (default)
+      const { routingScope, networkModelSlug } = get();
       let response: Response;
       // Name of the household machine that served this turn (My Machines path),
       // captured so MessageBubble can render "Ran on <your machine>".
       let householdPeerName: string | null = null;
-      if (householdMode) {
+      if (routingScope === 'household') {
         const peers = useMeshStore.getState().peers;
         const { response: r, peer } = await streamHouseholdInference(apiMessages, peers, {
           abortSignal: controller.signal,
@@ -476,12 +522,13 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         });
         response = r;
         householdPeerName = peer.node_name;
-      } else if (networkMode) {
+      } else if (routingScope === 'cooperative') {
         response = await localApi.streamNetworkJob(content, {
           modelSlug: networkModelSlug,
           abortSignal: controller.signal,
         });
       } else {
+        // 'local' and 'circle' (phase 1 fallback) both use the local sidecar.
         response = await localApi.streamChat(apiMessages, {
           abortSignal: controller.signal,
         });
@@ -757,22 +804,27 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
   },
 
-  setNetworkMode(on) {
-    // Mutually exclusive with householdMode — turning on network routing
-    // implicitly turns off household routing.
-    if (on) {
-      set({ networkMode: true, householdMode: false });
-    } else {
-      set({ networkMode: false });
+  setRoutingScope(scope) {
+    // Persist the chosen scope and keep the legacy boolean pair in sync so
+    // all existing readers (StatusBar, NetworkView, etc.) stay correct.
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(ROUTING_SCOPE_KEY, scope);
     }
+    set({
+      routingScope: scope,
+      networkMode: scope === 'cooperative',
+      householdMode: scope === 'household',
+    });
+  },
+
+  setNetworkMode(on) {
+    // Legacy compat — delegates to setRoutingScope so the scope field stays
+    // the canonical source of truth.
+    get().setRoutingScope(on ? 'cooperative' : 'local');
   },
 
   setHouseholdMode(on) {
-    if (on) {
-      set({ householdMode: true, networkMode: false });
-    } else {
-      set({ householdMode: false });
-    }
+    get().setRoutingScope(on ? 'household' : 'local');
   },
 
   setRoutingMode(mode) {
@@ -785,4 +837,5 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   setNetworkModelSlug(slug) {
     set({ networkModelSlug: slug });
   },
-}));
+  };
+});

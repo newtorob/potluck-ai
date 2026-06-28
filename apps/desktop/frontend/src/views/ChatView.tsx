@@ -8,9 +8,9 @@
  *   Empty state: centered card with model name + 3 example-prompt pills
  */
 
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Thermometer, Hash, Layers, Network, Cpu, Home } from 'lucide-react';
+import { Thermometer, Hash, Layers, Cpu, Home, Globe, Users, ChevronDown, Check } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { MessageList } from '@/components/chat/MessageList';
 import { Composer } from '@/components/chat/Composer';
@@ -21,6 +21,7 @@ import { useHealth } from '@/hooks/useHealth';
 import { useCoordinatorHealth } from '@/hooks/useCoordinatorHealth';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { useChatStore } from '@/stores/chatStore';
+import type { RoutingScope } from '@/stores/chatStore';
 import { useMeshStore } from '@/stores/meshStore';
 import { PotluckLogo } from '@/components/brand/PotluckLogo';
 
@@ -54,53 +55,45 @@ export function ChatView() {
   const { settings, isLoaded: settingsLoaded } = useSettings();
   const { modelLoaded, nCtxLoaded } = useHealth();
 
-  // Network-mode routing toggle. When on, the latest user prompt routes
-  // through the coordinator (POST /jobs/stream) to an eligible
-  // contributor peer instead of the local sidecar's /chat/completions.
-  const networkMode = useChatStore((s) => s.networkMode);
+  // Primary routing scope — the four-tier trust gradient.
+  const routingScope = useChatStore((s) => s.routingScope);
+  const setRoutingScope = useChatStore((s) => s.setRoutingScope);
   const networkModelSlug = useChatStore((s) => s.networkModelSlug);
-  const setNetworkMode = useChatStore((s) => s.setNetworkMode);
-
-  // Household-mode routing toggle. When on, the prompt goes directly to a
-  // peer in the user's household mesh (POST /peer/chat/completions over
-  // the WireGuard IP). Distinct from networkMode: household = machines you
-  // paired yourself, no coordinator routing, full conversation history
-  // forwarded. Mutually exclusive with networkMode — chatStore enforces.
-  const householdMode = useChatStore((s) => s.householdMode);
-  const setHouseholdMode = useChatStore((s) => s.setHouseholdMode);
 
   // Household-peer availability — mesh store polls the sidecar; we gate
-  // the toggle on having at least one reachable peer.
+  // the household tier on having at least one reachable peer.
   const householdPeersReachable = useMeshStore(
     (s) => s.peers.some((p) => p.reachable),
   );
-  // Start the mesh store on mount so the toggle has live data even when
+  // Start the mesh store on mount so the selector has live data even when
   // the user hasn't visited /household yet. start() is idempotent.
   const meshStart = useMeshStore((s) => s.start);
   useEffect(() => {
     meshStart();
   }, [meshStart]);
 
-  // Coordinator reachability — gates the Network toggle. If the user has
-  // network mode on AND the coordinator drops, we auto-flip them back to
-  // local rather than letting them hit send and get an opaque error.
+  // Coordinator reachability — gates the cooperative tier. If the user has
+  // cooperative scope active AND the coordinator drops, fall back to local
+  // rather than letting them hit send and get an opaque error.
   const { reachable: coordinatorReachable, lastCheckedAt } = useCoordinatorHealth();
 
   useEffect(() => {
-    if (networkMode && !coordinatorReachable && lastCheckedAt !== null) {
-      setNetworkMode(false);
+    if (routingScope === 'cooperative' && !coordinatorReachable && lastCheckedAt !== null) {
+      setRoutingScope('local');
     }
-  }, [networkMode, coordinatorReachable, lastCheckedAt, setNetworkMode]);
+  }, [routingScope, coordinatorReachable, lastCheckedAt, setRoutingScope]);
 
-  // Auto-clear household mode if no peers are reachable anymore.
+  // Auto-clear household scope if no peers are reachable anymore.
   useEffect(() => {
-    if (householdMode && !householdPeersReachable) {
-      setHouseholdMode(false);
+    if (routingScope === 'household' && !householdPeersReachable) {
+      setRoutingScope('local');
     }
-  }, [householdMode, householdPeersReachable, setHouseholdMode]);
+  }, [routingScope, householdPeersReachable, setRoutingScope]);
 
-  // In network OR household mode the local model isn't required — a peer
-  // hosts the weights. Send is gated on "any of the three is available."
+  // Send is possible when there's an inference path: local model, a
+  // reachable household peer, or a reachable coordinator.
+  const networkMode = routingScope === 'cooperative';
+  const householdMode = routingScope === 'household';
   const sendReady = modelLoaded || networkMode || householdMode;
 
   const isEmpty = messages.length === 0;
@@ -124,76 +117,15 @@ export function ChatView() {
           <>
             <ModelSelector disabled={isStreaming || networkMode || householdMode} />
 
-            {/* Routing-mode toggles. Three exclusive states:
-                  - Local      (default): this machine's Python sidecar
-                  - Household  : a peer in the user's household mesh
-                  - Network    : a contributor peer via the coordinator
-                Household + Network buttons are mutually exclusive — clicking
-                one auto-clears the other (enforced in chatStore.set*Mode).
-                Local is the implicit fallback when neither is active. */}
-
-            {/* Household button — strict private routing to a paired machine.
-                Only enabled when at least one household peer is reachable. */}
-            <button
-              type="button"
-              onClick={() => setHouseholdMode(!householdMode)}
-              disabled={isStreaming || !householdPeersReachable}
-              aria-pressed={householdMode}
-              aria-label={householdMode
-                ? 'Household mode on, serving via one of your paired machines. Click to go local.'
-                : !householdPeersReachable
-                  ? 'Household mode unavailable. No paired machines reachable. Set one up in Household.'
-                  : 'Route to a machine in your household'}
-              title={!householdPeersReachable
-                ? 'No household peers reachable. Pair a machine in Household first.'
-                : householdMode
-                  ? 'Routing to your household. Click to go local.'
-                  : 'Route to your household (private, no coordinator involved)'}
-              className={cn(
-                'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium',
-                'transition-colors duration-fast border',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                householdMode
-                  ? 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15'
-                  : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border',
-                (isStreaming || !householdPeersReachable) && 'cursor-not-allowed opacity-50',
-              )}
-            >
-              <Home className="h-3 w-3" aria-hidden="true" />
-              <span>Household</span>
-            </button>
-
-            {/* Network-mode toggle — routes through the coordinator to an
-                eligible contributor peer (cooperative-wide blinded path). */}
-            <button
-              type="button"
-              data-testid="chat-network-toggle"
-              onClick={() => setNetworkMode(!networkMode)}
-              disabled={isStreaming || !coordinatorReachable}
-              aria-pressed={networkMode}
-              aria-label={networkMode
-                ? `Network mode on - serving via ${networkModelSlug}. Click to switch back to local.`
-                : !coordinatorReachable
-                  ? 'Network mode unavailable. Coordinator unreachable. Run `make up` to start it.'
-                  : 'Switch to network mode (route via a contributor peer)'}
-              title={!coordinatorReachable
-                ? 'Coordinator unreachable. Start it with `make up`.'
-                : networkMode
-                  ? `Network: ${networkModelSlug}. Click to go local.`
-                  : 'Route via the contributor network'}
-              className={cn(
-                'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium',
-                'transition-colors duration-fast border',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                networkMode
-                  ? 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15'
-                  : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border',
-                (isStreaming || !coordinatorReachable) && 'cursor-not-allowed opacity-50',
-              )}
-            >
-              {networkMode ? <Network className="h-3 w-3" aria-hidden="true" /> : <Cpu className="h-3 w-3" aria-hidden="true" />}
-              <span>{networkMode ? 'Network' : 'Local'}</span>
-            </button>
+            {/* Four-tier scope selector — replaces the old pair of binary toggles. */}
+            <ScopeSelector
+              scope={routingScope}
+              onChange={setRoutingScope}
+              disabled={isStreaming}
+              householdAvailable={householdPeersReachable}
+              cooperativeAvailable={coordinatorReachable}
+              networkModelSlug={networkModelSlug}
+            />
 
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <InfoChip
@@ -270,9 +202,249 @@ export function ChatView() {
         onStop={abort}
         isStreaming={isStreaming}
         modelLoaded={sendReady}
-        householdMode={householdMode}
-        networkMode={networkMode}
+        routingScope={routingScope}
       />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ScopeSelector — four-tier routing scope picker
+// ---------------------------------------------------------------------------
+
+interface ScopeTierConfig {
+  scope: RoutingScope;
+  label: string;
+  shortLabel: string;
+  icon: typeof Cpu;
+  hint: string;
+  /** Returns undefined when the tier is available, or a short unavailability reason. */
+  unavailableReason?: string;
+  /** 'phase2' tiers are shown but always disabled with a setup nudge. */
+  phase?: 'phase2';
+}
+
+interface ScopeSelectorProps {
+  scope: RoutingScope;
+  onChange: (scope: RoutingScope) => void;
+  disabled: boolean;
+  householdAvailable: boolean;
+  cooperativeAvailable: boolean;
+  networkModelSlug: string;
+}
+
+function ScopeSelector({
+  scope,
+  onChange,
+  disabled,
+  householdAvailable,
+  cooperativeAvailable,
+  networkModelSlug,
+}: ScopeSelectorProps) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click or Escape.
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (
+        triggerRef.current && !triggerRef.current.contains(e.target as Node) &&
+        menuRef.current && !menuRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [open]);
+
+  const tiers: ScopeTierConfig[] = [
+    {
+      scope: 'local',
+      label: 'Local only',
+      shortLabel: 'Local',
+      icon: Cpu,
+      hint: 'Runs on this machine. Nothing leaves your device.',
+    },
+    {
+      scope: 'household',
+      label: 'My machines',
+      shortLabel: 'My machines',
+      icon: Home,
+      hint: 'Runs on one of your own machines over your private mesh, encrypted between your devices. Stays within your machines.',
+      ...(!householdAvailable && {
+        unavailableReason: 'No paired machines reachable. Pair a machine in Household first.',
+      }),
+    },
+    {
+      scope: 'circle',
+      label: 'Trusted circle',
+      shortLabel: 'Circle',
+      icon: Users,
+      hint: 'Runs on a machine in a group you have chosen and allowed. The machine that answers sees your prompt. Set up a circle to use this.',
+      phase: 'phase2' as const,
+    },
+    {
+      scope: 'cooperative',
+      label: 'Cooperative network',
+      shortLabel: 'Network',
+      icon: Globe,
+      hint: `Runs on any verified member's machine. The machine that answers sees your prompt to generate the reply, but the request carries no identity, so they do not know it came from you.${networkModelSlug ? ` Model: ${networkModelSlug}.` : ''}`,
+      ...(!cooperativeAvailable && {
+        unavailableReason: 'Coordinator unreachable. Start it with `make up`.',
+      }),
+    },
+  ];
+
+  const active = tiers.find((t) => t.scope === scope) ?? tiers[0]!;
+  const ActiveIcon = active.icon;
+
+  // Tier-level disabled logic: globally disabled (streaming) OR tier-specific unavailability.
+  function isTierInteractable(tier: ScopeTierConfig): boolean {
+    if (disabled) return false;
+    if (tier.phase === 'phase2') return false;
+    if (tier.unavailableReason !== undefined) return false;
+    return true;
+  }
+
+  function handleSelect(tier: ScopeTierConfig) {
+    if (!isTierInteractable(tier)) return;
+    onChange(tier.scope);
+    setOpen(false);
+  }
+
+  // Keyboard navigation within the menu.
+  function handleMenuKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const items = menuRef.current?.querySelectorAll<HTMLButtonElement>('button[data-tier]');
+    if (!items || items.length === 0) return;
+    const current = document.activeElement as HTMLButtonElement | null;
+    const currentIdx = current ? Array.from(items).indexOf(current) : -1;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = items[(currentIdx + 1) % items.length];
+      next?.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = items[(currentIdx - 1 + items.length) % items.length];
+      prev?.focus();
+    } else if (e.key === 'Tab') {
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div className="relative">
+      <button
+        ref={triggerRef}
+        type="button"
+        data-testid="scope-selector-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`Routing scope: ${active.label}. Click to change.`}
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium',
+          'transition-colors duration-fast border',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          scope !== 'local'
+            ? 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15'
+            : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border',
+          disabled && 'cursor-not-allowed opacity-50',
+        )}
+      >
+        <ActiveIcon className="h-3 w-3" aria-hidden="true" />
+        <span>{active.shortLabel}</span>
+        <ChevronDown
+          className={cn('h-2.5 w-2.5 transition-transform duration-fast', open && 'rotate-180')}
+          aria-hidden="true"
+        />
+      </button>
+
+      {open && (
+        <div
+          ref={menuRef}
+          role="listbox"
+          aria-label="Routing scope"
+          onKeyDown={handleMenuKeyDown}
+          className={cn(
+            'absolute right-0 top-full z-50 mt-1.5',
+            'w-80 rounded-xl border border-border bg-popover shadow-hearth',
+            'py-1.5',
+          )}
+        >
+          {tiers.map((tier) => {
+            const TierIcon = tier.icon;
+            const isSelected = tier.scope === scope;
+            const interactable = isTierInteractable(tier);
+            const isPhase2 = tier.phase === 'phase2';
+
+            return (
+              <button
+                key={tier.scope}
+                type="button"
+                role="option"
+                data-tier={tier.scope}
+                aria-selected={isSelected}
+                aria-disabled={!interactable}
+                disabled={!interactable}
+                onClick={() => handleSelect(tier)}
+                className={cn(
+                  'flex w-full flex-col gap-0.5 px-3 py-2.5 text-left',
+                  'transition-colors duration-fast',
+                  'focus-visible:outline-none focus-visible:bg-accent',
+                  interactable
+                    ? 'cursor-pointer hover:bg-accent'
+                    : 'cursor-not-allowed opacity-60',
+                )}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <TierIcon
+                      className={cn(
+                        'h-3.5 w-3.5 shrink-0',
+                        isSelected ? 'text-primary' : 'text-muted-foreground',
+                      )}
+                      aria-hidden="true"
+                    />
+                    <span
+                      className={cn(
+                        'text-xs font-medium',
+                        isSelected ? 'text-primary' : 'text-foreground',
+                        !interactable && 'text-muted-foreground',
+                      )}
+                    >
+                      {tier.label}
+                    </span>
+                    {isPhase2 && (
+                      <span className="rounded bg-muted px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                        soon
+                      </span>
+                    )}
+                  </div>
+                  {isSelected && (
+                    <Check className="h-3 w-3 shrink-0 text-primary" aria-hidden="true" />
+                  )}
+                </div>
+                <p className="pl-[22px] text-[11px] leading-snug text-muted-foreground">
+                  {tier.unavailableReason !== undefined
+                    ? tier.unavailableReason
+                    : tier.hint}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

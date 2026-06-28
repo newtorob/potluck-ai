@@ -22,23 +22,23 @@ import {
 } from 'react';
 import { Send, Square } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
+import type { RoutingScope } from '@/stores/chatStore';
 
 interface ComposerProps {
   onSend: (content: string) => void;
   onStop: () => void;
   isStreaming: boolean;
   /** Disable sending when no inference path is available (no local model AND
-   *  no network / household mode active). */
+   *  no remote scope active). */
   modelLoaded: boolean;
-  /** Current routing mode — drives the privacy-honesty footer copy. */
-  householdMode: boolean;
-  networkMode: boolean;
+  /** Active routing scope — drives the privacy-honesty footer copy. */
+  routingScope: RoutingScope;
 }
 
 /** Approximate max height for ~12 lines at 20px line-height */
 const MAX_HEIGHT_PX = 240;
 
-export function Composer({ onSend, onStop, isStreaming, modelLoaded, householdMode, networkMode }: ComposerProps) {
+export function Composer({ onSend, onStop, isStreaming, modelLoaded, routingScope }: ComposerProps) {
   const [value, setValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -185,8 +185,7 @@ export function Composer({ onSend, onStop, isStreaming, modelLoaded, householdMo
       <ComposerHint
         isStreaming={isStreaming}
         modelLoaded={modelLoaded}
-        householdMode={householdMode}
-        networkMode={networkMode}
+        routingScope={routingScope}
       />
     </div>
   );
@@ -199,21 +198,19 @@ export function Composer({ onSend, onStop, isStreaming, modelLoaded, householdMo
 interface ComposerHintProps {
   isStreaming: boolean;
   modelLoaded: boolean;
-  householdMode: boolean;
-  networkMode: boolean;
+  routingScope: RoutingScope;
 }
 
-function ComposerHint({ isStreaming, modelLoaded, householdMode, networkMode }: ComposerHintProps) {
-  // The hint switches voice depending on routing mode. The privacy line MUST
-  // accurately describe where the prompt actually goes (memory 20fd8d9f:
-  // honest framing — never overclaim privacy). When no inference path is
-  // ready, fall back to a "pick a model" nudge.
+function ComposerHint({ isStreaming, modelLoaded, routingScope }: ComposerHintProps) {
+  // The hint switches voice depending on routing scope. The privacy line
+  // accurately describes where the prompt actually goes — never overclaims.
+  // When no inference path is ready, fall back to a "pick a model" nudge.
   let body: React.ReactNode;
   if (!modelLoaded) {
     body = (
       <>
         Pick a model in <span className="font-medium text-muted-foreground">Models</span> and
-        we’re ready.
+        we're ready.
       </>
     );
   } else if (isStreaming) {
@@ -222,29 +219,28 @@ function ComposerHint({ isStreaming, modelLoaded, householdMode, networkMode }: 
         Press <Kbd>Esc</Kbd> to stop generating.
       </>
     );
-  } else if (householdMode) {
-    // Household: prompt POSTs directly to a paired peer's mesh IP over
-    // WireGuard. The coordinator is not on the inference path. The peer
-    // *does* see prompt content — be honest about that.
+  } else if (routingScope === 'household') {
     body = (
       <>
-        Routed over your WireGuard mesh to one of your own machines. Never the coordinator.
+        Runs on one of your own machines over your private mesh, encrypted between your devices. Stays within your machines.
       </>
     );
-  } else if (networkMode) {
-    // Cooperative network: blinded dispatch via the coordinator. The
-    // serving peer receives a JobAssignedMessage with no member-identifying
-    // fields (privacy invariant in services/coordinator). It DOES see the
-    // prompt content at inference time — say so.
+  } else if (routingScope === 'circle') {
     body = (
       <>
-        Blinded routing through the coordinator. The serving peer doesn’t see who you are.
+        Runs on a machine in a group you have chosen and allowed. The machine that answers sees your prompt. Set up a circle to use this.
+      </>
+    );
+  } else if (routingScope === 'cooperative') {
+    body = (
+      <>
+        Runs on any verified member's machine. The machine that answers sees your prompt to generate the reply, but the request carries no identity, so they do not know it came from you.
       </>
     );
   } else {
     body = (
       <>
-        Runs locally. Your messages never leave this device.
+        Runs on this machine. Nothing leaves your device.
       </>
     );
   }
