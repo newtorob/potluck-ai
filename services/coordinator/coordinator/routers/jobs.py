@@ -80,9 +80,12 @@ class JobRequest(BaseModel):
     model_slug: str = "stub-echo"  # m3 stub default; real models when llama-cpp lands
     sampling: SamplingParams = Field(default_factory=SamplingParams)
     # "mine"   -> only machines this member owns (503 if none online)
-    # "circle" -> mine, then trusted circle (not yet available -> 422)
+    # "circle" -> only machines whose member is in the named circle (503 if none online)
     # "pool"   -> mine, then the open pool (default; backward-compatible)
     scope: RoutingScope = "pool"
+    # Required when scope="circle". Must be a circle owned by the caller.
+    # Omit (or pass null) for all other scopes; has no effect when scope != "circle".
+    circle_id: uuid.UUID | None = None
 
 
 class JobResponse(BaseModel):
@@ -119,17 +122,38 @@ async def _dispatch_to_peer(
     blinded-routing violation (the schema has no member_id field, so it's also
     a type error, but the rule deserves the comment).
     """
+    # Circle scope: validate ownership then restrict candidates to circle members.
+    circle_pubkeys: set[str] | None = None
     if req.scope == "circle":
-        raise HTTPException(
-            status_code=422,
-            detail="Trusted-circle routing is not yet available. Use scope=mine or scope=pool.",
+        if req.circle_id is None:
+            raise HTTPException(
+                status_code=422,
+                detail="circle_id is required when scope='circle'.",
+            )
+        # Verify the circle belongs to the caller before doing anything else.
+        from coordinator.models.circle import TrustedCircle, CircleMember
+        from sqlalchemy import select as sa_select
+
+        circle_row = await db.get(TrustedCircle, req.circle_id)
+        if circle_row is None or circle_row.owner_member_id != _STUB_MEMBER_ID:
+            raise HTTPException(
+                status_code=404,
+                detail="circle not found",
+            )
+        # Collect the pubkeys in this circle.
+        cm_result = await db.execute(
+            sa_select(CircleMember.member_pubkey).where(
+                CircleMember.circle_id == req.circle_id
+            )
         )
+        circle_pubkeys = {row[0] for row in cm_result.all()}
 
     peer_conn, served_scope = await select_peer_for_request(
         db,
         model_slug=req.model_slug,
         requester_member_id=_STUB_MEMBER_ID,
         scope=req.scope,
+        circle_pubkeys=circle_pubkeys,
     )
     if peer_conn is None:
         # Distinguish the scope-specific failure modes so the caller knows
@@ -141,6 +165,11 @@ async def _dispatch_to_peer(
             detail = (
                 f"No machine you own is online and serving '{req.model_slug}'. "
                 f"Bring one of your machines online, or use scope=pool to allow the open pool."
+            )
+        elif req.scope == "circle":
+            detail = (
+                f"No machine in this circle is online for '{req.model_slug}'. "
+                f"Ask circle members to bring a machine online, or use scope=pool."
             )
         elif online == 0:
             detail = "No contributor peers connected. Bring at least one online and retry."

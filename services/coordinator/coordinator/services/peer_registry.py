@@ -129,6 +129,7 @@ async def pick_peer_for_model(
     *,
     owner_member_id: uuid.UUID | None = None,
     enforce_pool_trust: bool = False,
+    circle_member_pubkeys: set[str] | None = None,
 ) -> PeerConnection | None:
     """Pick a connected peer that advertises the requested model_slug.
 
@@ -145,6 +146,12 @@ async def pick_peer_for_model(
     still re-enter by rotating to a fresh device key; that Sybil churn is
     bounded by require_registered_keys + the canary/escrow loop, not by this
     gate. Returns None if no online peer serves this model.
+
+    When circle_member_pubkeys is set (trusted-circle routing), only peers
+    whose member's public_key is in that set are eligible. The filter is
+    applied via a DB join against member_keys (one row per enrolled device
+    key, keyed by public_key -> member_id). No extra trust gating is applied
+    for circle peers — the owner chose them; trust is the owner's to grant.
     """
     from sqlalchemy import select
     from coordinator.models import PeerCapability
@@ -188,6 +195,36 @@ async def pick_peer_for_model(
         if not eligible_ids:
             return None
 
+    # Trusted-circle filter: restrict to peers whose member's key is in the circle.
+    # Joins peer_id -> peers.member_id -> member_keys.public_key. Uses the Peer
+    # model (not the in-memory registry) to get the canonical member_id per peer.
+    if circle_member_pubkeys is not None:
+        from coordinator.models.peer import Peer
+        from coordinator.models.member_key import MemberKey
+
+        # Find member_ids that own at least one of the circle's pubkeys.
+        mk_rows = (await db.execute(
+            select(MemberKey.member_id).where(
+                MemberKey.public_key.in_(circle_member_pubkeys)
+            )
+        )).all()
+        circle_member_ids: set[uuid.UUID] = {row[0] for row in mk_rows}
+
+        if not circle_member_ids:
+            # No enrolled members match any of the pubkeys — no eligible peer.
+            return None
+
+        # Keep only peers whose member_id is in the circle.
+        peer_rows = (await db.execute(
+            select(Peer.id).where(
+                Peer.id.in_(eligible_ids),
+                Peer.member_id.in_(circle_member_ids),
+            )
+        )).all()
+        eligible_ids = {row[0] for row in peer_rows}
+        if not eligible_ids:
+            return None
+
     # Re-acquire the lock to read the connection map (might have changed,
     # but the peer_id->PeerConnection mapping is stable for the lifetime
     # of any given session).
@@ -211,19 +248,32 @@ async def select_peer_for_request(
     model_slug: str,
     requester_member_id: uuid.UUID,
     scope: str = "pool",
+    circle_pubkeys: "set[str] | None" = None,
 ) -> "tuple[PeerConnection | None, str | None]":
     """Pick a peer honoring the routing scope. `scope` is the WIDEST tier the
     requester accepts; we always try the closest/most-trusted tier first and
     widen outward only up to `scope`. Returns (peer, served_scope) or
     (None, None) if nothing in-scope is online.
 
-      "mine" -> only machines this member owns.
-      "pool" -> mine first, else the open pool.
+      "mine"   -> only machines this member owns.
+      "circle" -> only machines whose member's pubkey is in circle_pubkeys.
+      "pool"   -> mine first, else the open pool.
 
-    The "circle" tier is rejected at the API layer until a trusted-circle data
-    model exists, so it never reaches here as a widening target.
+    When scope="circle", circle_pubkeys must be provided (the set of member
+    pubkeys from the chosen TrustedCircle). The caller (routers/jobs.py) has
+    already validated that the circle belongs to the requester.
     """
-    # Tier 1 — My Machines (tried first for every scope).
+    if scope == "circle":
+        # Circle scope: dispatch strictly to peers in the circle. No fallback
+        # to My Machines or Pool — the caller explicitly chose circle isolation.
+        peer = await pick_peer_for_model(
+            db, model_slug, circle_member_pubkeys=circle_pubkeys
+        )
+        if peer is not None:
+            return peer, "circle"
+        return None, None
+
+    # Tier 1 — My Machines (tried first for mine and pool scopes).
     peer = await pick_peer_for_model(
         db, model_slug, owner_member_id=requester_member_id
     )

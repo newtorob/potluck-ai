@@ -131,12 +131,18 @@ interface ChatState {
   /** Not serialised — held only for abort() */
   abortController: AbortController | null;
 
-  // ---- Four-tier routing scope (Phase 1) ---- //
+  // ---- Four-tier routing scope (Phase 1 / Phase 2) ---- //
   // Primary setting — persisted to localStorage. The legacy networkMode /
   // householdMode fields below are kept for backward-compat with existing
   // readers (StatusBar, NetworkView, HouseholdView …) and are always
   // consistent with routingScope via the setRoutingScope setter.
   routingScope: RoutingScope;
+
+  // ---- Circle routing (Phase 2) ---- //
+  // When routingScope === 'circle', this is the circle id passed to
+  // streamNetworkJob. Null means no circle selected yet (the UI must gate
+  // the send button on this being set when the scope is 'circle').
+  activeCircleId: string | null;
 
   // ---- Phase G m3 #19: contributor-network routing ---- //
   // Derived from routingScope === 'cooperative'. Kept as explicit state so
@@ -167,6 +173,8 @@ interface ChatState {
   clearConversations: () => void;
   /** Primary setter — persists scope and keeps networkMode/householdMode in sync. */
   setRoutingScope: (scope: RoutingScope) => void;
+  /** Phase 2: set the active circle for the 'circle' routing scope. */
+  setActiveCircleId: (id: string | null) => void;
   /** Legacy setters — kept for backward-compat; delegate to setRoutingScope. */
   setNetworkMode: (on: boolean) => void;
   setNetworkModelSlug: (slug: string) => void;
@@ -238,6 +246,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
   streamingMessageId: null,
   abortController: null,
   routingScope: _initScope,
+  activeCircleId: null,
   networkMode: _initNetworkMode,
   // Default slug — qwen2.5:3b-instruct-q4_K_M is what both the Linux
   // media server and the Windows gaming PC advertise via Ollama.
@@ -509,7 +518,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       //                 'circle_unavailable' signal on the message. Must never
       //                 silently route to cooperative or household.
       //   local       — this machine's Python sidecar (default)
-      const { routingScope, networkModelSlug } = get();
+      const { routingScope, networkModelSlug, activeCircleId } = get();
       let response: Response;
       // Name of the household machine that served this turn (My Machines path),
       // captured so MessageBubble can render "Ran on <your machine>".
@@ -522,13 +531,21 @@ export const useChatStore = create<ChatState>()((set, get) => {
         });
         response = r;
         householdPeerName = peer.node_name;
+      } else if (routingScope === 'circle' && activeCircleId !== null) {
+        // Phase 2: route through the coordinator but restrict to the chosen circle.
+        response = await localApi.streamNetworkJob(content, {
+          modelSlug: networkModelSlug,
+          abortSignal: controller.signal,
+          circleId: activeCircleId,
+        });
       } else if (routingScope === 'cooperative') {
         response = await localApi.streamNetworkJob(content, {
           modelSlug: networkModelSlug,
           abortSignal: controller.signal,
         });
       } else {
-        // 'local' and 'circle' (phase 1 fallback) both use the local sidecar.
+        // 'local', and 'circle' without a selected circle, both use the local
+        // sidecar. The UI gates send when 'circle' has no activeCircleId.
         response = await localApi.streamChat(apiMessages, {
           abortSignal: controller.signal,
         });
@@ -815,6 +832,10 @@ export const useChatStore = create<ChatState>()((set, get) => {
       networkMode: scope === 'cooperative',
       householdMode: scope === 'household',
     });
+  },
+
+  setActiveCircleId(id) {
+    set({ activeCircleId: id });
   },
 
   setNetworkMode(on) {

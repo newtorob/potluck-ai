@@ -31,6 +31,7 @@ import {
   Gauge,
   Settings,
   CreditCard,
+  Users,
   Plus,
   MoreHorizontal,
   Trash2,
@@ -80,6 +81,7 @@ const PRIMARY_NAV: NavItem[] = [
   { to: '/household', label: 'My Machines', icon: Home },
   { to: '/readiness', label: 'Readiness', icon: Gauge },
   { to: '/network', label: 'Network', icon: Globe2 },
+  { to: '/circles', label: 'Circles', icon: Users },
   { to: '/models', label: 'Models', icon: Package },
 ];
 

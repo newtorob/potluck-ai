@@ -13,6 +13,7 @@ import { TaskStateView } from '@/views/TaskStateView';
 import { AgentsView } from '@/views/AgentsView';
 import { NetworkView } from '@/views/NetworkView';
 import { HouseholdView } from '@/views/HouseholdView';
+import { CirclesView } from '@/views/CirclesView';
 import { ReadinessView } from '@/views/ReadinessView';
 import { SettingsView } from '@/views/SettingsView';
 import { MembershipView } from '@/views/MembershipView';
@@ -190,6 +191,7 @@ export default function App() {
               <Route path="/tasks" element={<TaskStateView />} />
               <Route path="/agents" element={<AgentsView />} />
               <Route path="/household" element={<HouseholdView />} />
+              <Route path="/circles" element={<CirclesView />} />
               <Route path="/readiness" element={<ReadinessView />} />
               <Route path="/network" element={<NetworkView />} />
               <Route path="/settings" element={<SettingsView />} />

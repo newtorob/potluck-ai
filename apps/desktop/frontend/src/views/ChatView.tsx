@@ -23,6 +23,8 @@ import { ViewHeader } from '@/components/layout/ViewHeader';
 import { useChatStore } from '@/stores/chatStore';
 import type { RoutingScope } from '@/stores/chatStore';
 import { useMeshStore } from '@/stores/meshStore';
+import { localApi } from '@/lib/localApi';
+import type { Circle } from '@/lib/localApi';
 import { PotluckLogo } from '@/components/brand/PotluckLogo';
 
 // ---------------------------------------------------------------------------
@@ -59,6 +61,26 @@ export function ChatView() {
   const routingScope = useChatStore((s) => s.routingScope);
   const setRoutingScope = useChatStore((s) => s.setRoutingScope);
   const networkModelSlug = useChatStore((s) => s.networkModelSlug);
+  const activeCircleId = useChatStore((s) => s.activeCircleId);
+  const setActiveCircleId = useChatStore((s) => s.setActiveCircleId);
+
+  // Fetch circles from the coordinator so we can gate + populate the circle tier.
+  // Best-effort: coordinator unreachable = empty list (tier stays disabled).
+  const [circles, setCircles] = useState<Circle[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    localApi.circles
+      .list()
+      .then((res) => {
+        if (!cancelled) setCircles(res.circles);
+      })
+      .catch(() => {
+        // Coordinator unreachable — circles stays empty; tier stays disabled.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Household-peer availability — mesh store polls the sidecar; we gate
   // the household tier on having at least one reachable peer.
@@ -91,10 +113,12 @@ export function ChatView() {
   }, [routingScope, householdPeersReachable, setRoutingScope]);
 
   // Send is possible when there's an inference path: local model, a
-  // reachable household peer, or a reachable coordinator.
+  // reachable household peer, a reachable coordinator (cooperative), or a
+  // circle (which also routes through the coordinator).
   const networkMode = routingScope === 'cooperative';
   const householdMode = routingScope === 'household';
-  const sendReady = modelLoaded || networkMode || householdMode;
+  const circleMode = routingScope === 'circle' && activeCircleId !== null;
+  const sendReady = modelLoaded || networkMode || householdMode || circleMode;
 
   const isEmpty = messages.length === 0;
 
@@ -115,7 +139,7 @@ export function ChatView() {
         title="Chat"
         tools={
           <>
-            <ModelSelector disabled={isStreaming || networkMode || householdMode} />
+            <ModelSelector disabled={isStreaming || networkMode || householdMode || circleMode} />
 
             {/* Four-tier scope selector — replaces the old pair of binary toggles. */}
             <ScopeSelector
@@ -125,6 +149,9 @@ export function ChatView() {
               householdAvailable={householdPeersReachable}
               cooperativeAvailable={coordinatorReachable}
               networkModelSlug={networkModelSlug}
+              circles={circles}
+              activeCircleId={activeCircleId}
+              onCircleChange={setActiveCircleId}
             />
 
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -218,10 +245,8 @@ interface ScopeTierConfig {
   shortLabel: string;
   icon: typeof Cpu;
   hint: string;
-  /** Returns undefined when the tier is available, or a short unavailability reason. */
+  /** When set, the tier is shown but disabled with this short reason. */
   unavailableReason?: string;
-  /** 'phase2' tiers are shown but always disabled with a setup nudge. */
-  phase?: 'phase2';
 }
 
 interface ScopeSelectorProps {
@@ -231,6 +256,9 @@ interface ScopeSelectorProps {
   householdAvailable: boolean;
   cooperativeAvailable: boolean;
   networkModelSlug: string;
+  circles: Circle[];
+  activeCircleId: string | null;
+  onCircleChange: (id: string | null) => void;
 }
 
 function ScopeSelector({
@@ -240,6 +268,9 @@ function ScopeSelector({
   householdAvailable,
   cooperativeAvailable,
   networkModelSlug,
+  circles,
+  activeCircleId,
+  onCircleChange,
 }: ScopeSelectorProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -290,8 +321,13 @@ function ScopeSelector({
       label: 'Trusted circle',
       shortLabel: 'Circle',
       icon: Users,
-      hint: 'Runs on a machine in a group you have chosen and allowed. The machine that answers sees your prompt. Set up a circle to use this.',
-      phase: 'phase2' as const,
+      hint:
+        circles.length > 0
+          ? 'Runs on a machine in a circle you trust. The machine that answers sees your prompt.'
+          : 'Runs on a machine in a circle you trust. Set up a circle in Circles first.',
+      ...(circles.length === 0 && {
+        unavailableReason: 'No circles yet. Go to Circles to create one.',
+      }),
     },
     {
       scope: 'cooperative',
@@ -311,7 +347,6 @@ function ScopeSelector({
   // Tier-level disabled logic: globally disabled (streaming) OR tier-specific unavailability.
   function isTierInteractable(tier: ScopeTierConfig): boolean {
     if (disabled) return false;
-    if (tier.phase === 'phase2') return false;
     if (tier.unavailableReason !== undefined) return false;
     return true;
   }
@@ -319,6 +354,11 @@ function ScopeSelector({
   function handleSelect(tier: ScopeTierConfig) {
     if (!isTierInteractable(tier)) return;
     onChange(tier.scope);
+    // When switching to circle with only one circle, auto-pick it.
+    // When there are multiple circles the picker below handles selection.
+    if (tier.scope === 'circle' && circles.length === 1 && circles[0] !== undefined) {
+      onCircleChange(circles[0].id);
+    }
     setOpen(false);
   }
 
@@ -342,6 +382,7 @@ function ScopeSelector({
   }
 
   return (
+    <div className="flex items-center gap-1.5">
     <div className="relative">
       <button
         ref={triggerRef}
@@ -386,7 +427,6 @@ function ScopeSelector({
             const TierIcon = tier.icon;
             const isSelected = tier.scope === scope;
             const interactable = isTierInteractable(tier);
-            const isPhase2 = tier.phase === 'phase2';
 
             return (
               <button
@@ -425,11 +465,6 @@ function ScopeSelector({
                     >
                       {tier.label}
                     </span>
-                    {isPhase2 && (
-                      <span className="rounded bg-muted px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground/70">
-                        soon
-                      </span>
-                    )}
                   </div>
                   {isSelected && (
                     <Check className="h-3 w-3 shrink-0 text-primary" aria-hidden="true" />
@@ -440,6 +475,122 @@ function ScopeSelector({
                     ? tier.unavailableReason
                     : tier.hint}
                 </p>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+
+    {/* Circle picker — shown inline when circle scope is active and the user
+        has more than one circle to choose from. When there's only one circle
+        it was auto-selected on tier switch, so no picker is needed. */}
+    {scope === 'circle' && circles.length > 1 && (
+      <CirclePicker
+        circles={circles}
+        activeCircleId={activeCircleId}
+        onChange={onCircleChange}
+        disabled={disabled}
+      />
+    )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CirclePicker — compact inline selector for the active circle
+// ---------------------------------------------------------------------------
+
+interface CirclePickerProps {
+  circles: Circle[];
+  activeCircleId: string | null;
+  onChange: (id: string | null) => void;
+  disabled: boolean;
+}
+
+function CirclePicker({ circles, activeCircleId, onChange, disabled }: CirclePickerProps) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (
+        triggerRef.current && !triggerRef.current.contains(e.target as Node) &&
+        menuRef.current && !menuRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [open]);
+
+  const activeCircle = circles.find((c) => c.id === activeCircleId) ?? null;
+  const label = activeCircle?.name ?? 'Pick a circle';
+
+  return (
+    <div className="relative">
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`Active circle: ${label}. Click to change.`}
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          'flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium',
+          'transition-colors duration-fast border border-primary/30 bg-primary/10 text-primary',
+          'hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          disabled && 'cursor-not-allowed opacity-50',
+        )}
+      >
+        <span className="max-w-[8rem] truncate">{label}</span>
+        <ChevronDown
+          className={cn('h-2.5 w-2.5 transition-transform duration-fast', open && 'rotate-180')}
+          aria-hidden="true"
+        />
+      </button>
+
+      {open && (
+        <div
+          ref={menuRef}
+          role="listbox"
+          aria-label="Select circle"
+          className={cn(
+            'absolute left-0 top-full z-50 mt-1.5',
+            'min-w-[10rem] max-w-[16rem] rounded-xl border border-border bg-popover shadow-hearth',
+            'py-1.5',
+          )}
+        >
+          {circles.map((circle) => {
+            const isSelected = circle.id === activeCircleId;
+            return (
+              <button
+                key={circle.id}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                onClick={() => { onChange(circle.id); setOpen(false); }}
+                className={cn(
+                  'flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs',
+                  'transition-colors duration-fast cursor-pointer hover:bg-accent',
+                  'focus-visible:outline-none focus-visible:bg-accent',
+                )}
+              >
+                <span className={cn('truncate', isSelected ? 'font-medium text-primary' : 'text-foreground')}>
+                  {circle.name}
+                </span>
+                {isSelected && <Check className="h-3 w-3 shrink-0 text-primary" aria-hidden="true" />}
               </button>
             );
           })}

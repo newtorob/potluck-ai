@@ -334,6 +334,32 @@ export interface PersistedConversationDetail extends PersistedConversation {
 // Network (coordinator) shapes
 // ---------------------------------------------------------------------------
 
+// ---- Trusted circles (Phase 2) -------------------------------------------
+
+/** A member pubkey row inside a circle. */
+export interface CircleMember {
+  member_pubkey: string;
+  added_at: string; // ISO-8601
+}
+
+/** A trusted circle owned by the calling member. */
+export interface Circle {
+  id: string;
+  name: string;
+  created_at: string; // ISO-8601
+  members: CircleMember[];
+}
+
+/** Response from GET /me/circles. */
+export interface ListCirclesResponse {
+  circles: Circle[];
+}
+
+/** Response from GET /me/identity. */
+export interface MyIdentityResponse {
+  member_pubkey: string;
+}
+
 // ---- Credit ledger (Phase G m4) ------------------------------------------
 
 /**
@@ -498,19 +524,30 @@ export const localApi = {
    */
   streamNetworkJob(
     prompt: string,
-    options: { modelSlug: string; temperature?: number; maxTokens?: number; abortSignal?: AbortSignal }
+    options: {
+      modelSlug: string;
+      temperature?: number;
+      maxTokens?: number;
+      abortSignal?: AbortSignal;
+      /** When set, the coordinator only routes to members of this circle. */
+      circleId?: string;
+    },
   ): Promise<Response> {
+    const body: Record<string, unknown> = {
+      prompt,
+      model_slug: options.modelSlug,
+      sampling: {
+        temperature: options.temperature ?? 0.7,
+        max_tokens: options.maxTokens ?? 2048,
+      },
+    };
+    if (options.circleId !== undefined) {
+      body['circle_id'] = options.circleId;
+    }
     const init: RequestInit = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt,
-        model_slug: options.modelSlug,
-        sampling: {
-          temperature: options.temperature ?? 0.7,
-          max_tokens: options.maxTokens ?? 2048,
-        },
-      }),
+      body: JSON.stringify(body),
     };
     if (options.abortSignal) init.signal = options.abortSignal;
     // Streaming SSE — raw fetch, no timeout (long-lived); caller owns the abort.
@@ -1112,6 +1149,63 @@ export const localApi = {
         handleResponse<CreditHistory>(r),
       );
     },
+  },
+
+  // ---- Trusted circles (coordinator — Phase 2) ----------------------------
+
+  circles: {
+    /** GET /me/circles — the calling member's circles with their members. */
+    list(): Promise<ListCirclesResponse> {
+      return timedFetch(`${coordinatorBase()}/me/circles`).then((r) =>
+        handleResponse<ListCirclesResponse>(r),
+      );
+    },
+
+    /** POST /me/circles { name } — create a new trusted circle. */
+    create(name: string): Promise<Circle> {
+      return timedFetch(`${coordinatorBase()}/me/circles`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      }).then((r) => handleResponse<Circle>(r));
+    },
+
+    /** DELETE /me/circles/{circle_id} — delete a circle and all its members. */
+    delete(circleId: string): Promise<void> {
+      return timedFetch(`${coordinatorBase()}/me/circles/${encodeURIComponent(circleId)}`, {
+        method: 'DELETE',
+      }).then((r) => handle204(r));
+    },
+
+    /** POST /me/circles/{circle_id}/members { member_pubkey } — add a member.
+     *  Throws a [localApi] 409: … error on duplicate. */
+    addMember(circleId: string, memberPubkey: string): Promise<CircleMember> {
+      return timedFetch(
+        `${coordinatorBase()}/me/circles/${encodeURIComponent(circleId)}/members`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ member_pubkey: memberPubkey }),
+        },
+      ).then((r) => handleResponse<CircleMember>(r));
+    },
+
+    /** DELETE /me/circles/{circle_id}/members/{member_pubkey} — remove a member. */
+    removeMember(circleId: string, memberPubkey: string): Promise<void> {
+      return timedFetch(
+        `${coordinatorBase()}/me/circles/${encodeURIComponent(circleId)}/members/${encodeURIComponent(memberPubkey)}`,
+        { method: 'DELETE' },
+      ).then((r) => handle204(r));
+    },
+  },
+
+  // ---- Identity (coordinator — Phase 2) -----------------------------------
+
+  /** GET /me/identity — the calling member's own public key. */
+  getMyIdentity(): Promise<MyIdentityResponse> {
+    return timedFetch(`${coordinatorBase()}/me/identity`).then((r) =>
+      handleResponse<MyIdentityResponse>(r),
+    );
   },
 
   // ---- Vault ---------------------------------------------------------------
