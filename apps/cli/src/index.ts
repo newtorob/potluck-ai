@@ -132,9 +132,34 @@ async function main(): Promise<void> {
 
   const cwd = process.cwd();
   const rl = createInterface({ input: stdin, output: stdout });
-  const ask = (q: string): Promise<string> =>
-    new Promise((res) => rl.question(q, res));
-  const confirm = makeConfirm(ask);
+  let closed = false;
+  rl.once("close", () => {
+    closed = true;
+  });
+  // Resolves to null when stdin hits EOF / the readline closes (piped input
+  // ending, Ctrl-D), so the loop can exit instead of calling question() on a
+  // closed readline (ERR_USE_AFTER_CLOSE).
+  const ask = (q: string): Promise<string | null> =>
+    new Promise((res) => {
+      if (closed) {
+        res(null);
+        return;
+      }
+      let done = false;
+      const onClose = (): void => {
+        if (!done) {
+          done = true;
+          res(null);
+        }
+      };
+      rl.once("close", onClose);
+      rl.question(q, (answer) => {
+        done = true;
+        rl.removeListener("close", onClose);
+        res(answer);
+      });
+    });
+  const confirm = makeConfirm((q) => ask(q).then((a) => a ?? "n"));
 
   const conversation: ChatMessage[] = [
     { role: "system", content: systemPrompt(cwd) },
@@ -155,7 +180,9 @@ async function main(): Promise<void> {
   printBanner(model, cfg);
 
   while (true) {
-    const line = (await ask(c.green("you ▸ "))).trim();
+    const answer = await ask(c.green("you ▸ "));
+    if (answer === null) break; // EOF / readline closed
+    const line = answer.trim();
     if (line.length === 0) continue;
 
     if (line === "/exit" || line === "/quit") break;
