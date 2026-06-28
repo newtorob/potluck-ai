@@ -8,6 +8,14 @@
 #   pip install -r requirements-contributor.txt
 #   pip install -e .
 #   ./.venv/bin/potluck-contributor
+#
+# THROUGHPUT (Ollama backend): launch Ollama with OLLAMA_NUM_PARALLEL>=4 so it serves
+# concurrent requests via continuous batching. Default Ollama serializes -- a contributor
+# machine is multi-tenant (it serves many members at once), so serial serving is the main
+# throughput bottleneck. Measured 2026-06-28 (Apple Silicon, qwen2.5:0.5b): ~144 tok/s flat
+# under concurrency by default vs ~330 tok/s aggregate (2.3x) at NUM_PARALLEL=4. Bigger
+# models / more VRAM see a larger win. Set it where Ollama launches:
+#   OLLAMA_NUM_PARALLEL=4 ollama serve
 
 pydantic==2.10.*
 pydantic-settings==2.7.*
