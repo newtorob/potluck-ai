@@ -27,6 +27,8 @@ export interface StreamOptions {
   maxTokens?: number;
   stop?: string[];
   signal?: AbortSignal;
+  /** Routing scope sent as the X-Potluck-Scope header (e.g. "local" | "mine"). */
+  scope?: string;
 }
 
 interface ModelsResponse {
@@ -74,9 +76,14 @@ export async function* streamChat(
   messages: ChatMessage[],
   opts: StreamOptions,
 ): AsyncGenerator<string, void, void> {
+  const headers = authHeaders(cfg);
+  // A parallel gateway change adds local|mine routing; sending the header is
+  // harmless (ignored) on a gateway that doesn't yet understand it.
+  if (opts.scope) headers["x-potluck-scope"] = opts.scope;
+
   const res = await fetch(`${cfg.baseURL}/chat/completions`, {
     method: "POST",
-    headers: authHeaders(cfg),
+    headers,
     body: JSON.stringify({
       model: opts.model,
       messages,

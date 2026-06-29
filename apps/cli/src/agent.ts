@@ -80,18 +80,69 @@ export function systemPrompt(cwd: string): string {
     "When you are done, reply with a final answer and NO action block.",
     "",
     "Tools:",
-    '  read_file   {"path": string}                       read a UTF-8 file (auto-runs)',
-    '  list_dir    {"path": string}                       list a directory (auto-runs)',
-    '  write_file  {"path": string, "content": string}    create/overwrite a file (asks the user)',
-    '  run_command {"command": string}                    run a shell command (asks the user)',
+    '  search_files {"query": string, "path"?: string, "regex"?: bool}  search file contents (auto-runs)',
+    '  glob         {"pattern": string}                   find files by name, e.g. "**/*.ts" (auto-runs)',
+    '  read_file    {"path": string}                      read a UTF-8 file (auto-runs)',
+    '  list_dir     {"path": string}                      list a directory (auto-runs)',
+    '  edit_file    {"path": string, "old_string": string, "new_string": string}  targeted edit to an EXISTING file (asks the user)',
+    '  write_file   {"path": string, "content": string}   create a NEW file / full overwrite (asks the user)',
+    '  run_command  {"command": string}                   run a shell command (asks the user)',
+    "",
+    "Workflow:",
+    "- Locate code with search_files (by content) and glob (by filename) first.",
+    "- read_file to inspect before changing anything.",
+    "- To change an existing file, use edit_file with a SMALL, UNIQUE old_string",
+    "  (include enough surrounding context that it matches exactly one place).",
+    "- Only use write_file to CREATE a new file (or when a full rewrite is truly",
+    "  warranted). Prefer minimal, targeted edits over rewrites.",
     "",
     "Rules:",
     "- Emit at most ONE action per turn; put the JSON inside the fence.",
     `- Paths are relative to the working directory: ${cwd}  (you cannot escape it).`,
-    "- Read before you write. Make minimal, correct changes.",
+    "- Read before you edit. Make minimal, correct changes.",
     "- Keep prose short. Never fabricate tool output; wait for TOOL_RESULT.",
-    "- The user must approve every write_file and run_command, so explain risky steps.",
+    "- The user must approve every edit_file, write_file, and run_command, so",
+    "  explain risky steps.",
   ].join("\n");
+}
+
+/**
+ * Keep a long conversation under an approximate character budget so it doesn't
+ * blow the model's context window. The system prompt and the most recent turns
+ * are always kept; older turns are dropped and replaced by a short marker.
+ * Returns a NEW array (the caller keeps the full history for follow-ups).
+ */
+const DEFAULT_CHAR_BUDGET = 48_000; // ~12k tokens at ~4 chars/token
+
+export function trimHistory(
+  history: ChatMessage[],
+  budget: number = DEFAULT_CHAR_BUDGET,
+): ChatMessage[] {
+  if (history.length === 0) return history;
+  const total = history.reduce((n, m) => n + m.content.length, 0);
+  if (total <= budget) return history;
+
+  const hasSystem = history[0]?.role === "system";
+  const system = hasSystem ? history.slice(0, 1) : [];
+  const rest = history.slice(system.length);
+
+  let used = system.reduce((n, m) => n + m.content.length, 0);
+  const kept: ChatMessage[] = [];
+  for (let i = rest.length - 1; i >= 0; i--) {
+    const len = rest[i].content.length;
+    // Always keep at least the most recent message, even if it alone is large.
+    if (kept.length > 0 && used + len > budget) break;
+    kept.unshift(rest[i]);
+    used += len;
+  }
+
+  const dropped = rest.length - kept.length;
+  if (dropped <= 0) return history;
+  const marker: ChatMessage = {
+    role: "user",
+    content: `[${dropped} earlier message(s) trimmed to fit the context window]`,
+  };
+  return [...system, marker, ...kept];
 }
 
 export interface AgentCallbacks {
@@ -115,6 +166,10 @@ export interface AgentOptions {
   callbacks: AgentCallbacks;
   signal?: AbortSignal;
   maxSteps?: number;
+  /** Routing scope forwarded to the gateway (X-Potluck-Scope). */
+  scope?: string;
+  /** Approximate character budget before older turns are trimmed. */
+  charBudget?: number;
 }
 
 /**
@@ -133,8 +188,12 @@ export async function runTask(
 
   for (let step = 0; step < maxSteps; step++) {
     let assistant = "";
-    for await (const token of streamChat(cfg, history, {
+    // Send a trimmed view so long sessions stay under the context window; the
+    // caller keeps the full history untouched for follow-ups and cancel-restore.
+    const view = trimHistory(history, opts.charBudget);
+    for await (const token of streamChat(cfg, view, {
       model,
+      scope: opts.scope,
       signal: opts.signal,
     })) {
       assistant += token;

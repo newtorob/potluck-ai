@@ -40,14 +40,15 @@ export function renderDiff(diff: string): string {
 /**
  * Build the default interactive confirm gate from a question function (so the
  * single readline interface is shared with the REPL). Shows a diff for
- * write_file and the command for run_command, then asks y/N (default No).
+ * write_file/edit_file and the command for run_command, then asks y/N (No).
  */
 export function makeConfirm(ask: (q: string) => Promise<string>): Confirm {
   return async (ctx: ConfirmContext): Promise<boolean> => {
-    if (ctx.tool === "write_file") {
-      process.stdout.write(`\n${c.yellow("● write_file")} ${c.bold(ctx.subject)}\n`);
+    if (ctx.tool === "write_file" || ctx.tool === "edit_file") {
+      process.stdout.write(`\n${c.yellow(`● ${ctx.tool}`)} ${c.bold(ctx.subject)}\n`);
       process.stdout.write(`${renderDiff(ctx.summary)}\n`);
-      const answer = await ask(c.yellow("Apply this write? [y/N] "));
+      const verb = ctx.tool === "edit_file" ? "edit" : "write";
+      const answer = await ask(c.yellow(`Apply this ${verb}? [y/N] `));
       return /^y(es)?$/i.test(answer.trim());
     }
 
@@ -58,6 +59,29 @@ export function makeConfirm(ask: (q: string) => Promise<string>): Confirm {
   };
 }
 
+/**
+ * Non-interactive confirm gate for one-shot (-p) mode. With `autoApprove`
+ * (--yes) every gated action is allowed and announced; otherwise each is refused
+ * with a clear message (the model sees `user declined`). `emit` writes the
+ * notice (the caller routes it to stderr so stdout stays clean for piping).
+ */
+export function oneShotConfirm(
+  autoApprove: boolean,
+  emit: (line: string) => void,
+): Confirm {
+  return async (ctx: ConfirmContext): Promise<boolean> => {
+    if (autoApprove) {
+      emit(`${c.yellow(`● ${ctx.tool}`)} ${c.dim(ctx.subject)} ${c.dim("(auto-approved: --yes)")}`);
+      return true;
+    }
+    emit(
+      `${c.yellow(`✗ refusing ${ctx.tool}`)} ${c.dim(ctx.subject)} — ` +
+        `re-run with ${c.bold("--yes")} to allow writes and commands in -p mode`,
+    );
+    return false;
+  };
+}
+
 /** One-line summary of an action about to run. */
 export function renderAction(tool: string, args: Record<string, unknown>): string {
   const detail =
@@ -65,7 +89,11 @@ export function renderAction(tool: string, args: Record<string, unknown>): strin
       ? args.path
       : typeof args.command === "string"
         ? args.command
-        : "";
+        : typeof args.pattern === "string"
+          ? args.pattern
+          : typeof args.query === "string"
+            ? args.query
+            : "";
   return `${c.cyan("▶")} ${c.bold(tool)} ${c.dim(detail)}`;
 }
 

@@ -2,39 +2,65 @@
 /**
  * potluck — a terminal coding agent whose inference runs on the Potluck mesh.
  *
- * Reads a task, runs the prompt-based ReAct loop against the local gateway,
- * streams the assistant output, renders actions + results, and gates every
- * write/command behind a y/N confirm. Commands: /exit, /model, /help.
+ * Modes:
+ *   potluck                 interactive REPL (prompt-based ReAct loop)
+ *   potluck -p "task"       one-shot: run a single task and exit (scripting/CI)
+ *   potluck setup           configure CLI defaults (also auto-runs on first use)
+ *
+ * Streams the assistant output, renders actions + results, and gates every
+ * edit/write/command behind a y/N confirm (auto-approved with --yes in -p mode).
+ * In-session commands: /exit, /model, /scope, /help.
  */
 
-import { createInterface } from "node:readline";
-import { stdin, stdout } from "node:process";
+import { createInterface, type Interface } from "node:readline";
+import { stdin, stdout, stderr } from "node:process";
 
 import {
   assertGatewayReady,
+  cliPrefsExist,
   GatewayDisabledError,
+  loadCliPrefs,
   loadConfig,
+  loadSharedPrefs,
+  normalizeScope,
   resolveModel,
+  resolveScope,
   type GatewayConfig,
+  type Scope,
 } from "./config.js";
 import { listModels, type ChatMessage } from "./gateway.js";
 import { runTask, systemPrompt } from "./agent.js";
-import { c, makeConfirm, renderAction, renderResultPreview } from "./ui.js";
+import { runSetup, printSetupHelp } from "./setup.js";
+import {
+  c,
+  makeConfirm,
+  oneShotConfirm,
+  renderAction,
+  renderResultPreview,
+} from "./ui.js";
 
 const VERSION = "0.1.0";
 
 interface CliArgs {
   help: boolean;
   version: boolean;
+  print: boolean;
+  yes: boolean;
   model?: string;
+  scope?: string;
+  task?: string;
+  command?: "setup";
 }
 
 function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { help: false, version: false };
+  const args: CliArgs = { help: false, version: false, print: false, yes: false };
+  const positionals: string[] = [];
+
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") args.help = true;
     else if (arg === "--version" || arg === "-v") args.version = true;
+    else if (arg === "--yes" || arg === "-y") args.yes = true;
     else if (arg === "--model" || arg === "-m") {
       const next = argv[i + 1];
       if (next !== undefined) {
@@ -43,7 +69,34 @@ function parseArgs(argv: string[]): CliArgs {
       }
     } else if (arg.startsWith("--model=")) {
       args.model = arg.slice("--model=".length);
+    } else if (arg === "--scope") {
+      const next = argv[i + 1];
+      if (next !== undefined) {
+        args.scope = next;
+        i++;
+      }
+    } else if (arg.startsWith("--scope=")) {
+      args.scope = arg.slice("--scope=".length);
+    } else if (arg === "--print" || arg === "-p") {
+      args.print = true;
+      const next = argv[i + 1];
+      if (next !== undefined && !next.startsWith("-")) {
+        args.task = next;
+        i++;
+      }
+    } else if (arg.startsWith("--print=")) {
+      args.print = true;
+      args.task = arg.slice("--print=".length);
+    } else if (!arg.startsWith("-")) {
+      positionals.push(arg);
     }
+    // Unknown flags are ignored rather than fatal.
+  }
+
+  if (positionals[0] === "setup") {
+    args.command = "setup";
+  } else if (args.print && args.task === undefined && positionals.length > 0) {
+    args.task = positionals.join(" ");
   }
   return args;
 }
@@ -55,12 +108,17 @@ function printHelp(): void {
       "Inference runs on your own machines across the Potluck mesh.",
       "",
       `${c.bold("Usage")}`,
-      "  potluck [options]",
+      "  potluck [options]              start the interactive REPL",
+      '  potluck -p "task" [--yes]      run one task and exit (scripting/CI)',
+      "  potluck setup                  configure CLI defaults",
       "",
       `${c.bold("Options")}`,
-      "  -m, --model <id>   Model to use (default: first installed on the node)",
-      "  -h, --help         Show this help",
-      "  -v, --version      Show version",
+      "  -m, --model <id>       Model to use (default: cli.json / app / first installed)",
+      "      --scope <s>        Routing scope: local | mine (default from cli.json)",
+      '  -p, --print "task"     Run a single task non-interactively, then exit',
+      "  -y, --yes              In -p mode, auto-approve edits/writes/commands",
+      "  -h, --help             Show this help",
+      "  -v, --version          Show version",
       "",
       `${c.bold("Environment")}`,
       "  POTLUCK_GATEWAY_URL   Gateway base URL (default http://127.0.0.1:8321/v1)",
@@ -69,77 +127,68 @@ function printHelp(): void {
       "",
       `${c.bold("In-session commands")}`,
       "  /model [id]   Show or switch the model",
+      "  /scope [s]    Show or switch the routing scope (local | mine)",
       "  /help         Show help",
       "  /exit         Quit",
       "",
+      "Config layers (low -> high): defaults < ~/.potluck/config.json (app) <",
+      "~/.potluck/cli.json (CLI prefs) < env < flags.",
       "The gateway must be enabled in the Potluck app (Settings -> Connect tools).",
       "",
     ].join("\n"),
   );
 }
 
-function printBanner(model: string, cfg: GatewayConfig): void {
+function printBanner(model: string, scope: Scope, cfg: GatewayConfig): void {
   stdout.write(
-    `\n${c.bold("potluck")} ${c.dim("·")} ${c.cyan(model)} ${c.dim("·")} ${c.green(
-      "running on the Potluck mesh",
-    )}\n`,
+    `\n${c.bold("potluck")} ${c.dim("·")} ${c.cyan(model)} ${c.dim("·")} ${c.yellow(
+      `scope: ${scope}`,
+    )} ${c.dim("·")} ${c.green("running on the Potluck mesh")}\n`,
   );
   stdout.write(`${c.dim(cfg.baseURL)}\n`);
   stdout.write(
     `${c.dim("type a task, or")} ${c.bold("/help")} ${c.dim("·")} ${c.bold(
       "/model",
-    )} ${c.dim("·")} ${c.bold("/exit")}\n\n`,
+    )} ${c.dim("·")} ${c.bold("/scope")} ${c.dim("·")} ${c.bold("/exit")}\n\n`,
   );
 }
 
-async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
+/** Stream a single task to stdout and exit (-p mode). Notices go to stderr. */
+async function runOneShot(
+  task: string,
+  opts: { cfg: GatewayConfig; model: string; scope: Scope; cwd: string; yes: boolean },
+): Promise<void> {
+  const confirm = oneShotConfirm(opts.yes, (line) => stderr.write(`${line}\n`));
+  const conversation: ChatMessage[] = [
+    { role: "system", content: systemPrompt(opts.cwd) },
+  ];
+  await runTask(conversation, task, {
+    cfg: opts.cfg,
+    model: opts.model,
+    cwd: opts.cwd,
+    confirm,
+    scope: opts.scope,
+    callbacks: {
+      onToken: (t) => stdout.write(t),
+      onTurnEnd: () => stdout.write("\n"),
+      onAction: (a) => stderr.write(`${renderAction(a.tool, a.args)}\n`),
+      onToolResult: (r) => stderr.write(`${renderResultPreview(r)}\n`),
+      onNotice: (m) => stderr.write(`${c.yellow(m)}\n`),
+    },
+  });
+}
 
-  if (args.help) {
-    printHelp();
-    return;
-  }
-  if (args.version) {
-    stdout.write(`${VERSION}\n`);
-    return;
-  }
-
-  const cfg = await loadConfig();
-  try {
-    assertGatewayReady(cfg);
-  } catch (err) {
-    if (err instanceof GatewayDisabledError) {
-      stdout.write(`${c.yellow(err.message)}\n`);
-      process.exitCode = 1;
-      return;
-    }
-    throw err;
-  }
-
-  let model: string;
-  try {
-    model = await resolveModel(cfg, args.model);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    stdout.write(
-      `${c.red("Could not reach the Potluck gateway")} at ${cfg.baseURL}\n${c.dim(
-        message,
-      )}\nIs the Potluck app running with the gateway enabled?\n`,
-    );
-    process.exitCode = 1;
-    return;
-  }
-
-  const cwd = process.cwd();
-  const rl = createInterface({ input: stdin, output: stdout });
+/**
+ * A close-safe prompt bound to one readline. Resolves to null on EOF / readline
+ * close (piped input ending, Ctrl-D) so callers stop instead of calling
+ * question() on a closed readline (ERR_USE_AFTER_CLOSE).
+ */
+function createAsk(rl: Interface): (q: string) => Promise<string | null> {
   let closed = false;
   rl.once("close", () => {
     closed = true;
   });
-  // Resolves to null when stdin hits EOF / the readline closes (piped input
-  // ending, Ctrl-D), so the loop can exit instead of calling question() on a
-  // closed readline (ERR_USE_AFTER_CLOSE).
-  const ask = (q: string): Promise<string | null> =>
+  return (q: string): Promise<string | null> =>
     new Promise((res) => {
       if (closed) {
         res(null);
@@ -159,8 +208,137 @@ async function main(): Promise<void> {
         res(answer);
       });
     });
-  const confirm = makeConfirm((q) => ask(q).then((a) => a ?? "n"));
+}
 
+function reportGatewayError(cfg: GatewayConfig, err: unknown, sink: NodeJS.WritableStream): void {
+  const message = err instanceof Error ? err.message : String(err);
+  sink.write(
+    `${c.red("Could not reach the Potluck gateway")} at ${cfg.baseURL}\n${c.dim(
+      message,
+    )}\nIs the Potluck app running with the gateway enabled?\n`,
+  );
+}
+
+async function main(): Promise<void> {
+  const args = parseArgs(process.argv.slice(2));
+
+  // `potluck setup` — interactive wizard (or its help).
+  if (args.command === "setup") {
+    if (args.help) {
+      printSetupHelp((s) => stdout.write(s));
+      return;
+    }
+    const rl = createInterface({ input: stdin, output: stdout });
+    const ask = createAsk(rl);
+    try {
+      await runSetup({ ask, out: (s) => stdout.write(`${s}\n`) });
+    } finally {
+      rl.close();
+    }
+    return;
+  }
+
+  if (args.help) {
+    printHelp();
+    return;
+  }
+  if (args.version) {
+    stdout.write(`${VERSION}\n`);
+    return;
+  }
+
+  let cfg = await loadConfig();
+  let cli = await loadCliPrefs();
+  const shared = await loadSharedPrefs();
+  const cwd = process.cwd();
+
+  // ---- One-shot (-p / --print) ------------------------------------------
+  if (args.print) {
+    if (!args.task || !args.task.trim()) {
+      stderr.write(
+        `${c.red("error:")} -p/--print needs a task, e.g. ${c.bold(
+          'potluck -p "fix the build"',
+        )}\n`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+    try {
+      assertGatewayReady(cfg);
+    } catch (err) {
+      if (err instanceof GatewayDisabledError) {
+        stderr.write(`${c.yellow(err.message)}\n`);
+        process.exitCode = 1;
+        return;
+      }
+      throw err;
+    }
+
+    const preferred = args.model ?? cli.model ?? shared.activeModelId;
+    let model: string;
+    try {
+      model = await resolveModel(cfg, preferred);
+    } catch (err) {
+      reportGatewayError(cfg, err, stderr);
+      process.exitCode = 1;
+      return;
+    }
+
+    const { scope, notice } = resolveScope(args.scope, cli.scope);
+    if (notice) stderr.write(`${c.yellow(notice)}\n`);
+
+    try {
+      await runOneShot(args.task.trim(), { cfg, model, scope, cwd, yes: args.yes });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      stderr.write(`${c.red("error:")} ${c.dim(message)}\n`);
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  // ---- Interactive REPL --------------------------------------------------
+  const rl = createInterface({ input: stdin, output: stdout });
+  const ask = createAsk(rl);
+
+  // First-run setup: auto-run the wizard when cli.json is missing (TTY only, so
+  // pipes/CI fall back to defaults instead of hanging on a prompt).
+  if (stdin.isTTY === true && !(await cliPrefsExist())) {
+    await runSetup({ ask, out: (s) => stdout.write(`${s}\n`) });
+    cli = await loadCliPrefs();
+    cfg = await loadConfig();
+    stdout.write("\n");
+  }
+
+  try {
+    assertGatewayReady(cfg);
+  } catch (err) {
+    if (err instanceof GatewayDisabledError) {
+      stdout.write(`${c.yellow(err.message)}\n`);
+      process.exitCode = 1;
+      rl.close();
+      return;
+    }
+    rl.close();
+    throw err;
+  }
+
+  const preferred = args.model ?? cli.model ?? shared.activeModelId;
+  let model: string;
+  try {
+    model = await resolveModel(cfg, preferred);
+  } catch (err) {
+    reportGatewayError(cfg, err, stdout);
+    process.exitCode = 1;
+    rl.close();
+    return;
+  }
+
+  const initialScope = resolveScope(args.scope, cli.scope);
+  let scope: Scope = initialScope.scope;
+  if (initialScope.notice) stdout.write(`${c.yellow(initialScope.notice)}\n`);
+
+  const confirm = makeConfirm((q) => ask(q).then((a) => a ?? "n"));
   const conversation: ChatMessage[] = [
     { role: "system", content: systemPrompt(cwd) },
   ];
@@ -177,7 +355,7 @@ async function main(): Promise<void> {
     }
   });
 
-  printBanner(model, cfg);
+  printBanner(model, scope, cfg);
 
   while (true) {
     const answer = await ask(c.green("you ▸ "));
@@ -188,6 +366,22 @@ async function main(): Promise<void> {
     if (line === "/exit" || line === "/quit") break;
     if (line === "/help") {
       printHelp();
+      continue;
+    }
+    if (line === "/scope" || line.startsWith("/scope ")) {
+      const target = line.slice("/scope".length).trim();
+      if (target) {
+        const resolved = normalizeScope(target, scope);
+        if (resolved.notice) stdout.write(`${c.yellow(resolved.notice)}\n`);
+        scope = resolved.scope;
+        stdout.write(`${c.dim("scope set to")} ${c.yellow(scope)}\n`);
+      } else {
+        stdout.write(
+          `${c.dim("current scope:")} ${c.yellow(scope)} ${c.dim(
+            "(local = this machine, mine = your machines)",
+          )}\n`,
+        );
+      }
       continue;
     }
     if (line === "/model" || line.startsWith("/model ")) {
@@ -226,6 +420,7 @@ async function main(): Promise<void> {
         model,
         cwd,
         confirm,
+        scope,
         signal: active.signal,
         callbacks: {
           onToken: (t) => stdout.write(t),

@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -6,9 +6,17 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   assertGatewayReady,
+  cliPrefsExist,
   GatewayDisabledError,
+  loadCliPrefs,
   loadConfig,
+  loadSharedPrefs,
+  mergeSharedSafeFields,
+  normalizeScope,
   resolveModel,
+  resolveScope,
+  saveCliPrefs,
+  saveSharedSafeFields,
 } from "../src/config.js";
 
 let home = "";
@@ -22,7 +30,11 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  process.env = { ...savedEnv };
+  // Restore env vars in place. Reassigning process.env wholesale detaches it
+  // from the live proxy, after which HOME mutations no longer reach os.homedir().
+  process.env.HOME = savedEnv.HOME;
+  delete process.env.POTLUCK_GATEWAY_KEY;
+  delete process.env.POTLUCK_GATEWAY_URL;
   await rm(home, { recursive: true, force: true });
 });
 
@@ -88,8 +100,135 @@ describe("assertGatewayReady", () => {
 });
 
 describe("resolveModel", () => {
-  it("returns the --model flag without touching the network", async () => {
+  it("returns the preferred model without touching the network", async () => {
     const cfg = { baseURL: "http://invalid.invalid", apiKey: "k", enabled: true };
     await expect(resolveModel(cfg, "llama-3.1-8b")).resolves.toBe("llama-3.1-8b");
+  });
+});
+
+async function writeCliPrefs(prefs: unknown): Promise<void> {
+  const dir = join(home, ".potluck");
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, "cli.json"), JSON.stringify(prefs), "utf8");
+}
+
+describe("config layering (config.json < cli.json < env)", () => {
+  it("folds cli.json gatewayUrl into the base URL", async () => {
+    await writeConfig({ enabled: true, api_key: "k" });
+    await writeCliPrefs({ gatewayUrl: "http://127.0.0.1:7777/v1" });
+    const cfg = await loadConfig();
+    expect(cfg.baseURL).toBe("http://127.0.0.1:7777/v1");
+  });
+
+  it("lets POTLUCK_GATEWAY_URL win over cli.json gatewayUrl", async () => {
+    await writeCliPrefs({ gatewayUrl: "http://127.0.0.1:7777/v1" });
+    process.env.POTLUCK_GATEWAY_URL = "http://127.0.0.1:9999/v1";
+    const cfg = await loadConfig();
+    expect(cfg.baseURL).toBe("http://127.0.0.1:9999/v1");
+  });
+});
+
+describe("loadCliPrefs", () => {
+  it("reads model, scope, gatewayUrl and ignores an invalid scope", async () => {
+    await writeCliPrefs({ model: "m1", scope: "bogus", gatewayUrl: "u" });
+    const prefs = await loadCliPrefs();
+    expect(prefs.model).toBe("m1");
+    expect(prefs.gatewayUrl).toBe("u");
+    expect(prefs.scope).toBeUndefined(); // bad scope dropped
+  });
+
+  it("round-trips through saveCliPrefs", async () => {
+    await saveCliPrefs({ model: "m2", scope: "local", gatewayUrl: "g" });
+    expect(await cliPrefsExist()).toBe(true);
+    const prefs = await loadCliPrefs();
+    expect(prefs).toEqual({ model: "m2", scope: "local", gatewayUrl: "g" });
+  });
+
+  it("returns empty + cliPrefsExist false when missing", async () => {
+    expect(await cliPrefsExist()).toBe(false);
+    expect(await loadCliPrefs()).toEqual({});
+  });
+});
+
+describe("loadSharedPrefs", () => {
+  it("reads active_model_id and network.coordinator_url", async () => {
+    const dir = join(home, ".potluck");
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      join(dir, "config.json"),
+      JSON.stringify({
+        gateway: { enabled: true, api_key: "k" },
+        active_model_id: "llama",
+        network: { coordinator_url: "http://10.0.0.1:8400" },
+      }),
+      "utf8",
+    );
+    const shared = await loadSharedPrefs();
+    expect(shared.activeModelId).toBe("llama");
+    expect(shared.coordinatorUrl).toBe("http://10.0.0.1:8400");
+  });
+});
+
+describe("mergeSharedSafeFields (wizard write-back safety)", () => {
+  it("sets only active_model_id + network.coordinator_url, preserving the rest", () => {
+    const raw = {
+      gateway: { enabled: true, api_key: "SECRET", pool_routing: false },
+      network: { coordinator_url: "old", max_gpu_percent: 80 },
+      active_model_id: "old-model",
+      runtime: { temperature: 0.7 },
+    };
+    const next = mergeSharedSafeFields(raw, {
+      model: "new-model",
+      coordinatorUrl: "http://new:8400",
+    });
+    expect(next.active_model_id).toBe("new-model");
+    expect(next.network).toEqual({
+      coordinator_url: "http://new:8400",
+      max_gpu_percent: 80,
+    });
+    // gateway is passed through untouched — never the key or the enabled flag.
+    expect(next.gateway).toEqual({ enabled: true, api_key: "SECRET", pool_routing: false });
+    expect(next.runtime).toEqual({ temperature: 0.7 });
+  });
+
+  it("does not invent a gateway block or change keys", () => {
+    const next = mergeSharedSafeFields({}, { model: "m" });
+    expect(next.active_model_id).toBe("m");
+    expect("gateway" in next).toBe(false);
+  });
+
+  it("saveSharedSafeFields never touches gateway api_key/enabled on disk", async () => {
+    await writeConfig({ enabled: true, api_key: "DO-NOT-TOUCH" });
+    await saveSharedSafeFields({ model: "model-x", coordinatorUrl: "http://c:8400" });
+    const raw = JSON.parse(
+      await readFile(join(home, ".potluck", "config.json"), "utf8"),
+    ) as Record<string, unknown>;
+    expect(raw.active_model_id).toBe("model-x");
+    expect((raw.network as Record<string, unknown>).coordinator_url).toBe("http://c:8400");
+    expect(raw.gateway).toEqual({ enabled: true, api_key: "DO-NOT-TOUCH" });
+  });
+});
+
+describe("scope resolution", () => {
+  it("defaults to mine, honors cli.json, and lets a flag win", () => {
+    expect(resolveScope(undefined, undefined).scope).toBe("mine");
+    expect(resolveScope(undefined, "local").scope).toBe("local");
+    expect(resolveScope("local", "mine").scope).toBe("local");
+  });
+
+  it("treats circle/cooperative as single-turn only and falls back to mine", () => {
+    const circle = normalizeScope("circle", "local");
+    expect(circle.scope).toBe("mine");
+    expect(circle.notice).toMatch(/single-turn only/);
+
+    const coop = resolveScope("cooperative", "local");
+    expect(coop.scope).toBe("mine");
+    expect(coop.notice).toMatch(/single-turn only/);
+  });
+
+  it("falls back with a notice for an unknown scope", () => {
+    const r = normalizeScope("weird", "local");
+    expect(r.scope).toBe("local");
+    expect(r.notice).toMatch(/unknown scope/);
   });
 });

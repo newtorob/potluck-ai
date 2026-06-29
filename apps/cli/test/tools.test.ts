@@ -110,6 +110,152 @@ describe("run_command", () => {
   });
 });
 
+describe("search_files", () => {
+  it("returns file:line: text for matches", async () => {
+    await writeFile(join(cwd, "a.ts"), "const x = 1;\nconst hello = 2;\n", "utf8");
+    await writeFile(join(cwd, "b.ts"), "no match here\n", "utf8");
+    const out = await runTool(
+      "search_files",
+      { query: "hello" },
+      { cwd, confirm: allow },
+    );
+    expect(out).toContain("a.ts:2:");
+    expect(out).toContain("const hello = 2;");
+    expect(out).not.toContain("b.ts");
+  });
+
+  it("supports regex queries", async () => {
+    await writeFile(join(cwd, "a.ts"), "fooBar\nfoobaz\n", "utf8");
+    const out = await runTool(
+      "search_files",
+      { query: "foo[A-Z]\\w+" },
+      { cwd, confirm: allow },
+    );
+    expect(out).toContain("a.ts:1:");
+    expect(out).not.toContain("a.ts:2:");
+  });
+
+  it("respects .gitignore", async () => {
+    await writeFile(join(cwd, ".gitignore"), "secret.txt\nbuild/\n", "utf8");
+    await writeFile(join(cwd, "keep.txt"), "needle\n", "utf8");
+    await writeFile(join(cwd, "secret.txt"), "needle\n", "utf8");
+    await mkdir(join(cwd, "build"));
+    await writeFile(join(cwd, "build", "out.txt"), "needle\n", "utf8");
+
+    const out = await runTool(
+      "search_files",
+      { query: "needle" },
+      { cwd, confirm: allow },
+    );
+    expect(out).toContain("keep.txt");
+    expect(out).not.toContain("secret.txt");
+    expect(out).not.toContain("build/");
+  });
+
+  it("caps results and reports truncation", async () => {
+    const lines = Array.from({ length: 150 }, () => "match").join("\n");
+    await writeFile(join(cwd, "big.txt"), `${lines}\n`, "utf8");
+    const out = await runTool(
+      "search_files",
+      { query: "match" },
+      { cwd, confirm: allow },
+    );
+    expect(out).toMatch(/truncated at 100 matches/);
+    const hitLines = out.split("\n").filter((l) => l.startsWith("big.txt:"));
+    expect(hitLines.length).toBe(100);
+  });
+
+  it("reports when there are no matches", async () => {
+    await writeFile(join(cwd, "a.txt"), "nothing\n", "utf8");
+    const out = await runTool(
+      "search_files",
+      { query: "absent" },
+      { cwd, confirm: allow },
+    );
+    expect(out).toMatch(/no matches/);
+  });
+});
+
+describe("glob", () => {
+  it("finds files by ** pattern", async () => {
+    await mkdir(join(cwd, "src"));
+    await writeFile(join(cwd, "src", "a.ts"), "", "utf8");
+    await writeFile(join(cwd, "src", "b.js"), "", "utf8");
+    await writeFile(join(cwd, "top.ts"), "", "utf8");
+
+    const out = await runTool("glob", { pattern: "**/*.ts" }, { cwd, confirm: allow });
+    const files = out.split("\n");
+    expect(files).toContain("src/a.ts");
+    expect(files).toContain("top.ts");
+    expect(files).not.toContain("src/b.js");
+  });
+
+  it("respects .gitignore and reports no matches", async () => {
+    await writeFile(join(cwd, ".gitignore"), "*.log\n", "utf8");
+    await writeFile(join(cwd, "x.log"), "", "utf8");
+    const out = await runTool("glob", { pattern: "**/*.log" }, { cwd, confirm: allow });
+    expect(out).toMatch(/no files match/);
+  });
+});
+
+describe("edit_file", () => {
+  it("replaces a unique old_string and shows a diff", async () => {
+    await writeFile(join(cwd, "f.ts"), "const a = 1;\nconst b = 2;\n", "utf8");
+    const confirm = vi.fn<Confirm>(async () => true);
+    const out = await runTool(
+      "edit_file",
+      { path: "f.ts", old_string: "const b = 2;", new_string: "const b = 3;" },
+      { cwd, confirm },
+    );
+    expect(out).toMatch(/^edited f\.ts/);
+    expect(await readFile(join(cwd, "f.ts"), "utf8")).toBe("const a = 1;\nconst b = 3;\n");
+    const ctx = confirm.mock.calls[0]?.[0];
+    expect(ctx?.tool).toBe("edit_file");
+    expect(ctx?.summary).toContain("-const b = 2;");
+    expect(ctx?.summary).toContain("+const b = 3;");
+  });
+
+  it("errors when old_string is absent", async () => {
+    await writeFile(join(cwd, "f.ts"), "hello\n", "utf8");
+    const out = await runTool(
+      "edit_file",
+      { path: "f.ts", old_string: "missing", new_string: "x" },
+      { cwd, confirm: allow },
+    );
+    expect(out).toMatch(/old_string not found/);
+  });
+
+  it("errors when old_string is not unique", async () => {
+    await writeFile(join(cwd, "f.ts"), "dup\ndup\n", "utf8");
+    const out = await runTool(
+      "edit_file",
+      { path: "f.ts", old_string: "dup", new_string: "x" },
+      { cwd, confirm: allow },
+    );
+    expect(out).toMatch(/not unique/);
+  });
+
+  it("errors when the file does not exist (use write_file)", async () => {
+    const out = await runTool(
+      "edit_file",
+      { path: "nope.ts", old_string: "a", new_string: "b" },
+      { cwd, confirm: allow },
+    );
+    expect(out).toMatch(/does not exist/);
+  });
+
+  it("does not write when declined", async () => {
+    await writeFile(join(cwd, "f.ts"), "keep\n", "utf8");
+    const out = await runTool(
+      "edit_file",
+      { path: "f.ts", old_string: "keep", new_string: "changed" },
+      { cwd, confirm: deny },
+    );
+    expect(out).toBe("user declined");
+    expect(await readFile(join(cwd, "f.ts"), "utf8")).toBe("keep\n");
+  });
+});
+
 describe("runTool dispatch", () => {
   it("reports unknown tools", async () => {
     const out = await runTool("frobnicate", {}, { cwd, confirm: allow });
