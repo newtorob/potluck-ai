@@ -24,6 +24,12 @@ export type ParseResult =
 
 const ACTION_BLOCK = /```[ \t]*action[^\n]*\n([\s\S]*?)```/;
 
+/** End offset (exclusive) of the first complete ```action block, or -1 if none. */
+function actionBlockEnd(text: string): number {
+  const m = ACTION_BLOCK.exec(text);
+  return m ? m.index + m[0].length : -1;
+}
+
 /**
  * Parse one assistant message. Tolerates prose around the block. No block means
  * a final answer; a malformed block becomes an `error` so the loop can feed the
@@ -88,6 +94,11 @@ export function systemPrompt(cwd: string): string {
     "After an action, the CLI runs it and replies with one user message starting",
     "`TOOL_RESULT:` that contains the result. Read it, then continue the loop.",
     "When you are done, reply with a final answer and NO action block.",
+    "",
+    "CRITICAL: emit your action block and then STOP -- write nothing after it.",
+    "NEVER write a line starting with `TOOL_RESULT` yourself, and NEVER invent,",
+    "predict, or guess what a tool returns. The CLI runs the tool and gives you the",
+    "real result; wait for it.",
     "",
     "Tools:",
     '  search_files {"query": string, "path"?: string, "regex"?: bool}  search file contents (auto-runs)',
@@ -208,11 +219,21 @@ export async function runTask(
     })) {
       assistant += token;
       callbacks.onToken(token);
+      // Stop the moment one complete action block is emitted. Weaker local models
+      // tend to keep generating after it -- hallucinating a TOOL_RESULT or drifting
+      // into invented output. Breaking closes the stream so they can't.
+      if (actionBlockEnd(assistant) !== -1) break;
     }
     callbacks.onTurnEnd();
-    history.push({ role: "assistant", content: assistant });
 
     const parsed = parseAction(assistant);
+    // Store only up to the action block (discard any post-action hallucination);
+    // a final answer (no block) is stored whole.
+    const end = actionBlockEnd(assistant);
+    history.push({
+      role: "assistant",
+      content: end === -1 ? assistant : assistant.slice(0, end),
+    });
 
     if (parsed.kind === "final") {
       return;
