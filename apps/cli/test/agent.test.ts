@@ -121,6 +121,53 @@ describe("parseAction", () => {
     if (result.kind !== "action") throw new Error("expected action");
     expect(result.action.args).toEqual({ path: "a.ts" });
   });
+
+  it("falls back to a relaxed parse for single-quoted values with embedded quotes", () => {
+    const text = [
+      "```action",
+      `{"tool": "edit_file", "args": {"path": "src/index.ts", "old_string": '    if (line === "/exit" || line === "/quit") break;', "new_string": '    if (line === "/exit" || line === "/quit" || line === "/tools") break;'}}`,
+      "```",
+    ].join("\n");
+    const result = parseAction(text);
+    if (result.kind !== "action") throw new Error("expected action");
+    expect(result.action.tool).toBe("edit_file");
+    expect(result.action.args).toEqual({
+      path: "src/index.ts",
+      old_string: '    if (line === "/exit" || line === "/quit") break;',
+      new_string:
+        '    if (line === "/exit" || line === "/quit" || line === "/tools") break;',
+    });
+  });
+
+  it("relaxed-parses unquoted keys and trailing commas", () => {
+    const text = ["```action", "{tool: 'read_file', args: {path: 'a.ts',},}", "```"].join(
+      "\n",
+    );
+    const result = parseAction(text);
+    if (result.kind !== "action") throw new Error("expected action");
+    expect(result.action.tool).toBe("read_file");
+    expect(result.action.args).toEqual({ path: "a.ts" });
+  });
+
+  it("relaxed-parses inlined top-level args written with single quotes", () => {
+    const text = ["```action", "{tool: 'run_command', command: 'ls src'}", "```"].join(
+      "\n",
+    );
+    const result = parseAction(text);
+    if (result.kind !== "action") throw new Error("expected action");
+    expect(result.action.tool).toBe("run_command");
+    expect(result.action.args).toEqual({ command: "ls src" });
+  });
+
+  it("still returns an error when both strict and relaxed parses fail", () => {
+    for (const broken of ['{"tool":', "{a: }", "{unterminated: 'oops}"]) {
+      const text = ["```action", broken, "```"].join("\n");
+      const result = parseAction(text);
+      expect(result.kind).toBe("error");
+      if (result.kind !== "error") throw new Error("expected error");
+      expect(result.message).toMatch(/invalid JSON/i);
+    }
+  });
 });
 
 describe("trimHistory", () => {

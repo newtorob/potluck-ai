@@ -10,6 +10,7 @@
 
 import type { GatewayConfig } from "./config.js";
 import { streamChat, type ChatMessage } from "./gateway.js";
+import { parseRelaxedJson } from "./relaxedJson.js";
 import { runTool, runVerify, type Confirm, type VerifyOutcome } from "./tools.js";
 
 /** A function that runs the verify command (injectable for tests). */
@@ -48,9 +49,16 @@ export function parseAction(text: string): ParseResult {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    return { kind: "error", message: `invalid JSON in action block: ${reason}` };
+  } catch {
+    // Weaker local models emit loose JSON in the fence (single-quoted strings,
+    // trailing commas, unquoted keys). Fall back to the relaxed parser; only if
+    // THAT also throws do we surface a retryable error back to the loop.
+    try {
+      parsed = parseRelaxedJson(json);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      return { kind: "error", message: `invalid JSON in action block: ${reason}` };
+    }
   }
 
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
