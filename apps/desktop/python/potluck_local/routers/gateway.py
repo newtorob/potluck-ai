@@ -25,7 +25,7 @@ import logging
 import time
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -105,34 +105,68 @@ async def list_models_openai() -> dict:
 
 
 @router.post("/chat/completions")
-async def chat_completions_openai(req: ChatCompletionRequest):
+async def chat_completions_openai(
+    req: ChatCompletionRequest,
+    x_potluck_scope: str | None = Header(default=None),
+):
     """OpenAI /v1/chat/completions. Serves the local model, or routes to a
     household peer (your own machine over the mesh) that has the requested model
-    loaded. Routing is by model id: local first, then a reachable peer."""
+    loaded. Routing is by model id: local first, then a reachable peer.
+
+    X-Potluck-Scope controls the routing tier for this single request:
+      "local"  — this node only; 503 if no local model is loaded.
+      "mine"   — local first, then household peer; pool never used.
+      absent / any other value — default: local -> household -> pool-if-enabled.
+    """
     runtime = get_runtime()
     local = runtime.current_model_id() if runtime.is_loaded() else None
 
-    # Resolve the route: local -> household peer -> open pool. A requested model
-    # that isn't local is looked up across reachable household peers; if none has
-    # it and open-pool routing is opted in, the coordinator finds a pool peer;
-    # otherwise fail loudly (no silent swap).
+    # Resolve the route. The X-Potluck-Scope header narrows which tiers are
+    # eligible for this request. Absent or unrecognised values keep the existing
+    # local -> household -> pool-if-enabled fall-through unchanged.
+    scope = (x_potluck_scope or "").lower().strip()
     peer = None
     use_pool = False
-    if req.model and req.model != local:
-        peer = await gateway_routing.peer_for_model(req.model)
-        if peer is None:
-            if pool_routing.pool_enabled():
-                use_pool = True
-            else:
+
+    if scope == "local":
+        # This node only. Fail immediately — no fall-through to peer or pool.
+        if local is None:
+            raise HTTPException(
+                status_code=503,
+                detail="No local model loaded; load one or retry with X-Potluck-Scope: mine",
+            )
+    elif scope == "mine":
+        # Local first, then household peer. Pool is never reached.
+        if req.model and req.model != local:
+            peer = await gateway_routing.peer_for_model(req.model)
+            if peer is None:
                 raise HTTPException(
                     status_code=404,
                     detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
                 )
-    if not use_pool and peer is None and local is None:
-        raise HTTPException(
-            status_code=503,
-            detail="No model loaded on this node, and no household peer matched.",
-        )
+        if peer is None and local is None:
+            raise HTTPException(
+                status_code=503,
+                detail="No model loaded on this node, and no household peer matched.",
+            )
+    else:
+        # Default: local -> household peer -> open pool (if opted in). Existing
+        # behavior preserved byte-for-byte when the header is absent.
+        if req.model and req.model != local:
+            peer = await gateway_routing.peer_for_model(req.model)
+            if peer is None:
+                if pool_routing.pool_enabled():
+                    use_pool = True
+                else:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
+                    )
+        if not use_pool and peer is None and local is None:
+            raise HTTPException(
+                status_code=503,
+                detail="No model loaded on this node, and no household peer matched.",
+            )
 
     messages = [m.model_dump() for m in req.messages]
     max_tokens = req.max_tokens or _DEFAULT_MAX_TOKENS
@@ -235,31 +269,58 @@ def _prompt_to_message(prompt: str | list[str]) -> str:
 
 
 @router.post("/completions")
-async def text_completions(req: CompletionRequest):
+async def text_completions(
+    req: CompletionRequest,
+    x_potluck_scope: str | None = Header(default=None),
+):
     """OpenAI legacy /v1/completions. Converts prompt → user message and reuses
     the same local→household→pool routing path as /v1/chat/completions. Returns
     an OpenAI text_completion envelope (object "text_completion", choices[].text).
+
+    Honours X-Potluck-Scope with the same semantics as /v1/chat/completions.
     """
     runtime = get_runtime()
     local = runtime.current_model_id() if runtime.is_loaded() else None
 
+    scope = (x_potluck_scope or "").lower().strip()
     peer = None
     use_pool = False
-    if req.model and req.model != local:
-        peer = await gateway_routing.peer_for_model(req.model)
-        if peer is None:
-            if pool_routing.pool_enabled():
-                use_pool = True
-            else:
+
+    if scope == "local":
+        if local is None:
+            raise HTTPException(
+                status_code=503,
+                detail="No local model loaded; load one or retry with X-Potluck-Scope: mine",
+            )
+    elif scope == "mine":
+        if req.model and req.model != local:
+            peer = await gateway_routing.peer_for_model(req.model)
+            if peer is None:
                 raise HTTPException(
                     status_code=404,
                     detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
                 )
-    if not use_pool and peer is None and local is None:
-        raise HTTPException(
-            status_code=503,
-            detail="No model loaded on this node, and no household peer matched.",
-        )
+        if peer is None and local is None:
+            raise HTTPException(
+                status_code=503,
+                detail="No model loaded on this node, and no household peer matched.",
+            )
+    else:
+        if req.model and req.model != local:
+            peer = await gateway_routing.peer_for_model(req.model)
+            if peer is None:
+                if pool_routing.pool_enabled():
+                    use_pool = True
+                else:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
+                    )
+        if not use_pool and peer is None and local is None:
+            raise HTTPException(
+                status_code=503,
+                detail="No model loaded on this node, and no household peer matched.",
+            )
 
     prompt_text = _prompt_to_message(req.prompt)
     messages = [{"role": "user", "content": prompt_text}]
