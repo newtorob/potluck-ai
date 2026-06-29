@@ -53,10 +53,20 @@ export function parseAction(text: string): ParseResult {
     return { kind: "error", message: 'action requires a string "tool" field' };
   }
 
-  const args =
-    typeof obj.args === "object" && obj.args !== null && !Array.isArray(obj.args)
-      ? (obj.args as Record<string, unknown>)
-      : {};
+  // Prefer an explicit args/arguments object. Weaker local models often inline
+  // the args at the top level instead (e.g. {"tool":"run_command","command":"..."}),
+  // so fall back to treating any remaining top-level keys as the args.
+  const explicit = obj.args ?? obj.arguments;
+  let args: Record<string, unknown>;
+  if (typeof explicit === "object" && explicit !== null && !Array.isArray(explicit)) {
+    args = explicit as Record<string, unknown>;
+  } else {
+    const { tool: _tool, args: _args, arguments: _arguments, ...rest } = obj;
+    void _tool;
+    void _args;
+    void _arguments;
+    args = rest;
+  }
 
   return { kind: "action", action: { tool: obj.tool, args } };
 }

@@ -64,6 +64,27 @@ describe("parseAction", () => {
     if (result.kind !== "action") throw new Error("expected action");
     expect(result.action.args).toEqual({});
   });
+
+  it("accepts inlined top-level args when a weak model omits the args object", () => {
+    const text = ["```action", '{"tool": "run_command", "command": "ls src"}', "```"].join(
+      "\n",
+    );
+    const result = parseAction(text);
+    if (result.kind !== "action") throw new Error("expected action");
+    expect(result.action.tool).toBe("run_command");
+    expect(result.action.args).toEqual({ command: "ls src" });
+  });
+
+  it("accepts `arguments` as an alias for `args`", () => {
+    const text = [
+      "```action",
+      '{"tool": "read_file", "arguments": {"path": "a.ts"}}',
+      "```",
+    ].join("\n");
+    const result = parseAction(text);
+    if (result.kind !== "action") throw new Error("expected action");
+    expect(result.action.args).toEqual({ path: "a.ts" });
+  });
 });
 
 describe("trimHistory", () => {
