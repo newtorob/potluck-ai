@@ -20,7 +20,7 @@
  *   scope    : DEFAULT_SCOPE < cli.json.scope < --scope flag
  */
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -140,6 +140,12 @@ export interface CliPrefs {
   scope?: Scope;
   /** Override for the gateway base URL. */
   gatewayUrl?: string;
+  /**
+   * Verify command run after each successful edit. An explicit "" or "off"
+   * disables it; absent means auto-detect per project. (Kept verbatim — unlike
+   * the other fields, an empty string is meaningful here.)
+   */
+  verify?: string;
 }
 
 function isScope(value: unknown): value is Scope {
@@ -162,6 +168,8 @@ export async function loadCliPrefs(): Promise<CliPrefs> {
   if (typeof obj.gatewayUrl === "string" && obj.gatewayUrl.trim()) {
     prefs.gatewayUrl = obj.gatewayUrl.trim();
   }
+  // Keep verify verbatim: "" / "off" are meaningful (explicit disable).
+  if (typeof obj.verify === "string") prefs.verify = obj.verify;
   return prefs;
 }
 
@@ -297,4 +305,91 @@ export function normalizeScope(
     scope: fallback ?? DEFAULT_SCOPE,
     notice: `unknown scope "${raw}"; using "${fallback ?? DEFAULT_SCOPE}".`,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Verify command resolution
+// ---------------------------------------------------------------------------
+
+export interface VerifyResolution {
+  /** The resolved shell command, or null when verify is off / nothing detected. */
+  command: string | null;
+  /** True when the command came from auto-detection (not an explicit layer). */
+  autoDetected: boolean;
+}
+
+export interface VerifyInputs {
+  /** Directory to auto-detect against (the agent's working directory). */
+  cwd: string;
+  /** cli.json `verify` ("" / "off" disables; absent = auto-detect). */
+  cliVerify?: string;
+  /** POTLUCK_VERIFY env value. */
+  envVerify?: string;
+  /** --verify flag value. */
+  flag?: string;
+  /** --no-verify flag (overrides everything: disabled). */
+  noVerify?: boolean;
+}
+
+/** "" or "off" at any explicit layer means: disable verify. */
+function isVerifyDisableToken(value: string): boolean {
+  const t = value.trim().toLowerCase();
+  return t === "" || t === "off";
+}
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Auto-detect a verify command for `cwd`:
+ *   - package.json with scripts.build  -> "pnpm build" (pnpm-lock.yaml) | "npm run build"
+ *   - else tsconfig.json present         -> "npx tsc --noEmit"
+ *   - else                               -> null
+ */
+async function autoDetectVerify(cwd: string): Promise<string | null> {
+  try {
+    const pkgRaw = await readFile(join(cwd, "package.json"), "utf8");
+    const pkg: unknown = JSON.parse(pkgRaw);
+    const scripts =
+      pkg && typeof pkg === "object"
+        ? (pkg as { scripts?: unknown }).scripts
+        : undefined;
+    const hasBuild =
+      scripts !== null &&
+      typeof scripts === "object" &&
+      typeof (scripts as Record<string, unknown>).build === "string";
+    if (hasBuild) {
+      const pnpm = await pathExists(join(cwd, "pnpm-lock.yaml"));
+      return pnpm ? "pnpm build" : "npm run build";
+    }
+  } catch {
+    // No package.json or it is not valid JSON — fall through to tsconfig.
+  }
+  if (await pathExists(join(cwd, "tsconfig.json"))) return "npx tsc --noEmit";
+  return null;
+}
+
+/**
+ * Resolve the verify command. Precedence (low -> high):
+ *   auto-detect  <  cli.json.verify  <  POTLUCK_VERIFY  <  --verify
+ * --no-verify (and an explicit "" / "off" at the winning layer) disables it.
+ */
+export async function resolveVerify(inputs: VerifyInputs): Promise<VerifyResolution> {
+  if (inputs.noVerify) return { command: null, autoDetected: false };
+
+  // The highest-precedence explicit layer wins, even if it disables.
+  const explicit = inputs.flag ?? inputs.envVerify ?? inputs.cliVerify;
+  if (explicit !== undefined) {
+    if (isVerifyDisableToken(explicit)) return { command: null, autoDetected: false };
+    return { command: explicit.trim(), autoDetected: false };
+  }
+
+  const detected = await autoDetectVerify(inputs.cwd);
+  return { command: detected, autoDetected: detected !== null };
 }

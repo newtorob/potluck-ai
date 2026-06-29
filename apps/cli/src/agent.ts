@@ -10,7 +10,10 @@
 
 import type { GatewayConfig } from "./config.js";
 import { streamChat, type ChatMessage } from "./gateway.js";
-import { runTool, type Confirm } from "./tools.js";
+import { runTool, runVerify, type Confirm, type VerifyOutcome } from "./tools.js";
+
+/** A function that runs the verify command (injectable for tests). */
+export type VerifyRunner = (command: string, cwd: string) => Promise<VerifyOutcome>;
 
 export interface ParsedAction {
   tool: string;
@@ -78,8 +81,8 @@ export function parseAction(text: string): ParseResult {
 }
 
 /** Build the system prompt that defines the strict action protocol. */
-export function systemPrompt(cwd: string): string {
-  return [
+export function systemPrompt(cwd: string, verifyCommand?: string | null): string {
+  const lines = [
     "You are Potluck, a terminal coding agent. Your inference runs on the user's",
     "own machines across the Potluck mesh. Be precise, concise, and safe.",
     "",
@@ -124,7 +127,42 @@ export function systemPrompt(cwd: string): string {
     "- Keep prose short. Never fabricate tool output; wait for TOOL_RESULT.",
     "- The user must approve every edit_file, write_file, and run_command, so",
     "  explain risky steps.",
-  ].join("\n");
+  ];
+
+  if (verifyCommand) {
+    lines.push(
+      "",
+      "Verify-and-fix:",
+      `- After you edit or write a file the CLI runs the verify command`,
+      `  (\`${verifyCommand}\`) and reports the result at the end of TOOL_RESULT.`,
+      "- If verify FAILED, read the errors and fix them with another edit. The task",
+      "  is NOT done until verify passes; do not give a final answer while it fails.",
+    );
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Whether a verify run should follow this tool result: only edit_file/write_file
+ * that actually changed a file. An "error:" result or a declined edit changed
+ * nothing, and read-only tools / run_command never trigger verify.
+ */
+export function shouldVerify(tool: string, result: string): boolean {
+  if (tool !== "edit_file" && tool !== "write_file") return false;
+  if (result.startsWith("error:")) return false;
+  if (result === "user declined") return false;
+  return true;
+}
+
+/** Format a verify outcome to append to the TOOL_RESULT fed back to the model. */
+export function formatVerifyResult(
+  command: string,
+  outcome: VerifyOutcome,
+): string {
+  if (outcome.code === 0) return `\nVERIFY (\`${command}\`): passed.`;
+  const body = outcome.output.trim().length > 0 ? outcome.output : "(no output)";
+  return `\nVERIFY (\`${command}\`) FAILED (exit ${outcome.code}):\n${body}`;
 }
 
 /**
@@ -177,6 +215,10 @@ export interface AgentCallbacks {
   onToolResult: (result: string) => void;
   /** A non-fatal notice (e.g. step limit hit). */
   onNotice?: (message: string) => void;
+  /** The verify command is about to run (so the UI can show "running verify…"). */
+  onVerifyStart?: (command: string) => void;
+  /** A verify run finished: the command, whether it passed, and its output. */
+  onVerify?: (command: string, ok: boolean, output: string) => void;
 }
 
 export interface AgentOptions {
@@ -191,6 +233,15 @@ export interface AgentOptions {
   scope?: string;
   /** Approximate character budget before older turns are trimmed. */
   charBudget?: number;
+  /**
+   * The FIXED verify command run after a successful edit/write (the model can
+   * never choose it). null/undefined disables the verify loop.
+   */
+  verifyCommand?: string | null;
+  /** Consecutive verify failures before auto-verify stops for the task (default 4). */
+  maxVerifyFailures?: number;
+  /** Overrides the verify runner (tests inject a fake exec). */
+  runVerify?: VerifyRunner;
 }
 
 /**
@@ -204,6 +255,11 @@ export async function runTask(
 ): Promise<void> {
   const { cfg, model, cwd, confirm, callbacks } = opts;
   const maxSteps = opts.maxSteps ?? 24;
+  const verifyCommand = opts.verifyCommand ?? null;
+  const maxVerifyFailures = opts.maxVerifyFailures ?? 4;
+  const verifyRunner = opts.runVerify ?? runVerify;
+  let consecutiveVerifyFailures = 0;
+  let verifyStopped = false; // tripped after too many failures in a row
 
   history.push({ role: "user", content: task });
 
@@ -247,10 +303,38 @@ export async function runTask(
     }
 
     callbacks.onAction(parsed.action);
-    const result = await runTool(parsed.action.tool, parsed.action.args, {
+    let result = await runTool(parsed.action.tool, parsed.action.args, {
       cwd,
       confirm,
     });
+
+    // Verify-and-self-correct: after a file actually changed, run the FIXED
+    // verify command (never one the model picked, no confirm) and fold the
+    // outcome into the TOOL_RESULT so the model fixes any failure on the next turn.
+    if (
+      verifyCommand !== null &&
+      !verifyStopped &&
+      shouldVerify(parsed.action.tool, result)
+    ) {
+      callbacks.onVerifyStart?.(verifyCommand);
+      const outcome = await verifyRunner(verifyCommand, cwd);
+      const ok = outcome.code === 0;
+      callbacks.onVerify?.(verifyCommand, ok, outcome.output);
+      result += formatVerifyResult(verifyCommand, outcome);
+
+      if (ok) {
+        consecutiveVerifyFailures = 0;
+      } else {
+        consecutiveVerifyFailures++;
+        if (consecutiveVerifyFailures >= maxVerifyFailures) {
+          verifyStopped = true;
+          callbacks.onNotice?.(
+            `verify still failing after ${maxVerifyFailures} attempts; stopping auto-verify`,
+          );
+        }
+      }
+    }
+
     callbacks.onToolResult(result);
     history.push({ role: "user", content: `TOOL_RESULT: ${result}` });
   }

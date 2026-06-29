@@ -18,6 +18,7 @@ import {
   loadConfig,
   loadSharedPrefs,
   normalizeScope,
+  resolveVerify,
   saveCliPrefs,
   saveSharedSafeFields,
   type CliPrefs,
@@ -106,14 +107,7 @@ export async function runSetup(io: SetupIO): Promise<CliPrefs> {
   // Only persist an override when it differs from the built-in default.
   const gatewayUrl = urlRaw !== DEFAULT_BASE_URL ? urlRaw : undefined;
 
-  // 5) Persist CLI prefs (cli.json).
-  const prefs: CliPrefs = { scope };
-  if (model) prefs.model = model;
-  if (gatewayUrl) prefs.gatewayUrl = gatewayUrl;
-  await saveCliPrefs(prefs);
-  out(`\n${c.green("✓ saved CLI prefs")} ${c.dim("~/.potluck/cli.json")}`);
-
-  // 6) Offer to write SAFE shared fields back to config.json (opt-in).
+  // 5) Offer to write SAFE shared fields back to config.json (opt-in).
   const coordToShare = shared.coordinatorUrl;
   const haveShareable = Boolean(model) || Boolean(coordToShare);
   if (haveShareable) {
@@ -142,7 +136,42 @@ export async function runSetup(io: SetupIO): Promise<CliPrefs> {
     }
   }
 
-  // 7) If the gateway is off, the CLI cannot turn it on — explain how.
+  // 6) Verify command — a build/test command the agent runs after each edit so
+  //    it can catch and fix its own mistakes. Offer the auto-detected default.
+  out("");
+  out(c.dim("verify runs a build/test command after each edit so the agent can"));
+  out(c.dim("catch and fix mistakes that don't compile."));
+  const detected = await resolveVerify({ cwd: process.cwd() });
+  if (detected.command) {
+    out(`${c.dim("detected for this directory:")} ${c.bold(detected.command)}`);
+  }
+  const verifyHint =
+    existing.verify !== undefined
+      ? existing.verify.trim() || "off"
+      : detected.command
+        ? `auto: ${detected.command}`
+        : "off";
+  const verifyAnswer = await ask(
+    c.yellow(
+      `Verify command [${verifyHint}] (Enter = auto-detect per project, or "off" to disable): `,
+    ),
+  );
+  const verifyRaw = (verifyAnswer ?? "").trim();
+  // Blank keeps auto-detect (unset) so it adapts per project; an existing pinned
+  // value is preserved on blank. A typed command (or "off") is persisted.
+  let verify: string | undefined;
+  if (verifyRaw) verify = verifyRaw;
+  else if (existing.verify !== undefined) verify = existing.verify;
+
+  // 7) Persist CLI prefs (cli.json).
+  const prefs: CliPrefs = { scope };
+  if (model) prefs.model = model;
+  if (gatewayUrl) prefs.gatewayUrl = gatewayUrl;
+  if (verify !== undefined) prefs.verify = verify;
+  await saveCliPrefs(prefs);
+  out(`\n${c.green("✓ saved CLI prefs")} ${c.dim("~/.potluck/cli.json")}`);
+
+  // 8) If the gateway is off, the CLI cannot turn it on — explain how.
   if (!cfg.enabled || !cfg.apiKey) {
     out(
       `\n${c.yellow("Note:")} the gateway is off (or has no key). The CLI cannot enable it.\n` +
@@ -158,8 +187,9 @@ export function printSetupHelp(out: (s: string) => void): void {
     [
       `${c.bold("potluck setup")} — configure CLI defaults`,
       "",
-      "Walks you through the default model, the default network scope, and the",
-      "gateway URL, then writes ~/.potluck/cli.json. Optionally imports settings",
+      "Walks you through the default model, the default network scope, the",
+      "gateway URL, and the verify command (a build/test command the agent runs",
+      "after each edit), then writes ~/.potluck/cli.json. Optionally imports settings",
       "from the Potluck app and writes safe shared fields (default model,",
       "coordinator URL) back to ~/.potluck/config.json. It never touches the",
       "gateway api_key or the enabled flag — the app owns those.",

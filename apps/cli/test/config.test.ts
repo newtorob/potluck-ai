@@ -15,6 +15,7 @@ import {
   normalizeScope,
   resolveModel,
   resolveScope,
+  resolveVerify,
   saveCliPrefs,
   saveSharedSafeFields,
 } from "../src/config.js";
@@ -230,5 +231,84 @@ describe("scope resolution", () => {
     const r = normalizeScope("weird", "local");
     expect(r.scope).toBe("local");
     expect(r.notice).toMatch(/unknown scope/);
+  });
+});
+
+describe("resolveVerify", () => {
+  let dir = "";
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "potluck-verify-"));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  async function writePkg(scripts: Record<string, string>): Promise<void> {
+    await writeFile(join(dir, "package.json"), JSON.stringify({ scripts }), "utf8");
+  }
+
+  it("honors precedence: --verify flag > env > cli.json", async () => {
+    const r = await resolveVerify({
+      cwd: dir,
+      cliVerify: "from-cli",
+      envVerify: "from-env",
+      flag: "from-flag",
+    });
+    expect(r).toEqual({ command: "from-flag", autoDetected: false });
+  });
+
+  it("lets env win over cli.json when no flag", async () => {
+    const r = await resolveVerify({ cwd: dir, cliVerify: "from-cli", envVerify: "from-env" });
+    expect(r).toEqual({ command: "from-env", autoDetected: false });
+  });
+
+  it("uses cli.json when it is the only explicit layer", async () => {
+    const r = await resolveVerify({ cwd: dir, cliVerify: "tsc --noEmit" });
+    expect(r).toEqual({ command: "tsc --noEmit", autoDetected: false });
+  });
+
+  it("auto-detects pnpm build from package.json + pnpm-lock.yaml", async () => {
+    await writePkg({ build: "tsc" });
+    await writeFile(join(dir, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
+    const r = await resolveVerify({ cwd: dir });
+    expect(r).toEqual({ command: "pnpm build", autoDetected: true });
+  });
+
+  it("auto-detects npm run build when there is no pnpm-lock", async () => {
+    await writePkg({ build: "tsc" });
+    const r = await resolveVerify({ cwd: dir });
+    expect(r).toEqual({ command: "npm run build", autoDetected: true });
+  });
+
+  it("falls back to tsc --noEmit when tsconfig exists but no build script", async () => {
+    await writePkg({ test: "vitest" }); // package.json without a build script
+    await writeFile(join(dir, "tsconfig.json"), "{}", "utf8");
+    const r = await resolveVerify({ cwd: dir });
+    expect(r).toEqual({ command: "npx tsc --noEmit", autoDetected: true });
+  });
+
+  it("detects nothing when there is no package.json or tsconfig", async () => {
+    const r = await resolveVerify({ cwd: dir });
+    expect(r).toEqual({ command: null, autoDetected: false });
+  });
+
+  it("treats cli.json verify \"\" / \"off\" as disabled (no auto-detect)", async () => {
+    await writePkg({ build: "tsc" }); // would otherwise auto-detect
+    expect(await resolveVerify({ cwd: dir, cliVerify: "off" })).toEqual({
+      command: null,
+      autoDetected: false,
+    });
+    expect(await resolveVerify({ cwd: dir, cliVerify: "" })).toEqual({
+      command: null,
+      autoDetected: false,
+    });
+  });
+
+  it("--no-verify disables even when a flag/auto-detect would apply", async () => {
+    await writePkg({ build: "tsc" });
+    const r = await resolveVerify({ cwd: dir, flag: "pnpm build", noVerify: true });
+    expect(r).toEqual({ command: null, autoDetected: false });
   });
 });

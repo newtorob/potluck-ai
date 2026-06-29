@@ -54,6 +54,13 @@ const MAX_SEARCH_HITS = 100;
 const MAX_GLOB_MATCHES = 200;
 const MAX_SEARCH_FILE_BYTES = 2_000_000; // skip very large files when searching
 
+// Verify output is tail-capped (build/type errors cluster at the END), unlike
+// run_command which keeps the head. A rolling buffer bounds memory on a runaway
+// build; the final result is trimmed to the last few KB / lines.
+const VERIFY_KEEP_BYTES = 3_000;
+const VERIFY_KEEP_LINES = 40;
+const VERIFY_BUFFER_BYTES = 256_000;
+
 function requireString(
   args: Record<string, unknown>,
   key: string,
@@ -312,6 +319,48 @@ async function runCommandTool(
   const { code, output } = await execCommand(command, deps.cwd);
   const body = output.trim().length > 0 ? output : "(no output)";
   return `exit ${code}\n${body}`;
+}
+
+export interface VerifyOutcome {
+  code: number;
+  /** stdout+stderr, tail-capped to the last few lines / KB. */
+  output: string;
+}
+
+/** Keep the last VERIFY_KEEP_LINES lines, then the last VERIFY_KEEP_BYTES chars. */
+function tailCap(s: string): string {
+  let out = s;
+  const lines = out.split("\n");
+  if (lines.length > VERIFY_KEEP_LINES) out = lines.slice(-VERIFY_KEEP_LINES).join("\n");
+  if (out.length > VERIFY_KEEP_BYTES) out = out.slice(out.length - VERIFY_KEEP_BYTES);
+  return out.trim();
+}
+
+/**
+ * Run a FIXED verify command (build/tests) after an edit. Same child_process
+ * spawn as run_command, but it is NOT gated (the user configured it) and the
+ * captured output is tail-capped — build errors land at the end.
+ */
+export function runVerify(command: string, cwd: string): Promise<VerifyOutcome> {
+  return new Promise((resolveExec) => {
+    const child = spawn(command, { cwd, shell: true });
+    let buf = "";
+
+    const onData = (b: Buffer): void => {
+      buf += b.toString("utf8");
+      // Rolling tail buffer so a noisy build can't exhaust memory.
+      if (buf.length > VERIFY_BUFFER_BYTES) buf = buf.slice(buf.length - VERIFY_BUFFER_BYTES);
+    };
+
+    child.stdout.on("data", onData);
+    child.stderr.on("data", onData);
+    child.on("error", (err) => {
+      resolveExec({ code: -1, output: `failed to start: ${err.message}` });
+    });
+    child.on("close", (code) => {
+      resolveExec({ code: code ?? -1, output: tailCap(buf) });
+    });
+  });
 }
 
 /**

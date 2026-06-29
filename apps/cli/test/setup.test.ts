@@ -97,5 +97,23 @@ describe("runSetup", () => {
     await runSetup(scriptedIO([])); // every ask returns null
     const prefs = await loadCliPrefs();
     expect(prefs.scope).toBe("mine");
+    expect(prefs.verify).toBeUndefined(); // blank => auto-detect per project
+  });
+
+  it("persists a typed verify command to cli.json", async () => {
+    await writeAppConfig({ gateway: { enabled: false, api_key: "" } });
+    // No shared model => import prompt skipped. Asks: model, scope, url, share, verify.
+    await runSetup(scriptedIO(["m", "local", "", "n", "pnpm build"]));
+    const prefs = await loadCliPrefs();
+    expect(prefs.model).toBe("m");
+    expect(prefs.scope).toBe("local");
+    expect(prefs.verify).toBe("pnpm build");
+  });
+
+  it('persists "off" to disable verify', async () => {
+    await writeAppConfig({ gateway: { enabled: false, api_key: "" } });
+    await runSetup(scriptedIO(["m", "mine", "", "n", "off"]));
+    const prefs = await loadCliPrefs();
+    expect(prefs.verify).toBe("off");
   });
 });

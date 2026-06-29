@@ -1,7 +1,43 @@
-import { describe, expect, it } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { parseAction, trimHistory } from "../src/agent.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+  formatVerifyResult,
+  parseAction,
+  runTask,
+  shouldVerify,
+  trimHistory,
+} from "../src/agent.js";
+import type { GatewayConfig } from "../src/config.js";
 import type { ChatMessage } from "../src/gateway.js";
+
+// Replace the gateway's streamChat with a scriptable async generator so the loop
+// can be driven without a live gateway.
+const streamChatMock = vi.fn();
+vi.mock("../src/gateway.js", () => ({
+  streamChat: (...args: unknown[]) => streamChatMock(...args),
+}));
+
+/** Feed one assistant message per turn; later turns repeat a final answer. */
+function scriptTurns(turns: string[]): void {
+  let i = 0;
+  streamChatMock.mockImplementation(() => {
+    const text = turns[i] ?? "done.";
+    i++;
+    return (async function* () {
+      yield text;
+    })();
+  });
+}
+
+function action(tool: string, args: Record<string, unknown>): string {
+  return ["```action", JSON.stringify({ tool, args }), "```"].join("\n");
+}
+
+const CFG: GatewayConfig = { baseURL: "x", apiKey: "k", enabled: true };
 
 describe("parseAction", () => {
   it("extracts the first action block and parses its JSON", () => {
@@ -118,5 +154,222 @@ describe("trimHistory", () => {
     ];
     const trimmed = trimHistory(h, 10);
     expect(trimmed[trimmed.length - 1].content).toBe("y".repeat(500));
+  });
+});
+
+describe("shouldVerify", () => {
+  it("is true after a successful edit/write", () => {
+    expect(shouldVerify("edit_file", "edited f.ts")).toBe(true);
+    expect(shouldVerify("write_file", "wrote 10 bytes to f.ts")).toBe(true);
+  });
+
+  it("is false for read-only tools and run_command", () => {
+    expect(shouldVerify("read_file", "contents")).toBe(false);
+    expect(shouldVerify("list_dir", "a\nb")).toBe(false);
+    expect(shouldVerify("search_files", "f:1: hit")).toBe(false);
+    expect(shouldVerify("glob", "a.ts")).toBe(false);
+    expect(shouldVerify("run_command", "exit 0\nok")).toBe(false);
+  });
+
+  it("is false when the edit failed or was declined (nothing changed)", () => {
+    expect(shouldVerify("edit_file", "error: old_string not found")).toBe(false);
+    expect(shouldVerify("write_file", "user declined")).toBe(false);
+  });
+});
+
+describe("formatVerifyResult", () => {
+  it("formats a pass", () => {
+    expect(formatVerifyResult("pnpm build", { code: 0, output: "" })).toBe(
+      "\nVERIFY (`pnpm build`): passed.",
+    );
+  });
+
+  it("formats a failure with the exit code and capped output", () => {
+    const s = formatVerifyResult("pnpm build", { code: 2, output: "TS2322 boom" });
+    expect(s).toContain("VERIFY (`pnpm build`) FAILED (exit 2):");
+    expect(s).toContain("TS2322 boom");
+  });
+});
+
+describe("runTask verify loop", () => {
+  let cwd = "";
+
+  async function tmp(): Promise<string> {
+    cwd = await mkdtemp(join(tmpdir(), "potluck-agent-"));
+    return cwd;
+  }
+
+  afterEach(async () => {
+    streamChatMock.mockReset();
+    if (cwd) await rm(cwd, { recursive: true, force: true });
+    cwd = "";
+  });
+
+  it("runs verify after a successful edit and feeds a FAILURE back", async () => {
+    const dir = await tmp();
+    await writeFile(join(dir, "f.ts"), "const a = 1;\n", "utf8");
+    scriptTurns([
+      action("edit_file", {
+        path: "f.ts",
+        old_string: "const a = 1;",
+        new_string: "const a = 2;",
+      }),
+      "All set.",
+    ]);
+
+    const calls: Array<[string, string]> = [];
+    const results: string[] = [];
+    const verifies: Array<{ cmd: string; ok: boolean }> = [];
+    const history: ChatMessage[] = [{ role: "system", content: "sys" }];
+
+    await runTask(history, "bump a", {
+      cfg: CFG,
+      model: "m",
+      cwd: dir,
+      confirm: async () => true,
+      verifyCommand: "fake-verify",
+      runVerify: async (cmd, c) => {
+        calls.push([cmd, c]);
+        return { code: 1, output: "f.ts(1): error TS2322 boom" };
+      },
+      callbacks: {
+        onToken: () => {},
+        onTurnEnd: () => {},
+        onAction: () => {},
+        onToolResult: (r) => results.push(r),
+        onVerify: (cmd, ok) => verifies.push({ cmd, ok }),
+      },
+    });
+
+    expect(calls).toEqual([["fake-verify", dir]]);
+    expect(verifies).toEqual([{ cmd: "fake-verify", ok: false }]);
+    const fed = results.find((r) => r.includes("VERIFY"));
+    expect(fed).toContain("VERIFY (`fake-verify`) FAILED (exit 1):");
+    expect(fed).toContain("boom");
+    // The failure was also folded into the TOOL_RESULT fed back to the model.
+    expect(
+      history.some(
+        (m) => m.role === "user" && m.content.includes("VERIFY (`fake-verify`) FAILED"),
+      ),
+    ).toBe(true);
+  });
+
+  it("appends a passed line when verify succeeds", async () => {
+    const dir = await tmp();
+    await writeFile(join(dir, "f.ts"), "const a = 1;\n", "utf8");
+    scriptTurns([
+      action("edit_file", {
+        path: "f.ts",
+        old_string: "const a = 1;",
+        new_string: "const a = 2;",
+      }),
+      "done",
+    ]);
+
+    const results: string[] = [];
+    await runTask([{ role: "system", content: "s" }], "bump", {
+      cfg: CFG,
+      model: "m",
+      cwd: dir,
+      confirm: async () => true,
+      verifyCommand: "fake-verify",
+      runVerify: async () => ({ code: 0, output: "" }),
+      callbacks: {
+        onToken: () => {},
+        onTurnEnd: () => {},
+        onAction: () => {},
+        onToolResult: (r) => results.push(r),
+      },
+    });
+
+    expect(results.find((r) => r.includes("VERIFY"))).toContain(
+      "VERIFY (`fake-verify`): passed.",
+    );
+  });
+
+  it("does not run verify after a read-only tool", async () => {
+    const dir = await tmp();
+    await writeFile(join(dir, "r.txt"), "hello", "utf8");
+    scriptTurns([action("read_file", { path: "r.txt" }), "done"]);
+
+    const spy = vi.fn(async () => ({ code: 0, output: "" }));
+    await runTask([{ role: "system", content: "s" }], "read it", {
+      cfg: CFG,
+      model: "m",
+      cwd: dir,
+      confirm: async () => true,
+      verifyCommand: "fake-verify",
+      runVerify: spy,
+      callbacks: {
+        onToken: () => {},
+        onTurnEnd: () => {},
+        onAction: () => {},
+        onToolResult: () => {},
+      },
+    });
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("stops auto-verify after the consecutive-failure cap", async () => {
+    const dir = await tmp();
+    const write = action("write_file", { path: "out.txt", content: "x" });
+    scriptTurns([write, write, write, write, write, "done"]);
+
+    const spy = vi.fn(async () => ({ code: 1, output: "boom" }));
+    let notice = "";
+    await runTask([{ role: "system", content: "s" }], "spam writes", {
+      cfg: CFG,
+      model: "m",
+      cwd: dir,
+      confirm: async () => true,
+      verifyCommand: "fake-verify",
+      maxVerifyFailures: 4,
+      runVerify: spy,
+      callbacks: {
+        onToken: () => {},
+        onTurnEnd: () => {},
+        onAction: () => {},
+        onToolResult: () => {},
+        onNotice: (m) => {
+          notice = m;
+        },
+      },
+    });
+
+    // 5 successful writes occur, but verify stops after 4 failures in a row.
+    expect(spy).toHaveBeenCalledTimes(4);
+    expect(notice).toMatch(/stopping auto-verify/);
+  });
+
+  it("never runs verify when no verify command is configured", async () => {
+    const dir = await tmp();
+    await writeFile(join(dir, "f.ts"), "const a = 1;\n", "utf8");
+    scriptTurns([
+      action("edit_file", {
+        path: "f.ts",
+        old_string: "const a = 1;",
+        new_string: "const a = 2;",
+      }),
+      "done",
+    ]);
+
+    const spy = vi.fn(async () => ({ code: 0, output: "" }));
+    await runTask([{ role: "system", content: "s" }], "bump", {
+      cfg: CFG,
+      model: "m",
+      cwd: dir,
+      confirm: async () => true,
+      verifyCommand: null,
+      runVerify: spy,
+      callbacks: {
+        onToken: () => {},
+        onTurnEnd: () => {},
+        onAction: () => {},
+        onToolResult: () => {},
+      },
+    });
+
+    expect(spy).not.toHaveBeenCalled();
   });
 });

@@ -25,11 +25,14 @@ import {
   normalizeScope,
   resolveModel,
   resolveScope,
+  resolveVerify,
   type GatewayConfig,
   type Scope,
+  type VerifyResolution,
 } from "./config.js";
 import { listModels, type ChatMessage } from "./gateway.js";
 import { runTask, systemPrompt } from "./agent.js";
+import { runVerify } from "./tools.js";
 import { runSetup, printSetupHelp } from "./setup.js";
 import {
   c,
@@ -48,12 +51,20 @@ interface CliArgs {
   yes: boolean;
   model?: string;
   scope?: string;
+  verify?: string;
+  noVerify: boolean;
   task?: string;
   command?: "setup";
 }
 
 function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { help: false, version: false, print: false, yes: false };
+  const args: CliArgs = {
+    help: false,
+    version: false,
+    print: false,
+    yes: false,
+    noVerify: false,
+  };
   const positionals: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -77,6 +88,16 @@ function parseArgs(argv: string[]): CliArgs {
       }
     } else if (arg.startsWith("--scope=")) {
       args.scope = arg.slice("--scope=".length);
+    } else if (arg === "--no-verify") {
+      args.noVerify = true;
+    } else if (arg === "--verify") {
+      const next = argv[i + 1];
+      if (next !== undefined) {
+        args.verify = next;
+        i++;
+      }
+    } else if (arg.startsWith("--verify=")) {
+      args.verify = arg.slice("--verify=".length);
     } else if (arg === "--print" || arg === "-p") {
       args.print = true;
       const next = argv[i + 1];
@@ -115,6 +136,8 @@ function printHelp(): void {
       `${c.bold("Options")}`,
       "  -m, --model <id>       Model to use (default: cli.json / app / first installed)",
       "      --scope <s>        Routing scope: local | mine (default from cli.json)",
+      "      --verify <cmd>     Build/test command run after each edit (default: auto-detect)",
+      "      --no-verify        Disable the post-edit verify step",
       '  -p, --print "task"     Run a single task non-interactively, then exit',
       "  -y, --yes              In -p mode, auto-approve edits/writes/commands",
       "  -h, --help             Show this help",
@@ -123,11 +146,13 @@ function printHelp(): void {
       `${c.bold("Environment")}`,
       "  POTLUCK_GATEWAY_URL   Gateway base URL (default http://127.0.0.1:8321/v1)",
       "  POTLUCK_GATEWAY_KEY   Gateway API key (overrides ~/.potluck/config.json)",
+      "  POTLUCK_VERIFY        Verify command (overrides cli.json; \"off\" disables)",
       "  NO_COLOR              Disable colored output",
       "",
       `${c.bold("In-session commands")}`,
       "  /model [id]   Show or switch the model",
       "  /scope [s]    Show or switch the routing scope (local | mine)",
+      "  /verify       Run the verify command now",
       "  /help         Show help",
       "  /exit         Quit",
       "",
@@ -139,28 +164,45 @@ function printHelp(): void {
   );
 }
 
-function printBanner(model: string, scope: Scope, cfg: GatewayConfig): void {
+function printBanner(
+  model: string,
+  scope: Scope,
+  cfg: GatewayConfig,
+  verify: VerifyResolution,
+): void {
   stdout.write(
     `\n${c.bold("potluck")} ${c.dim("·")} ${c.cyan(model)} ${c.dim("·")} ${c.yellow(
       `scope: ${scope}`,
     )} ${c.dim("·")} ${c.green("running on the Potluck mesh")}\n`,
   );
-  stdout.write(`${c.dim(cfg.baseURL)}\n`);
+  const verifyLabel = verify.command
+    ? `verify: ${verify.command}${verify.autoDetected ? " (auto)" : ""}`
+    : "verify: off";
+  stdout.write(`${c.dim(cfg.baseURL)} ${c.dim("·")} ${c.dim(verifyLabel)}\n`);
   stdout.write(
     `${c.dim("type a task, or")} ${c.bold("/help")} ${c.dim("·")} ${c.bold(
       "/model",
-    )} ${c.dim("·")} ${c.bold("/scope")} ${c.dim("·")} ${c.bold("/exit")}\n\n`,
+    )} ${c.dim("·")} ${c.bold("/scope")} ${c.dim("·")} ${c.bold("/verify")} ${c.dim(
+      "·",
+    )} ${c.bold("/exit")}\n\n`,
   );
 }
 
 /** Stream a single task to stdout and exit (-p mode). Notices go to stderr. */
 async function runOneShot(
   task: string,
-  opts: { cfg: GatewayConfig; model: string; scope: Scope; cwd: string; yes: boolean },
+  opts: {
+    cfg: GatewayConfig;
+    model: string;
+    scope: Scope;
+    cwd: string;
+    yes: boolean;
+    verifyCommand: string | null;
+  },
 ): Promise<void> {
   const confirm = oneShotConfirm(opts.yes, (line) => stderr.write(`${line}\n`));
   const conversation: ChatMessage[] = [
-    { role: "system", content: systemPrompt(opts.cwd) },
+    { role: "system", content: systemPrompt(opts.cwd, opts.verifyCommand) },
   ];
   await runTask(conversation, task, {
     cfg: opts.cfg,
@@ -168,12 +210,20 @@ async function runOneShot(
     cwd: opts.cwd,
     confirm,
     scope: opts.scope,
+    verifyCommand: opts.verifyCommand,
     callbacks: {
       onToken: (t) => stdout.write(t),
       onTurnEnd: () => stdout.write("\n"),
       onAction: (a) => stderr.write(`${renderAction(a.tool, a.args)}\n`),
       onToolResult: (r) => stderr.write(`${renderResultPreview(r)}\n`),
       onNotice: (m) => stderr.write(`${c.yellow(m)}\n`),
+      onVerifyStart: (cmd) => stderr.write(`${c.dim(`running verify: ${cmd}`)}\n`),
+      onVerify: (cmd, ok) =>
+        stderr.write(
+          ok
+            ? `${c.green("✓ verify passed")} ${c.dim(cmd)}\n`
+            : `${c.red("✗ verify failed")} ${c.dim(cmd)}\n`,
+        ),
     },
   });
 }
@@ -252,6 +302,14 @@ async function main(): Promise<void> {
   const shared = await loadSharedPrefs();
   const cwd = process.cwd();
 
+  let verify = await resolveVerify({
+    cwd,
+    cliVerify: cli.verify,
+    envVerify: process.env.POTLUCK_VERIFY,
+    flag: args.verify,
+    noVerify: args.noVerify,
+  });
+
   // ---- One-shot (-p / --print) ------------------------------------------
   if (args.print) {
     if (!args.task || !args.task.trim()) {
@@ -288,7 +346,14 @@ async function main(): Promise<void> {
     if (notice) stderr.write(`${c.yellow(notice)}\n`);
 
     try {
-      await runOneShot(args.task.trim(), { cfg, model, scope, cwd, yes: args.yes });
+      await runOneShot(args.task.trim(), {
+        cfg,
+        model,
+        scope,
+        cwd,
+        yes: args.yes,
+        verifyCommand: verify.command,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       stderr.write(`${c.red("error:")} ${c.dim(message)}\n`);
@@ -307,6 +372,13 @@ async function main(): Promise<void> {
     await runSetup({ ask, out: (s) => stdout.write(`${s}\n`) });
     cli = await loadCliPrefs();
     cfg = await loadConfig();
+    verify = await resolveVerify({
+      cwd,
+      cliVerify: cli.verify,
+      envVerify: process.env.POTLUCK_VERIFY,
+      flag: args.verify,
+      noVerify: args.noVerify,
+    });
     stdout.write("\n");
   }
 
@@ -340,7 +412,7 @@ async function main(): Promise<void> {
 
   const confirm = makeConfirm((q) => ask(q).then((a) => a ?? "n"));
   const conversation: ChatMessage[] = [
-    { role: "system", content: systemPrompt(cwd) },
+    { role: "system", content: systemPrompt(cwd, verify.command) },
   ];
 
   // Ctrl-C cancels the active turn; at an idle prompt it exits.
@@ -355,7 +427,7 @@ async function main(): Promise<void> {
     }
   });
 
-  printBanner(model, scope, cfg);
+  printBanner(model, scope, cfg, verify);
 
   while (true) {
     const answer = await ask(c.green("you ▸ "));
@@ -405,6 +477,25 @@ async function main(): Promise<void> {
       }
       continue;
     }
+    if (line === "/verify") {
+      if (!verify.command) {
+        stdout.write(
+          `${c.yellow("verify is off")} ${c.dim(
+            "(set one with --verify, POTLUCK_VERIFY, or `potluck setup`)",
+          )}\n`,
+        );
+      } else {
+        stdout.write(`${c.dim("running verify:")} ${c.cyan(verify.command)}\n`);
+        const { code, output } = await runVerify(verify.command, cwd);
+        if (code === 0) {
+          stdout.write(`${c.green("✓ verify passed")}\n`);
+        } else {
+          stdout.write(`${c.red(`✗ verify failed (exit ${code})`)}\n`);
+          if (output.trim()) stdout.write(`${c.dim(output)}\n`);
+        }
+      }
+      continue;
+    }
     if (line.startsWith("/")) {
       stdout.write(`${c.yellow(`unknown command: ${line}`)} ${c.dim("(try /help)")}\n`);
       continue;
@@ -422,12 +513,21 @@ async function main(): Promise<void> {
         confirm,
         scope,
         signal: active.signal,
+        verifyCommand: verify.command,
         callbacks: {
           onToken: (t) => stdout.write(t),
           onTurnEnd: () => stdout.write("\n"),
           onAction: (a) => stdout.write(`${renderAction(a.tool, a.args)}\n`),
           onToolResult: (r) => stdout.write(`${renderResultPreview(r)}\n`),
           onNotice: (m) => stdout.write(`${c.yellow(m)}\n`),
+          onVerifyStart: (cmd) =>
+            stdout.write(`${c.gray("  ↳")} ${c.dim(`running verify: ${cmd}`)}\n`),
+          onVerify: (cmd, ok) =>
+            stdout.write(
+              ok
+                ? `${c.gray("  ↳")} ${c.green("verify passed")} ${c.dim(cmd)}\n`
+                : `${c.gray("  ↳")} ${c.red("verify failed")} ${c.dim(cmd)}\n`,
+            ),
         },
       });
     } catch (err) {
