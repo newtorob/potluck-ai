@@ -21,15 +21,20 @@ caller pulls the result. No persistence, no logging of token content.
 Peer selection (pick_peer_for_model):
   Eligible peers (model match + trust gates) are ranked by a composite score:
 
-      score = compute_score / (1 + current_jobs) * (0.5 + reputation)
+      score = compute_score / (1 + current_jobs) * (0.5 + reputation) * quality
 
   compute_score = PeerCapability.tokens_per_second for this model_slug when
   available; otherwise a coarse hardware-tier proxy derived from
   Peer.hardware_summary (see _hardware_tier_score). current_jobs and
   reputation come from the latest PeerHeartbeat row; missing heartbeat
-  defaults to 0 jobs / neutral reputation. Stable tiebreak on equal scores:
-  most-recently-connected peer wins (preserves pre-scoring behaviour when all
-  signals are absent or equal).
+  defaults to 0 jobs / neutral reputation.  quality comes from the sliding-
+  window aggregate in services/peer_quality.py (default 1.0 for new peers).
+  Stable tiebreak on equal scores: most-recently-connected peer wins
+  (preserves pre-scoring behaviour when all signals are absent or equal).
+
+  Quality hard-exclude: before scoring, pick_peer_for_model removes any peer
+  with >= QUALITY_CONSECUTIVE_FAIL_THRESHOLD (default 3) consecutive trailing
+  failures from eligible_ids.  A single bad signal NEVER triggers exclusion.
 
   RTT extension point: a latency factor can be multiplied into the score
   once a coordinator<->peer RTT measurement exists (see TODO in
@@ -210,17 +215,19 @@ async def _score_peers(
     peer_ids: list[uuid.UUID],
     model_slug: str,
 ) -> list[float]:
-    """Batch-fetch compute + load signals and return a score per peer.
+    """Batch-fetch compute + load + quality signals and return a score per peer.
 
-    Queries (2 total, each with an IN over the candidate set):
+    Queries (3 total, each with an IN over the candidate set):
       1. PeerCapability: tokens_per_second for this model_slug.
       2. Peer LEFT JOIN PeerHeartbeat: hardware_summary + current_jobs + reputation.
+      3. peer_quality_scores (sliding window): recency-weighted quality score.
 
     Score formula:
-        score = compute_score / (1 + current_jobs) * (0.5 + reputation)
+        score = compute_score / (1 + current_jobs) * (0.5 + reputation) * quality
 
     Missing heartbeat -> current_jobs=0, reputation=NEUTRAL_REPUTATION.
     tokens_per_second=NULL -> compute_score from _hardware_tier_score().
+    No quality observations in window -> quality=1.0 (neutral; new peers not penalised).
 
     RTT extension point: multiply the final score by
         rtt_factor = 1 / (1 + rtt_ms / REF_RTT_MS)
@@ -230,6 +237,7 @@ async def _score_peers(
     """
     from sqlalchemy import select
     from coordinator.models.peer import Peer, PeerCapability, PeerHeartbeat
+    from coordinator.services.peer_quality import QUALITY_NEUTRAL, batch_quality_scores
 
     # Query 1: tokens_per_second per peer for this model slug.
     tps_rows = (await db.execute(
@@ -255,6 +263,13 @@ async def _score_peers(
         row[0]: (row[1], row[2], row[3]) for row in hw_hb_rows
     }
 
+    # Query 3: quality scores (sliding-window recency-weighted mean).
+    # Peers with no observations in the window default to QUALITY_NEUTRAL (1.0),
+    # so brand-new peers are not penalised.
+    quality_map: dict[uuid.UUID, float] = await batch_quality_scores(
+        db, peer_ids, model_slug
+    )
+
     scores: list[float] = []
     for pid in peer_ids:
         tps = tps_map.get(pid)
@@ -272,8 +287,11 @@ async def _score_peers(
         # Reputation signal: default to neutral for brand-new peers.
         reputation = raw_rep if raw_rep is not None else NEUTRAL_REPUTATION
 
+        # Quality signal: default to neutral (1.0) for peers with no history.
+        quality = quality_map.get(pid, QUALITY_NEUTRAL)
+
         # TODO RTT: score *= 1 / (1 + rtt_ms / REF_RTT_MS)  when RTT is measured.
-        score = compute_score / (1 + current_jobs) * (0.5 + reputation)
+        score = compute_score / (1 + current_jobs) * (0.5 + reputation) * quality
         scores.append(score)
 
     return scores
@@ -329,6 +347,21 @@ async def pick_peer_for_model(
 
     if not eligible_ids:
         return None
+
+    # Quality hard-exclude: a peer with >= QUALITY_CONSECUTIVE_FAIL_THRESHOLD
+    # consecutive trailing failures is removed from eligibility regardless of
+    # routing scope (My Machines, circle, pool).  Requires N failures in a row
+    # (default N=3) — a single bad signal NEVER triggers exclusion.  Batch
+    # query over the candidate set so there is no per-peer round-trip.
+    from coordinator.services.peer_quality import batch_consecutive_fail_excluded
+
+    quality_excluded = await batch_consecutive_fail_excluded(
+        db, list(eligible_ids), model_slug
+    )
+    if quality_excluded:
+        eligible_ids -= quality_excluded
+        if not eligible_ids:
+            return None
 
     # Open-pool defense (hysteresis): drop peers whose reputation sits below the
     # re-entry bar (NEUTRAL). A wrong-answer canary hard-resets to 0.0, and the

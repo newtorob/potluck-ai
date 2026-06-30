@@ -14,3 +14,4 @@ from coordinator.models.household import Household, HouseholdMember  # noqa: F40
 from coordinator.models.mesh_node import MeshNode  # noqa: F401
 from coordinator.models.pairing import PairingToken  # noqa: F401
 from coordinator.models.circle import TrustedCircle, CircleMember  # noqa: F401
+from coordinator.models.peer_quality import PeerQualityScore  # noqa: F401
