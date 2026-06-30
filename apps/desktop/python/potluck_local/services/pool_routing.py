@@ -47,6 +47,7 @@ _CONNECT_TIMEOUT_S = 5.0
 # Match the coordinator's per-job ceiling (JOB_TIMEOUT_S) loosely; the read is
 # unbounded for the streaming body, only the connect is capped.
 _POOL_SCOPE = "pool"
+_CIRCLE_SCOPE = "circle"
 
 
 class PoolDispatchError(RuntimeError):
@@ -145,6 +146,23 @@ def pool_enabled() -> bool:
         return False
 
 
+def _pool_multiturn_enabled() -> bool:
+    """True when the user explicitly opted in to sending the full messages array
+    to pool contributors (gateway.pool_multiturn, default OFF).
+
+    This is checked only on the pool path; circle always sends full messages
+    regardless of this setting. Read live so toggling takes effect without a
+    restart.
+    """
+    try:
+        from potluck_local.services.settings_manager import get_settings
+
+        return bool(get_settings().gateway.pool_multiturn)
+    except Exception:
+        logger.debug("pool_multiturn_settings_unavailable", exc_info=True)
+        return False
+
+
 def last_user_prompt(messages: list[dict]) -> str:
     """The latest user message content — the only thing we send to the pool.
 
@@ -167,13 +185,41 @@ def _headers() -> dict[str, str]:
     return h
 
 
-def _job_body(prompt: str, model: str, temperature: float, max_tokens: int) -> dict:
-    return {
+def _job_body(
+    messages: list[dict],
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    scope: str = _POOL_SCOPE,
+) -> dict:
+    """Build the coordinator job body, applying the multi-turn privacy policy.
+
+    prompt = last_user_prompt(messages) is ALWAYS populated as the backward-compat
+    fallback. An old contributor that does not know `messages` uses `prompt`.
+
+    messages is included when:
+      - scope == "circle" (trusted members always receive the full conversation), OR
+      - scope == "pool" AND gateway.pool_multiturn is explicitly enabled by the user.
+
+    Default (pool, multiturn off): only prompt is sent — no conversation history
+    crosses the wire to strangers. This preserves the original privacy invariant.
+    """
+    prompt = last_user_prompt(messages)
+    body: dict = {
         "prompt": prompt,
         "model_slug": model,
         "sampling": {"temperature": temperature, "max_tokens": max_tokens},
-        "scope": _POOL_SCOPE,
+        "scope": scope,
     }
+    send_messages = scope == _CIRCLE_SCOPE or (
+        scope == _POOL_SCOPE and _pool_multiturn_enabled()
+    )
+    if send_messages:
+        body["messages"] = [
+            {"role": m.get("role", ""), "content": m.get("content", "")}
+            for m in messages
+        ]
+    return body
 
 
 def _content_of(line: str) -> str | None:
@@ -208,10 +254,20 @@ def _content_of(line: str) -> str | None:
         return None
 
 
-async def stream_pool_openai(prompt: str, model: str, temperature: float, max_tokens: int):
-    """Dispatch to the open pool via the coordinator and yield OpenAI
-    chat.completion.chunk dicts (same shape gateway_routing.stream_peer_openai
-    yields, so the gateway routers consume both identically)."""
+async def stream_pool_openai(
+    messages: list[dict],
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    scope: str = _POOL_SCOPE,
+):
+    """Dispatch to the coordinator and yield OpenAI chat.completion.chunk dicts.
+
+    Works for both pool (strangers) and circle (trusted members) scopes — the
+    privacy policy in _job_body decides whether messages or only prompt is sent.
+    Yields the same chunk shape as gateway_routing.stream_peer_openai so gateway
+    routers consume both identically.
+    """
     base = coordinator_http_base()
     if not base:
         raise RuntimeError("open-pool routing is not configured (no coordinator URL)")
@@ -229,7 +285,8 @@ async def stream_pool_openai(prompt: str, model: str, temperature: float, max_to
     async with httpx.AsyncClient(timeout=timeout) as c:
         async with c.stream(
             "POST", f"{base}/jobs/stream",
-            json=_job_body(prompt, model, temperature, max_tokens), headers=_headers(),
+            json=_job_body(messages, model, temperature, max_tokens, scope),
+            headers=_headers(),
         ) as resp:
             if resp.status_code != 200:
                 body = (await resp.aread()).decode("utf-8", "replace")[:300]
@@ -242,9 +299,15 @@ async def stream_pool_openai(prompt: str, model: str, temperature: float, max_to
             yield chunk({}, "stop")
 
 
-async def complete_pool_openai(prompt: str, model: str, temperature: float, max_tokens: int) -> dict:
-    """Dispatch to the open pool (streamed under the hood) and return one OpenAI
-    chat.completion envelope."""
+async def complete_pool_openai(
+    messages: list[dict],
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    scope: str = _POOL_SCOPE,
+) -> dict:
+    """Dispatch to the coordinator (streamed under the hood) and return one OpenAI
+    chat.completion envelope. Works for both pool and circle scopes."""
     parts: list[str] = []
     base = coordinator_http_base()
     if not base:
@@ -253,7 +316,8 @@ async def complete_pool_openai(prompt: str, model: str, temperature: float, max_
     async with httpx.AsyncClient(timeout=timeout) as c:
         async with c.stream(
             "POST", f"{base}/jobs/stream",
-            json=_job_body(prompt, model, temperature, max_tokens), headers=_headers(),
+            json=_job_body(messages, model, temperature, max_tokens, scope),
+            headers=_headers(),
         ) as resp:
             if resp.status_code != 200:
                 body = (await resp.aread()).decode("utf-8", "replace")[:300]

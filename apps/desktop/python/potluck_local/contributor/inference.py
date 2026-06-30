@@ -11,9 +11,12 @@ Two backends, same interface:
     wheels don't cover GPU acceleration. Ollama handles GPU detection +
     Vulkan/ROCm/CUDA wrangling internally; we just send prompts to it.
 
-Both backends expose `stream_completion(...) -> AsyncIterator[str]`.
-The contributor's job dispatcher (client.py:_handle_real_job) doesn't
-care which one it's talking to.
+Both backends expose:
+  stream_completion(prompt, ...) -> AsyncIterator[str]  (single-turn, prompt string)
+  stream_chat(messages, ...)     -> AsyncIterator[str]  (multi-turn, applies chat template)
+
+The contributor's job dispatcher (client.py:_handle_real_job) uses stream_chat
+when job.messages is populated; otherwise falls back to stream_completion.
 
 Privacy invariant (memory 42a7e671 + 1fc85a49):
     Prompt content and generated tokens MUST NOT be written to disk,
@@ -49,6 +52,18 @@ class InferenceBackend(Protocol):
     async def stream_completion(
         self,
         prompt: str,
+        max_tokens: int = 512,
+        temperature: float = 0.7,
+        top_p: float | None = 0.95,
+        top_k: int | None = None,
+        repeat_penalty: float | None = None,
+        stop_sequences: list[str] | None = None,
+        seed: int | None = None,
+    ) -> AsyncIterator[str]: ...
+
+    async def stream_chat(
+        self,
+        messages: list[dict],
         max_tokens: int = 512,
         temperature: float = 0.7,
         top_p: float | None = 0.95,
@@ -155,6 +170,74 @@ class LlamaCppInferenceEngine:
                     for chunk in self._llama.create_completion(**completion_kwargs):
                         choice = chunk["choices"][0]
                         text = choice.get("text", "")
+                        if text:
+                            asyncio.run_coroutine_threadsafe(
+                                queue.put(text), loop
+                            ).result()
+                except BaseException as exc:  # noqa: BLE001
+                    error_box.append(exc)
+                finally:
+                    asyncio.run_coroutine_threadsafe(queue.put(_DONE), loop).result()
+
+            producer = threading.Thread(target=_produce, daemon=True)
+            producer.start()
+
+            while True:
+                item = await queue.get()
+                if item is _DONE:
+                    break
+                yield item
+
+            if error_box:
+                raise error_box[0]
+
+    async def stream_chat(
+        self,
+        messages: list[dict],
+        max_tokens: int = 512,
+        temperature: float = 0.7,
+        top_p: float | None = 0.95,
+        top_k: int | None = None,
+        repeat_penalty: float | None = None,
+        stop_sequences: list[str] | None = None,
+        seed: int | None = None,
+    ) -> AsyncIterator[str]:
+        """Multi-turn inference via llama-cpp-python create_chat_completion.
+
+        Applies the GGUF's native chat template (stored in the model's metadata)
+        so the conversation history is formatted correctly for the model family.
+        Streams content deltas from the assistant turn.
+        """
+        await self._ensure_loaded()
+
+        async with self._inference_lock:
+            queue: asyncio.Queue = asyncio.Queue(maxsize=64)
+            loop = asyncio.get_event_loop()
+            error_box: list[BaseException] = []
+
+            def _produce() -> None:
+                try:
+                    assert self._llama is not None
+                    chat_kwargs: dict = {
+                        "messages": messages,
+                        "max_tokens": max_tokens,
+                        "temperature": temperature,
+                        "stream": True,
+                    }
+                    if top_p is not None:
+                        chat_kwargs["top_p"] = top_p
+                    if top_k is not None:
+                        chat_kwargs["top_k"] = top_k
+                    if repeat_penalty is not None:
+                        chat_kwargs["repeat_penalty"] = repeat_penalty
+                    if stop_sequences:
+                        chat_kwargs["stop"] = stop_sequences
+                    if seed is not None:
+                        chat_kwargs["seed"] = seed
+
+                    for chunk in self._llama.create_chat_completion(**chat_kwargs):
+                        delta = chunk["choices"][0].get("delta", {})
+                        text = delta.get("content") or ""
                         if text:
                             asyncio.run_coroutine_threadsafe(
                                 queue.put(text), loop
@@ -302,6 +385,70 @@ class OllamaInferenceEngine:
                         # Ollama occasionally emits keepalive blanks; ignore.
                         continue
                     text = chunk.get("response", "")
+                    if text:
+                        yield text
+                    if chunk.get("done"):
+                        break
+
+    async def stream_chat(
+        self,
+        messages: list[dict],
+        max_tokens: int = 512,
+        temperature: float = 0.7,
+        top_p: float | None = 0.95,
+        top_k: int | None = None,
+        repeat_penalty: float | None = None,
+        stop_sequences: list[str] | None = None,
+        seed: int | None = None,
+    ) -> AsyncIterator[str]:
+        """Multi-turn inference via Ollama's /api/chat endpoint.
+
+        Ollama applies the model's native chat template server-side, so the
+        messages array is passed as-is. Streams content from the assistant
+        message delta in each NDJSON chunk.
+        """
+        await self._ensure_model_available()
+
+        options: dict = {
+            "num_predict": max_tokens,
+            "temperature": temperature,
+            "num_ctx": self.n_ctx,
+        }
+        if top_p is not None:
+            options["top_p"] = top_p
+        if top_k is not None:
+            options["top_k"] = top_k
+        if repeat_penalty is not None:
+            options["repeat_penalty"] = repeat_penalty
+        if stop_sequences:
+            options["stop"] = stop_sequences
+        if seed is not None:
+            options["seed"] = seed
+
+        body = {
+            "model": self.model_slug,
+            "messages": messages,
+            "stream": True,
+            "options": options,
+        }
+
+        import httpx
+        timeout = httpx.Timeout(connect=5.0, read=None, write=10.0, pool=5.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            async with client.stream(
+                "POST", f"{self.base_url}/api/chat", json=body
+            ) as resp:
+                resp.raise_for_status()
+                async for line in resp.aiter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        chunk = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    # Ollama /api/chat: {"message": {"role": "assistant", "content": "..."}, "done": bool}
+                    msg = chunk.get("message") or {}
+                    text = msg.get("content") or ""
                     if text:
                         yield text
                     if chunk.get("done"):

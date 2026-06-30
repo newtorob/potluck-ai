@@ -39,6 +39,7 @@ from coordinator.middleware.auth import require_coordinator_token
 from coordinator.models.job import Job
 from coordinator.schemas.peer import (
     MAX_OUTPUT_TOKENS,
+    ChatMessage,
     JobAssignedMessage,
     SamplingParams,
 )
@@ -77,6 +78,13 @@ RoutingScope = Literal["mine", "circle", "pool"]
 
 class JobRequest(BaseModel):
     prompt: str
+    # Optional multi-turn history. When present, the peer uses messages as
+    # conversation context instead of (or in addition to) prompt. The
+    # coordinator relays whatever the sidecar sends — policy (circle always
+    # sends messages; pool sends messages only on opt-in) is enforced on the
+    # sidecar side. ChatMessage carries role + content only; no requester
+    # identity ever crosses to the peer.
+    messages: list[ChatMessage] | None = None
     model_slug: str = "stub-echo"  # m3 stub default; real models when llama-cpp lands
     sampling: SamplingParams = Field(default_factory=SamplingParams)
     # "mine"   -> only machines this member owns (503 if none online)
@@ -197,6 +205,7 @@ async def _dispatch_to_peer(
         job_id=job.id,
         model_slug=req.model_slug,
         prompt=req.prompt,
+        messages=req.messages,
         sampling=req.sampling,
     )
     try:
@@ -340,6 +349,61 @@ def _sse_error(category: str, message: str) -> str:
     the delta envelope so the parser can distinguish."""
     payload = {"error": {"category": category, "message": message}}
     return f"data: {json.dumps(payload)}\n\n"
+
+
+# ---------------------------------------------------------------------------
+# User-feedback quality signal
+# ---------------------------------------------------------------------------
+
+
+class FeedbackRequest(BaseModel):
+    rating: Literal["up", "down"]
+
+
+@router.post(
+    "/{job_id}/feedback",
+    dependencies=[Depends(require_coordinator_token)],
+)
+async def job_feedback(
+    job_id: uuid.UUID,
+    req: FeedbackRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Record a binary quality signal for a completed job.
+
+    Maps the caller's thumbs-up / thumbs-down rating to a quality score and
+    records it against the peer that served the job.
+
+    PRIVACY: records only the binary rating plus the job's peer_id and
+    model_slug.  Prompt and completion content are never read, stored, or
+    forwarded here.
+
+    Follow-on: frontend thumbs-down UI that calls this endpoint post-response.
+    """
+    job = await db.get(Job, job_id)
+    if job is None or job.peer_id is None:
+        raise HTTPException(status_code=404, detail="job not found")
+
+    score = 1.0 if req.rating == "up" else 0.0
+    from coordinator.services.peer_quality import record_quality_signal
+
+    await record_quality_signal(
+        db,
+        peer_id=job.peer_id,
+        model_slug=job.model_slug,
+        signal_type="user_feedback",
+        score=score,
+        sample_size=1,
+    )
+    await db.commit()
+    logger.info(
+        "job_feedback_recorded",
+        job_id=str(job_id),
+        rating=req.rating,
+        # peer_id intentionally omitted from log: coordinator-side internal
+        # log but we keep peer-bound observability consistent with the wire.
+    )
+    return {"recorded": True}
 
 
 @router.get("/stats", dependencies=[Depends(require_coordinator_token)])

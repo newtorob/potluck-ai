@@ -107,6 +107,13 @@ class GatewaySettings(BaseModel):
     # — household routing serves your own machines automatically, but reaching
     # strangers is the widest scope and stays an explicit opt-in.
     pool_routing: bool = False
+    # Multi-turn for pool contributors: when True, send the full messages array
+    # to pool contributors instead of only the last user message.
+    # Default OFF — pool contributors are strangers; sending conversation history
+    # to strangers is a privacy widening that requires explicit user opt-in.
+    # Circle-scope jobs always send the full messages array regardless of this
+    # setting (trusted-member invariant). Key: gateway.pool_multiturn.
+    pool_multiturn: bool = False
 
     @model_validator(mode="after")
     def _require_key_when_enabled(self) -> "GatewaySettings":
@@ -117,6 +124,9 @@ class GatewaySettings(BaseModel):
         # Pool routing is meaningless without the gateway itself enabled.
         if self.pool_routing and not self.enabled:
             self.pool_routing = False
+        # pool_multiturn is meaningless without pool_routing.
+        if self.pool_multiturn and not self.pool_routing:
+            self.pool_multiturn = False
         return self
 
 

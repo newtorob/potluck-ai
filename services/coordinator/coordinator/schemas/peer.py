@@ -130,17 +130,38 @@ class SamplingParams(BaseModel):
     seed: int | None = None
 
 
+class ChatMessage(BaseModel):
+    """One conversation turn forwarded verbatim to the serving peer.
+
+    Contains ONLY role + content — no turn id, no timestamp, no requester
+    metadata. The same blindness invariant as `prompt`: the peer learns
+    the conversation text but nothing about who sent it."""
+
+    role: str
+    content: str
+
+
 class JobAssignedMessage(BaseModel):
     """Server → Peer: 'run inference on this prompt and stream tokens back.'
 
     Carries ONLY the routing-blind subset: job id, model slug, prompt,
-    sampling params. No member_id, no conversation id, no anything that
-    could identify the requester."""
+    optional multi-turn messages, and sampling params. No member_id, no
+    conversation id, no anything that could identify the requester.
+
+    Fields:
+      prompt   — single-turn text (always present for backward compat with
+                 peers that don't support messages).
+      messages — OPTIONAL ordered list of conversation turns (role + content
+                 only). When present the peer should prefer messages over
+                 prompt for context. MUST carry ONLY conversation turns —
+                 NEVER member_id / source_conversation_id / any requester
+                 identifier. Same blindness invariant as prompt."""
 
     type: Literal["job_assigned"] = "job_assigned"
     job_id: uuid.UUID
     model_slug: str  # e.g. "llama-3.2-3b-instruct-q4_k_m"
     prompt: str
+    messages: list[ChatMessage] | None = None
     sampling: SamplingParams = Field(default_factory=SamplingParams)
 
 

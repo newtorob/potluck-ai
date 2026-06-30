@@ -100,15 +100,36 @@ class SamplingParams(BaseModel):
     seed: int | None = None
 
 
+class ChatMessage(BaseModel):
+    """One turn in a multi-turn conversation, on the contributor wire.
+
+    Mirrors coordinator/schemas/peer.py — keep in sync. The field order
+    (role, content) is stable; do not reorder without bumping the wire
+    version. Extra fields are silently ignored (Pydantic default) so old
+    contributors that receive an unknown field are unaffected.
+    """
+
+    role: str
+    content: str
+
+
 class JobAssignedMessage(BaseModel):
     """Server → Peer (incoming on this side). Contains the prompt + sampling;
     no member_id or conversation id by design — the coordinator strips
-    them before forwarding."""
+    them before forwarding.
+
+    Multi-turn extension: `messages` carries the full conversation when the
+    requesting scope permits it (circle: always; pool: only with explicit
+    opt-in). `prompt` is always populated as the backward-compat fallback —
+    an old contributor that doesn't know `messages` ignores the field and
+    uses `prompt`, which is the last user message.
+    """
 
     type: Literal["job_assigned"]
     job_id: uuid.UUID
     model_slug: str
     prompt: str
+    messages: list[ChatMessage] | None = None
     sampling: SamplingParams = Field(default_factory=SamplingParams)
 
 

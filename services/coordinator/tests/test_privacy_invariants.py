@@ -16,12 +16,16 @@ from __future__ import annotations
 
 import uuid
 
-from coordinator.schemas.peer import JobAssignedMessage, SamplingParams
+from coordinator.schemas.peer import ChatMessage, JobAssignedMessage, SamplingParams
 
 # Fields that JobAssignedMessage is allowed to carry. Anything outside
 # this set is a privacy regression — review the schema diff carefully.
+#
+# `messages` was added for multi-turn pool/circle jobs (2026-06-29). It
+# carries ChatMessage(role, content) turns only — no requester identity.
+# ChatMessage has no id / timestamp / metadata fields; the invariant holds.
 _ALLOWED_FIELDS: frozenset[str] = frozenset(
-    {"type", "job_id", "model_slug", "prompt", "sampling"}
+    {"type", "job_id", "model_slug", "prompt", "messages", "sampling"}
 )
 
 # Substrings that, if they appear as a key anywhere in a serialised
@@ -92,3 +96,112 @@ def test_job_assigned_serialised_payload_has_no_identifying_keys() -> None:
         "Routing is supposed to be blinded — peers must never see who the "
         "requester is."
     )
+
+
+# ---------------------------------------------------------------------------
+# Multi-turn (messages) wire contract
+# ---------------------------------------------------------------------------
+
+
+def test_chat_message_field_set_is_role_and_content_only() -> None:
+    """ChatMessage carries ONLY role + content — no id, timestamp, or metadata.
+
+    The moment a metadata field is added (e.g. turn_id, created_at) a peer
+    can start correlating turns across jobs. The field set is pinned here."""
+    actual = set(ChatMessage.model_fields.keys())
+    assert actual == {"role", "content"}, (
+        f"ChatMessage field set changed: {sorted(actual)}. "
+        "ChatMessage must have ONLY role + content — no metadata that could "
+        "let a peer correlate turns across jobs or identify the requester."
+    )
+
+
+def test_job_assigned_messages_none_by_default() -> None:
+    """Backward-compat: a prompt-only JobAssignedMessage has messages=None.
+
+    Peers running older code that don't understand messages receive None and
+    behave exactly as before. This test pins that the default never changes."""
+    msg = JobAssignedMessage(
+        job_id=uuid.uuid4(),
+        model_slug="stub-echo",
+        prompt="hello",
+        sampling=SamplingParams(),
+    )
+    assert msg.messages is None
+
+
+def test_job_assigned_carries_messages_through() -> None:
+    """JobAssignedMessage round-trips a messages array cleanly.
+
+    Verifies the coordinator correctly relays multi-turn history and that the
+    serialized form has no identifying keys beyond role + content."""
+    turns = [
+        ChatMessage(role="user", content="What is 2+2?"),
+        ChatMessage(role="assistant", content="4"),
+        ChatMessage(role="user", content="Are you sure?"),
+    ]
+    msg = JobAssignedMessage(
+        job_id=uuid.uuid4(),
+        model_slug="qwen2.5:3b-instruct-q4_K_M",
+        prompt="Are you sure?",
+        messages=turns,
+        sampling=SamplingParams(),
+    )
+    payload = msg.model_dump(mode="json")
+    assert payload["messages"] is not None
+    assert len(payload["messages"]) == 3
+    assert payload["messages"][0] == {"role": "user", "content": "What is 2+2?"}
+    assert payload["messages"][2] == {"role": "user", "content": "Are you sure?"}
+    # Serialized keys must still be free of identifying substrings
+    def _walk_keys(obj: object) -> list[str]:
+        keys: list[str] = []
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                keys.append(str(k))
+                keys.extend(_walk_keys(v))
+        elif isinstance(obj, list):
+            for item in obj:
+                keys.extend(_walk_keys(item))
+        return keys
+
+    all_keys = [k.lower() for k in _walk_keys(payload)]
+    leaks = [k for k in all_keys if any(f in k for f in _FORBIDDEN_KEY_SUBSTRINGS)]
+    assert not leaks, (
+        f"Multi-turn JobAssignedMessage payload contains identifier-shaped keys: {leaks}."
+    )
+
+
+def test_job_request_accepts_messages_array() -> None:
+    """JobRequest parses a messages array and exposes it as ChatMessage objects.
+
+    The coordinator is policy-neutral: it relays whatever the sidecar sends.
+    This test verifies the schema parses correctly and backward-compat holds
+    (omitting messages yields None, not a validation error)."""
+    from coordinator.routers.jobs import JobRequest
+
+    # With messages
+    req_with = JobRequest(
+        prompt="Are you sure?",
+        messages=[
+            {"role": "user", "content": "What is 2+2?"},
+            {"role": "assistant", "content": "4"},
+            {"role": "user", "content": "Are you sure?"},
+        ],
+    )
+    assert req_with.messages is not None
+    assert len(req_with.messages) == 3
+    assert req_with.messages[0].role == "user"
+    assert req_with.messages[0].content == "What is 2+2?"
+
+    # Without messages — backward-compat
+    req_without = JobRequest(prompt="hello")
+    assert req_without.messages is None
+
+
+def test_job_request_messages_default_is_none() -> None:
+    """Prompt-only JobRequest has messages=None — identical behavior to today."""
+    from coordinator.routers.jobs import JobRequest
+
+    req = JobRequest(prompt="single turn prompt")
+    assert req.messages is None
+    assert req.prompt == "single turn prompt"

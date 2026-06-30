@@ -171,9 +171,10 @@ async def chat(req: OllamaChatRequest):
         async def ndjson_stream():
             try:
                 if use_pool:
-                    # Single-turn to the pool: only the latest user message.
-                    prompt = pool_routing.last_user_prompt(messages)
-                    source = pool_routing.stream_pool_openai(prompt, model_name, temperature, max_tokens)
+                    # pool_routing applies the multi-turn privacy policy.
+                    source = pool_routing.stream_pool_openai(
+                        messages, model_name, temperature, max_tokens
+                    )
                 elif peer:
                     source = gateway_routing.stream_peer_openai(peer, messages, model_name, temperature, max_tokens)
                 else:
@@ -211,8 +212,7 @@ async def chat(req: OllamaChatRequest):
     # Non-streaming: single JSON object.
     try:
         if use_pool:
-            prompt = pool_routing.last_user_prompt(messages)
-            result = await pool_routing.complete_pool_openai(prompt, model_name, temperature, max_tokens)
+            result = await pool_routing.complete_pool_openai(messages, model_name, temperature, max_tokens)
         elif peer:
             result = await gateway_routing.complete_peer_openai(peer, messages, model_name, temperature, max_tokens)
         else:
@@ -281,7 +281,9 @@ async def generate(req: OllamaGenerateRequest):
         async def ndjson_stream():
             try:
                 if use_pool:
-                    source = pool_routing.stream_pool_openai(req.prompt, model_name, temperature, max_tokens)
+                    source = pool_routing.stream_pool_openai(
+                        messages, model_name, temperature, max_tokens
+                    )
                 elif peer:
                     source = gateway_routing.stream_peer_openai(peer, messages, model_name, temperature, max_tokens)
                 else:
@@ -321,7 +323,7 @@ async def generate(req: OllamaGenerateRequest):
     # Non-streaming: single aggregated object.
     try:
         if use_pool:
-            result = await pool_routing.complete_pool_openai(req.prompt, model_name, temperature, max_tokens)
+            result = await pool_routing.complete_pool_openai(messages, model_name, temperature, max_tokens)
         elif peer:
             result = await gateway_routing.complete_peer_openai(peer, messages, model_name, temperature, max_tokens)
         else:

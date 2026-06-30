@@ -315,17 +315,27 @@ async def _handle_real_job(
         return
 
     token_index = 0
+    # Choose the inference path based on what the coordinator sent:
+    #   job.messages populated -> stream_chat (applies the model's chat template,
+    #     multi-turn context).  Used when scope==circle or pool_multiturn is on.
+    #   job.messages absent/empty -> stream_completion (single-turn, prompt string).
+    #     Backward-compat default.
+    sampling_kwargs: dict = dict(
+        max_tokens=job.sampling.max_tokens,
+        temperature=job.sampling.temperature,
+        top_p=job.sampling.top_p,
+        top_k=job.sampling.top_k,
+        repeat_penalty=job.sampling.repeat_penalty,
+        stop_sequences=job.sampling.stop_sequences,
+        seed=job.sampling.seed,
+    )
     try:
-        async for chunk in engine.stream_completion(
-            prompt=job.prompt,
-            max_tokens=job.sampling.max_tokens,
-            temperature=job.sampling.temperature,
-            top_p=job.sampling.top_p,
-            top_k=job.sampling.top_k,
-            repeat_penalty=job.sampling.repeat_penalty,
-            stop_sequences=job.sampling.stop_sequences,
-            seed=job.sampling.seed,
-        ):
+        if job.messages:
+            messages_as_dicts = [{"role": m.role, "content": m.content} for m in job.messages]
+            token_source = engine.stream_chat(messages=messages_as_dicts, **sampling_kwargs)
+        else:
+            token_source = engine.stream_completion(prompt=job.prompt, **sampling_kwargs)
+        async for chunk in token_source:
             tok = JobTokenMessage(
                 job_id=job.job_id,
                 token_index=token_index,
@@ -455,10 +465,19 @@ async def _receive_loop(
             except Exception as exc:
                 logger.warning("job_assigned_invalid_shape error=%s", exc)
                 continue
-            logger.info(
-                "job_assigned_received job_id=%s model_slug=%s prompt_chars=%d",
-                job.job_id, job.model_slug, len(job.prompt),
-            )
+            # Privacy: log only message count + total chars, never content.
+            if job.messages:
+                total_chars = sum(len(m.content) for m in job.messages)
+                logger.info(
+                    "job_assigned_received job_id=%s model_slug=%s "
+                    "message_count=%d total_chars=%d",
+                    job.job_id, job.model_slug, len(job.messages), total_chars,
+                )
+            else:
+                logger.info(
+                    "job_assigned_received job_id=%s model_slug=%s prompt_chars=%d",
+                    job.job_id, job.model_slug, len(job.prompt),
+                )
             if settings.inference_enabled:
                 asyncio.create_task(_handle_real_job(ws, job, settings))
             else:

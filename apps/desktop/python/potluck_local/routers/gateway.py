@@ -127,6 +127,10 @@ async def chat_completions_openai(
     scope = (x_potluck_scope or "").lower().strip()
     peer = None
     use_pool = False
+    # coordinator_scope is the scope string sent in the job body when use_pool is
+    # True. "pool" = open pool (strangers, single-turn by default); "circle" =
+    # trusted members (always multi-turn).
+    coordinator_scope = pool_routing._POOL_SCOPE
 
     if scope == "local":
         # This node only. Fail immediately — no fall-through to peer or pool.
@@ -149,6 +153,16 @@ async def chat_completions_openai(
                 status_code=503,
                 detail="No model loaded on this node, and no household peer matched.",
             )
+    elif scope == "circle":
+        # Trusted-circle routing: go directly to the coordinator with circle scope
+        # (full messages always sent — trusted members). Requires coordinator URL.
+        if not pool_routing.pool_available():
+            raise HTTPException(
+                status_code=503,
+                detail="circle routing requires a configured coordinator URL",
+            )
+        use_pool = True
+        coordinator_scope = pool_routing._CIRCLE_SCOPE
     else:
         # Default: local -> household peer -> open pool (if opted in). Existing
         # behavior preserved byte-for-byte when the header is absent.
@@ -172,7 +186,12 @@ async def chat_completions_openai(
     max_tokens = req.max_tokens or _DEFAULT_MAX_TOKENS
     stop = _normalise_stop(req.stop)
     served_model = req.model if (peer or use_pool) else local
-    served_by = "pool" if use_pool else (f"peer:{peer['node_name']}" if peer else "local")
+    if use_pool:
+        served_by = coordinator_scope  # "pool" or "circle"
+    elif peer:
+        served_by = f"peer:{peer['node_name']}"
+    else:
+        served_by = "local"
 
     logger.info(
         "gateway_chat served_by=%s model=%s messages=%d stream=%s",
@@ -183,11 +202,13 @@ async def chat_completions_openai(
         async def event_stream():
             try:
                 if use_pool:
-                    # Single-turn to the pool: only the latest user message,
-                    # never the full conversation (privacy invariant).
-                    prompt = pool_routing.last_user_prompt(messages)
+                    # pool_routing applies the multi-turn privacy policy:
+                    # circle always sends full messages; pool sends full messages
+                    # only when pool_multiturn is explicitly opted in; otherwise
+                    # only the last user message (prompt) crosses the wire.
                     async for chunk in pool_routing.stream_pool_openai(
-                        prompt, served_model, req.temperature, max_tokens
+                        messages, served_model, req.temperature, max_tokens,
+                        scope=coordinator_scope,
                     ):
                         yield f"data: {json.dumps(chunk)}\n\n"
                 elif peer:
@@ -224,9 +245,9 @@ async def chat_completions_openai(
     # Non-streaming.
     try:
         if use_pool:
-            prompt = pool_routing.last_user_prompt(messages)
             result = await pool_routing.complete_pool_openai(
-                prompt, served_model, req.temperature, max_tokens
+                messages, served_model, req.temperature, max_tokens,
+                scope=coordinator_scope,
             )
         elif peer:
             result = await gateway_routing.complete_peer_openai(
@@ -285,6 +306,7 @@ async def text_completions(
     scope = (x_potluck_scope or "").lower().strip()
     peer = None
     use_pool = False
+    coordinator_scope = pool_routing._POOL_SCOPE
 
     if scope == "local":
         if local is None:
@@ -305,6 +327,14 @@ async def text_completions(
                 status_code=503,
                 detail="No model loaded on this node, and no household peer matched.",
             )
+    elif scope == "circle":
+        if not pool_routing.pool_available():
+            raise HTTPException(
+                status_code=503,
+                detail="circle routing requires a configured coordinator URL",
+            )
+        use_pool = True
+        coordinator_scope = pool_routing._CIRCLE_SCOPE
     else:
         if req.model and req.model != local:
             peer = await gateway_routing.peer_for_model(req.model)
@@ -327,7 +357,12 @@ async def text_completions(
     max_tokens = req.max_tokens or _DEFAULT_MAX_TOKENS
     stop = _normalise_stop(req.stop)
     served_model = req.model if (peer or use_pool) else local
-    served_by = "pool" if use_pool else (f"peer:{peer['node_name']}" if peer else "local")
+    if use_pool:
+        served_by = coordinator_scope
+    elif peer:
+        served_by = f"peer:{peer['node_name']}"
+    else:
+        served_by = "local"
 
     cid = "cmpl-" + uuid.uuid4().hex[:24]
     created = int(time.time())
@@ -342,7 +377,8 @@ async def text_completions(
             try:
                 if use_pool:
                     source = pool_routing.stream_pool_openai(
-                        prompt_text, served_model, req.temperature, max_tokens
+                        messages, served_model, req.temperature, max_tokens,
+                        scope=coordinator_scope,
                     )
                 elif peer:
                     source = gateway_routing.stream_peer_openai(
@@ -399,7 +435,8 @@ async def text_completions(
     try:
         if use_pool:
             result = await pool_routing.complete_pool_openai(
-                prompt_text, served_model, req.temperature, max_tokens
+                messages, served_model, req.temperature, max_tokens,
+                scope=coordinator_scope,
             )
         elif peer:
             result = await gateway_routing.complete_peer_openai(
