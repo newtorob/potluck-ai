@@ -276,7 +276,12 @@ ipcMain.handle('select-directory', async (_event) => {
 
 ipcMain.handle('show-notification', (_event, title, body) => {
   if (Notification.isSupported()) {
-    new Notification({ title: String(title), body: String(body) }).show();
+    const notif = new Notification({ title: String(title), body: String(body) });
+    // Electron 42+ uses UNNotification on macOS: unsigned/ad-hoc dev builds
+    // can't post and emit 'failed' instead of throwing. Log it so dev failures
+    // aren't silent (production is signed + notarized, so this won't fire there).
+    notif.on('failed', (_e, error) => log.warn(`[notification] failed: ${error}`));
+    notif.show();
   }
 });
 

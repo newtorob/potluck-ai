@@ -71,8 +71,7 @@
       "icon": "icons/icon.ico",
       "target": [
         { "target": "nsis", "arch": ["x64"] }
-      ],
-      "signingHashAlgorithms": ["sha256"]
+      ]
     },
     "linux": {
       "icon": "icons/icon.png",
@@ -94,14 +93,14 @@
     }
   },
   "dependencies": {
-    "electron-log": "^5.0.0",
-    "electron-updater": "^6.0.0"
+    "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "concurrently": "^9.0.0",
     "cross-env": "^7.0.0",
-    "electron": "^36.0.0",
-    "electron-builder": "^25.0.0",
+    "electron": "^42.5.1",
+    "electron-builder": "^26.15.6",
     "rimraf": "^6.0.0",
     "wait-on": "^8.0.0"
   },
