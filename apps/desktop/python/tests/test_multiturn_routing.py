@@ -236,7 +236,10 @@ class TestClientDispatch:
         )
 
     def _run(self, coro) -> Any:
-        return asyncio.get_event_loop().run_until_complete(coro)
+        # asyncio.run() makes a fresh loop each call -- robust under the full
+        # suite, where an earlier async test can leave the thread with no
+        # current loop (get_event_loop() then raises on 3.11+).
+        return asyncio.run(coro)
 
     def _make_fake_engine(self, calls: dict) -> Any:
         class _FakeEngine:
