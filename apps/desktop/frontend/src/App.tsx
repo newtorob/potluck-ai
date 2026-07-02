@@ -17,6 +17,7 @@ import { CirclesView } from '@/views/CirclesView';
 import { ReadinessView } from '@/views/ReadinessView';
 import { SettingsView } from '@/views/SettingsView';
 import { MembershipView } from '@/views/MembershipView';
+import { AuthVerify } from '@/views/AuthVerify';
 import { FirstRun } from '@/views/FirstRun';
 import { useModelStore } from '@/stores/modelStore';
 import { useChatStore } from '@/stores/chatStore';
@@ -132,6 +133,13 @@ export default function App() {
 
   // Only gate once the fetch has settled to avoid a false-positive flash
   const showFirstRun = fetchSettled && !onboardingCompleted && !hasInstalledModels;
+
+  // Standalone magic-link verify/bounce page — rendered outside the app shell
+  // (no sidebar/status bar). In a browser it bounces to the potluck:// scheme;
+  // inside Electron it verifies in place. See AuthVerify + useDeepLinkAuth.
+  if (location.pathname === '/auth/verify') {
+    return <AuthVerify />;
+  }
 
   // Loading spinner while the very first fetch is in-flight
   if (!fetchSettled && isFetching) {

@@ -36,6 +36,14 @@ let pythonProcess = null;
 let mainWindow = null;
 let restartAttempts = 0;
 
+// Deep-link state (magic-link sign-in via the potluck:// scheme).
+// pendingDeepLink buffers a URL that arrived before the renderer was ready to
+// receive it (cold start, or macOS open-url before the window exists). The
+// renderer pulls it once on mount via the 'potluck:get-initial-deep-link' IPC
+// channel, which also flips rendererReady so later links are pushed live.
+let pendingDeepLink = null;
+let rendererReady = false;
+
 // app.isQuitting is set in before-quit to stop the crash-restart loop.
 app.isQuitting = false;
 
@@ -45,6 +53,70 @@ log.transports.file.resolvePathFn = () =>
   path.join(app.getPath('userData'), 'logs', 'main.log');
 log.transports.file.level = 'debug';
 log.transports.console.level = 'debug';
+
+// ─── Deep linking (potluck:// magic-link sign-in) ────────────────────────────
+
+const DEEP_LINK_SCHEME = 'potluck';
+
+/** Find a potluck:// URL in an argv-style array, or null. */
+function extractDeepLink(argv) {
+  return (
+    (argv || []).find(
+      (a) => typeof a === 'string' && a.startsWith(`${DEEP_LINK_SCHEME}://`),
+    ) || null
+  );
+}
+
+/**
+ * Deliver a deep link to the renderer, or buffer it until the renderer is ready.
+ * Never logs the query string — it carries the one-time magic-link token.
+ */
+function handleDeepLink(url) {
+  if (!url) return;
+  log.info(`[deeplink] received ${url.split('?')[0]}`);
+  if (rendererReady && mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send('potluck:deep-link', url);
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  } else {
+    pendingDeepLink = url;
+  }
+}
+
+// Register potluck:// as this app's scheme. In dev (defaultApp) the exec path +
+// script must be passed so the OS routes the scheme back to this process.
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME, process.execPath, [
+      path.resolve(process.argv[1]),
+    ]);
+  }
+} else {
+  app.setAsDefaultProtocolClient(DEEP_LINK_SCHEME);
+}
+
+// Single-instance lock: on Windows/Linux the OS launches a *second* instance
+// carrying the deep-link URL in argv. We forward it to the primary instance and
+// let the second quit. Also stops two instances fighting over the sidecar port.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
+
+app.on('second-instance', (_event, argv) => {
+  handleDeepLink(extractDeepLink(argv));
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
+
+// macOS delivers deep links via open-url, which can fire before the window
+// (even before app.whenReady) exists — handleDeepLink buffers in that case.
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  handleDeepLink(url);
+});
 
 // ─── Sidecar path resolution ─────────────────────────────────────────────────
 
@@ -287,6 +359,16 @@ ipcMain.handle('show-notification', (_event, title, body) => {
 
 ipcMain.handle('get-app-version', () => app.getVersion());
 
+// Renderer pulls any deep link that arrived before it was ready (cold start).
+// The first call also marks the renderer ready, so later links are pushed live
+// over the 'potluck:deep-link' channel instead of being buffered.
+ipcMain.handle('potluck:get-initial-deep-link', () => {
+  rendererReady = true;
+  const url = pendingDeepLink;
+  pendingDeepLink = null;
+  return url;
+});
+
 // ─── Mesh IPC bridge ─────────────────────────────────────────────────────────
 //
 // The Go mesh sidecar exposes an HTTP server over a Unix domain socket
@@ -494,7 +576,18 @@ function killSidecar() {
 // ─── App lifecycle ───────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
+  // Secondary instance (lost the single-instance lock) is on its way out — do
+  // not boot a sidecar or window. The primary already got our argv via
+  // 'second-instance'.
+  if (!gotSingleInstanceLock) return;
+
   log.info(`[app] Starting Potluck AI ${app.getVersion()} on ${process.platform}/${process.arch}`);
+
+  // Cold start via deep link on Windows/Linux: the URL is in our own argv.
+  // Buffer it before the window is created so the renderer pulls it on mount.
+  if (process.platform !== 'darwin') {
+    pendingDeepLink = extractDeepLink(process.argv) || pendingDeepLink;
+  }
 
   // Override the Dock icon at runtime. Required on macOS dev, where the host
   // Electron.app's icon would otherwise show. Harmless on other platforms

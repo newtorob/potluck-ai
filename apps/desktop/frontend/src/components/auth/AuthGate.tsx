@@ -1,21 +1,23 @@
 import type { ReactNode } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { useDeepLinkAuth } from '@/hooks/useDeepLinkAuth';
 
 interface AuthGateProps {
   children: ReactNode;
 }
 
 /**
- * AuthGate — wraps the application and enforces authentication.
+ * AuthGate — resolves auth state and handles magic-link deep links, without
+ * gating the app.
  *
- * v0 scaffold: pass-through. Real implementation will:
- *   - Read authStore.session
- *   - Redirect to MagicLinkForm if session is null
- *   - Validate session expiry; call cloudApi.getMe() on mount
- *   - Show a full-screen loading state while session is resolving
- *
- * TODO (guide §4.7 / cloudApi): Replace pass-through with real guard.
+ * Potluck is local-first: local chat, memory, and MCP work with no account, so
+ * this never blocks rendering. It kicks off a one-time silent session
+ * rehydration (useAuth) and mounts the global potluck:// deep-link listener
+ * (useDeepLinkAuth). Sign-in lives on the Membership view and in
+ * Settings → Account.
  */
 export function AuthGate({ children }: AuthGateProps) {
-  // Pass-through for scaffold phase — auth enforcement comes later
+  useAuth();
+  useDeepLinkAuth();
   return <>{children}</>;
 }

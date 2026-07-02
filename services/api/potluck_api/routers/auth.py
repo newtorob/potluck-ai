@@ -1,9 +1,28 @@
-from __future__ import annotations
+# NOTE: intentionally NOT using `from __future__ import annotations` here.
+# slowapi's @limiter.limit wraps the endpoint with functools.wraps, which copies
+# the stringized annotations but not this module's globals. With deferred
+# annotations FastAPI then can't resolve `MagicLinkRequest` to a body model and
+# misreads it as a query param (422). Real annotation objects avoid that.
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Cookie,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from pydantic import BaseModel, EmailStr
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from potluck_api.config import get_settings
+from potluck_api.db.database import get_db
 from potluck_api.middleware.rate_limit import limiter
+from potluck_api.services.auth_service import AuthService, MagicLinkError
+from potluck_api.services.email_service import EmailService
 
 router = APIRouter(tags=["auth"])
 
@@ -24,18 +43,17 @@ class MagicLinkRequest(BaseModel):
 async def request_magic_link(
     request: Request,  # required by slowapi
     body: MagicLinkRequest,
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
     """Send a magic-link email to the provided address.
 
     Rate-limited to 10 requests per minute per IP to prevent email flooding.
-    Full implementation in Task 6 (auth_service.py + email_service.py).
+    Always returns 202 regardless of whether the address maps to an existing
+    member — we do not leak account existence.
     """
-    # TODO (Task 6): call AuthService.create_magic_link(body.email)
-    #                then EmailService.send_magic_link(body.email, link)
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Magic link sending not yet implemented — see Task 6",
-    )
+    link = AuthService(db).create_magic_link(body.email)
+    await EmailService().send_magic_link(body.email, link)
+    return {"status": "sent"}
 
 
 # ---------------------------------------------------------------------------
@@ -45,18 +63,37 @@ async def request_magic_link(
 
 @router.get("/callback")
 async def magic_link_callback(
+    response: Response,
     token: str = Query(..., description="JWT magic-link token from the email"),
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
-    """Verify a magic-link token, create/find the member, issue a session cookie.
+    """Verify a magic-link token, create/find the member, issue a session.
 
-    Full implementation in Task 6.
+    Sets the HTTP-only session cookie and returns the session metadata
+    (matching the frontend ``Session`` type: token / expiresAt / memberId).
     """
-    # TODO (Task 6): call AuthService.verify_magic_link(token)
-    #                set HttpOnly session cookie, redirect or return member JSON
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Magic link verification not yet implemented — see Task 6",
+    settings = get_settings()
+    try:
+        member, raw_token, session = await AuthService(db).verify_magic_link(token)
+    except MagicLinkError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+
+    response.set_cookie(
+        key=settings.session_cookie_name,
+        value=raw_token,
+        max_age=settings.session_expiry_days * 24 * 60 * 60,
+        httponly=True,
+        secure=settings.cookie_secure(),
+        samesite=settings.cookie_samesite(),
+        path="/",
     )
+    return {
+        "token": raw_token,
+        "expiresAt": session.expires_at.isoformat(),
+        "memberId": str(member.id),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -69,13 +106,15 @@ async def magic_link_callback(
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
 )
-async def logout(request: Request) -> Response:
-    """Invalidate the current session.
-
-    Full implementation in Task 6.
-    """
-    # TODO (Task 6): read potluck_session cookie, delete DB row, clear cookie
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Logout not yet implemented — see Task 6",
-    )
+async def logout(
+    request: Request,
+    potluck_session: Annotated[str | None, Cookie()] = None,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Invalidate the current session and clear the cookie."""
+    settings = get_settings()
+    if potluck_session:
+        await AuthService(db).revoke_session(potluck_session)
+    resp = Response(status_code=status.HTTP_204_NO_CONTENT)
+    resp.delete_cookie(settings.session_cookie_name, path="/")
+    return resp

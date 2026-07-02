@@ -10,6 +10,13 @@ import { useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import { cloudApi } from '@/lib/cloudApi';
 
+// Silent session rehydration should run once per app session, not once per
+// useAuth() consumer. Multiple components call useAuth() (AuthGate, the
+// membership surfaces); this module-level flag makes the getMe() probe fire a
+// single time. Effects run sequentially during commit, so setting it at the top
+// of the first effect safely blocks the rest.
+let rehydrateAttempted = false;
+
 interface UseAuthReturn {
   session: ReturnType<typeof useAuthStore.getState>['session'];
   memberProfile: ReturnType<typeof useAuthStore.getState>['memberProfile'];
@@ -24,8 +31,11 @@ interface UseAuthReturn {
 export function useAuth(): UseAuthReturn {
   const store = useAuthStore();
 
-  // Attempt silent session rehydration on mount
+  // Attempt silent session rehydration on mount (once per app session)
   useEffect(() => {
+    if (rehydrateAttempted) return;
+    rehydrateAttempted = true;
+
     let cancelled = false;
     store.setAuthLoading(true);
 

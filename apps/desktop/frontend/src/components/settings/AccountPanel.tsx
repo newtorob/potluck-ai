@@ -1,14 +1,30 @@
 /**
- * AccountPanel — placeholder for sign-in / membership features.
+ * AccountPanel — Settings → Account. Reflects real auth state:
+ *   - Signed in: identity + founding badge + link to Membership + sign out.
+ *   - Signed out: a prompt to sign in (local chat needs no account).
  *
- * Real auth (magic link) is implemented by Agent A. This panel shows
- * an informational card explaining that auth is coming and that local
- * chat is fully available without an account.
+ * The full sign-in flow lives on the Membership view; this panel routes there.
  */
 
-import { User, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { User, Sparkles, LogOut } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 export function AccountPanel() {
+  const navigate = useNavigate();
+  const { isSignedIn, memberProfile, signOut } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await signOut();
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Main card */}
@@ -17,26 +33,59 @@ export function AccountPanel() {
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
             <User className="h-5 w-5 text-primary" />
           </div>
-          <div>
-            <p className="text-sm font-semibold text-foreground">Sign in coming soon</p>
-            <p className="text-xs text-muted-foreground">Passwordless magic link, no password needed</p>
+          <div className="min-w-0">
+            {isSignedIn ? (
+              <>
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {memberProfile?.email ?? 'Signed in'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {memberProfile?.isFoundingMember ? 'Founding member' : 'Member'}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-foreground">Not signed in</p>
+                <p className="text-xs text-muted-foreground">Passwordless magic link, no password needed</p>
+              </>
+            )}
           </div>
         </div>
 
         <p className="text-sm text-muted-foreground leading-relaxed">
           Membership features (founding member status, governance voting, and the contributor
-          network) are in active development. Sign-in is not required to use local chat. Your
-          models run entirely on this device today.
+          network) live on the Membership page. Sign-in is not required to use local chat. Your
+          models run entirely on this device.
         </p>
 
-        <button
-          type="button"
-          disabled
-          className="w-full rounded-lg border border-border bg-muted/50 px-4 py-2.5 text-sm font-medium text-muted-foreground cursor-not-allowed"
-          aria-label="Sign in, coming soon"
-        >
-          Sign in with magic link
-        </button>
+        {isSignedIn ? (
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('/membership')}
+              className="rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              Manage membership
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSignOut()}
+              disabled={signingOut}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+            >
+              <LogOut className="h-4 w-4" />
+              {signingOut ? 'Signing out…' : 'Sign out'}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => navigate('/membership')}
+            className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Sign in with magic link
+          </button>
+        )}
       </div>
 
       {/* "What you get" info card */}

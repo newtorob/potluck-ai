@@ -71,6 +71,26 @@ contextBridge.exposeInMainWorld('potluck', {
     return () => ipcRenderer.removeListener('update-downloaded', handler);
   },
 
+  // ── Deep links (potluck:// magic-link sign-in) ─────────────────────────────
+
+  /**
+   * Register a callback for potluck:// deep links delivered while the app runs.
+   * @param {(url: string) => void} callback
+   * @returns {() => void} Unsubscribe function.
+   */
+  onDeepLink: (callback) => {
+    const handler = (_event, url) => callback(url);
+    ipcRenderer.on('potluck:deep-link', handler);
+    return () => ipcRenderer.removeListener('potluck:deep-link', handler);
+  },
+
+  /**
+   * Pull a deep link that arrived before the renderer was ready (cold start).
+   * Returns the URL once, then null. Calling it marks the renderer ready.
+   * @returns {Promise<string | null>}
+   */
+  getInitialDeepLink: () => ipcRenderer.invoke('potluck:get-initial-deep-link'),
+
   // ── Mesh sidecar bridge ────────────────────────────────────────────────────
   //
   // The Go mesh sidecar listens on a Unix-domain socket (mac/linux) or named

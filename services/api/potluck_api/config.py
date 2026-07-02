@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     magic_link_expiry_minutes: int = 15
     session_expiry_days: int = 30
     app_url: str = "http://localhost:5173"
+    # Name of the HTTP-only session cookie set on /auth/callback.
+    session_cookie_name: str = "potluck_session"
+    # Path appended to app_url to build the magic-link URL. Kept configurable so
+    # the delivery transport (a web verify page vs a potluck:// deep link) can
+    # change without a code edit.
+    magic_link_path: str = "/auth/verify"
 
     # Email (Resend)
     resend_api_key: str = ""
@@ -84,6 +90,19 @@ class Settings(BaseSettings):
     def admin_email_list(self) -> list[str]:
         """Return admin emails as a parsed list, stripping whitespace."""
         return [e.strip() for e in self.admin_emails.split(",") if e.strip()]
+
+    def cookie_secure(self) -> bool:
+        """Session cookie Secure flag — off in development so http localhost works."""
+        return self.env != "development"
+
+    def cookie_samesite(self) -> str:
+        """Session cookie SameSite policy.
+
+        The desktop app is a different site from api.trypotluck.ai, so production
+        needs SameSite=None (which requires Secure). Local http dev can't use
+        Secure, so fall back to Lax.
+        """
+        return "none" if self.env != "development" else "lax"
 
 
 @functools.lru_cache(maxsize=1)

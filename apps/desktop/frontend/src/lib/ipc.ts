@@ -20,6 +20,8 @@ interface PotluckBridge {
   selectDirectory: () => Promise<string | null>;
   showNotification: (title: string, body: string) => Promise<void>;
   getAppVersion: () => Promise<string>;
+  onDeepLink?: (callback: (url: string) => void) => () => void;
+  getInitialDeepLink?: () => Promise<string | null>;
 }
 
 /** Safely read the Electron context bridge, or undefined in plain browser */
@@ -67,5 +69,23 @@ export const ipc = {
   /** True when the app is running inside an Electron window */
   get isElectron(): boolean {
     return getBridge() !== undefined;
+  },
+
+  /**
+   * Subscribe to potluck:// deep links delivered while the app is running.
+   * No-ops (returns a no-op unsubscribe) outside Electron.
+   */
+  onDeepLink(callback: (url: string) => void): () => void {
+    const bridge = getBridge();
+    if (!bridge?.onDeepLink) return () => {};
+    return bridge.onDeepLink(callback);
+  },
+
+  /**
+   * Pull a deep link that arrived before the renderer mounted (cold start).
+   * Returns null outside Electron or when there is none.
+   */
+  async getInitialDeepLink(): Promise<string | null> {
+    return (await getBridge()?.getInitialDeepLink?.()) ?? null;
   },
 };

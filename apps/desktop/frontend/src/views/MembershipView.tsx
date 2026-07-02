@@ -1,17 +1,22 @@
 /**
  * Membership view — top-level route for /membership.
  *
- * Placeholder scaffold. Real implementation:
- *   - Signed-out state: email input -> magic link -> verifying screen
- *   - Signed-in state: MembershipCard (plan, founding badge), billing portal link
- *   - Governance: active proposals, voting (guide §5 / cloudApi.getProposals)
+ *   - Signed-out: editorial pitch + magic-link sign-in (MagicLinkForm ->
+ *     VerifyingLink). The token itself returns via a potluck:// deep link
+ *     handled globally by useDeepLinkAuth.
+ *   - Signed-in: MembershipCard (plan, founding badge, account actions).
  */
+import { useState } from 'react';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { PotluckLogo } from '@/components/brand/PotluckLogo';
+import { MagicLinkForm } from '@/components/auth/MagicLinkForm';
+import { VerifyingLink } from '@/components/auth/VerifyingLink';
+import { MembershipCard } from '@/components/membership/MembershipCard';
+import { useAuth } from '@/hooks/useAuth';
 
 export function MembershipView() {
-  // TODO: read from authStore — replace with real auth state
-  const isSignedIn = false;
+  const { isSignedIn, requestMagicLink } = useAuth();
+  const [sentTo, setSentTo] = useState<string | null>(null);
 
   return (
     <div className="flex h-full flex-col">
@@ -23,26 +28,7 @@ export function MembershipView() {
 
       <div className="relative flex flex-1 items-center justify-center p-8 grain">
         {isSignedIn ? (
-          /* Founding member card placeholder */
-          <div className="relative z-10 w-full max-w-md rounded-2xl border border-border/60 bg-card p-8 space-y-6 shadow-hearth-sm animate-fade-in-up">
-            <div className="space-y-1">
-              <h2 className="font-serif text-3xl leading-tight tracking-display text-foreground">Founding Member</h2>
-              <p className="text-sm text-muted-foreground">You're part of something being built from the ground up.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-sage/25 bg-sage/12 px-3 py-1 text-xs font-medium text-sage">
-                <span className="h-1.5 w-1.5 rounded-full bg-sage animate-hearth-pulse" />
-                Active
-              </span>
-            </div>
-            <div className="space-y-2">
-              <div className="h-3 w-3/4 animate-hearth-pulse rounded bg-muted" />
-              <div className="h-3 w-1/2 animate-hearth-pulse rounded bg-muted/70" />
-            </div>
-            <div className="pt-2">
-              <div className="h-9 w-full animate-hearth-pulse rounded-xl bg-muted" />
-            </div>
-          </div>
+          <MembershipCard />
         ) : (
           /* Sign-in state — editorial treatment */
           <div className="relative z-10 flex w-full max-w-md flex-col items-center gap-10 text-center animate-fade-in-up">
@@ -86,13 +72,21 @@ export function MembershipView() {
               </ul>
             </div>
 
-            {/* Sign-in form placeholder */}
-            <div className="w-full space-y-3">
-              <div className="h-11 w-full animate-hearth-pulse rounded-xl bg-muted" />
-              <div className="h-11 w-full animate-hearth-pulse rounded-xl bg-primary/20" />
-              <p className="text-xs italic text-muted-foreground/60">
-                Passwordless magic link. Your email, nothing else.
-              </p>
+            {/* Magic-link sign-in */}
+            <div className="w-full">
+              {sentTo === null ? (
+                <MagicLinkForm onSent={setSentTo} />
+              ) : (
+                <VerifyingLink
+                  email={sentTo}
+                  onResend={() => {
+                    void requestMagicLink(sentTo).catch(() => {
+                      /* authError surfaced in the form/verify UI */
+                    });
+                  }}
+                  onChangeEmail={() => setSentTo(null)}
+                />
+              )}
             </div>
           </div>
         )}

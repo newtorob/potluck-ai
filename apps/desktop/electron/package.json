@@ -24,6 +24,12 @@
     "afterSign": "scripts/notarize.js",
     "appId": "ai.trypotluck.app",
     "productName": "Potluck AI",
+    "protocols": [
+      {
+        "name": "Potluck",
+        "schemes": ["potluck"]
+      }
+    ],
     "directories": {
       "output": "out"
     },
