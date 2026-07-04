@@ -31,7 +31,30 @@ export interface MemberProfile {
   membershipPlan: MembershipPlan | null;
   membershipStatus: MembershipStatus | null;
   isFoundingMember: boolean;
+  isAdmin: boolean;
   joinedAt: string;
+}
+
+/** One row in the admin member list (superset of MemberProfile). */
+export interface AdminMemberSummary {
+  id: string;
+  email: string;
+  displayName: string | null;
+  isAdmin: boolean;
+  isFoundingMember: boolean;
+  foundingMemberAt: string | null;
+  membershipPlan: MembershipPlan | null;
+  membershipStatus: string | null;
+  stripeCustomerId: string | null;
+  joinedAt: string;
+}
+
+/** Paginated response from GET /admin/members. */
+export interface AdminMembersPage {
+  total: number;
+  limit: number;
+  offset: number;
+  members: AdminMemberSummary[];
 }
 
 export interface Session {

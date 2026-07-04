@@ -16,6 +16,8 @@ import type {
   Session,
   GovernanceProposal,
   MembershipPlan,
+  AdminMembersPage,
+  AdminMemberSummary,
 } from '@/types/api';
 
 const CLOUD_BASE =
@@ -52,6 +54,13 @@ function post<T>(path: string, body?: unknown): Promise<T> {
 
 function get<T>(path: string): Promise<T> {
   return fetch(`${CLOUD_BASE}${path}`, {
+    credentials: 'include',
+  }).then((r) => handleResponse<T>(r));
+}
+
+function del<T>(path: string): Promise<T> {
+  return fetch(`${CLOUD_BASE}${path}`, {
+    method: 'DELETE',
     credentials: 'include',
   }).then((r) => handleResponse<T>(r));
 }
@@ -139,5 +148,38 @@ export const cloudApi = {
    */
   vote(proposalId: string, choice: 'for' | 'against'): Promise<{ status: string }> {
     return post<{ status: string }>(`/votes/${encodeURIComponent(proposalId)}`, { choice });
+  },
+
+  // ---- Admin ---------------------------------------------------------------
+  // All admin routes require an admin session (is_admin). A non-admin session
+  // gets 403; an unauthenticated one gets 401. See services/api routers/admin.py.
+
+  /** GET /admin/members — paginated member roster with latest membership. */
+  adminListMembers(limit = 100, offset = 0): Promise<AdminMembersPage> {
+    return get<AdminMembersPage>(`/admin/members?limit=${limit}&offset=${offset}`);
+  },
+
+  /**
+   * POST /admin/members/:id/grant-founding — stamp founding status.
+   * Idempotent; `granted` is false if the member was already founding.
+   */
+  adminGrantFounding(
+    memberId: string,
+  ): Promise<{ granted: boolean; member: AdminMemberSummary }> {
+    return post<{ granted: boolean; member: AdminMemberSummary }>(
+      `/admin/members/${encodeURIComponent(memberId)}/grant-founding`,
+    );
+  },
+
+  /**
+   * DELETE /admin/members/:id/founding — revoke founding status.
+   * Idempotent; `revoked` is false if the member was not founding.
+   */
+  adminRevokeFounding(
+    memberId: string,
+  ): Promise<{ revoked: boolean; member: AdminMemberSummary }> {
+    return del<{ revoked: boolean; member: AdminMemberSummary }>(
+      `/admin/members/${encodeURIComponent(memberId)}/founding`,
+    );
   },
 };

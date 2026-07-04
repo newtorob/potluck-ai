@@ -49,6 +49,7 @@ def _profile(member: Member, membership: Membership | None) -> dict[str, object]
             else None
         ),
         "isFoundingMember": member.founding_member_at is not None,
+        "isAdmin": member.is_admin,
         "joinedAt": member.created_at.isoformat(),
     }
 

@@ -17,6 +17,7 @@ import { CirclesView } from '@/views/CirclesView';
 import { ReadinessView } from '@/views/ReadinessView';
 import { SettingsView } from '@/views/SettingsView';
 import { MembershipView } from '@/views/MembershipView';
+import { AdminView } from '@/views/AdminView';
 import { AuthVerify } from '@/views/AuthVerify';
 import { FirstRun } from '@/views/FirstRun';
 import { useModelStore } from '@/stores/modelStore';
@@ -195,6 +196,7 @@ export default function App() {
               <Route path="/network" element={<NetworkView />} />
               <Route path="/settings" element={<SettingsView />} />
               <Route path="/membership" element={<MembershipView />} />
+              <Route path="/admin" element={<AdminView />} />
               {/* Catch-all: redirect unknown paths to chat */}
               <Route path="*" element={<Navigate to="/chat" replace />} />
             </Routes>

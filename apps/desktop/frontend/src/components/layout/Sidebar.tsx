@@ -32,6 +32,7 @@ import {
   Gauge,
   Settings,
   CreditCard,
+  ShieldCheck,
   Users,
   Plus,
   MoreHorizontal,
@@ -48,6 +49,7 @@ import {
 import { cn } from '@/components/ui/cn';
 import { useChat } from '@/hooks/useChat';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/hooks/useAuth';
 import { ProjectSwitcher } from '@/components/layout/ProjectSwitcher';
 import { PotluckLogo } from '@/components/brand/PotluckLogo';
 import { relativeTimeFromMs } from '@/lib/timeFormat';
@@ -97,6 +99,7 @@ export function Sidebar() {
   const isChat = location.pathname === '/chat' || location.pathname.startsWith('/chat');
   const sidebarCollapsed = useUiPrefsStore((s) => s.sidebarCollapsed);
   const setSidebarCollapsed = useUiPrefsStore((s) => s.setSidebarCollapsed);
+  const { memberProfile } = useAuth();
 
   // ⌘\ / Ctrl+\ — global collapse toggle
   useEffect(() => {
@@ -193,6 +196,12 @@ export function Sidebar() {
         {SECONDARY_NAV.map((item) => (
           <NavItemLink key={item.to} item={item} expanded={expanded} />
         ))}
+        {memberProfile?.isAdmin && (
+          <NavItemLink
+            item={{ to: '/admin', label: 'Admin', icon: ShieldCheck }}
+            expanded={expanded}
+          />
+        )}
       </div>
 
       {/* Chrome controls — collapse + theme */}
