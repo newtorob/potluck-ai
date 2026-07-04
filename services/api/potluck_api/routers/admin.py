@@ -11,9 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from potluck_api.db.database import get_db
 from potluck_api.middleware.auth import require_admin
 from potluck_api.models.audit import AuditLog
+from potluck_api.models.billing import BillingEvent
 from potluck_api.models.member import Member
 from potluck_api.models.membership import Membership
 from potluck_api.routers.members import _STATUS_MAP
+from potluck_api.services.billing_service import BillingService
 
 router = APIRouter(tags=["admin"])
 
@@ -204,12 +206,70 @@ async def admin_revoke_founding(
 @router.get("/billing")
 async def admin_billing_summary(
     _: Annotated[Member, Depends(require_admin)],
+    db: AsyncSession = Depends(get_db),
+    recent_limit: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> dict[str, object]:
-    """Billing overview: active subscriptions, MRR, etc. (admin only).
+    """Billing overview: memberships, revenue, and recent events (admin only).
 
-    Deferred to Task 7 (needs the Stripe integration for real revenue data).
+    Revenue sums the money-bearing events we have recorded
+    (checkout.session.completed + invoice.paid). ``billingConfigured`` reports
+    whether a live Stripe key is set so the operator can tell real data from an
+    unconfigured (dev) backend.
     """
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Admin billing summary not yet implemented",
+    total_members = await db.scalar(select(func.count()).select_from(Member)) or 0
+    founding_count = (
+        await db.scalar(
+            select(func.count())
+            .select_from(Member)
+            .where(Member.founding_member_at.is_not(None))
+        )
+        or 0
     )
+
+    # Active memberships grouped by plan.
+    plan_rows = (
+        await db.execute(
+            select(Membership.plan, func.count())
+            .where(Membership.status == "active")
+            .group_by(Membership.plan)
+        )
+    ).all()
+    active_by_plan = {plan: int(count) for plan, count in plan_rows}
+
+    revenue_cents = (
+        await db.scalar(
+            select(func.coalesce(func.sum(BillingEvent.amount_cents), 0)).where(
+                BillingEvent.event_type.in_(
+                    ["checkout.session.completed", "invoice.paid"]
+                )
+            )
+        )
+        or 0
+    )
+
+    recent = (
+        await db.scalars(
+            select(BillingEvent)
+            .order_by(BillingEvent.created_at.desc())
+            .limit(recent_limit)
+        )
+    ).all()
+
+    return {
+        "billingConfigured": BillingService(db).enabled,
+        "totalMembers": int(total_members),
+        "foundingMembers": int(founding_count),
+        "activeMembershipsByPlan": active_by_plan,
+        "revenueCents": int(revenue_cents),
+        "recentEvents": [
+            {
+                "id": str(ev.id),
+                "type": ev.event_type,
+                "memberId": str(ev.member_id) if ev.member_id else None,
+                "amountCents": ev.amount_cents,
+                "currency": ev.currency,
+                "createdAt": ev.created_at.isoformat(),
+            }
+            for ev in recent
+        ],
+    }

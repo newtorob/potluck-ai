@@ -1,8 +1,9 @@
 /**
  * MembershipCard — signed-in state: identity, plan, founding badge, and the
- * account actions. Billing (Stripe checkout / portal) ships in a later pass, so
- * when there is no active plan yet this shows account info honestly rather than
- * a button that can't complete.
+ * account actions. With an active plan it offers "Manage billing" (Stripe
+ * portal); without one it offers "Become a founding member" (Stripe checkout).
+ * Both open Stripe in the external browser. Until a live Stripe key is set the
+ * cloud API returns 503, which surfaces here as an honest "not available yet".
  */
 
 import { useState } from 'react';
@@ -16,7 +17,7 @@ function titleCase(s: string): string {
 
 export function MembershipCard() {
   const { memberProfile, signOut } = useAuth();
-  const { membership, openBillingPortal } = useMembership();
+  const { membership, openBillingPortal, startCheckout } = useMembership();
   const [signingOut, setSigningOut] = useState(false);
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
@@ -36,6 +37,18 @@ export function MembershipCard() {
     setBillingBusy(true);
     try {
       await openBillingPortal();
+    } catch {
+      setBillingError("Billing isn't available yet.");
+    } finally {
+      setBillingBusy(false);
+    }
+  }
+
+  async function handleCheckout() {
+    setBillingError(null);
+    setBillingBusy(true);
+    try {
+      await startCheckout('founding');
     } catch {
       setBillingError("Billing isn't available yet.");
     } finally {
@@ -98,10 +111,26 @@ export function MembershipCard() {
           )}
         </div>
       ) : (
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Founding membership and dues open before we announce publicly. Your
-          account is ready; nothing is owed yet.
-        </p>
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => void handleCheckout()}
+            disabled={billingBusy}
+            className="h-11 w-full rounded-xl bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {billingBusy ? 'Opening…' : 'Become a founding member'}
+          </button>
+          {billingError && (
+            <p role="alert" className="text-xs text-destructive">
+              {billingError}
+            </p>
+          )}
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            A one-time founding fee locks in the permanent badge and reduced
+            dues. Your account is ready; nothing is charged until you choose to
+            join.
+          </p>
+        </div>
       )}
 
       <div className="border-t border-border/60 pt-4">

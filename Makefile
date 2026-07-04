@@ -19,7 +19,7 @@ COMPOSE ?= $(shell \
   fi)
 
 .PHONY: help setup check-python check-docker up down restart logs api-logs pg-logs coord-logs migrate psql \
-        api-shell coord-shell test-api test-coordinator m3-smoke mesh-smoke lint install-hooks dev desktop frontend \
+        api-shell coord-shell test test-api test-coordinator test-sidecar test-go m3-smoke mesh-smoke lint install-hooks dev desktop frontend \
         sidecar sidecar-setup sidecar-go installer-deps installer-bundle installer-mac installer-win installer-linux installer-clean \
         coordinator coordinator-setup frontend-setup electron-setup ps status clean reset eval-retrieval bench \
         bench-inference bench-inference-get-models \
@@ -161,8 +161,11 @@ api-shell: check-docker ## Open a bash shell inside the api container
 coord-shell: check-docker ## Open a bash shell inside the coordinator container
 	$(COMPOSE) exec coordinator bash
 
-test-api: check-docker ## Run pytest inside the api container
-	$(COMPOSE) exec api pytest -q
+test: test-api test-coordinator test-sidecar test-go ## Run every test suite (api + coordinator + sidecar + Go)
+
+test-api: check-docker ## Run pytest inside the api container (installs dev deps first)
+	$(COMPOSE) exec -u root api pip install -q -r requirements-dev.txt
+	$(COMPOSE) exec api env PYTHONDONTWRITEBYTECODE=1 pytest -q
 
 test-coordinator: ## Run coordinator pytest suite (privacy invariants etc.) in its venv
 	@if [ ! -x services/coordinator/.venv/bin/pytest ]; then \
@@ -170,6 +173,17 @@ test-coordinator: ## Run coordinator pytest suite (privacy invariants etc.) in i
 		exit 1; \
 	fi
 	@cd services/coordinator && ./.venv/bin/pytest -q
+
+test-sidecar: ## Run the desktop Python sidecar test suite in its venv
+	@if [ ! -x apps/desktop/python/.venv/bin/pytest ]; then \
+		echo "==> apps/desktop/python/.venv/bin/pytest missing — run 'make sidecar-setup' first"; \
+		exit 1; \
+	fi
+	@cd apps/desktop/python && ./.venv/bin/pytest -q
+
+test-go: ## Run the Go unit tests (mesh sidecar + DERP relay)
+	@cd apps/desktop/go/potluck-mesh && go test ./...
+	@cd services/derp && go test ./...
 
 m3-smoke: ## End-to-end Phase G m3 acceptance check (needs coordinator + at least one peer running)
 	@python3 scripts/dev/m3-smoke.py $(M3_ARGS)

@@ -1,6 +1,18 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request, status
+from typing import Annotated
+
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from potluck_api.db.database import get_db
+from potluck_api.services.billing_service import (
+    BillingService,
+    BillingSignatureError,
+)
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["webhooks"])
 
@@ -11,30 +23,39 @@ router = APIRouter(tags=["webhooks"])
 
 
 @router.post("/stripe", status_code=status.HTTP_200_OK)
-async def stripe_webhook(request: Request) -> dict[str, str]:
+async def stripe_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
     """Receive and process Stripe webhook events.
 
-    The raw request body is read before any JSON parsing so that the
-    Stripe signature can be verified against the unmodified bytes.
+    The raw request body is read before any JSON parsing so the Stripe signature
+    can be verified against the unmodified bytes.
 
-    Events handled (full implementation in Task 7 — billing_service.py):
+    Events handled:
     - checkout.session.completed
     - invoice.paid
     - invoice.payment_failed
     - customer.subscription.deleted
 
-    The endpoint intentionally returns 200 for all well-formed requests so
-    Stripe does not retry events that fail due to our internal errors. Error
-    details are logged and sent to Sentry instead.
+    Response contract (aligned with Stripe retry semantics):
+    - 400 on a bad/missing signature — a forged or misconfigured event; retrying
+      it would never succeed, so we tell Stripe not to.
+    - 200 once the event is processed (or safely deduped / ignored).
+    - 500 on an unexpected internal error — processing is atomic and events are
+      idempotent (deduped by id), so letting Stripe retry is the durable choice
+      rather than swallowing the failure.
     """
     # Read raw body now — once consumed it cannot be re-read by a JSON parser.
     raw_body: bytes = await request.body()
     stripe_signature = request.headers.get("stripe-signature", "")
 
-    # TODO (Task 7): call BillingService.handle_webhook(raw_body, stripe_signature)
-    #                which does stripe.Webhook.construct_event() and dispatches
-    #                to the appropriate handler.
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Stripe webhook handler not yet implemented — see Task 7",
-    )
+    try:
+        await BillingService(db).handle_webhook(raw_body, stripe_signature)
+    except BillingSignatureError as exc:
+        logger.warning("stripe_webhook_bad_signature", error=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+
+    return {"status": "ok"}

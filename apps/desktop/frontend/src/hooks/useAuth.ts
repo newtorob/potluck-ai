@@ -31,35 +31,35 @@ interface UseAuthReturn {
 export function useAuth(): UseAuthReturn {
   const store = useAuthStore();
 
-  // Attempt silent session rehydration on mount (once per app session)
+  // Attempt silent session rehydration on mount (once per app session).
+  //
+  // The result is applied to the global auth store unconditionally — NOT gated
+  // on a component-level "cancelled" flag. Under React.StrictMode the initiating
+  // component is mounted, unmounted, and remounted immediately; the module-level
+  // guard above stops the remount from re-fetching, so a cancel-on-unmount guard
+  // would discard the only in-flight getMe() and leave a valid session rendering
+  // as signed-out. The store is global, so a late write after unmount is safe.
   useEffect(() => {
     if (rehydrateAttempted) return;
     rehydrateAttempted = true;
 
-    let cancelled = false;
     store.setAuthLoading(true);
-
     cloudApi
       .getMe()
       .then((profile) => {
-        if (cancelled) return;
-        // If getMe succeeds we have a valid session cookie; synthesise a
-        // minimal session object for the store (token lives server-side).
+        // getMe succeeded => the session cookie is valid; synthesise a minimal
+        // session object for the store (the real token lives server-side).
         store.setSession(
           { token: '', expiresAt: '', memberId: profile.id },
           profile,
         );
       })
       .catch(() => {
-        // Not signed in — expected; treat as unauthenticated
+        // Not signed in — expected; treat as unauthenticated.
       })
       .finally(() => {
-        if (!cancelled) store.setAuthLoading(false);
+        store.setAuthLoading(false);
       });
-
-    return () => {
-      cancelled = true;
-    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

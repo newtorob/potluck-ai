@@ -4,8 +4,16 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from potluck_api.db.database import get_db
 from potluck_api.middleware.auth import get_current_member
+from potluck_api.models.member import Member
+from potluck_api.services.billing_service import (
+    BillingError,
+    BillingNotConfigured,
+    BillingService,
+)
 
 router = APIRouter(tags=["billing"])
 
@@ -24,20 +32,25 @@ class CheckoutRequest(BaseModel):
 @router.post("/checkout")
 async def create_checkout(
     body: CheckoutRequest,
-    member: Annotated[object, Depends(get_current_member)],
+    member: Annotated[Member, Depends(get_current_member)],
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
     """Create a Stripe Checkout session and return the redirect URL.
 
     - ``founding``: one-time founding member payment (STRIPE_FOUNDING_PRICE_ID)
     - ``monthly``:  recurring monthly dues (STRIPE_DUES_PRICE_ID)
-
-    Full implementation in Task 7 (billing_service.py).
     """
-    # TODO (Task 7): call BillingService.create_checkout(member, body.plan)
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Checkout not yet implemented — see Task 7",
-    )
+    try:
+        url = await BillingService(db).create_checkout(member, body.plan)
+    except BillingNotConfigured as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+    except BillingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+    return {"url": url}
 
 
 # ---------------------------------------------------------------------------
@@ -47,14 +60,18 @@ async def create_checkout(
 
 @router.post("/portal")
 async def billing_portal(
-    member: Annotated[object, Depends(get_current_member)],
+    member: Annotated[Member, Depends(get_current_member)],
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
-    """Create a Stripe Billing Portal session and return the redirect URL.
-
-    Full implementation in Task 7.
-    """
-    # TODO (Task 7): call BillingService.create_portal_session(member)
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Billing portal not yet implemented — see Task 7",
-    )
+    """Create a Stripe Billing Portal session and return the redirect URL."""
+    try:
+        url = await BillingService(db).create_portal_session(member)
+    except BillingNotConfigured as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
+    except BillingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+    return {"url": url}

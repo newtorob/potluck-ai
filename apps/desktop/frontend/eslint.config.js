@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules'] },
+  // Test files run under Vitest (typechecked via esbuild) and are excluded from
+  // tsconfig.app.json, so the type-aware lint below cannot resolve them.
+  { ignores: ['dist', 'node_modules', 'src/**/*.test.ts', 'src/**/*.test.tsx', 'src/test/**'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommendedTypeChecked],
     files: ['**/*.{ts,tsx}'],
