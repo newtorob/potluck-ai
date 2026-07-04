@@ -33,7 +33,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
     const body: unknown = await res.json().catch(() => ({}));
     const msg =
       typeof body === 'object' && body !== null && 'detail' in body
-        ? String((body as { detail: unknown }).detail)
+        ? String((body).detail)
         : res.statusText;
     throw new Error(`[cloudApi] ${res.status}: ${msg}`);
   }

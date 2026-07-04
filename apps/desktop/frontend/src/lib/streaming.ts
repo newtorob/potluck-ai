@@ -104,7 +104,7 @@ function extractContent(parsed: unknown): string | null {
     typeof parsed !== 'object' ||
     parsed === null ||
     !('choices' in parsed) ||
-    !Array.isArray((parsed as { choices: unknown }).choices)
+    !Array.isArray((parsed).choices)
   ) {
     return null;
   }
@@ -125,8 +125,8 @@ function extractMeta(parsed: unknown): StreamMeta | null {
     typeof parsed !== 'object' ||
     parsed === null ||
     !('meta' in parsed) ||
-    typeof (parsed as { meta: unknown }).meta !== 'object' ||
-    (parsed as { meta: unknown }).meta === null
+    typeof (parsed).meta !== 'object' ||
+    (parsed).meta === null
   ) {
     return null;
   }

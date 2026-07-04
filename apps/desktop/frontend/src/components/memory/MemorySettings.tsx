@@ -64,8 +64,8 @@ function WipeConfirmDialog({ onConfirm, onCancel, isWiping, error }: WipeConfirm
           Wipe all memory?
         </h2>
         <p className="mb-4 text-xs text-muted-foreground">
-          This deletes every memory permanently. There is no undo. Export your memories first if
-          you want a backup.
+          This deletes every memory permanently. There is no undo. Export your memories first if you
+          want a backup.
         </p>
 
         <label className="mb-4 flex cursor-pointer items-start gap-2">
@@ -165,9 +165,9 @@ export function MemorySettings({ settings, isSaving, onUpdate }: MemorySettingsP
     void onUpdate({
       privacy: {
         ...settings.privacy,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- extending settings shape forward-compatibly
+
         memory_enabled: !memoryEnabled,
-      } as any,
+      },
     });
   };
 

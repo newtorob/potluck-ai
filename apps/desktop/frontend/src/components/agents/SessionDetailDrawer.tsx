@@ -7,7 +7,7 @@
  * - Accessible: role="complementary", aria-label="Session detail"
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Download, X } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { ProjectPill } from '@/components/memory/ProjectPill';
@@ -56,7 +56,7 @@ function TimelineRow({ call, step }: TimelineRowProps) {
   const safeArgs = sanitizeArgsSummary(call.args_summary);
   const hasArgs = Object.keys(safeArgs).length > 0;
   const hasVersion = call.tool_schema_version !== null;
-  const memoryIds = call.memory_ids_touched ?? [];
+  const memoryIds = useMemo(() => call.memory_ids_touched ?? [], [call.memory_ids_touched]);
 
   // Lazy-load memory previews the first time the row is expanded AND it
   // touched memories. No prefetch — the drawer can show 200 rows; eager

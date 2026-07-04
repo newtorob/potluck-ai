@@ -484,7 +484,7 @@ export function TaskStateView() {
             <TaskCard
               key={task.id}
               task={task}
-              onCompleteStep={completeStep}
+              onCompleteStep={(id, step) => { void completeStep(id, step); }}
               onAddStep={handleAddStep}
               onAddError={(id, error, resolution) => { void addError(id, error, resolution); }}
               onSetStatus={(id, status) => { void setStatus(id, status); }}

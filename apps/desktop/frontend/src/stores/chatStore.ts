@@ -295,6 +295,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     }
   },
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- async by the store's uniform action contract; body is sync state + fire-and-forget persist
   async createConversation(modelSlug) {
     const id = makeId();
     const now = Date.now();
@@ -332,6 +333,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     return id;
   },
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- async by the store's uniform action contract; body is sync state + fire-and-forget persist
   async deleteConversation(id) {
     set((s) => {
       const next = { ...s.conversations };
@@ -407,6 +409,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     }
   },
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- async by the store's uniform action contract; body is sync state + fire-and-forget persist
   async renameConversation(id, title) {
     const trimmed = title.trim() || 'New chat';
     set((s) => {
@@ -662,7 +665,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
               [conversationId]: {
                 ...target,
                 messages: target.messages.map((m) =>
-                  m.id === assistantId ? { ...m, status: 'complete' as MessageStatus } : m,
+                  m.id === assistantId ? { ...m, status: 'complete' } : m,
                 ),
               },
             },
@@ -720,7 +723,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
                 m.id === assistantId
                   ? {
                       ...m,
-                      status: 'error' as MessageStatus,
+                      status: 'error',
                       errorText,
                       content: m.content,
                     }
@@ -772,7 +775,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
             ...target,
             messages: target.messages.map((m) =>
               m.id === streamingMessageId
-                ? { ...m, status: 'partial' as MessageStatus }
+                ? { ...m, status: 'partial' }
                 : m,
             ),
           },

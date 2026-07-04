@@ -203,7 +203,7 @@ export const useMemoryStore = create<MemoryState>()((set, get) => ({
       typeof parsed === 'object' &&
       parsed !== null &&
       'memories' in parsed &&
-      Array.isArray((parsed as { memories: unknown }).memories)
+      Array.isArray((parsed).memories)
     ) {
       memoriesArray = (parsed as { memories: unknown[] }).memories;
     } else if (Array.isArray(parsed)) {

@@ -59,7 +59,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     if (!previous) return;
 
     // Optimistic update — deep-merge the patch
-    const optimistic = deepMerge(previous, patch) as PotluckSettings;
+    const optimistic = deepMerge(previous, patch);
     set({ settings: optimistic, isSaving: true, saveError: null });
 
     try {
@@ -101,7 +101,7 @@ function deepMerge<T extends object>(target: T, source: DeepPartial<T>): T {
       tgtVal !== null &&
       typeof tgtVal === 'object'
     ) {
-      result[key] = deepMerge(tgtVal as object, srcVal as DeepPartial<object>);
+      result[key] = deepMerge(tgtVal, srcVal);
     } else if (srcVal !== undefined) {
       result[key] = srcVal;
     }

@@ -39,7 +39,6 @@ export function useAgents() {
   useEffect(() => {
     void fetchActivityRef.current();
     // filterKey is a stable JSON string — safe dep
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterKey]);
 
   // ---- Polling loops -------------------------------------------------------

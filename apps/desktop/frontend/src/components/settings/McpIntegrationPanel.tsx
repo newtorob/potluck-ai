@@ -36,7 +36,7 @@ const REPO_ROOT: string = import.meta.env['VITE_POTLUCK_REPO_ROOT'] as string | 
 const VENV_PYTHON = `${REPO_ROOT}/apps/desktop/python/.venv/bin/python`;
 const BUNDLED_BINARY = '/Applications/Potluck AI.app/Contents/Resources/python/potluck-mcp';
 
-const IS_DEV: boolean = import.meta.env.DEV as boolean;
+const IS_DEV: boolean = import.meta.env.DEV;
 
 interface BinaryConfig {
   command: string;

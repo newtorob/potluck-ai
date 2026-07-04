@@ -37,7 +37,7 @@ export function ProjectSwitcher({ compact = false }: ProjectSwitcherProps) {
   // Build the flat option list for keyboard nav
   // options: null (global), ...project names, 'new'
   const projectNames = projects.map((p) => p.project);
-  const optionValues: Array<string | null | '__new__'> = [null, ...projectNames, '__new__'];
+  const optionValues: Array<string | null> = [null, ...projectNames, '__new__'];
 
   const close = useCallback(() => {
     setOpen(false);
@@ -102,7 +102,7 @@ export function ProjectSwitcher({ compact = false }: ProjectSwitcherProps) {
     }
   };
 
-  const selectOption = async (val: string | null | '__new__' | undefined) => {
+  const selectOption = async (val: string | null | undefined) => {
     if (val === '__new__') {
       close();
       const raw = window.prompt('New project name:');

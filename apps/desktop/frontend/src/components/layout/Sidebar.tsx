@@ -178,10 +178,10 @@ export function Sidebar() {
           conversations={conversations}
           activeConversationId={activeConversationId}
           isStreaming={isStreaming}
-          onCreate={() => createConversation()}
-          onSwitch={switchConversation}
-          onDelete={deleteConversation}
-          onRename={renameConversation}
+          onCreate={() => void createConversation()}
+          onSwitch={(id) => void switchConversation(id)}
+          onDelete={(id) => void deleteConversation(id)}
+          onRename={(id, title) => void renameConversation(id, title)}
         />
       )}
 

@@ -18,7 +18,10 @@ import type { MemoryCategory } from '@/types/memory';
 
 export type UseMemoriesReturn = Omit<MemoryState, 'performSearch'> & {
   refetch: () => void;
-  performSearch: (query: string, opts?: { project?: string | null; min_confidence?: number }) => void;
+  performSearch: (
+    query: string,
+    opts?: { project?: string | null; min_confidence?: number },
+  ) => void;
 };
 
 interface UseMemoriesOptions {
@@ -39,7 +42,6 @@ export function useMemories(opts: UseMemoriesOptions = {}): UseMemoriesReturn {
       ...(opts.project !== undefined ? { project: opts.project } : {}),
       ...(opts.include_all !== undefined ? { include_all: opts.include_all } : {}),
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store, opts.category, opts.limit, opts.project, opts.include_all]);
 
   // Fetch on mount and whenever filter params change
@@ -74,7 +76,7 @@ export function useMemories(opts: UseMemoriesOptions = {}): UseMemoriesReturn {
       }, 300);
     },
     // store is a stable Zustand ref; clearSearch and performSearch are stable action refs
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     [store],
   );
 
