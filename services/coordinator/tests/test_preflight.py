@@ -16,8 +16,11 @@ from coordinator.services.preflight import enforce_preflight, run_preflight
 # The default dev DB URL (mirrors config.py's default). Hardcoded so a stray
 # local .env with DATABASE_URL set can't change what "insecure" means here.
 _DEFAULT_DB = "postgresql+asyncpg://potluck:potluck@localhost:5432/potluck"
-# A production-grade DB URL (not the default dev creds).
-_PROD_DB = "postgresql+asyncpg://app:s3cret@db.internal:5432/potluck"
+# A production-grade DB URL (not the default dev creds). Requests TLS via ssl=
+# so a "fully remediated" prod config clears the now fail-closed database_tls
+# check. A no-TLS variant used by the dedicated db-tls tests lives below.
+_PROD_DB = "postgresql+asyncpg://app:s3cret@db.internal:5432/potluck?ssl=require"
+_PROD_DB_NO_TLS = "postgresql+asyncpg://app:s3cret@db.internal:5432/potluck"
 # A token that clears the strength floor (>=16 chars).
 _STRONG_TOKEN = "coordinator-secret-0123456789"
 
@@ -94,12 +97,15 @@ def test_advisories_warn_in_prod_not_block(monkeypatch):
     names = _by_name(run_preflight(_remediated("production")))
     # CORS is env-gated: a clean prod (no CORS_ORIGINS) carries no dev origins.
     assert names["cors_dev_origins"].status == "ok"
-    # _PROD_DB has no TLS param, _remediated has no Sentry DSN -> advisory warns.
-    assert names["database_tls"].status == "warn"
+    # _remediated has no Sentry DSN -> advisory warns (but never blocks).
     assert names["error_reporting"].status == "warn"
-    # All advisories are non-blocking so they never refuse startup.
-    for n in ("cors_dev_origins", "database_tls", "error_reporting", "verification_probe"):
+    # These advisories are non-blocking so they never refuse startup.
+    for n in ("cors_dev_origins", "error_reporting", "verification_probe"):
         assert names[n].blocking is False
+    # database_tls is NOT an advisory any more — it is fail-closed (see the
+    # dedicated db-tls tests). _PROD_DB requests ssl=require, so it's ok here.
+    assert names["database_tls"].status == "ok"
+    assert names["database_tls"].blocking is True
 
 
 def test_cors_warns_when_localhost_configured_in_prod(monkeypatch):
@@ -160,3 +166,58 @@ def test_docs_exposure_is_warn_in_dev_ok_in_prod(monkeypatch):
     prod = _by_name(run_preflight(_remediated("production")))["api_docs_exposed"]
     assert dev.status == "warn" and dev.blocking is False
     assert prod.status == "ok"
+
+
+# --- database_tls is now fail-closed in staging/production -------------------
+# The DB carries the credit ledger + member keys, so a network deployment must
+# encrypt the link. Block unless the URL requests TLS (ssl=) OR the operator
+# explicitly acknowledges network-layer encryption (POTLUCK_DB_LINK_ENCRYPTED=1).
+
+
+def test_db_tls_blocks_prod_without_tls_or_ack(monkeypatch):
+    monkeypatch.setenv("POTLUCK_COORDINATOR_TOKEN", _STRONG_TOKEN)
+    monkeypatch.delenv("POTLUCK_DB_LINK_ENCRYPTED", raising=False)
+    s = _settings("production", registered_keys=True, db_url=_PROD_DB_NO_TLS)
+    check = _by_name(run_preflight(s))["database_tls"]
+    assert check.status == "fail"
+    assert check.blocking is True
+    # ...and it actually refuses to start.
+    with pytest.raises(RuntimeError) as exc:
+        enforce_preflight(s)
+    assert "database_tls" in str(exc.value)
+
+
+def test_db_tls_ok_when_ssl_require_in_url(monkeypatch):
+    monkeypatch.setenv("POTLUCK_COORDINATOR_TOKEN", _STRONG_TOKEN)
+    monkeypatch.delenv("POTLUCK_DB_LINK_ENCRYPTED", raising=False)
+    s = _settings("production", registered_keys=True, db_url=_PROD_DB_NO_TLS + "?ssl=require")
+    assert _by_name(run_preflight(s))["database_tls"].status == "ok"
+    enforce_preflight(s)  # remediated + TLS -> starts clean (no raise)
+
+
+def test_db_tls_ok_with_network_encryption_ack(monkeypatch):
+    # The private-network escape hatch: no ssl= in the URL, but the operator
+    # explicitly acknowledges the link is encrypted at the network layer.
+    monkeypatch.setenv("POTLUCK_COORDINATOR_TOKEN", _STRONG_TOKEN)
+    monkeypatch.setenv("POTLUCK_DB_LINK_ENCRYPTED", "1")
+    s = _settings("production", registered_keys=True, db_url=_PROD_DB_NO_TLS)
+    assert _by_name(run_preflight(s))["database_tls"].status == "ok"
+    enforce_preflight(s)  # ack present -> does not raise
+
+
+def test_db_tls_sslmode_is_a_trap_not_tls(monkeypatch):
+    # asyncpg ignores libpq's sslmode=; a URL carrying only sslmode=require is
+    # NOT encrypted and must still fail — with a message that names the trap.
+    monkeypatch.setenv("POTLUCK_COORDINATOR_TOKEN", _STRONG_TOKEN)
+    monkeypatch.delenv("POTLUCK_DB_LINK_ENCRYPTED", raising=False)
+    s = _settings("production", registered_keys=True, db_url=_PROD_DB_NO_TLS + "?sslmode=require")
+    check = _by_name(run_preflight(s))["database_tls"]
+    assert check.status == "fail"
+    assert "sslmode" in check.detail.lower()
+
+
+def test_db_tls_advisory_ok_in_development(monkeypatch):
+    # Development keeps clean logs: no TLS requirement even on a no-TLS URL.
+    monkeypatch.delenv("POTLUCK_DB_LINK_ENCRYPTED", raising=False)
+    s = _settings("development", registered_keys=False, db_url=_PROD_DB_NO_TLS)
+    assert _by_name(run_preflight(s))["database_tls"].status == "ok"

@@ -144,6 +144,12 @@ def create_app() -> FastAPI:
         # gateway prefix check and the exempt/peer checks see one canonical path.
         normalised = "/" + normalised.lstrip("/")
 
+        # Trust the socket peer IP, and ONLY the socket peer IP. We deliberately
+        # do not honor X-Forwarded-For / X-Real-IP here: the sidecar is dialed
+        # directly (Electron over loopback, peers over the raw WireGuard mesh IP),
+        # never through a reverse proxy. If a proxy is ever placed in front of the
+        # sidecar, every request would present the proxy's loopback IP and get the
+        # full local surface — so that must not happen without revisiting this gate.
         client_host = request.client.host if request.client else ""
         is_loopback = client_host in ("127.0.0.1", "::1", "localhost")
 
@@ -206,9 +212,17 @@ def create_app() -> FastAPI:
         # Shared-secret gate — applies to loopback callers too. When a token is
         # configured, every non-exempt path must present a matching bearer token.
         # This is what stops a malicious local process from reading the user's
-        # data over 127.0.0.1. Exempt: liveness (/health), peer routes (their own
-        # attestation auth + already remote-gated above), and /shutdown (Electron
-        # may call it from the main process during teardown).
+        # data over 127.0.0.1. Exempt: liveness (/health), peer routes, and
+        # /shutdown (Electron may call it from the main process during teardown).
+        #
+        # NOTE on /peer/* exemption: peer routes are NOT per-request signature
+        # authenticated in v0. Their credential is mesh membership — a caller can
+        # only reach them over the WireGuard mesh IP (Gate 1 already 403s any
+        # non-loopback path outside /peer/* + /health), and mesh enrollment is
+        # gated by the coordinator. Per-request signed-nonce attestation is a
+        # v0.5+ item. See routers/peer.py "Trust model". The exemption is safe
+        # because the peer surface never exposes local memory/tasks/chat and the
+        # one memory-read route is opt-in and off by default.
         if sidecar_token is not None:
             exempt = (
                 normalised == "/health"

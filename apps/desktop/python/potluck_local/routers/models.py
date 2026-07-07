@@ -185,6 +185,35 @@ class LoadModelRequest(BaseModel):
     )
 
 
+def _load_verify_reference(slug: str, manifest: dict | None, model_dir) -> tuple[str, str]:
+    """Pick the sha256 to check a model against at load time, and where it came from.
+
+    Threat: the opt-in load-time re-check exists to catch post-download tampering.
+    But its reference hash must come from a source the tamperer can't also rewrite.
+    The catalog (models.json) ships read-only inside the code-signed app bundle, so
+    its sha256 is tamper-resistant -> prefer it. The model.gguf.sha256 written next
+    to the weights lives in the user-writable ~/.potluck/models dir; anyone who can
+    rewrite model.gguf can rewrite it too, so it only catches accidental corruption.
+    Use it ONLY as a fallback for a non-catalog model (which has no bundled hash).
+
+    Returns (expected_hash_lowercased, source) where source is "catalog", "sidecar",
+    or "none" when no reference hash is available.
+    """
+    if manifest is not None:
+        h = str(manifest.get("sha256", "")).strip().lower()
+        if h:
+            return h, "catalog"
+    sidecar = model_dir / "model.gguf.sha256"
+    if sidecar.exists():
+        try:
+            h = sidecar.read_text().strip().lower()
+        except OSError:
+            h = ""
+        if h:
+            return h, "sidecar"
+    return "", "none"
+
+
 @router.post("/{slug}/load", status_code=200)
 async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
     # Pipeline-parallel: explicit chain (body.pipeline) or auto-orchestrated across the
@@ -285,23 +314,30 @@ async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
             detail=f"Model '{slug}' is not installed. POST /models/{slug}/install first.",
         )
 
-    # Opt-in integrity re-check against the sha256 recorded at download time.
-    # Off by default: a full re-hash of a multi-GB model adds seconds to load.
-    # Enable with POTLUCK_VERIFY_MODEL_ON_LOAD=1 to catch post-download tampering
-    # or a manually-dropped file.
+    # Fetch the catalog manifest once: used both by the opt-in integrity re-check
+    # below and by the n_ctx resolution further down. None for a non-catalog model.
+    manifest = model_registry.get_manifest(slug)
+
+    # Opt-in integrity re-check before load. Off by default: a full re-hash of a
+    # multi-GB file adds seconds to every load. Enable with
+    # POTLUCK_VERIFY_MODEL_ON_LOAD=1 to catch post-download tampering or a
+    # manually-dropped file. The reference hash comes from the catalog when the
+    # model is one we ship (tamper-resistant; see _load_verify_reference), not from
+    # the co-located sidecar an on-disk tamperer could rewrite.
     if os.environ.get("POTLUCK_VERIFY_MODEL_ON_LOAD") == "1":
-        sidecar = models_dir() / slug / "model.gguf.sha256"
-        if sidecar.exists():
-            expected = sidecar.read_text().strip().lower()
+        expected, reference = _load_verify_reference(slug, manifest, models_dir() / slug)
+        if expected:
             loop = asyncio.get_running_loop()
             actual = await loop.run_in_executor(None, lambda: sha256_file(model_path))
-            if expected and actual != expected:
-                logger.error("load_verify_mismatch slug=%s", slug)
+            if actual != expected:
+                logger.error("load_verify_mismatch slug=%s reference=%s", slug, reference)
                 raise HTTPException(
                     status_code=500,
                     detail=f"Model '{slug}' failed its integrity check (sha256 mismatch); refusing to load.",
                 )
-            logger.info("load_verify_ok slug=%s", slug)
+            logger.info("load_verify_ok slug=%s reference=%s", slug, reference)
+        else:
+            logger.warning("load_verify_skipped slug=%s reason=no_reference_hash", slug)
 
     settings = get_settings()
     runtime = get_runtime()
@@ -311,8 +347,7 @@ async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
     # Resolve n_ctx: auto-tune from the model + RAM when context_size is 0,
     # otherwise honor the user's pin (capped at the model's max). For a
     # non-catalog model we have no manifest, so fall back to the pin or a
-    # safe default.
-    manifest = model_registry.get_manifest(slug)
+    # safe default. (manifest was fetched above, before the integrity re-check.)
     ram_total_gb = psutil.virtual_memory().total / (1024 ** 3)
     if manifest is not None:
         n_ctx = resolve_context_size(

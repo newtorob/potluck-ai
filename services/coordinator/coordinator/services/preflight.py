@@ -129,25 +129,60 @@ def run_preflight(settings: Settings) -> list[Check]:
         )
     )
 
-    # --- Database transport encryption (advisory) ----------------------------
-    # WARN, not FAIL: some deployments run Postgres over a private encrypted
-    # network (e.g. Fly .internal over WireGuard), where app-level TLS is
-    # redundant. We can't tell from here, so surface it rather than block.
+    # --- Database transport encryption (operator-fixable, fail-closed) -------
+    # The DB carries the credit ledger and member keys, so in a network env the
+    # link must be encrypted. Fail-closed: in staging/production, block unless
+    # either the URL requests TLS OR the operator explicitly acknowledges that
+    # the transport is already encrypted at the network layer (private network /
+    # VPN / WireGuard, e.g. Fly .internal) via POTLUCK_DB_LINK_ENCRYPTED=1 — we
+    # can't detect that from the URL, so we require an auditable acknowledgement
+    # rather than silently accepting a plaintext link.
+    #
+    # Detection is asyncpg-accurate: this dialect (postgresql+asyncpg) honors the
+    # `ssl=` query arg, NOT libpq's `sslmode=`. A URL carrying only `sslmode=` is
+    # a trap — the operator thinks TLS is on but asyncpg ignores it — so it does
+    # NOT count as TLS and gets a pointed message.
     db_url_l = settings.database_url.lower()
-    db_tls = any(t in db_url_l for t in ("ssl=require", "sslmode=require", "ssl=true"))
+    tls_requested = any(
+        t in db_url_l
+        for t in ("ssl=require", "ssl=true", "ssl=verify-full", "ssl=verify-ca", "ssl=prefer")
+    )
+    link_encrypted_ack = os.environ.get("POTLUCK_DB_LINK_ENCRYPTED", "").strip() == "1"
+    sslmode_trap = ("sslmode=" in db_url_l) and not tls_requested
+
+    if tls_requested:
+        db_tls_status: Status = "ok"
+        db_tls_detail = "DATABASE_URL requests TLS via ssl= (honored by asyncpg)."
+    elif link_encrypted_ack:
+        db_tls_status = "ok"
+        db_tls_detail = (
+            "DATABASE_URL does not request app-level TLS, but "
+            "POTLUCK_DB_LINK_ENCRYPTED=1 asserts the transport is encrypted at the "
+            "network layer."
+        )
+    elif not prod:
+        # Advisory only in development — keep local logs clean (nobody runs a
+        # local dev Postgres over TLS).
+        db_tls_status = "ok"
+        db_tls_detail = "Local development DB link; TLS not required in this env."
+    else:
+        db_tls_status = "fail"
+        db_tls_detail = (
+            "DATABASE_URL sets sslmode= but this coordinator uses asyncpg, which "
+            "ignores sslmode (use ssl=require). The DB link is NOT encrypted."
+            if sslmode_trap
+            else "DATABASE_URL does not request TLS (no ssl=require) — the credit "
+            "ledger and member keys would travel unencrypted."
+        )
     checks.append(
         Check(
             name="database_tls",
-            status="ok" if (db_tls or not prod) else "warn",
-            detail=(
-                "Database connection requests TLS."
-                if db_tls
-                else "DATABASE_URL does not request TLS (no ssl/sslmode=require). "
-                "Acceptable only if the DB link is already encrypted (private network/VPN)."
-            ),
-            remedy="Add ssl=require (asyncpg) to DATABASE_URL unless the link is "
-            "already encrypted at the network layer.",
-            blocking=False,
+            status=db_tls_status,
+            detail=db_tls_detail,
+            remedy="Add ssl=require to DATABASE_URL (asyncpg honors ssl=, not "
+            "sslmode=). If the link is already encrypted at the network layer, set "
+            "POTLUCK_DB_LINK_ENCRYPTED=1 to acknowledge that instead.",
+            blocking=True,
         )
     )
 

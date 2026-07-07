@@ -294,6 +294,63 @@ async function createWindow() {
         callback({ requestHeaders: details.requestHeaders });
       }
     );
+
+    // Content-Security-Policy — defence-in-depth for the renderer. We already run
+    // sandbox:true + contextIsolation, load only local file:// content, and send
+    // external navigations to the OS browser, so a renderer compromise has a small
+    // blast radius. The CSP closes the last gap: it stops any script that DID slip
+    // in (a supply-chain-tainted dependency, or an injection through the markdown /
+    // syntax-highlight render path) from loading remote code or executing as an
+    // inline <script>.
+    //
+    // Packaged (file://) builds only. Dev loads from the Vite server
+    // (http://localhost:5173) whose HMR needs inline scripts, eval, and a
+    // websocket; forcing a strict policy there would break the dev loop. Same
+    // app.isPackaged reasoning as the token injector above.
+    //
+    // Verified safe against the shipped bundle before enabling: dist/index.html has
+    // no inline <script> (one external ./assets/*.js), and the bundle has no eval()/
+    // new Function()/runtime WebAssembly/web-workers — so script-src 'self' with no
+    // 'unsafe-eval' or 'wasm-unsafe-eval' loads the app cleanly. Re-verify after any
+    // dependency bump that could introduce those (re-run the static scan).
+    //
+    // connect-src is deliberately wide (any http/https/ws host). The coordinator
+    // URL is user-editable to any LAN/mesh IP (frontend connectionStore.ts) and is
+    // fetched directly by the renderer, so a fixed origin allowlist is impossible.
+    // That is an acceptable v1 posture because script-src 'self' already prevents
+    // injected code from RUNNING to abuse the open connect-src.
+    // TODO(v0.5): once the coordinator is reached only via the sidecar (or its host
+    // set is pinned), tighten connect-src to explicit origins.
+    const CSP = [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self' http: https: ws: wss:",
+      "worker-src 'self' blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'",
+    ].join('; ');
+
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      // Stamp only the top-level document response — its policy then governs every
+      // subresource and fetch the page makes. Leave API/asset responses untouched
+      // (a CSP header on a non-document response is ignored anyway). We must always
+      // call callback, or every response in the session stalls.
+      if (details.resourceType !== 'mainFrame') {
+        callback({ responseHeaders: details.responseHeaders });
+        return;
+      }
+      callback({
+        responseHeaders: {
+          ...(details.responseHeaders || {}),
+          'Content-Security-Policy': [CSP],
+        },
+      });
+    });
   }
 
   // Route all window.open() / anchor target="_blank" clicks to the system browser.

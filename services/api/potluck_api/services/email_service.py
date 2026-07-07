@@ -33,6 +33,20 @@ def _is_real_key(key: str) -> bool:
     return bool(key) and "placeholder" not in key.lower()
 
 
+def _mask_email(email: str) -> str:
+    """Mask an address for logs: ``newtorob@x.com`` -> ``n***@x.com``.
+
+    We never write a full recipient address to the log stream (it ships to
+    Sentry). Keeping the domain preserves deliverability debugging ("is this
+    provider bouncing?") without logging who the message went to.
+    """
+    local, _, domain = email.partition("@")
+    if not domain:
+        return "<redacted>"
+    head = local[0] if local else ""
+    return f"{head}***@{domain}"
+
+
 class EmailService:
     def __init__(self) -> None:
         self.settings = get_settings()
@@ -74,13 +88,24 @@ class EmailService:
         magic_link_url: str | None = None,
     ) -> None:
         if not self.enabled:
-            # Dev transport: log instead of sending so the link is copy-pasteable.
-            logger.warning(
-                "email_not_sent_dev_mode",
-                to=to_email,
-                subject=subject,
-                magic_link_url=magic_link_url,
-            )
+            # The magic-link URL contains a live, session-granting JWT, so it is a
+            # credential. Surface it ONLY in development (where logging it is the
+            # whole point — you copy the link out of the console). In a
+            # misconfigured production (no real key) we must never write it to the
+            # log stream; instead fail loudly so the deploy gets fixed.
+            if self.settings.env == "development":
+                logger.warning(
+                    "email_not_sent_dev_mode",
+                    to=_mask_email(to_email),
+                    subject=subject,
+                    magic_link_url=magic_link_url,
+                )
+            else:
+                logger.error(
+                    "email_send_skipped_no_key",
+                    to=_mask_email(to_email),
+                    subject=subject,
+                )
             return
 
         import resend  # lazy import — the dep is only needed when sending
@@ -99,4 +124,4 @@ class EmailService:
 
         # The Resend SDK is synchronous; run it off the event loop.
         await asyncio.to_thread(_do_send)
-        logger.info("email_sent", to=to_email, subject=subject)
+        logger.info("email_sent", to=_mask_email(to_email), subject=subject)
