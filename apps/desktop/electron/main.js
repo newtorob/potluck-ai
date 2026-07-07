@@ -196,18 +196,35 @@ function startPythonSidecar() {
       );
       setTimeout(startPythonSidecar, delay);
     } else {
-      log.error('[sidecar] Max restart attempts reached. Showing error dialog.');
+      log.error('[sidecar] Max restart attempts reached. Offering the user a retry.');
+      // Previously a dead end: the only button was Quit, so three fast crashes
+      // forced the user to kill and relaunch the whole app. Offer an in-place
+      // retry instead. It resets the consecutive-crash counter and re-spawns the
+      // sidecar without touching the window or the user's session; the renderer's
+      // /health poll picks the engine back up and clears the reconnecting banner.
+      // Quit stays as the escape hatch.
       dialog
         .showMessageBox({
           type: 'error',
-          title: 'Potluck AI — backend error',
-          message: 'The local AI engine has crashed and could not restart.',
+          title: 'Local engine stopped',
+          message: 'The local AI engine crashed and could not restart on its own.',
           detail:
-            'Check the log file for details.\n' +
-            path.join(app.getPath('userData'), 'logs', 'main.log'),
-          buttons: ['Quit'],
+            'You can try starting it again, or quit. If this keeps happening, the '
+            + 'details are in the log file:\n'
+            + path.join(app.getPath('userData'), 'logs', 'main.log'),
+          buttons: ['Try again', 'Quit'],
+          defaultId: 0,
+          cancelId: 1,
         })
-        .then(() => app.quit());
+        .then(({ response }) => {
+          if (response === 0) {
+            log.info('[sidecar] User chose retry; resetting crash counter and restarting.');
+            restartAttempts = 0;
+            startPythonSidecar();
+          } else {
+            app.quit();
+          }
+        });
     }
   });
 

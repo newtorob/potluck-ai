@@ -28,6 +28,7 @@ import {
   X,
   Cpu,
   Network,
+  Plug,
 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { PotluckLogo } from '@/components/brand/PotluckLogo';
@@ -629,6 +630,11 @@ function ReadyStep({
     navigate('/readiness');
   }
 
+  function handleOpenConnect() {
+    onFinish(); // marks onboarding complete
+    navigate('/settings');
+  }
+
   return (
     <div className="flex flex-col gap-4 animate-fade-in-up">
       {/* Header */}
@@ -668,6 +674,31 @@ function ReadyStep({
             checks={networkChecks}
           />
         )}
+      </div>
+
+      {/* Coding-agent on-ramp. Planted here so the MCP path isn't undiscovered;
+          the actual setup lives in Settings, so this is a pointer, not a step. */}
+      <div className="rounded-lg border border-border/70 bg-card px-3 py-2.5">
+        <div className="flex items-start gap-2.5">
+          <Plug className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <p className="text-xs font-medium text-foreground leading-snug">
+              Bring your coding agents
+            </p>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Potluck can serve your memory and tools to agents like Claude Code and
+              Cursor over MCP. Set it up any time in{' '}
+              <button
+                type="button"
+                onClick={handleOpenConnect}
+                className="underline underline-offset-2 hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-sm"
+              >
+                Settings, under Connect tools
+              </button>
+              .
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Pointer to full Readiness view — only after onboarding completes */}

@@ -4,6 +4,7 @@ import { TitleBar } from '@/components/layout/TitleBar';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { StatusBar } from '@/components/layout/StatusBar';
+import { SidecarReconnectingBanner } from '@/components/layout/SidecarReconnectingBanner';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { ChatView } from '@/views/ChatView';
 import { ModelLibrary } from '@/views/ModelLibrary';
@@ -175,6 +176,9 @@ export default function App() {
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
       {/* Mac-only drag region — zero height on other platforms */}
       <TitleBar />
+
+      {/* Thin strip shown only if the local engine drops after being up */}
+      <SidecarReconnectingBanner />
 
       <div className="flex flex-1 overflow-hidden">
         <AuthGate>
