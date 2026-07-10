@@ -57,6 +57,25 @@ function readStoredSidebarCollapsed(): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Sidebar nav groups (per-group collapse of the "Navigate" / "Workspace"
+// clusters, so a chat-heavy user can reclaim vertical space for the Chats list)
+// ---------------------------------------------------------------------------
+
+const NAV_GROUPS_KEY = 'potluck.nav_groups_collapsed';
+
+function readStoredNavGroupsCollapsed(): Record<string, boolean> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(NAV_GROUPS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Onboarding
 // ---------------------------------------------------------------------------
 
@@ -74,12 +93,16 @@ function readStoredOnboardingCompleted(): boolean {
 interface UiPrefsState {
   theme: Theme;
   sidebarCollapsed: boolean;
+  /** Which sidebar nav groups are collapsed, keyed by group id. Absent/false = expanded. */
+  navGroupsCollapsed: Record<string, boolean>;
   onboardingCompleted: boolean;
 
   /** Switch theme, update DOM class, persist to localStorage + sidecar. */
   setTheme: (t: Theme) => void;
   /** Set sidebar collapsed state, persist to localStorage + sidecar. */
   setSidebarCollapsed: (v: boolean) => void;
+  /** Collapse/expand a single sidebar nav group, persist to localStorage + sidecar. */
+  setNavGroupCollapsed: (id: string, v: boolean) => void;
   /** Mark onboarding done (or clear it), persist to localStorage + sidecar. */
   setOnboardingCompleted: (v: boolean) => void;
 }
@@ -92,6 +115,7 @@ applyTheme(_initialTheme);
 export const useUiPrefsStore = create<UiPrefsState>()((set) => ({
   theme: _initialTheme,
   sidebarCollapsed: readStoredSidebarCollapsed(),
+  navGroupsCollapsed: readStoredNavGroupsCollapsed(),
   onboardingCompleted: readStoredOnboardingCompleted(),
 
   setTheme(t) {
@@ -105,6 +129,16 @@ export const useUiPrefsStore = create<UiPrefsState>()((set) => ({
     if (typeof window !== 'undefined') window.localStorage.setItem(COLLAPSE_KEY, String(v));
     set({ sidebarCollapsed: v });
     persistUiPref(COLLAPSE_KEY, String(v));
+  },
+
+  setNavGroupCollapsed(id, v) {
+    set((s) => {
+      const next = { ...s.navGroupsCollapsed, [id]: v };
+      const serialized = JSON.stringify(next);
+      if (typeof window !== 'undefined') window.localStorage.setItem(NAV_GROUPS_KEY, serialized);
+      persistUiPref(NAV_GROUPS_KEY, serialized);
+      return { navGroupsCollapsed: next };
+    });
   },
 
   setOnboardingCompleted(v) {

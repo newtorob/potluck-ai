@@ -42,6 +42,7 @@ import {
   Check,
   PanelLeftClose,
   PanelLeftOpen,
+  ChevronRight,
   Sun,
   Moon,
   type LucideIcon,
@@ -99,6 +100,8 @@ export function Sidebar() {
   const isChat = location.pathname === '/chat' || location.pathname.startsWith('/chat');
   const sidebarCollapsed = useUiPrefsStore((s) => s.sidebarCollapsed);
   const setSidebarCollapsed = useUiPrefsStore((s) => s.setSidebarCollapsed);
+  const navGroupsCollapsed = useUiPrefsStore((s) => s.navGroupsCollapsed);
+  const setNavGroupCollapsed = useUiPrefsStore((s) => s.setNavGroupCollapsed);
   const { memberProfile } = useAuth();
 
   // ⌘\ / Ctrl+\ — global collapse toggle
@@ -153,24 +156,28 @@ export function Sidebar() {
       {/* Project switcher */}
       {expanded && <ProjectSwitcher />}
 
-      {/* Primary nav — the product story */}
-      <div className={cn('flex flex-col gap-0.5 pt-3 pb-2', expanded ? 'px-2' : 'items-center px-3')}>
-        {PRIMARY_NAV.map((item) => (
-          <NavItemLink key={item.to} item={item} expanded={expanded} />
-        ))}
-      </div>
+      {/* Primary nav — the product story. Collapsible so a chat-heavy user
+          can reclaim vertical space for the Chats list below. */}
+      <NavGroup
+        id="navigate"
+        label="Navigate"
+        items={PRIMARY_NAV}
+        sidebarExpanded={expanded}
+        collapsed={!!navGroupsCollapsed.navigate}
+        onToggle={() => setNavGroupCollapsed('navigate', !navGroupsCollapsed.navigate)}
+        className="pt-3 pb-2"
+      />
 
       {/* Workspace group — coding-agent / memory surfaces */}
-      <div className={cn('flex flex-col gap-0.5 border-t border-border/50 pt-2 pb-3', expanded ? 'px-2' : 'items-center px-3')}>
-        {expanded && (
-          <span className="px-2.5 pb-1 font-serif text-[11px] italic text-muted-foreground/70 tracking-hearth-label">
-            Workspace
-          </span>
-        )}
-        {WORKSPACE_NAV.map((item) => (
-          <NavItemLink key={item.to} item={item} expanded={expanded} />
-        ))}
-      </div>
+      <NavGroup
+        id="workspace"
+        label="Workspace"
+        items={WORKSPACE_NAV}
+        sidebarExpanded={expanded}
+        collapsed={!!navGroupsCollapsed.workspace}
+        onToggle={() => setNavGroupCollapsed('workspace', !navGroupsCollapsed.workspace)}
+        className="border-t border-border/50 pt-2 pb-3"
+      />
 
       {/* Conversations — only on /chat AND only when expanded */}
       {isChat && expanded && (
@@ -210,6 +217,81 @@ export function Sidebar() {
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
     </nav>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// NavGroup — a labelled cluster of nav items with a collapsible disclosure
+// header. Collapsing a group hides its items so the Chats list can grow.
+// In icon-only sidebar mode the header is dropped and every icon stays
+// visible (collapse only applies to the expanded rail).
+// ---------------------------------------------------------------------------
+
+interface NavGroupProps {
+  id: string;
+  label: string;
+  items: NavItem[];
+  /** Whether the sidebar itself is expanded (vs the w-16 icon rail). */
+  sidebarExpanded: boolean;
+  /** Whether this group is collapsed to just its header. */
+  collapsed: boolean;
+  onToggle: () => void;
+  className?: string;
+}
+
+function NavGroup({
+  id,
+  label,
+  items,
+  sidebarExpanded,
+  collapsed,
+  onToggle,
+  className,
+}: NavGroupProps) {
+  // Icon rail: no header, no collapse — keep every destination reachable.
+  if (!sidebarExpanded) {
+    return (
+      <div className={cn('flex flex-col items-center gap-0.5 px-3', className)}>
+        {items.map((item) => (
+          <NavItemLink key={item.to} item={item} expanded={false} />
+        ))}
+      </div>
+    );
+  }
+
+  const listId = `nav-group-${id}`;
+  return (
+    <div className={cn('flex flex-col gap-0.5 px-2', className)}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={!collapsed}
+        aria-controls={listId}
+        className={cn(
+          'group/hdr flex items-center gap-1 rounded-md px-2 pb-1 pt-0.5',
+          'text-muted-foreground/70 hover:text-foreground transition-colors',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        )}
+      >
+        <ChevronRight
+          className={cn(
+            'h-3 w-3 shrink-0 transition-transform duration-fast',
+            !collapsed && 'rotate-90',
+          )}
+          aria-hidden="true"
+        />
+        <span className="font-serif text-[11px] italic tracking-hearth-label">
+          {label}
+        </span>
+      </button>
+      {!collapsed && (
+        <div id={listId} className="flex flex-col gap-0.5">
+          {items.map((item) => (
+            <NavItemLink key={item.to} item={item} expanded />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
