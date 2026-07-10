@@ -5,6 +5,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { StatusBar } from '@/components/layout/StatusBar';
 import { SidecarReconnectingBanner } from '@/components/layout/SidecarReconnectingBanner';
+import { UpdateBanner } from '@/components/layout/UpdateBanner';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { ChatView } from '@/views/ChatView';
 import { ModelLibrary } from '@/views/ModelLibrary';
@@ -179,6 +180,9 @@ export default function App() {
 
       {/* Thin strip shown only if the local engine drops after being up */}
       <SidecarReconnectingBanner />
+
+      {/* Thin strip driving the auto-update download/restart flow */}
+      <UpdateBanner />
 
       <div className="flex flex-1 overflow-hidden">
         <AuthGate>

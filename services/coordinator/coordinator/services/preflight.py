@@ -261,10 +261,11 @@ def run_preflight(settings: Settings) -> list[Check]:
         )
     )
 
-    # --- Member identity (roadmap gap, no config remedy yet) -----------------
-    # Every requester is currently the dev fixture STUB_MEMBER_ID; there is no
-    # per-session member auth. This is the headline pre-launch blocker, but
-    # there is no flag to flip, so it warns loudly rather than blocking boot.
+    # --- Member identity -----------------------------------------------------
+    # Per-session member auth exists (POTLUCK_SESSION_AUTH_ENABLED); when it is
+    # off, every requester resolves to the dev fixture STUB_MEMBER_ID, so credits
+    # and jobs are not bound to real members. We warn rather than block so a
+    # single-tenant / household coordinator can still run without the flag.
     session_auth = session_auth_enabled()
     checks.append(
         Check(
@@ -276,8 +277,9 @@ def run_preflight(settings: Settings) -> list[Check]:
                 else "Member identity is the dev STUB_MEMBER_ID — there is no "
                 "per-session auth, so credits and jobs are not bound to real members."
             ),
-            remedy="Implement signed-session member auth (v0.5), then set "
-            "POTLUCK_SESSION_AUTH_ENABLED=1.",
+            remedy="Set POTLUCK_SESSION_AUTH_ENABLED=1 (needs DATABASE_URL "
+            "pointed at the cloud API's Postgres so the sessions table is "
+            "readable).",
             blocking=False,
         )
     )

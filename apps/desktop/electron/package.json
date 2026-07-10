@@ -9,9 +9,10 @@
     "dev": "concurrently --kill-others --names \"VITE,PY,ELECTRON\" --prefix-colors \"magenta,yellow,cyan\" \"pnpm --dir ../frontend dev\" \"pnpm run dev:python\" \"wait-on http-get://localhost:5173 http-get://127.0.0.1:8321/health && cross-env NODE_ENV=development electron .\"",
     "dev:python": "node scripts/run-python-dev.js",
     "build": "electron-builder",
-    "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win",
-    "build:linux": "electron-builder --linux",
+    "hash-release": "node scripts/hash-release.js",
+    "build:mac": "electron-builder --mac && node scripts/hash-release.js",
+    "build:win": "electron-builder --win && node scripts/hash-release.js",
+    "build:linux": "electron-builder --linux && node scripts/hash-release.js",
     "prepack:frontend": "cd ../frontend && pnpm exec vite build",
     "prepack:python": "rm -rf resources/python && mkdir -p resources/python && bash scripts/sign-sidecars.sh ../python/dist/potluck-local && cp -R ../python/dist/potluck-local resources/python/",
     "prepack:mcp": "bash scripts/sign-sidecars.sh ../python/dist/potluck-mcp && cp -R ../python/dist/potluck-mcp resources/python/",
@@ -93,9 +94,8 @@
       "vendor": "Potluck AI"
     },
     "publish": {
-      "provider": "github",
-      "owner": "potluck-ai",
-      "repo": "potluck"
+      "provider": "generic",
+      "url": "https://releases.trypotluck.ai"
     }
   },
   "dependencies": {

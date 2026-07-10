@@ -4,6 +4,12 @@ primary_region = "ord"
 [build]
   dockerfile = "Dockerfile"
 
+# Coordinator migrations use their own alembic version table, so this is safe to
+# run on every deploy. On a FRESH DB, deploy the API first (see its fly.toml) —
+# its 0008 migration drops v0 stubs this service then re-creates.
+[deploy]
+  release_command = "alembic upgrade head"
+
 [http_service]
   internal_port = 8400
   force_https = true
@@ -13,6 +19,11 @@ primary_region = "ord"
 
 [env]
   ENV = "production"
+  # Bind every request to a real member via the cloud API's shared `sessions`
+  # table instead of the dev STUB_MEMBER_ID. Requires DATABASE_URL to point at
+  # the same Postgres as the API. The token/registered-keys/DB-TLS secrets the
+  # prod preflight demands are set out-of-band via `fly secrets`.
+  POTLUCK_SESSION_AUTH_ENABLED = "1"
 
 [[vm]]
   cpu_kind = "shared"

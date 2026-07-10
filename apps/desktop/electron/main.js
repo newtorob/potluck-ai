@@ -433,6 +433,21 @@ ipcMain.handle('show-notification', (_event, title, body) => {
 
 ipcMain.handle('get-app-version', () => app.getVersion());
 
+// ─── Auto-updater IPC (renderer-driven download + install) ───────────────────
+// autoDownload is off, so the renderer decides when to pull the update (banner
+// "Download") and when to restart into it ("Restart"). These are registered
+// unconditionally so the facade never rejects; in dev there is simply no update.
+ipcMain.handle('updater:download', async () => {
+  log.info('[updater] Renderer requested download.');
+  return autoUpdater.downloadUpdate();
+});
+
+ipcMain.handle('updater:quit-and-install', () => {
+  log.info('[updater] Renderer requested restart-to-install.');
+  // Defer so the IPC reply flushes before the app tears itself down.
+  setImmediate(() => autoUpdater.quitAndInstall());
+});
+
 // Renderer pulls any deep link that arrived before it was ready (cold start).
 // The first call also marks the renderer ready, so later links are pushed live
 // over the 'potluck:deep-link' channel instead of being buffered.
@@ -581,8 +596,14 @@ function setupAutoUpdater() {
     }
   });
 
+  autoUpdater.on('download-progress', (p) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('update-progress', Math.round(p.percent));
+    }
+  });
+
   autoUpdater.on('update-downloaded', () => {
-    log.info('[updater] Update downloaded — will install on next quit.');
+    log.info('[updater] Update downloaded — ready to install on restart.');
     if (mainWindow) {
       mainWindow.webContents.send('update-downloaded');
     }
@@ -590,6 +611,9 @@ function setupAutoUpdater() {
 
   autoUpdater.on('error', (err) => {
     log.error(`[updater] Error: ${err.message}`);
+    if (mainWindow) {
+      mainWindow.webContents.send('update-error', err.message);
+    }
   });
 
   autoUpdater.checkForUpdatesAndNotify();

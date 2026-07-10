@@ -4,10 +4,22 @@ primary_region = "ord"
 [build]
   dockerfile = "Dockerfile"
 
+# Run DB migrations before the new release takes traffic. Deploy the API BEFORE
+# the coordinator on a fresh DB: API migration 0008 drops the v0 peers +
+# compute_credits stubs that the coordinator's migrations then re-create, so
+# running the coordinator first races that drop.
+[deploy]
+  release_command = "alembic upgrade head"
+
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = true
+  # Keep the single machine warm. Two reasons this API must NOT auto-stop or
+  # scale out at launch: (1) a cold start can exceed Stripe's webhook timeout,
+  # delaying founding-badge grants; (2) the rate limiter is in-memory, so its
+  # counts are only coherent on one always-on process. Revisit both when a
+  # shared limiter store lands.
+  auto_stop_machines = false
   auto_start_machines = true
   min_machines_running = 1
 

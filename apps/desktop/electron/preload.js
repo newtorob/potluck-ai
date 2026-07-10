@@ -71,6 +71,41 @@ contextBridge.exposeInMainWorld('potluck', {
     return () => ipcRenderer.removeListener('update-downloaded', handler);
   },
 
+  /**
+   * Register a callback for download progress (0-100) while an update pulls.
+   * @param {(percent: number) => void} callback
+   * @returns {() => void} Unsubscribe function.
+   */
+  onUpdateProgress: (callback) => {
+    const handler = (_event, percent) => callback(percent);
+    ipcRenderer.on('update-progress', handler);
+    return () => ipcRenderer.removeListener('update-progress', handler);
+  },
+
+  /**
+   * Register a callback for updater errors (download/install failures).
+   * @param {(message: string) => void} callback
+   * @returns {() => void} Unsubscribe function.
+   */
+  onUpdateError: (callback) => {
+    const handler = (_event, message) => callback(message);
+    ipcRenderer.on('update-error', handler);
+    return () => ipcRenderer.removeListener('update-error', handler);
+  },
+
+  /**
+   * Start downloading the available update. Resolves when the download begins;
+   * progress arrives via onUpdateProgress, completion via onUpdateDownloaded.
+   * @returns {Promise<void>}
+   */
+  downloadUpdate: () => ipcRenderer.invoke('updater:download'),
+
+  /**
+   * Quit and install a downloaded update (relaunches the app).
+   * @returns {Promise<void>}
+   */
+  quitAndInstall: () => ipcRenderer.invoke('updater:quit-and-install'),
+
   // ── Deep links (potluck:// magic-link sign-in) ─────────────────────────────
 
   /**

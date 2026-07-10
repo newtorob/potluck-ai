@@ -22,6 +22,12 @@ interface PotluckBridge {
   getAppVersion: () => Promise<string>;
   onDeepLink?: (callback: (url: string) => void) => () => void;
   getInitialDeepLink?: () => Promise<string | null>;
+  onUpdateAvailable?: (callback: (version: string) => void) => () => void;
+  onUpdateDownloaded?: (callback: () => void) => () => void;
+  onUpdateProgress?: (callback: (percent: number) => void) => () => void;
+  onUpdateError?: (callback: (message: string) => void) => () => void;
+  downloadUpdate?: () => Promise<void>;
+  quitAndInstall?: () => Promise<void>;
 }
 
 /** Safely read the Electron context bridge, or undefined in plain browser */
@@ -87,5 +93,46 @@ export const ipc = {
    */
   async getInitialDeepLink(): Promise<string | null> {
     return (await getBridge()?.getInitialDeepLink?.()) ?? null;
+  },
+
+  // ── Auto-update (renderer-driven download + install) ──────────────────────
+  // All no-op safely outside Electron so the UpdateBanner never renders there.
+
+  /** Fires when a newer version is published. Returns an unsubscribe fn. */
+  onUpdateAvailable(callback: (version: string) => void): () => void {
+    const bridge = getBridge();
+    if (!bridge?.onUpdateAvailable) return () => {};
+    return bridge.onUpdateAvailable(callback);
+  },
+
+  /** Fires when the update finished downloading and is ready to install. */
+  onUpdateDownloaded(callback: () => void): () => void {
+    const bridge = getBridge();
+    if (!bridge?.onUpdateDownloaded) return () => {};
+    return bridge.onUpdateDownloaded(callback);
+  },
+
+  /** Fires with download progress (0-100) while the update pulls. */
+  onUpdateProgress(callback: (percent: number) => void): () => void {
+    const bridge = getBridge();
+    if (!bridge?.onUpdateProgress) return () => {};
+    return bridge.onUpdateProgress(callback);
+  },
+
+  /** Fires when a download/install error occurs. */
+  onUpdateError(callback: (message: string) => void): () => void {
+    const bridge = getBridge();
+    if (!bridge?.onUpdateError) return () => {};
+    return bridge.onUpdateError(callback);
+  },
+
+  /** Begin downloading the available update. */
+  async downloadUpdate(): Promise<void> {
+    return getBridge()?.downloadUpdate?.();
+  },
+
+  /** Quit and install a downloaded update (relaunches the app). */
+  async quitAndInstall(): Promise<void> {
+    return getBridge()?.quitAndInstall?.();
   },
 };
