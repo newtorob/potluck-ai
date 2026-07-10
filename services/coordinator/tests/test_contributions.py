@@ -115,7 +115,7 @@ async def test_contributions_per_machine(db_session: AsyncSession) -> None:
     )
     await db_session.flush()
 
-    resp = await my_contributions(days=7, db=db_session)
+    resp = await my_contributions(days=7, db=db_session, member_id=STUB_MEMBER_ID)
     by_host = {m.hostname: m for m in resp.machines}
 
     # My two machines appear with the expected per-machine values.

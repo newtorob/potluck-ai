@@ -169,7 +169,9 @@ async def test_weekly_buckets_land_correctly(db_session: AsyncSession) -> None:
         completed_at=w2_monday + timedelta(hours=3),
     )
 
-    resp: WeeklyContributionsResponse = await my_contributions_weekly(weeks=4, db=db_session)
+    resp: WeeklyContributionsResponse = await my_contributions_weekly(
+        weeks=4, db=db_session, member_id=STUB_MEMBER_ID
+    )
 
     assert resp.window_weeks == 4
     assert len(resp.weeks) == 4
@@ -211,17 +213,11 @@ async def test_weekly_zero_fill_no_peers(db_session: AsyncSession) -> None:
     # Use a fresh member UUID that has no peers — guaranteed empty.
     phantom_member = uuid.uuid4()
 
-    # Temporarily override _STUB_MEMBER_ID by calling the endpoint function
-    # with a patched constant.  Since the function reads the module-level
-    # _STUB_MEMBER_ID directly, monkey-patch it for the duration of this call.
-    import coordinator.routers.me as me_module
-
-    original = me_module._STUB_MEMBER_ID
-    me_module._STUB_MEMBER_ID = phantom_member
-    try:
-        resp = await my_contributions_weekly(weeks=5, db=db_session)
-    finally:
-        me_module._STUB_MEMBER_ID = original
+    # The endpoint resolves member identity from its member_id dependency, so
+    # we supply the phantom member directly rather than patching a constant.
+    resp = await my_contributions_weekly(
+        weeks=5, db=db_session, member_id=phantom_member
+    )
 
     assert resp.window_weeks == 5
     assert len(resp.weeks) == 5
@@ -260,7 +256,9 @@ async def test_weekly_excludes_other_members_peers(db_session: AsyncSession) -> 
             completed_at=w0_monday + timedelta(hours=3),
         )
 
-    resp: WeeklyContributionsResponse = await my_contributions_weekly(weeks=2, db=db_session)
+    resp: WeeklyContributionsResponse = await my_contributions_weekly(
+        weeks=2, db=db_session, member_id=STUB_MEMBER_ID
+    )
     w0_key = (w0_monday.date()).isoformat()
     by_week = {b.week_start: b for b in resp.weeks}
 
@@ -279,21 +277,21 @@ async def test_weekly_default_and_range(db_session: AsyncSession) -> None:
     Note: the FastAPI Query() default is only resolved by FastAPI's DI layer,
     not when calling the function directly in tests — so we always pass an
     explicit int and verify boundary values rather than the default itself."""
-    r_eight = await my_contributions_weekly(weeks=8, db=db_session)
+    r_eight = await my_contributions_weekly(weeks=8, db=db_session, member_id=STUB_MEMBER_ID)
     assert len(r_eight.weeks) == 8
     assert r_eight.window_weeks == 8
 
-    r_one = await my_contributions_weekly(weeks=1, db=db_session)
+    r_one = await my_contributions_weekly(weeks=1, db=db_session, member_id=STUB_MEMBER_ID)
     assert len(r_one.weeks) == 1
 
-    r_max = await my_contributions_weekly(weeks=26, db=db_session)
+    r_max = await my_contributions_weekly(weeks=26, db=db_session, member_id=STUB_MEMBER_ID)
     assert len(r_max.weeks) == 26
 
 
 @pytest.mark.asyncio
 async def test_weekly_oldest_first_ordering(db_session: AsyncSession) -> None:
     """week_start strings are strictly ascending (oldest bucket first)."""
-    resp = await my_contributions_weekly(weeks=6, db=db_session)
+    resp = await my_contributions_weekly(weeks=6, db=db_session, member_id=STUB_MEMBER_ID)
     starts = [b.week_start for b in resp.weeks]
     assert starts == sorted(starts), f"not oldest-first: {starts}"
     assert len(starts) == 6
@@ -319,7 +317,7 @@ async def test_weekly_credits_earned_decimal_format(db_session: AsyncSession) ->
         credits=Decimal("3.10"),
         created_at=w0_monday + timedelta(hours=1),
     )
-    resp = await my_contributions_weekly(weeks=1, db=db_session)
+    resp = await my_contributions_weekly(weeks=1, db=db_session, member_id=STUB_MEMBER_ID)
     assert len(resp.weeks) == 1
     val = resp.weeks[0].credits_earned
     # Must be parseable as Decimal and have exactly two decimal places.

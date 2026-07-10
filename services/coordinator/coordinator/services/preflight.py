@@ -31,6 +31,7 @@ from typing import Literal
 import structlog
 
 from coordinator.config import Settings
+from coordinator.middleware.session_auth import session_auth_enabled
 
 logger = structlog.get_logger(__name__)
 
@@ -264,7 +265,7 @@ def run_preflight(settings: Settings) -> list[Check]:
     # Every requester is currently the dev fixture STUB_MEMBER_ID; there is no
     # per-session member auth. This is the headline pre-launch blocker, but
     # there is no flag to flip, so it warns loudly rather than blocking boot.
-    session_auth = os.environ.get("POTLUCK_SESSION_AUTH_ENABLED", "").strip() == "1"
+    session_auth = session_auth_enabled()
     checks.append(
         Check(
             name="member_session_auth",

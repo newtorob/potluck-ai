@@ -68,11 +68,11 @@ from coordinator.schemas.mesh import (
     SignalRosterUpdate,
     SignalWelcome,
 )
-from coordinator.constants import STUB_MEMBER_ID
 from coordinator.middleware.auth import (
     coordinator_token_matches,
     require_coordinator_token,
 )
+from coordinator.middleware.session_auth import resolve_session_member_id
 from coordinator.services.household_allocator import (
     HouseholdCIDRExhausted,
     allocate_household_cidr,
@@ -107,9 +107,6 @@ _signal_lock = asyncio.Lock()
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["mesh"])
 
-# Real member auth lands in v0.5; until then we use the dev-fixture stub.
-_STUB_MEMBER_ID = STUB_MEMBER_ID
-
 # How long a pairing token stays valid. 1 hour per design doc:
 # long enough for cross-room walk-and-install, short enough that a
 # leaked token is low-impact.
@@ -140,17 +137,18 @@ def _generate_pairing_token() -> str:
 async def create_household(
     req: HouseholdCreateRequest,
     db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
 ) -> HouseholdResponse:
-    """Create the dev-stub member's household. Idempotent: if a household
-    already exists for the stub member, return it instead of creating
+    """Create the calling member's household. Idempotent: if a household
+    already exists for this member, return it instead of creating
     a duplicate (avoids the UNIQUE-mesh_cidr collision on second call).
 
-    When real member auth lands, the dev-stub bypass goes away and this
-    becomes the standard "first-run create-household" call any newly-
-    authenticated member makes once."""
-    # If the stub member already has a household, return it.
+    This is the standard "first-run create-household" call any member makes
+    once. The member is the dev fixture STUB_MEMBER_ID until
+    POTLUCK_SESSION_AUTH_ENABLED is set, then the logged-in member."""
+    # If this member already has a household, return it.
     existing = await db.execute(
-        select(Household).where(Household.owner_member_id == _STUB_MEMBER_ID)
+        select(Household).where(Household.owner_member_id == member_id)
     )
     found = existing.scalar_one_or_none()
     if found is not None:
@@ -172,7 +170,7 @@ async def create_household(
         )
 
     household = Household(
-        owner_member_id=_STUB_MEMBER_ID,
+        owner_member_id=member_id,
         name=req.name,
         mesh_cidr=mesh_cidr,
     )
@@ -208,8 +206,9 @@ async def create_household(
 )
 async def issue_pairing_token(
     db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
 ) -> PairingTokenIssueResponse:
-    """Issue a fresh single-use pairing token for the dev-stub member's
+    """Issue a fresh single-use pairing token for the calling member's
     household. Returns 404 if the member has no household yet (must
     POST /mesh/households first).
 
@@ -218,7 +217,7 @@ async def issue_pairing_token(
     the user loses the value they need to issue a new one (rather than
     look it up server-side)."""
     household_result = await db.execute(
-        select(Household).where(Household.owner_member_id == _STUB_MEMBER_ID)
+        select(Household).where(Household.owner_member_id == member_id)
     )
     household = household_result.scalar_one_or_none()
     if household is None:
@@ -232,7 +231,7 @@ async def issue_pairing_token(
     token = PairingToken(
         token=token_value,
         household_id=household.id,
-        issued_by_member_id=_STUB_MEMBER_ID,
+        issued_by_member_id=member_id,
         expires_at=now + PAIRING_TOKEN_TTL,
     )
     db.add(token)

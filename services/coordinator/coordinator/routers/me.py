@@ -1,8 +1,9 @@
 """Per-member endpoints (credit balance, history).
 
-v0/dev: member identity comes from `_STUB_MEMBER_ID` (matches the
-pattern in `routers/jobs.py` and `routers/mesh.py`). Real member auth
-swaps in here when v0.5 lands.
+Member identity comes from the caller's session via
+`resolve_session_member_id` (matches the pattern in `routers/jobs.py` and
+`routers/mesh.py`). In dev (`POTLUCK_SESSION_AUTH_ENABLED` unset) it resolves
+to the fixture STUB_MEMBER_ID; with auth enabled it is the logged-in member.
 """
 from __future__ import annotations
 
@@ -16,9 +17,9 @@ from pydantic import BaseModel
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from coordinator.constants import STUB_MEMBER_ID
 from coordinator.db.database import get_db
 from coordinator.middleware.auth import require_coordinator_token
+from coordinator.middleware.session_auth import resolve_session_member_id
 from coordinator.models.credit import CreditLedger
 from coordinator.models.job import Job
 from coordinator.models.peer import Peer, PeerHeartbeat
@@ -32,8 +33,6 @@ from coordinator.schemas.credit import (
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["me"])
 
-_STUB_MEMBER_ID = STUB_MEMBER_ID
-
 
 @router.get(
     "/me/credit-balance",
@@ -42,6 +41,7 @@ _STUB_MEMBER_ID = STUB_MEMBER_ID
 )
 async def credit_balance(
     db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
 ) -> CreditBalanceResponse:
     """Return the calling member's aggregated credit balance.
 
@@ -54,7 +54,7 @@ async def credit_balance(
             CreditLedger.escrowed,
             func.sum(CreditLedger.credits).label("total"),
         )
-        .where(CreditLedger.member_id == _STUB_MEMBER_ID)
+        .where(CreditLedger.member_id == member_id)
         .group_by(
             CreditLedger.direction, CreditLedger.model_slug, CreditLedger.escrowed
         )
@@ -80,7 +80,7 @@ async def credit_balance(
             spent_total += amt
 
     return CreditBalanceResponse(
-        member_id=_STUB_MEMBER_ID,
+        member_id=member_id,
         earned=earned_total,
         spent=spent_total,
         net=earned_total - spent_total,
@@ -105,6 +105,7 @@ async def credit_history(
     direction: str | None = Query(default=None, pattern="^(earned|spent)$"),
     limit: int = Query(default=50, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
 ) -> CreditHistoryResponse:
     """Return the calling member's ledger entries, newest first.
 
@@ -113,7 +114,7 @@ async def credit_history(
     of their chain (see `docs/security/threat-model.md` §6)."""
     stmt = (
         select(CreditLedger)
-        .where(CreditLedger.member_id == _STUB_MEMBER_ID)
+        .where(CreditLedger.member_id == member_id)
         .order_by(CreditLedger.created_at.desc(), CreditLedger.id.desc())
         .limit(limit)
     )
@@ -124,7 +125,7 @@ async def credit_history(
     rows = result.scalars().all()
 
     return CreditHistoryResponse(
-        member_id=_STUB_MEMBER_ID,
+        member_id=member_id,
         entries=[
             CreditHistoryEntry(
                 id=row.id,
@@ -178,6 +179,7 @@ class ContributionsResponse(BaseModel):
 async def my_contributions(
     days: int = Query(default=7, ge=1, le=31),
     db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
 ) -> ContributionsResponse:
     """Per-machine contribution receipt for the calling member, over the last
     `days`. For each machine the member OWNS: requests served (completed jobs the
@@ -189,13 +191,13 @@ async def my_contributions(
 
     # The member's own machines.
     peers_res = await db.execute(
-        select(Peer.id, Peer.hostname).where(Peer.member_id == _STUB_MEMBER_ID)
+        select(Peer.id, Peer.hostname).where(Peer.member_id == member_id)
     )
     peers = peers_res.all()
     my_peer_ids = [row.id for row in peers]
     if not my_peer_ids:
         return ContributionsResponse(
-            member_id=_STUB_MEMBER_ID,
+            member_id=member_id,
             window_days=days,
             machines=[],
             total_requests_served=0,
@@ -229,7 +231,7 @@ async def my_contributions(
         .select_from(CreditLedger)
         .join(Job, CreditLedger.job_id == Job.id)
         .where(
-            CreditLedger.member_id == _STUB_MEMBER_ID,
+            CreditLedger.member_id == member_id,
             CreditLedger.direction == "earned",
             CreditLedger.created_at > since,
             Job.peer_id.in_(my_peer_ids),
@@ -270,7 +272,7 @@ async def my_contributions(
 
     machines.sort(key=lambda m: (m.requests_served, m.output_tokens), reverse=True)
     return ContributionsResponse(
-        member_id=_STUB_MEMBER_ID,
+        member_id=member_id,
         window_days=days,
         machines=machines,
         total_requests_served=sum(m.requests_served for m in machines),
@@ -326,6 +328,7 @@ def _week_start_utc(n_weeks_ago: int, now: datetime) -> date:
 async def my_contributions_weekly(
     weeks: int = Query(default=8, ge=1, le=26),
     db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
 ) -> WeeklyContributionsResponse:
     """Household-wide weekly contribution time-series for the calling member.
 
@@ -350,13 +353,13 @@ async def my_contributions_weekly(
 
     # The member's own peer IDs — the scope fence that ensures own-only data.
     peers_res = await db.execute(
-        select(Peer.id).where(Peer.member_id == _STUB_MEMBER_ID)
+        select(Peer.id).where(Peer.member_id == member_id)
     )
     my_peer_ids = [row.id for row in peers_res.all()]
 
     if not my_peer_ids:
         return WeeklyContributionsResponse(
-            member_id=_STUB_MEMBER_ID,
+            member_id=member_id,
             window_weeks=weeks,
             weeks=[
                 WeeklyContributionBucket(
@@ -404,7 +407,7 @@ async def my_contributions_weekly(
         .select_from(CreditLedger)
         .join(Job, CreditLedger.job_id == Job.id)
         .where(
-            CreditLedger.member_id == _STUB_MEMBER_ID,
+            CreditLedger.member_id == member_id,
             CreditLedger.direction == "earned",
             CreditLedger.created_at >= window_start,
             Job.peer_id.in_(my_peer_ids),
@@ -433,7 +436,7 @@ async def my_contributions_weekly(
         )
 
     return WeeklyContributionsResponse(
-        member_id=_STUB_MEMBER_ID,
+        member_id=member_id,
         window_weeks=weeks,
         weeks=result_weeks,
     )

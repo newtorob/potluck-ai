@@ -6,8 +6,10 @@ pubkey is in the chosen circle.  Ownership is the only access-control gate: a
 member reads and writes only their own circles; the owner_member_id filter is
 applied on every query without exception.
 
-v0/dev: member identity comes from _STUB_MEMBER_ID (same pattern as me.py and
-jobs.py). Real member auth swaps in here when v0.5 lands.
+Member identity comes from the caller's session via
+``resolve_session_member_id`` (same pattern as me.py and jobs.py). In dev
+(``POTLUCK_SESSION_AUTH_ENABLED`` unset) that resolves to the fixture
+STUB_MEMBER_ID; with auth enabled it is the logged-in member.
 
 Privacy: circle contents (member pubkeys) are visible only to the circle owner.
 No circle endpoint leaks another member's identity into its response beyond the
@@ -25,16 +27,14 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from coordinator.constants import STUB_MEMBER_ID
 from coordinator.db.database import get_db
 from coordinator.middleware.auth import require_coordinator_token
+from coordinator.middleware.session_auth import resolve_session_member_id
 from coordinator.models.circle import CircleMember, TrustedCircle
 from coordinator.models.member_key import MemberKey
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["circles"])
-
-_STUB_MEMBER_ID = STUB_MEMBER_ID
 
 # Plausible key string bounds: non-empty, at most 512 chars (matches the
 # member_keys.public_key column; Ed25519 base64url is ~43 chars but we don't
@@ -97,11 +97,11 @@ class AddCircleMemberRequest(BaseModel):
 
 
 async def _get_own_circle(
-    db: AsyncSession, circle_id: uuid.UUID
+    db: AsyncSession, circle_id: uuid.UUID, member_id: uuid.UUID
 ) -> TrustedCircle:
     """Fetch a circle that belongs to the calling member, or 404."""
     row = await db.get(TrustedCircle, circle_id)
-    if row is None or row.owner_member_id != _STUB_MEMBER_ID:
+    if row is None or row.owner_member_id != member_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="circle not found")
     return row
 
@@ -133,9 +133,10 @@ async def _load_circle_members(
 async def create_circle(
     req: CreateCircleRequest,
     db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
 ) -> CircleOut:
     """Create a new named trusted circle owned by the calling member."""
-    circle = TrustedCircle(owner_member_id=_STUB_MEMBER_ID, name=req.name)
+    circle = TrustedCircle(owner_member_id=member_id, name=req.name)
     db.add(circle)
     await db.flush()
     await db.commit()
@@ -150,11 +151,12 @@ async def create_circle(
 )
 async def list_circles(
     db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
 ) -> CircleListResponse:
     """List all circles owned by the calling member, with their members."""
     result = await db.execute(
         select(TrustedCircle)
-        .where(TrustedCircle.owner_member_id == _STUB_MEMBER_ID)
+        .where(TrustedCircle.owner_member_id == member_id)
         .order_by(TrustedCircle.created_at)
     )
     circles = result.scalars().all()
@@ -175,9 +177,10 @@ async def list_circles(
 async def delete_circle(
     circle_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
 ) -> Response:
     """Delete a circle and all its members. 404 if not owned by caller."""
-    circle = await _get_own_circle(db, circle_id)
+    circle = await _get_own_circle(db, circle_id, member_id)
     # CASCADE on FK takes care of circle_members rows.
     await db.delete(circle)
     await db.commit()
@@ -195,13 +198,14 @@ async def add_circle_member(
     circle_id: uuid.UUID,
     req: AddCircleMemberRequest,
     db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
 ) -> CircleMemberOut:
     """Add a member pubkey to the caller's circle.
 
     Returns 404 if the circle doesn't belong to the caller, 409 if the
     pubkey is already in the circle.
     """
-    await _get_own_circle(db, circle_id)
+    await _get_own_circle(db, circle_id, member_id)
     entry = CircleMember(circle_id=circle_id, member_pubkey=req.member_pubkey)
     db.add(entry)
     try:
@@ -230,9 +234,10 @@ async def remove_circle_member(
     circle_id: uuid.UUID,
     member_pubkey: str,
     db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
 ) -> Response:
     """Remove a member pubkey from the caller's circle. 204 whether or not it was present."""
-    await _get_own_circle(db, circle_id)
+    await _get_own_circle(db, circle_id, member_id)
     await db.execute(
         delete(CircleMember).where(
             CircleMember.circle_id == circle_id,
@@ -259,6 +264,7 @@ async def remove_circle_member(
 )
 async def my_identity(
     db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
 ) -> dict:
     """Return the calling member's own public key so they can share it with
     others for circle membership.
@@ -272,7 +278,7 @@ async def my_identity(
     """
     result = await db.execute(
         select(MemberKey.public_key)
-        .where(MemberKey.member_id == _STUB_MEMBER_ID)
+        .where(MemberKey.member_id == member_id)
         .order_by(MemberKey.created_at.desc())
         .limit(1)
     )

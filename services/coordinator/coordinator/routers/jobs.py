@@ -33,9 +33,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from coordinator.constants import STUB_MEMBER_ID
 from coordinator.db.database import get_db, get_session_factory
 from coordinator.middleware.auth import require_coordinator_token
+from coordinator.middleware.session_auth import resolve_session_member_id
 from coordinator.models.job import Job
 from coordinator.schemas.peer import (
     MAX_OUTPUT_TOKENS,
@@ -63,10 +63,6 @@ _background_tasks: set[asyncio.Task] = set()
 # peer should finish well under this. If we hit it, the peer hung and we
 # should stop blocking the requesting client.
 JOB_TIMEOUT_S = 120.0
-
-# Real member_id comes from the authenticated session in v0.5; until then
-# we use the dev-fixture stub from coordinator.constants.
-_STUB_MEMBER_ID = STUB_MEMBER_ID
 
 
 # Widest routing tier the requester will accept. The coordinator always tries
@@ -116,7 +112,7 @@ class JobErrorResponse(BaseModel):
 
 
 async def _dispatch_to_peer(
-    db: AsyncSession, req: JobRequest
+    db: AsyncSession, req: JobRequest, member_id: uuid.UUID
 ) -> tuple[PeerConnection, Job, JobBuffer, RoutingScope]:
     """Shared dispatch preamble for the sync + streaming job endpoints.
 
@@ -143,7 +139,7 @@ async def _dispatch_to_peer(
         from sqlalchemy import select as sa_select
 
         circle_row = await db.get(TrustedCircle, req.circle_id)
-        if circle_row is None or circle_row.owner_member_id != _STUB_MEMBER_ID:
+        if circle_row is None or circle_row.owner_member_id != member_id:
             raise HTTPException(
                 status_code=404,
                 detail="circle not found",
@@ -159,7 +155,7 @@ async def _dispatch_to_peer(
     peer_conn, served_scope = await select_peer_for_request(
         db,
         model_slug=req.model_slug,
-        requester_member_id=_STUB_MEMBER_ID,
+        requester_member_id=member_id,
         scope=req.scope,
         circle_pubkeys=circle_pubkeys,
     )
@@ -190,7 +186,7 @@ async def _dispatch_to_peer(
         raise HTTPException(status_code=503, detail=detail)
 
     job = Job(
-        member_id=_STUB_MEMBER_ID,
+        member_id=member_id,
         peer_id=peer_conn.peer_id,
         model_slug=req.model_slug,
         privacy_mode="pseudonymous",
@@ -235,6 +231,7 @@ async def _dispatch_to_peer(
 async def dispatch_job(
     req: JobRequest,
     db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
 ) -> JobResponse:
     """Dispatch one inference job to an online peer and return the full
     response when it completes.
@@ -244,7 +241,7 @@ async def dispatch_job(
     Streaming endpoints come in a follow-up.
     """
     # ---- 1-3. Pick peer, create job, deliver (shared with the stream endpoint) ---- #
-    peer_conn, job, buf, served_scope = await _dispatch_to_peer(db, req)
+    peer_conn, job, buf, served_scope = await _dispatch_to_peer(db, req, member_id)
     job_id = job.id
     logger.info(
         "job_dispatched",
@@ -407,11 +404,14 @@ async def job_feedback(
 
 
 @router.get("/stats", dependencies=[Depends(require_coordinator_token)])
-async def my_job_stats(db: AsyncSession = Depends(get_db)) -> dict:
+async def my_job_stats(
+    db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
+) -> dict:
     """Per-member requester stats for the desktop /network view.
 
-    v0 hardcodes member_id to the dev-fixture stub. When real auth lands
-    in v0.5 this filters by the authenticated session's member_id instead.
+    Filters by the caller's session member_id (the dev fixture STUB_MEMBER_ID
+    until POTLUCK_SESSION_AUTH_ENABLED is set).
 
     Returns counts + token totals + a coarse latency band (p50). NO
     peer_id, NO per-job records — aggregate-only, in keeping with the
@@ -425,7 +425,7 @@ async def my_job_stats(db: AsyncSession = Depends(get_db)) -> dict:
     day_ago = now - timedelta(hours=24)
 
     base = select(Job).where(
-        Job.member_id == _STUB_MEMBER_ID,
+        Job.member_id == member_id,
         Job.completed_at > day_ago,
         Job.status == "completed",
     )
@@ -435,7 +435,7 @@ async def my_job_stats(db: AsyncSession = Depends(get_db)) -> dict:
     )
     tokens_24h = await db.scalar(
         select(func.coalesce(func.sum(Job.output_tokens), 0)).where(
-            Job.member_id == _STUB_MEMBER_ID,
+            Job.member_id == member_id,
             Job.completed_at > day_ago,
             Job.status == "completed",
         )
@@ -446,7 +446,7 @@ async def my_job_stats(db: AsyncSession = Depends(get_db)) -> dict:
     # enough data to care about distribution shape.
     avg_duration = await db.scalar(
         select(func.coalesce(func.avg(Job.duration_ms), 0)).where(
-            Job.member_id == _STUB_MEMBER_ID,
+            Job.member_id == member_id,
             Job.completed_at > day_ago,
             Job.status == "completed",
             Job.duration_ms.isnot(None),
@@ -558,6 +558,7 @@ async def _finalize_job_in_db(
 async def dispatch_job_stream(
     req: JobRequest,
     db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
 ) -> StreamingResponse:
     """Stream tokens from a peer back to the requester as Server-Sent Events.
 
@@ -566,7 +567,7 @@ async def dispatch_job_stream(
     SSE stream rather than a collected JSON body.
     """
     # ---- 1-3. Pick peer, create job, deliver (shared with the sync endpoint) ---- #
-    peer_conn, job, buf, served_scope = await _dispatch_to_peer(db, req)
+    peer_conn, job, buf, served_scope = await _dispatch_to_peer(db, req, member_id)
     job_id = job.id
     logger.info(
         "job_dispatched_stream",

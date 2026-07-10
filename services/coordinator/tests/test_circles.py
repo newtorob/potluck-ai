@@ -90,7 +90,9 @@ async def _seed_peer_with_key(
 
 @pytest.mark.asyncio
 async def test_create_circle_returns_empty_members(db_session: AsyncSession) -> None:
-    resp = await create_circle(CreateCircleRequest(name="friends"), db=db_session)
+    resp = await create_circle(
+        CreateCircleRequest(name="friends"), db=db_session, member_id=STUB_MEMBER_ID
+    )
     assert resp.name == "friends"
     assert resp.members == []
     assert resp.id is not None
@@ -104,7 +106,7 @@ async def test_list_circles_shows_own_with_members(db_session: AsyncSession) -> 
     pubkey = f"pk-{tag}-abc"
     await _seed_member(db_session, c, pubkey)
 
-    resp = await list_circles(db=db_session)
+    resp = await list_circles(db=db_session, member_id=STUB_MEMBER_ID)
     ids = [ci.id for ci in resp.circles]
     assert c.id in ids
 
@@ -121,7 +123,7 @@ async def test_list_circles_excludes_other_members_circles(db_session: AsyncSess
     # Circle owned by another member — must NOT appear in STUB_MEMBER_ID's list.
     other_circle = await _seed_circle(db_session, owner=other, name=f"secret-{tag}")
 
-    resp = await list_circles(db=db_session)
+    resp = await list_circles(db=db_session, member_id=STUB_MEMBER_ID)
     ids = {ci.id for ci in resp.circles}
     assert other_circle.id not in ids
 
@@ -144,7 +146,7 @@ async def test_delete_circle_removes_circle_and_members(session_factory) -> None
 
     # Call the endpoint with its own fresh session — it will commit internally.
     async with session_factory.factory() as db:
-        await delete_circle(circle_id, db=db)
+        await delete_circle(circle_id, db=db, member_id=STUB_MEMBER_ID)
 
     # Verify in a third session: circle + members are gone.
     async with session_factory.factory() as verify_db:
@@ -164,7 +166,7 @@ async def test_delete_circle_404_for_other_member(db_session: AsyncSession) -> N
     c = await _seed_circle(db_session, owner=other, name="not-mine")
 
     with pytest.raises(HTTPException) as exc:
-        await delete_circle(c.id, db=db_session)
+        await delete_circle(c.id, db=db_session, member_id=STUB_MEMBER_ID)
     assert exc.value.status_code == 404
 
 
@@ -177,7 +179,10 @@ async def test_add_circle_member_success(db_session: AsyncSession) -> None:
     c = await _seed_circle(db_session, owner=STUB_MEMBER_ID, name=f"adder-{tag}")
     pubkey = f"edpk-{tag}"
 
-    resp = await add_circle_member(c.id, AddCircleMemberRequest(member_pubkey=pubkey), db=db_session)
+    resp = await add_circle_member(
+        c.id, AddCircleMemberRequest(member_pubkey=pubkey), db=db_session,
+        member_id=STUB_MEMBER_ID,
+    )
     assert resp.member_pubkey == pubkey
     assert isinstance(resp.added_at, datetime)
 
@@ -192,7 +197,10 @@ async def test_add_circle_member_409_on_duplicate(db_session: AsyncSession) -> N
     await _seed_member(db_session, c, pubkey)
 
     with pytest.raises(HTTPException) as exc:
-        await add_circle_member(c.id, AddCircleMemberRequest(member_pubkey=pubkey), db=db_session)
+        await add_circle_member(
+            c.id, AddCircleMemberRequest(member_pubkey=pubkey), db=db_session,
+            member_id=STUB_MEMBER_ID,
+        )
     assert exc.value.status_code == 409
 
 
@@ -205,7 +213,8 @@ async def test_add_circle_member_404_for_other_member_circle(db_session: AsyncSe
 
     with pytest.raises(HTTPException) as exc:
         await add_circle_member(
-            c.id, AddCircleMemberRequest(member_pubkey="some-key"), db=db_session
+            c.id, AddCircleMemberRequest(member_pubkey="some-key"), db=db_session,
+            member_id=STUB_MEMBER_ID,
         )
     assert exc.value.status_code == 404
 
@@ -228,7 +237,7 @@ async def test_remove_circle_member(session_factory) -> None:
             circle_id = c.id
 
     async with session_factory.factory() as db:
-        await remove_circle_member(circle_id, pubkey, db=db)
+        await remove_circle_member(circle_id, pubkey, db=db, member_id=STUB_MEMBER_ID)
 
     async with session_factory.factory() as verify_db:
         remaining = (await verify_db.execute(
