@@ -60,24 +60,31 @@ jobs:
           pip install -r apps/desktop/python/requirements.txt
           pip install "pyinstaller==6.12.*"
 
-      - name: Build Python sidecar (PyInstaller)
-        run: pyinstaller --onefile --name potluck-local --clean --noconfirm apps/desktop/python/potluck_local/app.py
+      - name: Build Python sidecar (PyInstaller, onedir via committed spec)
+        # Use the committed .spec, NOT --onefile. The spec builds a --onedir
+        # bundle (EXE + COLLECT), and main.js resolves the sidecar at
+        # resources/python/potluck-local/<binary> (the onedir sub-path). A
+        # --onefile build stages a flat file at that path and the app fails to
+        # launch the sidecar. This mirrors the local `prepack:python` script.
+        run: |
+          cd apps/desktop/python
+          pyinstaller potluck-local.spec --clean --noconfirm
 
       - name: Stage sidecar binary (Unix)
         if: matrix.platform != 'win'
         shell: bash
         run: |
           mkdir -p apps/desktop/electron/resources/python
-          cp dist/potluck-local* apps/desktop/electron/resources/python/
-          ls -la apps/desktop/electron/resources/python/
+          cp -R apps/desktop/python/dist/potluck-local apps/desktop/electron/resources/python/
+          ls -la apps/desktop/electron/resources/python/potluck-local/
 
       - name: Stage sidecar binary (Windows)
         if: matrix.platform == 'win'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path apps/desktop/electron/resources/python | Out-Null
-          Copy-Item -Path dist/potluck-local* -Destination apps/desktop/electron/resources/python/
-          Get-ChildItem apps/desktop/electron/resources/python/
+          Copy-Item -Recurse -Path apps/desktop/python/dist/potluck-local -Destination apps/desktop/electron/resources/python/
+          Get-ChildItem apps/desktop/electron/resources/python/potluck-local/
 
       - name: Install frontend dependencies
         run: pnpm -C apps/desktop/frontend install --frozen-lockfile
