@@ -23,6 +23,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Globe2, Layers, Activity, Cpu, BarChart3, TrendingUp, TrendingDown, Minus, type LucideIcon } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { localApi } from '@/lib/localApi';
+import { useChatStore } from '@/stores/chatStore';
 import type { FleetSummary, MyJobStats, CreditBalance, CreditHistory, CreditHistoryEntry, ContributionsResponse } from '@/lib/localApi';
 import { relativeTime } from '@/lib/timeFormat';
 import { formatModelName } from '@/lib/modelName';
@@ -220,7 +221,7 @@ export function NetworkView() {
           <FleetCard fleet={fleet} />
         </section>
 
-        {/* Available models */}
+        {/* Available models — pick which one network requests use */}
         <section aria-label="Available models">
           <SectionHeader>Models the network can serve</SectionHeader>
           <ModelChips models={fleet?.models ?? []} />
@@ -442,6 +443,9 @@ function StatCard({ icon: Icon, label, value, sub, emphasize, formatLarge }: Sta
 // ---------------------------------------------------------------------------
 
 function ModelChips({ models }: { models: { slug: string; online_peer_count: number }[] }) {
+  const networkModelSlug = useChatStore((s) => s.networkModelSlug);
+  const setNetworkModelSlug = useChatStore((s) => s.setNetworkModelSlug);
+
   if (models.length === 0) {
     return (
       <p className="text-sm text-muted-foreground/70">
@@ -451,30 +455,43 @@ function ModelChips({ models }: { models: { slug: string; online_peer_count: num
     );
   }
   return (
-    <div className="flex flex-wrap gap-2">
-      {models.map((m) => (
-        <span
-          key={m.slug}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-card px-2.5 py-1',
-            'text-xs',
-          )}
-          title={`${m.online_peer_count} peer${m.online_peer_count === 1 ? '' : 's'} currently serve ${m.slug}`}
-        >
-          <span className="text-foreground">{formatModelName(m.slug)}</span>
-          <span
-            className={cn(
-              'rounded-full px-1.5 text-[10px] font-medium tabular-nums',
-              m.online_peer_count > 0
-                ? 'bg-sage/20 text-sage-foreground dark:text-sage'
-                : 'bg-muted text-muted-foreground',
-            )}
-            aria-label={`${m.online_peer_count} peer${m.online_peer_count === 1 ? '' : 's'}`}
-          >
-            {m.online_peer_count}
-          </span>
-        </span>
-      ))}
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground/70">
+        Pick the model your network requests should use.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {models.map((m) => {
+          const active = m.slug === networkModelSlug;
+          return (
+            <button
+              key={m.slug}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setNetworkModelSlug(m.slug)}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
+                active
+                  ? 'border-primary bg-primary/10 text-foreground'
+                  : 'border-border/60 bg-card text-foreground hover:border-border',
+              )}
+              title={`${m.online_peer_count} peer${m.online_peer_count === 1 ? '' : 's'} currently serve ${m.slug}`}
+            >
+              <span>{formatModelName(m.slug)}</span>
+              <span
+                className={cn(
+                  'rounded-full px-1.5 text-[10px] font-medium tabular-nums',
+                  m.online_peer_count > 0
+                    ? 'bg-sage/20 text-sage-foreground dark:text-sage'
+                    : 'bg-muted text-muted-foreground',
+                )}
+                aria-label={`${m.online_peer_count} peer${m.online_peer_count === 1 ? '' : 's'}`}
+              >
+                {m.online_peer_count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

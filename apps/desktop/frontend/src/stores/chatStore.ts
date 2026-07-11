@@ -249,9 +249,9 @@ export const useChatStore = create<ChatState>()((set, get) => {
   routingScope: _initScope,
   activeCircleId: null,
   networkMode: _initNetworkMode,
-  // Default slug — qwen2.5:3b-instruct-q4_K_M is what both the Linux
-  // media server and the Windows gaming PC advertise via Ollama.
-  // Configurable via the model picker in /network (task 776cf3a7).
+  // Default slug until the user picks from the models the network advertises
+  // (the selectable chip rack in /network). qwen2.5:3b-instruct-q4_K_M is what
+  // both the Linux media server and the Windows gaming PC serve via Ollama.
   networkModelSlug: 'qwen2.5:3b-instruct-q4_K_M',
   householdMode: _initHouseholdMode,
   routingMode: readBootstrapRoutingMode(),
