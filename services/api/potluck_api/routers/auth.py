@@ -9,6 +9,7 @@ from fastapi import (
     APIRouter,
     Cookie,
     Depends,
+    Header,
     HTTPException,
     Query,
     Request,
@@ -20,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from potluck_api.config import get_settings
 from potluck_api.db.database import get_db
+from potluck_api.middleware.auth import _extract_token
 from potluck_api.middleware.rate_limit import limiter
 from potluck_api.services.auth_service import AuthService, MagicLinkError
 from potluck_api.services.email_service import EmailService
@@ -109,12 +111,19 @@ async def magic_link_callback(
 async def logout(
     request: Request,
     potluck_session: Annotated[str | None, Cookie()] = None,
+    authorization: Annotated[str | None, Header()] = None,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Invalidate the current session and clear the cookie."""
+    """Invalidate the current session and clear the cookie.
+
+    Accepts the session via the cookie (web) or ``Authorization: Bearer`` (the
+    desktop app), so a Bearer-based client's server-side session is genuinely
+    revoked, not just its (nonexistent) cookie cleared.
+    """
     settings = get_settings()
-    if potluck_session:
-        await AuthService(db).revoke_session(potluck_session)
+    token = _extract_token(potluck_session, authorization)
+    if token:
+        await AuthService(db).revoke_session(token)
     resp = Response(status_code=status.HTTP_204_NO_CONTENT)
     resp.delete_cookie(settings.session_cookie_name, path="/")
     return resp

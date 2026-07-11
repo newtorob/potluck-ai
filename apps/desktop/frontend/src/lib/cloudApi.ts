@@ -7,7 +7,10 @@
  * IMPORTANT: This API never receives chat messages or model weights.
  * Only account and membership data crosses the network.
  *
- * Session is maintained via httpOnly cookies (credentials: 'include').
+ * Transport is dual-path (see `request` below): the packaged app renders from
+ * file:// where browser CORS blocks direct calls, so it proxies through the
+ * Electron main process (`potluck.cloud`) with a bearer token held in main; the
+ * dev renderer runs on http://localhost:5173 and uses plain fetch + cookie.
  * See guide §4.5 and services/api/ for the server-side counterpart.
  */
 
@@ -28,23 +31,60 @@ const CLOUD_BASE =
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+/** The Electron main-process cloud bridge, present only in the packaged app. */
+interface CloudBridge {
+  request: (
+    method: string,
+    path: string,
+    body?: unknown,
+  ) => Promise<{ status: number; body: unknown }>;
+  setToken: (token: string) => Promise<void>;
+  clearToken: () => Promise<void>;
+}
+
+/**
+ * Return the main-process bridge when we must route through it (packaged app,
+ * file:// origin, where browser CORS blocks direct calls). In dev the renderer
+ * is http://localhost:5173 (CORS-allowlisted), so this is undefined and we use
+ * plain fetch + cookie.
+ */
+function cloudBridge(): CloudBridge | undefined {
+  if (typeof window === 'undefined' || window.location.protocol !== 'file:') {
+    return undefined;
+  }
+  return (window as unknown as { potluck?: { cloud?: CloudBridge } }).potluck?.cloud;
+}
+
+function detailOf(body: unknown, fallback: string): string {
+  return typeof body === 'object' && body !== null && 'detail' in body
+    ? String(body.detail)
+    : fallback;
+}
+
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body: unknown = await res.json().catch(() => ({}));
-    const msg =
-      typeof body === 'object' && body !== null && 'detail' in body
-        ? String((body).detail)
-        : res.statusText;
-    throw new Error(`[cloudApi] ${res.status}: ${msg}`);
+    throw new Error(`[cloudApi] ${res.status}: ${detailOf(body, res.statusText)}`);
   }
-  return res.json() as Promise<T>;
+  if (res.status === 204) return undefined as T;
+  const data: unknown = await res.json().catch(() => undefined);
+  return data as T;
 }
 
-function post<T>(path: string, body?: unknown): Promise<T> {
-  const init: RequestInit = {
-    method: 'POST',
-    credentials: 'include',
-  };
+async function request<T>(
+  method: 'GET' | 'POST' | 'DELETE',
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const bridge = cloudBridge();
+  if (bridge) {
+    const { status, body: resBody } = await bridge.request(method, path, body);
+    if (status < 200 || status >= 300) {
+      throw new Error(`[cloudApi] ${status}: ${detailOf(resBody, `HTTP ${status}`)}`);
+    }
+    return resBody as T;
+  }
+  const init: RequestInit = { method, credentials: 'include' };
   if (body !== undefined) {
     init.headers = { 'Content-Type': 'application/json' };
     init.body = JSON.stringify(body);
@@ -52,17 +92,16 @@ function post<T>(path: string, body?: unknown): Promise<T> {
   return fetch(`${CLOUD_BASE}${path}`, init).then((r) => handleResponse<T>(r));
 }
 
+function post<T>(path: string, body?: unknown): Promise<T> {
+  return request<T>('POST', path, body);
+}
+
 function get<T>(path: string): Promise<T> {
-  return fetch(`${CLOUD_BASE}${path}`, {
-    credentials: 'include',
-  }).then((r) => handleResponse<T>(r));
+  return request<T>('GET', path);
 }
 
 function del<T>(path: string): Promise<T> {
-  return fetch(`${CLOUD_BASE}${path}`, {
-    method: 'DELETE',
-    credentials: 'include',
-  }).then((r) => handleResponse<T>(r));
+  return request<T>('DELETE', path);
 }
 
 // ---------------------------------------------------------------------------
@@ -82,22 +121,30 @@ export const cloudApi = {
 
   /**
    * GET /auth/callback?token=... — exchanges the one-time token for a session.
-   * The server sets an httpOnly session cookie; this returns the session metadata.
+   * The web path sets an httpOnly cookie; the packaged app hands the opaque
+   * session token to the main process (bearer transport) and never keeps it in
+   * renderer state. Returns the session metadata either way.
    */
-  verifyMagicLink(token: string): Promise<Session> {
-    return fetch(`${CLOUD_BASE}/auth/callback?token=${encodeURIComponent(token)}`, {
-      credentials: 'include',
-    }).then((r) => handleResponse<Session>(r));
+  async verifyMagicLink(token: string): Promise<Session> {
+    const session = await request<Session>(
+      'GET',
+      `/auth/callback?token=${encodeURIComponent(token)}`,
+    );
+    const bridge = cloudBridge();
+    if (bridge && session.token) {
+      await bridge.setToken(session.token);
+      return { ...session, token: '' };
+    }
+    return session;
   },
 
-  /** POST /auth/logout — clears the server-side session and cookie */
-  logout(): Promise<void> {
-    return fetch(`${CLOUD_BASE}/auth/logout`, {
-      method: 'POST',
-      credentials: 'include',
-    }).then((r) => {
-      if (!r.ok) throw new Error(`[cloudApi] logout failed: ${r.status}`);
-    });
+  /** POST /auth/logout — revokes the server-side session and clears the token */
+  async logout(): Promise<void> {
+    try {
+      await request<void>('POST', '/auth/logout');
+    } finally {
+      await cloudBridge()?.clearToken();
+    }
   },
 
   // ---- Member --------------------------------------------------------------

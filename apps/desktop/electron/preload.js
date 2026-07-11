@@ -126,6 +126,21 @@ contextBridge.exposeInMainWorld('potluck', {
    */
   getInitialDeepLink: () => ipcRenderer.invoke('potluck:get-initial-deep-link'),
 
+  // ── Cloud API bridge (packaged app only; bypasses file:// CORS) ─────────────
+  //
+  // Proxies account/membership/billing calls to api.trypotluck.ai through the
+  // main process. The session token is held in main and attached as a bearer
+  // credential there; the renderer never sees or stores it.
+  cloud: {
+    /** Proxy a cloud call. Returns { status, body }. */
+    request: (method, path, body) =>
+      ipcRenderer.invoke('cloud:request', method, path, body),
+    /** Persist the opaque session token in the main process. */
+    setToken: (token) => ipcRenderer.invoke('cloud:set-token', String(token)),
+    /** Forget the session token (sign-out). */
+    clearToken: () => ipcRenderer.invoke('cloud:clear-token'),
+  },
+
   // ── Mesh sidecar bridge ────────────────────────────────────────────────────
   //
   // The Go mesh sidecar listens on a Unix-domain socket (mac/linux) or named

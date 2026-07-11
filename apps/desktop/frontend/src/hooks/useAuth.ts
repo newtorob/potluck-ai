@@ -2,7 +2,8 @@
  * useAuth — manages the magic-link auth flow and session state.
  *
  * On mount, attempts to rehydrate session by calling cloudApi.getMe().
- * If the httpOnly cookie is still valid the server returns the profile;
+ * The session persists as an httpOnly cookie (dev) or a main-process bearer
+ * token (packaged app); if it is still valid the server returns the profile,
  * otherwise the error is swallowed and the user is treated as signed out.
  */
 

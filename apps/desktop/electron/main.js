@@ -3,6 +3,7 @@
 const { app, BrowserWindow, shell, ipcMain, dialog, Notification, nativeImage, session } = require('electron');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
+const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const { autoUpdater } = require('electron-updater');
@@ -575,6 +576,107 @@ ipcMain.handle('mesh:request', async (_evt, method, reqPath, body) => {
       status: 0,
       body: { error: { code, message: err && err.message ? err.message : String(err) } },
     };
+  }
+});
+
+// ─── Cloud API bridge ────────────────────────────────────────────────────────
+//
+// The packaged renderer loads from file:// (Origin: null), so browser CORS
+// blocks it from reading responses off api.trypotluck.ai even with a bearer
+// token. We proxy cloud calls through the main process (Node fetch, no CORS)
+// and keep the opaque session token HERE in the main process, never in renderer
+// JS — preserving the httpOnly-cookie security property the web client has. The
+// cloud API accepts `Authorization: Bearer <token>` (services/api
+// middleware/auth.py). In dev the renderer is http://localhost:5173, which is
+// CORS-allowlisted, so it uses plain fetch + cookie and never hits this bridge.
+
+const CLOUD_API_BASE =
+  process.env.POTLUCK_CLOUD_API_URL || 'https://api.trypotluck.ai';
+const CLOUD_REQUEST_TIMEOUT_MS = 15_000;
+
+// undefined = not yet loaded from disk; null = no session; string = the token.
+let cloudSessionToken;
+
+function cloudTokenPath() {
+  return path.join(app.getPath('userData'), 'cloud-session');
+}
+
+function loadCloudToken() {
+  if (cloudSessionToken !== undefined) return cloudSessionToken;
+  try {
+    cloudSessionToken = fs.readFileSync(cloudTokenPath(), 'utf8').trim() || null;
+  } catch (_) {
+    cloudSessionToken = null;
+  }
+  return cloudSessionToken;
+}
+
+ipcMain.handle('cloud:set-token', (_evt, token) => {
+  cloudSessionToken = typeof token === 'string' && token.length > 0 ? token : null;
+  try {
+    if (cloudSessionToken) {
+      // 0600: readable only by the current user. TODO(v0.5+): wrap with
+      // electron safeStorage where the OS keychain is available.
+      fs.writeFileSync(cloudTokenPath(), cloudSessionToken, { mode: 0o600 });
+    } else {
+      fs.rmSync(cloudTokenPath(), { force: true });
+    }
+  } catch (err) {
+    log.warn(`[cloud] failed to persist session token: ${err.message}`);
+  }
+});
+
+ipcMain.handle('cloud:clear-token', () => {
+  cloudSessionToken = null;
+  try {
+    fs.rmSync(cloudTokenPath(), { force: true });
+  } catch (_) {
+    /* already gone */
+  }
+});
+
+ipcMain.handle('cloud:request', async (_evt, method, reqPath, body) => {
+  const allowed = new Set(['GET', 'POST', 'DELETE']);
+  if (typeof method !== 'string' || !allowed.has(method)) {
+    return { status: 400, body: { detail: 'method not allowed' } };
+  }
+  // Path only; the base host is fixed here so the renderer can never turn this
+  // into an open proxy to an arbitrary origin.
+  if (typeof reqPath !== 'string' || !reqPath.startsWith('/')) {
+    return { status: 400, body: { detail: 'path must start with /' } };
+  }
+
+  const headers = { Accept: 'application/json' };
+  const token = loadCloudToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const init = { method, headers };
+  if (body !== undefined && body !== null) {
+    headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CLOUD_REQUEST_TIMEOUT_MS);
+  init.signal = controller.signal;
+  try {
+    const res = await fetch(`${CLOUD_API_BASE}${reqPath}`, init);
+    const text = await res.text();
+    let parsed = null;
+    if (text.length > 0) {
+      try {
+        parsed = JSON.parse(text);
+      } catch (_) {
+        parsed = { raw: text };
+      }
+    }
+    return { status: res.status, body: parsed };
+  } catch (err) {
+    return {
+      status: 0,
+      body: { detail: err && err.message ? err.message : 'network error' },
+    };
+  } finally {
+    clearTimeout(timer);
   }
 });
 
