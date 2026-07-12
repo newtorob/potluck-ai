@@ -134,22 +134,35 @@ export async function resolveModel(
  * models (small, or general chat rather than code-tuned) can't reliably drive
  * the edit loop; surface that instead of letting the agent flail silently.
  * Returns null when the model looks capable enough. Heuristic, not a hard gate.
+ *
+ * The 14B recommendation is calibrated from live testing: a 7B coder handled a
+ * one-line fix but repeatedly failed a multi-step "add a function, keep the
+ * rest" task (dropping code), while qwen2.5-coder:14b did it cleanly.
  */
 export function modelCapabilityWarning(modelId: string): string | null {
   const id = modelId.toLowerCase();
-  const isCoder = /(coder|code|deepseek|devstral|qwen2\.5-coder|codestral)/.test(id);
-  const tiny = /(\b0\.5b|\b1b|\b1\.5b|\b2b|\b3b|:0\.5b|:1b|:1\.5b|:2b|:3b)/.test(id);
-  if (tiny) {
+  const isCoder = /(coder|code|deepseek|devstral|codestral|starcoder)/.test(id);
+  const sizeMatch = /(\d+(?:\.\d+)?)\s*b\b/.exec(id);
+  const billions = sizeMatch ? parseFloat(sizeMatch[1]) : null;
+
+  if (billions !== null && billions <= 3) {
     return (
-      `Model "${modelId}" looks small (<=3B) for agentic coding. It often fails to ` +
-      `emit valid edits and can loop. Prefer a 7B+ code model (e.g. qwen2.5-coder:7b); ` +
+      `Model "${modelId}" is small (<=3B) for agentic coding. It often emits invalid ` +
+      `edits, loops, or drops code. Use a 14B code model (e.g. qwen2.5-coder:14b); ` +
       `pass --model to switch.`
     );
   }
   if (!isCoder) {
     return (
-      `Model "${modelId}" is not a code-tuned model. A code model (e.g. ` +
-      `qwen2.5-coder:7b) drives the edit loop far more reliably; pass --model to switch.`
+      `Model "${modelId}" is not code-tuned. A code model (e.g. qwen2.5-coder:14b) ` +
+      `drives the edit loop far more reliably; pass --model to switch.`
+    );
+  }
+  if (billions !== null && billions <= 8) {
+    return (
+      `Model "${modelId}" (~${billions}B) handles simple edits but is unreliable on ` +
+      `multi-step tasks (it can drop code or make the wrong edit). qwen2.5-coder:14b ` +
+      `is markedly better; pass --model to switch.`
     );
   }
   return null;
@@ -373,8 +386,12 @@ async function pathExists(p: string): Promise<boolean> {
 }
 
 /**
- * Auto-detect a verify command for `cwd`:
+ * Auto-detect a verify command for `cwd`. Prefers a fast, dependency-free
+ * compile/syntax check so the agent can catch broken or dropped code:
  *   - package.json with scripts.build  -> "pnpm build" (pnpm-lock.yaml) | "npm run build"
+ *   - Cargo.toml                        -> "cargo build"
+ *   - go.mod                            -> "go build ./..."
+ *   - pyproject.toml / setup.py         -> "python3 -m compileall -q ."
  *   - else tsconfig.json present         -> "npx tsc --noEmit"
  *   - else                               -> null
  */
@@ -396,6 +413,14 @@ async function autoDetectVerify(cwd: string): Promise<string | null> {
     }
   } catch {
     // No package.json or it is not valid JSON — fall through to tsconfig.
+  }
+  if (await pathExists(join(cwd, "Cargo.toml"))) return "cargo build";
+  if (await pathExists(join(cwd, "go.mod"))) return "go build ./...";
+  if (
+    (await pathExists(join(cwd, "pyproject.toml"))) ||
+    (await pathExists(join(cwd, "setup.py")))
+  ) {
+    return "python3 -m compileall -q .";
   }
   if (await pathExists(join(cwd, "tsconfig.json"))) return "npx tsc --noEmit";
   return null;

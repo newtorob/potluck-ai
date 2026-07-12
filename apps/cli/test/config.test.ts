@@ -315,18 +315,48 @@ describe("resolveVerify", () => {
 });
 
 describe("modelCapabilityWarning", () => {
-  it("clears a capable 7B+ code model", () => {
-    expect(modelCapabilityWarning("qwen2.5-coder:7b")).toBeNull();
+  it("clears a capable 14B+ code model", () => {
+    expect(modelCapabilityWarning("qwen2.5-coder:14b")).toBeNull();
     expect(modelCapabilityWarning("qwen2.5-coder:32b-instruct-q4_K_M")).toBeNull();
     expect(modelCapabilityWarning("deepseek-coder-v2:16b")).toBeNull();
   });
 
-  it("warns on a small model", () => {
-    expect(modelCapabilityWarning("qwen2.5-coder:3b")).toMatch(/small|7B\+/i);
-    expect(modelCapabilityWarning("llama3.2:1b")).toMatch(/small|7B\+/i);
+  it("flags a ~7B coder as marginal for multi-step work", () => {
+    expect(modelCapabilityWarning("qwen2.5-coder:7b")).toMatch(/14b|multi-step/i);
+    expect(modelCapabilityWarning("qwen2.5-coder:8b")).toMatch(/14b|multi-step/i);
+  });
+
+  it("warns on a small model and steers to 14B", () => {
+    expect(modelCapabilityWarning("qwen2.5-coder:3b")).toMatch(/small|14b/i);
+    expect(modelCapabilityWarning("llama3.2:1b")).toMatch(/small|14b/i);
   });
 
   it("warns on a non-code-tuned model", () => {
     expect(modelCapabilityWarning("llama-3.1-8b-instruct")).toMatch(/code-tuned|code model/i);
+  });
+});
+
+describe("resolveVerify auto-detect (expanded ecosystems)", () => {
+  it("detects Cargo / Go / Python compile checks", async () => {
+    await writeFile(join(home, "Cargo.toml"), "[package]", "utf8");
+    let r = await resolveVerify({ cwd: home });
+    expect(r.command).toBe("cargo build");
+    expect(r.autoDetected).toBe(true);
+    await rm(join(home, "Cargo.toml"));
+
+    await writeFile(join(home, "go.mod"), "module x", "utf8");
+    r = await resolveVerify({ cwd: home });
+    expect(r.command).toBe("go build ./...");
+    await rm(join(home, "go.mod"));
+
+    await writeFile(join(home, "pyproject.toml"), "[project]", "utf8");
+    r = await resolveVerify({ cwd: home });
+    expect(r.command).toMatch(/compileall/);
+  });
+
+  it("--no-verify and explicit off still disable auto-detect", async () => {
+    await writeFile(join(home, "Cargo.toml"), "[package]", "utf8");
+    expect((await resolveVerify({ cwd: home, noVerify: true })).command).toBeNull();
+    expect((await resolveVerify({ cwd: home, flag: "off" })).command).toBeNull();
   });
 });

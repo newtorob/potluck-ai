@@ -179,7 +179,7 @@ function printBanner(
   );
   const verifyLabel = verify.command
     ? `verify: ${verify.command}${verify.autoDetected ? " (auto)" : ""}`
-    : "verify: off";
+    : "verify: off (pass --verify '<test/build cmd>' so edits are checked)";
   stdout.write(`${c.dim(cfg.baseURL)} ${c.dim("·")} ${c.dim(verifyLabel)}\n`);
   stdout.write(
     `${c.dim("type a task, or")} ${c.bold("/help")} ${c.dim("·")} ${c.bold(
@@ -208,6 +208,13 @@ async function runOneShot(
   ];
   const repoMap = await buildRepoMap(opts.cwd);
   if (repoMap) conversation.push({ role: "system", content: repoMap });
+  if (!opts.verifyCommand) {
+    stderr.write(
+      c.dim(
+        "no verify command — pass --verify '<test/build cmd>' so the agent checks its own edits.\n",
+      ),
+    );
+  }
   await runTask(conversation, task, {
     cfg: opts.cfg,
     model: opts.model,
