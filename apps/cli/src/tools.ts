@@ -232,11 +232,201 @@ async function writeFileTool(
   return `wrote ${content.length} bytes to ${path}`;
 }
 
+// ---------------------------------------------------------------------------
+// edit_file matching: exact -> trailing-whitespace-flex -> indent-flex
+// ---------------------------------------------------------------------------
+
+/** All start offsets of `needle` in `hay`. */
+function allIndexes(hay: string, needle: string): number[] {
+  const out: number[] = [];
+  for (let i = hay.indexOf(needle); i !== -1; i = hay.indexOf(needle, i + 1)) {
+    out.push(i);
+  }
+  return out;
+}
+
+/** Char [start,end) span of each line (end excludes the trailing newline). */
+function lineSpans(text: string): { start: number; end: number; text: string }[] {
+  const spans: { start: number; end: number; text: string }[] = [];
+  let pos = 0;
+  for (const line of text.split("\n")) {
+    spans.push({ start: pos, end: pos + line.length, text: line });
+    pos += line.length + 1;
+  }
+  return spans;
+}
+
+const leadingWs = (s: string): string => (/^[ \t]*/.exec(s) ?? [""])[0];
+
+/** Char spans in `current` whose consecutive lines equal `needle` under `norm`. */
+function lineWindowSpans(
+  current: string,
+  needle: string[],
+  norm: (s: string) => string,
+): { start: number; end: number }[] {
+  const hay = lineSpans(current);
+  const n = needle.length;
+  if (n === 0 || n > hay.length) return [];
+  const out: { start: number; end: number }[] = [];
+  for (let i = 0; i + n <= hay.length; i++) {
+    let ok = true;
+    for (let k = 0; k < n; k++) {
+      if (norm(hay[i + k].text) !== norm(needle[k])) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) out.push({ start: hay[i].start, end: hay[i + n - 1].end });
+  }
+  return out;
+}
+
+/** The longest leading-whitespace prefix shared by all non-blank lines. */
+function commonLeadingWs(lines: string[]): string {
+  const nonBlank = lines.filter((l) => l.trim().length > 0);
+  if (nonBlank.length === 0) return "";
+  let prefix = leadingWs(nonBlank[0]);
+  for (const l of nonBlank.slice(1)) {
+    const lw = leadingWs(l);
+    let i = 0;
+    while (i < prefix.length && i < lw.length && prefix[i] === lw[i]) i++;
+    prefix = prefix.slice(0, i);
+    if (prefix === "") break;
+  }
+  return prefix;
+}
+
+/** Strip `indent` from the front of `line` (or all leading ws if it doesn't match). */
+function dedentLine(line: string, indent: string): string {
+  if (line.trim().length === 0) return "";
+  return line.startsWith(indent) ? line.slice(indent.length) : line.replace(/^[ \t]*/, "");
+}
+
+/** Re-indent `block` from base `fromIndent` to base `toIndent`, keeping nesting. */
+function reindentBlock(block: string, fromIndent: string, toIndent: string): string {
+  return block
+    .split("\n")
+    .map((line) => (line.trim().length === 0 ? line : toIndent + dedentLine(line, fromIndent)))
+    .join("\n");
+}
+
+interface EditResult {
+  updated: string;
+  count: number;
+  /** true when a whitespace/indent-flexible tier matched (not a byte-exact hit). */
+  fuzzy: boolean;
+}
+
+function editNotFound(path: string): string {
+  return (
+    `old_string not found in ${path}. Re-read the file and copy the target text; ` +
+    `minor whitespace/indentation differences are tolerated, but the lines must otherwise match.`
+  );
+}
+
 /**
- * edit_file — replace one exact, unique `old_string` with `new_string` in an
- * existing file. This is the preferred way to change existing files; write_file
- * is for creating new ones. Fails clearly if the file is missing, if old_string
- * is absent, or if it appears more than once. Gated behind confirm (shows a diff).
+ * Resolve an edit with an increasing-leniency cascade so weak models' drift on
+ * whitespace and indentation still lands the edit on the first try instead of
+ * looping: (1) exact substring, (2) per-line trailing-whitespace-insensitive,
+ * (3) per-line indent-insensitive (re-indenting new_string to the file's actual
+ * indentation). The diff-confirm gate still shows exactly what will change.
+ */
+function resolveEdit(
+  current: string,
+  oldString: string,
+  newString: string,
+  replaceAll: boolean,
+  path: string,
+): EditResult | { error: string } {
+  // Tier 1: exact substring.
+  const exact = allIndexes(current, oldString);
+  if (exact.length === 1) {
+    return {
+      updated:
+        current.slice(0, exact[0]) + newString + current.slice(exact[0] + oldString.length),
+      count: 1,
+      fuzzy: false,
+    };
+  }
+  if (exact.length > 1) {
+    if (!replaceAll) {
+      return {
+        error:
+          `old_string is not unique in ${path} (appears ${exact.length} times); add more ` +
+          `surrounding context, or pass "replace_all": true to change every occurrence.`,
+      };
+    }
+    return {
+      updated: current.split(oldString).join(newString),
+      count: exact.length,
+      fuzzy: false,
+    };
+  }
+
+  // Fuzzy tiers, line-based. Drop a phantom trailing "" if old_string ended in \n.
+  let needle = oldString.split("\n");
+  const oldTrailNL = needle.length > 1 && needle[needle.length - 1] === "";
+  if (oldTrailNL) needle = needle.slice(0, -1);
+  if (needle.length === 0) return { error: editNotFound(path) };
+
+  // The matched span excludes the last line's trailing newline, so drop one from
+  // new_string too (the file's existing newline after the block stays in place).
+  let repl = newString;
+  if (oldTrailNL && repl.endsWith("\n")) repl = repl.slice(0, -1);
+
+  const rtrim = (s: string): string => s.replace(/[ \t\r]+$/, "");
+  const ambiguous = (n: number, how: string): { error: string } => ({
+    error:
+      `old_string matches ${n} places in ${path} (${how}); add more surrounding ` +
+      `context, or pass "replace_all": true.`,
+  });
+  const applySpans = <T extends { start: number; end: number }>(
+    spans: T[],
+    piece: (span: T) => string,
+  ): EditResult => {
+    const chosen = replaceAll ? spans : [spans[0]];
+    let updated = current;
+    for (let s = chosen.length - 1; s >= 0; s--) {
+      // Apply last-to-first so earlier offsets stay valid.
+      updated = updated.slice(0, chosen[s].start) + piece(chosen[s]) + updated.slice(chosen[s].end);
+    }
+    return { updated, count: chosen.length, fuzzy: true };
+  };
+
+  // Tier 2: trailing-whitespace-insensitive (leading indentation still exact).
+  const trailing = lineWindowSpans(current, needle, rtrim);
+  if (trailing.length > 1 && !replaceAll) return ambiguous(trailing.length, "trailing whitespace");
+  if (trailing.length >= 1) return applySpans(trailing, () => repl);
+
+  // Tier 3: uniform-indent — the whole block written at a consistent wrong
+  // indent. We ONLY accept a single uniform offset (reject non-uniform drift
+  // rather than silently apply mis-indented code), then re-indent new_string to
+  // the file's actual indentation.
+  const needleMin = commonLeadingWs(needle);
+  const dedentedNeedle = needle.map((l) => dedentLine(l, needleMin));
+  const hay = lineSpans(current);
+  const indented: { start: number; end: number; hayIndent: string }[] = [];
+  for (let i = 0; i + needle.length <= hay.length; i++) {
+    const window = hay.slice(i, i + needle.length).map((h) => h.text);
+    const hayIndent = commonLeadingWs(window);
+    if (window.every((l, k) => dedentLine(l, hayIndent) === dedentedNeedle[k])) {
+      indented.push({ start: hay[i].start, end: hay[i + needle.length - 1].end, hayIndent });
+    }
+  }
+  if (indented.length > 1 && !replaceAll) return ambiguous(indented.length, "indentation");
+  if (indented.length >= 1) {
+    return applySpans(indented, (span) => reindentBlock(repl, needleMin, span.hayIndent));
+  }
+
+  return { error: editNotFound(path) };
+}
+
+/**
+ * edit_file — replace `old_string` with `new_string` in an existing file. The
+ * preferred way to change existing files; write_file is for creating new ones.
+ * Matching is a cascade (exact -> trailing-whitespace-flex -> indent-flex), so
+ * small whitespace drift still lands. Fails clearly if the file is missing, the
+ * text is absent, or it is ambiguous. Gated behind confirm (shows a diff).
  */
 async function editFileTool(
   args: Record<string, unknown>,
@@ -264,38 +454,18 @@ async function editFileTool(
   }
 
   const replaceAll = args.replace_all === true;
+  const result = resolveEdit(current, oldString, newString, replaceAll, path);
+  if ("error" in result) throw new ToolError(result.error);
 
-  const first = current.indexOf(oldString);
-  if (first === -1) {
-    throw new ToolError(
-      `old_string not found in ${path}. It must match the file exactly, including ` +
-        `indentation and whitespace — re-read the file and copy the target text verbatim.`,
-    );
-  }
-  const occurrences = current.split(oldString).length - 1;
-
-  let updated: string;
-  if (occurrences === 1) {
-    updated =
-      current.slice(0, first) + newString + current.slice(first + oldString.length);
-  } else if (replaceAll) {
-    updated = current.split(oldString).join(newString);
-  } else {
-    throw new ToolError(
-      `old_string is not unique in ${path} (appears ${occurrences} times); add more ` +
-        `surrounding context so it matches exactly one place, or pass "replace_all": true ` +
-        `to change every occurrence.`,
-    );
-  }
-
-  const summary = unifiedDiff(path, current, updated);
+  const summary = unifiedDiff(path, current, result.updated);
   const approved = await deps.confirm({ tool: "edit_file", summary, subject: path });
   if (!approved) return "user declined";
 
-  await writeFile(abs, updated, "utf8");
-  return occurrences > 1 && replaceAll
-    ? `edited ${path} (${occurrences} occurrences)`
-    : `edited ${path}`;
+  await writeFile(abs, result.updated, "utf8");
+  const parts = [`edited ${path}`];
+  if (result.count > 1) parts.push(`(${result.count} occurrences)`);
+  if (result.fuzzy) parts.push("(matched with whitespace flexibility)");
+  return parts.join(" ");
 }
 
 function execCommand(

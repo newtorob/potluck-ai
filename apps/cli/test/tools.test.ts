@@ -295,6 +295,51 @@ describe("edit_file", () => {
     );
     expect(out).toMatch(/replace_all/);
   });
+
+  it("matches despite trailing-whitespace drift and notes the fuzzy match", async () => {
+    // File has trailing spaces the model won't reproduce.
+    await writeFile(join(cwd, "f.ts"), "const a = 1;   \nconst b = 2;\n", "utf8");
+    const out = await runTool(
+      "edit_file",
+      { path: "f.ts", old_string: "const a = 1;\n", new_string: "const a = 10;\n" },
+      { cwd, confirm: allow },
+    );
+    expect(out).toMatch(/edited f\.ts/);
+    expect(out).toMatch(/whitespace flexibility/);
+    expect(await readFile(join(cwd, "f.ts"), "utf8")).toBe("const a = 10;\nconst b = 2;\n");
+  });
+
+  it("matches a UNIFORMLY mis-indented block and re-indents to the file", async () => {
+    // File: method body at 8 spaces. Model dedents the whole block.
+    await writeFile(join(cwd, "c.py"), "class C:\n    def m(self):\n        return 1\n", "utf8");
+    const out = await runTool(
+      "edit_file",
+      {
+        path: "c.py",
+        old_string: "def m(self):\n    return 1\n", // dedented (def@0, return@4)
+        new_string: "def m(self):\n    return 2\n",
+      },
+      { cwd, confirm: allow },
+    );
+    expect(out).toMatch(/edited c\.py/);
+    // Re-indented back to the file's real indentation (def@4, return@8).
+    expect(await readFile(join(cwd, "c.py"), "utf8")).toBe(
+      "class C:\n    def m(self):\n        return 2\n",
+    );
+  });
+
+  it("REJECTS non-uniform indentation drift instead of applying mis-indented code", async () => {
+    // File uses 4-space; model's old_string mixes 0-space def + 2-space body.
+    await writeFile(join(cwd, "g.py"), "def add(a, b):\n    return a\n", "utf8");
+    const out = await runTool(
+      "edit_file",
+      { path: "g.py", old_string: "def add(a, b):\n  return a\n", new_string: "def add(a, b):\n  return a + b\n" },
+      { cwd, confirm: allow },
+    );
+    expect(out).toMatch(/not found/);
+    // File is unchanged — no mis-indented edit was applied.
+    expect(await readFile(join(cwd, "g.py"), "utf8")).toBe("def add(a, b):\n    return a\n");
+  });
 });
 
 describe("runTool dispatch", () => {
