@@ -33,6 +33,7 @@ import {
 } from "./config.js";
 import { listModels, type ChatMessage } from "./gateway.js";
 import { runTask, systemPrompt } from "./agent.js";
+import { buildRepoMap } from "./repomap.js";
 import { runVerify } from "./tools.js";
 import { runSetup, printSetupHelp } from "./setup.js";
 import {
@@ -205,6 +206,8 @@ async function runOneShot(
   const conversation: ChatMessage[] = [
     { role: "system", content: systemPrompt(opts.cwd, opts.verifyCommand) },
   ];
+  const repoMap = await buildRepoMap(opts.cwd);
+  if (repoMap) conversation.push({ role: "system", content: repoMap });
   await runTask(conversation, task, {
     cfg: opts.cfg,
     model: opts.model,
@@ -419,6 +422,8 @@ async function main(): Promise<void> {
   const conversation: ChatMessage[] = [
     { role: "system", content: systemPrompt(cwd, verify.command) },
   ];
+  const repoMap = await buildRepoMap(cwd);
+  if (repoMap) conversation.push({ role: "system", content: repoMap });
 
   // Ctrl-C cancels the active turn; at an idle prompt it exits.
   let active: AbortController | null = null;
