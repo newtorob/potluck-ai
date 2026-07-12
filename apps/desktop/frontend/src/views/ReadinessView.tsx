@@ -11,7 +11,7 @@
  * GET /readiness/gpu-test — never auto-runs on mount.
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
   CheckCircle2,
@@ -75,22 +75,25 @@ const SEV: Record<
 // Rows
 // ---------------------------------------------------------------------------
 
-function CheckRow({ check }: { check: ReadinessCheck }) {
+function CheckRow({ check, footer }: { check: ReadinessCheck; footer?: ReactNode }) {
   const sev = SEV[check.severity];
   const Icon = sev.icon;
   return (
-    <li className="flex items-start gap-3 px-4 py-3">
-      <Icon className={cn('mt-0.5 size-4 shrink-0', sev.tone)} aria-hidden />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-foreground">{check.title}</p>
-        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{check.detail}</p>
-        {check.fix && (
-          <p className="mt-1 text-xs text-foreground/80">
-            <span className="text-muted-foreground">Fix: </span>
-            {check.fix}
-          </p>
-        )}
+    <li>
+      <div className="flex items-start gap-3 px-4 py-3">
+        <Icon className={cn('mt-0.5 size-4 shrink-0', sev.tone)} aria-hidden />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">{check.title}</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{check.detail}</p>
+          {check.fix && (
+            <p className="mt-1 text-xs text-foreground/80">
+              <span className="text-muted-foreground">Fix: </span>
+              {check.fix}
+            </p>
+          )}
+        </div>
       </div>
+      {footer}
     </li>
   );
 }
@@ -289,12 +292,15 @@ function MachineGroup({
       </header>
       <ul className="divide-y divide-border">
         {checks.map((c) => (
-          <li key={c.code}>
-            <CheckRow check={c} />
-            {c.code === 'HARDWARE' && (
-              <GpuVerifyWidget state={gpuVerify} onVerify={onVerifyGpu} />
-            )}
-          </li>
+          <CheckRow
+            key={c.code}
+            check={c}
+            footer={
+              c.code === 'HARDWARE' ? (
+                <GpuVerifyWidget state={gpuVerify} onVerify={onVerifyGpu} />
+              ) : undefined
+            }
+          />
         ))}
       </ul>
     </section>
