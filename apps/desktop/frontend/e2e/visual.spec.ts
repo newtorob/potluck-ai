@@ -29,7 +29,7 @@ async function settle(page: import('@playwright/test').Page, anchor: () => Promi
 test.describe('visual regression', () => {
   test('membership - signed out', async ({ page }) => {
     await mockBackends(page, { me: null });
-    await page.goto('/membership');
+    await page.goto('/#/membership');
     await settle(page, async () => {
       await expect(page.getByPlaceholder('you@example.com')).toBeVisible();
     });
@@ -38,7 +38,7 @@ test.describe('visual regression', () => {
 
   test('membership - founding CTA', async ({ page }) => {
     await mockBackends(page, { me: MEMBER });
-    await page.goto('/membership');
+    await page.goto('/#/membership');
     await settle(page, async () => {
       await expect(page.getByRole('button', { name: /become a founding member/i })).toBeVisible();
     });
@@ -50,7 +50,7 @@ test.describe('visual regression', () => {
       me: MEMBER,
       membership: { plan: 'monthly', status: 'active', isFoundingMember: false, currentPeriodEnd: null },
     });
-    await page.goto('/membership');
+    await page.goto('/#/membership');
     await settle(page, async () => {
       await expect(page.getByRole('button', { name: /manage billing/i })).toBeVisible();
     });
@@ -59,7 +59,7 @@ test.describe('visual regression', () => {
 
   test('admin - roster', async ({ page }) => {
     await mockBackends(page, { me: ADMIN, adminMembers: ADMIN_ROSTER });
-    await page.goto('/admin');
+    await page.goto('/#/admin');
     await settle(page, async () => {
       await expect(page.getByText('member-a@example.com')).toBeVisible();
     });
@@ -68,7 +68,7 @@ test.describe('visual regression', () => {
 
   test('admin - forbidden', async ({ page }) => {
     await mockBackends(page, { me: MEMBER });
-    await page.goto('/admin');
+    await page.goto('/#/admin');
     await settle(page, async () => {
       await expect(page.getByText('Admins only')).toBeVisible();
     });

@@ -7,7 +7,7 @@ import { mockBackends, MEMBER, ADMIN, ADMIN_ROSTER } from './mock';
 test.describe('Membership', () => {
   test('signed-out shows the magic-link sign-in', async ({ page }) => {
     await mockBackends(page, { me: null });
-    await page.goto('/membership');
+    await page.goto('/#/membership');
 
     await expect(page.getByRole('heading', { name: 'Membership' })).toBeVisible();
     await expect(page.getByPlaceholder('you@example.com')).toBeVisible();
@@ -17,7 +17,7 @@ test.describe('Membership', () => {
 
   test('signed-in with no plan offers the founding checkout, gated honestly', async ({ page }) => {
     await mockBackends(page, { me: MEMBER });
-    await page.goto('/membership');
+    await page.goto('/#/membership');
 
     const cta = page.getByRole('button', { name: /become a founding member/i });
     await expect(cta).toBeVisible();
@@ -33,7 +33,7 @@ test.describe('Membership', () => {
       me: MEMBER,
       membership: { plan: 'monthly', status: 'active', isFoundingMember: false, currentPeriodEnd: null },
     });
-    await page.goto('/membership');
+    await page.goto('/#/membership');
 
     await expect(page.getByRole('button', { name: /manage billing/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /become a founding member/i })).toHaveCount(0);
@@ -45,7 +45,7 @@ test.describe('Membership', () => {
 test.describe('Admin', () => {
   test('an admin sees the member roster', async ({ page }) => {
     await mockBackends(page, { me: ADMIN, adminMembers: ADMIN_ROSTER });
-    await page.goto('/admin');
+    await page.goto('/#/admin');
 
     await expect(page.getByText(/Grant or revoke founding-member status/i)).toBeVisible();
     await expect(page.getByText('member-a@example.com')).toBeVisible();
@@ -56,7 +56,7 @@ test.describe('Admin', () => {
 
   test('a non-admin is blocked from /admin', async ({ page }) => {
     await mockBackends(page, { me: MEMBER });
-    await page.goto('/admin');
+    await page.goto('/#/admin');
 
     await expect(page.getByText('Admins only')).toBeVisible();
 
