@@ -208,6 +208,17 @@ async function writeFileTool(
     current = ""; // new file
   }
 
+  // Guard against the classic weak-model mistake: overwriting an existing,
+  // non-empty file with empty content. Seen live -- a 3B model blanked a file
+  // with a pointless empty write AFTER it had already made the real edit. Refuse
+  // hard so --yes can't auto-approve a destructive no-op.
+  if (current.trim().length > 0 && content.trim().length === 0) {
+    throw new ToolError(
+      `refusing to overwrite ${path} (${current.length} bytes) with empty content. ` +
+        `Use edit_file for a targeted change instead.`,
+    );
+  }
+
   const summary = unifiedDiff(path, current, content);
   const approved = await deps.confirm({
     tool: "write_file",

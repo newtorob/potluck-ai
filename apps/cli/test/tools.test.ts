@@ -84,6 +84,26 @@ describe("write_file", () => {
     );
     expect(out).toMatch(/^error:/);
   });
+
+  it("refuses to overwrite a non-empty file with empty content", async () => {
+    await writeFile(join(cwd, "keep.py"), "def f():\n    return 1\n", "utf8");
+    const out = await runTool(
+      "write_file",
+      { path: "keep.py", content: "" },
+      { cwd, confirm: allow },
+    );
+    expect(out).toMatch(/refusing to overwrite/);
+    expect(await readFile(join(cwd, "keep.py"), "utf8")).toBe("def f():\n    return 1\n");
+  });
+
+  it("still allows writing empty content to a NEW file", async () => {
+    const out = await runTool(
+      "write_file",
+      { path: "empty.txt", content: "" },
+      { cwd, confirm: allow },
+    );
+    expect(out).toMatch(/wrote 0 bytes/);
+  });
 });
 
 describe("run_command", () => {
