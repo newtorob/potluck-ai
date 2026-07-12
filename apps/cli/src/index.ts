@@ -22,6 +22,7 @@ import {
   loadCliPrefs,
   loadConfig,
   loadSharedPrefs,
+  modelCapabilityWarning,
   normalizeScope,
   resolveModel,
   resolveScope,
@@ -341,6 +342,8 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
+    const capWarn = modelCapabilityWarning(model);
+    if (capWarn) stderr.write(`${c.yellow(capWarn)}\n`);
 
     const { scope, notice } = resolveScope(args.scope, cli.scope);
     if (notice) stderr.write(`${c.yellow(notice)}\n`);
@@ -405,6 +408,8 @@ async function main(): Promise<void> {
     rl.close();
     return;
   }
+  const capWarn = modelCapabilityWarning(model);
+  if (capWarn) stdout.write(`${c.yellow(capWarn)}\n`);
 
   const initialScope = resolveScope(args.scope, cli.scope);
   let scope: Scope = initialScope.scope;

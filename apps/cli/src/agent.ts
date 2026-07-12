@@ -26,53 +26,40 @@ export type ParseResult =
   | { kind: "action"; action: ParsedAction }
   | { kind: "error"; message: string };
 
-const ACTION_BLOCK = /```[ \t]*action[^\n]*\n([\s\S]*?)```/;
+// The canonical fence the prompt asks for. A malformed JSON body HERE is a
+// retryable error (the model tried to act), not a final answer.
+const CANONICAL_ACTION = /```[ \t]*action[^\n]*\r?\n([\s\S]*?)```/;
+// Any fenced block — weak models routinely mislabel the fence (```json,
+// ```tool) or drop the label. We only treat such a block as an action if its
+// content actually parses to a tool object, so prose code fences are ignored.
+const ANY_FENCE = /```[^\n]*\r?\n([\s\S]*?)```/g;
 
-/** End offset (exclusive) of the first complete ```action block, or -1 if none. */
-function actionBlockEnd(text: string): number {
-  const m = ACTION_BLOCK.exec(text);
-  return m ? m.index + m[0].length : -1;
-}
-
-/**
- * Parse one assistant message. Tolerates prose around the block. No block means
- * a final answer; a malformed block becomes an `error` so the loop can feed the
- * reason back and let the model retry.
- */
-export function parseAction(text: string): ParseResult {
-  const match = ACTION_BLOCK.exec(text);
-  if (!match) {
-    return { kind: "final", text: text.trim() };
-  }
-
-  const json = match[1].trim();
-  let parsed: unknown;
+/** JSON first, then the relaxed parser; `undefined` when both fail. */
+function parseToolContent(raw: string): unknown {
+  const s = raw.trim();
   try {
-    parsed = JSON.parse(json);
+    return JSON.parse(s) as unknown;
   } catch {
-    // Weaker local models emit loose JSON in the fence (single-quoted strings,
-    // trailing commas, unquoted keys). Fall back to the relaxed parser; only if
-    // THAT also throws do we surface a retryable error back to the loop.
     try {
-      parsed = parseRelaxedJson(json);
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      return { kind: "error", message: `invalid JSON in action block: ${reason}` };
+      return parseRelaxedJson(s);
+    } catch {
+      return undefined;
     }
   }
+}
 
+/** Coerce a parsed value into a ParsedAction, or say why it isn't one. */
+function coerceAction(parsed: unknown): ParsedAction | { error: string } {
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    return { kind: "error", message: "action must be a JSON object" };
+    return { error: "action must be a JSON object" };
   }
-
   const obj = parsed as Record<string, unknown>;
   if (typeof obj.tool !== "string") {
-    return { kind: "error", message: 'action requires a string "tool" field' };
+    return { error: 'action requires a string "tool" field' };
   }
-
   // Prefer an explicit args/arguments object. Weaker local models often inline
-  // the args at the top level instead (e.g. {"tool":"run_command","command":"..."}),
-  // so fall back to treating any remaining top-level keys as the args.
+  // the args at the top level (e.g. {"tool":"run_command","command":"..."}), so
+  // fall back to treating any remaining top-level keys as the args.
   const explicit = obj.args ?? obj.arguments;
   let args: Record<string, unknown>;
   if (typeof explicit === "object" && explicit !== null && !Array.isArray(explicit)) {
@@ -84,8 +71,114 @@ export function parseAction(text: string): ParseResult {
     void _arguments;
     args = rest;
   }
+  return { tool: obj.tool, args };
+}
 
-  return { kind: "action", action: { tool: obj.tool, args } };
+/** End offset (exclusive) of the first balanced `{...}` at/after `start`, or -1. */
+function balancedObjectEnd(text: string, start: number): number {
+  let depth = 0;
+  let inStr = false;
+  let quote = "";
+  let esc = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === quote) inStr = false;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      inStr = true;
+      quote = ch;
+    } else if (ch === "{") {
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth === 0) return i + 1;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Locate the action in an assistant message, tolerantly. Returns the parse
+ * result plus the block's end offset (to truncate any post-action drift), or
+ * null when there is genuinely no action (a final answer).
+ *
+ * Order: (1) a canonical ```action fence — malformed JSON here is a retryable
+ * error, not a final answer; (2) any other fenced block whose content parses to
+ * a tool object (covers ```json / ```tool / unlabeled fences); (3) a bare
+ * top-level {...} with a "tool" key. This is what stops the loop from silently
+ * ending WITHOUT acting when a weak model gets the fence label wrong.
+ */
+function locateAction(text: string): { result: ParseResult; end: number } | null {
+  const canonical = CANONICAL_ACTION.exec(text);
+  if (canonical) {
+    const end = canonical.index + canonical[0].length;
+    const parsed = parseToolContent(canonical[1]);
+    if (parsed === undefined) {
+      return { result: { kind: "error", message: "invalid JSON in action block" }, end };
+    }
+    const coerced = coerceAction(parsed);
+    return {
+      result:
+        "error" in coerced
+          ? { kind: "error", message: coerced.error }
+          : { kind: "action", action: coerced },
+      end,
+    };
+  }
+
+  ANY_FENCE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = ANY_FENCE.exec(text)) !== null) {
+    const parsed = parseToolContent(m[1]);
+    if (parsed === undefined) continue;
+    const coerced = coerceAction(parsed);
+    if (!("error" in coerced)) {
+      return { result: { kind: "action", action: coerced }, end: m.index + m[0].length };
+    }
+  }
+
+  for (let start = text.indexOf("{"); start !== -1; start = text.indexOf("{", start + 1)) {
+    const end = balancedObjectEnd(text, start);
+    if (end === -1) continue;
+    const parsed = parseToolContent(text.slice(start, end));
+    if (parsed === undefined) continue;
+    const coerced = coerceAction(parsed);
+    if (!("error" in coerced)) {
+      return { result: { kind: "action", action: coerced }, end };
+    }
+  }
+
+  return null;
+}
+
+/** True once a complete fenced action block (valid or malformed) is present. */
+function hasActionBlock(text: string): boolean {
+  if (CANONICAL_ACTION.test(text)) return true;
+  ANY_FENCE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = ANY_FENCE.exec(text)) !== null) {
+    const parsed = parseToolContent(m[1]);
+    if (parsed !== undefined && !("error" in coerceAction(parsed))) return true;
+  }
+  return false;
+}
+
+/** End offset (exclusive) of the located action block, or -1 if none. */
+function actionBlockEnd(text: string): number {
+  return locateAction(text)?.end ?? -1;
+}
+
+/**
+ * Parse one assistant message. Tolerates prose, mislabeled fences, and bare
+ * JSON. No action means a final answer; a malformed canonical action block
+ * becomes a retryable `error`.
+ */
+export function parseAction(text: string): ParseResult {
+  return locateAction(text)?.result ?? { kind: "final", text: text.trim() };
 }
 
 /** Build the system prompt that defines the strict action protocol. */
@@ -116,7 +209,7 @@ export function systemPrompt(cwd: string, verifyCommand?: string | null): string
     '  glob         {"pattern": string}                   find files by name, e.g. "**/*.ts" (auto-runs)',
     '  read_file    {"path": string}                      read a UTF-8 file (auto-runs)',
     '  list_dir     {"path": string}                      list a directory (auto-runs)',
-    '  edit_file    {"path": string, "old_string": string, "new_string": string}  targeted edit to an EXISTING file (asks the user)',
+    '  edit_file    {"path": string, "old_string": string, "new_string": string, "replace_all"?: bool}  targeted edit to an EXISTING file (asks the user)',
     '  write_file   {"path": string, "content": string}   create a NEW file / full overwrite (asks the user)',
     '  run_command  {"command": string}                   run a shell command (asks the user)',
     "",
@@ -124,7 +217,14 @@ export function systemPrompt(cwd: string, verifyCommand?: string | null): string
     "- Locate code with search_files (by content) and glob (by filename) first.",
     "- read_file to inspect before changing anything.",
     "- To change an existing file, use edit_file with a SMALL, UNIQUE old_string",
-    "  (include enough surrounding context that it matches exactly one place).",
+    "  (include enough surrounding context that it matches exactly one place). It",
+    "  must match the file byte-for-byte, including indentation. Newlines inside",
+    "  the JSON strings are written as \\n. Example:",
+    "```action",
+    '{"tool": "edit_file", "args": {"path": "src/math.ts", "old_string": "function add(a, b) {\\n  return a;\\n}", "new_string": "function add(a, b) {\\n  return a + b;\\n}"}}',
+    "```",
+    "  If old_string appears more than once, add more surrounding context, or pass",
+    '  "replace_all": true to change every occurrence.',
     "- Only use write_file to CREATE a new file (or when a full rewrite is truly",
     "  warranted). Prefer minimal, targeted edits over rewrites.",
     "",
@@ -189,27 +289,55 @@ export function trimHistory(
   const total = history.reduce((n, m) => n + m.content.length, 0);
   if (total <= budget) return history;
 
-  const hasSystem = history[0]?.role === "system";
-  const system = hasSystem ? history.slice(0, 1) : [];
-  const rest = history.slice(system.length);
+  // Always keep: the system prompt AND the current task. The task is the most
+  // recent plain user message (tool feedback is prefixed `TOOL_RESULT:`); on a
+  // long task it is an OLD message, so plain oldest-first trimming would drop
+  // the goal itself. Pinning it is what stops the agent losing the thread.
+  const keep = new Set<number>();
+  if (history[0]?.role === "system") keep.add(0);
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].role === "user" && !history[i].content.startsWith("TOOL_RESULT:")) {
+      keep.add(i);
+      break;
+    }
+  }
 
-  let used = system.reduce((n, m) => n + m.content.length, 0);
-  const kept: ChatMessage[] = [];
-  for (let i = rest.length - 1; i >= 0; i--) {
-    const len = rest[i].content.length;
-    // Always keep at least the most recent message, even if it alone is large.
-    if (kept.length > 0 && used + len > budget) break;
-    kept.unshift(rest[i]);
+  let used = 0;
+  for (const i of keep) used += history[i].content.length;
+
+  // Always keep the very last message (the latest tool result the model must
+  // read), then add older messages most-recent-first while under budget.
+  const last = history.length - 1;
+  if (!keep.has(last)) {
+    keep.add(last);
+    used += history[last].content.length;
+  }
+  for (let i = last - 1; i >= 0; i--) {
+    if (keep.has(i)) continue;
+    const len = history[i].content.length;
+    if (used + len > budget) break;
+    keep.add(i);
     used += len;
   }
 
-  const dropped = rest.length - kept.length;
-  if (dropped <= 0) return history;
-  const marker: ChatMessage = {
-    role: "user",
-    content: `[${dropped} earlier message(s) trimmed to fit the context window]`,
-  };
-  return [...system, marker, ...kept];
+  if (keep.size >= history.length) return history;
+
+  const keptSorted = [...keep].sort((a, b) => a - b);
+  const dropped = history.length - keptSorted.length;
+  const out: ChatMessage[] = [];
+  let markerInserted = false;
+  for (let k = 0; k < keptSorted.length; k++) {
+    const idx = keptSorted[k];
+    if (k > 0 && idx !== keptSorted[k - 1] + 1 && !markerInserted) {
+      out.push({
+        role: "user",
+        content: `[${dropped} earlier message(s) trimmed to fit the context window]`,
+      });
+      markerInserted = true;
+    }
+    out.push(history[idx]);
+  }
+  return out;
 }
 
 export interface AgentCallbacks {
@@ -268,6 +396,8 @@ export async function runTask(
   const verifyRunner = opts.runVerify ?? runVerify;
   let consecutiveVerifyFailures = 0;
   let verifyStopped = false; // tripped after too many failures in a row
+  let lastActionKey = ""; // repeat-detection: identical (tool,args) in a row
+  let repeatCount = 0;
 
   history.push({ role: "user", content: task });
 
@@ -286,7 +416,7 @@ export async function runTask(
       // Stop the moment one complete action block is emitted. Weaker local models
       // tend to keep generating after it -- hallucinating a TOOL_RESULT or drifting
       // into invented output. Breaking closes the stream so they can't.
-      if (actionBlockEnd(assistant) !== -1) break;
+      if (hasActionBlock(assistant)) break;
     }
     callbacks.onTurnEnd();
 
@@ -315,6 +445,29 @@ export async function runTask(
       cwd,
       confirm,
     });
+
+    // Repeat-detection: a weak model stuck in a loop re-emits the identical
+    // action that keeps FAILING (e.g. an edit whose old_string never matches).
+    // Count only identical actions that error — a repeated successful write
+    // whose verify keeps failing is the verify cap's job, not this. Bail after
+    // three identical failures rather than burn the whole step budget.
+    const actionKey = `${parsed.action.tool}:${JSON.stringify(parsed.action.args)}`;
+    if (actionKey === lastActionKey && result.startsWith("error:")) repeatCount++;
+    else repeatCount = 0;
+    lastActionKey = actionKey;
+    if (repeatCount >= 2) {
+      callbacks.onNotice?.(
+        `Stopping: the same action failed identically ${repeatCount + 1} times.`,
+      );
+      callbacks.onToolResult(result);
+      history.push({ role: "user", content: `TOOL_RESULT: ${result}` });
+      return;
+    }
+    if (repeatCount === 1) {
+      result +=
+        "\n(NOTE: this identical action just failed twice. Change your approach:" +
+        " re-read the file, adjust old_string, or use a different tool.)";
+    }
 
     // Verify-and-self-correct: after a file actually changed, run the FIXED
     // verify command (never one the model picked, no confirm) and fold the

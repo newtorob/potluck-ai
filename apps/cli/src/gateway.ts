@@ -88,7 +88,10 @@ export async function* streamChat(
       model: opts.model,
       messages,
       temperature: opts.temperature ?? 0.2,
-      max_tokens: opts.maxTokens ?? 2048,
+      // 2048 truncated any non-trivial write/edit mid-JSON (the model's output
+      // is code embedded in a JSON string, which is verbose). 4096 fits a real
+      // file write without blowing a small model's context on the input side.
+      max_tokens: opts.maxTokens ?? 4096,
       stream: true,
       stop: opts.stop,
     }),

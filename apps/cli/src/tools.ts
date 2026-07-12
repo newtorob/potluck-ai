@@ -252,24 +252,39 @@ async function editFileTool(
     );
   }
 
+  const replaceAll = args.replace_all === true;
+
   const first = current.indexOf(oldString);
   if (first === -1) {
-    throw new ToolError(`old_string not found in ${path}`);
-  }
-  if (current.indexOf(oldString, first + oldString.length) !== -1) {
     throw new ToolError(
-      `old_string is not unique in ${path}; add more surrounding context so it matches exactly one place`,
+      `old_string not found in ${path}. It must match the file exactly, including ` +
+        `indentation and whitespace — re-read the file and copy the target text verbatim.`,
+    );
+  }
+  const occurrences = current.split(oldString).length - 1;
+
+  let updated: string;
+  if (occurrences === 1) {
+    updated =
+      current.slice(0, first) + newString + current.slice(first + oldString.length);
+  } else if (replaceAll) {
+    updated = current.split(oldString).join(newString);
+  } else {
+    throw new ToolError(
+      `old_string is not unique in ${path} (appears ${occurrences} times); add more ` +
+        `surrounding context so it matches exactly one place, or pass "replace_all": true ` +
+        `to change every occurrence.`,
     );
   }
 
-  const updated =
-    current.slice(0, first) + newString + current.slice(first + oldString.length);
   const summary = unifiedDiff(path, current, updated);
   const approved = await deps.confirm({ tool: "edit_file", summary, subject: path });
   if (!approved) return "user declined";
 
   await writeFile(abs, updated, "utf8");
-  return `edited ${path}`;
+  return occurrences > 1 && replaceAll
+    ? `edited ${path} (${occurrences} occurrences)`
+    : `edited ${path}`;
 }
 
 function execCommand(

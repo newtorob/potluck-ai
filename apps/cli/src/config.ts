@@ -129,6 +129,32 @@ export async function resolveModel(
   return first;
 }
 
+/**
+ * A warning if `modelId` looks below the agentic-editing floor. Weak local
+ * models (small, or general chat rather than code-tuned) can't reliably drive
+ * the edit loop; surface that instead of letting the agent flail silently.
+ * Returns null when the model looks capable enough. Heuristic, not a hard gate.
+ */
+export function modelCapabilityWarning(modelId: string): string | null {
+  const id = modelId.toLowerCase();
+  const isCoder = /(coder|code|deepseek|devstral|qwen2\.5-coder|codestral)/.test(id);
+  const tiny = /(\b0\.5b|\b1b|\b1\.5b|\b2b|\b3b|:0\.5b|:1b|:1\.5b|:2b|:3b)/.test(id);
+  if (tiny) {
+    return (
+      `Model "${modelId}" looks small (<=3B) for agentic coding. It often fails to ` +
+      `emit valid edits and can loop. Prefer a 7B+ code model (e.g. qwen2.5-coder:7b); ` +
+      `pass --model to switch.`
+    );
+  }
+  if (!isCoder) {
+    return (
+      `Model "${modelId}" is not a code-tuned model. A code model (e.g. ` +
+      `qwen2.5-coder:7b) drives the edit loop far more reliably; pass --model to switch.`
+    );
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // CLI-owned prefs (~/.potluck/cli.json)
 // ---------------------------------------------------------------------------

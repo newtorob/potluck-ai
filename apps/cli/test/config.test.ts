@@ -12,6 +12,7 @@ import {
   loadConfig,
   loadSharedPrefs,
   mergeSharedSafeFields,
+  modelCapabilityWarning,
   normalizeScope,
   resolveModel,
   resolveScope,
@@ -310,5 +311,22 @@ describe("resolveVerify", () => {
     await writePkg({ build: "tsc" });
     const r = await resolveVerify({ cwd: dir, flag: "pnpm build", noVerify: true });
     expect(r).toEqual({ command: null, autoDetected: false });
+  });
+});
+
+describe("modelCapabilityWarning", () => {
+  it("clears a capable 7B+ code model", () => {
+    expect(modelCapabilityWarning("qwen2.5-coder:7b")).toBeNull();
+    expect(modelCapabilityWarning("qwen2.5-coder:32b-instruct-q4_K_M")).toBeNull();
+    expect(modelCapabilityWarning("deepseek-coder-v2:16b")).toBeNull();
+  });
+
+  it("warns on a small model", () => {
+    expect(modelCapabilityWarning("qwen2.5-coder:3b")).toMatch(/small|7B\+/i);
+    expect(modelCapabilityWarning("llama3.2:1b")).toMatch(/small|7B\+/i);
+  });
+
+  it("warns on a non-code-tuned model", () => {
+    expect(modelCapabilityWarning("llama-3.1-8b-instruct")).toMatch(/code-tuned|code model/i);
   });
 });

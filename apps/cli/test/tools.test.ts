@@ -254,6 +254,27 @@ describe("edit_file", () => {
     expect(out).toBe("user declined");
     expect(await readFile(join(cwd, "f.ts"), "utf8")).toBe("keep\n");
   });
+
+  it("replaces every occurrence when replace_all is true", async () => {
+    await writeFile(join(cwd, "f.ts"), "dup\ndup\ndup\n", "utf8");
+    const out = await runTool(
+      "edit_file",
+      { path: "f.ts", old_string: "dup", new_string: "x", replace_all: true },
+      { cwd, confirm: allow },
+    );
+    expect(out).toMatch(/3 occurrences/);
+    expect(await readFile(join(cwd, "f.ts"), "utf8")).toBe("x\nx\nx\n");
+  });
+
+  it("the not-unique error points the model at replace_all", async () => {
+    await writeFile(join(cwd, "f.ts"), "dup\ndup\n", "utf8");
+    const out = await runTool(
+      "edit_file",
+      { path: "f.ts", old_string: "dup", new_string: "x" },
+      { cwd, confirm: allow },
+    );
+    expect(out).toMatch(/replace_all/);
+  });
 });
 
 describe("runTool dispatch", () => {

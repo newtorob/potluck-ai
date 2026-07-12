@@ -168,6 +168,40 @@ describe("parseAction", () => {
       expect(result.message).toMatch(/invalid JSON/i);
     }
   });
+
+  it("parses a mislabeled ```json fence as an action (not a final answer)", () => {
+    const text = ["```json", '{"tool": "read_file", "args": {"path": "a.ts"}}', "```"].join(
+      "\n",
+    );
+    const result = parseAction(text);
+    if (result.kind !== "action") throw new Error("expected action");
+    expect(result.action.tool).toBe("read_file");
+  });
+
+  it("parses an UNLABELED fenced tool object as an action", () => {
+    const text = ["```", '{"tool": "list_dir", "args": {"path": "."}}', "```"].join("\n");
+    const result = parseAction(text);
+    if (result.kind !== "action") throw new Error("expected action");
+    expect(result.action.tool).toBe("list_dir");
+  });
+
+  it("parses a bare top-level tool object with no fence at all", () => {
+    const result = parseAction('{"tool": "read_file", "args": {"path": "x.ts"}}');
+    if (result.kind !== "action") throw new Error("expected action");
+    expect(result.action.args).toEqual({ path: "x.ts" });
+  });
+
+  it("does NOT mistake a prose code fence in a final answer for an action", () => {
+    const text = [
+      "Here is the change I made:",
+      "```ts",
+      "export const x = 1;",
+      "```",
+      "That completes the task.",
+    ].join("\n");
+    const result = parseAction(text);
+    expect(result.kind).toBe("final");
+  });
 });
 
 describe("trimHistory", () => {
@@ -201,6 +235,21 @@ describe("trimHistory", () => {
     ];
     const trimmed = trimHistory(h, 10);
     expect(trimmed[trimmed.length - 1].content).toBe("y".repeat(500));
+  });
+
+  it("pins the task so the goal survives even when it is the oldest user turn", () => {
+    const h: ChatMessage[] = [
+      { role: "system", content: "S" },
+      { role: "user", content: "THE TASK: refactor foo" }, // the goal
+      { role: "assistant", content: "a".repeat(200) },
+      { role: "user", content: "TOOL_RESULT: " + "b".repeat(200) },
+      { role: "assistant", content: "c".repeat(200) },
+      { role: "user", content: "TOOL_RESULT: latest" },
+    ];
+    const trimmed = trimHistory(h, 80);
+    expect(trimmed.some((m) => m.content.includes("THE TASK"))).toBe(true);
+    expect(trimmed[trimmed.length - 1].content).toContain("latest");
+    expect(trimmed.some((m) => /trimmed to fit/.test(m.content))).toBe(true);
   });
 });
 
@@ -418,5 +467,56 @@ describe("runTask verify loop", () => {
     });
 
     expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe("runTask repeat-detection", () => {
+  const dirs: string[] = [];
+  afterEach(async () => {
+    await Promise.all(dirs.splice(0).map((d) => rm(d, { recursive: true, force: true })));
+  });
+  async function tmp(): Promise<string> {
+    const d = await mkdtemp(join(tmpdir(), "potluck-cli-repeat-"));
+    dirs.push(d);
+    return d;
+  }
+
+  it("aborts when the identical action keeps failing, instead of looping to maxSteps", async () => {
+    const dir = await tmp();
+    await writeFile(join(dir, "f.ts"), "const a = 1;\n", "utf8");
+    // The model is stuck: it re-emits the SAME edit whose old_string never matches.
+    scriptTurns(
+      Array.from({ length: 10 }, () =>
+        action("edit_file", {
+          path: "f.ts",
+          old_string: "does-not-exist",
+          new_string: "whatever",
+        }),
+      ),
+    );
+
+    const results: string[] = [];
+    let notice = "";
+    await runTask([{ role: "system", content: "s" }], "edit it", {
+      cfg: CFG,
+      model: "m",
+      cwd: dir,
+      confirm: async () => true,
+      maxSteps: 24,
+      callbacks: {
+        onToken: () => {},
+        onTurnEnd: () => {},
+        onAction: () => {},
+        onToolResult: (r) => results.push(r),
+        onNotice: (m) => {
+          notice = m;
+        },
+      },
+    });
+
+    // Bailed after 3 identical failures, not 24 steps.
+    expect(results.length).toBe(3);
+    expect(notice).toMatch(/failed identically/i);
+    expect(results.every((r) => r.startsWith("error:"))).toBe(true);
   });
 });
