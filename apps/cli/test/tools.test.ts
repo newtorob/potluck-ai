@@ -104,6 +104,41 @@ describe("write_file", () => {
     );
     expect(out).toMatch(/wrote 0 bytes/);
   });
+
+  it("refuses to overwrite an existing non-empty file it hasn't read", async () => {
+    await writeFile(join(cwd, "e.py"), "def f():\n    return 1\n", "utf8");
+    const readPaths = new Set<string>();
+    const out = await runTool(
+      "write_file",
+      { path: "e.py", content: "def f():\n    return 2\n" },
+      { cwd, confirm: allow, readPaths },
+    );
+    expect(out).toMatch(/without reading it first/);
+    expect(await readFile(join(cwd, "e.py"), "utf8")).toBe("def f():\n    return 1\n");
+  });
+
+  it("allows overwriting after the file has been read", async () => {
+    await writeFile(join(cwd, "e.py"), "def f():\n    return 1\n", "utf8");
+    const readPaths = new Set<string>();
+    await runTool("read_file", { path: "e.py" }, { cwd, confirm: allow, readPaths });
+    const out = await runTool(
+      "write_file",
+      { path: "e.py", content: "def f():\n    return 2\n" },
+      { cwd, confirm: allow, readPaths },
+    );
+    expect(out).toMatch(/wrote \d+ bytes/);
+    expect(await readFile(join(cwd, "e.py"), "utf8")).toBe("def f():\n    return 2\n");
+  });
+
+  it("allows creating a NEW file without a prior read", async () => {
+    const readPaths = new Set<string>();
+    const out = await runTool(
+      "write_file",
+      { path: "new.py", content: "x = 1\n" },
+      { cwd, confirm: allow, readPaths },
+    );
+    expect(out).toMatch(/wrote \d+ bytes/);
+  });
 });
 
 describe("run_command", () => {

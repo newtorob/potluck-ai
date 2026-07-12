@@ -398,6 +398,7 @@ export async function runTask(
   let verifyStopped = false; // tripped after too many failures in a row
   let lastActionKey = ""; // repeat-detection: identical (tool,args) in a row
   let repeatCount = 0;
+  const readPaths = new Set<string>(); // files read this task (write_file guard)
 
   history.push({ role: "user", content: task });
 
@@ -444,6 +445,7 @@ export async function runTask(
     let result = await runTool(parsed.action.tool, parsed.action.args, {
       cwd,
       confirm,
+      readPaths,
     });
 
     // Repeat-detection: a weak model stuck in a loop re-emits the identical

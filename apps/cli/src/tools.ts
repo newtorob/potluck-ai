@@ -33,6 +33,12 @@ export type Confirm = (ctx: ConfirmContext) => Promise<boolean>;
 export interface ToolDeps {
   cwd: string;
   confirm: Confirm;
+  /**
+   * Absolute paths the agent has read this task. read_file adds to it; write_file
+   * refuses to blind-overwrite an existing file that isn't in it. Optional so
+   * direct tool tests can omit it (the guard is then inert).
+   */
+  readPaths?: Set<string>;
 }
 
 export const TOOL_NAMES = [
@@ -89,6 +95,7 @@ async function readFileTool(
   const path = requireString(args, "path");
   const abs = resolveInCwd(deps.cwd, path);
   const content = await readFile(abs, "utf8");
+  deps.readPaths?.add(abs);
   if (content.length > MAX_FILE_BYTES) {
     return `${content.slice(0, MAX_FILE_BYTES)}\n…[truncated at ${MAX_FILE_BYTES} chars]`;
   }
@@ -219,6 +226,18 @@ async function writeFileTool(
     );
   }
 
+  // Guard against blind-overwrite: rewriting an existing, non-empty file the
+  // agent never read this task. Seen live -- a 7B rewrote a file from memory and
+  // silently dropped an existing function. Force a read first, and steer toward a
+  // targeted edit_file over a whole-file overwrite.
+  if (current.trim().length > 0 && deps.readPaths && !deps.readPaths.has(abs)) {
+    throw new ToolError(
+      `refusing to overwrite existing file ${path} without reading it first. ` +
+        `read_file it, then use edit_file for a targeted change (write_file replaces ` +
+        `the WHOLE file and will drop anything you don't re-include).`,
+    );
+  }
+
   const summary = unifiedDiff(path, current, content);
   const approved = await deps.confirm({
     tool: "write_file",
@@ -229,6 +248,9 @@ async function writeFileTool(
 
   await mkdir(dirname(abs), { recursive: true });
   await writeFile(abs, content, "utf8");
+  // After authoring the file, the agent knows its content — a later overwrite is
+  // informed, not blind, so record it like a read.
+  deps.readPaths?.add(abs);
   return `wrote ${content.length} bytes to ${path}`;
 }
 
