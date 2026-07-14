@@ -1,0 +1,53 @@
+app = "potluck-derp"
+primary_region = "ord"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# The relay is a TCP service, not HTTP, so it uses the [[services]] array form
+# rather than [http_service]. Fly's edge terminates TLS on 443 and forwards a
+# raw TCP stream to the relay's cleartext port 8443, so the binary runs
+# --insecure-cleartext and never handles a cert itself. This is safe: the relay
+# only ever sees WireGuard-encrypted bytes (end-to-end encryption lives one
+# layer above), so the Fly-terminated TLS is an outer wrapper, not the only one.
+[processes]
+  app = "--insecure-cleartext"
+
+[env]
+  POTLUCK_DERP_REGION = "ord"        # must match the mesh sidecar + coordinator default
+  POTLUCK_DERP_PORT = "8443"
+  POTLUCK_DERP_HEALTH_PORT = "8444"
+  POTLUCK_DERP_MAX_CLIENTS = "10000"
+  # POTLUCK_DERP_JWT_KEY is a secret — set via `fly secrets set` (identical to
+  # the coordinator's key). See docs/launch/fly-deploy.md.
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
+
+# Relay: public TLS on 443, forwarded cleartext to the binary on 8443.
+[[services]]
+  protocol = "tcp"
+  internal_port = 8443
+  processes = ["app"]
+  # A relay must stay up; do not idle-stop it or in-flight tunnels drop.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls"]
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 10000
+    soft_limit = 9000
+
+  # Liveness: the relay port refuses connections only when the process is dead,
+  # so a plain TCP connect is an honest health signal.
+  [[services.tcp_checks]]
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "5s"

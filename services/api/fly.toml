@@ -1,4 +1,7 @@
-app = "potluck-api"
+# Note: the global name "potluck-api" was already taken on Fly, so this app is
+# "potluck-cloud-api". Clients reach it by the custom domain (api.trypotluck.ai),
+# so the internal app name is cosmetic.
+app = "potluck-cloud-api"
 primary_region = "ord"
 
 [build]

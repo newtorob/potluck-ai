@@ -21,9 +21,20 @@ primary_region = "ord"
   ENV = "production"
   # Bind every request to a real member via the cloud API's shared `sessions`
   # table instead of the dev STUB_MEMBER_ID. Requires DATABASE_URL to point at
-  # the same Postgres as the API. The token/registered-keys/DB-TLS secrets the
+  # the same Postgres as the API. The token/DERP-JWT/DATABASE_URL secrets the
   # prod preflight demands are set out-of-band via `fly secrets`.
   POTLUCK_SESSION_AUTH_ENABLED = "1"
+  # Prod preflight is fail-closed: these two are non-secret config, so they live
+  # here rather than in `fly secrets`.
+  #   REQUIRE_REGISTERED_KEYS  — strict allowlist; an attesting device key must
+  #     already be in member_keys (written during enrollment). VALIDATE the
+  #     enrollment-then-attest path in dogfood before public launch: if
+  #     enrollment does not pre-register the key, joins will fail closed.
+  #   POTLUCK_DB_LINK_ENCRYPTED — acknowledges the DB link is encrypted at the
+  #     network layer. True on Fly: the app reaches Postgres over the private
+  #     6PN (.internal) WireGuard mesh, which asyncpg's ssl= arg can't express.
+  REQUIRE_REGISTERED_KEYS = "true"
+  POTLUCK_DB_LINK_ENCRYPTED = "1"
 
 [[vm]]
   cpu_kind = "shared"
