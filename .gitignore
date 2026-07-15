@@ -84,3 +84,12 @@ marketing/
 docs/grants/
 docs/governance/contributor-equity.md
 docs/concepts/cooperative-connection.md
+
+# Large public benchmark datasets (re-downloadable; kept on disk, not versioned)
+bench/longmemeval/data/
+# Build artifacts produced by electron prepack (compiled sidecars/mesh; do not commit)
+apps/desktop/electron/resources/mesh/
+apps/desktop/electron/resources/python/
+# Archived to ~/Documents/potluck-archive (standalone learn page + unused landing video)
+/potluck-learn.html
+/web/landing/public/demo-c.mp4
