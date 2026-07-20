@@ -12,6 +12,8 @@ from __future__ import annotations
 import argparse
 import contextlib
 import hmac
+import ipaddress
+import logging
 import os
 import posixpath
 
@@ -25,6 +27,8 @@ from potluck_local import __version__
 from potluck_local.routers import agents, chat, gateway, hardware, health, memory, models, ollama, peer, readiness, settings, tasks, vault, verify
 from potluck_local.utils.logging import setup_logging
 
+logger = logging.getLogger(__name__)
+
 
 # CORS origins permitted to call the local sidecar.
 # The Electron app uses app:// and file:// schemes; the Vite dev server
@@ -35,6 +39,62 @@ _CORS_ORIGINS: list[str] = [
     "app://.",
     "file://",
 ]
+
+
+# The WireGuard mesh subnet -- the trust boundary for /peer/* is "the caller is
+# on the household's WireGuard mesh", NOT merely "the caller isn't loopback".
+# main() below binds uvicorn to 0.0.0.0 so household peers can dial the mesh
+# IP, which means the bare socket is ALSO reachable from anything else on the
+# same LAN/Wi-Fi (coffee shop, dorm, apartment) -- "not loopback" and "on the
+# mesh" are not the same claim.
+#
+# Source of truth for the actual allocation: the coordinator hands out mesh
+# IPs from 100.64.0.0/10 (the CGNAT range -- chosen because it never collides
+# with home/corp RFC1918 ranges), carving one /24 per household. See
+# services/coordinator/coordinator/services/household_allocator.py
+# (HOUSEHOLD_POOL) and coordinator/models/household.py. A stale comment in
+# the 0001 migration says "10.42.0.0/16" -- that predates the CGNAT-range
+# decision and does not match the allocator code; 100.64.0.0/10 is correct.
+#
+# Override via POTLUCK_MESH_CIDR for non-default deployments (must remain a
+# superset of every household's allocated /24).
+_DEFAULT_MESH_CIDR = "100.64.0.0/10"
+
+
+def _resolve_mesh_network() -> ipaddress.IPv4Network | ipaddress.IPv6Network:
+    """Parse POTLUCK_MESH_CIDR (or the default) once at app construction."""
+    raw = os.environ.get("POTLUCK_MESH_CIDR", "").strip() or _DEFAULT_MESH_CIDR
+    try:
+        return ipaddress.ip_network(raw, strict=False)
+    except ValueError:
+        logger.warning(
+            "invalid_mesh_cidr value=%r falling back to default=%s", raw, _DEFAULT_MESH_CIDR
+        )
+        return ipaddress.ip_network(_DEFAULT_MESH_CIDR)
+
+
+def _client_ip_in_network(
+    client_host: str, network: ipaddress.IPv4Network | ipaddress.IPv6Network
+) -> bool:
+    """True when `client_host` parses as an IP address inside `network`.
+
+    Unparseable input (empty string, hostnames, test-harness placeholders like
+    "testclient") is treated as NOT in the mesh -- fail closed. IPv4-mapped
+    IPv6 addresses (::ffff:a.b.c.d), which a dual-stack listen socket can
+    report for an IPv4 peer, are unwrapped to their v4 form before the
+    membership check so they still match a v4 mesh CIDR.
+    """
+    try:
+        addr = ipaddress.ip_address(client_host)
+    except ValueError:
+        return False
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped is not None:
+        addr = addr.ipv4_mapped
+    try:
+        return addr in network
+    except TypeError:
+        # Address family mismatch (e.g. v6 address vs v4 network) -- not a member.
+        return False
 
 
 @contextlib.asynccontextmanager
@@ -102,6 +162,10 @@ def create_app() -> FastAPI:
     # dev. Enforced in peer_access_middleware below.
     gateway_key = os.environ.get("POTLUCK_GATEWAY_API_KEY") or None
 
+    # Mesh CIDR — the trust boundary /peer/* enforces (see _resolve_mesh_network
+    # docstring for the source-of-truth rationale). Parsed once per app instance.
+    mesh_network = _resolve_mesh_network()
+
     app = FastAPI(
         lifespan=_lifespan,
         title="Potluck Local",
@@ -125,10 +189,13 @@ def create_app() -> FastAPI:
     # Peer-access guard — when the sidecar is bound to 0.0.0.0 (required so
     # household peers can dial it over the mesh), the bare socket would
     # expose every endpoint. This middleware restricts non-loopback callers
-    # to the explicit peer-facing surface (/peer/* + /health). The local
-    # user's memory, tasks, conversation history, and agent observability
-    # are never reachable from another machine — even one in the same
-    # household.
+    # to the explicit peer-facing surface (/peer/* + /health), and further
+    # requires /peer/* callers' source IP to be inside the WireGuard mesh
+    # CIDR (mesh_network above) — "non-loopback" is not the mesh boundary,
+    # since 0.0.0.0 is reachable from any device on the same LAN/Wi-Fi, not
+    # just mesh peers. The local user's memory, tasks, conversation history,
+    # and agent observability are never reachable from another machine —
+    # even one in the same household, let alone the same coffee shop.
     #
     # Localhost source IPs (Electron, dev tools) get the full surface.
     @app.middleware("http")
@@ -165,6 +232,29 @@ def create_app() -> FastAPI:
                         "detail": (
                             "this path is only available to localhost; "
                             "household peers may call /peer/* or /health"
+                        ),
+                    },
+                )
+
+            # /peer/* additionally requires the caller's source IP to be on the
+            # WireGuard mesh (see mesh_network above) -- "non-loopback" alone is
+            # NOT the mesh boundary: uvicorn binds 0.0.0.0 (see main()), so a
+            # device on the same Wi-Fi/LAN is also "non-loopback" without ever
+            # having joined the household's mesh. /peer/capabilities,
+            # /peer/chat/completions, and (when opted in) /peer/memory/search --
+            # which returns full memory content -- must never be reachable by a
+            # bystander on the coffee-shop/dorm/apartment network. /health stays
+            # on the pre-existing loopback-or-any-caller liveness exemption (no
+            # memory or inference surface there).
+            if normalised.startswith("/peer/") and not _client_ip_in_network(
+                client_host, mesh_network
+            ):
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "detail": (
+                            "peer routes require the caller to be on the "
+                            "household WireGuard mesh"
                         ),
                     },
                 )
@@ -217,12 +307,14 @@ def create_app() -> FastAPI:
         #
         # NOTE on /peer/* exemption: peer routes are NOT per-request signature
         # authenticated in v0. Their credential is mesh membership — a caller can
-        # only reach them over the WireGuard mesh IP (Gate 1 already 403s any
-        # non-loopback path outside /peer/* + /health), and mesh enrollment is
-        # gated by the coordinator. Per-request signed-nonce attestation is a
-        # v0.5+ item. See routers/peer.py "Trust model". The exemption is safe
-        # because the peer surface never exposes local memory/tasks/chat and the
-        # one memory-read route is opt-in and off by default.
+        # only reach them from a source IP inside the WireGuard mesh CIDR (Gate 1
+        # above already 403s any non-loopback path outside /peer/* + /health, and
+        # the mesh-CIDR check just above that 403s a /peer/* caller whose source
+        # IP is outside the mesh subnet), and mesh enrollment is gated by the
+        # coordinator. Per-request signed-nonce attestation is a v0.5+ item. See
+        # routers/peer.py "Trust model". The exemption is safe because the peer
+        # surface never exposes local memory/tasks/chat and the one memory-read
+        # route is opt-in and off by default.
         if sidecar_token is not None:
             exempt = (
                 normalised == "/health"
