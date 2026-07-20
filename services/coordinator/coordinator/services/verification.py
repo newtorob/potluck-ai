@@ -245,7 +245,7 @@ async def run_canary_probe(
     rng = random.Random()
     canary = generate_canary(rng)
     job_id = uuid.uuid4()
-    buf = await register_job(job_id)
+    buf = await register_job(job_id, peer_id=peer_id)
     assigned = JobAssignedMessage(
         job_id=job_id,
         model_slug=model_slug,

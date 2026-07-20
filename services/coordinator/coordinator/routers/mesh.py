@@ -67,6 +67,7 @@ from coordinator.schemas.mesh import (
     SignalRequestPunch,
     SignalRosterUpdate,
     SignalWelcome,
+    safe_endpoint_or_none,
 )
 from coordinator.middleware.auth import (
     coordinator_token_matches,
@@ -397,13 +398,22 @@ async def enroll(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/mesh/peers", response_model=list[EnrolledPeer])
+@router.get(
+    "/mesh/peers",
+    response_model=list[EnrolledPeer],
+    dependencies=[Depends(require_coordinator_token)],
+)
 async def list_peers(
     wg_public_key: str,
     db: AsyncSession = Depends(get_db),
 ) -> list[EnrolledPeer]:
     """Return the household roster for a node, identified by its
     `wg_public_key` query parameter.
+
+    Gated by the coordinator token (mirrors every sibling /mesh/* route) so
+    an internet-facing coordinator can't be enumerated by anyone who merely
+    knows/guesses a registered wg_public_key. This was previously missing —
+    LAUNCH-BLOCKER fix.
 
     v0 auth model: possession of the WG pubkey is treated as proof
     of household membership. This is acceptable for v0 because:
@@ -941,13 +951,17 @@ async def mesh_signal(ws: WebSocket) -> None:
                     )
                     continue
 
-                # Tell the initiator about the target.
+                # Tell the initiator about the target. `safe_endpoint_or_none`
+                # guards against a legacy row (persisted before endpoint
+                # validation shipped) tripping SignalPunchCoord's own
+                # field_validator and killing this WS loop over one bad row —
+                # coerce to None (peer just doesn't get a punch hint) instead.
                 await _safe_send(
                     ws,
                     SignalPunchCoord(
                         peer_node_id=rp.target_node_id,
                         peer_wg_public_key=target.wg_public_key,
-                        peer_endpoint=target.last_endpoint,
+                        peer_endpoint=safe_endpoint_or_none(target.last_endpoint),
                         role="initiator",
                     ).model_dump(mode="json"),
                 )
@@ -957,7 +971,7 @@ async def mesh_signal(ws: WebSocket) -> None:
                     SignalPunchCoord(
                         peer_node_id=node_id,
                         peer_wg_public_key=requester.wg_public_key,
-                        peer_endpoint=requester.last_endpoint,
+                        peer_endpoint=safe_endpoint_or_none(requester.last_endpoint),
                         role="responder",
                     ).model_dump(mode="json"),
                 )

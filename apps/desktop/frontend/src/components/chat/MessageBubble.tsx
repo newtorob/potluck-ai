@@ -22,6 +22,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import { Network, Cpu, Home } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
+import { SafeExternalLink } from '@/components/ui/SafeExternalLink';
 import type { AppMessage } from '@/stores/chatStore';
 
 interface MessageBubbleProps {
@@ -287,12 +288,12 @@ function MarkdownContent({ content, isStreaming }: { content: string; isStreamin
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
         components={{
-          // Open external links in the system browser
-          a: ({ href, children, node: _node, ...props }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
-              {children}
-            </a>
-          ),
+          // Assistant replies can carry model-generated or pool-routed
+          // markdown — untrusted the same way memory content is. Only
+          // fully-qualified http(s) links are clickable, and they only ever
+          // open via window.open()/setWindowOpenHandler, never an in-window
+          // navigation. See SafeExternalLink.
+          a: SafeExternalLink,
           // Inline vs block code: language class signals fenced block
           code: ({ className, children, node: _node, ...props }) => {
             const isBlock = typeof className === 'string' && className.includes('language-');

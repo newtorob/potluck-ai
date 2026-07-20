@@ -312,6 +312,92 @@ def test_signal_punch_coord_role_locked_down() -> None:
         pass
 
 
+# ---------------------------------------------------------------------------
+# ip:port endpoint-string injection (LAUNCH-BLOCKER, coordinator half)
+# ---------------------------------------------------------------------------
+#
+# HeartbeatRequest.external_endpoint, SignalEndpointUpdate.external_endpoint,
+# and SignalPunchCoord.peer_endpoint all flow into the sidecar's WireGuard
+# UAPI config on the receiving side. Before this fix they had only a
+# max_length cap (or, for peer_endpoint, no cap at all) and no shape
+# validation — a value like "1.1.1.1:1\nallowed_ip=0.0.0.0/0\n" would have
+# been accepted and relayed. These pin that a malformed value is REJECTED
+# (raises ValidationError), not silently truncated or passed through.
+
+_INJECTION_ENDPOINTS = [
+    "1.1.1.1:1\nallowed_ip=0.0.0.0/0\n",  # newline-smuggled UAPI directive
+    "1.1.1.1:51820 extra",  # embedded space
+    "1.1.1.1:51820\r\nsomething",  # CRLF variant
+    "not-an-endpoint",  # no port at all
+    "1.1.1.1:",  # empty port
+    "1.1.1.1:999999",  # port out of range
+    "\n",  # bare newline
+    "",  # empty string
+]
+
+
+def test_heartbeat_request_rejects_malformed_external_endpoint() -> None:
+    for bad in _INJECTION_ENDPOINTS:
+        with pytest.raises(ValidationError):
+            HeartbeatRequest(
+                node_id=uuid.uuid4(),
+                wg_public_key="C" * 44,
+                external_endpoint=bad,
+            )
+
+
+def test_heartbeat_request_accepts_well_formed_public_endpoint() -> None:
+    req = HeartbeatRequest(
+        node_id=uuid.uuid4(),
+        wg_public_key="C" * 44,
+        external_endpoint="203.0.113.7:51820",
+    )
+    assert req.external_endpoint == "203.0.113.7:51820"
+
+
+def test_heartbeat_request_allows_none_external_endpoint() -> None:
+    req = HeartbeatRequest(node_id=uuid.uuid4(), wg_public_key="C" * 44)
+    assert req.external_endpoint is None
+
+
+def test_signal_endpoint_update_rejects_malformed_external_endpoint() -> None:
+    for bad in _INJECTION_ENDPOINTS:
+        with pytest.raises(ValidationError):
+            SignalEndpointUpdate(external_endpoint=bad)
+
+
+def test_signal_punch_coord_rejects_malformed_peer_endpoint() -> None:
+    """peer_endpoint previously had NO cap and no validation at all."""
+    for bad in _INJECTION_ENDPOINTS:
+        with pytest.raises(ValidationError):
+            SignalPunchCoord(
+                peer_node_id=uuid.uuid4(),
+                peer_wg_public_key="A" * 44,
+                peer_endpoint=bad,
+                role="initiator",
+            )
+
+
+def test_signal_punch_coord_allows_none_peer_endpoint() -> None:
+    msg = SignalPunchCoord(
+        peer_node_id=uuid.uuid4(),
+        peer_wg_public_key="A" * 44,
+        peer_endpoint=None,
+        role="responder",
+    )
+    assert msg.peer_endpoint is None
+
+
+def test_signal_punch_coord_accepts_well_formed_public_endpoint() -> None:
+    msg = SignalPunchCoord(
+        peer_node_id=uuid.uuid4(),
+        peer_wg_public_key="A" * 44,
+        peer_endpoint="198.51.100.9:51820",
+        role="initiator",
+    )
+    assert msg.peer_endpoint == "198.51.100.9:51820"
+
+
 def test_signal_welcome_includes_roster() -> None:
     """SignalWelcome must include the roster — that's how new peers
     learn their household composition."""

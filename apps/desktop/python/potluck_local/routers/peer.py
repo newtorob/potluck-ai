@@ -16,10 +16,14 @@ on the local side. Memory writes also remain strictly local — the peer
 memory endpoint is read-only.
 
 Trust model:
-  v0 — request comes in on a non-loopback interface, which means the
-  caller dialed our mesh IP, which means they're a paired household
-  peer. Mesh-IP reachability is the credential. Signed-nonce challenge
-  is a v0.5+ hardening item.
+  v0 — request comes in on a non-loopback interface AND the source IP
+  falls inside the WireGuard mesh CIDR (POTLUCK_MESH_CIDR, default
+  100.64.0.0/10 — see app.py's peer_access_middleware). Both checks are
+  required: the sidecar binds 0.0.0.0 so household peers can dial the
+  mesh IP, but that also means the bare socket is reachable from any
+  other device on the same LAN/Wi-Fi — "non-loopback" alone is NOT
+  proof of mesh membership. Mesh-CIDR-scoped reachability is the
+  credential. Signed-nonce challenge is a v0.5+ hardening item.
 
   For memory aggregation specifically: the env var gate exists because
   even within a household-trusted mesh, sharing memory by default would
@@ -37,7 +41,9 @@ Privacy invariants enforced here:
   * Request body MAY be logged in dev mode but content stays in-process.
 
 Path access control: see `app.py`'s `peer_access_middleware`. Anything
-that isn't /peer/* or /health gets 403 from non-loopback callers.
+that isn't /peer/* or /health gets 403 from non-loopback callers, and
+/peer/* additionally 403s a non-loopback caller whose source IP is
+outside the WireGuard mesh CIDR.
 """
 
 from __future__ import annotations

@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const { pathToFileURL } = require('url');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 
@@ -264,6 +265,86 @@ async function waitForSidecar() {
   return false;
 }
 
+// ─── Navigation & external-link hardening ────────────────────────────────────
+//
+// Two independent gates apply to every URL the renderer tries to leave the
+// current page for:
+//
+//   1. In-window navigation (will-navigate — e.g. a clicked <a href> with no
+//      target) is allowed ONLY to the app's own origin: the exact packaged
+//      index.html in production, or the exact Vite dev-server origin in dev.
+//      There is deliberately no "local passthrough" exception for file:// or
+//      localhost/127.0.0.1 — a poisoned memory/chat markdown link
+//      (`[x](file:///…)`) must not be able to replace the whole window (and
+//      its live preload contextBridge — window.potluck, carrying the cloud
+//      bearer session + mesh access) with arbitrary local content. Everything
+//      else is denied in-window and, if it's an allowed external scheme,
+//      handed to the OS browser via safeOpenExternal instead.
+//   2. shell.openExternal() only ever receives http:/https: URLs. Anything
+//      else (file:, javascript:, custom schemes, UNC paths) is rejected and
+//      logged — openExternal on an arbitrary scheme can trigger OS-level
+//      file/UNC handling outside our control.
+
+/**
+ * The one URL in-window navigation is allowed to land on: our own app shell.
+ * Recomputed (not cached) so it always reflects the current app.isPackaged
+ * state, which is fixed for the process lifetime but keeps this testable.
+ */
+function getExpectedAppURL() {
+  if (app.isPackaged) {
+    return pathToFileURL(
+      path.join(process.resourcesPath, 'frontend', 'index.html')
+    ).href;
+  }
+  return 'http://localhost:5173/';
+}
+
+/**
+ * True only if targetURL is our own app shell (protocol + host + pathname
+ * match exactly). Hash/search are ignored: the frontend uses HashRouter
+ * specifically because the packaged app is file:// (see frontend/src/main.tsx),
+ * so route changes live in the fragment and never reach will-navigate as a
+ * top-level navigation (same-document hash changes fire did-navigate-in-page
+ * instead) — but we don't rely on that here, we just don't gate on it.
+ */
+function isAppOrigin(targetURL) {
+  let expected;
+  let target;
+  try {
+    expected = new URL(getExpectedAppURL());
+    target = new URL(targetURL);
+  } catch (_) {
+    return false;
+  }
+  return (
+    target.protocol === expected.protocol &&
+    target.host === expected.host &&
+    target.pathname === expected.pathname
+  );
+}
+
+/**
+ * The only path anything (renderer-triggered window.open, or a denied
+ * will-navigate) may reach the OS shell through. Allowlists url.protocol to
+ * exactly http:/https:; everything else — file:, javascript:, custom
+ * schemes, UNC paths — is rejected and logged, never handed to
+ * shell.openExternal.
+ */
+function safeOpenExternal(rawURL) {
+  let parsed;
+  try {
+    parsed = new URL(rawURL);
+  } catch (_) {
+    log.warn(`[nav] Rejected openExternal — unparseable URL.`);
+    return;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    log.warn(`[nav] Rejected openExternal — disallowed scheme: ${parsed.protocol}`);
+    return;
+  }
+  shell.openExternal(rawURL);
+}
+
 // ─── BrowserWindow ───────────────────────────────────────────────────────────
 
 async function createWindow() {
@@ -371,23 +452,23 @@ async function createWindow() {
     });
   }
 
-  // Route all window.open() / anchor target="_blank" clicks to the system browser.
+  // Route all window.open() / anchor target="_blank" clicks to the system
+  // browser, through the http(s)-only allowlist (see safeOpenExternal above).
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    safeOpenExternal(url);
     return { action: 'deny' };
   });
 
-  // Also intercept will-navigate to external URLs.
+  // Gate ALL in-window navigation to the app's own origin (see isAppOrigin
+  // above). Anything else — including file:// and localhost/127.0.0.1, which
+  // used to pass through unchecked — is denied in-window and, if it's an
+  // allowed external scheme, sent to the OS browser instead.
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    const parsed = new URL(url);
-    const isLocal =
-      parsed.hostname === 'localhost' ||
-      parsed.hostname === '127.0.0.1' ||
-      parsed.protocol === 'file:';
-    if (!isLocal) {
-      event.preventDefault();
-      shell.openExternal(url);
+    if (isAppOrigin(url)) {
+      return; // Our own app shell — allow (e.g. a full reload).
     }
+    event.preventDefault();
+    safeOpenExternal(url);
   });
 
   if (!app.isPackaged) {

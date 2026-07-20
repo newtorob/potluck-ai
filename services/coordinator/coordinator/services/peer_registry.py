@@ -48,10 +48,13 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
+import structlog
 from fastapi import WebSocket
 
 from coordinator.schemas.peer import MAX_OUTPUT_TOKENS
 from coordinator.services.credit_ledger import NEUTRAL_REPUTATION
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass
@@ -85,6 +88,11 @@ class JobBuffer:
     # capped to this so a peer that over-generates beyond the request can't
     # inflate credits. Defaults to the hard ceiling when the budget is unknown.
     max_tokens: int = MAX_OUTPUT_TOKENS
+    # Which peer this job was dispatched to, when known. Used only to key
+    # `_peer_jobs` for drain-on-disconnect (see `drain_peer_jobs`); never
+    # forwarded to any wire response. None for callers that don't thread a
+    # peer_id through (keeps this additive/back-compat for any future caller).
+    peer_id: uuid.UUID | None = None
     tokens: list[str] = field(default_factory=list)
     token_stream: asyncio.Queue[str] = field(
         default_factory=lambda: asyncio.Queue(maxsize=512)
@@ -99,6 +107,12 @@ class JobBuffer:
 
 _peers: dict[uuid.UUID, PeerConnection] = {}
 _jobs: dict[uuid.UUID, JobBuffer] = {}
+# peer_id -> set of job_ids currently dispatched to that peer. Populated
+# alongside `_jobs` in register_job(), discarded alongside `_jobs` in
+# complete_job(). Lets a disconnect fail-fast every in-flight job for that
+# peer (drain_peer_jobs) instead of leaving the requester's JobBuffer to time
+# out at JOB_TIMEOUT_S with no signal that the contributor is gone.
+_peer_jobs: dict[uuid.UUID, set[uuid.UUID]] = {}
 _lock = asyncio.Lock()
 
 
@@ -108,14 +122,55 @@ _lock = asyncio.Lock()
 async def register_peer(conn: PeerConnection) -> None:
     """Add a peer's open WS to the registry. If the same peer_id already has
     a registered connection, replace it (the old one is presumed dead or
-    being replaced by a reconnect)."""
+    being replaced by a reconnect).
+
+    Reconnect-race guard: replacing the registry entry alone used to leave
+    the OLD connection's in-flight jobs (`_peer_jobs`) pointing at a socket
+    that can never deliver another JobTokenMessage/JobCompleteMessage —
+    those jobs would hang until JOB_TIMEOUT_S with no failover signal. So on
+    a same-key reconnect, drain the old connection's jobs FIRST (marking
+    them `error_category="peer_disconnected"`), then swap in the new
+    connection. See `drain_peer_jobs` and the session_id guard on
+    `unregister_peer` for the other half of this race (the OLD socket's
+    later `finally:` must not evict the connection we just registered here).
+    """
     async with _lock:
+        existing = _peers.get(conn.peer_id)
         _peers[conn.peer_id] = conn
 
+    if existing is not None:
+        drained = await drain_peer_jobs(conn.peer_id)
+        if drained:
+            logger.info(
+                "peer_reconnect_drained_stale_jobs",
+                peer_id=str(conn.peer_id),
+                old_session_id=str(existing.session_id),
+                new_session_id=str(conn.session_id),
+                job_ids=[str(j) for j in drained],
+            )
 
-async def unregister_peer(peer_id: uuid.UUID) -> None:
+
+async def unregister_peer(
+    peer_id: uuid.UUID, session_id: uuid.UUID | None = None
+) -> bool:
+    """Remove a peer's connection from the registry.
+
+    If `session_id` is given, only unregister when the connection currently
+    registered for `peer_id` is STILL this session. Without this guard, a
+    same-key reconnect races the OLD connection's WS handler: `register_peer`
+    already swapped in the NEW connection (and drained the old one's jobs —
+    see above), but the OLD handler's `finally:` runs sometime after that
+    with the OLD session_id and would otherwise evict the freshly-registered
+    NEW connection. Returns True if a connection was actually removed.
+    """
     async with _lock:
+        current = _peers.get(peer_id)
+        if current is None:
+            return False
+        if session_id is not None and current.session_id != session_id:
+            return False
         _peers.pop(peer_id, None)
+        return True
 
 
 async def pick_peer() -> PeerConnection | None:
@@ -516,15 +571,25 @@ async def online_peer_ids() -> list[uuid.UUID]:
 
 
 async def register_job(
-    job_id: uuid.UUID, max_tokens: int = MAX_OUTPUT_TOKENS
+    job_id: uuid.UUID,
+    max_tokens: int = MAX_OUTPUT_TOKENS,
+    peer_id: uuid.UUID | None = None,
 ) -> JobBuffer:
     """Create + register a JobBuffer the dispatch endpoint can await on.
 
     `max_tokens` is the job's requested output budget (sampling.max_tokens);
-    billing is capped to it so peer over-generation can't inflate credits."""
+    billing is capped to it so peer over-generation can't inflate credits.
+
+    `peer_id`, when given, is the contributor this job was dispatched to.
+    It's threaded into `_peer_jobs` so `drain_peer_jobs` can fail this job
+    fast if that peer disconnects mid-job, instead of the caller hanging
+    until JOB_TIMEOUT_S. Callers that don't know the peer yet (there are
+    none today, but keep this optional) simply don't get drain coverage."""
     async with _lock:
-        buf = JobBuffer(job_id=job_id, max_tokens=max_tokens)
+        buf = JobBuffer(job_id=job_id, max_tokens=max_tokens, peer_id=peer_id)
         _jobs[job_id] = buf
+        if peer_id is not None:
+            _peer_jobs.setdefault(peer_id, set()).add(job_id)
         return buf
 
 
@@ -536,8 +601,64 @@ async def get_job(job_id: uuid.UUID) -> JobBuffer | None:
 async def complete_job(job_id: uuid.UUID) -> None:
     """Signal the buffer's `done` event and drop it from the registry. The
     awaiting caller still holds a reference, so they can read tokens after
-    the buffer is gone from the dict."""
+    the buffer is gone from the dict. Also discards the job from
+    `_peer_jobs` so a peer that later disconnects doesn't try to drain a
+    job that already finished normally."""
     async with _lock:
         buf = _jobs.pop(job_id, None)
+        if buf is not None and buf.peer_id is not None:
+            peer_job_ids = _peer_jobs.get(buf.peer_id)
+            if peer_job_ids is not None:
+                peer_job_ids.discard(job_id)
+                if not peer_job_ids:
+                    _peer_jobs.pop(buf.peer_id, None)
     if buf is not None:
         buf.done.set()
+
+
+async def drain_peer_jobs(
+    peer_id: uuid.UUID, session_id: uuid.UUID | None = None
+) -> list[uuid.UUID]:
+    """Fail every job currently dispatched to `peer_id` (called on
+    disconnect, or on a same-key reconnect for the connection being
+    replaced) so the requester gets a fast 502 instead of hanging out
+    JOB_TIMEOUT_S (120s) with no signal that the contributor is gone.
+
+    If `session_id` is given, only drains when the connection currently
+    registered for `peer_id` is still this session — guards against a stale
+    disconnect handler draining a freshly-reconnected session's brand-new
+    jobs (see the reconnect-race note on `register_peer`/`unregister_peer`).
+
+    NOTE — reputation/quality: "peer_disconnected" is a COORDINATOR-
+    SYNTHESIZED sentinel error_category, not a peer-reported one. It must
+    NEVER feed a reputation or quality-score slash: a dropped connection is
+    not evidence the peer fabricated or mishandled the job (could be a
+    laptop lid closing, wifi flap, etc). Today neither the disconnect path
+    nor `_finalize_job_in_db`'s error branch writes any reputation/quality
+    row for a failed job, so this is safe by construction — but if a future
+    "penalize peers for job failures" signal is added, it MUST filter this
+    sentinel out explicitly rather than assume every error_category is a
+    peer-caused fault.
+    """
+    async with _lock:
+        if session_id is not None:
+            current = _peers.get(peer_id)
+            if current is None or current.session_id != session_id:
+                return []
+        job_ids = _peer_jobs.pop(peer_id, set())
+        buffers: list[JobBuffer] = []
+        for job_id in job_ids:
+            buf = _jobs.pop(job_id, None)
+            if buf is not None:
+                buffers.append(buf)
+
+    # Set the error state + fire `done` OUTSIDE the lock: `done.set()` wakes
+    # up whoever is awaiting `buf.done.wait()` in routers/jobs.py, and we
+    # don't want that wakeup (and its own downstream work) serialized behind
+    # our registry lock.
+    for buf in buffers:
+        buf.error_category = "peer_disconnected"
+        buf.error_message = "contributor peer disconnected mid-job"
+        buf.done.set()
+
+    return [buf.job_id for buf in buffers]

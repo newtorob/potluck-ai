@@ -10,6 +10,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Pencil, Trash2, ChevronUp, ChevronDown, Pin } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '@/components/ui/cn';
+import { SafeExternalLink } from '@/components/ui/SafeExternalLink';
 import { CategoryPill } from './CategoryPill';
 import { ProjectPill } from './ProjectPill';
 import { ConfidenceBar } from './ConfidenceBar';
@@ -394,6 +395,10 @@ export function MemoryCard({ memory }: MemoryCardProps) {
                     {children}
                   </code>
                 ),
+                // Memory content is untrusted (LLM-extracted / user-pasted): a
+                // poisoned [x](file:///…) link must never navigate the window
+                // or run an arbitrary scheme. See SafeExternalLink.
+                a: SafeExternalLink,
               }}
             >
               {memory.content}
