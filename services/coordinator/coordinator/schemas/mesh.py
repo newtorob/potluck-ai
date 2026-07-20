@@ -29,6 +29,46 @@ from pydantic import BaseModel, Field, field_validator
 MAX_LOCAL_ENDPOINTS = 4
 
 
+def _parse_ip_port(value: str) -> tuple[str, int] | None:
+    """Strict "<ip>:<port>" (or "[<ipv6>]:<port>") shape parser shared by every
+    peer-supplied endpoint field on the wire (local_endpoints, external_endpoint,
+    peer_endpoint).
+
+    This is the defense-in-depth backstop against WireGuard UAPI config
+    injection: a value like "1.1.1.1:1\\nallowed_ip=0.0.0.0/0\\n" must never
+    reach the sidecar's UAPI config as an unvalidated string. Any embedded
+    whitespace/newline fails immediately (before any parsing), so a payload
+    can't smuggle extra UAPI lines through a value that "looks like" a valid
+    endpoint at a glance. Returns (ip, port) on success, None otherwise —
+    never raises.
+    """
+    if not isinstance(value, str) or not value:
+        return None
+    if any(ch.isspace() for ch in value):
+        return None
+    if value.startswith("["):
+        # Bracketed IPv6 form: "[<ipv6>]:<port>" (matches Go's net.JoinHostPort).
+        close = value.find("]")
+        if close == -1 or value[close + 1 : close + 2] != ":":
+            return None
+        host = value[1:close]
+        port = value[close + 2 :]
+    else:
+        host, sep, port = value.rpartition(":")
+        if not sep or not host:
+            return None
+    if not port.isdigit():
+        return None
+    port_num = int(port)
+    if port_num < 1 or port_num > 65535:
+        return None
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return None
+    return str(ip), port_num
+
+
 def _is_private_lan_endpoint(value: str) -> bool:
     """Server-side defense in depth for LAN direct-path candidates.
 
@@ -38,18 +78,11 @@ def _is_private_lan_endpoint(value: str) -> bool:
     Tailscale address can never be redistributed as a physical-LAN endpoint —
     even if a malicious or buggy client claims one.
     """
-    host, sep, port = value.rpartition(":")
-    if not sep or not host:
+    parsed = _parse_ip_port(value)
+    if parsed is None:
         return False
-    if not port.isdigit():
-        return False
-    port_num = int(port)
-    if port_num < 1 or port_num > 65535:
-        return False
-    try:
-        ip = ipaddress.ip_address(host)
-    except ValueError:
-        return False
+    host, _port_num = parsed
+    ip = ipaddress.ip_address(host)
     if ip.version != 4:
         return False
     if ip.is_loopback or ip.is_link_local:
@@ -58,6 +91,45 @@ def _is_private_lan_endpoint(value: str) -> bool:
     if ip in ipaddress.ip_network("100.64.0.0/10"):
         return False
     return ip.is_private
+
+
+def safe_endpoint_or_none(value: str | None) -> str | None:
+    """Coerce a DB-stored endpoint value (e.g. MeshNode.last_endpoint) to
+    None if it isn't well-formed ip:port. Rows written before this
+    validation shipped could in principle hold a legacy malformed value;
+    rather than let SignalPunchCoord's field_validator raise (which would
+    kill the whole signaling connection over one peer's stale row), callers
+    that relay a stored endpoint onward should pass it through this first."""
+    if value is None or not _is_well_formed_endpoint(value):
+        return None
+    return value
+
+
+def _is_well_formed_endpoint(value: str) -> bool:
+    """Format-only check for endpoint fields that carry PUBLIC (or NAT'd)
+    addresses — external_endpoint / peer_endpoint. Unlike
+    `_is_private_lan_endpoint`, this does NOT filter by address scope (a
+    public IP is exactly what's expected here); it only rejects malformed
+    shapes, embedded whitespace/newlines, and out-of-range ports. That's
+    enough to stop wire-protocol injection into the sidecar's WireGuard UAPI
+    config while still accepting any legitimate STUN-discovered endpoint."""
+    return _parse_ip_port(value) is not None
+
+
+def _validate_endpoint_field(v: object) -> str | None:
+    """Shared field_validator body for optional "ip:port" endpoint fields.
+    None is always allowed (endpoint not yet known). Anything else must be a
+    well-formed ip:port string, or Pydantic rejects the request — this is
+    intentionally a hard validation error, not a silent truncation/drop, so a
+    malformed value never quietly flows through to a peer."""
+    if v is None:
+        return None
+    if not isinstance(v, str) or not _is_well_formed_endpoint(v):
+        raise ValueError(
+            "must be a well-formed 'ip:port' (or '[ipv6]:port') address with "
+            "no whitespace/newlines"
+        )
+    return v
 
 
 def _filter_local_endpoints(values: list[str]) -> list[str]:
@@ -153,6 +225,11 @@ class HeartbeatRequest(BaseModel):
     wg_public_key: str
     external_endpoint: str | None = Field(default=None, max_length=64)
 
+    @field_validator("external_endpoint")
+    @classmethod
+    def _validate_external_endpoint(cls, v: str | None) -> str | None:
+        return _validate_endpoint_field(v)
+
 
 class HeartbeatResponse(BaseModel):
     accepted: bool = True
@@ -235,6 +312,18 @@ class SignalEndpointUpdate(BaseModel):
     # client cannot get a tailnet/public address redistributed to peers.
     local_endpoints: list[str] = Field(default_factory=list)
 
+    @field_validator("external_endpoint")
+    @classmethod
+    def _validate_external_endpoint(cls, v: str) -> str:
+        # external_endpoint is required (not Optional) here, but reuse the
+        # shared None-tolerant validator — a non-string/malformed value still
+        # raises, `None` simply can't occur once Pydantic's own required-field
+        # check has passed.
+        validated = _validate_endpoint_field(v)
+        if validated is None:
+            raise ValueError("external_endpoint is required")
+        return validated
+
     @field_validator("local_endpoints", mode="before")
     @classmethod
     def _sanitize_local_endpoints(cls, v: object) -> list[str]:
@@ -287,8 +376,17 @@ class SignalPunchCoord(BaseModel):
     type: Literal["punch_coord"] = "punch_coord"
     peer_node_id: uuid.UUID
     peer_wg_public_key: str
-    peer_endpoint: str | None
+    # Previously had NO length cap and no format validation at all (this field
+    # is server-constructed FROM a stored `last_endpoint`, but that value
+    # originated as untrusted peer input via heartbeat/endpoint_update — so it
+    # needs the same ip:port validation at the point it's relayed onward).
+    peer_endpoint: str | None = Field(default=None, max_length=64)
     role: Literal["initiator", "responder"]
+
+    @field_validator("peer_endpoint")
+    @classmethod
+    def _validate_peer_endpoint(cls, v: str | None) -> str | None:
+        return _validate_endpoint_field(v)
 
 
 class SignalPong(BaseModel):
