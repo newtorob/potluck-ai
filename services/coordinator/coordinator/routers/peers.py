@@ -32,6 +32,7 @@ from coordinator.services.attestation import AttestationError, verify_attestatio
 from coordinator.services.peer_registry import (
     PeerConnection,
     complete_job,
+    drain_peer_jobs,
     get_job,
     register_peer,
     unregister_peer,
@@ -338,4 +339,20 @@ async def peer_connect(
             session_id=str(session_id),
         )
     finally:
-        await unregister_peer(peer.id)
+        # Drain BEFORE unregistering, and gate both on `session_id` still
+        # being the currently-registered connection for this peer_id. The
+        # session_id guard matters on a same-key reconnect: register_peer
+        # already replaced `_peers[peer.id]` with the NEW connection and
+        # drained the OLD connection's jobs itself (see peer_registry.py) —
+        # if this stale `finally` ran unguarded it would (a) wrongly drain
+        # the NEW connection's brand-new in-flight jobs and (b) evict the
+        # NEW connection from the registry entirely.
+        drained = await drain_peer_jobs(peer.id, session_id=session_id)
+        if drained:
+            logger.info(
+                "peer_disconnect_drained_jobs",
+                peer_id=str(peer.id),
+                session_id=str(session_id),
+                job_ids=[str(job_id) for job_id in drained],
+            )
+        await unregister_peer(peer.id, session_id=session_id)
