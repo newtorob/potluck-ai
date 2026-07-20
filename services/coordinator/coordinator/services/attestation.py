@@ -6,7 +6,6 @@ on any failure (caller turns that into a `reject` message + WS close).
 """
 from __future__ import annotations
 
-import base64
 from datetime import datetime, timezone
 from typing import Any
 
@@ -18,6 +17,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from coordinator.config import get_settings
+from coordinator.crypto import KeyDecodeError, b64url_decode, decode_ed25519_public_key
 from coordinator.models import (
     ContributorRelease,
     MemberKey,
@@ -36,24 +36,21 @@ class AttestationError(Exception):
 
 
 def _b64url_decode(s: str) -> bytes:
-    """Decode base64url with optional padding stripped."""
-    pad = "=" * (-len(s) % 4)
-    return base64.urlsafe_b64decode(s + pad)
+    """Decode base64url with optional padding stripped. Thin re-export of
+    `coordinator.crypto.b64url_decode` kept for callers already importing
+    this name from this module."""
+    return b64url_decode(s)
 
 
 def _decode_public_key(b64: str) -> Ed25519PublicKey:
+    """Decode + validate `peer_public_key`. Delegates to the shared
+    `coordinator.crypto` helper (also used by the device-key registration
+    endpoint and the DERP-token PoP check) and re-raises as AttestationError
+    so existing callers/tests see the same exception type as before."""
     try:
-        raw = _b64url_decode(b64)
-    except Exception as e:
-        raise AttestationError(f"peer_public_key: not valid base64url ({e})") from e
-    if len(raw) != 32:
-        raise AttestationError(
-            f"peer_public_key: expected 32 raw bytes, got {len(raw)}"
-        )
-    try:
-        return Ed25519PublicKey.from_public_bytes(raw)
-    except Exception as e:
-        raise AttestationError(f"peer_public_key: not a valid Ed25519 key ({e})") from e
+        return decode_ed25519_public_key(b64, field_name="peer_public_key")
+    except KeyDecodeError as e:
+        raise AttestationError(str(e)) from e
 
 
 async def verify_attestation(

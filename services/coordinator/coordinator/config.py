@@ -36,6 +36,21 @@ class Settings(BaseSettings):
     # member and can't later claim a different one.
     require_registered_keys: bool = False
 
+    # DERP-token proof-of-possession (POST /mesh/derp-token). When a caller
+    # presents the OPTIONAL `nonce` + `signature` fields, the coordinator
+    # always verifies them (mismatch -> 401) regardless of this flag. This
+    # flag only controls what happens when they're ABSENT:
+    #   * False (default) — legacy behaviour: possession of the (non-secret)
+    #     wg_public_key alone is accepted, same as before this hardening
+    #     landed. Required while the Go mesh client (coordapi/client.go)
+    #     doesn't yet sign the challenge — flipping this on before that
+    #     ships would lock out every currently-enrolled node.
+    #   * True — PoP becomes mandatory: a request with no signature is
+    #     rejected. Only safe to enable once (a) the Go client signs by
+    #     default and (b) every enrolled mesh_nodes row has a
+    #     signing_public_key (fresh enroll, or a backfill/re-enroll pass).
+    derp_pop_required: bool = False
+
     @field_validator("env")
     @classmethod
     def validate_env(cls, v: str) -> str:

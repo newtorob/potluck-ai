@@ -42,7 +42,7 @@ from coordinator.schemas.mesh import (
 # We do not include identifying fields like member_id, conversation_id,
 # session_id — the mesh layer doesn't need them.
 _ENROLL_REQUEST_FIELDS = frozenset(
-    {"pairing_token", "wg_public_key", "node_name", "platform"}
+    {"pairing_token", "wg_public_key", "node_name", "platform", "signing_public_key"}
 )
 
 # Substrings that, if they appear in a mesh-schema field name, suggest
@@ -428,12 +428,23 @@ def test_signal_roster_update_three_lists() -> None:
 # Expected field sets for DERP schemas. Adding any field here requires
 # explicit review — especially guard against inference-layer identity leaking
 # into the JWT request/response (which flows to the relay).
-_DERP_TOKEN_REQUEST_FIELDS = frozenset({"wg_public_key", "region"})
+#
+# `nonce` + `signature` (2026-07-20, coordinator-DERP-PoP hardening) are the
+# OPTIONAL proof-of-possession fields: a caller MAY prove it holds the
+# private key for a registered `MeshNode.signing_public_key` by signing
+# `f"derp-token:{wg_public_key}:{region}:{nonce}"`. Neither carries identity
+# — a nonce is just a timestamp string and a signature is opaque bytes — so
+# they don't violate the "no inference-layer identity" invariant this file
+# guards. Both default to None so old clients that omit them are unaffected.
+_DERP_TOKEN_REQUEST_FIELDS = frozenset(
+    {"wg_public_key", "region", "nonce", "signature"}
+)
 _DERP_TOKEN_RESPONSE_FIELDS = frozenset({"token", "expires_at", "region"})
 
 
 def test_derp_token_request_field_set_locked_down() -> None:
-    """DERPTokenRequest carries only wg_public_key + region.
+    """DERPTokenRequest carries only wg_public_key + region + the optional
+    PoP fields (nonce, signature).
 
     Adding member_id, household_id, node_id, or any inference-layer field
     here would leak identity to the DERP relay (which only needs to know

@@ -172,6 +172,14 @@ class EnrollRequest(BaseModel):
     wg_public_key: str = Field(..., min_length=32, max_length=128)
     node_name: str = Field(..., min_length=1, max_length=128)
     platform: str | None = Field(default=None, max_length=32)
+    # OPTIONAL Ed25519 public key (base64url, no padding) used ONLY for the
+    # DERP-token proof-of-possession challenge (POST /mesh/derp-token) — see
+    # `MeshNode.signing_public_key`. Absent for any mesh client that hasn't
+    # picked up PoP support yet (back-compat: old clients omit this field and
+    # enroll exactly as before). Format-validated only where it's actually
+    # used (issue_derp_token), not here, so a malformed value never blocks
+    # enrollment itself.
+    signing_public_key: str | None = Field(default=None, min_length=32, max_length=64)
 
 
 class EnrolledPeer(BaseModel):
@@ -423,9 +431,32 @@ class DERPTokenRequest(BaseModel):
     """Body of POST /mesh/derp-token.
 
     Caller identifies itself by its WG public key. The coordinator looks
-    up the corresponding mesh_node to confirm it is enrolled. The same v0
-    auth model as /mesh/peers: possession of the WG pubkey is the credential.
-    Signed-nonce challenge is a v1 hardening item.
+    up the corresponding mesh_node to confirm it is enrolled.
+
+    v0 auth model: possession of the WG pubkey is the ONLY credential
+    (`wg_public_key` is not secret — it's exchanged with peers anyway — so
+    this alone lets anyone who has observed a node's pubkey mint a token
+    AS that node and hijack its DERP session).
+
+    v0.5 OPTIONAL proof-of-possession hardening (back-compat, additive):
+    `nonce` + `signature` let the caller prove it holds the private key for
+    a separately-registered `MeshNode.signing_public_key` (an Ed25519 key;
+    WG keys are Curve25519 and are not directly usable for signature
+    verification — see `models/mesh_node.py`). Both fields are OPTIONAL and
+    default to None so existing mesh clients (incl. the current Go
+    `coordapi` client) that don't send them keep working exactly as before;
+    the coordinator only verifies when both are present, and logs a warning
+    when they're absent. See `routers/mesh.py::issue_derp_token` for the
+    verification + the `POTLUCK_DERP_POP_REQUIRED` flag that will eventually
+    make this mandatory once the Go client signs by default.
+
+    `nonce` is a caller-generated, timestamp-based value (`<node's current
+    UTC unix timestamp>`) rather than a coordinator-issued challenge, so PoP
+    doesn't require an extra round trip; the coordinator rejects a nonce
+    outside a small clock-skew window to bound replay. `signature` is the
+    base64url Ed25519 signature (no padding) of
+    `f"derp-token:{wg_public_key}:{region}:{nonce}"` (UTF-8 encoded),
+    produced with the private key matching `MeshNode.signing_public_key`.
 
     No member_id or node_id in this schema — the relay must never learn
     the calling user's identity, only their WG pubkey and requested region.
@@ -433,6 +464,8 @@ class DERPTokenRequest(BaseModel):
 
     wg_public_key: str = Field(..., min_length=32, max_length=128)
     region: str = Field(default="ord", min_length=1, max_length=32)
+    nonce: str | None = Field(default=None, min_length=1, max_length=32)
+    signature: str | None = Field(default=None, min_length=1, max_length=128)
 
 
 class DERPTokenResponse(BaseModel):

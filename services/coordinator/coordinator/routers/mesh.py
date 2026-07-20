@@ -43,6 +43,8 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from coordinator.config import get_settings
+from coordinator.crypto import KeyDecodeError, decode_ed25519_public_key, verify_ed25519_signature
 from coordinator.db.database import get_db, get_session_factory
 from coordinator.models.household import Household
 from coordinator.models.mesh_node import MeshNode
@@ -116,6 +118,13 @@ PAIRING_TOKEN_TTL = timedelta(hours=1)
 # How long a DERP auth JWT is valid. The DERP client refreshes every
 # 50 minutes, so a 1-hour TTL gives a 10-minute buffer before expiry.
 DERP_TOKEN_TTL = timedelta(hours=1)
+
+# Max allowed clock skew (seconds) between a DERP-token PoP `nonce`
+# (a caller-generated unix timestamp) and the coordinator's own clock.
+# Bounds signature replay: a captured (nonce, signature) pair is only
+# usable within this window. Generous enough for real clock drift +
+# network latency, tight enough that a replayed pair goes stale fast.
+DERP_NONCE_MAX_SKEW_S = 120
 
 
 def _generate_pairing_token() -> str:
@@ -349,12 +358,24 @@ async def enroll(
             ),
         )
 
+    # ---- 4c. Validate the optional PoP signing key up front ---- #
+    # OPTIONAL — absent for any mesh client that predates DERP-token PoP
+    # hardening (back-compat). If present, validate it's actually a decodable
+    # Ed25519 key now rather than storing garbage that would just fail every
+    # future derp-token verification silently.
+    if req.signing_public_key is not None:
+        try:
+            decode_ed25519_public_key(req.signing_public_key, field_name="signing_public_key")
+        except KeyDecodeError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     # ---- 5. Persist the new node ---- #
     node = MeshNode(
         household_id=household.id,
         node_name=req.node_name,
         mesh_ip=mesh_ip,
         wg_public_key=req.wg_public_key,
+        signing_public_key=req.signing_public_key,
         platform=req.platform,
     )
     db.add(node)
@@ -560,6 +581,36 @@ async def heartbeat(
 # ---------------------------------------------------------------------------
 
 
+def _verify_derp_pop(node: MeshNode, req: DERPTokenRequest) -> None:
+    """Verify the OPTIONAL proof-of-possession signature on a DERP-token
+    request. Raises HTTPException on any failure. No-op (returns silently)
+    when the request carries no signature and PoP isn't required — the
+    caller is responsible for logging that fallback.
+    """
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    try:
+        nonce_ts = int(req.nonce)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="nonce must be a unix timestamp")
+    if abs(now_ts - nonce_ts) > DERP_NONCE_MAX_SKEW_S:
+        raise HTTPException(status_code=401, detail="nonce is stale or from the future")
+
+    if node.signing_public_key is None:
+        # Caller tried to prove possession but this node never registered a
+        # signing key (enrolled before PoP hardening, or omitted it). This is
+        # a client/config error, not something to silently paper over by
+        # falling back to the legacy check — the caller explicitly asked for
+        # verification we can't perform.
+        raise HTTPException(
+            status_code=401,
+            detail="signature provided but no signing_public_key registered for this node",
+        )
+
+    message = f"derp-token:{req.wg_public_key}:{req.region}:{req.nonce}".encode()
+    if not verify_ed25519_signature(node.signing_public_key, req.signature, message):  # type: ignore[arg-type]
+        raise HTTPException(status_code=401, detail="signature does not verify")
+
+
 @router.post(
     "/mesh/derp-token",
     response_model=DERPTokenResponse,
@@ -572,18 +623,33 @@ async def issue_derp_token(
     """Issue a short-lived JWT that authorises a mesh node to connect to
     the DERP relay.
 
-    Auth model (v0): same as /mesh/peers — possession of a registered
-    wg_public_key is the credential. The coordinator verifies the key
-    exists in mesh_nodes. Signed-nonce challenge is a v1 hardening item.
+    Auth model: possession of a registered wg_public_key is the BASE
+    credential — the coordinator verifies the key exists in mesh_nodes. This
+    alone is weak: wg_public_key is not secret (nodes exchange it with peers
+    for the WG handshake), so anyone who has observed it can mint a token AS
+    that node. See docs/security audit HIGH finding on DERP-token PoP.
+
+    v0.5 hardening (back-compat, additive — see DERPTokenRequest's
+    docstring): OPTIONAL `nonce` + `signature` prove the caller holds the
+    private key for a separately-registered `MeshNode.signing_public_key`
+    (Ed25519 — distinct from the WG/Curve25519 key, which isn't usable for
+    signature verification). When both are present they are ALWAYS verified
+    (mismatch -> 401, regardless of `derp_pop_required`). When absent:
+      * `derp_pop_required=False` (default) — legacy behaviour: the
+        wg_public_key-possession check alone is accepted, and we log a
+        warning so operators can see how much of their fleet hasn't
+        upgraded. Needed because the current Go mesh client
+        (coordapi/client.go) does not yet sign this challenge — flipping
+        the flag on before that ships would lock out every enrolled node.
+      * `derp_pop_required=True` — the request is rejected (401). Only
+        safe once the Go client signs by default.
 
     Privacy contract:
       * JWT claims: wg_pubkey + region + exp + iat ONLY.
       * No member_id, no household_id, no node_id leaks into the JWT.
       * The relay therefore never learns the caller's identity.
-      * We log only the truncated pubkey (first 8 chars), never the token.
-
-    The relay validates this JWT using the symmetric key stored in
-    POTLUCK_DERP_JWT_KEY (shared secret, never in the JWT itself).
+      * We log only the truncated pubkey (first 8 chars), never the token
+        or the signature.
     """
     # ---- look up the node ---- #
     result = await db.execute(
@@ -594,6 +660,30 @@ async def issue_derp_token(
         raise HTTPException(
             status_code=404,
             detail="wg_public_key not enrolled",
+        )
+
+    # ---- proof-of-possession (optional, back-compat) ---- #
+    settings = get_settings()
+    if req.signature is not None or req.nonce is not None:
+        if req.signature is None or req.nonce is None:
+            raise HTTPException(
+                status_code=400,
+                detail="nonce and signature must both be present or both absent",
+            )
+        _verify_derp_pop(node, req)
+        logger.info("derp_token_pop_verified", pubkey_prefix=req.wg_public_key[:8])
+    elif settings.derp_pop_required:
+        raise HTTPException(
+            status_code=401,
+            detail="proof-of-possession (nonce + signature) is required",
+        )
+    else:
+        logger.warning(
+            "derp_token_issued_without_pop",
+            pubkey_prefix=req.wg_public_key[:8],
+            reason="caller omitted nonce/signature — accepted under legacy "
+            "wg_public_key-possession-only auth (v0.5 PoP hardening, "
+            "not yet mandatory; see DERPTokenRequest docstring)",
         )
 
     # ---- load the signing key ---- #

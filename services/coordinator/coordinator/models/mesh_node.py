@@ -34,6 +34,19 @@ class MeshNode(Base):
     node_name: Mapped[str] = mapped_column(String(128), nullable=False)
     mesh_ip: Mapped[str] = mapped_column(INET, nullable=False, unique=True)
     wg_public_key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    # OPTIONAL Ed25519 key (base64url, no padding) used only for the
+    # DERP-token proof-of-possession challenge (POST /mesh/derp-token). This
+    # is deliberately NOT the wg_public_key: WireGuard keys are Curve25519,
+    # used only for the WG DH handshake, and are not usable for Ed25519
+    # signature verification — so PoP needs a distinct signing key. Nullable
+    # and additive: nodes enrolled before this shipped (or by a mesh client
+    # that hasn't been updated yet) simply have none, and DERP-token issuance
+    # falls back to the legacy wg_public_key-possession-only check (see
+    # `routers/mesh.py::issue_derp_token`). Set at enrollment time
+    # (`EnrollRequest.signing_public_key`, optional) — there is no separate
+    # rotation endpoint yet (matches the WG key's own "post-launch" rotation
+    # note above).
+    signing_public_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     last_endpoint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

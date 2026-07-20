@@ -22,11 +22,12 @@ from datetime import datetime
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from coordinator.crypto import KeyDecodeError, decode_ed25519_public_key
 from coordinator.db.database import get_db
 from coordinator.middleware.auth import require_coordinator_token
 from coordinator.middleware.session_auth import resolve_session_member_id
@@ -289,3 +290,122 @@ async def my_identity(
             detail="No device key registered for this member yet.",
         )
     return {"member_pubkey": row}
+
+
+# ---------------------------------------------------------------------------
+# Device-key registration — v0.5 attestation onboarding path
+# ---------------------------------------------------------------------------
+#
+# `models/member_key.py` has documented since it landed that "v0.5 member-auth
+# replaces TOFU: a signed-in member registers their device key through the
+# authenticated session (added_via='session')" — but no route ever implemented
+# it. That's a real gap: with `require_registered_keys=true` (the strict
+# allowlist posture `services/attestation.py` expects for multi-member /
+# production coordinators), an unregistered device key hard-fails attestation
+# with no way to ever register one, since MemberKey rows were otherwise only
+# created via TOFU (disabled in strict mode), operator SQL backfill, or a seed
+# script. That's an onboarding trap that pressures an operator into disabling
+# `require_registered_keys` — this endpoint is the promised fix.
+
+
+class DeviceKeyRegisterRequest(BaseModel):
+    """Body of POST /me/device-keys.
+
+    `public_key` is the device's Ed25519 public key (base64url, no padding) —
+    the same key the desktop sidecar will later present as `peer_public_key`
+    in its WS attestation handshake. This endpoint does NOT verify possession
+    of the matching private key (that proof happens at attestation time via
+    the signed-nonce challenge in `services/attestation.verify_attestation`);
+    it only pre-authorizes the key for the authenticated member, which is what
+    lets a brand-new device attest at all once `require_registered_keys` is
+    enabled.
+    """
+
+    public_key: str = Field(..., min_length=1, max_length=_PUBKEY_MAX_LEN)
+    label: str | None = Field(default=None, max_length=256)
+
+    @field_validator("label")
+    @classmethod
+    def _label_or_none(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip()
+        return v or None
+
+
+class DeviceKeyOut(BaseModel):
+    public_key: str
+    member_id: uuid.UUID
+    label: str | None
+    added_via: str
+    created_at: datetime
+
+
+@router.post(
+    "/me/device-keys",
+    response_model=DeviceKeyOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_coordinator_token)],
+)
+async def register_device_key(
+    req: DeviceKeyRegisterRequest,
+    db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
+) -> DeviceKeyOut:
+    """Register a device Ed25519 public key to the calling (session-
+    authenticated) member.
+
+    Auth: gated the same way as every other `/me/*` route —
+    `require_coordinator_token` (bearer-token transport gate) plus
+    `resolve_session_member_id` (the real identity gate: with
+    `POTLUCK_SESSION_AUTH_ENABLED=1` this 401s without a valid
+    `potluck_session` cookie / bearer session token; in dev passthrough it
+    resolves to the fixture member, matching every other `/me/*` endpoint).
+
+    Validates `public_key` decodes to a 32-byte Ed25519 key (same check the
+    WS attestation handshake applies), then inserts a `member_keys` row with
+    `added_via='session'`. Returns 409 if the key is already registered — to
+    this member or to a different one; we don't disclose which, so this
+    endpoint can't be used to fingerprint whether a guessed key belongs to
+    someone else.
+
+    This endpoint only pre-authorizes the key; it is NOT the possession
+    proof. `services/attestation.verify_attestation` still requires the
+    peer to sign the server's connection nonce with the matching private key
+    before it can attest as this member — registering a key here does not by
+    itself let anyone impersonate the device.
+    """
+    try:
+        decode_ed25519_public_key(req.public_key)
+    except KeyDecodeError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    entry = MemberKey(
+        public_key=req.public_key,
+        member_id=member_id,
+        label=req.label,
+        added_via="session",
+    )
+    db.add(entry)
+    try:
+        await db.flush()
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="public_key is already registered",
+        )
+
+    logger.info(
+        "device_key_registered",
+        member_id=str(member_id),
+        pubkey_prefix=req.public_key[:16],
+    )
+    return DeviceKeyOut(
+        public_key=entry.public_key,
+        member_id=entry.member_id,
+        label=entry.label,
+        added_via=entry.added_via,
+        created_at=entry.created_at,
+    )
