@@ -121,21 +121,35 @@ export const cloudApi = {
 
   /**
    * GET /auth/callback?token=... — exchanges the one-time token for a session.
-   * The web path sets an httpOnly cookie; the packaged app hands the opaque
-   * session token to the main process (bearer transport) and never keeps it in
-   * renderer state. Returns the session metadata either way.
+   *
+   * SECURITY: does NOT persist the session. A potluck://auth/callback?token=
+   * deep link can hand this app ANY token — including a valid one for an
+   * attacker's own account (request a magic link to yourself, wrap it as a
+   * deep link, get the victim to click it) — so the exchange result must be
+   * confirmed by the user (see useAuth.confirmSignIn) before it becomes the
+   * active session. Callers must call `commitSession()` only after that
+   * confirmation; on cancel, simply drop the returned session.
+   *
+   * The web/dev cookie transport is the one exception: the server sets the
+   * httpOnly cookie as a side effect of this GET itself, before we ever see
+   * the response. If the caller cancels, call `logout()` to revoke it.
    */
   async verifyMagicLink(token: string): Promise<Session> {
-    const session = await request<Session>(
-      'GET',
-      `/auth/callback?token=${encodeURIComponent(token)}`,
-    );
+    return request<Session>('GET', `/auth/callback?token=${encodeURIComponent(token)}`);
+  },
+
+  /**
+   * Persist a verified session as the active one. Call ONLY after the user
+   * has explicitly confirmed the account from `verifyMagicLink`'s result —
+   * this is the one call that turns a token exchange into a signed-in app.
+   */
+  async commitSession(session: Session): Promise<void> {
     const bridge = cloudBridge();
     if (bridge && session.token) {
       await bridge.setToken(session.token);
-      return { ...session, token: '' };
     }
-    return session;
+    // Cookie transport (dev/browser): the httpOnly cookie was already set by
+    // the /auth/callback response itself — nothing further to persist here.
   },
 
   /** POST /auth/logout — revokes the server-side session and clears the token */

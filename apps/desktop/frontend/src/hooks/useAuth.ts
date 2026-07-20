@@ -21,11 +21,22 @@ let rehydrateAttempted = false;
 interface UseAuthReturn {
   session: ReturnType<typeof useAuthStore.getState>['session'];
   memberProfile: ReturnType<typeof useAuthStore.getState>['memberProfile'];
+  /**
+   * A verified-but-unconfirmed session awaiting the "Sign in as <email>?"
+   * prompt (see SignInConfirmDialog). Non-null means a deep link just
+   * exchanged a token and is waiting on the user before anything persists.
+   */
+  pendingSession: ReturnType<typeof useAuthStore.getState>['pendingSession'];
   isAuthLoading: boolean;
   authError: string | null;
   isSignedIn: boolean;
   requestMagicLink: (email: string) => Promise<void>;
+  /** Exchanges the token but does NOT sign in — populates `pendingSession` for confirmation. */
   verifyMagicLink: (token: string) => Promise<void>;
+  /** User confirmed the account shown for `pendingSession` — persist it and sign in. */
+  confirmSignIn: () => Promise<void>;
+  /** User declined — discard `pendingSession` without ever persisting it. */
+  cancelSignIn: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -77,14 +88,17 @@ export function useAuth(): UseAuthReturn {
     [store],
   );
 
+  // Exchanges the one-time token (consumes it server-side) but stops short of
+  // signing in: the result lands in `pendingSession` for the caller to show
+  // an explicit "Sign in as <email>?" prompt (SignInConfirmDialog) before
+  // anything is persisted. This is the login-CSRF fix — see cloudApi.verifyMagicLink.
   const verifyMagicLink = useCallback(
     async (token: string) => {
       store.setAuthLoading(true);
       store.setAuthError(null);
       try {
         const session = await cloudApi.verifyMagicLink(token);
-        const profile = await cloudApi.getMe();
-        store.setSession(session, profile);
+        store.setPendingSession(session);
       } catch (err) {
         store.setAuthError(err instanceof Error ? err.message : 'Verification failed');
         throw err;
@@ -94,6 +108,41 @@ export function useAuth(): UseAuthReturn {
     },
     [store],
   );
+
+  // User confirmed the account shown in the prompt: persist the session
+  // (cloud.setToken) and fetch the profile. This is the ONLY path that turns
+  // a pendingSession into an active one.
+  const confirmSignIn = useCallback(async () => {
+    const pending = store.pendingSession;
+    if (!pending) return;
+    store.setAuthLoading(true);
+    store.setAuthError(null);
+    try {
+      await cloudApi.commitSession(pending);
+      const profile = await cloudApi.getMe();
+      store.setSession(pending, profile);
+    } catch (err) {
+      store.setAuthError(err instanceof Error ? err.message : 'Sign-in failed');
+      throw err;
+    } finally {
+      store.setAuthLoading(false);
+      store.setPendingSession(null);
+    }
+  }, [store]);
+
+  // User declined: drop the pending session without ever persisting it. For
+  // the cookie transport (dev/browser) the exchange call already set an
+  // httpOnly cookie server-side, so also revoke it explicitly — "cancel"
+  // must mean signed into nothing on every transport.
+  const cancelSignIn = useCallback(async () => {
+    if (!store.pendingSession) return;
+    store.setPendingSession(null);
+    try {
+      await cloudApi.logout();
+    } catch {
+      // Best-effort revoke; nothing was persisted client-side regardless.
+    }
+  }, [store]);
 
   const signOut = useCallback(async () => {
     try {
@@ -106,11 +155,14 @@ export function useAuth(): UseAuthReturn {
   return {
     session: store.session,
     memberProfile: store.memberProfile,
+    pendingSession: store.pendingSession,
     isAuthLoading: store.isAuthLoading,
     authError: store.authError,
     isSignedIn: store.session !== null,
     requestMagicLink,
     verifyMagicLink,
+    confirmSignIn,
+    cancelSignIn,
     signOut,
   };
 }

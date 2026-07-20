@@ -16,10 +16,18 @@ interface AuthState {
   memberProfile: MemberProfile | null;
   isAuthLoading: boolean;
   authError: string | null;
+  /**
+   * A session that has been exchanged (verifyMagicLink resolved) but not yet
+   * confirmed by the user. Non-null here is what drives the "Sign in as
+   * <email>?" prompt — see useAuth.confirmSignIn/cancelSignIn. Nothing reads
+   * or trusts this as an active session; only `session` above is.
+   */
+  pendingSession: Session | null;
 
   // Actions
   setSession: (session: Session, profile: MemberProfile) => void;
   clearSession: () => void;
+  setPendingSession: (session: Session | null) => void;
   setAuthLoading: (loading: boolean) => void;
   setAuthError: (error: string | null) => void;
   updateProfile: (profile: Partial<MemberProfile>) => void;
@@ -30,6 +38,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
   memberProfile: null,
   isAuthLoading: false,
   authError: null,
+  pendingSession: null,
 
   setSession(session, memberProfile) {
     set({ session, memberProfile, authError: null });
@@ -37,6 +46,10 @@ export const useAuthStore = create<AuthState>()((set) => ({
 
   clearSession() {
     set({ session: null, memberProfile: null });
+  },
+
+  setPendingSession(pendingSession) {
+    set({ pendingSession });
   },
 
   setAuthLoading(isAuthLoading) {

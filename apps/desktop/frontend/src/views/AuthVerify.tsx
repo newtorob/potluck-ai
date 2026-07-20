@@ -7,6 +7,14 @@
  * electron/main.js). If it happens to load INSIDE Electron, it just verifies in
  * place. The desktop SPA carries this route mainly for dev (app_url is the Vite
  * server); production hosts the equivalent page on the marketing site.
+ *
+ * SECURITY (login CSRF fix): this route is reached by a ?token=... in the
+ * URL, same as the deep-link path — verifyMagicLink()
+ * exchanges the token but does not sign in on its own (see useAuth /
+ * cloudApi.verifyMagicLink). This page renders its own "Sign in as <email>?"
+ * confirm step (rather than relying on SignInConfirmDialog, which lives
+ * inside AuthGate — a component tree this standalone route is rendered
+ * outside of) before calling confirmSignIn().
  */
 
 import { useEffect, useState } from 'react';
@@ -15,12 +23,13 @@ import { ipc } from '@/lib/ipc';
 import { useAuth } from '@/hooks/useAuth';
 import { PotluckLogo } from '@/components/brand/PotluckLogo';
 
-type Status = 'working' | 'verifying' | 'done' | 'error';
+type Status = 'working' | 'verifying' | 'confirming' | 'done' | 'error' | 'cancelled';
 
 export function AuthVerify() {
   const [params] = useSearchParams();
   const token = params.get('token');
-  const { verifyMagicLink } = useAuth();
+  const { verifyMagicLink, confirmSignIn, cancelSignIn, pendingSession, isAuthLoading } =
+    useAuth();
   const navigate = useNavigate();
   const [status, setStatus] = useState<Status>('working');
 
@@ -34,13 +43,11 @@ export function AuthVerify() {
       return;
     }
     if (ipc.isElectron) {
-      // Already inside the app — verify directly, no bounce needed.
+      // Already inside the app — exchange the token, then wait for the user
+      // to confirm the account below before it's persisted.
       setStatus('verifying');
       verifyMagicLink(token)
-        .then(() => {
-          setStatus('done');
-          navigate('/membership');
-        })
+        .then(() => setStatus('confirming'))
         .catch(() => setStatus('error'));
     } else if (deepLink) {
       // In a browser — bounce into the desktop app.
@@ -48,6 +55,21 @@ export function AuthVerify() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  const handleConfirm = async (): Promise<void> => {
+    try {
+      await confirmSignIn();
+      setStatus('done');
+      navigate('/membership');
+    } catch {
+      setStatus('error');
+    }
+  };
+
+  const handleCancel = async (): Promise<void> => {
+    await cancelSignIn();
+    setStatus('cancelled');
+  };
 
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-background p-8">
@@ -71,6 +93,46 @@ export function AuthVerify() {
               It may have expired or already been used. Request a new one from
               the Potluck app.
             </p>
+          </div>
+        ) : status === 'cancelled' ? (
+          <div className="space-y-2">
+            <h1 className="font-serif text-2xl tracking-display text-foreground">
+              Sign-in cancelled
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              You weren't signed in. Request a new link if this wasn't you.
+            </p>
+          </div>
+        ) : status === 'confirming' ? (
+          <div className="w-full space-y-4">
+            <h1 className="font-serif text-2xl tracking-display text-foreground">
+              {pendingSession?.email
+                ? `Sign in as ${pendingSession.email}?`
+                : 'Confirm sign-in to Potluck?'}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {pendingSession?.email
+                ? 'Only confirm if you expected this.'
+                : "Only confirm if you requested this magic link yourself."}
+            </p>
+            <div className="flex w-full gap-2">
+              <button
+                type="button"
+                onClick={() => void handleConfirm()}
+                disabled={isAuthLoading}
+                className="flex-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isAuthLoading ? 'Signing in…' : 'Confirm'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleCancel()}
+                disabled={isAuthLoading}
+                className="flex-1 rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         ) : status === 'done' ? (
           <div className="space-y-2">

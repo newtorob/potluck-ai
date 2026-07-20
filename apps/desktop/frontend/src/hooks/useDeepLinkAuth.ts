@@ -1,5 +1,5 @@
 /**
- * useDeepLinkAuth — completes magic-link sign-in when the OS hands the app a
+ * useDeepLinkAuth — starts magic-link sign-in when the OS hands the app a
  * potluck://auth/callback?token=... deep link.
  *
  * The email link opens a web verify page which bounces to the potluck:// scheme;
@@ -9,26 +9,44 @@
  *
  * Cold start (app launched by the link) is covered by getInitialDeepLink();
  * links that arrive while the app runs are covered by onDeepLink().
+ *
+ * SECURITY (login CSRF): this hook only EXCHANGES the token — it does not
+ * sign in on its own. A deep link is not proof the person who clicked it
+ * requested this app's sign-in: an attacker can request a magic link to
+ * THEIR OWN email, wrap the token as potluck://auth/callback?token=..., and
+ * get a victim to click it. verifyMagicLink() populates `pendingSession`;
+ * SignInConfirmDialog (mounted alongside this hook in AuthGate) is what
+ * shows "Sign in as <email>?" and gates the actual persist/navigate on the
+ * user confirming it's the account they expect.
  */
 
 import { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { ipc } from '@/lib/ipc';
 import { useAuth } from '@/hooks/useAuth';
 
-/** Pull the one-time token out of a potluck://auth/callback?token=... URL. */
+/**
+ * Pull the one-time token out of a deep link, but ONLY when it's exactly
+ * potluck://auth/callback — never from any other potluck:// URL. Scoping
+ * extraction to this one path keeps every other potluck:// route (and any
+ * scheme the OS mis-routes to us) from being able to trigger a token
+ * exchange at all, regardless of query string.
+ */
 function tokenFromDeepLink(url: string): string | null {
+  let parsed: URL;
   try {
-    return new URL(url).searchParams.get('token');
+    parsed = new URL(url);
   } catch {
-    const match = url.match(/[?&]token=([^&]+)/);
-    return match?.[1] ? decodeURIComponent(match[1]) : null;
+    return null;
   }
+  if (parsed.protocol !== 'potluck:') return null;
+  // Electron/WHATWG URL parsing of `scheme://host/path` puts "auth" in
+  // hostname and "/callback" in pathname for this non-special scheme.
+  if (parsed.hostname !== 'auth' || parsed.pathname !== '/callback') return null;
+  return parsed.searchParams.get('token');
 }
 
 export function useDeepLinkAuth(): void {
   const { verifyMagicLink } = useAuth();
-  const navigate = useNavigate();
   // Each token is single-use; guard against double delivery (cold-start pull
   // plus a live event for the same URL).
   const processed = useRef<Set<string>>(new Set());
@@ -40,18 +58,9 @@ export function useDeepLinkAuth(): void {
       const token = tokenFromDeepLink(url);
       if (!token || processed.current.has(token)) return;
       processed.current.add(token);
-      verifyMagicLink(token)
-        .then(() => {
-          if (cancelled) return;
-          navigate('/membership');
-          void ipc.showNotification(
-            'Signed in to Potluck',
-            'Your magic link worked.',
-          );
-        })
-        .catch(() => {
-          // authError is surfaced by the sign-in UI; nothing to do here.
-        });
+      verifyMagicLink(token).catch(() => {
+        // authError is surfaced by the sign-in UI; nothing to do here.
+      });
     };
 
     const unsubscribe = ipc.onDeepLink(handle);
@@ -63,7 +72,7 @@ export function useDeepLinkAuth(): void {
       cancelled = true;
       unsubscribe();
     };
-    // Run once on mount; verifyMagicLink/navigate are stable enough for this.
+    // Run once on mount; verifyMagicLink is stable enough for this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }

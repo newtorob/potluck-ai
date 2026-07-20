@@ -61,6 +61,13 @@ export interface Session {
   token: string;
   expiresAt: string;
   memberId: string;
+  /**
+   * The account email, when the server includes it on /auth/callback.
+   * Older API responses may omit this — callers must not assume it's
+   * present (see the sign-in confirmation prompt in useAuth/authStore,
+   * which falls back to a generic message when it's absent).
+   */
+  email?: string;
 }
 
 export interface GovernanceProposal {

@@ -69,12 +69,37 @@ function extractDeepLink(argv) {
   );
 }
 
+// The only deep link this app understands today is the magic-link callback.
+// Restricting to the exact host/path (not just the scheme) matters: without
+// it, any potluck://...?token=... URL — however it arrives (argv on
+// Windows/Linux, the 'open-url' OS event on macOS, a cloned bounce page) —
+// would reach the renderer's token extraction. See useDeepLinkAuth.ts for the
+// matching renderer-side check; this is defense in depth at the routing
+// choke point so a future non-auth deep link can't accidentally widen this.
+function isAuthCallbackDeepLink(url) {
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.protocol === `${DEEP_LINK_SCHEME}:` &&
+      parsed.hostname === 'auth' &&
+      parsed.pathname === '/callback'
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Deliver a deep link to the renderer, or buffer it until the renderer is ready.
  * Never logs the query string — it carries the one-time magic-link token.
+ * Silently drops anything that isn't the exact auth/callback path.
  */
 function handleDeepLink(url) {
   if (!url) return;
+  if (!isAuthCallbackDeepLink(url)) {
+    log.warn(`[deeplink] ignored non-auth-callback deep link: ${url.split('?')[0]}`);
+    return;
+  }
   log.info(`[deeplink] received ${url.split('?')[0]}`);
   if (rendererReady && mainWindow && mainWindow.webContents) {
     mainWindow.webContents.send('potluck:deep-link', url);
@@ -866,8 +891,13 @@ app.whenReady().then(async () => {
 
   // Cold start via deep link on Windows/Linux: the URL is in our own argv.
   // Buffer it before the window is created so the renderer pulls it on mount.
+  // Goes through the same isAuthCallbackDeepLink gate as every other entry
+  // point — see handleDeepLink.
   if (process.platform !== 'darwin') {
-    pendingDeepLink = extractDeepLink(process.argv) || pendingDeepLink;
+    const coldStartLink = extractDeepLink(process.argv);
+    if (coldStartLink && isAuthCallbackDeepLink(coldStartLink)) {
+      pendingDeepLink = coldStartLink;
+    }
   }
 
   // Override the Dock icon at runtime. Required on macOS dev, where the host
