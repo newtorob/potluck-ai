@@ -281,6 +281,61 @@ func (t *Tunnel) SetMeshIP(meshIP string) error {
 	return nil
 }
 
+// truncateForLog returns s clipped to at most maxLogEndpointLen characters
+// (with a "..." suffix if clipped) so that a malicious/malformed endpoint
+// string (e.g. a newline-injection payload) never gets echoed into logs
+// verbatim — that would just relocate the injection risk from IpcSet's UAPI
+// stream to whatever consumes the structured log output.
+const maxLogEndpointLen = 64
+
+func truncateForLog(s string) string {
+	s = strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\r' {
+			return '_'
+		}
+		return r
+	}, s)
+	if len(s) > maxLogEndpointLen {
+		return s[:maxLogEndpointLen] + "..."
+	}
+	return s
+}
+
+// validateEndpoint rejects any endpoint string that does not round-trip to a
+// clean "host:port" pair with a syntactically valid IP address and a port in
+// [1, 65535].
+//
+// This is defense-in-depth against UAPI config injection: endpoint strings
+// originate from the coordinator/peer roster (untrusted wire data) and are
+// interpolated directly into newline-delimited UAPI directives sent to
+// wireguard-go via IpcSet. A value containing an embedded "\n" (e.g.
+// "1.1.1.1:1\nallowed_ip=0.0.0.0/0\n") would inject an extra UAPI directive —
+// e.g. widening a peer's allowed_ips past its intended /32 — because IpcSet
+// has no concept of a single "field"; it just parses whatever newline-
+// separated key=value lines it's given. net.SplitHostPort + net.ParseIP
+// reject embedded newlines/extra content because the host component would
+// then fail to parse as a valid IP.
+//
+// The coordinator is being hardened server-side in parallel, but this client
+// must never trust the wire regardless of what the server does.
+func validateEndpoint(endpoint string) error {
+	host, portStr, err := net.SplitHostPort(endpoint)
+	if err != nil {
+		return fmt.Errorf("split host:port: %w", err)
+	}
+	if net.ParseIP(host) == nil {
+		return fmt.Errorf("invalid IP host %q", host)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return fmt.Errorf("invalid port %q: %w", portStr, err)
+	}
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("port %d out of range [1, 65535]", port)
+	}
+	return nil
+}
+
 // SetPeers atomically replaces all WG peers on the device with the provided
 // list. Uses the UAPI `replace_peers=true` directive so stale peers are
 // removed in the same transaction.
@@ -304,15 +359,28 @@ func (t *Tunnel) SetPeers(peers []Peer) error {
 
 	var sb strings.Builder
 	sb.WriteString("replace_peers=true\n")
+	skipped := 0
 	for _, p := range peers {
-		appendPeerConfig(&sb, p)
+		if err := appendPeerConfig(&sb, p); err != nil {
+			// A single malformed/malicious peer entry must not abort the
+			// whole batch (which would tear down every other peer's config
+			// via replace_peers=true) or block the rest of the roster from
+			// being applied. Drop just this peer and keep going.
+			slog.Error("tunnel: rejecting peer with invalid config, excluding from SetPeers batch",
+				"pubkey_prefix", util.TruncatePubkey(p.PublicKey),
+				"endpoint", truncateForLog(p.Endpoint),
+				"err", err,
+			)
+			skipped++
+			continue
+		}
 	}
 
 	if err := t.dev.IpcSet(sb.String()); err != nil {
 		return fmt.Errorf("tunnel: set peers: %w", err)
 	}
 
-	slog.Info("tunnel: peers configured", "count", len(peers))
+	slog.Info("tunnel: peers configured", "count", len(peers)-skipped, "rejected", skipped)
 	return nil
 }
 
@@ -323,7 +391,14 @@ func (t *Tunnel) AddPeer(p Peer) error {
 	defer t.mu.Unlock()
 
 	var sb strings.Builder
-	appendPeerConfig(&sb, p)
+	if err := appendPeerConfig(&sb, p); err != nil {
+		slog.Error("tunnel: rejecting AddPeer with invalid config",
+			"pubkey_prefix", util.TruncatePubkey(p.PublicKey),
+			"endpoint", truncateForLog(p.Endpoint),
+			"err", err,
+		)
+		return fmt.Errorf("tunnel: add peer %s: %w", p.PublicKey, err)
+	}
 
 	if err := t.dev.IpcSet(sb.String()); err != nil {
 		return fmt.Errorf("tunnel: add peer %s: %w", p.PublicKey, err)
@@ -372,6 +447,20 @@ func (t *Tunnel) UpdatePeerEndpoint(pubkey, endpoint string) error {
 			"pubkey_prefix", util.TruncatePubkey(pubkey),
 		)
 		return nil
+	}
+
+	// Reject any endpoint that isn't a clean "host:port" before it ever
+	// reaches IpcSet. See validateEndpoint for the UAPI config-injection
+	// rationale. A rejected endpoint is a no-op for this peer, not a crash —
+	// the roster-update loop that calls this per-peer must keep going for
+	// the rest of the roster.
+	if err := validateEndpoint(endpoint); err != nil {
+		slog.Error("tunnel: rejecting UpdatePeerEndpoint with invalid endpoint",
+			"pubkey_prefix", util.TruncatePubkey(pubkey),
+			"endpoint", truncateForLog(endpoint),
+			"err", err,
+		)
+		return fmt.Errorf("tunnel: update peer endpoint %s: invalid endpoint: %w", pubkey, err)
 	}
 
 	config := fmt.Sprintf("public_key=%s\nendpoint=%s\n", pubkeyHex, endpoint)
@@ -506,14 +595,28 @@ func (t *Tunnel) IsPeerConfigured(pubkeyBase64 string) (bool, error) {
 
 // appendPeerConfig writes the UAPI stanza for a single peer to sb.
 // Format follows https://www.wireguard.com/xplatform/#configuration-protocol
-func appendPeerConfig(sb *strings.Builder, p Peer) {
+//
+// Returns an error (and writes nothing to sb) if the peer's fields cannot be
+// safely encoded — in particular, a non-empty Endpoint that fails
+// validateEndpoint is a hard reject: endpoint strings are untrusted
+// coordinator/peer-supplied data, and writing one straight into the
+// newline-delimited UAPI stream would let an embedded "\n" inject arbitrary
+// extra directives (e.g. widening allowed_ip past the peer's /32). Callers
+// must not fall back to writing a partial/unvalidated stanza on error.
+func appendPeerConfig(sb *strings.Builder, p Peer) error {
 	pubkeyHex, err := base64ToHex(p.PublicKey)
 	if err != nil {
 		slog.Error("tunnel: cannot encode peer pubkey, skipping peer",
 			"pubkey_prefix", util.TruncatePubkey(p.PublicKey),
 			"err", err,
 		)
-		return
+		return fmt.Errorf("encode peer pubkey: %w", err)
+	}
+
+	if p.Endpoint != "" {
+		if err := validateEndpoint(p.Endpoint); err != nil {
+			return fmt.Errorf("invalid endpoint for peer %s: %w", util.TruncatePubkey(p.PublicKey), err)
+		}
 	}
 
 	sb.WriteString("public_key=")
@@ -548,6 +651,8 @@ func appendPeerConfig(sb *strings.Builder, p Peer) {
 	if p.PersistentKeepalive > 0 {
 		fmt.Fprintf(sb, "persistent_keepalive_interval=%d\n", p.PersistentKeepalive)
 	}
+
+	return nil
 }
 
 // applyBaseConfig writes the private key and listen port via the wg-go
