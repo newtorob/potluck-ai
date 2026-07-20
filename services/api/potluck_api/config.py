@@ -88,8 +88,14 @@ class Settings(BaseSettings):
         return self
 
     def admin_email_list(self) -> list[str]:
-        """Return admin emails as a parsed list, stripping whitespace."""
-        return [e.strip() for e in self.admin_emails.split(",") if e.strip()]
+        """Return admin emails as a parsed, normalized list.
+
+        Normalized to strip().lower() so the allowlist compares equal to the
+        normalized emails AuthService looks members up by — otherwise
+        ``ADMIN_EMAILS=Rob@x.com`` would silently never match the member row
+        created from a lowercased sign-in email.
+        """
+        return [e.strip().lower() for e in self.admin_emails.split(",") if e.strip()]
 
     def cookie_secure(self) -> bool:
         """Session cookie Secure flag — off in development so http localhost works."""
@@ -98,11 +104,15 @@ class Settings(BaseSettings):
     def cookie_samesite(self) -> str:
         """Session cookie SameSite policy.
 
-        The desktop app is a different site from api.trypotluck.ai, so production
-        needs SameSite=None (which requires Secure). Local http dev can't use
-        Secure, so fall back to Lax.
+        The web client (trypotluck.ai) and the API (api.trypotluck.ai) are
+        same-site, and the desktop app authenticates via a Bearer token, not
+        the cookie — so production has no legitimate cross-site cookie sender.
+        SameSite=Lax keeps the cookie off cross-site requests (closes a CSRF
+        vector on bodyless POSTs) while still attaching on top-level
+        navigations, which is all the web client needs. Local http dev can't
+        use Secure, so it also uses Lax.
         """
-        return "none" if self.env != "development" else "lax"
+        return "lax"
 
 
 @functools.lru_cache(maxsize=1)

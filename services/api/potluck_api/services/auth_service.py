@@ -16,13 +16,16 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from potluck_api.config import get_settings
+from potluck_api.models.consumed_magic_link import ConsumedMagicLink
 from potluck_api.models.member import Member
 from potluck_api.models.session import Session
 
@@ -49,6 +52,11 @@ class AuthService:
         The URL base is ``app_url + magic_link_path`` — both configurable so the
         delivery transport (a web verify page vs a ``potluck://`` deep link) can
         change without editing this code.
+
+        Every token gets a unique ``jti``. verify_magic_link() records it in
+        ``consumed_magic_links`` on redemption, so a second redemption of the
+        same link (e.g. an email client prefetching the URL, or a shoulder-surfed
+        link) fails even inside the token's validity window.
         """
         now = datetime.now(timezone.utc)
         payload = {
@@ -56,6 +64,7 @@ class AuthService:
             "iat": now,
             "exp": now + timedelta(minutes=self.settings.magic_link_expiry_minutes),
             "type": _MAGIC_LINK_TYPE,
+            "jti": uuid.uuid4().hex,
         }
         token = jwt.encode(
             payload, self.settings.magic_link_secret, algorithm="HS256"
@@ -70,8 +79,15 @@ class AuthService:
         only ever returned here; the DB stores ``SHA-256(raw_token)`` so a
         database breach never yields usable session tokens.
 
+        Single-use: the token's ``jti`` is inserted into ``consumed_magic_links``
+        in the SAME transaction that creates the session. A second redemption
+        hits a primary-key conflict on that insert and the whole transaction
+        (including the session row) rolls back — so a replayed link never
+        mints a session, even inside the 15-minute validity window.
+
         Raises:
-            MagicLinkError — token expired, malformed, or wrong type.
+            MagicLinkError — token expired, malformed, wrong type, or already
+            redeemed.
         """
         try:
             payload = jwt.decode(
@@ -85,17 +101,37 @@ class AuthService:
         if payload.get("type") != _MAGIC_LINK_TYPE:
             raise MagicLinkError("Invalid magic link")
         email = payload.get("email")
-        if not email:
+        jti = payload.get("jti")
+        exp = payload.get("exp")
+        if not email or not jti or not exp:
             raise MagicLinkError("Invalid magic link")
+        email = email.strip().lower()
 
-        member = await self.db.scalar(select(Member).where(Member.email == email))
+        # Allowlist membership is re-evaluated on every sign-in below, so both a
+        # promotion (email added to ADMIN_EMAILS) and a demotion (email removed)
+        # take effect on the member's next sign-in rather than only at creation.
+        is_allowlisted_admin = email in self.settings.admin_email_list()
+
+        # Case-insensitive lookup: emails are normalized to lowercase at every
+        # write path going forward, but existing rows may predate that and
+        # carry mixed case — comparing on lower() means "Rob@x.com" and
+        # "rob@x.com" always resolve to the same member.
+        member = await self.db.scalar(
+            select(Member).where(func.lower(Member.email) == email)
+        )
         if member is None:
-            member = Member(email=email)
-            # Bootstrap admins from the configured allowlist on first sign-in.
-            if email in self.settings.admin_email_list():
-                member.is_admin = True
+            member = Member(email=email, is_admin=is_allowlisted_admin)
             self.db.add(member)
             await self.db.flush()  # populate member.id for the FK below
+        elif member.is_admin != is_allowlisted_admin:
+            member.is_admin = is_allowlisted_admin
+
+        self.db.add(
+            ConsumedMagicLink(
+                jti=jti,
+                expires_at=datetime.fromtimestamp(exp, tz=timezone.utc),
+            )
+        )
 
         raw_token = secrets.token_urlsafe(64)
         session = Session(
@@ -105,7 +141,11 @@ class AuthService:
             + timedelta(days=self.settings.session_expiry_days),
         )
         self.db.add(session)
-        await self.db.commit()
+        try:
+            await self.db.commit()
+        except IntegrityError as exc:
+            await self.db.rollback()
+            raise MagicLinkError("Magic link already used") from exc
         return member, raw_token, session
 
     async def validate_session(self, raw_token: str) -> Member | None:
