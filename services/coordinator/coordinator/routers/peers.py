@@ -239,6 +239,21 @@ async def peer_connect(
                         job_id=str(tok.job_id),
                     )
                     continue
+                if buf.peer_id is not None and buf.peer_id != peer.id:
+                    # This job was dispatched to a DIFFERENT peer. Same
+                    # ownership check as the heartbeat handler above — drop
+                    # the message rather than let one peer push tokens into
+                    # another peer's buffer. buf.peer_id is None only for
+                    # legacy/canary buffers that didn't thread a peer_id
+                    # through register_job(); those are left unguarded on
+                    # purpose (no assignee to check against).
+                    logger.warning(
+                        "peer_job_token_ownership_mismatch",
+                        connection_peer_id=str(peer.id),
+                        assigned_peer_id=str(buf.peer_id),
+                        job_id=str(tok.job_id),
+                    )
+                    continue
                 buf.tokens.append(tok.token_text)
                 # Also push to the streaming queue. put_nowait() can raise
                 # QueueFull on a runaway peer; we log + drop in that case
@@ -260,6 +275,17 @@ async def peer_connect(
                     continue
                 buf = await get_job(cmp.job_id)
                 if buf is None:
+                    continue
+                if buf.peer_id is not None and buf.peer_id != peer.id:
+                    # Same ownership check as job_token: don't let a peer
+                    # finalize (and trigger billing on) a job assigned to
+                    # someone else.
+                    logger.warning(
+                        "peer_job_complete_ownership_mismatch",
+                        connection_peer_id=str(peer.id),
+                        assigned_peer_id=str(buf.peer_id),
+                        job_id=str(cmp.job_id),
+                    )
                     continue
                 # Bill on what the COORDINATOR actually forwarded, not the
                 # peer's self-reported count. The peer is outside the trust
@@ -315,6 +341,16 @@ async def peer_connect(
                     continue
                 buf = await get_job(err.job_id)
                 if buf is None:
+                    continue
+                if buf.peer_id is not None and buf.peer_id != peer.id:
+                    # Same ownership check: don't let a peer abort a job
+                    # assigned to someone else.
+                    logger.warning(
+                        "peer_job_error_ownership_mismatch",
+                        connection_peer_id=str(peer.id),
+                        assigned_peer_id=str(buf.peer_id),
+                        job_id=str(err.job_id),
+                    )
                     continue
                 buf.error_category = err.error_category
                 buf.error_message = err.error_message
