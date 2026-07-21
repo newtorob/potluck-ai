@@ -367,20 +367,43 @@ function BeFirstPanel({ onPaired }: { onPaired: () => void }) {
   );
 }
 
-function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
+/** Server-side cap on wrong-PIN guesses per broadcast session
+ *  (`internal/lanpair.maxRevealAttempts`). Once hit, the inviter cancels the
+ *  broadcast and stops answering — there's no distinct "exhausted" response,
+ *  so we track our own count client-side purely for messaging. */
+const MAX_PIN_ATTEMPTS = 5;
+
+export function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
   const [tokenInput, setTokenInput] = useState('');
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [discovered, setDiscovered] = useState<{ hostname: string; token: string } | null>(null);
+  const [discovered, setDiscovered] = useState<{ hostname: string; fingerprint: string } | null>(
+    null,
+  );
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [pinAttempts, setPinAttempts] = useState(0);
 
-  // Poll the mesh sidecar for a pairing token broadcast on the local network,
-  // so a machine being invited from a nearby machine can join in one tap.
+  // Poll the mesh sidecar for a pairing invite broadcast on the local
+  // network, so a machine being invited from a nearby machine doesn't have
+  // to type the full token — just the short PIN shown on the inviter.
   useEffect(() => {
     let cancelled = false;
     const poll = async () => {
       try {
         const d = await meshClient.discoveredPairing();
-        if (!cancelled) setDiscovered(d.found ? { hostname: d.hostname, token: d.token } : null);
+        setDiscovered((prev) => {
+          if (!d.found) return null;
+          const next = { hostname: d.hostname, fingerprint: d.fingerprint };
+          // A new invite (different fingerprint) gets a clean attempt count —
+          // the old broadcast session, and whatever PIN went with it, is gone.
+          if (!prev || prev.fingerprint !== next.fingerprint) {
+            setPinAttempts(0);
+            setPinError(null);
+            setPinInput('');
+          }
+          return next;
+        });
       } catch {
         if (!cancelled) setDiscovered(null);
       }
@@ -430,6 +453,48 @@ function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
     void join(tokenInput);
   }
 
+  const capped = pinAttempts >= MAX_PIN_ATTEMPTS;
+
+  // Plain function, not a form-submit handler: the PIN input/button live
+  // inside the outer token-paste <form>, and nested <form> elements are
+  // invalid HTML, so the PIN "Join" button is type="button" and the input's
+  // onKeyDown calls this directly on Enter instead of bubbling to the form.
+  async function handlePinSubmit() {
+    if (!discovered || capped) return;
+    const pin = pinInput.trim();
+    if (pin.length === 0) return;
+    setPinError(null);
+    setWorking(true);
+    try {
+      const { token } = await meshClient.revealPairing(discovered.fingerprint, pin);
+      setPinAttempts(0);
+      await join(token);
+    } catch (err) {
+      const nextAttempts = pinAttempts + 1;
+      setPinAttempts(nextAttempts);
+      if (err instanceof MeshApiError && err.code === 'reveal_failed') {
+        if (nextAttempts >= MAX_PIN_ATTEMPTS) {
+          setPinError('Too many attempts. Restart pairing on the other device.');
+        } else if (/incorrect/i.test(err.message)) {
+          const left = MAX_PIN_ATTEMPTS - nextAttempts;
+          setPinError(`Incorrect PIN. ${left} attempt${left === 1 ? '' : 's'} left.`);
+        } else if (/timed out|no response/i.test(err.message)) {
+          setPinError(
+            'No response from the other device. Make sure it\'s still showing the PIN, or restart pairing there.',
+          );
+        } else {
+          setPinError(err.message);
+        }
+      } else if (err instanceof MeshApiError) {
+        setPinError(err.message);
+      } else {
+        setPinError(err instanceof Error ? err.message : 'Could not verify PIN.');
+      }
+    } finally {
+      setWorking(false);
+    }
+  }
+
   return (
     <form
       onSubmit={handleJoin}
@@ -449,7 +514,7 @@ function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
       </p>
 
       {discovered && (
-        <div className="rounded-lg border border-sage/30 bg-sage/8 p-3 space-y-2">
+        <div className="rounded-lg border border-sage/30 bg-sage/8 p-3 space-y-2.5">
           <p className="flex items-center gap-1.5 text-sm text-foreground">
             <RadioTower className="h-3.5 w-3.5 shrink-0 text-sage" aria-hidden="true" />
             <span>
@@ -457,20 +522,59 @@ function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
               <span className="font-medium">{discovered.hostname || 'a nearby machine'}</span>.
             </span>
           </p>
-          <button
-            type="button"
-            onClick={() => void join(discovered.token)}
-            disabled={working}
-            className={cn(
-              'inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-3',
-              'bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-              'disabled:cursor-not-allowed disabled:opacity-60',
-            )}
-          >
-            {working ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}
-            Join {discovered.hostname || 'this machine'}
-          </button>
+          <p className="text-xs text-muted-foreground leading-snug">
+            Enter the PIN shown on that machine's screen to confirm it's really
+            the one you're pairing with.
+          </p>
+          <div className="flex items-stretch gap-2">
+            <label htmlFor="join-pin" className="sr-only">
+              Confirmation PIN
+            </label>
+            <input
+              id="join-pin"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              spellCheck={false}
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+              onKeyDown={(e) => {
+                // Enter submits the PIN directly rather than bubbling up to
+                // the outer token-paste <form>.
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void handlePinSubmit();
+                }
+              }}
+              placeholder="123456"
+              disabled={working || capped}
+              className={cn(
+                'w-28 rounded-lg border border-input bg-background px-3 py-2',
+                'font-mono text-sm tracking-widest text-foreground placeholder:text-muted-foreground/50',
+                'focus:outline-none focus:ring-2 focus:ring-ring',
+                'disabled:cursor-not-allowed disabled:opacity-60',
+              )}
+            />
+            <button
+              type="button"
+              onClick={() => void handlePinSubmit()}
+              disabled={working || capped || pinInput.trim().length === 0}
+              className={cn(
+                'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3',
+                'bg-primary text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                'disabled:cursor-not-allowed disabled:opacity-60',
+              )}
+            >
+              {working ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}
+              Join {discovered.hostname || 'this machine'}
+            </button>
+          </div>
+          {pinError !== null && (
+            <p className="text-xs text-destructive" role="alert">
+              {pinError}
+            </p>
+          )}
         </div>
       )}
 

@@ -1,33 +1,56 @@
-// Package lanpair broadcasts a pairing token over the local network so a
-// second machine on the same LAN can join a household without the user
-// copy-pasting the token by hand.
+// Package lanpair helps a second machine on the local network find a
+// household's pairing invite without the user copy-pasting the token by
+// hand.
 //
 // Transport: IPv4 multicast on a link-local group (224.0.0.0/24, which routers
-// must not forward off-subnet) at multicast TTL 1. Each datagram carries ONLY
-// the opaque pairing token plus the inviter's hostname. No household id, node
-// id, member id, or any other identity is broadcast. The coordinator still
-// validates the token on enroll, so the LAN broadcast only removes the manual
-// copy-paste; it grants no trust by itself. A machine that is merely listening
-// transmits nothing, so listening reveals no presence.
+// must not forward off-subnet) at multicast TTL 1, plus a subnet-broadcast
+// fallback for WiFi/wired topologies that drop link-local multicast (see
+// broadcastSweepLoop). Only RFC1918 interfaces are used; the tailnet range
+// (100.64.0.0/10) is never sent to, so pairing stays on the physical LAN.
 //
-// Broadcast fallback: many consumer WiFi/mesh routers silently drop link-local
-// multicast between a wireless client and a wired one, so multicast discovery
-// finds nothing on a very common home topology (verified on the bench network:
-// a WiFi laptop and a wired desktop on one /22 never saw each other's multicast,
-// while an L2 broadcast crossed fine). So during the broadcast window the inviter
-// ALSO sends the same datagram to the IPv4 subnet broadcast address (directed
-// per interface, plus the limited 255.255.255.255). One datagram reaches every
-// host on the segment, with no per-host ARP and no dependence on multicast
-// forwarding. This changes only the delivery: same payload, same opaque
-// single-use token, same coordinator validation, and the joining machine still
-// only listens (it transmits nothing, so it still reveals no presence). Only
-// RFC1918 interfaces are used; the tailnet range (100.64.0.0/10) is never sent
-// to, so pairing stays on the physical LAN.
+// Security model: the periodic LAN announce carries ONLY an opaque
+// fingerprint of the pairing token plus the inviter's hostname — never the
+// raw, redeemable token. A fingerprint is a one-way hash: it lets a listener
+// notice "there's an invite from this host" and correlate it against a later
+// exchange, but it cannot be replayed at the coordinator's /mesh/enroll to
+// redeem household membership, and the token cannot be feasibly recovered
+// from it.
+//
+// The actual token is handed over only through a second, PIN-gated exchange
+// (RequestReveal / handleRevealRequest): the inviter's sidecar generates a
+// random 6-digit PIN when it starts broadcasting and returns it to its own
+// local caller only (displayed on the inviter's screen — it is never put on
+// the wire). A joining machine that wants to auto-join must have a human read
+// that PIN off the inviter's screen and supply it locally; only then does the
+// joiner's sidecar unicast a reveal request carrying the PIN to the inviter,
+// which replies with the real token if and only if the PIN matches. Reveal
+// attempts are capped (maxRevealAttempts) per broadcast session, after which
+// the session is burned and the broadcast is cancelled, so a LAN attacker who
+// only captured the fingerprint gets a bounded number of blind guesses at a
+// 6-digit space rather than an unlimited, unauthenticated redemption.
+//
+// This closes the "passive listener wins the race" hole a raw-token broadcast
+// had: coordinator validation of the token IS the trust grant, so it was
+// never sufficient to reason that broadcasting the token was safe merely
+// because the coordinator also checks it — a listener who captured the raw
+// token could redeem it directly against the coordinator, bypassing this
+// sidecar (and the legitimate second machine) entirely.
+//
+// The manual/headless flow (copy-paste the token shown on the inviter's
+// screen into the joiner's UI or CLI, then POST /pair) is unaffected by any
+// of this: it never depended on the LAN broadcast and is already
+// physical-possession-based.
 package lanpair
 
 import (
 	"context"
+	crand "crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net"
 	"sync"
@@ -45,21 +68,82 @@ var (
 )
 
 const (
-	magic        = "POTLUCK-PAIR-1"
+	// magic bumped from POTLUCK-PAIR-1: the wire format no longer carries a
+	// raw redeemable token (see package doc), so an old build's announce
+	// (which did) and a new build's announce are deliberately incompatible
+	// rather than silently interpreted with the wrong field meaning.
+	magic           = "POTLUCK-PAIR-2"
+	revealReqMagic  = "POTLUCK-PAIR-REVEAL-REQ-1"
+	revealRespMagic = "POTLUCK-PAIR-REVEAL-RESP-1"
+
 	sendInterval = 2 * time.Second // re-send cadence (multicast + broadcast)
 	maxDatagram  = 2048
+
+	// maxRevealAttempts bounds how many PIN guesses a broadcast session will
+	// answer before it is treated as under attack and burned (broadcast
+	// cancelled). A 6-digit PIN has 1e6 possibilities; capping guesses here
+	// is what keeps a LAN listener who only saw the fingerprint from having
+	// an unlimited number of blind tries.
+	maxRevealAttempts = 5
+
+	// revealSendInterval is the retry cadence for an outstanding reveal
+	// request (in case the first unicast datagram is dropped).
+	revealSendInterval = 400 * time.Millisecond
 )
 
+// announce is the periodic LAN beacon. It intentionally carries no
+// redeemable secret — see the package doc.
 type announce struct {
-	Magic    string `json:"m"`
-	Token    string `json:"t"`
-	Hostname string `json:"h"`
+	Magic       string `json:"m"`
+	Hostname    string `json:"h"`
+	Fingerprint string `json:"f"`
+}
+
+// revealRequest is sent unicast, joiner -> inviter, to redeem the PIN a
+// human read off the inviter's screen for the actual pairing token.
+type revealRequest struct {
+	Magic       string `json:"m"`
+	Fingerprint string `json:"f"`
+	PIN         string `json:"p"`
+}
+
+// revealResponse is sent unicast, inviter -> joiner, in answer to a
+// revealRequest. Token is only populated when OK is true.
+type revealResponse struct {
+	Magic       string `json:"m"`
+	Fingerprint string `json:"f"`
+	Token       string `json:"t,omitempty"`
+	OK          bool   `json:"ok"`
+}
+
+// envelope is used to peek at a datagram's message type before deciding
+// which concrete struct to unmarshal into.
+type envelope struct {
+	Magic string `json:"m"`
 }
 
 type heard struct {
-	token    string
-	hostname string
-	at       time.Time
+	fingerprint string
+	hostname    string
+	addr        *net.UDPAddr // source of the beacon; needed to unicast a reveal request
+	at          time.Time
+}
+
+// bcastSession is the inviter-side state for a single active broadcast: the
+// real token (never sent on the wire directly), the PIN a human must supply
+// out-of-band to redeem it, and how many reveal attempts have been spent.
+type bcastSession struct {
+	fingerprint string
+	token       string
+	pin         string
+	attempts    int
+}
+
+// revealOutcome is handed back to a waiting RequestReveal call once a
+// matching revealResponse arrives.
+type revealOutcome struct {
+	token string
+	ok    bool
 }
 
 // Service runs a passive listener for the lifetime of the sidecar and lets the
@@ -69,6 +153,18 @@ type Service struct {
 	latest      *heard
 	cancelBcast context.CancelFunc
 	now         func() time.Time // injectable for tests
+
+	// conn is the listener's socket, shared for sending unicast reveal
+	// request/response datagrams while RunListener is active. nil otherwise.
+	conn net.PacketConn
+
+	// session is the inviter-side state for the currently active broadcast,
+	// if any. nil when not broadcasting.
+	session *bcastSession
+
+	// waiters holds a delivery channel per outstanding RequestReveal call on
+	// the joiner side, keyed by fingerprint.
+	waiters map[string]chan revealOutcome
 }
 
 // New returns a Service. Call RunListener(ctx) once to start receiving.
@@ -160,8 +256,35 @@ func broadcastDests() []net.IP {
 	return out
 }
 
+// fingerprintOf returns a short, one-way, non-redeemable correlation handle
+// for token: enough entropy (48 bits) that guessing it is no easier than
+// guessing the token itself, and — being a one-way hash — it cannot be
+// inverted back into the token. Safe to put on an unauthenticated broadcast.
+func fingerprintOf(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:6])
+}
+
+// generatePIN returns a random 6-digit PIN using a CSPRNG. This is the
+// out-of-band secret: it is shown to the human on the inviter's device and is
+// never itself sent over the LAN.
+func generatePIN() string {
+	var b [4]byte
+	if _, err := crand.Read(b[:]); err != nil {
+		// crypto/rand failing is effectively unrecoverable on any real target;
+		// fall back to a fixed-but-still-unbroadcast value rather than a
+		// non-random one derived from time, which would be guessable.
+		slog.Error("lanpair: crypto/rand unavailable for pairing PIN", "err", err)
+		return "000000"
+	}
+	n := binary.BigEndian.Uint32(b[:]) % 1_000_000
+	return fmt.Sprintf("%06d", n)
+}
+
 // RunListener joins the multicast group on every capable interface and records
-// the most recent valid announce until ctx is cancelled. Receive-only.
+// the most recent valid announce until ctx is cancelled. It also answers
+// reveal requests for any broadcast session this host currently owns, and
+// delivers reveal responses to any outstanding RequestReveal call.
 func (s *Service) RunListener(ctx context.Context) {
 	c, err := net.ListenPacket("udp4", net.JoinHostPort("0.0.0.0", itoa(groupPort)))
 	if err != nil {
@@ -169,6 +292,15 @@ func (s *Service) RunListener(ctx context.Context) {
 		return
 	}
 	defer c.Close()
+	s.mu.Lock()
+	s.conn = c
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		s.conn = nil
+		s.mu.Unlock()
+	}()
+
 	p := ipv4.NewPacketConn(c)
 	group := &net.UDPAddr{IP: groupIP}
 	joined := 0
@@ -192,60 +324,293 @@ func (s *Service) RunListener(ctx context.Context) {
 
 	buf := make([]byte, maxDatagram)
 	for {
-		n, _, _, err := p.ReadFrom(buf) // source addr discarded on purpose
+		n, _, src, err := p.ReadFrom(buf)
 		if err != nil {
 			if ctx.Err() != nil {
 				return
 			}
 			continue
 		}
-		var a announce
-		if json.Unmarshal(buf[:n], &a) != nil || a.Magic != magic || a.Token == "" {
+		var env envelope
+		if json.Unmarshal(buf[:n], &env) != nil {
 			continue
 		}
-		s.mu.Lock()
-		s.latest = &heard{token: a.Token, hostname: a.Hostname, at: s.now()}
-		s.mu.Unlock()
+		switch env.Magic {
+		case magic:
+			var a announce
+			if json.Unmarshal(buf[:n], &a) != nil || a.Fingerprint == "" {
+				continue
+			}
+			// A host with multiple multicast-capable interfaces (a VPN /
+			// tailnet tunnel adapter alongside the real LAN NIC, common on a
+			// dev machine) sends the same announce out every one of them
+			// (see multicastSend), so more than one copy can arrive with
+			// different source addresses. Only accept one whose source is
+			// actually on the physical LAN (or loopback, for same-host
+			// listener+broadcaster in tests): a tunnel-adapter address isn't
+			// a real second machine, and — worse — a reveal request unicast
+			// back to it can be silently swallowed by that tunnel's own
+			// routing rather than ever reaching a listening socket, turning
+			// a legitimate reveal into a silent timeout.
+			addr := groupPortAddr(src)
+			if addr == nil || !(addr.IP.IsLoopback() || util.PrivateLAN(addr.IP)) {
+				continue
+			}
+			s.mu.Lock()
+			s.latest = &heard{
+				fingerprint: a.Fingerprint,
+				hostname:    a.Hostname,
+				addr:        addr,
+				at:          s.now(),
+			}
+			s.mu.Unlock()
+		case revealReqMagic:
+			var rq revealRequest
+			if json.Unmarshal(buf[:n], &rq) != nil || rq.Fingerprint == "" {
+				continue
+			}
+			s.handleRevealRequest(rq, src)
+		case revealRespMagic:
+			var rr revealResponse
+			if json.Unmarshal(buf[:n], &rr) != nil || rr.Fingerprint == "" {
+				continue
+			}
+			s.handleRevealResponse(rr)
+		}
 	}
 }
 
-// Discovered returns the freshest heard token within maxAge, if any.
-func (s *Service) Discovered(maxAge time.Duration) (token, hostname string, ok bool) {
+// groupPortAddr returns a's IP with the port forced to groupPort: the fixed
+// port every lanpair listener (inviter and joiner alike) is bound to, and
+// therefore the only port a reveal request/response can be answered on. a's
+// own source port (an ephemeral per-broadcast send socket) is not read by
+// anyone and must not be used as a reply target.
+func groupPortAddr(a net.Addr) *net.UDPAddr {
+	u, ok := a.(*net.UDPAddr)
+	if !ok || u == nil {
+		return nil
+	}
+	return &net.UDPAddr{IP: u.IP, Port: groupPort}
+}
+
+// Discovered returns the freshest heard invite within maxAge, if any. It
+// returns a fingerprint — not the redeemable token, which is never
+// broadcast — so a caller can show "found an invite from HOST" and then use
+// RequestReveal (after a human supplies the inviter's PIN) to actually obtain
+// the token.
+func (s *Service) Discovered(maxAge time.Duration) (fingerprint, hostname string, ok bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.latest == nil || s.now().Sub(s.latest.at) > maxAge {
 		return "", "", false
 	}
-	return s.latest.token, s.latest.hostname, true
+	return s.latest.fingerprint, s.latest.hostname, true
 }
 
-// StartBroadcast (re)starts a time-boxed broadcast of token+hostname. Any prior
+// RequestReveal asks the LAN host that broadcast fingerprint to reveal the
+// real pairing token, authenticating with pin — a value a human must read off
+// the inviter's screen and supply locally; it is never transmitted by the
+// periodic LAN announce. A passive listener that only captured the broadcast
+// fingerprint cannot complete this exchange without also guessing the PIN,
+// and guesses are capped by the inviter (see maxRevealAttempts).
+//
+// Returns an error if no recent beacon matches fingerprint, the PIN is
+// rejected, or the inviter doesn't answer within timeout.
+func (s *Service) RequestReveal(fingerprint, pin string, timeout time.Duration) (string, error) {
+	target := s.targetFor(fingerprint)
+	if target == nil {
+		return "", fmt.Errorf("no recent invite matches this fingerprint")
+	}
+
+	s.mu.Lock()
+	conn := s.conn
+	if s.waiters == nil {
+		s.waiters = make(map[string]chan revealOutcome)
+	}
+	ch := make(chan revealOutcome, 1)
+	s.waiters[fingerprint] = ch
+	s.mu.Unlock()
+
+	defer func() {
+		s.mu.Lock()
+		delete(s.waiters, fingerprint)
+		s.mu.Unlock()
+	}()
+
+	if conn == nil {
+		return "", fmt.Errorf("LAN pairing listener is not running")
+	}
+
+	payload, err := json.Marshal(revealRequest{Magic: revealReqMagic, Fingerprint: fingerprint, PIN: pin})
+	if err != nil {
+		return "", err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if _, err := conn.WriteTo(payload, target); err != nil {
+		return "", fmt.Errorf("could not reach inviter on LAN: %w", err)
+	}
+	t := time.NewTicker(revealSendInterval)
+	defer t.Stop()
+	for {
+		select {
+		case out := <-ch:
+			if !out.ok {
+				return "", fmt.Errorf("incorrect pairing PIN")
+			}
+			return out.token, nil
+		case <-t.C:
+			// Re-resolve the target on every retry rather than reusing the
+			// address captured at the start: on a multi-homed host the
+			// inviter's periodic re-announce (every sendInterval, on every
+			// multicast-capable interface) may update the freshest known
+			// source address between ticks, and the first one recorded is
+			// not guaranteed to be the one that actually answers back.
+			if fresh := s.targetFor(fingerprint); fresh != nil {
+				target = fresh
+			}
+			_, _ = conn.WriteTo(payload, target)
+		case <-ctx.Done():
+			return "", fmt.Errorf("no response from inviter (timed out)")
+		}
+	}
+}
+
+// targetFor returns the most recently recorded source address for
+// fingerprint, if any.
+func (s *Service) targetFor(fingerprint string) *net.UDPAddr {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.latest != nil && s.latest.fingerprint == fingerprint {
+		return s.latest.addr
+	}
+	return nil
+}
+
+// handleRevealRequest answers a unicast reveal request if and only if this
+// host currently owns a broadcast session matching rq.Fingerprint and the
+// supplied PIN is correct, subject to a per-session attempt cap. Once the cap
+// is hit without a correct PIN, the session is treated as under attack: no
+// further requests are answered and the broadcast itself is cancelled.
+func (s *Service) handleRevealRequest(rq revealRequest, src net.Addr) {
+	s.mu.Lock()
+	sess := s.session
+	if sess == nil || sess.fingerprint != rq.Fingerprint {
+		s.mu.Unlock()
+		return // not (or no longer) our session — say nothing
+	}
+	if sess.attempts >= maxRevealAttempts {
+		s.mu.Unlock()
+		return // already burned; ignore silently
+	}
+	sess.attempts++
+	ok := subtle.ConstantTimeCompare([]byte(sess.pin), []byte(rq.PIN)) == 1
+	var token string
+	if ok {
+		token = sess.token
+	}
+	exhausted := !ok && sess.attempts >= maxRevealAttempts
+	s.mu.Unlock()
+
+	resp := revealResponse{Magic: revealRespMagic, Fingerprint: rq.Fingerprint, OK: ok, Token: token}
+	payload, err := json.Marshal(resp)
+	if err == nil {
+		_ = s.sendTo(payload, src)
+	}
+
+	if ok {
+		slog.Info("lanpair: pairing PIN confirmed; token revealed to LAN peer")
+		return
+	}
+	if exhausted {
+		slog.Warn("lanpair: pairing PIN attempts exhausted; cancelling broadcast",
+			"fingerprint", rq.Fingerprint)
+		s.StopBroadcast()
+	}
+}
+
+func (s *Service) handleRevealResponse(rr revealResponse) {
+	s.mu.Lock()
+	ch, ok := s.waiters[rr.Fingerprint]
+	if ok {
+		delete(s.waiters, rr.Fingerprint)
+	}
+	s.mu.Unlock()
+	if !ok {
+		return
+	}
+	select {
+	case ch <- revealOutcome{token: rr.Token, ok: rr.OK}:
+	default:
+	}
+}
+
+func (s *Service) sendTo(payload []byte, dst net.Addr) error {
+	s.mu.Lock()
+	c := s.conn
+	s.mu.Unlock()
+	if c == nil {
+		return fmt.Errorf("lanpair: no active listener socket")
+	}
+	_, err := c.WriteTo(payload, dst)
+	return err
+}
+
+// StartBroadcast (re)starts a time-boxed broadcast advertising a pairing
+// fingerprint (never the raw token) on the LAN for window, and returns a
+// freshly generated confirmation PIN for the caller to display locally (e.g.
+// on the inviter's screen). A joining machine can only obtain the actual
+// token via RequestReveal once a human has supplied that PIN. Any prior
 // broadcast is cancelled first, so at most one is ever active. There is
-// deliberately no IPC "stop early" path: the window is short, the token is
-// single-use, and the group is link-local, so letting it self-expire keeps the
-// surface minimal. StopBroadcast exists for tests / shutdown only.
-func (s *Service) StartBroadcast(token, hostname string, window time.Duration) {
+// deliberately no IPC "stop early" path beyond StopBroadcast: the window is
+// short, the token is single-use, and the group is link-local, so letting it
+// self-expire keeps the surface minimal.
+func (s *Service) StartBroadcast(token, hostname string, window time.Duration) string {
+	fp := fingerprintOf(token)
+	pin := generatePIN()
+
 	s.mu.Lock()
 	if s.cancelBcast != nil {
 		s.cancelBcast()
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), window)
 	s.cancelBcast = cancel
+	s.session = &bcastSession{fingerprint: fp, token: token, pin: pin}
 	s.mu.Unlock()
-	go s.broadcastLoop(ctx, token, hostname)
+
+	go s.broadcastLoop(ctx, fp, hostname)
+	return pin
 }
 
-// StopBroadcast cancels any active broadcast.
+// StopBroadcast cancels any active broadcast and clears its session, so no
+// further reveal requests are answered for it.
 func (s *Service) StopBroadcast() {
 	s.mu.Lock()
 	if s.cancelBcast != nil {
 		s.cancelBcast()
 		s.cancelBcast = nil
 	}
+	s.session = nil
 	s.mu.Unlock()
 }
 
-func (s *Service) broadcastLoop(ctx context.Context, token, hostname string) {
+// clearSessionIfMatches drops the active session once its broadcast loop
+// exits (window expired, or the socket failed), so a reveal request arriving
+// after expiry gets no answer even if s.cancelBcast was since overwritten by
+// a newer StartBroadcast call.
+func (s *Service) clearSessionIfMatches(fingerprint string) {
+	s.mu.Lock()
+	if s.session != nil && s.session.fingerprint == fingerprint {
+		s.session = nil
+	}
+	s.mu.Unlock()
+}
+
+func (s *Service) broadcastLoop(ctx context.Context, fingerprint, hostname string) {
+	defer s.clearSessionIfMatches(fingerprint)
+
 	c, err := net.ListenPacket("udp4", "0.0.0.0:0")
 	if err != nil {
 		slog.Warn("lanpair: broadcast socket failed", "err", err)
@@ -256,7 +621,7 @@ func (s *Service) broadcastLoop(ctx context.Context, token, hostname string) {
 	_ = p.SetMulticastTTL(1) // stay on the subnet
 	_ = p.SetMulticastLoopback(true)
 	dst := &net.UDPAddr{IP: groupIP, Port: groupPort}
-	payload, err := json.Marshal(announce{Magic: magic, Token: token, Hostname: hostname})
+	payload, err := json.Marshal(announce{Magic: magic, Hostname: hostname, Fingerprint: fingerprint})
 	if err != nil {
 		return
 	}

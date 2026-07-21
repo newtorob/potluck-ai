@@ -157,25 +157,43 @@ export const meshClient = {
   unpair: () => meshRequest<void>('POST', '/unpair'),
 
   /**
-   * Start broadcasting a pairing token on the local network so a machine on the
-   * same LAN can pick it up without manual copy-paste. Enrolled machine only;
-   * the sidecar stops after a short window. Token + hostname only on the wire.
+   * Start broadcasting a pairing invite on the local network so a machine on
+   * the same LAN can discover it without manual copy-paste. Enrolled machine
+   * only; the sidecar stops after a short window.
+   *
+   * The raw token is NEVER put on the wire — only a one-way fingerprint of
+   * it. The response additively includes `confirmation_pin`, a 6-digit code
+   * generated locally that the caller must display so a human can read it
+   * to whoever is joining; without it, a LAN listener that only captured
+   * the fingerprint cannot redeem a token via POST /pairing/reveal.
    */
   broadcastPairingToken: (token: string) =>
-    meshRequest<{ broadcasting: boolean; window_seconds: number }>(
+    meshRequest<{ broadcasting: boolean; window_seconds: number; confirmation_pin: string }>(
       'POST',
       '/pairing/broadcast',
       { token },
     ),
 
-  /** A pairing token heard on the LAN, if any (unenrolled machine only). */
+  /** A pairing invite heard on the LAN, if any (unenrolled machine only).
+   *  Carries a fingerprint only — never a redeemable token. */
   discoveredPairing: () => meshRequest<DiscoveredPairing>('GET', '/pairing/discovered'),
+
+  /**
+   * Exchange a human-entered PIN for the actual pairing token held by the
+   * inviter. The inviter caps wrong guesses at 5 per broadcast session
+   * (server-side, `internal/lanpair.maxRevealAttempts`); after the cap the
+   * broadcast is cancelled and further reveal calls time out rather than
+   * returning a distinguishable "exhausted" error, so the caller is
+   * expected to track its own attempt count as a UX nicety.
+   */
+  revealPairing: (fingerprint: string, pin: string) =>
+    meshRequest<{ token: string }>('POST', '/pairing/reveal', { fingerprint, pin }),
 };
 
 /** Result of GET /pairing/discovered. */
 export type DiscoveredPairing =
   | { found: false }
-  | { found: true; token: string; hostname: string };
+  | { found: true; hostname: string; fingerprint: string; pin_required: true };
 
 // ---------------------------------------------------------------------------
 // Coordinator helpers (direct HTTP, not via the bridge)

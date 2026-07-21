@@ -34,6 +34,7 @@ export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
   const [isIssuing, setIsIssuing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [broadcasting, setBroadcasting] = useState(false);
+  const [confirmationPin, setConfirmationPin] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -48,20 +49,27 @@ export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
     setError(null);
     setCopied(false);
     setBroadcasting(false);
+    setConfirmationPin(null);
     setIsIssuing(true);
 
     void (async () => {
       try {
         const res = await issuePairingToken();
         if (!cancelled) setToken(res);
-        // Best-effort: also push the token onto the local network so a machine
-        // on the same LAN can pick it up without copy-paste. Failure (no mesh
+        // Best-effort: also push a fingerprint of the token onto the local
+        // network so a machine on the same LAN can discover it without
+        // copy-paste. The raw token never goes on the wire — the sidecar
+        // returns a confirmation_pin instead, which we display here for the
+        // user to read aloud to whoever is joining. Failure (no mesh
         // sidecar, no LAN) just falls back to manual paste.
         if (!cancelled) {
           void meshClient
             .broadcastPairingToken(res.token)
-            .then(() => {
-              if (!cancelled) setBroadcasting(true);
+            .then((broadcastRes) => {
+              if (!cancelled) {
+                setBroadcasting(true);
+                setConfirmationPin(broadcastRes.confirmation_pin);
+              }
             })
             .catch(() => {
               /* LAN broadcast unavailable; manual token still works */
@@ -293,18 +301,31 @@ export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
                 </Step>
                 <Step n={3}>
                   Paste this token, or if the other machine is on this network,
-                  pick this invite from its "Join existing household" panel. The
-                  two machines then connect directly on the LAN or relay through
+                  pick this invite from its "Join existing household" panel and
+                  enter the PIN shown below when broadcasting starts. The two
+                  machines then connect directly on the LAN or relay through
                   Potluck's DERP servers if they can't reach each other.
                 </Step>
               </ol>
 
-              {broadcasting && (
-                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <RadioTower className="h-3 w-3 text-sage" aria-hidden="true" />
-                  Also inviting machines on this network for 2 minutes, so a
-                  nearby machine can join without the token.
-                </p>
+              {broadcasting && confirmationPin !== null && (
+                <div className="space-y-2 rounded-xl border border-sage/30 bg-sage/8 p-4">
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <RadioTower className="h-3 w-3 text-sage" aria-hidden="true" />
+                    Also inviting machines on this network for 2 minutes. On
+                    the other device, pick this invite and enter this PIN:
+                  </p>
+                  <p
+                    className="text-center font-mono text-2xl font-semibold tracking-[0.3em] text-foreground"
+                    aria-label={`Confirmation PIN ${confirmationPin.split('').join(' ')}`}
+                  >
+                    {confirmationPin}
+                  </p>
+                  <p className="text-center text-[11px] text-muted-foreground/70">
+                    This PIN is never sent over the network — read it aloud or
+                    show this screen to whoever is joining.
+                  </p>
+                </div>
               )}
             </>
           )}

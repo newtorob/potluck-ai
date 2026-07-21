@@ -361,6 +361,7 @@ func New(cfg Config) *Server {
 	mux.HandleFunc("GET /events", s.handleEvents)
 	mux.HandleFunc("POST /pairing/broadcast", s.handlePairingBroadcast)
 	mux.HandleFunc("GET /pairing/discovered", s.handlePairingDiscovered)
+	mux.HandleFunc("POST /pairing/reveal", s.handlePairingReveal)
 
 	// Wrap every response with the protocol-version header.
 	versionMW := func(next http.Handler) http.Handler {
@@ -754,13 +755,25 @@ const (
 	// the coordinator token may live an hour, but it only needs to be on the
 	// LAN for the moment the user is actively adding a machine.
 	pairingBroadcastWindow = 120 * time.Second
-	// A discovered token is only offered if heard within this window.
+	// A discovered invite is only offered if heard within this window.
 	pairingDiscoveryMaxAge = 150 * time.Second
+	// How long POST /pairing/reveal waits for the inviter to answer a
+	// PIN-gated reveal request before giving up.
+	pairingRevealTimeout = 5 * time.Second
 )
 
-// handlePairingBroadcast starts broadcasting a pairing token on the LAN. Only an
-// enrolled machine can invite (it is the one that issued the token); an
+// handlePairingBroadcast starts broadcasting a pairing invite on the LAN. Only
+// an enrolled machine can invite (it is the one that issued the token); an
 // unenrolled machine has no token to share.
+//
+// The LAN announce itself never carries the raw, redeemable token (see
+// internal/lanpair's package doc) — only a one-way fingerprint of it. The
+// response here additively includes a freshly generated confirmation_pin:
+// the caller is expected to display it locally (e.g. on the inviter's
+// screen) so a human can read it aloud/over-the-shoulder to whoever is
+// joining. Without that PIN, a machine that only overheard the LAN broadcast
+// cannot complete POST /pairing/reveal and so cannot obtain a redeemable
+// token from a passive capture alone.
 func (s *Server) handlePairingBroadcast(w http.ResponseWriter, r *http.Request) {
 	if s.lanpair == nil {
 		writeError(w, http.StatusServiceUnavailable, "lan_unavailable", "LAN pairing is not available")
@@ -778,32 +791,84 @@ func (s *Server) handlePairingBroadcast(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	hostname, _ := os.Hostname()
-	s.lanpair.StartBroadcast(body.Token, hostname, pairingBroadcastWindow)
-	slog.Info("localapi: broadcasting pairing token on LAN", "window_s", int(pairingBroadcastWindow.Seconds()))
+	pin := s.lanpair.StartBroadcast(body.Token, hostname, pairingBroadcastWindow)
+	// Never log the PIN or the token: the PIN is the out-of-band secret this
+	// whole mechanism depends on, same rule as the WG keys / pairing tokens
+	// noted at the top of this file.
+	slog.Info("localapi: broadcasting pairing invite on LAN", "window_s", int(pairingBroadcastWindow.Seconds()))
 	writeJSON(w, http.StatusOK, map[string]any{
-		"broadcasting":   true,
-		"window_seconds": int(pairingBroadcastWindow.Seconds()),
+		"broadcasting":     true,
+		"window_seconds":   int(pairingBroadcastWindow.Seconds()),
+		"confirmation_pin": pin,
 	})
 }
 
-// handlePairingDiscovered returns a pairing token heard on the LAN, if any. Only
+// handlePairingDiscovered returns an invite heard on the LAN, if any. Only
 // meaningful on an unenrolled machine that is looking to join; an enrolled
-// machine never acts on a discovered token.
+// machine never acts on a discovered invite.
+//
+// This intentionally no longer returns a redeemable token (it never learned
+// one — the LAN announce doesn't carry it). It returns a fingerprint the
+// caller can use with POST /pairing/reveal once a human has supplied the
+// inviter's confirmation PIN.
 func (s *Server) handlePairingDiscovered(w http.ResponseWriter, r *http.Request) {
 	if s.lanpair == nil || s.enrolled.Load() == 1 {
 		writeJSON(w, http.StatusOK, map[string]any{"found": false})
 		return
 	}
-	token, hostname, ok := s.lanpair.Discovered(pairingDiscoveryMaxAge)
+	fingerprint, hostname, ok := s.lanpair.Discovered(pairingDiscoveryMaxAge)
 	if !ok {
 		writeJSON(w, http.StatusOK, map[string]any{"found": false})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"found":    true,
-		"token":    token,
-		"hostname": hostname,
+		"found":        true,
+		"hostname":     hostname,
+		"fingerprint":  fingerprint,
+		"pin_required": true,
 	})
+}
+
+type pairingRevealRequest struct {
+	Fingerprint string `json:"fingerprint"`
+	PIN         string `json:"pin"`
+}
+
+// handlePairingReveal exchanges a human-confirmed PIN for the actual pairing
+// token held by the inviter's sidecar. The PIN is read by a human off the
+// inviter's screen (returned from POST /pairing/broadcast as
+// confirmation_pin) — it was never itself broadcast on the LAN. A passive
+// listener that only captured the announce's fingerprint cannot complete
+// this exchange: it needs the PIN, and the inviter rate-limits + burns the
+// broadcast session after a small number of wrong guesses (see
+// internal/lanpair.maxRevealAttempts).
+func (s *Server) handlePairingReveal(w http.ResponseWriter, r *http.Request) {
+	if s.lanpair == nil {
+		writeError(w, http.StatusServiceUnavailable, "lan_unavailable", "LAN pairing is not available")
+		return
+	}
+	if s.enrolled.Load() == 1 {
+		writeError(w, http.StatusConflict, "already_enrolled",
+			"this node is already enrolled; call POST /unpair first to re-pair")
+		return
+	}
+	var req pairingRevealRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "invalid JSON body: "+err.Error())
+		return
+	}
+	if req.Fingerprint == "" || req.PIN == "" {
+		writeError(w, http.StatusBadRequest, "bad_request", "fingerprint and pin are required")
+		return
+	}
+
+	token, err := s.lanpair.RequestReveal(req.Fingerprint, req.PIN, pairingRevealTimeout)
+	if err != nil {
+		slog.Warn("localapi: pairing reveal failed", "err", err)
+		writeError(w, http.StatusUnauthorized, "reveal_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"token": token})
 }
 
 // ---------------------------------------------------------------------------
