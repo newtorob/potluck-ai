@@ -15,6 +15,34 @@ Usage:
     python -m potluck_local.mcp --stdio
     python -m potluck_local.mcp --tcp 8322
 
+Auth contract (2026-07-17 security audit, MEDIUM)
+---------------------------------------------------
+stdio is unchanged and carries NO token: it is a private pipe to a single
+child process spawned by the caller (Electron, Claude Code, ...), so the
+OS process boundary is the credential. This is how most agents connect.
+
+--tcp is a loopback TCP/SSE listener, reachable by ANY local process that
+can open a socket to 127.0.0.1 -- unlike stdio there is no OS-enforced
+caller identity. It therefore requires a shared-secret bearer token, read
+from POTLUCK_MCP_TOKEN (or POTLUCK_SIDECAR_TOKEN as a fallback, so the
+desktop app can reuse the same per-launch secret it already generates for
+the HTTP sidecar). Every request must send `Authorization: Bearer <token>`;
+requests are compared with hmac.compare_digest (see _TokenAuthMiddleware),
+mirroring the sidecar_token gate in potluck_local.app.
+
+FastMCP's own `auth=` parameter is NOT used here: it implements the full
+MCP OAuth flow and requires an `issuer_url` (a real OAuth authorization
+server) -- there is no local-shared-secret mode in the installed SDK
+(mcp==1.12.4). Instead we wrap the plain Starlette app FastMCP.sse_app()
+returns in a minimal ASGI middleware, which is the SDK-supported escape
+hatch for custom auth.
+
+Fail-safe: if --tcp is passed and neither POTLUCK_MCP_TOKEN nor
+POTLUCK_SIDECAR_TOKEN is set, the process refuses to start (exit 1) rather
+than binding an unauthenticated socket. --tcp is opt-in (never entered
+unless a user explicitly runs it), so this cannot break the default stdio
+path used by Electron/Claude Code/etc.
+
 Observability:
   On startup: opens an AgentSession row in mcp_sessions.
   clientInfo is captured via a notifications/initialized handler registered on
@@ -27,6 +55,7 @@ Observability:
 import argparse
 import asyncio
 import contextvars
+import hmac
 import logging
 import os
 import sys
@@ -512,6 +541,78 @@ def _build_mcp(host: str = _LOOPBACK, port: int = _DEFAULT_TCP_PORT) -> FastMCP:
 
 
 # ---------------------------------------------------------------------------
+# TCP/SSE auth gate
+# ---------------------------------------------------------------------------
+
+# Env var read for the TCP/SSE shared-secret gate. Falls back to
+# POTLUCK_SIDECAR_TOKEN (see main()) so the desktop app can reuse the same
+# per-launch secret it already generates for the HTTP sidecar without a
+# second value to plumb through Electron. See the module docstring "Auth
+# contract" section for the full rationale.
+MCP_TOKEN_ENV = "POTLUCK_MCP_TOKEN"
+_SIDECAR_TOKEN_ENV = "POTLUCK_SIDECAR_TOKEN"
+
+
+class _TokenAuthMiddleware:
+    """Minimal ASGI middleware requiring `Authorization: Bearer <token>`.
+
+    Wraps the plain Starlette app FastMCP.sse_app() returns. This is a
+    deliberately small hand-rolled gate rather than FastMCP's `auth=`
+    parameter -- see the module docstring for why (auth= needs a real OAuth
+    issuer_url; there is no local shared-secret mode in the SDK). Every HTTP
+    request on the TCP/SSE listener (including the initial SSE handshake and
+    the POST /messages/ tool-call endpoint) must present the token; there is
+    no exempt path, unlike the HTTP sidecar which exempts /health.
+    """
+
+    def __init__(self, app: Any, token: str) -> None:
+        self._app = app
+        self._token = token
+
+    async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
+        if scope["type"] != "http":
+            await self._app(scope, receive, send)
+            return
+
+        from starlette.responses import JSONResponse
+
+        headers = dict(scope.get("headers") or [])
+        raw = headers.get(b"authorization", b"").decode("latin-1")
+        presented = raw[7:] if raw[:7].lower() == "bearer " else ""
+        if not (presented and hmac.compare_digest(presented, self._token)):
+            response = JSONResponse(
+                {"detail": "missing or invalid MCP token"}, status_code=401
+            )
+            await response(scope, receive, send)
+            return
+
+        await self._app(scope, receive, send)
+
+
+async def _serve_sse_authenticated(mcp: FastMCP, token: str) -> None:
+    """Run the SSE transport behind _TokenAuthMiddleware.
+
+    Reimplements FastMCP.run_sse_async() (build the Starlette app, hand it to
+    uvicorn on mcp.settings.host/port) but wraps the app in the token gate
+    first. Kept in sync manually with the SDK's run_sse_async -- if a future
+    mcp-package upgrade changes that method's uvicorn wiring, mirror the
+    change here too.
+    """
+    import uvicorn
+
+    starlette_app = mcp.sse_app()
+    protected_app = _TokenAuthMiddleware(starlette_app, token)
+    config = uvicorn.Config(
+        protected_app,
+        host=mcp.settings.host,
+        port=mcp.settings.port,
+        log_level=mcp.settings.log_level.lower(),
+    )
+    server = uvicorn.Server(config)
+    await server.serve()
+
+
+# ---------------------------------------------------------------------------
 # Argument parsing
 # ---------------------------------------------------------------------------
 
@@ -552,10 +653,26 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.tcp is not None:
         port = args.tcp
-        logger.info("potluck_mcp_start transport=sse host=%s port=%d", _LOOPBACK, port)
+        # Shared-secret gate — see the module docstring "Auth contract"
+        # section. Fail safe: refuse to bind an unauthenticated TCP/SSE
+        # socket rather than silently exposing memory_search/memory_list/
+        # memory_delete to any local process that finds the port.
+        token = os.environ.get(MCP_TOKEN_ENV) or os.environ.get(_SIDECAR_TOKEN_ENV)
+        if not token:
+            logger.error(
+                "potluck_mcp_tcp_refused reason=no_token — set %s (or %s) "
+                "before starting --tcp mode; the TCP/SSE transport has no "
+                "other authentication and must never be exposed unauthenticated",
+                MCP_TOKEN_ENV,
+                _SIDECAR_TOKEN_ENV,
+            )
+            raise SystemExit(1)
+        logger.info(
+            "potluck_mcp_start transport=sse host=%s port=%d auth=token", _LOOPBACK, port
+        )
         mcp = _build_mcp(host=_LOOPBACK, port=port)
         try:
-            mcp.run(transport="sse")
+            asyncio.run(_serve_sse_authenticated(mcp, token))
         except KeyboardInterrupt:
             logger.info("potluck_mcp_shutdown transport=sse")
     else:

@@ -7,6 +7,7 @@ Full implementation per guide §4.4 and §9.9 — small, self-contained, no heav
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -186,9 +187,24 @@ def save_settings(
     settings: PotluckSettings,
     config_path: Path = _CONFIG_PATH,
 ) -> None:
-    """Persist settings to disk, creating the directory if needed."""
+    """Persist settings to disk, creating the directory if needed.
+
+    config.json holds secrets in cleartext (gateway.api_key), so the file is
+    chmod'd 0600 and its parent dir 0700 on every save — idempotent, cheap,
+    and closes the window where a freshly-created file was briefly
+    world-readable before permissions were applied. os.chmod is a partial
+    no-op on Windows (no POSIX mode bits); best-effort there, never fatal.
+    """
     config_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(config_path.parent, 0o700)
+    except OSError:
+        pass
     config_path.write_text(settings.model_dump_json(indent=2), encoding="utf-8")
+    try:
+        os.chmod(config_path, 0o600)
+    except OSError:
+        pass
     # Keep the mtime cache coherent so the next get_settings reflects this write.
     try:
         _settings_cache[str(config_path)] = (config_path.stat().st_mtime, settings)

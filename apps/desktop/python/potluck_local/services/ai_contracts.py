@@ -36,7 +36,14 @@ from __future__ import annotations
 #   - the prompt text in _EXTRACTION_PROMPT changes
 #   - the JSON schema we ask the model to return changes
 #   - the input-conversation slicing (how much context we pass in) changes
-EXTRACTION_PROMPT_VERSION = "extraction-v2-2026-05-27"
+#
+# v3 (2026-07-17 security audit, MEDIUM): added a rule restricting category
+# "instruction" to directives the user typed themselves — never pasted,
+# quoted, or copied text — to reduce prompt-injection-via-paste turning into
+# a stored "instruction" memory. See RETRIEVAL_PROFILE_VERSION v3 for the
+# paired retrieval-side mitigation (auto-extracted instructions no longer
+# get always-inject status).
+EXTRACTION_PROMPT_VERSION = "extraction-v3-2026-07-17"
 
 # Version stamped on memories saved via the explicit user-typed path
 # (memory_save MCP tool, /memory POST endpoint). No LLM is involved here,
@@ -75,6 +82,17 @@ VAULT_INGESTION_VERSION = "vault-ingest-v1"
 #            or empty embedding store), RRF reduces to keyword-only ranking —
 #            identical to v1 behavior.
 #
+# v3 (2026-07-17 security audit, MEDIUM): Tier 1 no longer always-injects
+#   category='instruction' memories whose source_type='extracted' (i.e.
+#   auto-extracted from raw conversation text, which may contain pasted/
+#   untrusted content). Tier 1 now injects: all 'preference' memories, plus
+#   'instruction' memories only when source_type != 'extracted' (explicit
+#   user-confirmed instructions via memory_save). Auto-extracted instructions
+#   are still stored and still retrievable through Tier 2 (keyword+semantic,
+#   relevance-ranked) like any other memory; pinning (the existing `pinned`
+#   opt-in) is the only path back to always-inject status. Preference-tier
+#   behavior and Tier 2/RRF are unchanged.
+#
 # Bump when:
 #   - any tier's algorithm, weighting, or budget split changes
 #   - top_k, the score threshold, or any reranking step changes
@@ -82,7 +100,7 @@ VAULT_INGESTION_VERSION = "vault-ingest-v1"
 #   - we swap the embedding model used at query time (embedding-model
 #     drift for stored vectors is already captured separately on
 #     memory_embeddings.model_used)
-RETRIEVAL_PROFILE_VERSION = "retrieval-v2-rrf-2026-05-28"
+RETRIEVAL_PROFILE_VERSION = "retrieval-v3-2026-07-17"
 
 
 # ---------------------------------------------------------------------------

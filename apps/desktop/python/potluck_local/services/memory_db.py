@@ -202,10 +202,40 @@ def _add_column_if_missing(
     return _run()
 
 
+def _secure_memory_db_files(path: Path) -> None:
+    """Chmod the memory DB, its ~/.potluck (and data/) dirs, and any WAL/SHM
+    siblings to owner-only. memory.db holds the full content of every stored
+    memory in cleartext, so this must not be world-readable.
+
+    Idempotent — safe to call on every init_memory_db, including when the
+    file already existed from a previous run. os.chmod is a partial no-op on
+    Windows (no POSIX mode bits); best-effort there, never fatal.
+    """
+    dirs = {path.parent, path.parent.parent}
+    for d in dirs:
+        try:
+            os.chmod(d, 0o700)
+        except OSError:
+            pass
+    # WAL mode leaves -wal/-shm alongside the main file; both can contain
+    # unflushed memory content, so they need the same restriction.
+    candidates = [path, path.with_name(path.name + "-wal"), path.with_name(path.name + "-shm")]
+    for f in candidates:
+        if f.exists():
+            try:
+                os.chmod(f, 0o600)
+            except OSError:
+                pass
+
+
 async def init_memory_db(db_path: Path | None = None) -> None:
     """Create the DB file and all tables/indices if missing. Idempotent."""
     path = db_path or get_memory_db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(path.parent, 0o700)
+    except OSError:
+        pass
 
     async with aiosqlite.connect(path) as db:
         # WAL mode: allows concurrent readers + one writer without blocking.
@@ -296,6 +326,7 @@ async def init_memory_db(db_path: Path | None = None) -> None:
 
         await db.commit()
 
+    _secure_memory_db_files(path)
     logger.info("memory_db_ready path=%s journal_mode=wal", path)
 
 

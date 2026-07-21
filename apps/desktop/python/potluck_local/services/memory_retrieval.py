@@ -447,12 +447,36 @@ class MemoryRetriever:
                 # Tier 1: top high-confidence preferences + instructions as
                 # ambient context (excludes already-pinned rows so they don't
                 # double-count).
+                #
+                # SECURITY (2026-07-17 audit, MEDIUM): auto-extracted
+                # ('source_type=extracted') instruction memories are NOT
+                # granted Tier-1 always-inject status here. The extractor
+                # pulls 'instruction' memories out of raw conversation text,
+                # which may include pasted/quoted untrusted content (e.g. a
+                # copied doc containing "ignore previous instructions..."). If
+                # that text scores >=0.7 confidence it used to become a
+                # standing instruction force-injected into every future
+                # session and every MCP-connected agent, with no review. It
+                # is still stored and still retrievable via Tier 2 (keyword +
+                # semantic ranking, subject to relevance and confidence like
+                # any other memory) -- it just no longer bypasses relevance
+                # ranking for free. Explicitly user-confirmed instructions
+                # (source_type='explicit', i.e. saved via memory_save because
+                # the user or agent directly asked to remember them) are
+                # unaffected and still preload here, as do preference-category
+                # memories of either source_type. The reversible opt-in path
+                # for an auto-extracted instruction to become standing/ambient
+                # context is the existing `pinned` mechanism (memory_retrieval.
+                # set_pinned) -- the same mechanism already used for Tier 0.
                 cursor = await db.execute(
                     f"""SELECT * FROM memories
                        WHERE is_active = 1
                          AND pinned = 0
                          AND confidence >= ?
-                         AND category IN ('preference', 'instruction')
+                         AND (
+                             category = 'preference'
+                             OR (category = 'instruction' AND source_type != 'extracted')
+                         )
                          AND {proj_clause}
                        ORDER BY confidence DESC, last_accessed_at DESC
                        LIMIT ?""",
@@ -483,8 +507,19 @@ class MemoryRetriever:
                 cat_clause = "AND category = ?"
                 cat_params: list = [category]
             else:
-                # Exclude Tier-1 categories to avoid duplicating those rows
-                cat_clause = "AND category NOT IN ('preference', 'instruction')"
+                # Exclude Tier-1 categories to avoid duplicating those rows --
+                # EXCEPT auto-extracted ('source_type=extracted') instruction
+                # memories. As of the 2026-07-17 security fix those no longer
+                # get Tier-1 always-inject status (see the Tier-1 query
+                # above), so Tier 2 is their only path to being surfaced by
+                # relevance. Without this carve-out they would be excluded
+                # from BOTH tiers -- contradicting the fix's explicit
+                # contract that they "are still stored and still retrievable
+                # by relevance", not force-injected.
+                cat_clause = (
+                    "AND (category NOT IN ('preference', 'instruction') "
+                    "OR (category = 'instruction' AND source_type = 'extracted'))"
+                )
                 cat_params = []
 
             # --- Keyword arm (same SQL as before) ---
