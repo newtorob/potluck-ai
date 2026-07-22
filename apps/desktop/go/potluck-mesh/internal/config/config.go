@@ -15,6 +15,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -48,6 +49,15 @@ type Config struct {
 	// Populated either from --wg-public-key flag / env var (for nodes that
 	// already have a key) or derived after key generation on first run.
 	WGPublicKey string
+
+	// SigningPrivateKeyPath is the path to this node's Ed25519 signing
+	// private key file, used ONLY for the DERP-token proof-of-possession
+	// challenge (POST /mesh/derp-token nonce+signature — see
+	// internal/signingkey). Distinct from WGPrivateKeyPath: the WG key is
+	// Curve25519 (DH-only, cannot sign); this is a separate Ed25519 keypair.
+	// Generated once and persisted (mode 0600) alongside the WG key, mirroring
+	// LoadOrGenerateKeyPair's pattern. Never logged.
+	SigningPrivateKeyPath string
 
 	// NodeName is the human-readable name for this node (defaults to hostname).
 	NodeName string
@@ -119,6 +129,10 @@ func Load() (*Config, error) {
 	flag.StringVar(&cfg.WGPublicKey, "wg-public-key",
 		envOr("POTLUCK_WG_PUBLIC_KEY", ""),
 		"WireGuard public key (base64); if empty, derived from private key (env: POTLUCK_WG_PUBLIC_KEY)")
+
+	flag.StringVar(&cfg.SigningPrivateKeyPath, "signing-key-path",
+		envOr("POTLUCK_SIGNING_KEY_PATH", defaultSigningKeyPath()),
+		"Path to the Ed25519 DERP-token proof-of-possession signing key file; generated on first run if absent (env: POTLUCK_SIGNING_KEY_PATH)")
 
 	flag.StringVar(&cfg.NodeName, "node-name",
 		envOr("POTLUCK_NODE_NAME", hostname),
@@ -238,4 +252,13 @@ func defaultPrivateKeyPath() string {
 		}
 		return "/var/lib/potluck/mesh/wg.key"
 	}
+}
+
+// defaultSigningKeyPath returns the default path for the Ed25519
+// proof-of-possession signing key, sited next to the default WG key path
+// (same directory, "signing.key" filename). Computed independently of any
+// --wg-private-key-path override so the flag default is stable at flag-
+// registration time (flags are declared before Parse() runs).
+func defaultSigningKeyPath() string {
+	return filepath.Join(filepath.Dir(defaultPrivateKeyPath()), "signing.key")
 }

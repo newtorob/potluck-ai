@@ -43,6 +43,7 @@ import (
 	"github.com/potluck-ai/potluck-mesh/internal/events"
 	"github.com/potluck-ai/potluck-mesh/internal/lanpair"
 	"github.com/potluck-ai/potluck-mesh/internal/peerstate"
+	"github.com/potluck-ai/potluck-mesh/internal/signingkey"
 )
 
 // protocolVersion is the value of the X-Potluck-Protocol-Version response
@@ -302,6 +303,7 @@ type Config struct {
 	CoordClient        *coordapi.Client
 	SignalRestart      SignalRestartFunc
 	WGPrivKeyPath      string           // path to detect / generate the WG private key
+	SigningKeyPath     string           // path to the Ed25519 DERP-token PoP signing key (internal/signingkey)
 	SocketPath         string           // "" → use platform default
 	Platform           string           // runtime.GOOS
 	LanPair            *lanpair.Service // LAN pairing-token broadcast/listen; may be nil
@@ -318,6 +320,7 @@ type Server struct {
 	coordClient        *coordapi.Client
 	signalRestart      SignalRestartFunc
 	wgPrivKeyPath      string
+	signingKeyPath     string
 	platform           string
 	socketPath         string
 	lanpair            *lanpair.Service
@@ -348,6 +351,7 @@ func New(cfg Config) *Server {
 		coordClient:        cfg.CoordClient,
 		signalRestart:      cfg.SignalRestart,
 		wgPrivKeyPath:      cfg.WGPrivKeyPath,
+		signingKeyPath:     cfg.SigningKeyPath,
 		platform:           cfg.Platform,
 		socketPath:         sp,
 		lanpair:            cfg.LanPair,
@@ -627,13 +631,30 @@ func (s *Server) handlePair(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Generate (or load) this node's Ed25519 signing keypair — DISTINCT from
+	// the WG keypair above, used only for the DERP-token PoP challenge. A
+	// failure here is logged but does NOT fail pairing: signing_public_key is
+	// optional on the wire (coordinator/schemas/mesh.py), so a node that
+	// can't produce one simply enrolls without it and falls back to the
+	// legacy DERP-token auth path forever (safe, just unhardened for that
+	// one node).
+	var signingPubKey *string
+	signingKP, skErr := signingkey.LoadOrGenerate(s.signingKeyPath)
+	if skErr != nil {
+		slog.Warn("localapi: pair: signing keypair unavailable, enrolling without PoP support",
+			"err", skErr)
+	} else {
+		signingPubKey = &signingKP.PublicKeyB64
+	}
+
 	// Call the coordinator's enroll endpoint.
 	platform := s.platform
 	enrollReq := coordapi.EnrollRequest{
-		PairingToken: req.PairingToken,
-		WGPublicKey:  wgPublicKey,
-		NodeName:     nodeName,
-		Platform:     &platform,
+		PairingToken:     req.PairingToken,
+		WGPublicKey:      wgPublicKey,
+		NodeName:         nodeName,
+		Platform:         &platform,
+		SigningPublicKey: signingPubKey,
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
@@ -656,6 +677,23 @@ func (s *Server) handlePair(w http.ResponseWriter, r *http.Request) {
 		slog.Error("localapi: pair: coordinator request failed", "err", err)
 		writeError(w, http.StatusBadGateway, "coordinator_unreachable", err.Error())
 		return
+	}
+
+	// The coordinator accepted this enrollment — if we sent a
+	// signing_public_key, it is now registered there. This is the ONLY point
+	// in the node's lifecycle where that becomes true; record it locally so
+	// the DERP-token fetcher knows it's safe to start signing (see
+	// internal/signingkey's package doc for why this ordering matters).
+	if signingPubKey != nil {
+		if mErr := signingkey.MarkRegistered(s.signingKeyPath, *signingPubKey); mErr != nil {
+			// Non-fatal: the coordinator DOES have the key registered now, we
+			// just failed to record that fact locally. Worst case this node
+			// stays on the legacy (unsigned) DERP-token path until the marker
+			// write can succeed on a future pairing — never a false-positive
+			// "registered" that could trigger an unregistered-signature 401.
+			slog.Warn("localapi: pair: failed to persist signing-key registration marker",
+				"err", mErr)
+		}
 	}
 
 	// Persist state and mark enrolled.
@@ -691,6 +729,22 @@ func (s *Server) handleUnpair(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "unpair_failed",
 			"could not remove WG private key: "+err.Error())
 		return
+	}
+
+	// Wipe the signing keypair + its registration marker too, so a
+	// subsequent /pair generates a fresh Ed25519 identity and starts from a
+	// clean (unregistered) state — it only starts signing DERP-token
+	// requests again once that fresh /pair actually confirms registration.
+	// Best-effort: a failure here doesn't block unpair (the WG key removal
+	// above is what actually severs the node from the household), but it
+	// does mean a stale signing key could linger — log so it's visible.
+	if s.signingKeyPath != "" {
+		if err := os.Remove(s.signingKeyPath); err != nil && !os.IsNotExist(err) {
+			slog.Warn("localapi: unpair: remove signing key failed", "err", err)
+		}
+		if err := signingkey.ClearRegistered(s.signingKeyPath); err != nil {
+			slog.Warn("localapi: unpair: clear signing-key registration marker failed", "err", err)
+		}
 	}
 
 	s.enrolled.Store(0)

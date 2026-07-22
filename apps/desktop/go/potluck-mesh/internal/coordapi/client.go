@@ -57,6 +57,14 @@ type EnrollRequest struct {
 	WGPublicKey  string  `json:"wg_public_key"`
 	NodeName     string  `json:"node_name"`
 	Platform     *string `json:"platform,omitempty"`
+	// SigningPublicKey is the OPTIONAL Ed25519 public key (base64url, no
+	// padding — see internal/signingkey) used ONLY for the DERP-token
+	// proof-of-possession challenge. Mirrors
+	// coordinator/schemas/mesh.py:EnrollRequest.signing_public_key exactly:
+	// omitted (nil) is back-compat with any coordinator that predates PoP
+	// hardening, and is itself perfectly safe — the coordinator's DERP-token
+	// endpoint only verifies a signature when one is actually sent.
+	SigningPublicKey *string `json:"signing_public_key,omitempty"`
 }
 
 // EnrolledPeer mirrors coordinator/schemas/mesh.py:EnrolledPeer.

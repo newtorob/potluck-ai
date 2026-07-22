@@ -21,6 +21,7 @@ import (
 	"github.com/potluck-ai/potluck-mesh/internal/events"
 	"github.com/potluck-ai/potluck-mesh/internal/localapi"
 	"github.com/potluck-ai/potluck-mesh/internal/peerstate"
+	"github.com/potluck-ai/potluck-mesh/internal/signingkey"
 )
 
 // ---------------------------------------------------------------------------
@@ -477,5 +478,157 @@ func TestHandlePair_CoordinatorServerError_MappedTo502(t *testing.T) {
 
 	if resp.StatusCode != http.StatusBadGateway {
 		t.Errorf("expected 502 for coordinator 500, got %d", resp.StatusCode)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// POST /pair — Ed25519 signing-key registration (DERP-token PoP)
+// ---------------------------------------------------------------------------
+
+// TestHandlePair_Success_RegistersSigningKey exercises the full happy path:
+// a successful /pair must (1) attach signing_public_key to the coordinator's
+// EnrollRequest, using the same key this node loads/generates locally, and
+// (2) mark that exact key as registered locally ONLY after the coordinator
+// actually accepted it — this is the ordering guard from
+// internal/signingkey's package doc, verified end-to-end through the real
+// HTTP handler rather than just the helper function.
+func TestHandlePair_Success_RegistersSigningKey(t *testing.T) {
+	var capturedBody map[string]any
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/mesh/enroll" {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if err := json.NewDecoder(r.Body).Decode(&capturedBody); err != nil {
+			t.Fatalf("decode enroll request body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprint(w, `{
+			"node_id": "11111111-1111-1111-1111-111111111111",
+			"household_id": "22222222-2222-2222-2222-222222222222",
+			"mesh_ip": "100.64.0.7",
+			"mesh_cidr": "100.64.0.0/24",
+			"peers": []
+		}`)
+	}))
+	defer mock.Close()
+
+	cfg := defaultCfg(t)
+	cfg.CoordClient = coordapi.New(mock.URL)
+	signingKeyPath := filepath.Join(t.TempDir(), "signing.key")
+	cfg.SigningKeyPath = signingKeyPath
+
+	client, _ := testServer(t, cfg)
+
+	body := strings.NewReader(`{"pairing_token":"GOODTOKEN1234567890123456789012"}`)
+	resp, err := client.Post("http://localhost/pair", "application/json", body)
+	if err != nil {
+		t.Fatalf("POST /pair: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 201, got %d: %s", resp.StatusCode, b)
+	}
+
+	// The enroll request sent to the coordinator must carry signing_public_key
+	// under exactly that field name (coordinator/schemas/mesh.py::EnrollRequest).
+	spk, ok := capturedBody["signing_public_key"].(string)
+	if !ok || spk == "" {
+		t.Fatalf("enroll request did not carry signing_public_key: %v", capturedBody)
+	}
+
+	// The node's own local signing key (loaded/generated during this /pair
+	// call) must be the exact one sent to the coordinator...
+	kp, err := signingkey.LoadOrGenerate(signingKeyPath)
+	if err != nil {
+		t.Fatalf("LoadOrGenerate: %v", err)
+	}
+	if kp.PublicKeyB64 != spk {
+		t.Fatalf("local signing key %q does not match the one sent to the coordinator %q", kp.PublicKeyB64, spk)
+	}
+	// ...and, because the coordinator returned 201, it must now be recorded
+	// as registered so future DERP-token requests are safe to sign.
+	if !signingkey.IsRegistered(signingKeyPath, kp.PublicKeyB64) {
+		t.Error("expected the signing key to be marked registered after a successful enroll")
+	}
+}
+
+// TestHandlePair_CoordinatorError_DoesNotRegisterSigningKey is the negative
+// half of the ordering guard: if the coordinator REJECTS the enroll call, the
+// signing key must NOT be marked registered — signing before confirmed
+// registration is exactly the footgun this feature exists to avoid (a
+// signed-but-unregistered DERP-token request 401s outright).
+func TestHandlePair_CoordinatorError_DoesNotRegisterSigningKey(t *testing.T) {
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, `{"detail":"pairing token not found"}`)
+	}))
+	defer mock.Close()
+
+	cfg := defaultCfg(t)
+	cfg.CoordClient = coordapi.New(mock.URL)
+	signingKeyPath := filepath.Join(t.TempDir(), "signing.key")
+	cfg.SigningKeyPath = signingKeyPath
+
+	client, _ := testServer(t, cfg)
+
+	body := strings.NewReader(`{"pairing_token":"BADTOKEN12345678901234567890"}`)
+	resp, err := client.Post("http://localhost/pair", "application/json", body)
+	if err != nil {
+		t.Fatalf("POST /pair: %v", err)
+	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body) //nolint:errcheck
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404 forwarded from coordinator, got %d", resp.StatusCode)
+	}
+
+	kp, err := signingkey.LoadOrGenerate(signingKeyPath)
+	if err != nil {
+		t.Fatalf("LoadOrGenerate: %v", err)
+	}
+	if signingkey.IsRegistered(signingKeyPath, kp.PublicKeyB64) {
+		t.Error("signing key must NOT be marked registered when the coordinator rejected enrollment")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// POST /unpair — signing-key + marker cleanup
+// ---------------------------------------------------------------------------
+
+func TestHandleUnpair_ClearsSigningKeyAndMarker(t *testing.T) {
+	cfg := defaultCfg(t)
+	signingKeyPath := filepath.Join(t.TempDir(), "signing.key")
+	cfg.SigningKeyPath = signingKeyPath
+
+	kp, err := signingkey.LoadOrGenerate(signingKeyPath)
+	if err != nil {
+		t.Fatalf("LoadOrGenerate: %v", err)
+	}
+	if err := signingkey.MarkRegistered(signingKeyPath, kp.PublicKeyB64); err != nil {
+		t.Fatalf("MarkRegistered: %v", err)
+	}
+
+	client, _ := testServer(t, cfg)
+
+	resp, err := client.Post("http://localhost/unpair", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST /unpair: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", resp.StatusCode)
+	}
+
+	if _, err := os.Stat(signingKeyPath); !os.IsNotExist(err) {
+		t.Errorf("expected signing key file to be removed, stat err=%v", err)
+	}
+	if signingkey.IsRegistered(signingKeyPath, kp.PublicKeyB64) {
+		t.Error("expected registration marker to be cleared after unpair")
 	}
 }

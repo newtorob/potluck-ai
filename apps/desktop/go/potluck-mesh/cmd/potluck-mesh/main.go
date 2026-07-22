@@ -78,6 +78,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -94,6 +95,7 @@ import (
 	"github.com/potluck-ai/potluck-mesh/internal/localep"
 	"github.com/potluck-ai/potluck-mesh/internal/peerstate"
 	msignal "github.com/potluck-ai/potluck-mesh/internal/signal"
+	"github.com/potluck-ai/potluck-mesh/internal/signingkey"
 	"github.com/potluck-ai/potluck-mesh/internal/stun"
 	"github.com/potluck-ai/potluck-mesh/internal/tunnel"
 	"github.com/potluck-ai/potluck-mesh/internal/util"
@@ -136,6 +138,19 @@ func run() int {
 	// ---- keypair ---- //
 	if err := config.LoadOrGenerateKeyPair(cfg); err != nil {
 		slog.Error("keypair init failed", "err", err)
+		return 1
+	}
+
+	// ---- signing keypair (DERP-token proof-of-possession; internal/signingkey) ---- //
+	// Generated unconditionally here (mirrors the WG keypair above) so it
+	// exists before the first /pair call even when POTLUCK_DERP_URL is unset
+	// this run. DISTINCT from the WG (Curve25519) key — Ed25519, sign-only.
+	// This does NOT register anything with the coordinator by itself; that
+	// only happens via a successful POST /mesh/enroll (see
+	// internal/localapi's handlePair) and is tracked locally by
+	// internal/signingkey's registration marker.
+	if _, err := signingkey.LoadOrGenerate(cfg.SigningPrivateKeyPath); err != nil {
+		slog.Error("signing keypair init failed", "err", err)
 		return 1
 	}
 
@@ -318,12 +333,13 @@ func run() int {
 			ok, _ := tun.IsPeerConfigured(pubkey)
 			return ok
 		},
-		CoordClient:   coordClient,
-		SignalRestart: signalRestart,
-		WGPrivKeyPath: cfg.WGPrivateKeyPath,
-		SocketPath:    cfg.LocalAPISocketPath,
-		Platform:      cfg.Platform,
-		LanPair:       lanSvc,
+		CoordClient:    coordClient,
+		SignalRestart:  signalRestart,
+		WGPrivKeyPath:  cfg.WGPrivateKeyPath,
+		SigningKeyPath: cfg.SigningPrivateKeyPath,
+		SocketPath:     cfg.LocalAPISocketPath,
+		Platform:       cfg.Platform,
+		LanPair:        lanSvc,
 	})
 
 	// Discover this node's private-LAN endpoints once at startup so they show
@@ -1752,18 +1768,57 @@ type derpTokenResponse struct {
 	Region    string `json:"region"`
 }
 
+// derpTokenRegion is the single v0 DERP region. Shared between the request
+// body ("region") and the PoP-signed message (which must carry the SAME
+// region string — see signingkey.DERPTokenMessage / routers/mesh.py's
+// _verify_derp_pop).
+const derpTokenRegion = "ord"
+
+// buildDERPTokenRequestBody constructs the POST /mesh/derp-token JSON body.
+// It ALWAYS carries wg_public_key + region. It additionally carries the
+// OPTIONAL proof-of-possession nonce+signature, but ONLY when this node's
+// current signing key is confirmed registered with the coordinator (see
+// internal/signingkey's package doc: the coordinator 401s the ENTIRE request
+// if a signature is present but no signing_public_key is registered for this
+// node, so an upgraded-but-not-yet-(re)paired node must omit both fields and
+// fall back to the legacy wg_public_key-possession-only shape it already
+// used before this change — that fallback is what keeps DERP working with
+// POTLUCK_DERP_POP_REQUIRED off, which is the current and only-safe-so-far
+// prod state).
+func buildDERPTokenRequestBody(wgPublicKey, region, signingKeyPath string) map[string]string {
+	body := map[string]string{
+		"wg_public_key": wgPublicKey,
+		"region":        region,
+	}
+
+	kp, err := signingkey.LoadOrGenerate(signingKeyPath)
+	if err != nil {
+		slog.Warn("derp: signing keypair unavailable, requesting token without PoP", "err", err)
+		return body
+	}
+	if !signingkey.IsRegistered(signingKeyPath, kp.PublicKeyB64) {
+		// Not (yet) registered with the coordinator — sign nothing. This is
+		// the normal, safe steady state for any node that hasn't (re)enrolled
+		// since this feature shipped.
+		return body
+	}
+
+	nonce := strconv.FormatInt(time.Now().Unix(), 10)
+	body["nonce"] = nonce
+	body["signature"] = kp.Sign(signingkey.DERPTokenMessage(wgPublicKey, region, nonce))
+	return body
+}
+
 // makeDERPJWTFetcher returns a JWTFetcher that calls the coordinator's
 // POST /mesh/derp-token endpoint to get a fresh auth token.
 func makeDERPJWTFetcher(cfg *config.Config) derp.JWTFetcher {
 	coordinatorURL := cfg.CoordinatorURL
 	wgPublicKey := cfg.WGPublicKey
 	coordinatorToken := cfg.CoordinatorToken
+	signingKeyPath := cfg.SigningPrivateKeyPath
 
 	return func(ctx context.Context) (string, error) {
-		body := map[string]string{
-			"wg_public_key": wgPublicKey,
-			"region":        "ord", // v0: single region
-		}
+		body := buildDERPTokenRequestBody(wgPublicKey, derpTokenRegion, signingKeyPath)
 		bodyBytes, _ := json.Marshal(body)
 
 		req, err := http.NewRequestWithContext(
