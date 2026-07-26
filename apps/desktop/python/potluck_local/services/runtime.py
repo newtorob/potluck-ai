@@ -14,6 +14,7 @@ Big Model Mode (Potluck Phase G, project=potluck-parallel):
 from __future__ import annotations
 
 import asyncio
+import atexit
 import json
 import logging
 import threading
@@ -44,6 +45,8 @@ class LLMRuntime:
         # loads so the Models page + peer rows can show "last bench" without
         # re-running. Populated by benchmark().
         self._benchmarks: dict[str, dict] = {}
+        # Ensure unload runs before ggml-metal's atexit finalize on process exit.
+        self._atexit_registered = False
 
     def is_loaded(self) -> bool:
         return self._model is not None or self._pipeline is not None
@@ -123,6 +126,12 @@ class LLMRuntime:
             self._model_id = Path(model_path).parent.name
             self._loaded_n_ctx = n_ctx
             self._loaded_rpc_servers = tuple(rpc_servers) if rpc_servers else None
+            # Register after Llama() so our atexit runs before ggml-metal's
+            # (atexit is LIFO). Prevents the macOS "python quit unexpectedly /
+            # Reopen" dialog when Metal finalize races process exit.
+            if not self._atexit_registered:
+                atexit.register(self.unload_model)
+                self._atexit_registered = True
 
             logger.info(
                 "model_loaded model_id=%s n_ctx=%d n_gpu_layers=%d n_threads=%s "
@@ -314,13 +323,26 @@ class LLMRuntime:
     def _release_model(self) -> None:
         """Inner release — must be called while _load_lock is held."""
         if self._model is not None:
+            import gc
+
             model_id = self._model_id
-            del self._model
+            # Drop the Llama handle explicitly so ggml-metal frees device
+            # resources now, not during interpreter atexit (which can
+            # GGML_ASSERT on macOS and pop the system "Reopen?" crash dialog).
+            model = self._model
             self._model = None
             self._model_path = None
             self._model_id = None
             self._loaded_n_ctx = None
             self._loaded_rpc_servers = None
+            close = getattr(model, "close", None)
+            if callable(close):
+                try:
+                    close()
+                except Exception:  # noqa: BLE001
+                    logger.exception("model_close_failed model_id=%s", model_id)
+            del model
+            gc.collect()
             logger.info("model_unloaded model_id=%s", model_id)
         if self._batcher is not None:
             self._batcher.stop()

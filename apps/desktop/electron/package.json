@@ -109,5 +109,13 @@
     "electron-builder": "^26.15.6",
     "rimraf": "^6.0.0",
     "wait-on": "^8.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-builder",
+      "electron-winstaller",
+      "esbuild"
+    ]
   }
 }

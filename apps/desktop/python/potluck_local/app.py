@@ -100,9 +100,14 @@ def _client_ip_in_network(
 @contextlib.asynccontextmanager
 async def _lifespan(app: FastAPI):  # noqa: ARG001
     import asyncio
+    import gc
+    import logging
+
     from potluck_local.services.memory_db import init_memory_db
     from potluck_local.services.embedding_backfill import run_embedding_backfill
     from potluck_local.services.agent_observability import AgentObserver
+
+    logger = logging.getLogger(__name__)
 
     await init_memory_db()
 
@@ -137,6 +142,17 @@ async def _lifespan(app: FastAPI):  # noqa: ARG001
     asyncio.create_task(_stale_session_sweeper())
 
     yield
+
+    # Release Metal / llama.cpp before process exit. If the model is still
+    # loaded, ggml-metal's atexit finalize can GGML_ASSERT on macOS
+    # (seen on Ctrl+C / SIGTERM of `make dev`).
+    try:
+        from potluck_local.services.runtime import get_runtime
+
+        get_runtime().unload_model()
+        gc.collect()
+    except Exception:  # noqa: BLE001
+        logger.exception("shutdown_unload_failed")
 
 
 def create_app() -> FastAPI:

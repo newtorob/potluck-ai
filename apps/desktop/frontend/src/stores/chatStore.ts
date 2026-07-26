@@ -14,13 +14,15 @@
  *
  * The `sendMessage` action:
  *   1. Lazily creates a conversation if none active.
- *   2. Appends user message + persists immediately.
- *   3. Creates an empty assistant placeholder (local-only until done).
- *   4. Opens the SSE stream via localApi.streamChat or streamNetworkJob.
- *   5. Appends tokens as they arrive (memory-only during stream).
- *   6. On stream completion: persists the assistant message in one shot
+ *   2. Awaits the conversation create (optimistic UI still returns immediately
+ *      from createConversation; this gate prevents FK races on append).
+ *   3. Appends user message + persists immediately.
+ *   4. Creates an empty assistant placeholder (local-only until done).
+ *   5. Opens the SSE stream via localApi.streamChat or streamNetworkJob.
+ *   6. Appends tokens as they arrive (memory-only during stream).
+ *   7. On stream completion: persists the assistant message in one shot
  *      with all meta (served_by / output_tokens / duration_ms).
- *   7. Marks partial on abort, error on failure (each persisted too).
+ *   8. Marks partial on abort, error on failure (each persisted too).
  */
 
 import { create } from 'zustand';
@@ -227,6 +229,61 @@ function persist<T>(p: Promise<T>, label: string): void {
   });
 }
 
+/**
+ * In-flight conversation creates keyed by id.
+ *
+ * createConversation() returns the optimistic id immediately so the UI can
+ * switch chats without waiting on the network, but message/title persists
+ * MUST wait for the matching create — otherwise SQLite rejects the insert
+ * with FOREIGN KEY constraint failed (messages.conversation_id → conversations).
+ *
+ * The promise resolves to true on success, false on failure (so callers can
+ * retry create before appending).
+ */
+const pendingCreates = new Map<string, Promise<boolean>>();
+
+/** Conversation ids known to exist on disk (hydrated or successfully created).
+ *  ensureConversationPersisted must NOT re-POST create for these — that
+ *  produces UNIQUE constraint failed on every subsequent send. */
+const knownPersistedIds = new Set<string>();
+
+async function ensureConversationPersisted(
+  conversationId: string,
+  getConvo: () =>
+    | {
+        title: string;
+      }
+    | undefined,
+  networkMode: boolean,
+  networkModelSlug: string,
+): Promise<void> {
+  if (knownPersistedIds.has(conversationId)) return;
+
+  const pending = pendingCreates.get(conversationId);
+  if (pending) {
+    const ok = await pending;
+    if (ok || knownPersistedIds.has(conversationId)) return;
+  }
+
+  // Optimistic id whose create failed (or never started). Retry once.
+  const convo = getConvo();
+  if (!convo) return;
+
+  try {
+    await localApi.history.create({
+      id: conversationId,
+      title: convo.title,
+      network_mode: networkMode,
+      network_model_slug: networkMode ? networkModelSlug : null,
+    });
+    knownPersistedIds.add(conversationId);
+  } catch (err) {
+    // Idempotent create on the sidecar returns success for an existing id;
+    // a hard failure still leaves us memory-only for this session.
+    console.warn('[chatStore] ensureConversationPersisted:create failed', err);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
@@ -269,6 +326,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           createdAt: new Date(p.created_at).getTime(),
           updatedAt: new Date(p.updated_at).getTime(),
         };
+        knownPersistedIds.add(p.id);
       }
 
       let activeId: string | null = null;
@@ -318,17 +376,27 @@ export const useChatStore = create<ChatState>()((set, get) => {
       window.localStorage.setItem(ACTIVE_CONVO_KEY, id);
     }
 
-    // Persist. Failure leaves the convo in memory-only mode (won't survive
-    // restart) but the user can still chat in the current session.
-    persist(
-      localApi.history.create({
+    // Persist create, but keep the promise so sendMessage can await it
+    // before appending messages (FK: messages → conversations).
+    const createPromise = localApi.history
+      .create({
         id,
         title: 'New chat',
         network_mode: get().networkMode,
         network_model_slug: get().networkMode ? get().networkModelSlug : null,
-      }),
-      'create',
-    );
+      })
+      .then(() => {
+        knownPersistedIds.add(id);
+        return true;
+      })
+      .catch((err) => {
+        console.warn('[chatStore] persist:create failed', err);
+        return false;
+      })
+      .finally(() => {
+        pendingCreates.delete(id);
+      });
+    pendingCreates.set(id, createPromise);
 
     return id;
   },
@@ -367,6 +435,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
 
       return { conversations: next, activeConversationId: activeId, hydratedIds: nextHydrated };
     });
+
+    knownPersistedIds.delete(id);
 
     // If the new active needs hydration, lazy-load.
     const newActive = get().activeConversationId;
@@ -458,6 +528,16 @@ export const useChatStore = create<ChatState>()((set, get) => {
       };
       return { conversations: { ...s.conversations, [conversationId]: updated } };
     });
+
+    // Ensure the conversation row exists before message/title writes.
+    // createConversation is optimistic; without this gate, append races
+    // ahead and SQLite returns FOREIGN KEY constraint failed.
+    await ensureConversationPersisted(
+      conversationId,
+      () => get().conversations[conversationId],
+      get().networkMode,
+      get().networkModelSlug,
+    );
 
     // Persist user message immediately. The first-message title rename
     // piggybacks here as a separate update — small extra round-trip but
@@ -812,6 +892,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
     // State-only reset — does NOT delete persisted conversations from disk.
     // Use deleteConversation() per-id for that. This action exists for
     // tests and future "panic clear" UI; not currently bound to any view.
+    knownPersistedIds.clear();
+    pendingCreates.clear();
     set({
       conversations: {},
       hydratedIds: new Set(),

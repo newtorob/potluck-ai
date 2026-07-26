@@ -48,7 +48,16 @@ async def shutdown() -> dict[str, str]:
     """Ask the sidecar to shut down cleanly.
 
     Electron posts here before sending SIGKILL so in-flight inference can finish.
+    Unload the model first so ggml-metal does not assert during process exit.
     """
+    import gc
+
+    try:
+        get_runtime().unload_model()
+        gc.collect()
+    except Exception:  # noqa: BLE001
+        # Still proceed to terminate — better a noisy exit than a hung sidecar.
+        pass
 
     def _terminate() -> None:
         os.kill(os.getpid(), signal.SIGTERM)
