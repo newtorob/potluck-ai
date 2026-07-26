@@ -15,7 +15,7 @@
  * Keyboard: Enter advances (unless a button has focus), Esc shows confirm exit.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useUiPrefsStore } from '@/stores/uiPrefsStore';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -95,12 +95,20 @@ export function FirstRun({ models }: FirstRunProps) {
   const meshPeers = useMeshStore((s) => s.peers);
   const meshBridge = useMeshStore((s) => s.bridge);
 
-  const store = useModelStore();
+  // Select stable slices/actions — never subscribe to the whole store.
+  // A whole-store dep in the download-complete effect re-fired load() on every
+  // zustand write and hit React's maximum update depth during onboarding.
+  const install = useModelStore((s) => s.install);
+  const load = useModelStore((s) => s.load);
+  const activeModelSlug = useModelStore((s) => s.activeModelSlug);
+  const installing = useModelStore((s) => s.installing);
 
   const [step, setStep] = useState<Step>('welcome');
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Guard so download-complete only kicks load() once per slug.
+  const loadStartedForSlug = useRef<string | null>(null);
 
   // Pre-select the recommended tier when hardware and models are both available
   useEffect(() => {
@@ -120,33 +128,36 @@ export function FirstRun({ models }: FirstRunProps) {
 
   const selectedModel = models.find((m) => m.slug === selectedSlug) ?? null;
   const selectedProgress: DownloadProgressRecord | undefined = selectedModel?.download_progress;
-  const isInstalling = selectedSlug !== null && (store.installing[selectedSlug] ?? false);
+  const downloadStatus = selectedProgress?.status;
+  const isInstalling = selectedSlug !== null && (installing[selectedSlug] ?? false);
 
   // Advance from 'pick' to 'loading' once download completes and model is installed
   useEffect(() => {
     if (step !== 'pick') return;
     if (!selectedSlug) return;
-    if (!selectedProgress) return;
+    if (downloadStatus !== 'complete') return;
+    if (loadStartedForSlug.current === selectedSlug) return;
 
-    if (selectedProgress.status === 'complete') {
-      // Start loading the model into the runtime
-      setStep('loading');
-      setLoadError(null);
-      void store.load(selectedSlug).then(() => {
+    loadStartedForSlug.current = selectedSlug;
+    setStep('loading');
+    setLoadError(null);
+    void load(selectedSlug)
+      .then(() => {
         setStep('connect');
-      }).catch((err) => {
+      })
+      .catch((err) => {
+        // Allow retry from the loading-step error UI
+        loadStartedForSlug.current = null;
         setLoadError(err instanceof Error ? err.message : 'Failed to load model');
-        // Stay on loading step so user sees the error
       });
-    }
-  }, [step, selectedSlug, selectedProgress, store]);
+  }, [step, selectedSlug, downloadStatus, load]);
 
   // Auto-advance from loading to connect when activeModelSlug is set
   useEffect(() => {
-    if (step === 'loading' && store.activeModelSlug === selectedSlug && selectedSlug !== null) {
+    if (step === 'loading' && activeModelSlug === selectedSlug && selectedSlug !== null) {
       setStep('connect');
     }
-  }, [step, store.activeModelSlug, selectedSlug]);
+  }, [step, activeModelSlug, selectedSlug]);
 
   // Keyboard: Enter advances, Esc triggers confirm exit
   useEffect(() => {
@@ -176,8 +187,8 @@ export function FirstRun({ models }: FirstRunProps) {
 
   const handleInstall = useCallback(() => {
     if (!selectedSlug) return;
-    void store.install(selectedSlug);
-  }, [selectedSlug, store]);
+    void install(selectedSlug);
+  }, [selectedSlug, install]);
 
   const handleSkip = useCallback(() => {
     markOnboardingComplete();
@@ -394,9 +405,11 @@ export function FirstRun({ models }: FirstRunProps) {
                   setStep('loading');
                   setLoadError(null);
                   if (selectedSlug) {
-                    void store.load(selectedSlug).then(() => {
+                    loadStartedForSlug.current = selectedSlug;
+                    void load(selectedSlug).then(() => {
                       setStep('connect');
                     }).catch((err) => {
+                      loadStartedForSlug.current = null;
                       setLoadError(err instanceof Error ? err.message : 'Failed to load model');
                     });
                   }
@@ -411,9 +424,11 @@ export function FirstRun({ models }: FirstRunProps) {
             <PrimaryButton onClick={() => {
               if (selectedSlug) {
                 setLoadError(null);
-                void store.load(selectedSlug).then(() => {
+                loadStartedForSlug.current = selectedSlug;
+                void load(selectedSlug).then(() => {
                   setStep('connect');
                 }).catch((err) => {
+                  loadStartedForSlug.current = null;
                   setLoadError(err instanceof Error ? err.message : 'Failed to load model');
                 });
               }

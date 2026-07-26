@@ -51,6 +51,10 @@ import { WeeklyReceiptToast } from '@/components/household/WeeklyReceiptToast';
  *   2. potluck.onboarding_completed is not true in uiPrefsStore (backed by
  *      localStorage + the sidecar durable config)
  *
+ * That decision is latched: once the wizard opens, finishing a model install
+ * must not unmount it mid-flow. The wizard exits only when onboarding is
+ * marked complete (skip / finish).
+ *
  * We wait for the initial fetch to complete before deciding so that users
  * who already have models installed never see the wizard on startup.
  *
@@ -134,8 +138,19 @@ export default function App() {
   const onboardingCompleted = useUiPrefsStore((s) => s.onboardingCompleted);
   const hasInstalledModels = models.some((m) => m.installed);
 
+  // Latch the "should show wizard" decision after the first settled fetch.
+  // Without this, completing the onboarding install flips hasInstalledModels
+  // and unmounts FirstRun mid-flow (before the user finishes the wizard).
+  const wizardLatched = useRef(false);
+  if (fetchSettled && !onboardingCompleted && !hasInstalledModels) {
+    wizardLatched.current = true;
+  }
+  if (onboardingCompleted) {
+    wizardLatched.current = false;
+  }
+
   // Only gate once the fetch has settled to avoid a false-positive flash
-  const showFirstRun = fetchSettled && !onboardingCompleted && !hasInstalledModels;
+  const showFirstRun = fetchSettled && !onboardingCompleted && wizardLatched.current;
 
   // Standalone magic-link verify/bounce page — rendered outside the app shell
   // (no sidebar/status bar). In a browser it bounces to the potluck:// scheme;

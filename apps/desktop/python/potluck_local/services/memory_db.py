@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import aiosqlite
+import sqlite3
 
 from potluck_local.utils.time import now_iso as _now_iso
 
@@ -835,21 +836,41 @@ async def create_conversation(
     db_path: Path | None = None,
 ) -> dict:
     """Insert a new conversation row. Caller-supplied id (UUID) so the
-    frontend can optimistically use it before the round-trip completes."""
+    frontend can optimistically use it before the round-trip completes.
+
+    Idempotent: if the id already exists, return the existing row instead
+    of raising UNIQUE. Optimistic clients may re-POST create on retry.
+    """
     now = _now_iso()
     path = db_path or get_memory_db_path()
     async with aiosqlite.connect(path) as db:
         await db.execute("PRAGMA foreign_keys=ON")
-        await db.execute(
-            """
-            INSERT INTO conversations
-                (id, title, project, network_mode, network_model_slug, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (conversation_id, title, project, 1 if network_mode else 0,
-             network_model_slug, now, now),
-        )
-        await db.commit()
+        try:
+            await db.execute(
+                """
+                INSERT INTO conversations
+                    (id, title, project, network_mode, network_model_slug, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (conversation_id, title, project, 1 if network_mode else 0,
+                 network_model_slug, now, now),
+            )
+            await db.commit()
+        except sqlite3.IntegrityError:
+            await db.rollback()
+            existing = await get_conversation(conversation_id, db_path=path)
+            if existing is not None:
+                return {
+                    "id": existing["id"],
+                    "title": existing["title"],
+                    "project": existing["project"],
+                    "network_mode": existing["network_mode"],
+                    "network_model_slug": existing["network_model_slug"],
+                    "created_at": existing["created_at"],
+                    "updated_at": existing["updated_at"],
+                    "message_count": len(existing["messages"]),
+                }
+            raise
     return {
         "id": conversation_id,
         "title": title,

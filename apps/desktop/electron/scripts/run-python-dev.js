@@ -65,6 +65,9 @@ child.on('exit', (code, signal) => {
   process.exit(code ?? 0);
 });
 
-// Forward SIGINT and SIGTERM so concurrently can shut us down cleanly.
-process.on('SIGINT', () => child.kill('SIGINT'));
+// Forward shutdown signals to the sidecar. Prefer SIGTERM over SIGINT:
+// uvicorn's SIGINT path raises KeyboardInterrupt and can skip lifespan
+// cleanup, leaving Metal/llama.cpp to GGML_ASSERT on process exit (macOS
+// then shows the "python quit unexpectedly / Reopen" dialog).
+process.on('SIGINT', () => child.kill('SIGTERM'));
 process.on('SIGTERM', () => child.kill('SIGTERM'));

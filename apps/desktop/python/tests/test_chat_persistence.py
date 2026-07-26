@@ -81,3 +81,21 @@ def test_delete_conversation_cascades_and_is_gone_after_restart(tmp_path):
     assert existed is True
     assert gone is None
     assert listing == []
+
+
+def test_create_conversation_is_idempotent(tmp_path):
+    """Re-POST create with the same id must not 500 (UNIQUE) — optimistic
+    clients retry create before append."""
+    db = tmp_path / "memory.db"
+
+    async def scenario():
+        await init_memory_db(db_path=db)
+        first = await create_conversation("c1", "First", None, False, None, db_path=db)
+        second = await create_conversation("c1", "Ignored title", None, False, None, db_path=db)
+        return first, second
+
+    first, second = _run(scenario())
+    assert first["id"] == "c1"
+    assert second["id"] == "c1"
+    # Existing row wins — title is not overwritten by the duplicate create.
+    assert second["title"] == "First"

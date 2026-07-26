@@ -114,6 +114,7 @@
     "onlyBuiltDependencies": [
       "electron",
       "electron-builder",
+      "electron-winstaller",
       "esbuild"
     ]
   }
