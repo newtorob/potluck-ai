@@ -142,7 +142,6 @@ def _generate_pairing_token() -> str:
     "/mesh/households",
     response_model=HouseholdResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def create_household(
     req: HouseholdCreateRequest,
@@ -155,7 +154,16 @@ async def create_household(
 
     This is the standard "first-run create-household" call any member makes
     once. The member is the dev fixture STUB_MEMBER_ID until
-    POTLUCK_SESSION_AUTH_ENABLED is set, then the logged-in member."""
+    POTLUCK_SESSION_AUTH_ENABLED is set, then the logged-in member.
+
+    Auth: this is a USER action (a logged-in member managing their own
+    household), so it's gated ONLY by `resolve_session_member_id` (the
+    member's session) — NOT by `require_coordinator_token`. The coordinator
+    token is a machine/sidecar credential and must not need to live in the
+    browser/desktop-app UI that calls this route. Contrast with the
+    machine-plumbing routes below (/mesh/enroll, /mesh/heartbeat,
+    /mesh/signal, /mesh/peers, /mesh/derp-token, /mesh/nodes/{id}), which
+    keep the coordinator-token gate."""
     # If this member already has a household, return it.
     existing = await db.execute(
         select(Household).where(Household.owner_member_id == member_id)
@@ -212,7 +220,6 @@ async def create_household(
     "/mesh/pairing-tokens",
     response_model=PairingTokenIssueResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def issue_pairing_token(
     db: AsyncSession = Depends(get_db),
@@ -225,7 +232,15 @@ async def issue_pairing_token(
     The plaintext token value is returned ONLY in this response. The
     coordinator stores it as the primary key in `pairing_tokens`; if
     the user loses the value they need to issue a new one (rather than
-    look it up server-side)."""
+    look it up server-side).
+
+    Auth: same posture as POST /mesh/households — this is a USER action
+    (the logged-in member issuing a token for their own household), gated
+    ONLY by the member's session, NOT the coordinator token. The token
+    issued HERE (the pairing token) is what subsequently authorizes the
+    machine-level POST /mesh/enroll call — that's the credential handoff
+    from user-space to machine-space, and it's why /mesh/enroll itself
+    deliberately needs no session."""
     household_result = await db.execute(
         select(Household).where(Household.owner_member_id == member_id)
     )
