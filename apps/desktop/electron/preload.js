@@ -139,6 +139,18 @@ contextBridge.exposeInMainWorld('potluck', {
     setToken: (token) => ipcRenderer.invoke('cloud:set-token', String(token)),
     /** Forget the session token (sign-out). */
     clearToken: () => ipcRenderer.invoke('cloud:clear-token'),
+    /**
+     * Proxy a session-authenticated call to the (user-configured) coordinator.
+     * Attaches the same bearer token as `request` above, but against a
+     * caller-supplied coordinator origin rather than the fixed cloud API host
+     * — main.js allowlists the exact paths this may target. Returns
+     * { status, body }.
+     * @param {string} baseUrl  Coordinator origin, e.g. from connectionStore.
+     * @param {'POST'} method
+     * @param {string} path     Must be one of the allowlisted session-auth paths.
+     */
+    coordinatorRequest: (baseUrl, method, path, body) =>
+      ipcRenderer.invoke('coordinator:session-request', baseUrl, method, path, body),
   },
 
   // ── Mesh sidecar bridge ────────────────────────────────────────────────────

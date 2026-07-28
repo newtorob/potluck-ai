@@ -7,9 +7,10 @@
  *
  *   1. **Local IPC** (via the Electron bridge). For status / peers / pair /
  *      unpair. Goes over the Unix socket — never network.
- *   2. **Coordinator HTTP** (direct fetch from the renderer). For issuing
- *      pairing tokens. Reads the coordinator URL from connectionStore so
- *      users can target a coordinator on another machine in their fleet.
+ *   2. **Coordinator HTTP** (via `coordinatorAuth.coordinatorSessionRequest`).
+ *      For issuing pairing tokens. Session-authenticated — see that module's
+ *      doc comment. Reads the coordinator URL from connectionStore so users
+ *      can target a coordinator on another machine in their fleet.
  *
  * Error model:
  *   - `MeshBridgeUnavailableError` — `window.potluck.mesh` isn't there.
@@ -32,7 +33,7 @@ import type {
   PairingTokenIssueResponse,
   MeshBridgeResult,
 } from '@/types/mesh';
-import { coordinatorBase } from '@/stores/connectionStore';
+import { coordinatorSessionRequest, detailOf } from '@/lib/coordinatorAuth';
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -196,59 +197,42 @@ export type DiscoveredPairing =
   | { found: true; hostname: string; fingerprint: string; pin_required: true };
 
 // ---------------------------------------------------------------------------
-// Coordinator helpers (direct HTTP, not via the bridge)
+// Coordinator helpers (session-authenticated HTTP — see coordinatorAuth.ts)
 // ---------------------------------------------------------------------------
 
 /**
- * Ensure the dev-stub member has a household, then issue a fresh pairing
+ * Ensure the calling member has a household, then issue a fresh pairing
  * token. Returns the plaintext token (only exposed in this response — the
  * coordinator stores its primary-key form server-side).
  *
- * `POST /mesh/households` is idempotent for the dev-stub member; we call
- * it unconditionally to side-step the 404-then-retry dance.
+ * Both calls are session-authenticated (not gated by the coordinator token —
+ * see `coordinatorSessionRequest`'s doc comment): the coordinator resolves
+ * the calling member from the bearer this attaches, via
+ * `resolve_session_member_id`.
  *
- * When real member auth lands (v0.5), the household-create call moves out
- * of this helper and becomes part of the sign-in flow.
+ * `POST /mesh/households` is idempotent for the calling member; we call it
+ * unconditionally to side-step the 404-then-retry dance.
  */
 export async function issuePairingToken(): Promise<PairingTokenIssueResponse> {
-  const base = coordinatorBase();
-
   // Idempotent household-bootstrap; ignore the body, we just need the
   // household row to exist so the next call doesn't 404.
-  const householdRes = await fetch(`${base}/mesh/households`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'My household' }),
+  const householdRes = await coordinatorSessionRequest('/mesh/households', {
+    name: 'My household',
   });
-  if (!householdRes.ok && householdRes.status !== 201 && householdRes.status !== 200) {
-    const detail = await safeDetail(householdRes);
+  if (householdRes.status !== 200 && householdRes.status !== 201) {
     throw new CoordinatorError(
-      `Could not create household: ${detail}`,
+      `Could not create household: ${detailOf(householdRes.body)}`,
       householdRes.status,
     );
   }
 
-  const tokenRes = await fetch(`${base}/mesh/pairing-tokens`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!tokenRes.ok) {
-    const detail = await safeDetail(tokenRes);
+  const tokenRes = await coordinatorSessionRequest('/mesh/pairing-tokens');
+  if (tokenRes.status !== 200 && tokenRes.status !== 201) {
     throw new CoordinatorError(
-      `Could not issue pairing token: ${detail}`,
+      `Could not issue pairing token: ${detailOf(tokenRes.body)}`,
       tokenRes.status,
     );
   }
 
-  return (await tokenRes.json()) as PairingTokenIssueResponse;
-}
-
-async function safeDetail(res: Response): Promise<string> {
-  try {
-    const data = (await res.json()) as { detail?: unknown };
-    if (data && typeof data.detail === 'string') return data.detail;
-    return res.statusText || `HTTP ${res.status}`;
-  } catch {
-    return res.statusText || `HTTP ${res.status}`;
-  }
+  return tokenRes.body as PairingTokenIssueResponse;
 }

@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import { cn } from '@/components/ui/cn';
 import { useMeshStore } from '@/stores/meshStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { registerContributorDeviceKey } from '@/lib/deviceKey';
 
 // ---------------------------------------------------------------------------
 // Component
@@ -55,6 +56,20 @@ export function ConnectStep() {
       await updateSettings({ network: { contributor_mode: next } });
     } catch {
       // Rollback is handled by the store; nothing extra needed here.
+      return;
+    }
+    if (next) {
+      // Pre-register this machine's contributor device key with the
+      // coordinator so attestation isn't rejected by REQUIRE_REGISTERED_KEYS
+      // (see lib/deviceKey.ts). Best-effort: a coordinator that's
+      // unreachable here just means the machine will fail attestation
+      // later, same as before this wiring existed — don't block the toggle
+      // or roll it back over this.
+      try {
+        await registerContributorDeviceKey();
+      } catch (err) {
+        console.warn('[ConnectStep] device key registration failed:', err);
+      }
     }
   }
 

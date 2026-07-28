@@ -786,6 +786,90 @@ ipcMain.handle('cloud:request', async (_evt, method, reqPath, body) => {
   }
 });
 
+// ─── Coordinator session-auth bridge ────────────────────────────────────────
+//
+// A small, path-allowlisted proxy for the handful of coordinator routes that
+// require the member's login session rather than the (optional) coordinator
+// token: POST /mesh/households + POST /mesh/pairing-tokens (household
+// bootstrap — coordinator/routers/mesh.py) and POST /me/device-keys (device
+// key pre-registration for REQUIRE_REGISTERED_KEYS=true — coordinator's
+// routers/circles.py). All three resolve identity via
+// `resolve_session_member_id`, which accepts an `Authorization: Bearer
+// <session token>` header as the desktop-app fallback for a cross-origin
+// cookie (see coordinator/middleware/session_auth.py).
+//
+// Unlike `cloud:request` above, the target ORIGIN is caller-supplied: the
+// coordinator is a member-operated node the user points the app at (LAN IP,
+// Tailscale IP, or the hosted default — see connectionStore.ts), not a fixed
+// api.trypotluck.ai host. That's an intentional part of the mesh design, not
+// a new open-proxy hole: the renderer can already reach any coordinator URL
+// directly via plain fetch() (CORS on the coordinator allows file:///
+// localhost origins for exactly this). What this bridge protects is the
+// bearer token itself — it stays main-process-only, same as cloud:request,
+// and is attached here rather than ever being handed to renderer JS. The
+// path allowlist below is defence in depth so this can't become a generic
+// "attach my session token to any request" primitive.
+const COORDINATOR_SESSION_PATHS = new Set([
+  '/mesh/households',
+  '/mesh/pairing-tokens',
+  '/me/device-keys',
+]);
+
+ipcMain.handle(
+  'coordinator:session-request',
+  async (_evt, baseUrl, method, reqPath, body) => {
+    if (typeof method !== 'string' || method !== 'POST') {
+      return { status: 400, body: { detail: 'method not allowed' } };
+    }
+    if (typeof reqPath !== 'string' || !COORDINATOR_SESSION_PATHS.has(reqPath)) {
+      return { status: 400, body: { detail: 'path not allowed' } };
+    }
+
+    let target;
+    try {
+      target = new URL(reqPath, baseUrl);
+    } catch (_) {
+      return { status: 400, body: { detail: 'invalid coordinator url' } };
+    }
+    if (target.protocol !== 'http:' && target.protocol !== 'https:') {
+      return { status: 400, body: { detail: 'unsupported protocol' } };
+    }
+
+    const headers = { Accept: 'application/json' };
+    const token = loadCloudToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const init = { method, headers };
+    if (body !== undefined && body !== null) {
+      headers['Content-Type'] = 'application/json';
+      init.body = JSON.stringify(body);
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CLOUD_REQUEST_TIMEOUT_MS);
+    init.signal = controller.signal;
+    try {
+      const res = await fetch(target, init);
+      const text = await res.text();
+      let parsed = null;
+      if (text.length > 0) {
+        try {
+          parsed = JSON.parse(text);
+        } catch (_) {
+          parsed = { raw: text };
+        }
+      }
+      return { status: res.status, body: parsed };
+    } catch (err) {
+      return {
+        status: 0,
+        body: { detail: err && err.message ? err.message : 'network error' },
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+);
+
 // ─── Auto-updater ────────────────────────────────────────────────────────────
 
 function setupAutoUpdater() {
