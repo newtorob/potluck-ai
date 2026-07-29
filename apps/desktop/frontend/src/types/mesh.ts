@@ -115,3 +115,34 @@ export interface MeshBridgeResult<T> {
 // status === 0 in the bridge result indicates a transport-layer failure
 // (sidecar unreachable or timeout). Renderer code translates this into
 // MeshSidecarUnreachableError via the meshClient wrapper.
+
+// ---------------------------------------------------------------------------
+// Daemon supervision bridge (Electron main.js → renderer, macOS SMAppService)
+// ---------------------------------------------------------------------------
+
+/**
+ * Mesh daemon lifecycle, as reported by main.js's mesh:daemon-status /
+ * mesh:enable IPC handlers. Distinct from MeshStatusValue above, which is
+ * the sidecar's OWN mesh_status once it's actually running — this is
+ * "is there even a sidecar process to ask" rather than "what is it doing."
+ *
+ *   not_installed     — never registered (or the OS lost track of it)
+ *   requires_approval — registered, needs a click in System Settings
+ *   starting          — registered + approved, but the local IPC socket
+ *                        hasn't answered a status probe yet
+ *   running           — registered, approved, and the socket answered
+ *   unsupported       — this platform's daemon supervision isn't
+ *                        implemented yet (Linux/Windows today)
+ */
+export type MeshDaemonState =
+  | 'not_installed'
+  | 'requires_approval'
+  | 'starting'
+  | 'running'
+  | 'unsupported';
+
+export interface MeshDaemonStatus {
+  platform: string;
+  state: MeshDaemonState;
+  detail?: string;
+}

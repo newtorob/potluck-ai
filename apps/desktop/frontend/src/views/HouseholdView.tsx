@@ -67,6 +67,7 @@ import { relativeTime } from '@/lib/timeFormat';
 import { formatModelName } from '@/lib/modelName';
 import type { MeshPeer, MeshStatus } from '@/types/mesh';
 import { AddMachineWizard } from '@/components/household/AddMachineWizard';
+import { MeshEnablePanel } from '@/components/household/MeshEnablePanel';
 import { ContributionReceiptsCard } from '@/components/household/ContributionReceiptsCard';
 import { deriveDiagnostics, type PeerDiagnostic } from '@/lib/meshDiagnostics';
 import { PreflightBanner } from '@/components/household/PreflightBanner';
@@ -80,6 +81,7 @@ export function HouseholdView() {
   const status = useMeshStore((s) => s.status);
   const peers = useMeshStore((s) => s.peers);
   const bridge = useMeshStore((s) => s.bridge);
+  const daemonStatus = useMeshStore((s) => s.daemonStatus);
   const lastError = useMeshStore((s) => s.lastError);
   const start = useMeshStore((s) => s.start);
   const refresh = useMeshStore((s) => s.refresh);
@@ -113,7 +115,26 @@ export function HouseholdView() {
     );
   }
 
-  // --- sidecar offline (bridge present, socket not reachable) ---
+  // --- mesh daemon needs enabling / approval / is starting up ---
+  // (the "app brings up the mesh" flow — macOS SMAppService today; see
+  // MeshEnablePanel + main.js's mesh-daemon-supervision section)
+  if (
+    bridge === 'daemon_not_installed' ||
+    bridge === 'daemon_requires_approval' ||
+    bridge === 'daemon_starting' ||
+    bridge === 'daemon_unsupported'
+  ) {
+    return (
+      <div className="flex h-full flex-col">
+        <HouseholdHeader status={null} />
+        <MeshEnablePanel bridge={bridge} daemonStatus={daemonStatus} onChanged={() => void refresh()} />
+      </div>
+    );
+  }
+
+  // --- sidecar offline (bridge present, socket not reachable, no daemon
+  // info available to explain why — dev mode without the daemon bridge, a
+  // platform daemon supervision doesn't cover, or a rare timing race) ---
   if (bridge === 'sidecar_offline') {
     return (
       <div className="flex h-full flex-col">
@@ -133,8 +154,7 @@ export function HouseholdView() {
               <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
                 make run
               </code>
-              . In packaged builds, the system daemon should be running.
-              If it isn't, reinstall.
+              . If you're running a packaged build, try restarting Potluck.
             </>
           }
         />

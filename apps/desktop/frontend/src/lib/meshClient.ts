@@ -32,6 +32,7 @@ import type {
   EnrollResponse,
   PairingTokenIssueResponse,
   MeshBridgeResult,
+  MeshDaemonStatus,
 } from '@/types/mesh';
 import { coordinatorSessionRequest, detailOf } from '@/lib/coordinatorAuth';
 
@@ -195,6 +196,73 @@ export const meshClient = {
 export type DiscoveredPairing =
   | { found: false }
   | { found: true; hostname: string; fingerprint: string; pin_required: true };
+
+// ---------------------------------------------------------------------------
+// Daemon supervision — "is there a mesh sidecar to talk to at all"
+// ---------------------------------------------------------------------------
+//
+// Separate bridge surface from `meshClient` above: that one assumes a
+// running sidecar and talks to its socket. This one is about bringing the
+// sidecar itself up — on macOS, registering it as a root LaunchDaemon via
+// SMAppService. See apps/desktop/electron/main.js's mesh-daemon-supervision
+// section for the full state machine and apps/desktop/electron/preload.js
+// for the exact bridge shape this wraps.
+
+interface MeshDaemonBridge {
+  daemonStatus: () => Promise<MeshDaemonStatus>;
+  enable: () => Promise<MeshDaemonStatus>;
+  openLoginItems: () => Promise<{ platform: string; ok: boolean }>;
+}
+
+function getDaemonBridge(): MeshDaemonBridge {
+  const w = window as unknown as { potluck?: { mesh?: Partial<MeshDaemonBridge> } };
+  const bridge = w.potluck?.mesh;
+  if (
+    !bridge ||
+    typeof bridge.daemonStatus !== 'function' ||
+    typeof bridge.enable !== 'function' ||
+    typeof bridge.openLoginItems !== 'function'
+  ) {
+    throw new MeshBridgeUnavailableError();
+  }
+  return bridge as MeshDaemonBridge;
+}
+
+/**
+ * True when the daemon-supervision bridge (daemonStatus/enable/
+ * openLoginItems) is present. Same "running outside Electron, or a stale
+ * preload script" guard as `isMeshBridgeAvailable`, scoped to this
+ * sub-surface — use this before calling into `meshDaemon` from code that
+ * needs to degrade gracefully (a plain browser, or a dev preload that
+ * predates this bridge) instead of throwing.
+ */
+export function isMeshDaemonBridgeAvailable(): boolean {
+  const w = window as unknown as { potluck?: { mesh?: Partial<MeshDaemonBridge> } };
+  return Boolean(w.potluck?.mesh && typeof w.potluck.mesh.daemonStatus === 'function');
+}
+
+/**
+ * Mesh daemon supervision. macOS today: backed by SMAppService via main.js's
+ * signed mesh-helper CLI. Linux/Windows always resolve
+ * `{ state: 'unsupported' }` for now — see main.js for the TODOs.
+ */
+export const meshDaemon = {
+  /** Current daemon status. Cheap enough to poll on the household 2s cadence. */
+  status: (): Promise<MeshDaemonStatus> => getDaemonBridge().daemonStatus(),
+
+  /**
+   * Registers (or re-registers) the mesh daemon. Resolving with
+   * `state: 'requires_approval'` is a normal, successful outcome — the
+   * daemon is registered but macOS needs the user to approve it in System
+   * Settings before it starts. It is not an error.
+   */
+  enable: (): Promise<MeshDaemonStatus> => getDaemonBridge().enable(),
+
+  /** Opens System Settings so the user can approve the already-registered
+   *  daemon. */
+  openLoginItems: (): Promise<{ platform: string; ok: boolean }> =>
+    getDaemonBridge().openLoginItems(),
+};
 
 // ---------------------------------------------------------------------------
 // Coordinator helpers (session-authenticated HTTP — see coordinatorAuth.ts)
