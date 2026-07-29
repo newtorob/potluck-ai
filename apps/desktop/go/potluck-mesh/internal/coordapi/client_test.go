@@ -1,7 +1,12 @@
 package coordapi_test
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/potluck-ai/potluck-mesh/internal/coordapi"
@@ -67,4 +72,68 @@ func TestEnrollRequest_SigningPublicKey_IncludedWhenSet(t *testing.T) {
 	if gotStr != pub {
 		t.Errorf("signing_public_key value: got %q want %q", gotStr, pub)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// BaseURL / SetBaseURL — runtime coordinator-URL override support
+// ---------------------------------------------------------------------------
+
+func TestClient_BaseURL_ReturnsConstructorValue(t *testing.T) {
+	c := coordapi.New("http://127.0.0.1:8400")
+	if got := c.BaseURL(); got != "http://127.0.0.1:8400" {
+		t.Errorf("BaseURL() = %q, want %q", got, "http://127.0.0.1:8400")
+	}
+}
+
+func TestClient_SetBaseURL_UpdatesLiveValue(t *testing.T) {
+	c := coordapi.New("http://127.0.0.1:8400")
+	c.SetBaseURL("https://coordinator.example.com")
+	if got := c.BaseURL(); got != "https://coordinator.example.com" {
+		t.Errorf("BaseURL() after SetBaseURL = %q, want %q", got, "https://coordinator.example.com")
+	}
+}
+
+// TestClient_SetBaseURL_ConcurrentWithListPeers is the concurrency-safety
+// regression test for the SUDO_UID-gap-adjacent runtime coordinator-URL
+// override: a live SetBaseURL call can race an in-flight ListPeers call from
+// the roster-reconcile loop (cmd/potluck-mesh/main.go's
+// runRosterRefreshLoop). Run under -race; a bare string field here would
+// fail this test with a data race.
+func TestClient_SetBaseURL_ConcurrentWithListPeers(t *testing.T) {
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `[]`)
+	}))
+	defer mock.Close()
+
+	c := coordapi.New(mock.URL)
+
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 50; i++ {
+			c.SetBaseURL(mock.URL)
+		}
+		close(stop)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ctx := context.Background()
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				_, _ = c.ListPeers(ctx, "pubkey")
+			}
+		}
+	}()
+
+	wg.Wait()
 }

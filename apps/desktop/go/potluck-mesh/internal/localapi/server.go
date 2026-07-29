@@ -8,11 +8,12 @@
 //
 // Endpoints (all return JSON):
 //
-//	GET  /status  — current sidecar state
-//	GET  /peers   — household roster with reachability
-//	POST /pair    — enroll this node using a pairing token
-//	POST /unpair  — wipe local keys + stop tunnel
-//	WS   /events  — subscribe to the event bus
+//	GET   /status    — current sidecar state
+//	GET   /peers     — household roster with reachability
+//	POST  /pair      — enroll this node using a pairing token
+//	POST  /unpair    — wipe local keys + stop tunnel
+//	PATCH /settings  — runtime settings override (currently: coordinator_url)
+//	WS    /events    — subscribe to the event bus
 //
 // Every response includes X-Potluck-Protocol-Version: 1 per the spec.
 //
@@ -30,8 +31,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -44,6 +47,7 @@ import (
 	"github.com/potluck-ai/potluck-mesh/internal/lanpair"
 	"github.com/potluck-ai/potluck-mesh/internal/nodetoken"
 	"github.com/potluck-ai/potluck-mesh/internal/peerstate"
+	"github.com/potluck-ai/potluck-mesh/internal/runtimesettings"
 	"github.com/potluck-ai/potluck-mesh/internal/signingkey"
 )
 
@@ -156,13 +160,26 @@ func (s *State) SetCoordinatorConnState(st string) {
 	s.mu.Unlock()
 }
 
-// SetCoordinatorURL records the coordinator URL the sidecar is dialing. This
-// is a static value (the --coordinator-url launch flag); call it once at
-// startup before the server begins serving.
+// SetCoordinatorURL records the coordinator URL the sidecar is dialing.
+// Originally a static value (the --coordinator-url launch flag / a
+// persisted runtimesettings override) set once at startup before the server
+// begins serving; also called live by handleSettingsPatch after a
+// successful PATCH /settings so GET /status reflects a runtime override
+// immediately.
 func (s *State) SetCoordinatorURL(u string) {
 	s.mu.Lock()
 	s.coordinatorURL = u
 	s.mu.Unlock()
+}
+
+// CoordinatorURL returns the coordinator URL the sidecar is currently
+// dialing (or about to dial, if not yet enrolled). Used by
+// handleSettingsPatch to echo the current value when a PATCH /settings body
+// doesn't touch coordinator_url.
+func (s *State) CoordinatorURL() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.coordinatorURL
 }
 
 // SetWGPort records the UDP port the WireGuard device is listening on. Call
@@ -309,24 +326,40 @@ type Config struct {
 	SocketPath         string           // "" → use platform default
 	Platform           string           // runtime.GOOS
 	LanPair            *lanpair.Service // LAN pairing-token broadcast/listen; may be nil
+
+	// SettingsPath is where PATCH /settings persists a runtime coordinator-URL
+	// override (internal/runtimesettings). "" disables persistence (tests) —
+	// the live update via ApplyCoordinatorURLFn still happens, it just won't
+	// survive a restart.
+	SettingsPath string
+	// ApplyCoordinatorURLFn is called after a validated, persisted PATCH
+	// /settings coordinator_url update to install the new value as the LIVE
+	// coordinator URL across coordClient, the signal client, and ipcState
+	// (see cmd/potluck-mesh/main.go's applyCoordinatorURL). nil is
+	// tolerated (tests, or a caller that only wants the value reflected in
+	// State without any live side effects) — handleSettingsPatch falls back
+	// to State.SetCoordinatorURL alone in that case.
+	ApplyCoordinatorURLFn func(url string)
 }
 
 // Server is the local IPC HTTP+WS server.
 type Server struct {
-	bus                *events.Bus
-	ps                 *peerstate.Store
-	state              *State
-	peerReachFn        PeerReachabilityFunc
-	isDERPRoutedFn     IsDERPRoutedFunc
-	isPeerConfiguredFn IsPeerConfiguredFunc
-	coordClient        *coordapi.Client
-	signalRestart      SignalRestartFunc
-	wgPrivKeyPath      string
-	signingKeyPath     string
-	nodeTokenPath      string
-	platform           string
-	socketPath         string
-	lanpair            *lanpair.Service
+	bus                   *events.Bus
+	ps                    *peerstate.Store
+	state                 *State
+	peerReachFn           PeerReachabilityFunc
+	isDERPRoutedFn        IsDERPRoutedFunc
+	isPeerConfiguredFn    IsPeerConfiguredFunc
+	coordClient           *coordapi.Client
+	signalRestart         SignalRestartFunc
+	wgPrivKeyPath         string
+	signingKeyPath        string
+	nodeTokenPath         string
+	platform              string
+	socketPath            string
+	lanpair               *lanpair.Service
+	settingsPath          string
+	applyCoordinatorURLFn func(url string)
 
 	// pairingMu prevents concurrent /pair attempts.
 	pairingMu sync.Mutex
@@ -345,20 +378,22 @@ func New(cfg Config) *Server {
 	}
 
 	s := &Server{
-		bus:                cfg.Bus,
-		ps:                 cfg.PeerStore,
-		state:              cfg.State,
-		peerReachFn:        cfg.PeerReachFn,
-		isDERPRoutedFn:     cfg.IsDERPRoutedFn,
-		isPeerConfiguredFn: cfg.IsPeerConfiguredFn,
-		coordClient:        cfg.CoordClient,
-		signalRestart:      cfg.SignalRestart,
-		wgPrivKeyPath:      cfg.WGPrivKeyPath,
-		signingKeyPath:     cfg.SigningKeyPath,
-		nodeTokenPath:      cfg.NodeTokenPath,
-		platform:           cfg.Platform,
-		socketPath:         sp,
-		lanpair:            cfg.LanPair,
+		bus:                   cfg.Bus,
+		ps:                    cfg.PeerStore,
+		state:                 cfg.State,
+		peerReachFn:           cfg.PeerReachFn,
+		isDERPRoutedFn:        cfg.IsDERPRoutedFn,
+		isPeerConfiguredFn:    cfg.IsPeerConfiguredFn,
+		coordClient:           cfg.CoordClient,
+		signalRestart:         cfg.SignalRestart,
+		wgPrivKeyPath:         cfg.WGPrivKeyPath,
+		signingKeyPath:        cfg.SigningKeyPath,
+		nodeTokenPath:         cfg.NodeTokenPath,
+		platform:              cfg.Platform,
+		socketPath:            sp,
+		lanpair:               cfg.LanPair,
+		settingsPath:          cfg.SettingsPath,
+		applyCoordinatorURLFn: cfg.ApplyCoordinatorURLFn,
 	}
 
 	mux := http.NewServeMux()
@@ -370,6 +405,7 @@ func New(cfg Config) *Server {
 	mux.HandleFunc("POST /pairing/broadcast", s.handlePairingBroadcast)
 	mux.HandleFunc("GET /pairing/discovered", s.handlePairingDiscovered)
 	mux.HandleFunc("POST /pairing/reveal", s.handlePairingReveal)
+	mux.HandleFunc("PATCH /settings", s.handleSettingsPatch)
 
 	// Wrap every response with the protocol-version header.
 	versionMW := func(next http.Handler) http.Handler {
@@ -965,6 +1001,108 @@ func (s *Server) handlePairingReveal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"token": token})
+}
+
+// ---------------------------------------------------------------------------
+// PATCH /settings — runtime settings override
+// ---------------------------------------------------------------------------
+
+// settingsPatchRequest is the PATCH /settings body. Every field is a
+// pointer so a request can update a subset of settings — an omitted field
+// (nil) leaves that setting untouched, mirroring the Python sidecar's
+// merge-update PATCH /settings semantics (apps/desktop/python/potluck_local/
+// routers/settings.py). Only coordinator_url exists today; add more pointer
+// fields here as additional runtime overrides are needed.
+type settingsPatchRequest struct {
+	CoordinatorURL *string `json:"coordinator_url,omitempty"`
+}
+
+// settingsResponse is returned by PATCH /settings, reflecting the settings
+// state AFTER applying the patch (updated fields plus anything left
+// untouched).
+type settingsResponse struct {
+	CoordinatorURL string `json:"coordinator_url"`
+}
+
+// handleSettingsPatch applies a runtime settings override. Currently
+// supports coordinator_url only: validates it's a well-formed http/https
+// URL, persists it to runtimesettings' settings.json (sited next to the WG
+// key — see Config.SettingsPath), and installs it as the LIVE coordinator
+// URL via ApplyCoordinatorURLFn (wired from cmd/potluck-mesh/main.go to
+// update coordClient, the signal client, and ipcState, then prod a
+// reconnect).
+//
+// Loopback/socket-only by construction: this handler, like every other
+// localapi route, is only ever reachable via the Unix socket / named pipe
+// this server listens on (see platformListen's same-user ACL) — there is no
+// separate auth check needed here.
+//
+// A request with coordinator_url omitted (nil) is a no-op that just echoes
+// the current value — lets a caller probe the endpoint's shape without
+// requiring a full "settings object" round-trip, and leaves room for future
+// settings keys to be patched independently.
+func (s *Server) handleSettingsPatch(w http.ResponseWriter, r *http.Request) {
+	var req settingsPatchRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "bad_request", "invalid JSON body: "+err.Error())
+		return
+	}
+
+	if req.CoordinatorURL == nil {
+		writeJSON(w, http.StatusOK, settingsResponse{CoordinatorURL: s.state.CoordinatorURL()})
+		return
+	}
+
+	normalized, err := validateCoordinatorURL(*req.CoordinatorURL)
+	if err != nil {
+		writeError(w, http.StatusUnprocessableEntity, "invalid_coordinator_url", err.Error())
+		return
+	}
+
+	if s.settingsPath != "" {
+		if err := runtimesettings.Save(s.settingsPath, runtimesettings.Settings{CoordinatorURL: normalized}); err != nil {
+			slog.Error("localapi: settings: persist coordinator_url failed", "err", err)
+			writeError(w, http.StatusInternalServerError, "persist_failed",
+				"could not persist settings: "+err.Error())
+			return
+		}
+	}
+
+	// Apply live. Prefer the full multi-component update (coordClient +
+	// signal client + state + reconnect) when wired; fall back to just
+	// updating State so GET /status is at least consistent (tests / a
+	// caller that only cares about the persisted value).
+	if s.applyCoordinatorURLFn != nil {
+		s.applyCoordinatorURLFn(normalized)
+	} else {
+		s.state.SetCoordinatorURL(normalized)
+	}
+
+	slog.Info("localapi: settings: coordinator_url updated", "coordinator_url", normalized)
+	writeJSON(w, http.StatusOK, settingsResponse{CoordinatorURL: normalized})
+}
+
+// validateCoordinatorURL normalizes (trims whitespace + any trailing slash)
+// and validates a candidate coordinator_url, mirroring
+// internal/config.Load's --coordinator-url validation: must parse as a URL,
+// scheme must be http or https, and a host must be present. Returns the
+// normalized value on success.
+func validateCoordinatorURL(raw string) (string, error) {
+	trimmed := strings.TrimRight(strings.TrimSpace(raw), "/")
+	if trimmed == "" {
+		return "", fmt.Errorf("coordinator_url is required")
+	}
+	if !strings.HasPrefix(trimmed, "http://") && !strings.HasPrefix(trimmed, "https://") {
+		return "", fmt.Errorf("coordinator_url must start with http:// or https://, got: %s", trimmed)
+	}
+	u, err := url.Parse(trimmed)
+	if err != nil {
+		return "", fmt.Errorf("coordinator_url is not a valid URL: %w", err)
+	}
+	if u.Host == "" {
+		return "", fmt.Errorf("coordinator_url must include a host")
+	}
+	return trimmed, nil
 }
 
 // ---------------------------------------------------------------------------

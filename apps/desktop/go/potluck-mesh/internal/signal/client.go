@@ -65,6 +65,12 @@ type RosterHandler interface {
 // Client manages a persistent WebSocket connection to /mesh/signal.
 // It reconnects automatically with exponential backoff on any failure.
 type Client struct {
+	// urlMu guards signalURL. A runtime coordinator-URL override (PATCH
+	// /settings on the local IPC socket — see internal/localapi's
+	// handleSettingsPatch, wired via cmd/potluck-mesh/main.go's
+	// applyCoordinatorURL) calls SetSignalURL live, which can race Run's
+	// read of the URL on its next (re)connect attempt.
+	urlMu            sync.RWMutex
 	signalURL        string
 	wgPublicKey      string
 	coordinatorToken string
@@ -101,6 +107,28 @@ func NewClient(signalURL, wgPublicKey, coordinatorToken string, nodeTokenFn func
 		nodeTokenFn:      nodeTokenFn,
 		handler:          handler,
 	}
+}
+
+// SignalURL returns the coordinator signal WebSocket URL that will be used
+// on the NEXT (re)connect attempt. Safe to call concurrently with
+// Run/runOnce and SetSignalURL.
+func (c *Client) SignalURL() string {
+	c.urlMu.RLock()
+	defer c.urlMu.RUnlock()
+	return c.signalURL
+}
+
+// SetSignalURL updates the URL used on the NEXT (re)connect attempt. It does
+// NOT tear down an already-established connection — the currently active
+// session (if any) keeps talking to the OLD coordinator until it naturally
+// disconnects or a caller prods a reconnect (see
+// cmd/potluck-mesh/main.go's signalRestart / applyCoordinatorURL, called
+// after this from the runtime coordinator-URL override path). Safe to call
+// concurrently with Run/runOnce.
+func (c *Client) SetSignalURL(url string) {
+	c.urlMu.Lock()
+	c.signalURL = url
+	c.urlMu.Unlock()
 }
 
 // loadSendCh returns the currently armed send channel, or nil if no
@@ -180,7 +208,7 @@ func (c *Client) Run(ctx context.Context) error {
 		}
 
 		attempt++
-		slog.Info("signal: connecting", "url", c.signalURL, "attempt", attempt)
+		slog.Info("signal: connecting", "url", c.SignalURL(), "attempt", attempt)
 
 		established, err := c.runOnce(ctx)
 		// runOnce already cleared sendCh under its WaitGroup ordering before
@@ -255,7 +283,7 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 	if len(headers) > 0 {
 		dialOpts = &websocket.DialOptions{HTTPHeader: headers}
 	}
-	conn, _, err := websocket.Dial(dialCtx, c.signalURL, dialOpts)
+	conn, _, err := websocket.Dial(dialCtx, c.SignalURL(), dialOpts)
 	if err != nil {
 		return false, fmt.Errorf("signal: dial: %w", err)
 	}

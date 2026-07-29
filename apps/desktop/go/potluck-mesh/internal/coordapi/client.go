@@ -47,9 +47,9 @@ import (
 const defaultHTTPTimeout = 30 * time.Second
 
 // Client is a typed wrapper around coordinator mesh endpoints.
-// BaseURL must not have a trailing slash.
+// BaseURL (via the BaseURL()/SetBaseURL() accessors) must not have a
+// trailing slash.
 type Client struct {
-	BaseURL    string
 	HTTPClient *http.Client
 	// CoordinatorToken, when set, is sent as X-Potluck-Coordinator-Token on
 	// every coordinator request — the legacy machine-wide shared secret.
@@ -59,6 +59,15 @@ type Client struct {
 	// from every request but that's fine as long as a node_token is set, or
 	// the coordinator itself runs in dev passthrough.
 	CoordinatorToken string
+
+	// baseURLMu guards baseURL. Same rationale as nodeTokenMu below: a
+	// runtime coordinator-URL override (PATCH /settings on the local IPC
+	// socket — see internal/localapi's handleSettingsPatch, wired via
+	// cmd/potluck-mesh/main.go's applyCoordinatorURL) calls SetBaseURL live,
+	// which can race an in-flight Enroll/ListPeers call from the
+	// roster-reconcile loop.
+	baseURLMu sync.RWMutex
+	baseURL   string
 
 	// nodeTokenMu guards nodeToken. It is set once at startup (loaded from
 	// disk by main.go if this node was already enrolled) and again after a
@@ -73,11 +82,34 @@ type Client struct {
 // New creates a Client with the given base URL and a default 30-second timeout.
 func New(baseURL string) *Client {
 	return &Client{
-		BaseURL: baseURL,
+		baseURL: baseURL,
 		HTTPClient: &http.Client{
 			Timeout: defaultHTTPTimeout,
 		},
 	}
+}
+
+// BaseURL returns the currently configured coordinator base URL. Safe to
+// call concurrently with in-flight requests and SetBaseURL. Also used as the
+// LIVE coordinator-URL source for the DERP JWT fetcher (see
+// cmd/potluck-mesh/main.go's buildDERPBind/makeDERPJWTFetcher), mirroring how
+// NodeToken is the shared live source for the bearer credential.
+func (c *Client) BaseURL() string {
+	c.baseURLMu.RLock()
+	defer c.baseURLMu.RUnlock()
+	return c.baseURL
+}
+
+// SetBaseURL updates the coordinator base URL used by every subsequent
+// request (Enroll, ListPeers, and anything reading it live via BaseURL()).
+// Safe to call concurrently with in-flight requests — mirrors
+// SetNodeToken's contract. Called from a runtime coordinator-URL override
+// (PATCH /settings); never required for normal operation (the URL passed to
+// New at startup is otherwise the only value ever in play).
+func (c *Client) SetBaseURL(baseURL string) {
+	c.baseURLMu.Lock()
+	c.baseURL = baseURL
+	c.baseURLMu.Unlock()
 }
 
 // SetNodeToken installs the per-node bearer credential (`Authorization:
@@ -192,7 +224,7 @@ func (c *Client) Enroll(ctx context.Context, req EnrollRequest) (*EnrollResponse
 	httpReq, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,
-		c.BaseURL+"/mesh/enroll",
+		c.BaseURL()+"/mesh/enroll",
 		bytes.NewReader(body),
 	)
 	if err != nil {
@@ -252,7 +284,7 @@ func (c *Client) Enroll(ctx context.Context, req EnrollRequest) (*EnrollResponse
 // Used by the sidecar's roster-reconcile loop as a safety net for roster_update
 // broadcasts missed over the signal WS.
 func (c *Client) ListPeers(ctx context.Context, wgPublicKey string) ([]EnrolledPeer, error) {
-	endpoint := c.BaseURL + "/mesh/peers?wg_public_key=" + url.QueryEscape(wgPublicKey)
+	endpoint := c.BaseURL() + "/mesh/peers?wg_public_key=" + url.QueryEscape(wgPublicKey)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("coordapi: build list-peers request: %w", err)

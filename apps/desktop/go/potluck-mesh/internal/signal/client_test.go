@@ -162,3 +162,59 @@ func dialAndWaitForHeaders(t *testing.T, srv *httptest.Server, coordinatorToken 
 	}
 	return hdr
 }
+
+// ---------------------------------------------------------------------------
+// SignalURL / SetSignalURL — runtime coordinator-URL override support
+// ---------------------------------------------------------------------------
+
+func TestClient_SignalURL_ReturnsConstructorValue(t *testing.T) {
+	c := signal.NewClient("ws://127.0.0.1:8400/mesh/signal", "pubkey", "", nil, noopHandler{})
+	if got := c.SignalURL(); got != "ws://127.0.0.1:8400/mesh/signal" {
+		t.Errorf("SignalURL() = %q, want %q", got, "ws://127.0.0.1:8400/mesh/signal")
+	}
+}
+
+func TestClient_SetSignalURL_UpdatesLiveValue(t *testing.T) {
+	c := signal.NewClient("ws://127.0.0.1:8400/mesh/signal", "pubkey", "", nil, noopHandler{})
+	c.SetSignalURL("wss://coordinator.example.com/mesh/signal")
+	if got := c.SignalURL(); got != "wss://coordinator.example.com/mesh/signal" {
+		t.Errorf("SignalURL() after SetSignalURL = %q, want %q", got, "wss://coordinator.example.com/mesh/signal")
+	}
+}
+
+// TestClient_SetSignalURL_ConcurrentWithRun is the concurrency-safety
+// regression test for the runtime coordinator-URL override path
+// (cmd/potluck-mesh/main.go's applyCoordinatorURL calls SetSignalURL while
+// Run's connect loop is independently reading the URL on every reconnect
+// attempt). Run under -race; a bare string field would fail this test.
+func TestClient_SetSignalURL_ConcurrentWithRun(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.CloseNow() //nolint:errcheck
+		// Never send a welcome — the dial loop will time out on helloTimeout
+		// and retry, giving SetSignalURL plenty of concurrent opportunities.
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+	wsURL := "ws" + srv.URL[len("http"):]
+
+	c := signal.NewClient(wsURL, "pubkey", "", nil, noopHandler{})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = c.Run(ctx)
+	}()
+
+	for i := 0; i < 50; i++ {
+		c.SetSignalURL(wsURL)
+	}
+
+	<-done
+}

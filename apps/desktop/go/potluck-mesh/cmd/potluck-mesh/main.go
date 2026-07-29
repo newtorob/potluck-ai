@@ -95,6 +95,7 @@ import (
 	"github.com/potluck-ai/potluck-mesh/internal/localep"
 	"github.com/potluck-ai/potluck-mesh/internal/nodetoken"
 	"github.com/potluck-ai/potluck-mesh/internal/peerstate"
+	"github.com/potluck-ai/potluck-mesh/internal/runtimesettings"
 	msignal "github.com/potluck-ai/potluck-mesh/internal/signal"
 	"github.com/potluck-ai/potluck-mesh/internal/signingkey"
 	"github.com/potluck-ai/potluck-mesh/internal/stun"
@@ -129,6 +130,30 @@ func run() int {
 	}
 
 	setupLogging(cfg)
+
+	// ---- runtime coordinator-URL override (internal/runtimesettings) ---- //
+	// A prior PATCH /settings call (internal/localapi's handleSettingsPatch)
+	// may have persisted a saved coordinator URL next to the WG private key.
+	// This is the ONLY way to point a static-plist/unit LaunchDaemon/systemd/
+	// Windows-service build (baked-in prod coordinator, no flag to change
+	// post-install) at a self-hosted or LAN coordinator, so a saved override
+	// always wins over the --coordinator-url flag/env default — loaded here,
+	// before ANYTHING coordinator-facing (coordClient, the DERP bind, the
+	// signal client) is constructed below, and before the startup log line
+	// so it reflects the URL actually in use.
+	settingsPath := runtimesettings.Path(cfg.WGPrivateKeyPath)
+	persistedSettings, err := runtimesettings.Load(settingsPath)
+	if err != nil {
+		slog.Error("runtime settings load failed", "err", err)
+		return 1
+	}
+	if persistedSettings.CoordinatorURL != "" {
+		slog.Info("runtime settings: applying persisted coordinator_url override",
+			"coordinator_url", persistedSettings.CoordinatorURL,
+		)
+		cfg.CoordinatorURL = persistedSettings.CoordinatorURL
+	}
+
 	slog.Info("potluck-mesh starting",
 		"coordinator", cfg.CoordinatorURL,
 		"platform", cfg.Platform,
@@ -199,7 +224,7 @@ func run() int {
 	var derpClient *derp.Client
 	var tunnelOpts []tunnel.Option
 	if cfg.DERPRelayURL != "" {
-		dBind, derpClient = buildDERPBind(cfg, coordClient.NodeToken)
+		dBind, derpClient = buildDERPBind(cfg, coordClient.BaseURL, coordClient.NodeToken)
 		if dBind != nil {
 			tunnelOpts = append(tunnelOpts, tunnel.WithBind(dBind))
 		}
@@ -325,6 +350,32 @@ func run() int {
 	// node-token load — see the "coordinator API client" section near the
 	// top of run(), before the DERP bind that also needs it.)
 
+	// applyCoordinatorURL installs newURL as the LIVE coordinator URL across
+	// every coordinator-facing component, for a runtime override delivered
+	// via PATCH /settings on the local IPC socket (internal/localapi's
+	// handleSettingsPatch — the settings.json persistence + request
+	// validation happen there; this closure only does the live-apply part):
+	//
+	//   - coordClient (internal/coordapi.Client): the single shared source
+	//     of truth already used for the node-token propagation pattern —
+	//     the DERP JWT fetcher reads the coordinator URL live from here too
+	//     (see buildDERPBind/makeDERPJWTFetcher above), so updating it here
+	//     is sufficient for both Enroll/ListPeers AND the next DERP token
+	//     fetch.
+	//   - the signal WS client's dial target (derived via
+	//     signalURLFromCoordinatorURL).
+	//   - ipcState, so GET /status reflects the new value immediately.
+	//
+	// Then prods a reconnect via the existing signalRestart mechanism
+	// (best-effort — see its docstring above for exactly what that does and
+	// does not guarantee).
+	applyCoordinatorURL := func(newURL string) {
+		coordClient.SetBaseURL(newURL)
+		client.SetSignalURL(signalURLFromCoordinatorURL(newURL))
+		ipcState.SetCoordinatorURL(newURL)
+		signalRestart()
+	}
+
 	// ---- LAN pairing-token broadcast/listen ---- //
 	lanSvc := lanpair.New()
 
@@ -358,14 +409,16 @@ func run() int {
 			ok, _ := tun.IsPeerConfigured(pubkey)
 			return ok
 		},
-		CoordClient:    coordClient,
-		SignalRestart:  signalRestart,
-		WGPrivKeyPath:  cfg.WGPrivateKeyPath,
-		SigningKeyPath: cfg.SigningPrivateKeyPath,
-		NodeTokenPath:  nodeTokenPath,
-		SocketPath:     cfg.LocalAPISocketPath,
-		Platform:       cfg.Platform,
-		LanPair:        lanSvc,
+		CoordClient:           coordClient,
+		SignalRestart:         signalRestart,
+		WGPrivKeyPath:         cfg.WGPrivateKeyPath,
+		SigningKeyPath:        cfg.SigningPrivateKeyPath,
+		NodeTokenPath:         nodeTokenPath,
+		SettingsPath:          settingsPath,
+		ApplyCoordinatorURLFn: applyCoordinatorURL,
+		SocketPath:            cfg.LocalAPISocketPath,
+		Platform:              cfg.Platform,
+		LanPair:               lanSvc,
 	})
 
 	// Discover this node's private-LAN endpoints once at startup so they show
@@ -428,7 +481,7 @@ func run() int {
 	}()
 
 	// ---- signaling client (blocks until ctx is cancelled) ---- //
-	slog.Info("connecting to coordinator signal channel", "url", cfg.SignalURL())
+	slog.Info("connecting to coordinator signal channel", "url", client.SignalURL())
 	if err := client.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 		slog.Error("signal client exited with error", "err", err)
 		ipcCancel()
@@ -445,6 +498,20 @@ func run() int {
 
 	slog.Info("potluck-mesh shutdown complete")
 	return 0
+}
+
+// signalURLFromCoordinatorURL derives the /mesh/signal WebSocket URL from a
+// coordinator base URL, upgrading http→ws and https→wss. Mirrors
+// config.Config.SignalURL()'s transform exactly; kept as a free function
+// here (rather than a *config.Config method call) so a runtime
+// coordinator-URL override (PATCH /settings — see applyCoordinatorURL above)
+// can compute the same value from an arbitrary string with no *config.Config
+// in scope.
+func signalURLFromCoordinatorURL(coordinatorURL string) string {
+	u := strings.TrimRight(coordinatorURL, "/")
+	u = strings.Replace(u, "http://", "ws://", 1)
+	u = strings.Replace(u, "https://", "wss://", 1)
+	return u + "/mesh/signal"
 }
 
 // runSTUNLoop runs an initial STUN binding request then refreshes on interval.
@@ -1737,9 +1804,18 @@ func rosterPeerToTunnelPeer(p msignal.RosterPeer) tunnel.Peer {
 // The returned DerpBind should be installed via tunnel.WithBind before
 // tunnel.New is called. The returned Client's Run method should be started in
 // a goroutine after the tunnel is up.
+//
+// coordURLFn returns the CURRENT coordinator base URL — called on every
+// token fetch (not just once here at construction) so a runtime
+// coordinator-URL override (PATCH /settings; see internal/localapi's
+// handleSettingsPatch and this file's applyCoordinatorURL) reaches the DERP
+// JWT fetcher the same way a freshly-minted node_token reaches it: read
+// live from coordapi.Client, never captured as a snapshot string. Pass
+// coordClient.BaseURL.
+//
 // nodeTokenFn returns the current per-node bearer credential (may be "" pre-
 // enroll), or nil if the caller has none to offer. See coordapi.Client.NodeToken.
-func buildDERPBind(cfg *config.Config, nodeTokenFn func() string) (*derp.DerpBind, *derp.Client) {
+func buildDERPBind(cfg *config.Config, coordURLFn func() string, nodeTokenFn func() string) (*derp.DerpBind, *derp.Client) {
 	slog.Info("derp: relay URL configured, constructing DerpBind",
 		"url", cfg.DERPRelayURL,
 	)
@@ -1777,7 +1853,7 @@ func buildDERPBind(cfg *config.Config, nodeTokenFn func() string) (*derp.DerpBin
 
 	derpClient := derp.New(
 		cfg.DERPRelayURL,
-		makeDERPJWTFetcher(cfg, nodeTokenFn),
+		makeDERPJWTFetcher(coordURLFn, cfg.WGPublicKey, cfg.CoordinatorToken, cfg.SigningPrivateKeyPath, nodeTokenFn),
 		ourRawPubkey,
 		rxHandler,
 	)
@@ -1840,17 +1916,18 @@ func buildDERPTokenRequestBody(wgPublicKey, region, signingKeyPath string) map[s
 // makeDERPJWTFetcher returns a JWTFetcher that calls the coordinator's
 // POST /mesh/derp-token endpoint to get a fresh auth token.
 //
+// coordURLFn is called on every fetch (not just once at construction) so a
+// runtime coordinator-URL override (PATCH /settings) is picked up on the
+// very next token refresh — see buildDERPBind's doc for why this must be a
+// live getter rather than a captured string.
+//
 // nodeTokenFn is called on every fetch (not just once at construction) so a
 // token minted by a /pair that happens after this fetcher is built — DERP is
 // wired up before enrollment, at process start — is picked up on the very
 // next refresh with no separate propagation call needed.
-func makeDERPJWTFetcher(cfg *config.Config, nodeTokenFn func() string) derp.JWTFetcher {
-	coordinatorURL := cfg.CoordinatorURL
-	wgPublicKey := cfg.WGPublicKey
-	coordinatorToken := cfg.CoordinatorToken
-	signingKeyPath := cfg.SigningPrivateKeyPath
-
+func makeDERPJWTFetcher(coordURLFn func() string, wgPublicKey, coordinatorToken, signingKeyPath string, nodeTokenFn func() string) derp.JWTFetcher {
 	return func(ctx context.Context) (string, error) {
+		coordinatorURL := coordURLFn()
 		body := buildDERPTokenRequestBody(wgPublicKey, derpTokenRegion, signingKeyPath)
 		bodyBytes, _ := json.Marshal(body)
 

@@ -21,6 +21,7 @@ import (
 	"github.com/potluck-ai/potluck-mesh/internal/events"
 	"github.com/potluck-ai/potluck-mesh/internal/localapi"
 	"github.com/potluck-ai/potluck-mesh/internal/peerstate"
+	"github.com/potluck-ai/potluck-mesh/internal/runtimesettings"
 	"github.com/potluck-ai/potluck-mesh/internal/signingkey"
 )
 
@@ -101,6 +102,22 @@ func get(t *testing.T, client *http.Client, path string) *http.Response {
 	resp, err := client.Get("http://localhost" + path)
 	if err != nil {
 		t.Fatalf("GET %s: %v", path, err)
+	}
+	return resp
+}
+
+// patch issues a PATCH request with a JSON body. http.Client has no Patch
+// convenience method (unlike Get/Post), so build the request by hand.
+func patch(t *testing.T, client *http.Client, path, jsonBody string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodPatch, "http://localhost"+path, strings.NewReader(jsonBody))
+	if err != nil {
+		t.Fatalf("build PATCH %s request: %v", path, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("PATCH %s: %v", path, err)
 	}
 	return resp
 }
@@ -787,3 +804,216 @@ func TestHandleUnpair_NilCoordClient_DoesNotPanic(t *testing.T) {
 		t.Errorf("expected 204, got %d", resp.StatusCode)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// PATCH /settings
+// ---------------------------------------------------------------------------
+
+func TestHandleSettingsPatch_OmittedField_EchoesCurrentValue(t *testing.T) {
+	cfg := defaultCfg(t)
+	cfg.State.SetCoordinatorURL("http://127.0.0.1:8400")
+	client, _ := testServer(t, cfg)
+
+	resp := patch(t, client, "/settings", `{}`)
+	defer resp.Body.Close()
+	checkProtocolHeader(t, resp)
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
+	}
+
+	var body struct {
+		CoordinatorURL string `json:"coordinator_url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.CoordinatorURL != "http://127.0.0.1:8400" {
+		t.Errorf("coordinator_url = %q, want unchanged %q", body.CoordinatorURL, "http://127.0.0.1:8400")
+	}
+}
+
+func TestHandleSettingsPatch_ValidURL_UpdatesStateAndPersists(t *testing.T) {
+	cfg := defaultCfg(t)
+	cfg.State.SetCoordinatorURL("http://127.0.0.1:8400")
+	settingsPath := filepath.Join(t.TempDir(), "settings.json")
+	cfg.SettingsPath = settingsPath
+
+	var applied []string
+	cfg.ApplyCoordinatorURLFn = func(url string) {
+		applied = append(applied, url)
+		cfg.State.SetCoordinatorURL(url) // mimic main.go's applyCoordinatorURL side effect
+	}
+
+	client, _ := testServer(t, cfg)
+
+	resp := patch(t, client, "/settings", `{"coordinator_url":"https://coordinator.example.com"}`)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
+	}
+
+	var body struct {
+		CoordinatorURL string `json:"coordinator_url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.CoordinatorURL != "https://coordinator.example.com" {
+		t.Errorf("response coordinator_url = %q, want %q", body.CoordinatorURL, "https://coordinator.example.com")
+	}
+
+	// ApplyCoordinatorURLFn was invoked exactly once with the normalized URL.
+	if len(applied) != 1 || applied[0] != "https://coordinator.example.com" {
+		t.Errorf("ApplyCoordinatorURLFn calls = %v, want exactly one call with %q", applied, "https://coordinator.example.com")
+	}
+
+	// State reflects the live update.
+	if got := cfg.State.CoordinatorURL(); got != "https://coordinator.example.com" {
+		t.Errorf("State.CoordinatorURL() = %q, want %q", got, "https://coordinator.example.com")
+	}
+
+	// Persisted to settings.json.
+	saved, err := runtimesettings.Load(settingsPath)
+	if err != nil {
+		t.Fatalf("Load(settingsPath): %v", err)
+	}
+	if saved.CoordinatorURL != "https://coordinator.example.com" {
+		t.Errorf("persisted coordinator_url = %q, want %q", saved.CoordinatorURL, "https://coordinator.example.com")
+	}
+
+	// Persisted file is mode 0600 (secrets-adjacent convention).
+	info, err := os.Stat(settingsPath)
+	if err != nil {
+		t.Fatalf("stat settings file: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0600 {
+		t.Errorf("settings file mode = %o, want 0600", perm)
+	}
+}
+
+func TestHandleSettingsPatch_TrailingSlash_Normalized(t *testing.T) {
+	cfg := defaultCfg(t)
+	client, _ := testServer(t, cfg)
+
+	resp := patch(t, client, "/settings", `{"coordinator_url":"https://coordinator.example.com/"}`)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
+	}
+
+	var body struct {
+		CoordinatorURL string `json:"coordinator_url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.CoordinatorURL != "https://coordinator.example.com" {
+		t.Errorf("coordinator_url = %q, want trailing slash trimmed to %q", body.CoordinatorURL, "https://coordinator.example.com")
+	}
+}
+
+func TestHandleSettingsPatch_InvalidURL_Rejected(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"empty string", `{"coordinator_url":""}`},
+		{"missing scheme", `{"coordinator_url":"coordinator.example.com"}`},
+		{"unsupported scheme", `{"coordinator_url":"ftp://coordinator.example.com"}`},
+		{"scheme only, no host", `{"coordinator_url":"https://"}`},
+		{"not a string", `{"coordinator_url":123}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := defaultCfg(t)
+			cfg.State.SetCoordinatorURL("http://127.0.0.1:8400")
+			settingsPath := filepath.Join(t.TempDir(), "settings.json")
+			cfg.SettingsPath = settingsPath
+			applyCalled := false
+			cfg.ApplyCoordinatorURLFn = func(string) { applyCalled = true }
+
+			client, _ := testServer(t, cfg)
+			resp := patch(t, client, "/settings", tc.body)
+			defer resp.Body.Close()
+			io.Copy(io.Discard, resp.Body) //nolint:errcheck
+
+			if resp.StatusCode != http.StatusUnprocessableEntity && resp.StatusCode != http.StatusBadRequest {
+				t.Errorf("expected 422 or 400, got %d", resp.StatusCode)
+			}
+			if applyCalled {
+				t.Error("ApplyCoordinatorURLFn must not be called for a rejected update")
+			}
+			if got := cfg.State.CoordinatorURL(); got != "http://127.0.0.1:8400" {
+				t.Errorf("State.CoordinatorURL() = %q, want unchanged %q", got, "http://127.0.0.1:8400")
+			}
+			if _, err := os.Stat(settingsPath); !os.IsNotExist(err) {
+				t.Errorf("expected no settings file for a rejected update, stat err=%v", err)
+			}
+		})
+	}
+}
+
+func TestHandleSettingsPatch_MalformedJSON_400(t *testing.T) {
+	cfg := defaultCfg(t)
+	client, _ := testServer(t, cfg)
+
+	resp := patch(t, client, "/settings", `not json`)
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body) //nolint:errcheck
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", resp.StatusCode)
+	}
+}
+
+// TestHandleSettingsPatch_NilApplyFn_FallsBackToStateOnly pins the
+// documented fallback: when ApplyCoordinatorURLFn isn't wired (tests, or a
+// caller that only wants the persisted/State value), the handler still
+// succeeds and updates State directly rather than panicking on a nil call.
+func TestHandleSettingsPatch_NilApplyFn_FallsBackToStateOnly(t *testing.T) {
+	cfg := defaultCfg(t) // cfg.ApplyCoordinatorURLFn is nil
+	client, _ := testServer(t, cfg)
+
+	resp := patch(t, client, "/settings", `{"coordinator_url":"https://coordinator.example.com"}`)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, b)
+	}
+	if got := cfg.State.CoordinatorURL(); got != "https://coordinator.example.com" {
+		t.Errorf("State.CoordinatorURL() = %q, want %q", got, "https://coordinator.example.com")
+	}
+}
+
+// TestHandleSettingsPatch_NoSettingsPath_StillAppliesLive pins that
+// SettingsPath == "" (disables persistence — the documented test-only
+// escape hatch) still applies the live update; it just won't survive a
+// restart.
+func TestHandleSettingsPatch_NoSettingsPath_StillAppliesLive(t *testing.T) {
+	cfg := defaultCfg(t) // cfg.SettingsPath is ""
+	var applied string
+	cfg.ApplyCoordinatorURLFn = func(url string) { applied = url }
+	client, _ := testServer(t, cfg)
+
+	resp := patch(t, client, "/settings", `{"coordinator_url":"https://coordinator.example.com"}`)
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body) //nolint:errcheck
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	if applied != "https://coordinator.example.com" {
+		t.Errorf("ApplyCoordinatorURLFn called with %q, want %q", applied, "https://coordinator.example.com")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GET (startup) — persisted override reload-on-startup lives in main.go, not
+// this package; internal/runtimesettings has its own Load/Save round-trip
+// tests. This package's tests stop at "handleSettingsPatch persists +
+// applies correctly" — see internal/runtimesettings/runtimesettings_test.go
+// for the storage layer and cmd/potluck-mesh for the startup-load wiring.
+// ---------------------------------------------------------------------------

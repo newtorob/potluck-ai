@@ -27,6 +27,26 @@ const pipeName = `\\.\pipe\potluck-mesh`
 //
 // This prevents other local users (and SYSTEM) from connecting, matching the
 // same-user-only invariant enforced by Unix socket permissions.
+//
+// KNOWN GAP (tracked, not yet fixed — see the SUDO_UID/console-user fix in
+// listener_unix.go for the equivalent macOS/Linux problem): when this
+// sidecar runs as a Windows SERVICE (LocalSystem or a dedicated service
+// account) rather than as the interactively logged-in user, user.Current()
+// above resolves to THAT service account's SID, not the desktop user's. The
+// DACL then grants pipe access only to the service account, and Electron
+// (running as the logged-in user) gets access denied connecting — the exact
+// same class of bug the SUDO_UID gap was for Unix, just via a different
+// mechanism (DACL vs. file chmod/chown).
+//
+// Fixing this properly needs more than a small change: resolve the active
+// interactive session's user SID via WTSGetActiveConsoleSessionId +
+// WTSQueryUserToken (or WTSEnumerateSessions + per-session
+// WTSQuerySessionInformation for WTSUserName), translate that to a SID via
+// LookupAccountName, and grant the DACL to BOTH the service account and that
+// SID (so the service can still administer the pipe and the desktop user can
+// connect to it). That's a real Win32/golang.org/x/sys/windows undertaking —
+// deliberately left out of this change; flagging here so it isn't silently
+// assumed to work once the sidecar ships as a Windows service.
 func platformListen(_ string) (net.Listener, error) {
 	u, err := user.Current()
 	if err != nil {
