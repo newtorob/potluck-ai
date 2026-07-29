@@ -1,21 +1,66 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Potluck mesh sidecar — macOS LaunchDaemon template.
+  Potluck mesh sidecar — macOS ROOT LaunchDaemon.
 
-  Installed to /Library/LaunchDaemons/ai.trypotluck.mesh.plist by the
-  .pkg installer's post-install script. Runs as the dedicated `_potluck`
-  system user (created at install time), not root. Starts at boot;
-  survives logout.
+  This file is embedded STATICALLY, at build time, inside the signed
+  Potluck AI.app bundle at Contents/Library/LaunchDaemons/ai.trypotluck.mesh.plist
+  (electron-builder's mac.extraFiles — see apps/desktop/electron/package.json).
+  It is registered/unregistered at RUNTIME by the mesh-helper Swift CLI
+  (apps/desktop/electron/native/mesh-helper/) via
+  SMAppService.daemon(plistName: "ai.trypotluck.mesh.plist"), which main.js's
+  mesh:enable IPC handler shells out to. See docs/phase-g/local-ipc.md for the
+  IPC surface the daemon itself exposes once running.
 
-  Substitution tokens (rendered by the installer):
-    {{BINARY_PATH}}       — absolute path to the installed sidecar binary
-    {{COORDINATOR_URL}}   — defaults to the cooperative's hosted URL;
-                             user can override via the desktop app's
-                             Settings → Advanced → Cooperative connection
-    {{KEY_DIR}}           — /Library/Application Support/Potluck/keys (0700)
-    {{LOG_DIR}}           — /Library/Logs/Potluck (0755)
-  TODO(installer): replace these at install time, OR have the binary
-  read POTLUCK_* env vars from a config file the installer writes.
+  WHY THIS FILE CANNOT CONTAIN INSTALL-TIME TOKENS
+  --------------------------------------------------
+  SMAppService requires the embedded plist to be present, unmodified, inside
+  the app's code signature at the moment the app is built and signed — it
+  canNOT be rewritten, templated, or regenerated after install (unlike the
+  old .pkg-postinstall-rendered template this file replaces, which is now
+  dead). Anything that needs to vary per-install (a self-hosted or LAN
+  coordinator URL) is handled by a LIVE runtime override instead: a
+  PATCH /settings call on the sidecar's local IPC socket persists the
+  override to settings.json next to the WireGuard private key (see
+  internal/runtimesettings), and the sidecar applies it on every subsequent
+  launch BEFORE connecting to any coordinator-facing endpoint. This plist
+  only ever carries the PRODUCTION default.
+
+  WHY ROOT (no UserName/GroupName key)
+  -------------------------------------
+  The WireGuard mesh needs a utun device, which requires root on macOS. We
+  deliberately run as a root LaunchDaemon (the same model tailscaled uses)
+  rather than requesting the paid Network Extension entitlement, and rather
+  than ever prompting the end user for `sudo` — the whole point of the
+  SMAppService mechanism is that the user never runs a binary or types a
+  password beyond the one-time System Settings > Login Items & Extensions
+  approval click.
+
+  The sidecar no longer needs a coordinator token in its environment: a
+  pairing token (entered once, in the app's "Add this machine" flow) both
+  authorizes enrollment and has the sidecar mint + persist its own per-node
+  bearer token on disk (internal/nodetoken) for every later coordinator call.
+  Do NOT add POTLUCK_COORDINATOR_TOKEN here.
+
+  KNOWN CONSTRAINT — /Applications only
+  ---------------------------------------
+  ProgramArguments hardcodes the /Applications install path. Because this
+  plist is static, the daemon can only find its own binary if the app is
+  installed at the conventional /Applications/Potluck AI.app location (the
+  standard outcome of the DMG's drag-to-Applications flow). This is a known,
+  shared limitation of every macOS app that ships a privileged LaunchDaemon
+  via SMAppService this way — there is no supported way to make an
+  SMAppService daemon plist location-independent. If the app is run from
+  anywhere else (~/Downloads, a different Applications folder, etc.),
+  registration will succeed but launchd will fail to spawn the daemon
+  (binary not found at the hardcoded path). Needs an on-device check: see the
+  deliverable report for the exact verification steps.
+
+  WG key / signing key / IPC socket paths are intentionally NOT set here —
+  the binary's built-in platform defaults apply (internal/config/config.go):
+  socket at /tmp/potluck-mesh.sock, keys under
+  /var/lib/potluck/mesh/ or $HOME/Library/Application Support/Potluck/mesh/
+  depending on what HOME resolves to for this LaunchDaemon's root process.
 -->
 <plist version="1.0">
   <dict>
@@ -24,55 +69,27 @@
 
     <key>ProgramArguments</key>
     <array>
-      <string>{{BINARY_PATH}}</string>
+      <string>/Applications/Potluck AI.app/Contents/Resources/mesh/potluck-mesh</string>
       <string>--coordinator-url</string>
-      <string>{{COORDINATOR_URL}}</string>
+      <string>https://coordinator.trypotluck.ai</string>
       <string>--log-format</string>
       <string>json</string>
     </array>
 
-    <!-- Run as the unprivileged service user. The installer creates
-         _potluck if it doesn't exist; the binary needs no special
-         privileges to operate the utun device on macOS. -->
-    <key>UserName</key>
-    <string>_potluck</string>
-    <key>GroupName</key>
-    <string>_potluck</string>
-
-    <!-- Run at load + restart if killed (with throttle to avoid restart
-         storms on a misconfigured binary). -->
+    <!-- Start immediately once registered/approved, and keep it running —
+         the mesh daemon must outlive the Electron app entirely (it's a
+         member-operated compute network node, not a per-session process). -->
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
-    <dict>
-      <key>SuccessfulExit</key>
-      <false/>
-    </dict>
-    <key>ThrottleInterval</key>
-    <integer>10</integer>
+    <true/>
 
-    <!-- Environment variables consumed by the sidecar. Adjust to match
-         the actual env-var names in internal/config/config.go. -->
-    <key>EnvironmentVariables</key>
-    <dict>
-      <key>POTLUCK_WG_PRIVATE_KEY_PATH</key>
-      <string>{{KEY_DIR}}/wg.key</string>
-      <key>POTLUCK_LOCAL_API_SOCKET</key>
-      <string>/var/run/potluck-mesh.sock</string>
-    </dict>
-
-    <!-- Structured JSON logs land in /Library/Logs/Potluck/mesh.log.
-         Errors go to a separate file so on-call can grep them quickly. -->
+    <!-- /Library/Logs always exists on a stock macOS install, unlike a
+         Potluck-specific subdirectory launchd would need to create itself
+         (it does not create missing parent directories for these paths). -->
     <key>StandardOutPath</key>
-    <string>{{LOG_DIR}}/mesh.log</string>
+    <string>/Library/Logs/potluck-mesh.log</string>
     <key>StandardErrorPath</key>
-    <string>{{LOG_DIR}}/mesh.err</string>
-
-    <!-- Lower the daemon's CPU priority so it doesn't compete with
-         interactive workloads when the user is actively using the
-         machine. Mesh keepalive + STUN traffic is bursty + low-CPU
-         anyway. -->
-    <key>Nice</key>
-    <integer>5</integer>
+    <string>/Library/Logs/potluck-mesh.err</string>
   </dict>
 </plist>

@@ -16,10 +16,11 @@
     "prepack:frontend": "cd ../frontend && pnpm exec vite build",
     "prepack:python": "rm -rf resources/python && mkdir -p resources/python && bash scripts/sign-sidecars.sh ../python/dist/potluck-local && cp -R ../python/dist/potluck-local resources/python/",
     "prepack:mcp": "bash scripts/sign-sidecars.sh ../python/dist/potluck-mcp && cp -R ../python/dist/potluck-mcp resources/python/",
-    "prepack:mesh": "make -C ../go/potluck-mesh build && rm -rf resources/mesh && mkdir -p resources/mesh && cp ../go/potluck-mesh/dist/potluck-mesh* resources/mesh/",
-    "prepack": "pnpm run prepack:frontend && pnpm run prepack:python && pnpm run prepack:mcp && pnpm run prepack:mesh",
+    "prepack:mesh": "make -C ../go/potluck-mesh build && bash scripts/sign-sidecars.sh ../go/potluck-mesh/dist && rm -rf resources/mesh && mkdir -p resources/mesh && cp ../go/potluck-mesh/dist/potluck-mesh* resources/mesh/",
+    "prepack:mesh-helper": "bash native/mesh-helper/build.sh",
+    "prepack": "pnpm run prepack:frontend && pnpm run prepack:python && pnpm run prepack:mcp && pnpm run prepack:mesh && pnpm run prepack:mesh-helper",
     "package": "pnpm run prepack && pnpm run build",
-    "clean": "rimraf dist out resources/python resources/mesh"
+    "clean": "rimraf dist out resources/python resources/mesh resources/mesh-helper"
   },
   "build": {
     "afterSign": "scripts/notarize.js",
@@ -54,11 +55,6 @@
         "from": "./resources/mesh/",
         "to": "mesh",
         "filter": ["**/*"]
-      },
-      {
-        "from": "../../../packaging/daemons/",
-        "to": "daemons",
-        "filter": ["**/*"]
       }
     ],
     "mac": {
@@ -72,7 +68,17 @@
         { "target": "dmg", "arch": ["arm64", "x64"] },
         { "target": "zip", "arch": ["arm64", "x64"] }
       ],
-      "notarize": false
+      "notarize": false,
+      "extraFiles": [
+        {
+          "from": "../../../packaging/daemons/ai.trypotluck.mesh.plist",
+          "to": "Library/LaunchDaemons/ai.trypotluck.mesh.plist"
+        },
+        {
+          "from": "./resources/mesh-helper/mesh-helper",
+          "to": "MacOS/mesh-helper"
+        }
+      ]
     },
     "win": {
       "icon": "icons/icon.ico",

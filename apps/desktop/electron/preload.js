@@ -182,5 +182,43 @@ contextBridge.exposeInMainWorld('potluck', {
      */
     request: (method, path, body) =>
       ipcRenderer.invoke('mesh:request', method, path, body),
+
+    // ── Mesh daemon supervision ("app brings up the mesh") ──────────────────
+    //
+    // Distinct from `request` above: these three drive whether the mesh
+    // sidecar is even running as a system daemon, not what it does once it
+    // is. macOS today: backed by SMAppService via a signed helper CLI.
+    // Linux/Windows: always resolve `state: 'unsupported'` (not implemented
+    // yet) — the shape is stable across platforms so the UI can be built
+    // once.
+    //
+    // `state` values: 'not_installed' | 'requires_approval' | 'starting' |
+    // 'running' | 'unsupported'. See main.js's mesh-daemon-supervision
+    // section for exactly what each means.
+
+    /**
+     * Current mesh daemon status. Safe to poll (e.g. every 2-5s from a
+     * settings/status view) — each call is one short helper subprocess plus,
+     * on macOS when the daemon reports enabled, one local socket probe.
+     * @returns {Promise<{ platform: string, state: string, detail?: string }>}
+     */
+    daemonStatus: () => ipcRenderer.invoke('mesh:daemon-status'),
+
+    /**
+     * Registers (or re-registers) the mesh daemon. May resolve with
+     * state: 'requires_approval' — that is a SUCCESSFUL outcome, not an
+     * error: the daemon is registered but the user must approve it in
+     * System Settings > Login Items & Extensions before it starts. Follow up
+     * with openLoginItems() to take them straight there.
+     * @returns {Promise<{ platform: string, state: string, detail?: string }>}
+     */
+    enable: () => ipcRenderer.invoke('mesh:enable'),
+
+    /**
+     * Opens System Settings > General > Login Items & Extensions so the user
+     * can approve the already-registered mesh daemon.
+     * @returns {Promise<{ platform: string, ok: boolean }>}
+     */
+    openLoginItems: () => ipcRenderer.invoke('mesh:open-login-items'),
   },
 });

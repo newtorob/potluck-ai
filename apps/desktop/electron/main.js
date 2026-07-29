@@ -1,7 +1,7 @@
 'use strict';
 
 const { app, BrowserWindow, shell, ipcMain, dialog, Notification, nativeImage, session } = require('electron');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -683,6 +683,188 @@ ipcMain.handle('mesh:request', async (_evt, method, reqPath, body) => {
       body: { error: { code, message: err && err.message ? err.message : String(err) } },
     };
   }
+});
+
+// ─── Mesh daemon supervision (macOS: SMAppService root LaunchDaemon) ─────────
+//
+// This is the "app brings up the mesh" layer, distinct from the mesh:request
+// bridge above (which only talks to an ALREADY-running sidecar over its
+// socket). The mesh binary needs root for the utun device, so on macOS it
+// runs as a root LaunchDaemon registered via SMAppService — never via `sudo`,
+// never hand-run by the user. main.js never spawns/kills this daemon itself
+// (unlike the Python sidecar above): it is installed once, OUTLIVES the
+// Electron app across quits/relaunches/updates, and is only driven through
+// the signed mesh-helper Swift CLI (native/mesh-helper/), which wraps
+// SMAppService.daemon(plistName:) — see that file's header comment for why
+// it must be a sibling of the main executable at Contents/MacOS/mesh-helper
+// (electron-builder's mac.extraFiles in package.json), not Resources/.
+//
+// The static LaunchDaemon plist (packaging/daemons/ai.trypotluck.mesh.plist,
+// embedded the same way at Contents/Library/LaunchDaemons/) is baked in at
+// build time and can't be rewritten post-install — see its header comment.
+//
+// Cross-platform shape: the renderer-facing contract (channel names + the
+// `state` enum) is the same on every OS so the frontend can be wired once.
+// Only macOS is implemented; Linux/Windows always resolve state:'unsupported'
+// with a TODO for now (systemd/pkexec on Linux, a Windows Service on
+// Windows — neither needs root/UAC-avoidance tricks the way macOS does, so
+// their mechanism will look different, not just a port of this one).
+//
+// State enum (superset of what the task spec listed — 'starting' added
+// below because SMAppService's 'enabled' means "registered + approved," NOT
+// "the socket is actually answering yet," and collapsing that into one of
+// the other four buckets would be actively misleading to the UI):
+//   'not_installed'    — never registered (or SMAppService lost track of it)
+//   'requires_approval'— registered, but the user must flip it on in
+//                        System Settings > Login Items & Extensions
+//   'starting'         — SMAppService says enabled, but GET /status on the
+//                        daemon's own IPC socket hasn't answered yet
+//                        (freshly registered, or the daemon is unhealthy)
+//   'running'          — enabled AND the socket answered 200 on /status
+//   'unsupported'      — this platform's mechanism isn't implemented yet
+
+/**
+ * Absolute path to the signed mesh-helper CLI inside the packaged app, or
+ * null in dev (there is no packaged bundle to resolve the sibling path
+ * against, and no point registering a real system LaunchDaemon from a dev
+ * checkout). Mirrors getSidecarPath()'s app.isPackaged guard above.
+ *
+ * process.resourcesPath is Contents/Resources; the helper lives at the
+ * sibling Contents/MacOS/mesh-helper (see the big comment block above).
+ */
+function getMeshHelperPath() {
+  if (!app.isPackaged || process.platform !== 'darwin') {
+    return null;
+  }
+  return path.join(process.resourcesPath, '..', 'MacOS', 'mesh-helper');
+}
+
+const MESH_HELPER_TIMEOUT_MS = 15_000;
+
+/**
+ * Runs the mesh-helper CLI with a single subcommand and captures stdout.
+ * Never rejects — callers get { ok: false, error } instead, since every
+ * caller needs to turn a helper failure into a `state` value, not an
+ * exception.
+ */
+function runMeshHelper(subcommand) {
+  return new Promise((resolve) => {
+    const helperPath = getMeshHelperPath();
+    if (!helperPath) {
+      resolve({ ok: false, error: 'mesh-helper unavailable (dev mode or non-macOS)' });
+      return;
+    }
+    execFile(helperPath, [subcommand], { timeout: MESH_HELPER_TIMEOUT_MS }, (err, stdout, stderr) => {
+      if (err) {
+        const detail = (stderr && stderr.trim()) || err.message;
+        log.warn(`[mesh-daemon] helper '${subcommand}' failed: ${detail}`);
+        resolve({ ok: false, error: detail });
+        return;
+      }
+      resolve({ ok: true, output: stdout.trim() });
+    });
+  });
+}
+
+/**
+ * Computes the full macOS daemon status: shells out to the helper's `status`
+ * subcommand for the SMAppService.Status, then — only when that reports
+ * 'enabled' — probes the daemon's own IPC socket (GET /status, via the
+ * existing meshRequest() above) to confirm it's actually up, not just
+ * registered. See the state-enum comment above for what each value means.
+ */
+async function computeMacDaemonStatus() {
+  const helperResult = await runMeshHelper('status');
+  if (!helperResult.ok) {
+    return { platform: 'darwin', state: 'not_installed', detail: helperResult.error };
+  }
+
+  const token = helperResult.output;
+  if (token === 'requiresApproval') {
+    return { platform: 'darwin', state: 'requires_approval' };
+  }
+  if (token === 'notRegistered' || token === 'notFound') {
+    return { platform: 'darwin', state: 'not_installed' };
+  }
+  if (token === 'enabled') {
+    try {
+      const res = await meshRequest({ method: 'GET', path: '/status' });
+      if (res.status === 200) {
+        return { platform: 'darwin', state: 'running' };
+      }
+      return { platform: 'darwin', state: 'starting', detail: `socket responded with HTTP ${res.status}` };
+    } catch (err) {
+      const code = err && err.code ? err.code : (err && err.message) || 'socket unreachable';
+      return { platform: 'darwin', state: 'starting', detail: code };
+    }
+  }
+  // Unrecognised token — a future SMAppService.Status case the helper
+  // doesn't know how to map (see statusToken() in main.swift). Fail safe
+  // toward "not installed" rather than silently claiming success.
+  return { platform: 'darwin', state: 'not_installed', detail: `unrecognised helper status: ${token}` };
+}
+
+ipcMain.handle('mesh:daemon-status', async () => {
+  if (process.platform === 'darwin') {
+    return computeMacDaemonStatus();
+  }
+  if (process.platform === 'win32') {
+    // TODO(windows): supervise potluck-mesh as a Windows Service (installed
+    // at .msi install time, or registered on demand) — no SMAppService
+    // equivalent exists on Windows, so this needs its own mechanism, not a
+    // port of the macOS one. Not implemented.
+    return {
+      platform: 'win32',
+      state: 'unsupported',
+      detail: 'Windows mesh daemon supervision not implemented (TODO)',
+    };
+  }
+  // linux
+  // TODO(linux): supervise potluck-mesh as a systemd system unit, most
+  // likely installed/enabled via a one-time `pkexec` prompt from this IPC
+  // handler (systemd has no user-consent-free root-daemon API like
+  // SMAppService). Not implemented.
+  return {
+    platform: 'linux',
+    state: 'unsupported',
+    detail: 'Linux mesh daemon supervision not implemented (TODO)',
+  };
+});
+
+ipcMain.handle('mesh:enable', async () => {
+  if (process.platform !== 'darwin') {
+    return {
+      platform: process.platform,
+      state: 'unsupported',
+      detail: `mesh:enable not implemented on ${process.platform} (TODO)`,
+    };
+  }
+
+  const helperResult = await runMeshHelper('register');
+  if (!helperResult.ok) {
+    return { platform: 'darwin', state: 'not_installed', detail: helperResult.error };
+  }
+
+  const token = helperResult.output;
+  if (token === 'requiresApproval') {
+    log.info('[mesh-daemon] registered — awaiting Login Items approval.');
+    return { platform: 'darwin', state: 'requires_approval' };
+  }
+  if (token === 'enabled') {
+    log.info('[mesh-daemon] registered and enabled.');
+    // Confirm liveness the same way daemon-status does, rather than
+    // optimistically reporting 'running' before the socket answers.
+    return computeMacDaemonStatus();
+  }
+  return { platform: 'darwin', state: 'not_installed', detail: `unexpected status after register: ${token}` };
+});
+
+ipcMain.handle('mesh:open-login-items', async () => {
+  if (process.platform !== 'darwin') {
+    return { platform: process.platform, ok: false };
+  }
+  const helperResult = await runMeshHelper('open-login-items');
+  return { platform: 'darwin', ok: helperResult.ok };
 });
 
 // ─── Cloud API bridge ────────────────────────────────────────────────────────
