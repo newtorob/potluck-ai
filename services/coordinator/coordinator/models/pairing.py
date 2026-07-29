@@ -13,7 +13,15 @@ from coordinator.db.base import Base
 class PairingToken(Base):
     """One-time token issued to enroll a new mesh node into a household.
 
-    Single-use, 1-hour TTL, opaque base32 (~110 bits entropy).
+    Single-use, 1-hour TTL, opaque base32 encoding of 20 CSPRNG bytes
+    (`secrets.token_bytes(20)` — 160 bits of entropy; see
+    `routers/mesh.py::_generate_pairing_token`). Since node-token-hardening
+    (v0.6) this token is no longer just a bootstrap convenience gate — a
+    valid pairing token is now SUFFICIENT AUTH on its own for POST
+    /mesh/enroll (no coordinator token required), so its entropy/TTL/
+    single-use properties carry real security weight, not just UX
+    ergonomics. All three already held before that change; verified, not
+    newly hardened.
     """
 
     __tablename__ = "pairing_tokens"

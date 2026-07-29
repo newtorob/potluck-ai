@@ -138,6 +138,7 @@ def test_enroll_response_round_trip() -> None:
                 platform="linux",
             )
         ],
+        node_token="fresh-node-token-shown-once",
     )
     dumped = resp.model_dump(mode="json")
     parsed = EnrollResponse.model_validate(dumped)  # round-trip, must not raise
@@ -146,6 +147,7 @@ def test_enroll_response_round_trip() -> None:
         "192.168.1.20:51820",
         "10.0.0.5:51820",
     ]
+    assert parsed.node_token == "fresh-node-token-shown-once"
 
 
 def test_heartbeat_request_minimal_shape() -> None:

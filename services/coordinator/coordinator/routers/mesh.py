@@ -38,7 +38,16 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Response, WebSocket, WebSocketDisconnect, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Header,
+    HTTPException,
+    Response,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,9 +80,12 @@ from coordinator.schemas.mesh import (
     SignalWelcome,
     safe_endpoint_or_none,
 )
-from coordinator.middleware.auth import (
-    coordinator_token_matches,
-    require_coordinator_token,
+from coordinator.middleware.auth import coordinator_token_matches
+from coordinator.middleware.node_auth import (
+    enforce_node_scope,
+    extract_bearer_token,
+    hash_node_token,
+    resolve_node_from_token,
 )
 from coordinator.middleware.session_auth import resolve_session_member_id
 from coordinator.services.household_allocator import (
@@ -133,6 +145,21 @@ def _generate_pairing_token() -> str:
     return base64.b32encode(secrets.token_bytes(20)).decode("ascii").rstrip("=")
 
 
+# Raw byte length of a freshly-minted node_token. >=32 bytes (256 bits) per
+# the node-token-hardening contract — this token now authorizes ongoing
+# machine calls on its own, so it needs the same order-of-magnitude entropy
+# as the pairing token that mints it.
+NODE_TOKEN_BYTES = 32
+
+
+def _generate_node_token() -> str:
+    """Fresh per-node bearer credential, minted once at successful enroll.
+    urlsafe-base64 (no padding) of 32 CSPRNG bytes — 256 bits of entropy.
+    The coordinator stores only `hash_node_token(...)`; the raw value is
+    returned in `EnrollResponse.node_token` and never persisted or logged."""
+    return secrets.token_urlsafe(NODE_TOKEN_BYTES)
+
+
 # ---------------------------------------------------------------------------
 # POST /mesh/households
 # ---------------------------------------------------------------------------
@@ -158,12 +185,13 @@ async def create_household(
 
     Auth: this is a USER action (a logged-in member managing their own
     household), so it's gated ONLY by `resolve_session_member_id` (the
-    member's session) — NOT by `require_coordinator_token`. The coordinator
-    token is a machine/sidecar credential and must not need to live in the
+    member's session) — NOT by any machine credential. Neither the
+    coordinator token nor a per-node `node_token` is ever needed in the
     browser/desktop-app UI that calls this route. Contrast with the
     machine-plumbing routes below (/mesh/enroll, /mesh/heartbeat,
     /mesh/signal, /mesh/peers, /mesh/derp-token, /mesh/nodes/{id}), which
-    keep the coordinator-token gate."""
+    are gated by `resolve_node_from_token` (per-node `node_token` OR the
+    legacy coordinator token — see `middleware/node_auth.py`)."""
     # If this member already has a household, return it.
     existing = await db.execute(
         select(Household).where(Household.owner_member_id == member_id)
@@ -287,23 +315,39 @@ async def issue_pairing_token(
     "/mesh/enroll",
     response_model=EnrollResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def enroll(
     req: EnrollRequest,
     db: AsyncSession = Depends(get_db),
+    x_potluck_coordinator_token: str | None = Header(
+        default=None, alias="X-Potluck-Coordinator-Token"
+    ),
 ) -> EnrollResponse:
     """Redeem a pairing token, allocate a mesh IP, persist the node,
-    return the household's roster.
+    return the household's roster + a fresh per-node bearer credential.
 
     Flow:
       1. Look up the pairing token. Must exist, must be unconsumed,
          must not be expired.
       2. Load the household.
       3. Allocate a mesh IP from the household's CIDR.
-      4. Create the mesh_nodes row.
+      4. Create the mesh_nodes row (with a freshly-minted node_token_hash).
       5. Mark the pairing_token consumed.
-      6. Return the new node's mesh IP + the household roster.
+      6. Return the new node's mesh IP + the household roster + the raw
+         node_token (shown exactly once).
+
+    Auth (v0.6 — node-token hardening): a VALID pairing token
+    (unconsumed, unexpired, resolves to a real household) is SUFFICIENT
+    AUTH on its own — an app-spawned sidecar enrolls with nothing but the
+    pairing token a member handed it, never the machine-wide
+    POTLUCK_COORDINATOR_TOKEN. When the pairing token alone doesn't verify,
+    the coordinator token is still accepted (back-compat for the dev
+    fleet, which enrolls with `--coordinator-token` and a shared pairing
+    token). Neither present/valid → 401. This does NOT relax pairing-token
+    validation itself: a bogus/expired/reused token still fails with its
+    specific 404/409/410 below even when a valid coordinator token is
+    presented — the coordinator token only ever substitutes for "no
+    pairing token needed", never for "any pairing token accepted".
 
     On any failure that's the caller's fault → 4xx with a categorical
     reason. Internal errors → 5xx with a generic message; structured
@@ -311,8 +355,20 @@ async def enroll(
     """
     now = datetime.now(timezone.utc)
 
-    # ---- 1. Verify the pairing token ---- #
+    # ---- 0. Auth: valid pairing token is sufficient on its own; else fall
+    #      back to the coordinator token (back-compat). ---- #
     token_row = await db.get(PairingToken, req.pairing_token)
+    pairing_token_valid = (
+        token_row is not None
+        and token_row.consumed_at is None
+        and token_row.expires_at > now
+    )
+    if not pairing_token_valid and not coordinator_token_matches(
+        x_potluck_coordinator_token
+    ):
+        raise HTTPException(status_code=401, detail="unauthorized")
+
+    # ---- 1. Verify the pairing token (surface the specific reason) ---- #
     if token_row is None:
         raise HTTPException(status_code=404, detail="pairing token not found")
     if token_row.consumed_at is not None:
@@ -385,6 +441,10 @@ async def enroll(
             raise HTTPException(status_code=400, detail=str(e))
 
     # ---- 5. Persist the new node ---- #
+    # Mint the per-node bearer credential now, before insert, so only its
+    # hash ever touches the DB (or logs) — the raw value lives in this local
+    # variable until it's placed on the response below.
+    node_token = _generate_node_token()
     node = MeshNode(
         household_id=household.id,
         node_name=req.node_name,
@@ -392,6 +452,7 @@ async def enroll(
         wg_public_key=req.wg_public_key,
         signing_public_key=req.signing_public_key,
         platform=req.platform,
+        node_token_hash=hash_node_token(node_token),
     )
     db.add(node)
     await db.flush()  # populate node.id
@@ -426,6 +487,7 @@ async def enroll(
         mesh_ip=mesh_ip,
         mesh_cidr=str(household.mesh_cidr),
         peers=peers,
+        node_token=node_token,
     )
 
 
@@ -437,19 +499,21 @@ async def enroll(
 @router.get(
     "/mesh/peers",
     response_model=list[EnrolledPeer],
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def list_peers(
     wg_public_key: str,
+    auth_node: MeshNode | None = Depends(resolve_node_from_token),
     db: AsyncSession = Depends(get_db),
 ) -> list[EnrolledPeer]:
     """Return the household roster for a node, identified by its
     `wg_public_key` query parameter.
 
-    Gated by the coordinator token (mirrors every sibling /mesh/* route) so
-    an internet-facing coordinator can't be enumerated by anyone who merely
-    knows/guesses a registered wg_public_key. This was previously missing —
-    LAUNCH-BLOCKER fix.
+    Gated by `resolve_node_from_token` (mirrors every sibling /mesh/* route)
+    so an internet-facing coordinator can't be enumerated by anyone who
+    merely knows/guesses a registered wg_public_key. This was previously
+    missing — LAUNCH-BLOCKER fix. Accepts EITHER a per-node `node_token`
+    (bound to exactly that node — see below) OR the legacy coordinator
+    token (back-compat, no per-node binding).
 
     v0 auth model: possession of the WG pubkey is treated as proof
     of household membership. This is acceptable for v0 because:
@@ -466,6 +530,7 @@ async def list_peers(
     caller = result.scalar_one_or_none()
     if caller is None:
         raise HTTPException(status_code=404, detail="node not found")
+    enforce_node_scope(auth_node, caller.id)
 
     roster_result = await db.execute(
         select(MeshNode).where(
@@ -485,15 +550,21 @@ async def list_peers(
     "/mesh/nodes/{node_id}",
     status_code=204,
     response_class=Response,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def delete_mesh_node(
     node_id: uuid.UUID,
     wg_public_key: str,
+    auth_node: MeshNode | None = Depends(resolve_node_from_token),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Remove a node from a household. Idempotent — returns 204 even if the
     node row is already gone (re-running the cleanup is safe).
+
+    Gated by `resolve_node_from_token`: EITHER a per-node `node_token`
+    (bound to the CALLER — the `wg_public_key` query param must be that
+    node's own key, enforced below; the TARGET may still be a different
+    household-mate, e.g. peer cleanup of a stale entry) OR the legacy
+    coordinator token (back-compat, no per-node binding).
 
     v0 auth model: the caller proves household membership with their own
     wg_public_key. Either:
@@ -515,6 +586,7 @@ async def delete_mesh_node(
     caller = caller_result.scalar_one_or_none()
     if caller is None:
         raise HTTPException(status_code=403, detail="wg_public_key not enrolled")
+    enforce_node_scope(auth_node, caller.id)
 
     target = await db.get(MeshNode, node_id)
     if target is None:
@@ -564,17 +636,19 @@ async def delete_mesh_node(
 @router.post(
     "/mesh/heartbeat",
     response_model=HeartbeatResponse,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def heartbeat(
     req: HeartbeatRequest,
+    auth_node: MeshNode | None = Depends(resolve_node_from_token),
     db: AsyncSession = Depends(get_db),
 ) -> HeartbeatResponse:
     """Update a node's `last_endpoint` + `last_seen_at`.
 
     Same v0 auth model as /mesh/peers: the (node_id, wg_public_key)
     pair must match an existing row. v1 will move to a signed-nonce
-    flow.
+    flow. Gated by `resolve_node_from_token`: EITHER a per-node
+    `node_token` (bound to exactly `req.node_id`, enforced below) OR the
+    legacy coordinator token (back-compat, no per-node binding).
     """
     node = await db.get(MeshNode, req.node_id)
     if node is None:
@@ -583,6 +657,7 @@ async def heartbeat(
         # Identifying as a different node than the caller's key matches
         # → reject with 403, not 404, to make the failure mode clear.
         raise HTTPException(status_code=403, detail="wg_public_key mismatch")
+    enforce_node_scope(auth_node, node.id)
 
     node.last_endpoint = req.external_endpoint
     node.last_seen_at = datetime.now(timezone.utc)
@@ -629,14 +704,18 @@ def _verify_derp_pop(node: MeshNode, req: DERPTokenRequest) -> None:
 @router.post(
     "/mesh/derp-token",
     response_model=DERPTokenResponse,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def issue_derp_token(
     req: DERPTokenRequest,
+    auth_node: MeshNode | None = Depends(resolve_node_from_token),
     db: AsyncSession = Depends(get_db),
 ) -> DERPTokenResponse:
     """Issue a short-lived JWT that authorises a mesh node to connect to
     the DERP relay.
+
+    Gated by `resolve_node_from_token`: EITHER a per-node `node_token`
+    (bound to exactly `req.wg_public_key`'s node, enforced below) OR the
+    legacy coordinator token (back-compat, no per-node binding).
 
     Auth model: possession of a registered wg_public_key is the BASE
     credential — the coordinator verifies the key exists in mesh_nodes. This
@@ -676,6 +755,7 @@ async def issue_derp_token(
             status_code=404,
             detail="wg_public_key not enrolled",
         )
+    enforce_node_scope(auth_node, node.id)
 
     # ---- proof-of-possession (optional, back-compat) ---- #
     settings = get_settings()
@@ -828,26 +908,51 @@ async def mesh_signal(ws: WebSocket) -> None:
       5. On disconnect: server removes the connection from the registry
          and broadcasts the node's `removed` to the household.
 
-    v0 auth: a coordinator token (when configured) gates the WS upgrade, then
-    possession of a valid `wg_public_key` identifies the node. Stronger auth
-    (signed-nonce member<->key challenge mirroring /peers/connect) is a v0.5
-    hardening item.
+    v0.6 auth: the WS upgrade is gated by EITHER a per-node `node_token`
+    (`Authorization: Bearer <node_token>` header on the upgrade request —
+    same header/format as the REST machine routes) OR the legacy
+    coordinator token (`X-Potluck-Coordinator-Token`, when configured;
+    back-compat). A resolved node_token additionally binds this connection
+    to exactly that node: once `hello.wg_public_key` is known (step 2
+    below), it must match the token's own node, or the connection is
+    rejected — a node_token must only ever open the signal channel AS
+    itself. Possession of a valid `wg_public_key` alone (no credential
+    matched, dev-mode passthrough) still identifies the node, as before.
+    Stronger auth (signed-nonce member<->key challenge mirroring
+    /peers/connect) is a v1 hardening item.
     """
     await ws.accept()
 
-    # ---- coordinator-token gate (mirrors /peers/connect) ---- #
-    # No-op when POTLUCK_COORDINATOR_TOKEN is unset (tokenless household
-    # coordinators unaffected). When configured, the mesh sidecar must present
-    # X-Potluck-Coordinator-Token on the WS upgrade. Raises the bar for joining
-    # the signaling channel from "anyone with any enrolled WG pubkey" (which the
-    # code's own comments call not-secret) to "anyone holding the coordinator
-    # token", while the full signed-nonce member<->key binding is built (v0.5).
-    if not coordinator_token_matches(ws.headers.get("x-potluck-coordinator-token")):
-        logger.info("mesh_signal_rejected_bad_coordinator_token")
+    # ---- node_token / coordinator-token gate (mirrors /peers/connect) ---- #
+    # Try the per-node bearer credential first (NEW): `Authorization: Bearer
+    # <node_token>`, same header/format as every REST machine route. If it
+    # resolves, `auth_node_id` binds this connection to exactly that node —
+    # checked against `hello.wg_public_key` once hello arrives (step 2
+    # below).
+    #
+    # If it doesn't resolve (absent, malformed, unknown), fall back to the
+    # legacy `X-Potluck-Coordinator-Token` gate exactly as before this
+    # change — no-op when POTLUCK_COORDINATOR_TOKEN is unset (tokenless
+    # household coordinators unaffected).
+    auth_node_id: uuid.UUID | None = None
+    bearer = extract_bearer_token(ws.headers.get("authorization"))
+    if bearer:
+        token_hash = hash_node_token(bearer)
+        async with get_session_factory()() as auth_db:
+            auth_result = await auth_db.execute(
+                select(MeshNode.id).where(MeshNode.node_token_hash == token_hash)
+            )
+            auth_node_id = auth_result.scalar_one_or_none()
+
+    if auth_node_id is None and not coordinator_token_matches(
+        ws.headers.get("x-potluck-coordinator-token")
+    ):
+        logger.info("mesh_signal_rejected_bad_credentials")
         await _safe_send(
             ws,
             SignalError(
-                code="unauthorized", message="coordinator token required"
+                code="unauthorized",
+                message="node_token or coordinator token required",
             ).model_dump(mode="json"),
         )
         await ws.close(code=1008)
@@ -895,6 +1000,20 @@ async def mesh_signal(ws: WebSocket) -> None:
                 SignalError(
                     code="node_not_enrolled",
                     message="wg_public_key not found in any household",
+                ).model_dump(mode="json"),
+            )
+            await ws.close(code=1008)
+            return
+
+        # A resolved node_token may only open this channel AS its own
+        # node — reject if `hello.wg_public_key` names a DIFFERENT node
+        # than the one the bearer credential resolved to.
+        if auth_node_id is not None and auth_node_id != node.id:
+            await _safe_send(
+                ws,
+                SignalError(
+                    code="unauthorized",
+                    message="node_token does not authorize this wg_public_key",
                 ).model_dump(mode="json"),
             )
             await ws.close(code=1008)

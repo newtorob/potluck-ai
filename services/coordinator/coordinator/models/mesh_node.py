@@ -47,6 +47,22 @@ class MeshNode(Base):
     # rotation endpoint yet (matches the WG key's own "post-launch" rotation
     # note above).
     signing_public_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # SHA-256 hex digest of the per-node bearer credential ("node_token")
+    # minted once at successful POST /mesh/enroll and returned to the caller
+    # exactly then — the coordinator never stores or logs the raw value.
+    # Lets an app-spawned sidecar authorize its OWN ongoing calls
+    # (heartbeat, peers, derp-token, node delete, the /mesh/signal WS
+    # upgrade) WITHOUT ever holding the machine-wide
+    # POTLUCK_COORDINATOR_TOKEN. Nullable + additive: nodes enrolled before
+    # this migration (or by a mesh client that hasn't picked up node-token
+    # support yet) simply have none, and every machine route keeps accepting
+    # the legacy coordinator token unchanged (see
+    # `middleware/node_auth.py::resolve_node_from_token`). No rotation
+    # endpoint yet — matches the wg_public_key/signing_public_key
+    # "post-launch" rotation note above.
+    node_token_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, unique=True
+    )
     last_endpoint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

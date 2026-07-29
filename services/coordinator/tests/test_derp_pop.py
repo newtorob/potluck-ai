@@ -104,7 +104,7 @@ def _reset_derp_pop_flag(monkeypatch: pytest.MonkeyPatch):
 async def test_legacy_request_without_signature_still_works(db_session) -> None:
     _, wg_pubkey = await _seed_household_and_node(db_session)
     resp = await issue_derp_token(
-        DERPTokenRequest(wg_public_key=wg_pubkey), db=db_session
+        DERPTokenRequest(wg_public_key=wg_pubkey), auth_node=None, db=db_session
     )
     assert resp.token
     assert resp.region == "ord"
@@ -114,7 +114,7 @@ async def test_legacy_request_without_signature_still_works(db_session) -> None:
 async def test_unknown_wg_pubkey_still_404s(db_session) -> None:
     with pytest.raises(HTTPException) as exc:
         await issue_derp_token(
-            DERPTokenRequest(wg_public_key=_fresh_wg_pubkey()), db=db_session
+            DERPTokenRequest(wg_public_key=_fresh_wg_pubkey()), auth_node=None, db=db_session
         )
     assert exc.value.status_code == 404
 
@@ -127,7 +127,7 @@ async def test_nonce_without_signature_400(db_session) -> None:
     _, wg_pubkey = await _seed_household_and_node(db_session)
     with pytest.raises(HTTPException) as exc:
         await issue_derp_token(
-            DERPTokenRequest(wg_public_key=wg_pubkey, nonce="12345"), db=db_session
+            DERPTokenRequest(wg_public_key=wg_pubkey, nonce="12345"), auth_node=None, db=db_session
         )
     assert exc.value.status_code == 400
 
@@ -137,7 +137,7 @@ async def test_signature_without_nonce_400(db_session) -> None:
     _, wg_pubkey = await _seed_household_and_node(db_session)
     with pytest.raises(HTTPException) as exc:
         await issue_derp_token(
-            DERPTokenRequest(wg_public_key=wg_pubkey, signature="bogus"), db=db_session
+            DERPTokenRequest(wg_public_key=wg_pubkey, signature="bogus"), auth_node=None, db=db_session
         )
     assert exc.value.status_code == 400
 
@@ -158,7 +158,7 @@ async def test_valid_signature_accepted(db_session) -> None:
 
     resp = await issue_derp_token(
         DERPTokenRequest(wg_public_key=wg_pubkey, region=region, nonce=nonce, signature=sig),
-        db=db_session,
+        auth_node=None, db=db_session,
     )
     assert resp.token
     assert resp.region == region
@@ -182,7 +182,7 @@ async def test_forged_signature_rejected(db_session) -> None:
             DERPTokenRequest(
                 wg_public_key=wg_pubkey, region=region, nonce=nonce, signature=forged_sig
             ),
-            db=db_session,
+            auth_node=None, db=db_session,
         )
     assert exc.value.status_code == 401
 
@@ -203,7 +203,7 @@ async def test_signature_over_wrong_message_rejected(db_session) -> None:
     with pytest.raises(HTTPException) as exc:
         await issue_derp_token(
             DERPTokenRequest(wg_public_key=wg_pubkey, region="ord", nonce=nonce, signature=sig),
-            db=db_session,
+            auth_node=None, db=db_session,
         )
     assert exc.value.status_code == 401
 
@@ -223,7 +223,7 @@ async def test_signature_without_registered_signing_key_401(db_session) -> None:
     with pytest.raises(HTTPException) as exc:
         await issue_derp_token(
             DERPTokenRequest(wg_public_key=wg_pubkey, nonce=nonce, signature=sig),
-            db=db_session,
+            auth_node=None, db=db_session,
         )
     assert exc.value.status_code == 401
 
@@ -242,7 +242,7 @@ async def test_stale_nonce_rejected(db_session) -> None:
     with pytest.raises(HTTPException) as exc:
         await issue_derp_token(
             DERPTokenRequest(wg_public_key=wg_pubkey, nonce=nonce, signature=sig),
-            db=db_session,
+            auth_node=None, db=db_session,
         )
     assert exc.value.status_code == 401
 
@@ -258,7 +258,7 @@ async def test_non_numeric_nonce_400(db_session) -> None:
             DERPTokenRequest(
                 wg_public_key=wg_pubkey, nonce="not-a-timestamp", signature="bogus"
             ),
-            db=db_session,
+            auth_node=None, db=db_session,
         )
     assert exc.value.status_code == 400
 
@@ -277,7 +277,7 @@ async def test_pop_required_rejects_missing_signature(
 
     _, wg_pubkey = await _seed_household_and_node(db_session)
     with pytest.raises(HTTPException) as exc:
-        await issue_derp_token(DERPTokenRequest(wg_public_key=wg_pubkey), db=db_session)
+        await issue_derp_token(DERPTokenRequest(wg_public_key=wg_pubkey), auth_node=None, db=db_session)
     assert exc.value.status_code == 401
 
 
@@ -300,7 +300,7 @@ async def test_pop_required_accepts_valid_signature(
 
     resp = await issue_derp_token(
         DERPTokenRequest(wg_public_key=wg_pubkey, nonce=nonce, signature=sig),
-        db=db_session,
+        auth_node=None, db=db_session,
     )
     assert resp.token
 

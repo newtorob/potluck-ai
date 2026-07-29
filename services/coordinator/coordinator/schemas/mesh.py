@@ -208,6 +208,18 @@ class EnrollResponse(BaseModel):
     Carries the newly-allocated mesh IP for the calling node + the
     roster of all OTHER nodes in the household so the new node can
     configure its WG peers immediately.
+
+    `node_token` (ADDITIVE) is a fresh, high-entropy per-node bearer
+    credential — urlsafe-base64, 32 raw bytes (256 bits). The coordinator
+    stores only its SHA-256 hash (`MeshNode.node_token_hash`); this is the
+    ONLY time the raw value is exposed, exactly like `pairing_token` in
+    `PairingTokenIssueResponse`. Present it as `Authorization: Bearer
+    <node_token>` on every subsequent machine call (POST /mesh/heartbeat,
+    GET /mesh/peers, POST /mesh/derp-token, DELETE /mesh/nodes/{id}, and the
+    `/mesh/signal` WS upgrade) instead of the machine-wide
+    `X-Potluck-Coordinator-Token`. Old mesh clients that don't read this
+    field are unaffected — they keep using the coordinator token exactly as
+    before (back-compat; see `middleware/node_auth.py`).
     """
 
     node_id: uuid.UUID
@@ -215,6 +227,7 @@ class EnrollResponse(BaseModel):
     mesh_ip: str
     mesh_cidr: str
     peers: list[EnrolledPeer]
+    node_token: str
 
 
 # ---------------------------------------------------------------------------
