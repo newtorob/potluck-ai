@@ -93,6 +93,7 @@ import (
 	"github.com/potluck-ai/potluck-mesh/internal/lanpair"
 	"github.com/potluck-ai/potluck-mesh/internal/localapi"
 	"github.com/potluck-ai/potluck-mesh/internal/localep"
+	"github.com/potluck-ai/potluck-mesh/internal/nodetoken"
 	"github.com/potluck-ai/potluck-mesh/internal/peerstate"
 	msignal "github.com/potluck-ai/potluck-mesh/internal/signal"
 	"github.com/potluck-ai/potluck-mesh/internal/signingkey"
@@ -154,6 +155,30 @@ func run() int {
 		return 1
 	}
 
+	// ---- node token (per-node bearer credential; internal/nodetoken) ---- //
+	// Sited next to the WG private key. A missing file is normal (unpaired,
+	// or enrolled before this feature shipped) — Load returns "" with no
+	// error in that case, and every coordinator call below just falls back
+	// to the legacy coordinator-token credential (or dev passthrough).
+	nodeTokenPath := nodetoken.Path(cfg.WGPrivateKeyPath)
+	loadedNodeToken, err := nodetoken.Load(nodeTokenPath)
+	if err != nil {
+		slog.Error("node token load failed", "err", err)
+		return 1
+	}
+
+	// ---- coordinator API client ---- //
+	// Constructed early (before the DERP bind + signal client below) because
+	// both of those read the LIVE node token via coordClient.NodeToken as a
+	// function value — this Client is the single shared source of truth for
+	// the bearer credential. A fresh token minted by a later /pair
+	// (internal/localapi's handlePair calls coordClient.SetNodeToken) is
+	// picked up automatically by every caller on their next request/reconnect
+	// with no separate propagation plumbing needed.
+	coordClient := coordapi.New(cfg.CoordinatorURL)
+	coordClient.CoordinatorToken = cfg.CoordinatorToken
+	coordClient.SetNodeToken(loadedNodeToken)
+
 	// ---- root context, wired to OS signals ---- //
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -174,7 +199,7 @@ func run() int {
 	var derpClient *derp.Client
 	var tunnelOpts []tunnel.Option
 	if cfg.DERPRelayURL != "" {
-		dBind, derpClient = buildDERPBind(cfg)
+		dBind, derpClient = buildDERPBind(cfg, coordClient.NodeToken)
 		if dBind != nil {
 			tunnelOpts = append(tunnelOpts, tunnel.WithBind(dBind))
 		}
@@ -271,7 +296,7 @@ func run() int {
 		})
 	}
 
-	client := msignal.NewClient(cfg.SignalURL(), cfg.WGPublicKey, cfg.CoordinatorToken, handler)
+	client := msignal.NewClient(cfg.SignalURL(), cfg.WGPublicKey, cfg.CoordinatorToken, coordClient.NodeToken, handler)
 
 	// Give the handler a reference to the client so it can call
 	// SendRequestPunch from OnWelcome / OnRosterUpdate.
@@ -296,9 +321,9 @@ func run() int {
 		client.SendEndpointUpdate(ipcState.MeshIP(), nil)
 	}
 
-	// ---- coordinator API client ---- //
-	coordClient := coordapi.New(cfg.CoordinatorURL)
-	coordClient.CoordinatorToken = cfg.CoordinatorToken
+	// (coordClient itself was already constructed earlier, alongside the
+	// node-token load — see the "coordinator API client" section near the
+	// top of run(), before the DERP bind that also needs it.)
 
 	// ---- LAN pairing-token broadcast/listen ---- //
 	lanSvc := lanpair.New()
@@ -337,6 +362,7 @@ func run() int {
 		SignalRestart:  signalRestart,
 		WGPrivKeyPath:  cfg.WGPrivateKeyPath,
 		SigningKeyPath: cfg.SigningPrivateKeyPath,
+		NodeTokenPath:  nodeTokenPath,
 		SocketPath:     cfg.LocalAPISocketPath,
 		Platform:       cfg.Platform,
 		LanPair:        lanSvc,
@@ -1711,7 +1737,9 @@ func rosterPeerToTunnelPeer(p msignal.RosterPeer) tunnel.Peer {
 // The returned DerpBind should be installed via tunnel.WithBind before
 // tunnel.New is called. The returned Client's Run method should be started in
 // a goroutine after the tunnel is up.
-func buildDERPBind(cfg *config.Config) (*derp.DerpBind, *derp.Client) {
+// nodeTokenFn returns the current per-node bearer credential (may be "" pre-
+// enroll), or nil if the caller has none to offer. See coordapi.Client.NodeToken.
+func buildDERPBind(cfg *config.Config, nodeTokenFn func() string) (*derp.DerpBind, *derp.Client) {
 	slog.Info("derp: relay URL configured, constructing DerpBind",
 		"url", cfg.DERPRelayURL,
 	)
@@ -1749,7 +1777,7 @@ func buildDERPBind(cfg *config.Config) (*derp.DerpBind, *derp.Client) {
 
 	derpClient := derp.New(
 		cfg.DERPRelayURL,
-		makeDERPJWTFetcher(cfg),
+		makeDERPJWTFetcher(cfg, nodeTokenFn),
 		ourRawPubkey,
 		rxHandler,
 	)
@@ -1811,7 +1839,12 @@ func buildDERPTokenRequestBody(wgPublicKey, region, signingKeyPath string) map[s
 
 // makeDERPJWTFetcher returns a JWTFetcher that calls the coordinator's
 // POST /mesh/derp-token endpoint to get a fresh auth token.
-func makeDERPJWTFetcher(cfg *config.Config) derp.JWTFetcher {
+//
+// nodeTokenFn is called on every fetch (not just once at construction) so a
+// token minted by a /pair that happens after this fetcher is built — DERP is
+// wired up before enrollment, at process start — is picked up on the very
+// next refresh with no separate propagation call needed.
+func makeDERPJWTFetcher(cfg *config.Config, nodeTokenFn func() string) derp.JWTFetcher {
 	coordinatorURL := cfg.CoordinatorURL
 	wgPublicKey := cfg.WGPublicKey
 	coordinatorToken := cfg.CoordinatorToken
@@ -1831,6 +1864,14 @@ func makeDERPJWTFetcher(cfg *config.Config) derp.JWTFetcher {
 			return "", fmt.Errorf("build derp-token request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
+		// Primary credential: the per-node bearer, fetched live. Legacy
+		// coordinator token stays attached whenever configured, unconditionally
+		// alongside it (belt-and-suspenders / dev-fleet back-compat).
+		if nodeTokenFn != nil {
+			if nt := nodeTokenFn(); nt != "" {
+				req.Header.Set("Authorization", "Bearer "+nt)
+			}
+		}
 		if coordinatorToken != "" {
 			req.Header.Set("X-Potluck-Coordinator-Token", coordinatorToken)
 		}

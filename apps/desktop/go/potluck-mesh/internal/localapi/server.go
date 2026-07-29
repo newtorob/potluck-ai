@@ -42,6 +42,7 @@ import (
 	"github.com/potluck-ai/potluck-mesh/internal/coordapi"
 	"github.com/potluck-ai/potluck-mesh/internal/events"
 	"github.com/potluck-ai/potluck-mesh/internal/lanpair"
+	"github.com/potluck-ai/potluck-mesh/internal/nodetoken"
 	"github.com/potluck-ai/potluck-mesh/internal/peerstate"
 	"github.com/potluck-ai/potluck-mesh/internal/signingkey"
 )
@@ -304,6 +305,7 @@ type Config struct {
 	SignalRestart      SignalRestartFunc
 	WGPrivKeyPath      string           // path to detect / generate the WG private key
 	SigningKeyPath     string           // path to the Ed25519 DERP-token PoP signing key (internal/signingkey)
+	NodeTokenPath      string           // path to the persisted per-node bearer credential (internal/nodetoken); "" disables persistence (tests)
 	SocketPath         string           // "" → use platform default
 	Platform           string           // runtime.GOOS
 	LanPair            *lanpair.Service // LAN pairing-token broadcast/listen; may be nil
@@ -321,6 +323,7 @@ type Server struct {
 	signalRestart      SignalRestartFunc
 	wgPrivKeyPath      string
 	signingKeyPath     string
+	nodeTokenPath      string
 	platform           string
 	socketPath         string
 	lanpair            *lanpair.Service
@@ -352,6 +355,7 @@ func New(cfg Config) *Server {
 		signalRestart:      cfg.SignalRestart,
 		wgPrivKeyPath:      cfg.WGPrivKeyPath,
 		signingKeyPath:     cfg.SigningKeyPath,
+		nodeTokenPath:      cfg.NodeTokenPath,
 		platform:           cfg.Platform,
 		socketPath:         sp,
 		lanpair:            cfg.LanPair,
@@ -696,6 +700,28 @@ func (s *Server) handlePair(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Persist the freshly-minted per-node bearer credential (shown exactly
+	// ONCE in this response — see coordapi.EnrollResponse.NodeToken / the
+	// coordinator's EnrollResponse docstring) to disk, mode 0600, the same
+	// directory as the WG key. Then make it the LIVE credential on the
+	// shared coordapi.Client: every subsequent heartbeat/peers/derp-token
+	// call and the signal WS's next reconnect all read it from there (see
+	// cmd/potluck-mesh/main.go's wiring — coordClient.NodeToken is passed as
+	// a live getter to both), so this one call is the only propagation this
+	// handler needs to do.
+	if s.nodeTokenPath != "" {
+		if err := nodetoken.Save(s.nodeTokenPath, enrollResp.NodeToken); err != nil {
+			// Non-fatal: the coordinator DID mint + hash-store this token —
+			// we only failed to persist our own copy. Worst case this node
+			// keeps using the legacy coordinator-token fallback (if
+			// configured) until a future re-pair succeeds in writing the
+			// file; never block enrollment on a local disk-write failure the
+			// user can't act on mid-flow.
+			slog.Warn("localapi: pair: failed to persist node_token to disk", "err", err)
+		}
+	}
+	s.coordClient.SetNodeToken(enrollResp.NodeToken)
+
 	// Persist state and mark enrolled.
 	s.state.SetWelcome(
 		enrollResp.NodeID,
@@ -745,6 +771,22 @@ func (s *Server) handleUnpair(w http.ResponseWriter, r *http.Request) {
 		if err := signingkey.ClearRegistered(s.signingKeyPath); err != nil {
 			slog.Warn("localapi: unpair: clear signing-key registration marker failed", "err", err)
 		}
+	}
+
+	// Wipe the persisted node_token too, so a subsequent /pair mints (and
+	// this sidecar persists) a completely fresh one rather than a stale
+	// credential left over from this enrollment. Also clear the LIVE value
+	// on the shared coordapi.Client so no in-flight or newly-dialed request
+	// keeps presenting a token for a node the coordinator no longer
+	// considers ours — the legacy coordinator token (if configured) is the
+	// only credential in play again until the next successful /pair.
+	if s.nodeTokenPath != "" {
+		if err := nodetoken.Clear(s.nodeTokenPath); err != nil {
+			slog.Warn("localapi: unpair: remove node token failed", "err", err)
+		}
+	}
+	if s.coordClient != nil {
+		s.coordClient.SetNodeToken("")
 	}
 
 	s.enrolled.Store(0)

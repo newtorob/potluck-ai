@@ -1,18 +1,34 @@
 // Package coordapi provides a typed HTTP client for the Potluck coordinator's
-// mesh enrollment endpoint.
+// mesh enrollment + roster endpoints.
 //
-// This is intentionally dependency-free (stdlib net/http only). The package
-// covers only the endpoints the sidecar calls directly during the /pair flow:
+// This is intentionally dependency-free (stdlib net/http only, plus sync for
+// the node-token guard). The package covers the endpoints the sidecar calls
+// directly outside the persistent signal WS:
 //
-//   - POST /mesh/enroll — redeem a pairing token, get mesh IP + roster.
+//   - POST /mesh/enroll — redeem a pairing token, get mesh IP + roster + a
+//     fresh per-node bearer credential (EnrollResponse.NodeToken).
+//   - GET  /mesh/peers  — pull the authoritative household roster (the
+//     roster-reconcile safety net for signal-WS broadcasts missed while
+//     disconnected).
 //
 // The pairing-token issuance endpoint (POST /mesh/pairing-tokens) is NOT here
 // because that call is made from Electron directly (the desktop app drives the
 // "Add another machine" wizard), not from the sidecar.
 //
-// Privacy: never logs pairing tokens, WG private keys, or full enrollment
-// response bodies. Coordinator errors are surfaced by HTTP status code + body
-// fragment only.
+// Auth (matches coordinator/middleware/node_auth.py byte-for-byte): every
+// request attaches `Authorization: Bearer <node_token>` whenever one is
+// loaded (SetNodeToken/NodeToken — the primary credential, node-scoped
+// server-side) and the legacy `X-Potluck-Coordinator-Token` whenever
+// CoordinatorToken is configured (belt-and-suspenders / dev-fleet
+// back-compat, never required). POST /mesh/enroll is the one call that also
+// accepts a valid pairing_token in the body as sufficient auth on its own —
+// see the coordinator's enroll() docstring — so enrollment works with no
+// token at all attached by this client, node_token included (it doesn't
+// exist yet on a fresh install).
+//
+// Privacy: never logs pairing tokens, node tokens, WG private keys, or full
+// enrollment response bodies. Coordinator errors are surfaced by HTTP status
+// code + body fragment only.
 package coordapi
 
 import (
@@ -23,6 +39,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 )
 
@@ -35,9 +52,22 @@ type Client struct {
 	BaseURL    string
 	HTTPClient *http.Client
 	// CoordinatorToken, when set, is sent as X-Potluck-Coordinator-Token on
-	// every coordinator request (the shared-secret gate on /mesh/* routes).
-	// Empty = dev mode (coordinator passthrough).
+	// every coordinator request — the legacy machine-wide shared secret.
+	// ADDITIVE / back-compat only (dev fleet): the per-node bearer credential
+	// below (nodeToken) is the primary credential and is NEVER required to be
+	// paired with this. Empty = not configured; coordinator token omitted
+	// from every request but that's fine as long as a node_token is set, or
+	// the coordinator itself runs in dev passthrough.
 	CoordinatorToken string
+
+	// nodeTokenMu guards nodeToken. It is set once at startup (loaded from
+	// disk by main.go if this node was already enrolled) and again after a
+	// fresh POST /mesh/enroll mints a new one (internal/localapi's
+	// handlePair) — that second Set can race an in-flight ListPeers call
+	// from the roster-reconcile loop, hence the lock rather than a bare
+	// string field.
+	nodeTokenMu sync.RWMutex
+	nodeToken   string
 }
 
 // New creates a Client with the given base URL and a default 30-second timeout.
@@ -47,6 +77,46 @@ func New(baseURL string) *Client {
 		HTTPClient: &http.Client{
 			Timeout: defaultHTTPTimeout,
 		},
+	}
+}
+
+// SetNodeToken installs the per-node bearer credential (`Authorization:
+// Bearer <token>`) used on every subsequent request. Safe to call
+// concurrently with in-flight requests (e.g. the roster-reconcile loop's
+// ListPeers). Pass "" to clear it (called from /unpair).
+func (c *Client) SetNodeToken(token string) {
+	c.nodeTokenMu.Lock()
+	c.nodeToken = token
+	c.nodeTokenMu.Unlock()
+}
+
+// NodeToken returns the currently installed per-node bearer credential, or
+// "" if none is available (not yet enrolled, or enrolled before node_token
+// support shipped and never re-paired since). Also used as the live token
+// source for the signal WS dialer and the DERP-token fetcher — see
+// cmd/potluck-mesh/main.go, which passes this method value through to both
+// so a freshly-minted token (set here by handlePair) reaches every
+// coordinator-facing caller without separate plumbing.
+func (c *Client) NodeToken() string {
+	c.nodeTokenMu.RLock()
+	defer c.nodeTokenMu.RUnlock()
+	return c.nodeToken
+}
+
+// attachAuth sets the auth headers on an outbound coordinator request. The
+// per-node bearer credential is the primary credential and is attached
+// whenever one is loaded; the legacy X-Potluck-Coordinator-Token is attached
+// whenever configured, unconditionally alongside it (belt-and-suspenders /
+// dev-fleet back-compat — never required, never mutually exclusive with the
+// bearer). Mirrors coordinator/middleware/node_auth.py's
+// resolve_node_from_token: either credential is independently sufficient
+// server-side, so sending both when both happen to be available is harmless.
+func (c *Client) attachAuth(req *http.Request) {
+	if nt := c.NodeToken(); nt != "" {
+		req.Header.Set("Authorization", "Bearer "+nt)
+	}
+	if c.CoordinatorToken != "" {
+		req.Header.Set("X-Potluck-Coordinator-Token", c.CoordinatorToken)
 	}
 }
 
@@ -87,6 +157,13 @@ type EnrollResponse struct {
 	MeshIP      string         `json:"mesh_ip"`
 	MeshCIDR    string         `json:"mesh_cidr"`
 	Peers       []EnrolledPeer `json:"peers"`
+	// NodeToken is the freshly-minted per-node bearer credential — urlsafe
+	// base64 of 32 raw bytes (~43 chars, no padding), shown ONCE. Mirrors
+	// coordinator/schemas/mesh.py:EnrollResponse.node_token exactly. The
+	// caller (internal/localapi's handlePair) MUST persist this immediately
+	// (internal/nodetoken.Save) and install it as the live credential
+	// (Client.SetNodeToken) — there is no way to retrieve it again later.
+	NodeToken string `json:"node_token"`
 }
 
 // CoordinatorError represents a structured error returned by the coordinator.
@@ -123,9 +200,14 @@ func (c *Client) Enroll(ctx context.Context, req EnrollRequest) (*EnrollResponse
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json")
-	if c.CoordinatorToken != "" {
-		httpReq.Header.Set("X-Potluck-Coordinator-Token", c.CoordinatorToken)
-	}
+	// Enroll is the one call the coordinator will accept on the pairing
+	// token alone (see coordinator/routers/mesh.py::enroll) — a node_token
+	// never exists yet at this point in a fresh enrollment (attachAuth is a
+	// no-op for it then), but attach whatever's loaded regardless: a re-pair
+	// after /unpair always clears both credentials first, and the legacy
+	// coordinator token (when configured) still works as this call's
+	// back-compat fallback auth exactly as before.
+	c.attachAuth(httpReq)
 
 	cl := c.HTTPClient
 	if cl == nil {
@@ -161,8 +243,11 @@ func (c *Client) Enroll(ctx context.Context, req EnrollRequest) (*EnrollResponse
 
 // ListPeers calls GET /mesh/peers?wg_public_key=... and returns the caller's
 // full household roster (which INCLUDES the caller's own node) on 200, or a
-// *CoordinatorError on any other status. v0 auth: possession of the
-// wg_public_key is the credential (mirrors POST /mesh/heartbeat + the signal WS).
+// *CoordinatorError on any other status. Gated by the coordinator's
+// resolve_node_from_token dependency (mirrors POST /mesh/heartbeat + the
+// signal WS): the per-node bearer credential (attachAuth, when loaded) or the
+// legacy coordinator token authenticate the call, and wgPublicKey must belong
+// to whichever node the bearer resolves to or the coordinator 403s.
 //
 // Used by the sidecar's roster-reconcile loop as a safety net for roster_update
 // broadcasts missed over the signal WS.
@@ -173,9 +258,7 @@ func (c *Client) ListPeers(ctx context.Context, wgPublicKey string) ([]EnrolledP
 		return nil, fmt.Errorf("coordapi: build list-peers request: %w", err)
 	}
 	httpReq.Header.Set("Accept", "application/json")
-	if c.CoordinatorToken != "" {
-		httpReq.Header.Set("X-Potluck-Coordinator-Token", c.CoordinatorToken)
-	}
+	c.attachAuth(httpReq)
 
 	cl := c.HTTPClient
 	if cl == nil {

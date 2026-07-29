@@ -70,7 +70,7 @@ func TestStressSignalSendDuringReconnect(t *testing.T) {
 	// Convert http://... to ws://...
 	url := "ws" + srv.URL[len("http"):] + "/mesh/signal"
 
-	c := NewClient(url, "test-wg-pubkey", "", noopHandler{})
+	c := NewClient(url, "test-wg-pubkey", "", nil, noopHandler{})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

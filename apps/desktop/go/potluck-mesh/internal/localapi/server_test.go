@@ -632,3 +632,158 @@ func TestHandleUnpair_ClearsSigningKeyAndMarker(t *testing.T) {
 		t.Error("expected registration marker to be cleared after unpair")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// POST /pair / POST /unpair — node_token persistence (per-node bearer
+// credential; matches coordinator commit 10dd5a4's EnrollResponse.node_token)
+// ---------------------------------------------------------------------------
+
+// TestHandlePair_Success_PersistsNodeToken exercises the primary new
+// behaviour: a successful /pair must (1) persist the coordinator's freshly
+// minted node_token to disk at NodeTokenPath, mode 0600, and (2) install it
+// as the LIVE credential on the shared coordapi.Client so the very next
+// coordinator call (e.g. the roster-reconcile loop's ListPeers) presents it.
+func TestHandlePair_Success_PersistsNodeToken(t *testing.T) {
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/mesh/enroll" {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprint(w, `{
+			"node_id": "11111111-1111-1111-1111-111111111111",
+			"household_id": "22222222-2222-2222-2222-222222222222",
+			"mesh_ip": "100.64.0.7",
+			"mesh_cidr": "100.64.0.0/24",
+			"peers": [],
+			"node_token": "minted-node-token-xyz"
+		}`)
+	}))
+	defer mock.Close()
+
+	cfg := defaultCfg(t)
+	coordClient := coordapi.New(mock.URL)
+	cfg.CoordClient = coordClient
+	nodeTokenPath := filepath.Join(t.TempDir(), "node.token")
+	cfg.NodeTokenPath = nodeTokenPath
+
+	client, _ := testServer(t, cfg)
+
+	body := strings.NewReader(`{"pairing_token":"GOODTOKEN1234567890123456789012"}`)
+	resp, err := client.Post("http://localhost/pair", "application/json", body)
+	if err != nil {
+		t.Fatalf("POST /pair: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 201, got %d: %s", resp.StatusCode, b)
+	}
+
+	// Persisted to disk verbatim.
+	raw, err := os.ReadFile(nodeTokenPath)
+	if err != nil {
+		t.Fatalf("read node token file: %v", err)
+	}
+	if string(raw) != "minted-node-token-xyz" {
+		t.Errorf("persisted node token: got %q want %q", string(raw), "minted-node-token-xyz")
+	}
+
+	// Live value installed on the shared coordapi.Client.
+	if got := coordClient.NodeToken(); got != "minted-node-token-xyz" {
+		t.Errorf("coordClient.NodeToken(): got %q want %q", got, "minted-node-token-xyz")
+	}
+}
+
+// TestHandlePair_CoordinatorError_DoesNotPersistNodeToken is the negative
+// half: a rejected enroll must leave no node_token file behind and must not
+// touch the shared client's live value.
+func TestHandlePair_CoordinatorError_DoesNotPersistNodeToken(t *testing.T) {
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, `{"detail":"pairing token not found"}`)
+	}))
+	defer mock.Close()
+
+	cfg := defaultCfg(t)
+	coordClient := coordapi.New(mock.URL)
+	cfg.CoordClient = coordClient
+	nodeTokenPath := filepath.Join(t.TempDir(), "node.token")
+	cfg.NodeTokenPath = nodeTokenPath
+
+	client, _ := testServer(t, cfg)
+
+	body := strings.NewReader(`{"pairing_token":"BADTOKEN12345678901234567890"}`)
+	resp, err := client.Post("http://localhost/pair", "application/json", body)
+	if err != nil {
+		t.Fatalf("POST /pair: %v", err)
+	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body) //nolint:errcheck
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404 forwarded from coordinator, got %d", resp.StatusCode)
+	}
+	if _, err := os.Stat(nodeTokenPath); !os.IsNotExist(err) {
+		t.Errorf("expected no node token file after a rejected enroll, stat err=%v", err)
+	}
+	if got := coordClient.NodeToken(); got != "" {
+		t.Errorf("coordClient.NodeToken() after rejected enroll: got %q want empty", got)
+	}
+}
+
+// TestHandleUnpair_ClearsNodeToken mirrors the signing-key cleanup test: a
+// stale node_token must not survive /unpair, on disk or in the shared
+// client's live value — a fresh /pair afterwards mints and persists a
+// completely new one.
+func TestHandleUnpair_ClearsNodeToken(t *testing.T) {
+	cfg := defaultCfg(t)
+	coordClient := coordapi.New("http://unused.invalid")
+	cfg.CoordClient = coordClient
+	nodeTokenPath := filepath.Join(t.TempDir(), "node.token")
+	cfg.NodeTokenPath = nodeTokenPath
+
+	if err := os.WriteFile(nodeTokenPath, []byte("stale-token"), 0600); err != nil {
+		t.Fatalf("seed node token file: %v", err)
+	}
+	coordClient.SetNodeToken("stale-token")
+
+	client, _ := testServer(t, cfg)
+
+	resp, err := client.Post("http://localhost/unpair", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST /unpair: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", resp.StatusCode)
+	}
+
+	if _, err := os.Stat(nodeTokenPath); !os.IsNotExist(err) {
+		t.Errorf("expected node token file to be removed, stat err=%v", err)
+	}
+	if got := coordClient.NodeToken(); got != "" {
+		t.Errorf("coordClient.NodeToken() after unpair: got %q want empty", got)
+	}
+}
+
+// TestHandleUnpair_NilCoordClient_DoesNotPanic pins that /unpair works even
+// when no CoordClient was wired (mirrors TestHandleUnpair's defaultCfg,
+// which never sets one) — the node-token live-clear step must be a guarded
+// no-op, not a nil-pointer panic, for any caller that hasn't wired
+// node-token support at all.
+func TestHandleUnpair_NilCoordClient_DoesNotPanic(t *testing.T) {
+	cfg := defaultCfg(t) // cfg.CoordClient is nil
+	client, _ := testServer(t, cfg)
+
+	resp, err := client.Post("http://localhost/unpair", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST /unpair: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Errorf("expected 204, got %d", resp.StatusCode)
+	}
+}

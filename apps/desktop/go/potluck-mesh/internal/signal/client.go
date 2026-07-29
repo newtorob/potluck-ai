@@ -68,7 +68,15 @@ type Client struct {
 	signalURL        string
 	wgPublicKey      string
 	coordinatorToken string
-	handler          RosterHandler
+	// nodeTokenFn, when non-nil, is called on every (re)connect to fetch the
+	// CURRENT per-node bearer credential for the WS upgrade's Authorization
+	// header. A function rather than a static string so a token minted by a
+	// later /pair (main.go wires this to coordapi.Client.NodeToken, the
+	// single shared source of truth) is picked up automatically on the next
+	// reconnect — no separate propagation call needed. Returns "" before
+	// enrollment; the header is simply omitted in that case.
+	nodeTokenFn func() string
+	handler     RosterHandler
 
 	// sendCh is the channel used to enqueue outbound messages from any
 	// goroutine. A dedicated writer goroutine drains it, ensuring only
@@ -81,11 +89,16 @@ type Client struct {
 }
 
 // NewClient creates a Client. Call Run(ctx) to start the connection loop.
-func NewClient(signalURL, wgPublicKey, coordinatorToken string, handler RosterHandler) *Client {
+//
+// nodeTokenFn is called on every dial to fetch the current per-node bearer
+// credential (may be nil — e.g. tests, or callers that only ever use the
+// legacy coordinatorToken).
+func NewClient(signalURL, wgPublicKey, coordinatorToken string, nodeTokenFn func() string, handler RosterHandler) *Client {
 	return &Client{
 		signalURL:        signalURL,
 		wgPublicKey:      wgPublicKey,
 		coordinatorToken: coordinatorToken,
+		nodeTokenFn:      nodeTokenFn,
 		handler:          handler,
 	}
 }
@@ -220,15 +233,27 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 	dialCtx, dialCancel := context.WithTimeout(ctx, 15*time.Second)
 	defer dialCancel()
 
-	// Present the coordinator token (when configured) on the WS upgrade so the
-	// /mesh/signal gate accepts us; no-op in dev mode (token empty).
-	var dialOpts *websocket.DialOptions
-	if c.coordinatorToken != "" {
-		dialOpts = &websocket.DialOptions{
-			HTTPHeader: http.Header{
-				"X-Potluck-Coordinator-Token": {c.coordinatorToken},
-			},
+	// Present auth on the WS upgrade so the /mesh/signal gate accepts us.
+	// Primary credential: Authorization: Bearer <node_token> (whenever
+	// nodeTokenFn returns one — fetched fresh on every dial so a token
+	// minted by a /pair that happened after this Client was constructed is
+	// picked up on the very next reconnect). Legacy X-Potluck-Coordinator-Token
+	// is attached whenever configured, unconditionally alongside it
+	// (belt-and-suspenders / dev-fleet back-compat — never required). Both
+	// headers omitted (dialOpts stays nil) is the pre-enroll / full-dev-mode
+	// no-op case.
+	headers := http.Header{}
+	if c.nodeTokenFn != nil {
+		if nt := c.nodeTokenFn(); nt != "" {
+			headers.Set("Authorization", "Bearer "+nt)
 		}
+	}
+	if c.coordinatorToken != "" {
+		headers.Set("X-Potluck-Coordinator-Token", c.coordinatorToken)
+	}
+	var dialOpts *websocket.DialOptions
+	if len(headers) > 0 {
+		dialOpts = &websocket.DialOptions{HTTPHeader: headers}
 	}
 	conn, _, err := websocket.Dial(dialCtx, c.signalURL, dialOpts)
 	if err != nil {
