@@ -357,7 +357,14 @@ async def enroll(
 
     # ---- 0. Auth: valid pairing token is sufficient on its own; else fall
     #      back to the coordinator token (back-compat). ---- #
-    token_row = await db.get(PairingToken, req.pairing_token)
+    # with_for_update: SELECT ... FOR UPDATE serializes concurrent redemptions
+    # of the same single-use token. Without the row lock, two enrolls racing
+    # under READ COMMITTED both read consumed_at=None and both succeed — one
+    # token enrolls N rogue nodes into the household. The lock makes the second
+    # redemption block, re-read consumed_at as set, and correctly 409.
+    token_row = await db.get(
+        PairingToken, req.pairing_token, with_for_update=True
+    )
     pairing_token_valid = (
         token_row is not None
         and token_row.consumed_at is None
