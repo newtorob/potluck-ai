@@ -732,6 +732,10 @@ ipcMain.handle('cloud:set-token', (_evt, token) => {
   }
 });
 
+ipcMain.handle('cloud:has-token', () => {
+  return loadCloudToken() != null;
+});
+
 ipcMain.handle('cloud:clear-token', () => {
   cloudSessionToken = null;
   try {

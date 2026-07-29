@@ -24,12 +24,31 @@ interface AuthState {
    */
   pendingSession: Session | null;
 
+  /**
+   * Whether a cloud session token is persisted (packaged app only — see
+   * cloudApi.hasToken). `null` means "unknown/not applicable", which is the
+   * permanent state on the dev/browser cookie transport. Set once by the
+   * silent rehydration probe in useAuth.
+   */
+  hasPersistedToken: boolean | null;
+
+  /**
+   * Why the last rehydration probe (getMe()) failed to produce a session,
+   * when it did. `'network'` = couldn't reach the cloud API (offline, DNS,
+   * 5xx, timeout) — the token itself may still be good. `'auth'` = the API
+   * was reached and said the token is invalid/expired (401/403). `null` =
+   * no failure recorded yet (still loading, or the probe succeeded).
+   */
+  authFailureKind: 'network' | 'auth' | null;
+
   // Actions
   setSession: (session: Session, profile: MemberProfile) => void;
   clearSession: () => void;
   setPendingSession: (session: Session | null) => void;
   setAuthLoading: (loading: boolean) => void;
   setAuthError: (error: string | null) => void;
+  setHasPersistedToken: (hasToken: boolean | null) => void;
+  setAuthFailureKind: (kind: 'network' | 'auth' | null) => void;
   updateProfile: (profile: Partial<MemberProfile>) => void;
 }
 
@@ -39,9 +58,11 @@ export const useAuthStore = create<AuthState>()((set) => ({
   isAuthLoading: false,
   authError: null,
   pendingSession: null,
+  hasPersistedToken: null,
+  authFailureKind: null,
 
   setSession(session, memberProfile) {
-    set({ session, memberProfile, authError: null });
+    set({ session, memberProfile, authError: null, authFailureKind: null });
   },
 
   clearSession() {
@@ -58,6 +79,14 @@ export const useAuthStore = create<AuthState>()((set) => ({
 
   setAuthError(authError) {
     set({ authError });
+  },
+
+  setHasPersistedToken(hasPersistedToken) {
+    set({ hasPersistedToken });
+  },
+
+  setAuthFailureKind(authFailureKind) {
+    set({ authFailureKind });
   },
 
   updateProfile(patch) {

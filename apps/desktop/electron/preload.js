@@ -137,8 +137,16 @@ contextBridge.exposeInMainWorld('potluck', {
       ipcRenderer.invoke('cloud:request', method, path, body),
     /** Persist the opaque session token in the main process. */
     setToken: (token) => ipcRenderer.invoke('cloud:set-token', String(token)),
-    /** Forget the session token (sign-out). */
+    /** Forget the session token (sign-out, or an expired/invalid token). */
     clearToken: () => ipcRenderer.invoke('cloud:clear-token'),
+    /**
+     * Whether a cloud session token is currently persisted, without making a
+     * network call. Used by the sign-in wall (AuthGate) to tell "signed out
+     * because offline" (token present, /me just couldn't be reached) apart
+     * from "signed out because there's no account" (no token at all).
+     * @returns {Promise<boolean>}
+     */
+    hasToken: () => ipcRenderer.invoke('cloud:has-token'),
     /**
      * Proxy a session-authenticated call to the (user-configured) coordinator.
      * Attaches the same bearer token as `request` above, but against a

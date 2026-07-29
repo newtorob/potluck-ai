@@ -40,6 +40,23 @@ interface CloudBridge {
   ) => Promise<{ status: number; body: unknown }>;
   setToken: (token: string) => Promise<void>;
   clearToken: () => Promise<void>;
+  hasToken: () => Promise<boolean>;
+}
+
+/**
+ * Thrown by `request()` on any non-2xx response, carrying the HTTP status so
+ * callers can tell an auth failure (401/403 — the token is invalid/expired)
+ * apart from a network or server failure (status 0, or 5xx — the account may
+ * still be good, the cloud API is just unreachable). See useAuth's rehydrate
+ * probe and AuthGate's offline-vs-signed-out decision.
+ */
+export class CloudApiError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'CloudApiError';
+    this.status = status;
+  }
 }
 
 /**
@@ -64,7 +81,7 @@ function detailOf(body: unknown, fallback: string): string {
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body: unknown = await res.json().catch(() => ({}));
-    throw new Error(`[cloudApi] ${res.status}: ${detailOf(body, res.statusText)}`);
+    throw new CloudApiError(res.status, `[cloudApi] ${res.status}: ${detailOf(body, res.statusText)}`);
   }
   if (res.status === 204) return undefined as T;
   const data: unknown = await res.json().catch(() => undefined);
@@ -79,8 +96,12 @@ async function request<T>(
   const bridge = cloudBridge();
   if (bridge) {
     const { status, body: resBody } = await bridge.request(method, path, body);
+    // status 0 is the main-process bridge's own signal for a transport
+    // failure (network unreachable, timeout) — see cloud:request in
+    // electron/main.js. It is deliberately distinct from any real HTTP
+    // status so callers can tell "offline" apart from "server said no".
     if (status < 200 || status >= 300) {
-      throw new Error(`[cloudApi] ${status}: ${detailOf(resBody, `HTTP ${status}`)}`);
+      throw new CloudApiError(status, `[cloudApi] ${status}: ${detailOf(resBody, `HTTP ${status}`)}`);
     }
     return resBody as T;
   }
@@ -89,7 +110,15 @@ async function request<T>(
     init.headers = { 'Content-Type': 'application/json' };
     init.body = JSON.stringify(body);
   }
-  return fetch(`${CLOUD_BASE}${path}`, init).then((r) => handleResponse<T>(r));
+  let res: Response;
+  try {
+    res = await fetch(`${CLOUD_BASE}${path}`, init);
+  } catch (err) {
+    // fetch() itself rejects on network failure (offline, DNS, CORS) before
+    // any status exists — surface it the same way as the bridge's status 0.
+    throw new CloudApiError(0, err instanceof Error ? err.message : 'network error');
+  }
+  return handleResponse<T>(res);
 }
 
 function post<T>(path: string, body?: unknown): Promise<T> {
@@ -159,6 +188,32 @@ export const cloudApi = {
     } finally {
       await cloudBridge()?.clearToken();
     }
+  },
+
+  /**
+   * Whether a cloud session token is currently persisted in the main
+   * process, without making a network call — this is what tells "signed out
+   * because offline" (token present, /me just failed to reach the server)
+   * apart from "signed out, no account on this machine".
+   *
+   * Only meaningful for the packaged app's bridge transport. The dev/browser
+   * cookie transport has no client-readable equivalent (the cookie is
+   * httpOnly) — this resolves `null` there, meaning "unknown", not `false`.
+   */
+  async hasToken(): Promise<boolean | null> {
+    const bridge = cloudBridge();
+    if (!bridge) return null;
+    return bridge.hasToken();
+  },
+
+  /**
+   * Drop the persisted session token locally without hitting the server —
+   * use this when the token itself has already proven invalid (a 401/403 on
+   * `getMe()`), so there is nothing legitimate left to revoke server-side.
+   * `logout()` is for a live, user-initiated sign-out instead.
+   */
+  async clearToken(): Promise<void> {
+    await cloudBridge()?.clearToken();
   },
 
   // ---- Member --------------------------------------------------------------

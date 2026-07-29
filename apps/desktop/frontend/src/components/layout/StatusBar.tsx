@@ -31,12 +31,14 @@ import { cn } from '@/components/ui/cn';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatStore } from '@/stores/chatStore';
 import { useMeshStore } from '@/stores/meshStore';
+import { useAuth } from '@/hooks/useAuth';
 import { ipc } from '@/lib/ipc';
 import { formatModelName } from '@/lib/modelName';
 import { deriveDiagnostics } from '@/lib/meshDiagnostics';
 
 export function StatusBar() {
   const { modelLoaded, activeModelId, sidecarUp } = useHealth();
+  const { isSignedIn, hasCachedAccount } = useAuth();
 
   // App version — fetched from Electron preload on mount
   const [appVersion, setAppVersion] = useState<string | null>(null);
@@ -90,6 +92,21 @@ export function StatusBar() {
       <Divider />
 
       <NetworkPill mode={networkMode} />
+
+      {/* Shown only in the offline-account case: signed in on a cached
+          token but the cloud API couldn't confirm it (see AuthGate /
+          useAuth.hasCachedAccount). Not shown once actually signed in. */}
+      {!isSignedIn && hasCachedAccount && (
+        <>
+          <Divider />
+          <StatusItem
+            active={false}
+            label="Account offline"
+            tooltip="Signed in, but Potluck can't reach the cloud API right now. Your account will resync once you're back online."
+            href="/membership"
+          />
+        </>
+      )}
 
       {/* Right-aligned: app version */}
       <div className="ml-auto flex items-center gap-3">

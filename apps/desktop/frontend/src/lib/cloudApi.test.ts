@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { cloudApi } from '@/lib/cloudApi';
+import { cloudApi, CloudApiError } from '@/lib/cloudApi';
 
 /** Stub global fetch with a single canned Response-like object. */
 function mockFetch(response: { ok: boolean; status?: number; json: () => Promise<unknown> }) {
@@ -34,6 +34,32 @@ describe('cloudApi billing', () => {
   it('surfaces the server error detail on a non-ok response', async () => {
     mockFetch({ ok: false, status: 503, json: async () => ({ detail: 'Billing is not configured' }) });
     await expect(cloudApi.createCheckout('founding')).rejects.toThrow(/503: Billing is not configured/);
+  });
+});
+
+describe('cloudApi auth failure classification', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('getMe() rejects with a CloudApiError carrying the HTTP status on a 401', async () => {
+    mockFetch({ ok: false, status: 401, json: async () => ({ detail: 'Not authenticated' }) });
+    const err = await cloudApi.getMe().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CloudApiError);
+    expect((err as CloudApiError).status).toBe(401);
+  });
+
+  it('getMe() rejects with status 0 on a network failure (fetch itself rejects)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    const err = await cloudApi.getMe().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CloudApiError);
+    expect((err as CloudApiError).status).toBe(0);
+  });
+
+  it('hasToken() resolves null outside the packaged app (no Electron bridge)', async () => {
+    await expect(cloudApi.hasToken()).resolves.toBeNull();
+  });
+
+  it('clearToken() is a no-op outside the packaged app (no Electron bridge)', async () => {
+    await expect(cloudApi.clearToken()).resolves.toBeUndefined();
   });
 });
 

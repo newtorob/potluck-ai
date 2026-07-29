@@ -9,7 +9,7 @@
 
 import { useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
-import { cloudApi } from '@/lib/cloudApi';
+import { cloudApi, CloudApiError } from '@/lib/cloudApi';
 
 // Silent session rehydration should run once per app session, not once per
 // useAuth() consumer. Multiple components call useAuth() (AuthGate, the
@@ -30,6 +30,16 @@ interface UseAuthReturn {
   isAuthLoading: boolean;
   authError: string | null;
   isSignedIn: boolean;
+  /**
+   * True once the silent rehydration probe has resolved a *cached* account:
+   * a session token is persisted (packaged app only) but the getMe() probe
+   * that would confirm it failed for a network reason (offline, timeout,
+   * 5xx) rather than because the token itself is invalid. AuthGate treats
+   * this the same as signed-in — an offline blip must not lock a returning
+   * member out of their own local-first app. Always false on the dev/browser
+   * cookie transport, where there is no client-readable "token exists".
+   */
+  hasCachedAccount: boolean;
   requestMagicLink: (email: string) => Promise<void>;
   /** Exchanges the token but does NOT sign in — populates `pendingSession` for confirmation. */
   verifyMagicLink: (token: string) => Promise<void>;
@@ -56,22 +66,38 @@ export function useAuth(): UseAuthReturn {
     rehydrateAttempted = true;
 
     store.setAuthLoading(true);
-    cloudApi
-      .getMe()
-      .then((profile) => {
-        // getMe succeeded => the session cookie is valid; synthesise a minimal
-        // session object for the store (the real token lives server-side).
-        store.setSession(
-          { token: '', expiresAt: '', memberId: profile.id },
-          profile,
-        );
-      })
-      .catch(() => {
-        // Not signed in — expected; treat as unauthenticated.
-      })
-      .finally(() => {
+    void (async () => {
+      // Read token presence first (a local IPC read, not a network call) so
+      // AuthGate still knows a cached account exists even if the getMe()
+      // probe below fails for a network reason. null on the dev/browser
+      // cookie transport, where there's no client-readable equivalent.
+      const hasToken = await cloudApi.hasToken();
+      store.setHasPersistedToken(hasToken);
+
+      try {
+        const profile = await cloudApi.getMe();
+        // getMe succeeded => the session cookie/token is valid; synthesise a
+        // minimal session object for the store (the real token lives
+        // server-side / in the main process).
+        store.setSession({ token: '', expiresAt: '', memberId: profile.id }, profile);
+      } catch (err) {
+        if (err instanceof CloudApiError && (err.status === 401 || err.status === 403)) {
+          // The cloud API was reached and said the token is invalid/expired
+          // — there is no legitimate cached account left, so drop it and
+          // let AuthGate show the sign-in wall.
+          store.setAuthFailureKind('auth');
+          await cloudApi.clearToken();
+          store.setHasPersistedToken(false);
+        } else {
+          // Unreachable cloud API (offline, timeout, 5xx) or anything else
+          // that isn't a definitive "your token is bad" — the account may
+          // still be good, just uncontactable right now.
+          store.setAuthFailureKind('network');
+        }
+      } finally {
         store.setAuthLoading(false);
-      });
+      }
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -159,6 +185,7 @@ export function useAuth(): UseAuthReturn {
     isAuthLoading: store.isAuthLoading,
     authError: store.authError,
     isSignedIn: store.session !== null,
+    hasCachedAccount: store.hasPersistedToken === true && store.authFailureKind === 'network',
     requestMagicLink,
     verifyMagicLink,
     confirmSignIn,

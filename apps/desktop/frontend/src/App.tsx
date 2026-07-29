@@ -36,7 +36,9 @@ import { WeeklyReceiptToast } from '@/components/household/WeeklyReceiptToast';
  * Root application shell.
  *
  * Layout: TitleBar (Mac drag region) + Sidebar (fixed left) + main content area.
- * AuthGate is a pass-through for now; real auth enforcement comes later.
+ * AuthGate requires a signed-in account before Sidebar/routes render — see
+ * apps/desktop/frontend/src/components/auth/AuthGate.tsx for the loading /
+ * sign-in-wall / offline-cached-account decision.
  *
  * Routes:
  *   /chat        — streaming chat interface

@@ -28,15 +28,24 @@ vi.mock('@/lib/ipc', () => ({
   },
 }));
 
-vi.mock('@/lib/cloudApi', () => ({
-  cloudApi: {
-    verifyMagicLink: vi.fn(),
-    commitSession: vi.fn().mockResolvedValue(undefined),
-    getMe: vi.fn(),
-    logout: vi.fn().mockResolvedValue(undefined),
-    requestMagicLink: vi.fn(),
-  },
-}));
+vi.mock('@/lib/cloudApi', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/cloudApi')>('@/lib/cloudApi');
+  return {
+    CloudApiError: actual.CloudApiError,
+    cloudApi: {
+      verifyMagicLink: vi.fn(),
+      commitSession: vi.fn().mockResolvedValue(undefined),
+      getMe: vi.fn(),
+      logout: vi.fn().mockResolvedValue(undefined),
+      requestMagicLink: vi.fn(),
+      // useAuth's silent rehydration probe reads these too; hasToken
+      // resolves null (unknown) to mirror the dev/browser cookie transport
+      // this jsdom test environment has no Electron bridge for.
+      hasToken: vi.fn().mockResolvedValue(null),
+      clearToken: vi.fn().mockResolvedValue(undefined),
+    },
+  };
+});
 
 import { cloudApi } from '@/lib/cloudApi';
 import { useAuthStore } from '@/stores/authStore';
@@ -55,6 +64,8 @@ describe('useDeepLinkAuth — login CSRF gate', () => {
       pendingSession: null,
       isAuthLoading: false,
       authError: null,
+      hasPersistedToken: null,
+      authFailureKind: null,
     });
     vi.mocked(cloudApi.verifyMagicLink).mockReset();
     vi.mocked(cloudApi.commitSession).mockReset().mockResolvedValue(undefined);
@@ -62,6 +73,8 @@ describe('useDeepLinkAuth — login CSRF gate', () => {
     // per test file, guarded by a module-level flag) — unrelated to this
     // test, but must resolve/reject rather than being left undefined.
     vi.mocked(cloudApi.getMe).mockReset().mockRejectedValue(new Error('not signed in'));
+    vi.mocked(cloudApi.hasToken).mockReset().mockResolvedValue(null);
+    vi.mocked(cloudApi.clearToken).mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => vi.clearAllMocks());
