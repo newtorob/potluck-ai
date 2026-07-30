@@ -58,6 +58,11 @@ ReadWritePaths=@KEY_DIR@ @LOG_DIR@ /var/run
 
 # Environment.
 Environment=POTLUCK_WG_PRIVATE_KEY_PATH=@KEY_DIR@/wg.key
+# Pin the DERP-PoP signing key into the same writable @KEY_DIR@; without this it
+# defaults to $HOME/.local/state/... which a system service (no writable HOME)
+# can't create, and the daemon exits on startup. node.token + settings.json
+# already land in @KEY_DIR@ (derived from the WG key dir).
+Environment=POTLUCK_SIGNING_KEY_PATH=@KEY_DIR@/signing.key
 Environment=POTLUCK_LOCAL_API_SOCKET=/var/run/potluck-mesh.sock
 
 # Logs go through journald. `journalctl -u potluck-mesh` to view.
