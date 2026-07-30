@@ -298,7 +298,7 @@ installer-bundle: installer-deps sidecar-go ## Bundle both Python sidecar binari
 	@echo "==> Building frontend bundle"
 	@cd apps/desktop/frontend && pnpm exec vite build
 	@echo "==> Staging into apps/desktop/electron/resources/"
-	@cd apps/desktop/electron && pnpm run prepack:python && pnpm run prepack:mcp && pnpm run prepack:mesh
+	@cd apps/desktop/electron && pnpm run prepack:python && pnpm run prepack:mcp && pnpm run prepack:mesh && pnpm run prepack:mesh-helper
 
 installer-mac: installer-bundle ## Build unsigned macOS installer (.dmg + .zip). Signing requires Apple Developer cert.
 	@echo "==> Building macOS installer (unsigned — needs CSC_LINK + APPLE_ID env for signing)"
