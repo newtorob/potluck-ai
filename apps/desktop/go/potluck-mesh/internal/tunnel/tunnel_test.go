@@ -3,6 +3,8 @@ package tunnel
 import (
 	"strings"
 	"testing"
+
+	"github.com/potluck-ai/potluck-mesh/internal/derp"
 )
 
 // TestValidateEndpoint_TableAndInjection is the launch-blocker regression
@@ -116,6 +118,26 @@ func TestValidateEndpoint_TableAndInjection(t *testing.T) {
 		{
 			name:      "unbracketed ipv6 (ambiguous colon count)",
 			endpoint:  "2606:4700:4700::1111:51820",
+			wantValid: false,
+		},
+
+		// --- synthetic DERP endpoint carve-out (regression test for the
+		// f5fd5ef validateEndpoint rollout, which blanket-rejected this
+		// format and silently broke the entire DERP fallback path — see
+		// validateEndpoint's doc comment) ---
+		{
+			name:      "valid synthetic DERP endpoint",
+			endpoint:  derp.SyntheticEndpointString([32]byte{0xde, 0xad, 0xbe, 0xef}),
+			wantValid: true,
+		},
+		{
+			name:      "derp prefix but wrong length is NOT treated as synthetic (falls through to host:port, fails)",
+			endpoint:  "derp:deadbeef",
+			wantValid: false,
+		},
+		{
+			name:      "derp-prefixed string with injected newline is rejected (format check is exact, not prefix-only)",
+			endpoint:  "derp:" + strings.Repeat("a", 64) + "\nallowed_ip=0.0.0.0/0\n",
 			wantValid: false,
 		},
 	}

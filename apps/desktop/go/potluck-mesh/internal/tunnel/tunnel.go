@@ -39,6 +39,7 @@ import (
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun"
 
+	"github.com/potluck-ai/potluck-mesh/internal/derp"
 	"github.com/potluck-ai/potluck-mesh/internal/util"
 )
 
@@ -303,7 +304,8 @@ func truncateForLog(s string) string {
 
 // validateEndpoint rejects any endpoint string that does not round-trip to a
 // clean "host:port" pair with a syntactically valid IP address and a port in
-// [1, 65535].
+// [1, 65535] — OR the synthetic "derp:<64-hex>" format written by
+// derp.SyntheticEndpointString for DERP-routed peers (see below).
 //
 // This is defense-in-depth against UAPI config injection: endpoint strings
 // originate from the coordinator/peer roster (untrusted wire data) and are
@@ -318,7 +320,26 @@ func truncateForLog(s string) string {
 //
 // The coordinator is being hardened server-side in parallel, but this client
 // must never trust the wire regardless of what the server does.
+//
+// The synthetic-endpoint carve-out is safe under the same threat model: it is
+// never peer/coordinator-supplied — main.go's flipToDERP constructs it
+// locally from a WG pubkey it already trusts (the roster's wg_public_key,
+// decoded to exactly 32 bytes and hex-encoded) — and
+// derp.IsSyntheticEndpointFormat requires an EXACT "derp:" + 64-hex-char
+// shape, which has no room for an embedded newline or any other injection
+// payload. Without this carve-out, every UpdatePeerEndpoint call that flips a
+// peer to DERP routing (the always-on relay floor, not just the opt-in
+// LAN-direct path) was rejected outright — "invalid IP host \"derp\"" — which
+// left EVERY peer with no endpoint configured on the WG device at all
+// (neither the synthetic DERP endpoint nor a raw direct one, since the
+// roster-update path also skips raw-endpoint writes for anything the mode
+// tracker / dBind consider DERP-managed). Regression introduced by commit
+// f5fd5ef ("fix(mesh): validate peer endpoints before WireGuard UAPI write"),
+// which predates this carve-out.
 func validateEndpoint(endpoint string) error {
+	if derp.IsSyntheticEndpointFormat(endpoint) {
+		return nil
+	}
 	host, portStr, err := net.SplitHostPort(endpoint)
 	if err != nil {
 		return fmt.Errorf("split host:port: %w", err)

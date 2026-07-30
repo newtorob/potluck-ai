@@ -352,6 +352,65 @@ func TestHandlePair_AlreadyEnrolled(t *testing.T) {
 	}
 }
 
+// TestHandlePair_FreshKeyAloneIsNotEnrolled is the regression test for the
+// "fresh machine 409s on its first /pair" bug: ensureKeypair generates a
+// wg.key unconditionally at tunnel bring-up, BEFORE /pair is ever called, so
+// a never-paired machine already has a key file on disk. When NodeTokenPath
+// is configured (the production wiring — see main.go), enrolled-detection
+// must key off the persisted node_token, not mere key-file existence, or
+// POST /pair 409s with already_enrolled on a machine that has never actually
+// enrolled — the in-app "Add a machine" flow would never get past the first
+// attempt.
+func TestHandlePair_FreshKeyAloneIsNotEnrolled(t *testing.T) {
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/mesh/enroll" {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprint(w, `{
+			"node_id": "11111111-1111-1111-1111-111111111111",
+			"household_id": "22222222-2222-2222-2222-222222222222",
+			"mesh_ip": "100.64.0.7",
+			"mesh_cidr": "100.64.0.0/24",
+			"peers": [],
+			"node_token": "minted-node-token-xyz"
+		}`)
+	}))
+	defer mock.Close()
+
+	cfg := defaultCfg(t)
+	cfg.CoordClient = coordapi.New(mock.URL)
+	cfg.NodeTokenPath = filepath.Join(t.TempDir(), "node.token")
+
+	// Simulate a fresh, never-paired machine whose tunnel bring-up already
+	// generated a wg.key (as ensureKeypair/tunnel.New always do) but that has
+	// NO node.token on disk — the true "never enrolled" state.
+	keyPath := cfg.WGPrivKeyPath
+	if err := os.MkdirAll(filepath.Dir(keyPath), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(keyPath, []byte("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	client, _ := testServer(t, cfg)
+
+	body := strings.NewReader(`{"pairing_token":"GOODTOKEN1234567890123456789012"}`)
+	resp, err := client.Post("http://localhost/pair", "application/json", body)
+	if err != nil {
+		t.Fatalf("POST /pair: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Must reach the coordinator and succeed — NOT a local 409 short-circuit.
+	if resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 201 (pairing should proceed to the coordinator), got %d: %s", resp.StatusCode, b)
+	}
+}
+
 func TestHandlePair_MissingToken(t *testing.T) {
 	cfg := defaultCfg(t)
 	client, _ := testServer(t, cfg)

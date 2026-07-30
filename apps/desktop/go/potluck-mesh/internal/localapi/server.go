@@ -237,6 +237,27 @@ func (s *State) MeshIP() string {
 	return s.meshIP
 }
 
+// ExternalEndpoint returns this node's last STUN-discovered public endpoint
+// ("ip:port"), or "" if none has resolved yet. Used to re-announce our own
+// current endpoint on every fresh signal connection (see
+// cmd/potluck-mesh/main.go's rosterHandler.OnWelcome) — closing the race
+// where the initial SendEndpointUpdate fires before the signal WS has
+// finished connecting and is silently dropped ("no active connection").
+func (s *State) ExternalEndpoint() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.externalEndpoint
+}
+
+// LocalEndpoints returns a copy of this node's last-discovered private-LAN
+// candidates. See ExternalEndpoint's doc for why a live getter (rather than
+// only the STUN-loop's own change-triggered send) is needed.
+func (s *State) LocalEndpoints() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return append([]string(nil), s.localEndpoints...)
+}
+
 // snapshot returns a JSON-serialisable view. peerCount is supplied by the
 // caller (from peerstate.Store.All()) to avoid a nested lock.
 //
@@ -441,8 +462,27 @@ func (s *Server) Serve(ctx context.Context) error {
 		"platform", runtime.GOOS,
 	)
 
-	// If a private key already exists on disk at startup, mark as enrolled.
-	if _, statErr := os.Stat(s.wgPrivKeyPath); statErr == nil {
+	// Determine "enrolled" at startup. A WG keypair existing on disk is NOT
+	// proof of enrollment: ensureKeypair generates one unconditionally the
+	// first time the tunnel needs it (bring-up happens before /pair is ever
+	// called), so a freshly-installed, never-paired machine ALREADY has a
+	// wg.key file by the time this runs — the old `os.Stat(wgPrivKeyPath)`
+	// check alone treated that as "enrolled" and made POST /pair 409 with
+	// already_enrolled before ever contacting the coordinator (in-app "Add a
+	// machine" would 409 on a fresh machine). The persisted node_token
+	// (internal/nodetoken) is the authoritative signal instead: it is minted
+	// ONLY by a successful POST /mesh/enroll (see handlePair below) and
+	// cleared on /unpair, so its presence is a true enrollment record rather
+	// than a side effect of key generation.
+	//
+	// When node_token persistence isn't configured (nodeTokenPath == "" —
+	// tests, or a build predating node-token support), fall back to the
+	// legacy wg-key-exists heuristic so behaviour is unchanged there.
+	if s.nodeTokenPath != "" {
+		if tok, err := nodetoken.Load(s.nodeTokenPath); err == nil && tok != "" {
+			s.enrolled.Store(1)
+		}
+	} else if _, statErr := os.Stat(s.wgPrivKeyPath); statErr == nil {
 		s.enrolled.Store(1)
 	}
 

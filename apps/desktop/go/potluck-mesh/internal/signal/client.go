@@ -72,8 +72,19 @@ type Client struct {
 	// read of the URL on its next (re)connect attempt.
 	urlMu            sync.RWMutex
 	signalURL        string
-	wgPublicKey      string
 	coordinatorToken string
+
+	// wgPublicKeyMu guards wgPublicKey. Same rationale as urlMu: a freshly
+	// enrolled key (from POST /pair on an already-running daemon — see
+	// cmd/potluck-mesh/main.go's handlePair-triggered signalRestart) must
+	// reach the NEXT (re)connect's hello without racing runOnce's read of it.
+	// Before this field existed, wgPublicKey was captured ONCE at NewClient
+	// time and never updated: a /pair on a process that started unenrolled
+	// (empty key) kept hello-ing with "" forever, so the coordinator closed
+	// every reconnect with node_not_enrolled until the whole process was
+	// restarted — see SetWGPublicKey's doc.
+	wgPublicKeyMu sync.RWMutex
+	wgPublicKey   string
 	// nodeTokenFn, when non-nil, is called on every (re)connect to fetch the
 	// CURRENT per-node bearer credential for the WS upgrade's Authorization
 	// header. A function rather than a static string so a token minted by a
@@ -129,6 +140,29 @@ func (c *Client) SetSignalURL(url string) {
 	c.urlMu.Lock()
 	c.signalURL = url
 	c.urlMu.Unlock()
+}
+
+// WGPublicKey returns the WG public key that will be sent on the NEXT
+// (re)connect's hello. Safe to call concurrently with Run/runOnce and
+// SetWGPublicKey.
+func (c *Client) WGPublicKey() string {
+	c.wgPublicKeyMu.RLock()
+	defer c.wgPublicKeyMu.RUnlock()
+	return c.wgPublicKey
+}
+
+// SetWGPublicKey updates the WG public key used on the NEXT (re)connect's
+// hello. Call this immediately after a successful POST /pair (see
+// cmd/potluck-mesh/main.go's signalRestart) so a daemon that was already
+// running unenrolled (and therefore already mid-backoff-loop with an empty
+// key) picks up the freshly-minted key on its very next retry — no process
+// restart required. Does NOT tear down an already-established connection,
+// mirroring SetSignalURL's contract exactly: the current session (if any)
+// keeps using the OLD key's identity until it naturally reconnects.
+func (c *Client) SetWGPublicKey(pubKey string) {
+	c.wgPublicKeyMu.Lock()
+	c.wgPublicKey = pubKey
+	c.wgPublicKeyMu.Unlock()
 }
 
 // loadSendCh returns the currently armed send channel, or nil if no
@@ -290,7 +324,7 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 	defer conn.CloseNow() // best-effort cleanup; error intentionally ignored
 
 	// ---- send hello ---- //
-	if err := wsjson.Write(ctx, conn, NewHello(c.wgPublicKey)); err != nil {
+	if err := wsjson.Write(ctx, conn, NewHello(c.WGPublicKey())); err != nil {
 		return false, fmt.Errorf("signal: send hello: %w", err)
 	}
 

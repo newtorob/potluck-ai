@@ -338,11 +338,22 @@ func run() int {
 	// normal backoff cycle even without an explicit trigger.
 	signalRestart := func() {
 		slog.Info("localapi: pair: signal client reconnect triggered")
+		// Propagate the (possibly freshly-enrolled) WG public key to the LIVE
+		// signal client BEFORE prodding anything. client.wgPublicKey used to be
+		// captured once at NewClient time with no update path — a /pair on an
+		// already-running daemon (started unenrolled, so already looping on
+		// backoff with hello.wg_public_key="") kept resending that stale
+		// (usually empty) key forever, so the coordinator closed every
+		// reconnect with node_not_enrolled until the whole process was
+		// restarted. ipcState.WGPublicKey() was already updated by handlePair's
+		// state.SetWelcome call before this closure runs (see localapi's
+		// handlePair), so this always reads the current value.
+		client.SetWGPublicKey(ipcState.WGPublicKey())
 		// Send a no-op endpoint update to prod the existing connection. If the
 		// new key differs, the coordinator will close with node_not_enrolled and
-		// the client reconnects; on the next hello it uses cfg.WGPublicKey which
-		// was updated by the /pair handler via ipcState.SetWGPublicKey.
-		// No LAN candidates needed for this prod; the next STUN refresh carries them.
+		// the client reconnects; on the next hello it now uses the key just set
+		// above. No LAN candidates needed for this prod; the next STUN refresh
+		// (or OnWelcome's own re-announce) carries them.
 		client.SendEndpointUpdate(ipcState.MeshIP(), nil)
 	}
 
@@ -1409,6 +1420,29 @@ func (h *rosterHandler) OnWelcome(w msignal.Welcome) {
 	// 1. Update IPC state so /status reflects the welcome.
 	if h.ipcState != nil {
 		h.ipcState.SetWelcome(w.NodeID, w.HouseholdID, w.MeshIP, h.ipcState.WGPublicKey())
+	}
+
+	// 1b. Re-announce OUR OWN current endpoint on every fresh connection
+	// (first connect AND every reconnect). Without this, a node whose STUN
+	// resolution completes before the signal WS finishes its hello/welcome
+	// handshake has its very first SendEndpointUpdate silently dropped
+	// ("signal: no active connection, dropping endpoint_update" — sendCh is
+	// nil until OnWelcome fires) and then NEVER retries, because the STUN
+	// loop only calls SendEndpointUpdate again when the resolved endpoint
+	// CHANGES (see runSTUNLoop) — on a stable network that may be hours or
+	// days. The same gap re-opens on every signal reconnect (network blip,
+	// coordinator restart): the external IP hasn't changed, so STUN stays
+	// silent, and the peer we're reconnecting to never learns we're back.
+	// ipcState already holds the last-known values regardless of whether the
+	// original send actually reached the coordinator, so replaying them here
+	// is always safe and idempotent (coordinator just re-stores + re-
+	// broadcasts the same value). Skipped when we have no endpoint yet
+	// (fresh process, STUN hasn't resolved) — the STUN loop's own first-
+	// resolve call handles that case.
+	if h.ipcState != nil && h.client != nil {
+		if ep := h.ipcState.ExternalEndpoint(); ep != "" {
+			h.client.SendEndpointUpdate(ep, h.ipcState.LocalEndpoints())
+		}
 	}
 
 	// 2. Assign mesh IP.

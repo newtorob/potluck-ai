@@ -118,6 +118,20 @@ func SyntheticEndpointString(pubkey [32]byte) string {
 	return fmt.Sprintf("derp:%x", pubkey[:])
 }
 
+// IsSyntheticEndpointFormat reports whether s is a well-formed synthetic DERP
+// endpoint string (as produced by SyntheticEndpointString): the "derp:"
+// prefix followed by exactly 64 hex characters. Exported so
+// internal/tunnel's validateEndpoint can recognize (and accept) this format
+// at the UAPI-injection defense-in-depth check — see that function's doc for
+// why a blanket host:port requirement there was wrongly rejecting this
+// locally-constructed, injection-safe format (fixed-length hex, no
+// whitespace/newlines possible) and silently breaking the entire DERP
+// fallback path for every peer.
+func IsSyntheticEndpointFormat(s string) bool {
+	_, ok := parseSyntheticEndpoint(s)
+	return ok
+}
+
 // parseSyntheticEndpoint parses a string written by SyntheticEndpointString.
 // Returns (ep, true) if the string matches; (zero, false) otherwise.
 func parseSyntheticEndpoint(s string) (syntheticEndpoint, bool) {
