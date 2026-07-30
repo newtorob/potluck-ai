@@ -212,3 +212,32 @@ export const useConnectionStore = create<ConnectionState>()((set, get) => {
 export function coordinatorBase(): string {
   return useConnectionStore.getState().coordinatorUrl;
 }
+
+/**
+ * True when the app's active coordinatorUrl disagrees with what this
+ * machine's mesh daemon actually reports itself connected to
+ * (sidecarReportedUrl — populated from the Go mesh daemon's own live
+ * GET /status via meshStore's adoptSidecarUrl calls, NOT the Python
+ * sidecar despite the name inherited from that field).
+ *
+ * Per this file's precedence, `adoptSidecarUrl` keeps `coordinatorUrl` and
+ * `sidecarReportedUrl` in sync whenever there's no explicit user override —
+ * so a divergence here can only mean there IS an explicit override, and
+ * it's stale relative to what the daemon is actually dialing (e.g. a
+ * coordinator URL saved during dev testing, still active in a prod
+ * session). This is exactly the "app knew the right answer and didn't use
+ * it" failure mode: the daemon is on the right coordinator, but
+ * session-authed calls (issuePairingToken, household setup, pairing) go
+ * through the app's own `coordinatorUrl` and get rejected by a coordinator
+ * that never saw the user's session.
+ *
+ * `sidecarReportedUrl === null` (no daemon status yet — not started, dev
+ * without the bridge, or a platform without daemon supervision) is never a
+ * mismatch; there's nothing to compare against.
+ */
+export function isCoordinatorMismatched(
+  coordinatorUrl: string,
+  sidecarReportedUrl: string | null,
+): boolean {
+  return sidecarReportedUrl !== null && sidecarReportedUrl !== coordinatorUrl;
+}

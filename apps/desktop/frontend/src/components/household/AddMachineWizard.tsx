@@ -20,7 +20,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Copy, Check, X, Plus, AlertCircle, Clock, RadioTower } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
-import { issuePairingToken, CoordinatorError, meshClient } from '@/lib/meshClient';
+import { issuePairingToken, meshClient } from '@/lib/meshClient';
+import { useConnectionStore } from '@/stores/connectionStore';
+import { describeCoordinatorAuthError } from '@/lib/coordinatorErrorMessage';
 import type { PairingTokenIssueResponse } from '@/types/mesh';
 
 interface AddMachineWizardProps {
@@ -31,22 +33,28 @@ interface AddMachineWizardProps {
 export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
   const [token, setToken] = useState<PairingTokenIssueResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [switchToUrl, setSwitchToUrl] = useState<string | null>(null);
   const [isIssuing, setIsIssuing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [broadcasting, setBroadcasting] = useState(false);
   const [confirmationPin, setConfirmationPin] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  // Bumped by "Switch and try again" to re-run the issue-token effect below
+  // without needing to extract it into a standalone callback.
+  const [retryNonce, setRetryNonce] = useState(0);
 
   const dialogRef = useRef<HTMLDivElement>(null);
   const copyBtnRef = useRef<HTMLButtonElement>(null);
 
-  // Issue a token whenever the dialog opens.
+  // Issue a token whenever the dialog opens (or a "Switch and try again"
+  // bumps retryNonce while it's already open).
   useEffect(() => {
     if (!open) return;
 
     let cancelled = false;
     setToken(null);
     setError(null);
+    setSwitchToUrl(null);
     setCopied(false);
     setBroadcasting(false);
     setConfirmationPin(null);
@@ -77,15 +85,14 @@ export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
         }
       } catch (err) {
         if (cancelled) return;
-        if (err instanceof CoordinatorError) {
-          setError(
-            err.httpStatus === 0 || err.httpStatus >= 500
-              ? "Couldn't reach the coordinator. Check the connection URL in Settings → Advanced."
-              : err.message,
-          );
-        } else {
-          setError(err instanceof Error ? err.message : 'Could not issue pairing token.');
-        }
+        // Covers a stale coordinator override the same way BeFirstPanel's
+        // "Set up household" does — see describeCoordinatorAuthError.
+        const info = describeCoordinatorAuthError(err, {
+          coordinatorUrl: useConnectionStore.getState().coordinatorUrl,
+          sidecarReportedUrl: useConnectionStore.getState().sidecarReportedUrl,
+        });
+        setError(info.message);
+        setSwitchToUrl(info.switchToUrl ?? null);
       } finally {
         if (!cancelled) setIsIssuing(false);
       }
@@ -94,7 +101,7 @@ export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, retryNonce]);
 
   // Tick once per second for the countdown.
   useEffect(() => {
@@ -136,6 +143,12 @@ export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
           : 'Could not copy to clipboard.',
       );
     }
+  }
+
+  function handleSwitchAndRetry() {
+    if (switchToUrl === null) return;
+    useConnectionStore.getState().setCoordinatorUrl(switchToUrl);
+    setRetryNonce((n) => n + 1);
   }
 
   const expiresInMs = token ? new Date(token.expires_at).getTime() - now : 0;
@@ -216,9 +229,22 @@ export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
                 className="mt-0.5 h-4 w-4 shrink-0 text-destructive"
                 aria-hidden="true"
               />
-              <div className="space-y-1 text-sm">
+              <div className="space-y-1.5 text-sm">
                 <p className="font-medium text-foreground">Couldn't issue token</p>
                 <p className="text-muted-foreground">{error}</p>
+                {switchToUrl !== null && (
+                  <button
+                    type="button"
+                    onClick={handleSwitchAndRetry}
+                    className={cn(
+                      'inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium',
+                      'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    )}
+                  >
+                    Switch and try again
+                  </button>
+                )}
               </div>
             </div>
           )}

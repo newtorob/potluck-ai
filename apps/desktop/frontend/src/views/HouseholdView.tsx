@@ -43,6 +43,7 @@ import { cn } from '@/components/ui/cn';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { useMeshStore } from '@/stores/meshStore';
+import { useConnectionStore } from '@/stores/connectionStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useHealth } from '@/hooks/useHealth';
 import { localApi } from '@/lib/localApi';
@@ -62,12 +63,14 @@ import {
   type CapacityResult,
 } from '@/lib/capacity';
 import { useModelStore, type ModelTier } from '@/stores/modelStore';
-import { meshClient, issuePairingToken, MeshApiError, CoordinatorError } from '@/lib/meshClient';
+import { meshClient, issuePairingToken, MeshApiError } from '@/lib/meshClient';
 import { relativeTime } from '@/lib/timeFormat';
 import { formatModelName } from '@/lib/modelName';
 import type { MeshPeer, MeshStatus } from '@/types/mesh';
 import { AddMachineWizard } from '@/components/household/AddMachineWizard';
 import { MeshEnablePanel } from '@/components/household/MeshEnablePanel';
+import { CoordinatorMismatchBanner } from '@/components/household/CoordinatorMismatchBanner';
+import { describeCoordinatorAuthError } from '@/lib/coordinatorErrorMessage';
 import { ContributionReceiptsCard } from '@/components/household/ContributionReceiptsCard';
 import { deriveDiagnostics, type PeerDiagnostic } from '@/lib/meshDiagnostics';
 import { PreflightBanner } from '@/components/household/PreflightBanner';
@@ -185,6 +188,8 @@ export function HouseholdView() {
         <HouseholdHeader status={status} />
 
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+          <CoordinatorMismatchBanner />
+
           {lastError !== null && (
             <ErrorBanner message={lastError} />
           )}
@@ -292,6 +297,7 @@ function UnpairedPanels({ onPaired }: { onPaired: () => void }) {
 function BeFirstPanel({ onPaired }: { onPaired: () => void }) {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [switchToUrl, setSwitchToUrl] = useState<string | null>(null);
 
   async function pairOnce(token: string): Promise<void> {
     await meshClient.pair({ pairing_token: token });
@@ -299,6 +305,7 @@ function BeFirstPanel({ onPaired }: { onPaired: () => void }) {
 
   async function handleSetup() {
     setError(null);
+    setSwitchToUrl(null);
     setWorking(true);
     try {
       const token = await issuePairingToken();
@@ -322,20 +329,27 @@ function BeFirstPanel({ onPaired }: { onPaired: () => void }) {
       }
       onPaired();
     } catch (err) {
-      if (err instanceof MeshApiError) {
-        setError(`${err.code}: ${err.message}`);
-      } else if (err instanceof CoordinatorError) {
-        setError(
-          err.httpStatus === 0 || err.httpStatus >= 500
-            ? "Couldn't reach the coordinator. Check the connection URL in Settings → Advanced."
-            : err.message,
-        );
-      } else {
-        setError(err instanceof Error ? err.message : 'Could not set up household.');
-      }
+      // Covers a stale coordinator override: either issuePairingToken() was
+      // rejected directly (CoordinatorError 401), or it succeeded against
+      // the wrong coordinator and the mesh daemon's own upstream redemption
+      // in pairOnce() was rejected (MeshApiError 'coordinator_error'). Both
+      // get an actionable "switch and retry" when this machine's daemon
+      // reports a different coordinator than the app is using.
+      const info = describeCoordinatorAuthError(err, {
+        coordinatorUrl: useConnectionStore.getState().coordinatorUrl,
+        sidecarReportedUrl: useConnectionStore.getState().sidecarReportedUrl,
+      });
+      setError(info.message);
+      setSwitchToUrl(info.switchToUrl ?? null);
     } finally {
       setWorking(false);
     }
+  }
+
+  function handleSwitchAndRetry() {
+    if (switchToUrl === null) return;
+    useConnectionStore.getState().setCoordinatorUrl(switchToUrl);
+    void handleSetup();
   }
 
   return (
@@ -354,9 +368,26 @@ function BeFirstPanel({ onPaired }: { onPaired: () => void }) {
       </p>
 
       {error !== null && (
-        <p className="text-sm text-destructive" role="alert">
-          {error}
-        </p>
+        <div className="space-y-1.5">
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+          {switchToUrl !== null && (
+            <button
+              type="button"
+              onClick={handleSwitchAndRetry}
+              disabled={working}
+              className={cn(
+                'inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium',
+                'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                'disabled:cursor-not-allowed disabled:opacity-60',
+              )}
+            >
+              Switch and try again
+            </button>
+          )}
+        </div>
       )}
 
       <button
