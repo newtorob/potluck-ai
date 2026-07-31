@@ -72,6 +72,13 @@
       <string>/Applications/Potluck AI.app/Contents/Resources/mesh/potluck-mesh</string>
       <string>--coordinator-url</string>
       <string>https://coordinator.trypotluck.ai</string>
+      <!-- Pin the key directory. Under launchd $HOME is unreliable, so the
+           $HOME-dependent default would put wg.key / node.token / signing.key
+           in shifting locations between runs and desync enrollment state (a
+           fresh /pair would 409 already_enrolled). node.token and signing.key
+           are co-located with this path (see internal/config Load()). -->
+      <string>--wg-private-key-path</string>
+      <string>/Library/Application Support/Potluck/mesh/wg.key</string>
       <string>--log-format</string>
       <string>json</string>
     </array>

@@ -171,6 +171,25 @@ func Load() (*Config, error) {
 	}
 	cfg.STUNRefreshInterval = *stunRefresh
 
+	// Keep signing.key co-located with wg.key + node.token. node.token already
+	// derives from cfg.WGPrivateKeyPath (cmd/main.go), but signing.key defaulted
+	// off defaultSigningKeyPath() — the $HOME-dependent default — independently
+	// of any --wg-private-key-path override. Under launchd/systemd $HOME is
+	// unreliable, so a daemon that pins only --wg-private-key-path ended up with
+	// wg.key + node.token in one directory and signing.key in another, which
+	// desynced enrollment state and made a fresh /pair 409 already_enrolled.
+	// When the signing path was NOT explicitly set, derive it from the resolved
+	// WG key directory so pinning --wg-private-key-path alone is sufficient.
+	signingExplicit := os.Getenv("POTLUCK_SIGNING_KEY_PATH") != ""
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "signing-key-path" {
+			signingExplicit = true
+		}
+	})
+	if !signingExplicit {
+		cfg.SigningPrivateKeyPath = filepath.Join(filepath.Dir(cfg.WGPrivateKeyPath), "signing.key")
+	}
+
 	// ---- normalize + validate ---- //
 	cfg.CoordinatorURL = strings.TrimRight(cfg.CoordinatorURL, "/")
 	if cfg.CoordinatorURL == "" {
