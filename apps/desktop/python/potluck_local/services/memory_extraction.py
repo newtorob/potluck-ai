@@ -6,7 +6,6 @@ storing them in the SQLite memory DB with Jaccard-based deduplication.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import re
@@ -161,24 +160,13 @@ def _memory_enabled() -> bool:
 def _fire_embed(memory_id: str, content: str) -> None:
     """Schedule an embedding generation as a fire-and-forget asyncio task.
 
-    Safe to call from any async context.  If the event loop isn't running
-    (shouldn't happen in production) this is a no-op.
+    Thin wrapper over services.embeddings.schedule_embed_memory — the shared
+    implementation used by every write path (insert, import upsert, content
+    edit) so they all regenerate + persist + invalidate the cluster cache
+    identically.
     """
-    async def _embed_and_save() -> None:
-        try:
-            from potluck_local.services.embeddings import get_embedder
-            from potluck_local.services.memory_db import save_embedding
-            from potluck_local.services.memory_clustering import get_cluster_cache
-
-            embedder = get_embedder()
-            vec = await embedder.embed(content)
-            if vec is not None:
-                await save_embedding(memory_id, vec, embedder.MODEL_NAME)
-                await get_cluster_cache().invalidate_all()
-        except Exception as exc:
-            logger.warning("embed_on_insert_failed id=%s reason=%s", memory_id, exc)
-
-    asyncio.create_task(_embed_and_save())
+    from potluck_local.services.embeddings import schedule_embed_memory
+    schedule_embed_memory(memory_id, content)
 
 
 class MemoryExtractor:
@@ -388,6 +376,151 @@ class MemoryExtractor:
         logger.info(
             "memory_explicit_saved id=%s category=%s project=%s",
             mem.id, mem.category, mem.project,
+        )
+        return mem
+
+    async def import_memory(self, raw: dict) -> Memory:
+        """Insert-or-update a memory from an /memory/export payload, keyed on
+        the exported id.
+
+        This is the fix for the "import isn't a real restore" finding: the
+        previous implementation always routed through extract_explicit(),
+        which mints a brand-new id and created_at/pinned/access_count on
+        every call — so re-importing the same export produced a second row
+        with the original's pin state and timestamps lost, instead of
+        updating the first one in place.
+
+        Behaviour:
+        - No `id` in the payload, or an `id` not present locally: INSERT a
+          new row, preserving the exported created_at/last_accessed_at/
+          access_count/pinned when present (falls back to "now"/0/False for
+          a payload that only has content+category, e.g. a hand-built
+          import).
+        - `id` present locally: UPDATE that row in place — content,
+          category, confidence, source_type, source_conversation_id,
+          project, and pinned are overwritten from the payload; id and
+          created_at are preserved untouched. Calling this twice with the
+          same payload is therefore idempotent: one row, not two.
+
+        Embedding: cleared + a fresh one scheduled (see
+        services.embeddings.schedule_embed_memory) whenever the row is new
+        or its content changed, so an imported/updated memory is never left
+        pointing at a stale or absent vector. Unchanged re-imports leave the
+        existing embedding alone.
+
+        Raises ValueError if content is missing/empty — the caller counts
+        that as a skipped row.
+        """
+        content = str(raw.get("content", "")).strip()
+        if not content:
+            raise ValueError("import row missing non-empty 'content'")
+
+        category = raw.get("category", "fact")
+        if category not in (
+            "preference", "fact", "decision", "project", "person",
+            "instruction", "reference",
+        ):
+            category = "fact"
+
+        confidence = min(max(float(raw.get("confidence", 0.7) or 0.7), 0.0), 1.0)
+        source_type = raw.get("source_type") or "explicit"
+        if source_type not in ("extracted", "explicit", "agent_state", "vault"):
+            source_type = "explicit"
+        source_conversation_id = raw.get("source_conversation_id")
+        project = raw.get("project") or None
+        pinned = bool(raw.get("pinned", False))
+        memory_id = raw.get("id") or str(uuid.uuid4())
+        now = _now_iso()
+
+        from potluck_local.services.memory_db import get_memory_db_path
+        db_path = get_memory_db_path()
+
+        async with aiosqlite.connect(db_path) as db:
+            db.row_factory = aiosqlite.Row
+            await db.execute("PRAGMA foreign_keys=ON")
+            cursor = await db.execute(
+                "SELECT content FROM memories WHERE id = ?", (memory_id,)
+            )
+            existing = await cursor.fetchone()
+            content_changed = existing is None or existing["content"] != content
+
+            if existing is not None:
+                # Update in place: id and created_at are untouched, so a
+                # re-import of the same export id never mints a duplicate
+                # or resets provenance.
+                await db.execute(
+                    """UPDATE memories
+                       SET content = ?, category = ?, confidence = ?, source_type = ?,
+                           source_conversation_id = ?, project = ?, pinned = ?,
+                           is_active = 1, updated_at = ?
+                       WHERE id = ?""",
+                    (
+                        content, category, confidence, source_type,
+                        source_conversation_id, project, 1 if pinned else 0,
+                        now, memory_id,
+                    ),
+                )
+            else:
+                created_at = raw.get("created_at") or now
+                last_accessed_at = raw.get("last_accessed_at") or created_at
+                access_count = int(raw.get("access_count", 0) or 0)
+                extraction_prompt_version = raw.get("extraction_prompt_version")
+                await db.execute(
+                    """INSERT INTO memories
+                       (id, content, category, confidence, source_type,
+                        source_conversation_id, created_at, last_accessed_at,
+                        updated_at, access_count, is_active, project,
+                        extraction_prompt_version, pinned)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)""",
+                    (
+                        memory_id, content, category, confidence, source_type,
+                        source_conversation_id, created_at, last_accessed_at,
+                        now, access_count, project, extraction_prompt_version,
+                        1 if pinned else 0,
+                    ),
+                )
+
+            if content_changed:
+                # Stale vector would otherwise survive under the new content
+                # (see the sibling "edited memory keeps its old embedding"
+                # fix in memory_retrieval.update_memory) — clear it so
+                # run_embedding_backfill also treats this row as needing a
+                # fresh embedding even if the fire-and-forget task below
+                # never gets to run (e.g. process exits immediately after).
+                await db.execute(
+                    "DELETE FROM memory_embeddings WHERE memory_id = ?", (memory_id,)
+                )
+
+            await db.commit()
+
+            cursor = await db.execute(
+                "SELECT * FROM memories WHERE id = ?", (memory_id,)
+            )
+            row = dict(await cursor.fetchone())
+
+        if content_changed:
+            _fire_embed(memory_id, content)
+
+        mem = Memory(
+            id=row["id"],
+            content=row["content"],
+            category=row["category"],  # type: ignore[arg-type]
+            confidence=row["confidence"],
+            source_type=row["source_type"],  # type: ignore[arg-type]
+            source_conversation_id=row["source_conversation_id"],
+            created_at=row["created_at"],
+            last_accessed_at=row["last_accessed_at"],
+            updated_at=row.get("updated_at") or row["created_at"],
+            access_count=row["access_count"],
+            is_active=bool(row["is_active"]),
+            superseded_by=row["superseded_by"],
+            project=row["project"],
+            extraction_prompt_version=row.get("extraction_prompt_version"),
+            pinned=bool(row.get("pinned", 0)),
+        )
+        logger.info(
+            "memory_imported id=%s category=%s was_update=%s",
+            mem.id, mem.category, existing is not None,
         )
         return mem
 

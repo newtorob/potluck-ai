@@ -152,20 +152,36 @@ class PotluckSettings(BaseModel):
     ui: dict[str, str] = Field(default_factory=dict)
 
 
-_CONFIG_PATH = Path.home() / ".potluck" / "config.json"
+def _default_config_path() -> Path:
+    """~/.potluck/config.json, honouring POTLUCK_DATA_DIR when set.
+
+    Resolved lazily (at call time, not import time) via utils.paths.config_path
+    — the same POTLUCK_DATA_DIR-aware helper every other on-disk store
+    (memory.db, models/, logs/) routes through. Settings used to hardcode
+    Path.home() / ".potluck" as a *default argument value*, which is baked in
+    at function-definition time; even a caller that set POTLUCK_DATA_DIR
+    before importing this module would still get the real home directory's
+    config.json (and its gateway.api_key) mixed into a supposedly-isolated
+    override instance. Computing it fresh on every call closes that gap.
+    """
+    from potluck_local.utils.paths import config_path as _config_path_helper
+    return _config_path_helper()
 
 
 _settings_cache: dict[str, tuple[float, PotluckSettings]] = {}
 
 
-def get_settings(config_path: Path = _CONFIG_PATH) -> PotluckSettings:
+def get_settings(config_path: Path | None = None) -> PotluckSettings:
     """Load settings from disk, returning defaults if the file is absent.
 
     Cached by file mtime so hot callers (e.g. the gateway middleware on every
     /v1 request) don't re-read and re-parse the file each time. A save changes
     the mtime, so live updates are still picked up. The config_path parameter
-    exists for testability (pass a tmp_path).
+    exists for testability (pass a tmp_path); when omitted it resolves via
+    _default_config_path(), which honours POTLUCK_DATA_DIR.
     """
+    if config_path is None:
+        config_path = _default_config_path()
     if config_path.exists():
         try:
             mtime = config_path.stat().st_mtime
@@ -185,7 +201,7 @@ def get_settings(config_path: Path = _CONFIG_PATH) -> PotluckSettings:
 
 def save_settings(
     settings: PotluckSettings,
-    config_path: Path = _CONFIG_PATH,
+    config_path: Path | None = None,
 ) -> None:
     """Persist settings to disk, creating the directory if needed.
 
@@ -194,7 +210,12 @@ def save_settings(
     and closes the window where a freshly-created file was briefly
     world-readable before permissions were applied. os.chmod is a partial
     no-op on Windows (no POSIX mode bits); best-effort there, never fatal.
+
+    config_path defaults to _default_config_path() (POTLUCK_DATA_DIR-aware)
+    when omitted, same as get_settings().
     """
+    if config_path is None:
+        config_path = _default_config_path()
     config_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         os.chmod(config_path.parent, 0o700)

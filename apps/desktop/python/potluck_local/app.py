@@ -111,15 +111,31 @@ async def _lifespan(app: FastAPI):  # noqa: ARG001
 
     await init_memory_db()
 
+    # Background tasks spawned below must be retained, not fire-and-forgotten:
+    # an unreferenced asyncio.create_task() is only kept alive by the event
+    # loop's internal weak bookkeeping, and a test run (or a fast shutdown)
+    # can close the loop while one is still scheduled — e.g. the stale-session
+    # sweeper waking up from asyncio.sleep(60) after the TestClient's loop is
+    # gone, which surfaced as an aiosqlite worker thread hitting a closed
+    # event loop. Every task we create here goes into background_tasks so the
+    # shutdown path below can cancel + await (drain) all of them before the
+    # model/DB teardown runs.
+    background_tasks: set[asyncio.Task] = set()
+
+    def _track(task: asyncio.Task) -> asyncio.Task:
+        background_tasks.add(task)
+        task.add_done_callback(background_tasks.discard)
+        return task
+
     # Eagerly warm the hardware-detect cache so the first /hardware or
     # /peer/capabilities request never pays the blocking subprocess cost.
     # Runs in a thread-pool executor via the same helper used by both routers.
     from potluck_local.routers.peer import _cached_hardware
-    asyncio.create_task(_cached_hardware())
+    _track(asyncio.create_task(_cached_hardware()))
 
     # Fire-and-forget: backfill embeddings for any memories that don't have them.
     # Runs to completion in the background; never blocks startup or the event loop.
-    asyncio.create_task(run_embedding_backfill())
+    _track(asyncio.create_task(run_embedding_backfill()))
 
     # Stale-session sweep. MCP transports don't always send a clean disconnect
     # (crash, kill, network loss), so without this, rows pile up as "active"
@@ -139,9 +155,18 @@ async def _lifespan(app: FastAPI):  # noqa: ARG001
             except Exception:  # noqa: BLE001
                 # Don't let one failed sweep kill the loop.
                 pass
-    asyncio.create_task(_stale_session_sweeper())
+    _track(asyncio.create_task(_stale_session_sweeper()))
 
     yield
+
+    # Cancel + drain every background task BEFORE touching the model or DB
+    # below, so nothing still in flight (e.g. the sweeper mid-sleep, or the
+    # embedding backfill mid-batch) can wake up after the loop this
+    # lifespan belongs to has started closing.
+    for task in list(background_tasks):
+        task.cancel()
+    if background_tasks:
+        await asyncio.gather(*background_tasks, return_exceptions=True)
 
     # Release Metal / llama.cpp before process exit. If the model is still
     # loaded, ggml-metal's atexit finalize can GGML_ASSERT on macOS

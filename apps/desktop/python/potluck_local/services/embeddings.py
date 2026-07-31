@@ -223,3 +223,32 @@ def _reset_embedder() -> None:
     """
     global _embedder
     _embedder = None
+
+
+def schedule_embed_memory(memory_id: str, content: str) -> None:
+    """Schedule embedding (re)generation for a memory as a fire-and-forget task.
+
+    Shared by every write path that inserts or changes memory content
+    (explicit save, extraction, import upsert, content edit) so they all
+    regenerate + persist the vector and invalidate the cluster cache the same
+    way.  Safe to call from any async context — if the event loop isn't
+    running (shouldn't happen in production) this is a no-op.  Any failure
+    (model unavailable, etc.) is logged and swallowed: keyword search still
+    works without a vector, and services.embedding_backfill.run_embedding_backfill
+    retries rows that are still missing an embedding for the active model.
+    """
+
+    async def _embed_and_save() -> None:
+        try:
+            from potluck_local.services.memory_clustering import get_cluster_cache
+            from potluck_local.services.memory_db import save_embedding
+
+            embedder = get_embedder()
+            vec = await embedder.embed(content)
+            if vec is not None:
+                await save_embedding(memory_id, vec, embedder.MODEL_NAME)
+                await get_cluster_cache().invalidate_all()
+        except Exception as exc:
+            logger.warning("embed_fire_and_forget_failed id=%s reason=%s", memory_id, exc)
+
+    asyncio.create_task(_embed_and_save())

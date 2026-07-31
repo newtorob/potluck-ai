@@ -378,29 +378,26 @@ async def wipe_memories(req: WipeRequest) -> dict[str, str]:
 
 @router.post("/import")
 async def import_memories(req: ImportRequest) -> dict[str, int]:
-    """Import a list of memories, skipping IDs that already exist."""
+    """Import a list of memories exported via GET /memory/export.
+
+    A real restore, not a skip-if-present insert: each row is upserted keyed
+    on its exported id. An id that already exists locally is updated in
+    place (content/category/confidence/project/pinned refreshed, id and
+    created_at preserved); an id that doesn't exist yet is inserted with its
+    original id/created_at/pinned/access_count intact. Re-running the same
+    import is idempotent — it never produces a second row for the same
+    exported memory. See services.memory_extraction.MemoryExtractor.import_memory.
+    """
     if not _memory_active():
         raise HTTPException(status_code=403, detail=_DISABLED_DETAIL)
 
-    retriever = get_memory_retriever()
+    extractor = get_memory_extractor()
     imported = 0
     skipped = 0
 
     for raw in req.memories:
-        memory_id = raw.get("id")
-        if memory_id and await retriever.get_memory(memory_id) is not None:
-            skipped += 1
-            continue
-
-        # Re-insert via explicit extraction (strips unknown fields via Pydantic).
         try:
-            await get_memory_extractor().extract_explicit(
-                content=raw["content"],
-                category=raw["category"],
-                conversation_id=raw.get("source_conversation_id"),
-                confidence=float(raw.get("confidence", 0.7)),
-                project=raw.get("project"),
-            )
+            await extractor.import_memory(raw)
             imported += 1
         except Exception as exc:
             logger.warning("memory_import_skip reason=%s", type(exc).__name__)

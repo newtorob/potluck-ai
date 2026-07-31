@@ -829,6 +829,17 @@ class MemoryRetriever:
         else:
             new_project = project or None  # coerce "" -> None
 
+        # An edited content string invalidates the stored vector — it was
+        # computed from the OLD text. memories_missing_embeddings() only
+        # catches rows with no embedding row at all, or one from a
+        # different model, so leaving the stale row in place meant an
+        # edited memory silently kept ranking/matching on its pre-edit
+        # semantics forever. Clear it synchronously (so it's gone the
+        # instant this call returns, even if the process exits before the
+        # fire-and-forget regen below runs — the periodic backfill picks up
+        # any row with no embedding row) and schedule a fresh one.
+        content_changed = new_content != existing.content
+
         async with aiosqlite.connect(db_path) as db:
             await db.execute(
                 """UPDATE memories
@@ -838,10 +849,18 @@ class MemoryRetriever:
                 (new_content, new_category, new_confidence, new_project,
                  _now_iso(), memory_id),
             )
+            if content_changed:
+                await db.execute(
+                    "DELETE FROM memory_embeddings WHERE memory_id = ?", (memory_id,)
+                )
             await db.commit()
 
         from potluck_local.services.memory_clustering import get_cluster_cache
         await get_cluster_cache().invalidate_all()
+
+        if content_changed:
+            from potluck_local.services.embeddings import schedule_embed_memory
+            schedule_embed_memory(memory_id, new_content)
 
         return await self.get_memory(memory_id)
 
