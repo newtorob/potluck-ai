@@ -332,12 +332,50 @@ async def init_memory_db(db_path: Path | None = None) -> None:
 
 
 async def reset_memory_db(db_path: Path | None = None) -> None:
-    """Delete the DB file and re-initialise. Destructive — for tests/wipe-all."""
+    """Delete the DB file and re-initialise. Destructive — for tests only.
+
+    NOT used by the /memory/wipe route (see wipe_memory_tables): this drops
+    the WHOLE database file, including task_states, vault_files,
+    conversations, messages, mcp_sessions, and mcp_tool_calls — every other
+    product surface that happens to share this SQLite file with memory, not
+    memory data. A prior version of /memory/wipe called this directly, which
+    silently deleted the user's chat history and tasks alongside their
+    memories. Kept here only for tests that want a fully blank DB.
+    """
     path = db_path or get_memory_db_path()
     if path.exists():
         path.unlink()
         logger.info("memory_db_deleted path=%s", path)
     await init_memory_db(path)
+
+
+async def wipe_memory_tables(db_path: Path | None = None) -> int:
+    """Delete every row from the memory-specific tables ONLY, in one transaction.
+
+    Scope, enumerated against the schema above: `memories`, `memory_embeddings`,
+    and `memory_access_log` are memory data. Every other table in this file —
+    task_states (tasks), vault_files (vault), conversations/messages (chat),
+    mcp_sessions/mcp_tool_calls (agent observability) — is a distinct product
+    surface that merely shares this SQLite file with memory, and MUST be left
+    untouched by a memory wipe. This is the fix for the launch-blocker where
+    POST /memory/wipe called reset_memory_db() and dropped the whole file,
+    taking the user's chats/tasks/vault state with it.
+
+    memory_embeddings and memory_access_log both FK-reference memories.id
+    with no ON DELETE CASCADE, so the children are deleted before the parent
+    (PRAGMA foreign_keys=ON would otherwise reject the parent delete).
+    Returns the number of memory rows removed.
+    """
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        await db.execute("PRAGMA foreign_keys=ON")
+        await db.execute("DELETE FROM memory_access_log")
+        await db.execute("DELETE FROM memory_embeddings")
+        cursor = await db.execute("DELETE FROM memories")
+        removed = cursor.rowcount if cursor.rowcount is not None and cursor.rowcount >= 0 else 0
+        await db.commit()
+    logger.info("memory_tables_wiped path=%s removed=%d", path, removed)
+    return removed
 
 
 _CREATE_MCP_SESSIONS = """

@@ -318,8 +318,9 @@ def create_app() -> FastAPI:
         # Shared-secret gate — applies to loopback callers too. When a token is
         # configured, every non-exempt path must present a matching bearer token.
         # This is what stops a malicious local process from reading the user's
-        # data over 127.0.0.1. Exempt: liveness (/health), peer routes, and
-        # /shutdown (Electron may call it from the main process during teardown).
+        # data over 127.0.0.1. Exempt: liveness (/health), /shutdown (Electron
+        # may call it from the main process during teardown), and /peer/* —
+        # but ONLY for a non-loopback caller.
         #
         # NOTE on /peer/* exemption: peer routes are NOT per-request signature
         # authenticated in v0. Their credential is mesh membership — a caller can
@@ -328,14 +329,23 @@ def create_app() -> FastAPI:
         # the mesh-CIDR check just above that 403s a /peer/* caller whose source
         # IP is outside the mesh subnet), and mesh enrollment is gated by the
         # coordinator. Per-request signed-nonce attestation is a v0.5+ item. See
-        # routers/peer.py "Trust model". The exemption is safe because the peer
-        # surface never exposes local memory/tasks/chat and the one memory-read
-        # route is opt-in and off by default.
+        # routers/peer.py "Trust model".
+        #
+        # That mesh-membership credential ONLY exists for a non-loopback caller
+        # — the mesh-CIDR check above runs exclusively inside `if not
+        # is_loopback:` (Gate 1), so a loopback caller hitting /peer/* never
+        # proves mesh membership at all. Exempting /peer/* from the token gate
+        # unconditionally therefore left it completely unauthenticated for any
+        # local process (no token, or the wrong token, both worked) — the
+        # private-memory leak this fixes. A loopback /peer/* caller has no mesh
+        # credential to fall back on, so it must present the sidecar token like
+        # every other loopback route; a mesh peer keeps its pre-existing
+        # token-free path since mesh membership already gated it above.
         if sidecar_token is not None:
             exempt = (
                 normalised == "/health"
                 or normalised == "/shutdown"
-                or normalised.startswith("/peer/")
+                or (normalised.startswith("/peer/") and not is_loopback)
             )
             if not exempt:
                 auth = request.headers.get("authorization", "")

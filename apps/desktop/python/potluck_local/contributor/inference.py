@@ -146,6 +146,12 @@ class LlamaCppInferenceEngine:
             queue: asyncio.Queue = asyncio.Queue(maxsize=64)
             loop = asyncio.get_event_loop()
             error_box: list[BaseException] = []
+            # Signals the producer thread to stop pulling more tokens from
+            # llama.cpp. Checked once per token AND used, together with
+            # draining the queue below, to unstick a producer that is
+            # currently blocked inside queue.put(...).result() waiting for
+            # room -- see the finally block below for why that matters.
+            stop_event = threading.Event()
 
             def _produce() -> None:
                 try:
@@ -168,28 +174,70 @@ class LlamaCppInferenceEngine:
                         completion_kwargs["seed"] = seed
 
                     for chunk in self._llama.create_completion(**completion_kwargs):
+                        if stop_event.is_set():
+                            break
                         choice = chunk["choices"][0]
                         text = choice.get("text", "")
                         if text:
-                            asyncio.run_coroutine_threadsafe(
-                                queue.put(text), loop
-                            ).result()
+                            try:
+                                asyncio.run_coroutine_threadsafe(
+                                    queue.put(text), loop
+                                ).result()
+                            except RuntimeError:
+                                # Event loop already closed/closing underneath us.
+                                break
                 except BaseException as exc:  # noqa: BLE001
                     error_box.append(exc)
                 finally:
-                    asyncio.run_coroutine_threadsafe(queue.put(_DONE), loop).result()
+                    try:
+                        asyncio.run_coroutine_threadsafe(queue.put(_DONE), loop).result()
+                    except RuntimeError:
+                        pass
 
-            producer = threading.Thread(target=_produce, daemon=True)
+            producer = threading.Thread(
+                target=_produce, daemon=True, name="potluck-llamacpp-producer"
+            )
             producer.start()
 
-            while True:
-                item = await queue.get()
-                if item is _DONE:
-                    break
-                yield item
+            try:
+                while True:
+                    item = await queue.get()
+                    if item is _DONE:
+                        break
+                    yield item
 
-            if error_box:
-                raise error_box[0]
+                if error_box:
+                    raise error_box[0]
+            finally:
+                # Reached on normal completion, on an exception raised above,
+                # AND when this async generator is abandoned mid-stream (WS
+                # send failure, disconnect, GC/aclose()) -- e.g. via a
+                # GeneratorExit thrown in at `await queue.get()`. Without
+                # this, a producer thread blocked inside queue.put(...)
+                # .result() on a full queue (maxsize=64) would never see
+                # anyone call queue.get() again and would block forever,
+                # leaking the OS thread and leaving self._llama's generator
+                # half-consumed -- then a LATER job reusing this singleton
+                # engine could start a second producer thread that races the
+                # first one on the same (not thread-safe) Llama instance.
+                stop_event.set()
+                # Drain so a producer currently blocked on a full queue can
+                # complete its put() and observe stop_event on its next loop
+                # iteration. asyncio.Queue.get_nowait() wakes up a waiting
+                # put() the same way get() does.
+                while not queue.empty():
+                    try:
+                        queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+                if producer.is_alive():
+                    await loop.run_in_executor(None, producer.join, 5.0)
+                    if producer.is_alive():
+                        logger.error(
+                            "producer_thread_stuck backend=llama-cpp slug=%s "
+                            "(did not stop within 5s of cancellation)",
+                            self.model_slug,
+                        )
 
     async def stream_chat(
         self,
@@ -214,6 +262,9 @@ class LlamaCppInferenceEngine:
             queue: asyncio.Queue = asyncio.Queue(maxsize=64)
             loop = asyncio.get_event_loop()
             error_box: list[BaseException] = []
+            # See stream_completion's finally block for why this exists: it
+            # closes the launch-blocking "stranded producer thread" bug.
+            stop_event = threading.Event()
 
             def _produce() -> None:
                 try:
@@ -236,28 +287,54 @@ class LlamaCppInferenceEngine:
                         chat_kwargs["seed"] = seed
 
                     for chunk in self._llama.create_chat_completion(**chat_kwargs):
+                        if stop_event.is_set():
+                            break
                         delta = chunk["choices"][0].get("delta", {})
                         text = delta.get("content") or ""
                         if text:
-                            asyncio.run_coroutine_threadsafe(
-                                queue.put(text), loop
-                            ).result()
+                            try:
+                                asyncio.run_coroutine_threadsafe(
+                                    queue.put(text), loop
+                                ).result()
+                            except RuntimeError:
+                                break
                 except BaseException as exc:  # noqa: BLE001
                     error_box.append(exc)
                 finally:
-                    asyncio.run_coroutine_threadsafe(queue.put(_DONE), loop).result()
+                    try:
+                        asyncio.run_coroutine_threadsafe(queue.put(_DONE), loop).result()
+                    except RuntimeError:
+                        pass
 
-            producer = threading.Thread(target=_produce, daemon=True)
+            producer = threading.Thread(
+                target=_produce, daemon=True, name="potluck-llamacpp-producer"
+            )
             producer.start()
 
-            while True:
-                item = await queue.get()
-                if item is _DONE:
-                    break
-                yield item
+            try:
+                while True:
+                    item = await queue.get()
+                    if item is _DONE:
+                        break
+                    yield item
 
-            if error_box:
-                raise error_box[0]
+                if error_box:
+                    raise error_box[0]
+            finally:
+                stop_event.set()
+                while not queue.empty():
+                    try:
+                        queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+                if producer.is_alive():
+                    await loop.run_in_executor(None, producer.join, 5.0)
+                    if producer.is_alive():
+                        logger.error(
+                            "producer_thread_stuck backend=llama-cpp slug=%s "
+                            "(did not stop within 5s of cancellation)",
+                            self.model_slug,
+                        )
 
 
 # ---- Ollama backend ------------------------------------------------------ #

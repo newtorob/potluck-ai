@@ -27,7 +27,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 
 from potluck_local.services.memory_clustering import ClusterResponse, compute_clusters
-from potluck_local.services.memory_db import list_projects, reset_memory_db
+from potluck_local.services.memory_db import list_projects, wipe_memory_tables
 from potluck_local.services.memory_extraction import (
     Memory,
     MemoryCategory,
@@ -362,13 +362,16 @@ async def extract_memories(req: ExtractMemoryRequest) -> list[dict[str, Any]]:
 
 @router.post("/wipe")
 async def wipe_memories(req: WipeRequest) -> dict[str, str]:
-    """Delete all memories from the database. Requires confirm=true."""
+    """Delete all memories (and their embeddings/access log) from the database.
+    Requires confirm=true. Scoped to the memory tables only — chats, tasks,
+    vault state, and agent observability history are untouched (see
+    wipe_memory_tables)."""
     if not req.confirm:
         raise HTTPException(
             status_code=400,
             detail="Pass {'confirm': true} to confirm the wipe.",
         )
-    await reset_memory_db()
+    await wipe_memory_tables()
     logger.info("memory_wiped")
     return {"status": "wiped"}
 

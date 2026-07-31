@@ -320,6 +320,71 @@ class LLMRuntime:
         with self._load_lock:
             self._release_model()
 
+    # -----------------------------------------------------------------
+    # Async lifecycle wrappers — the ONLY load/unload entrypoints the HTTP
+    # routes should call.
+    #
+    # Root cause of the launch-blocking race this closes: _release_model()
+    # (called by unload_model, and internally by load_model/load_pipeline/
+    # load_whole_model before swapping in a new model) used to run with no
+    # coordination against _inference_lock -- the asyncio.Lock that
+    # stream_chat/chat/stream_chat_raw/score_sequence/benchmark hold for the
+    # full duration of an active generation. A worker thread can be mid
+    # `model.create_chat_completion()` while the event-loop thread runs
+    # unload_model() -> _release_model() -> model.close(), freeing the
+    # llama.cpp handle out from under the still-running worker thread
+    # (use-after-free). The old GGUF load path made this worse by calling
+    # the blocking `Llama(...)` constructor directly on the event loop
+    # (routers/models.py), so a multi-second load also stalled every other
+    # in-flight request on this process.
+    #
+    # These wrappers acquire the SAME _inference_lock generation holds
+    # before touching the model, so a lifecycle op can only proceed once any
+    # active generation has fully finished (and, symmetrically, a new
+    # generation can't start mid-swap) -- and they run the actual blocking
+    # work (Llama() construction / model.close()) in a thread-pool executor
+    # so holding the lock never blocks the event loop.
+    async def load_model_async(
+        self,
+        model_path: str,
+        *,
+        n_ctx: int = 4096,
+        n_gpu_layers: int = -1,
+        n_threads: int | None = None,
+        rpc_servers: list[str] | None = None,
+    ) -> dict:
+        loop = asyncio.get_running_loop()
+        async with self._inference_lock:
+            return await loop.run_in_executor(
+                None,
+                lambda: self.load_model(
+                    model_path,
+                    n_ctx=n_ctx,
+                    n_gpu_layers=n_gpu_layers,
+                    n_threads=n_threads,
+                    rpc_servers=rpc_servers,
+                ),
+            )
+
+    async def load_pipeline_async(self, model_id: str, **kwargs) -> dict:
+        loop = asyncio.get_running_loop()
+        async with self._inference_lock:
+            return await loop.run_in_executor(
+                None, lambda: self.load_pipeline(model_id, **kwargs)
+            )
+
+    async def load_whole_model_async(self, model_id: str, **kwargs) -> dict:
+        loop = asyncio.get_running_loop()
+        async with self._inference_lock:
+            return await loop.run_in_executor(
+                None, lambda: self.load_whole_model(model_id, **kwargs)
+            )
+
+    async def unload_model_async(self) -> None:
+        loop = asyncio.get_running_loop()
+        async with self._inference_lock:
+            await loop.run_in_executor(None, self.unload_model)
+
     def _release_model(self) -> None:
         """Inner release — must be called while _load_lock is held."""
         if self._model is not None:

@@ -53,7 +53,7 @@ async def shutdown() -> dict[str, str]:
     import gc
 
     try:
-        get_runtime().unload_model()
+        await get_runtime().unload_model_async()
         gc.collect()
     except Exception:  # noqa: BLE001
         # Still proceed to terminate — better a noisy exit than a hung sidecar.

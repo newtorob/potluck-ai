@@ -449,41 +449,65 @@ async def _receive_loop(
     a time per peer in practice — the coordinator's pick_peer is round-
     robin-ish and won't stack jobs — but the structure is here for when
     concurrent jobs land in m4.
-    """
-    while True:
-        raw = await ws.recv()
-        try:
-            msg = json.loads(raw)
-        except json.JSONDecodeError:
-            logger.warning("server_message_not_json")
-            continue
-        msg_type = msg.get("type") if isinstance(msg, dict) else None
 
-        if msg_type == "job_assigned":
+    Every spawned handler task is tracked in `background_tasks` and, in the
+    `finally` below, cancelled + awaited before this function returns. This
+    closes a launch-blocking leak: WITHOUT tracking, a WS disconnect (or any
+    other reason ws.recv() raises out of the `while True`) left an in-flight
+    _handle_real_job task running detached in the background, still driving
+    LlamaCppInferenceEngine's producer thread against a socket that's gone.
+    Tracking + cancelling here is what lets that engine's own cancellation
+    (stop_event + drain, see inference.py) actually run.
+    """
+    background_tasks: set[asyncio.Task] = set()
+    try:
+        while True:
+            raw = await ws.recv()
             try:
-                job = JobAssignedMessage.model_validate(msg)
-            except Exception as exc:
-                logger.warning("job_assigned_invalid_shape error=%s", exc)
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                logger.warning("server_message_not_json")
                 continue
-            # Privacy: log only message count + total chars, never content.
-            if job.messages:
-                total_chars = sum(len(m.content) for m in job.messages)
-                logger.info(
-                    "job_assigned_received job_id=%s model_slug=%s "
-                    "message_count=%d total_chars=%d",
-                    job.job_id, job.model_slug, len(job.messages), total_chars,
-                )
+            msg_type = msg.get("type") if isinstance(msg, dict) else None
+
+            if msg_type == "job_assigned":
+                try:
+                    job = JobAssignedMessage.model_validate(msg)
+                except Exception as exc:
+                    logger.warning("job_assigned_invalid_shape error=%s", exc)
+                    continue
+                # Privacy: log only message count + total chars, never content.
+                if job.messages:
+                    total_chars = sum(len(m.content) for m in job.messages)
+                    logger.info(
+                        "job_assigned_received job_id=%s model_slug=%s "
+                        "message_count=%d total_chars=%d",
+                        job.job_id, job.model_slug, len(job.messages), total_chars,
+                    )
+                else:
+                    logger.info(
+                        "job_assigned_received job_id=%s model_slug=%s prompt_chars=%d",
+                        job.job_id, job.model_slug, len(job.prompt),
+                    )
+                if settings.inference_enabled:
+                    task = asyncio.create_task(_handle_real_job(ws, job, settings))
+                else:
+                    task = asyncio.create_task(_handle_stub_job(ws, job))
+                background_tasks.add(task)
+                task.add_done_callback(background_tasks.discard)
             else:
-                logger.info(
-                    "job_assigned_received job_id=%s model_slug=%s prompt_chars=%d",
-                    job.job_id, job.model_slug, len(job.prompt),
-                )
-            if settings.inference_enabled:
-                asyncio.create_task(_handle_real_job(ws, job, settings))
-            else:
-                asyncio.create_task(_handle_stub_job(ws, job))
-        else:
-            logger.debug("server_message_unhandled type=%s", msg_type)
+                logger.debug("server_message_unhandled type=%s", msg_type)
+    finally:
+        # The WS is closing/closed (or this loop is being torn down for any
+        # other reason) — cancel and await every still-running job handler
+        # rather than leaving it stranded. Copy to a list first: cancel()
+        # doesn't mutate the set, but the done-callback (background_tasks
+        # .discard) fires as each task actually finishes, which would mutate
+        # the set while we're iterating it.
+        for task in list(background_tasks):
+            task.cancel()
+        if background_tasks:
+            await asyncio.gather(*background_tasks, return_exceptions=True)
 
 
 async def _session(settings: Settings, priv: Ed25519PrivateKey) -> None:

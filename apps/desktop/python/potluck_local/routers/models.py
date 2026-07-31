@@ -16,6 +16,7 @@ import asyncio
 import logging
 import os
 import shutil
+from pathlib import Path
 
 import psutil
 from fastapi import APIRouter, BackgroundTasks, HTTPException
@@ -31,6 +32,43 @@ from potluck_local.utils.paths import models_dir
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _safe_model_dir(slug: str) -> Path:
+    """Resolve `slug` to a model directory strictly inside models_dir(), or
+    raise 400. This is the ONLY approved way to turn a caller-supplied slug
+    into a filesystem path in this router.
+
+    delete_model shutil.rmtrees whatever this returns, so a slug that
+    escapes models_dir() is destructive, not just a bad-request: a slug of
+    ".." (e.g. from a URL-encoded "%2e%2e" path segment, which FastAPI/
+    Starlette decode to ".." before the handler ever sees it) resolves to
+    models_dir()'s PARENT -- the whole ~/.potluck data directory -- and
+    shutil.rmtree deletes it.
+
+    Two independent checks, deliberately redundant:
+      1. Reject slugs containing a path separator, "..", or a null byte
+         outright -- catches the obvious cases without even touching the
+         filesystem.
+      2. Resolve the candidate path and assert its parent is EXACTLY
+         models_dir() (not merely "starts with" it, which a symlink or a
+         cleverly-nested "a/../.." could defeat) -- catches anything the
+         first check's blocklist didn't anticipate.
+    """
+    if (
+        not slug
+        or slug in (".", "..")
+        or "/" in slug
+        or "\\" in slug
+        or "\x00" in slug
+    ):
+        raise HTTPException(status_code=400, detail=f"Invalid model slug '{slug}'.")
+
+    base = models_dir().resolve()
+    candidate = (base / slug).resolve()
+    if candidate.parent != base:
+        raise HTTPException(status_code=400, detail=f"Invalid model slug '{slug}'.")
+    return candidate
 
 
 @router.get("")
@@ -86,7 +124,7 @@ async def install_model(slug: str, background_tasks: BackgroundTasks) -> dict:
             detail=f"Catalog entry for '{slug}' has no sha256; refusing to install unverified.",
         )
 
-    model_path = models_dir() / slug / "model.gguf"
+    model_path = _safe_model_dir(slug) / "model.gguf"
     if model_path.exists():
         return {"status": "already_installed"}
 
@@ -109,13 +147,13 @@ async def install_model(slug: str, background_tasks: BackgroundTasks) -> dict:
 
 @router.delete("/{slug}", status_code=200)
 async def delete_model(slug: str) -> dict:
-    model_dir = models_dir() / slug
+    model_dir = _safe_model_dir(slug)
     if not model_dir.exists():
         raise HTTPException(status_code=404, detail=f"Model '{slug}' is not installed.")
 
     runtime = get_runtime()
     if runtime.is_loaded() and runtime.current_model_id() == slug:
-        runtime.unload_model()
+        await runtime.unload_model_async()
 
     shutil.rmtree(model_dir)
     logger.info("model_deleted slug=%s", slug)
@@ -249,12 +287,9 @@ async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
             if chain.get("mode") == "whole":
                 logger.info("load_whole_model_start model_id=%s (fits on head; no split)", model_id)
                 try:
-                    result = await loop.run_in_executor(
-                        None,
-                        lambda: runtime.load_whole_model(
-                            model_id, device=ac.device, dtype=chain.get("dtype"),
-                            continuous_batch=body.continuous_batch,
-                        ),
+                    result = await runtime.load_whole_model_async(
+                        model_id, device=ac.device, dtype=chain.get("dtype"),
+                        continuous_batch=body.continuous_batch,
                     )
                 except Exception as exc:
                     logger.error("load_whole_model_error model_id=%s error=%s", model_id, exc)
@@ -285,13 +320,10 @@ async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
             model_id, split, split2, peer, port,
         )
         try:
-            result = await loop.run_in_executor(
-                None,
-                lambda: runtime.load_pipeline(
-                    model_id, split=split, peer=peer, port=port,
-                    split2=split2, device=device, dtype=dtype,
-                    continuous_batch=body.continuous_batch,
-                ),
+            result = await runtime.load_pipeline_async(
+                model_id, split=split, peer=peer, port=port,
+                split2=split2, device=device, dtype=dtype,
+                continuous_batch=body.continuous_batch,
             )
         except Exception as exc:
             logger.error("load_pipeline_error model_id=%s error=%s", model_id, exc)
@@ -307,7 +339,7 @@ async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
         logger.info("load_pipeline_complete model_id=%s load_time=%.2f", model_id, result.get("load_time_seconds", 0))
         return result
 
-    model_path = models_dir() / slug / "model.gguf"
+    model_path = _safe_model_dir(slug) / "model.gguf"
     if not model_path.exists():
         raise HTTPException(
             status_code=404,
@@ -369,7 +401,7 @@ async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
         ",".join(rpc_servers) if rpc_servers else "(none)",
     )
     try:
-        result = runtime.load_model(
+        result = await runtime.load_model_async(
             str(model_path),
             n_ctx=n_ctx,
             n_gpu_layers=settings.runtime.gpu_layers,
@@ -400,7 +432,7 @@ async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
 async def unload_model(slug: str) -> dict:
     runtime = get_runtime()
     if runtime.is_loaded() and runtime.current_model_id() == slug:
-        runtime.unload_model()
+        await runtime.unload_model_async()
         logger.info("model_unloaded slug=%s", slug)
     return {"status": "unloaded"}
 
