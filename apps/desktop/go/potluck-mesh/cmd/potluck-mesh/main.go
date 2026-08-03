@@ -81,6 +81,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -265,7 +266,19 @@ func run() int {
 	ipcState.SetWGPort(tun.WGPort())
 
 	// ---- STUN resolver ---- //
-	resolver := stun.NewResolver(cfg.STUNServers)
+	// localPort is pinned to the WG transport port (tun.WGPort(), 51820 by
+	// default) rather than an OS-assigned ephemeral one. This is bug #3 of the
+	// direct-connectivity fix: on a per-flow/per-socket NAT mapping (the
+	// common case for consumer + CGNAT routers), the external ip:port a
+	// throwaway ephemeral-port STUN probe observes has NO relation to the
+	// mapping the WG data plane actually uses — so even a perfect hole-punch
+	// would target the wrong port. Binding the probe to the SAME local port
+	// observes the SAME NAT mapping WG traffic uses (for endpoint-independent
+	// / cone NATs — the majority of home routers — the mapping is keyed by
+	// local port only, so this holds regardless of destination). See
+	// internal/stun's bindProbeConn for the same-port bind + graceful
+	// ephemeral-port fallback when the WG socket already owns the port.
+	resolver := stun.NewResolver(cfg.STUNServers, tun.WGPort())
 
 	// ---- per-peer routing-mode tracker (Phase 2) ---- //
 	// Shared between the reachability/verify loop (writer; owns the LAN trial
@@ -279,12 +292,32 @@ func run() int {
 	handler := newRosterHandler(tun, ps, bus, ipcState)
 	handler.setModeTracker(modes)
 
+	// ---- WAN punch-trial tracker (Phase 3) ---- //
+	// Only meaningfully used when a DERP relay is configured (dBind != nil,
+	// wired below) — a punch trial needs a DERP floor to fall back to on
+	// timeout. Declared here (not inside the `if dBind != nil` block) so it's
+	// in scope for the goroutine-start section further down.
+	var punchTrials *punchTrialTracker
+
+	// isSymmetricNAT reports whether this node's own NAT was classified as
+	// symmetric by the one-shot dual-server STUN probe (see below). Read by
+	// OnPunchCoord via handler.setIsSymmetricNATFn; atomic.Bool since it's
+	// written once from the classification goroutine and read from the
+	// signal-client goroutine.
+	var isSymmetricNAT atomic.Bool
+
 	// Wire managed-mode introspection so the roster + punch_coord handlers
 	// know not to overwrite a managed endpoint (synthetic derp:<pubkey> for
-	// modeDERP, or the LAN ip:port for lan-trial/lan-direct) with a raw IP:port
-	// from a signal-driven update. nil-safe when --derp-url isn't set: dBind
-	// stays nil and the gate returns false (always allow direct updates).
+	// modeDERP, or the direct ip:port for lan-trial/lan-direct/punch-trial/
+	// direct) with a raw IP:port from a signal-driven update. nil-safe when
+	// --derp-url isn't set: dBind stays nil and the gate returns false
+	// (always allow direct updates).
 	if dBind != nil {
+		punchTrials = newPunchTrialTracker()
+		handler.setDBind(dBind)
+		handler.setPunchTrials(punchTrials)
+		handler.setIsSymmetricNATFn(isSymmetricNAT.Load)
+
 		handler.setIsDERPRoutedFn(func(pubkey string) bool {
 			// "Managed" subsumes the old "DERP-routed" check: a peer in
 			// lan-trial / lan-direct must ALSO be protected from raw-endpoint
@@ -452,11 +485,53 @@ func run() int {
 	// ---- STUN goroutine ---- //
 	go runSTUNLoop(ctx, resolver, onEndpointChange, cfg.STUNRefreshInterval)
 
+	// ---- NAT-type classification goroutine (Phase 3, recommended addition) ---- //
+	// One-shot, best-effort: probes two DIFFERENT STUN servers from the SAME
+	// local port and compares the external ports observed. A mismatch means
+	// this node's own NAT allocates mappings per-destination (symmetric) —
+	// client-side hole-punch cannot work from a symmetric NAT, so OnPunchCoord
+	// (via isSymmetricNAT, wired above) skips starting new punch trials
+	// entirely rather than burning punchTrialDuration (and a DERP-off window)
+	// on every punch_coord in a doomed retry loop. NAT topology on a stable
+	// network essentially never changes mid-session, so a single classification
+	// at startup (bounded by classifyCtx's timeout below) is sufficient — no
+	// periodic re-classification. Failure to classify (timeout, STUN servers
+	// unreachable, etc.) just leaves isSymmetricNAT false: fail open to
+	// attempting the trial, since the trial's own timeout+backoff already
+	// bounds the cost of a failed attempt either way.
+	if dBind != nil {
+		go func() {
+			classifyCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+			defer cancel()
+			natType, err := resolver.ClassifyNAT(classifyCtx)
+			if err != nil {
+				slog.Debug("stun: NAT classification failed, punch trials proceed unclassified",
+					"err", err,
+				)
+				return
+			}
+			if natType == stun.NATSymmetric {
+				isSymmetricNAT.Store(true)
+				slog.Warn("stun: local NAT classified as SYMMETRIC — client-side hole-punch cannot work from this node; peers stay on the DERP relay floor")
+			} else {
+				slog.Info("stun: local NAT classified", "nat_type", natType.String())
+			}
+		}()
+	}
+
 	// ---- reachability + DERP-fallback + LAN-trial goroutine ---- //
 	// myLocalIPNets is recomputed on each LAN trial decision (interfaces come +
 	// go) via localep.LocalIPNets — passed as a provider so the loop always sees
 	// the current interface set rather than a startup snapshot.
 	go runReachabilityLoop(ctx, tun, ps, dBind, bus, modes, localep.LocalIPNets)
+
+	// ---- WAN punch-trial verify/timeout/direct-health-check goroutine (Phase 3) ---- //
+	// Runs unconditionally whenever a DERP relay is configured — NOT gated by
+	// POTLUCK_LAN_DIRECT, since WAN direct is the general-purpose upgrade over
+	// the always-on DERP floor. See landirect.go's Phase-3 doc comment.
+	if dBind != nil {
+		go runPunchTrialLoop(ctx, tun, ps, dBind, bus, modes, punchTrials)
+	}
 
 	// ---- roster reconcile goroutine ---- //
 	// Safety net for roster_update broadcasts missed over the signal WS: the
@@ -1001,6 +1076,24 @@ func runReachabilityLoop(
 				states[pubkey] = st
 			}
 
+			// Phase 3: peers owned by the WAN punch-trial mechanism
+			// (runPunchTrialLoop, driven by OnPunchCoord — see landirect.go)
+			// are skipped entirely here. This loop's own local st.mode never
+			// reflects modePunchTrial/modeDirect (only the LAN trial code
+			// below ever writes a non-derp value into it), so without this
+			// guard the legacy DERP-fallback logic further down would see
+			// "not reachable" — RemovePeer wipes the handshake the instant
+			// OnPunchCoord force-rekeys the peer — and call flipToDERP,
+			// silently undoing the punch trial's SetPeerRouting(false) out
+			// from under it. Checked against the SHARED tracker (the source
+			// of truth for WAN modes), not st.mode.
+			if modes != nil {
+				switch modes.get(pubkey) {
+				case modePunchTrial, modeDirect:
+					continue
+				}
+			}
+
 			// Rejoin re-sync reconciliation (Phase 2, requirement #5): a same-key
 			// rejoin in OnRosterUpdate tears down + re-adds the WG peer and
 			// re-asserts DERP, resetting the shared tracker to modeDERP. If the
@@ -1301,19 +1394,25 @@ func flipToDERP(tun *tunnel.Tunnel, dBind *derp.DerpBind, pubkeyBase64 string, p
 	)
 }
 
-// flipToDirectUDP reverts the peer back to direct UDP routing. The real
-// endpoint must come from the latest STUN/roster data; we clear the routing
-// flag and update the endpoint to empty (WG keeps the peer configured but will
-// wait for an inbound initiation or a fresh endpoint_update from the coordinator).
-func flipToDirectUDP(tun *tunnel.Tunnel, dBind *derp.DerpBind, pubkeyBase64 string, pubkeyBytes [32]byte) {
-	dBind.SetPeerRouting(pubkeyBytes, false)
-	// Set endpoint to empty string — tunnel.UpdatePeerEndpoint is a no-op for
-	// empty strings (see its implementation), so the last-known real endpoint
-	// stays configured in wg-go. The coordinator will deliver a fresh
-	// endpoint_update when the peer's STUN binding is current.
-	slog.Info("derp_fallback: peer reverted to direct UDP",
-		"pubkey_prefix", util.TruncatePubkey(pubkeyBase64),
-	)
+// promoteToDirect re-adds a peer pinned to a VERIFIED direct endpoint with the
+// standard (non-trial) keepalive, superseding the previously dead-code
+// flipToDirectUDP (which only cleared the DERP routing flag without pinning
+// an endpoint — exactly the bare-endpoint-write bug #2 diagnoses, so wiring
+// it up as-is would have reintroduced the same failure it was meant to fix).
+// DERP routing for this peer must already be off by the time this is called
+// (the trial that led here already turned it off via SetPeerRouting).
+//
+// Used by runPunchTrialLoop on a verified WAN punch trial. Best-effort: on
+// AddPeer failure the peer is left on its trial (short) keepalive rather than
+// stranded with no session — the caller logs and the next reachability check
+// still sees a fresh handshake.
+func promoteToDirect(tun *tunnel.Tunnel, pubkeyBase64, meshIP, endpoint string, keepalive int) error {
+	return tun.AddPeer(tunnel.Peer{
+		PublicKey:           pubkeyBase64,
+		AllowedIPs:          []string{meshIP + "/32"},
+		Endpoint:            endpoint,
+		PersistentKeepalive: keepalive,
+	})
 }
 
 // formatHandshakeAge returns a human-readable age string for a last-handshake
@@ -1323,6 +1422,144 @@ func formatHandshakeAge(t time.Time) string {
 		return "<never>"
 	}
 	return time.Since(t).Round(time.Second).String()
+}
+
+// runPunchTrialLoop is the Phase-3 WAN twin of runReachabilityLoop's LAN
+// verify ticker. It owns two responsibilities, both scoped to peers OnPunchCoord
+// put into modePunchTrial / promoted to modeDirect:
+//
+//  1. Verify in-progress punch trials: promote to modeDirect on a fresh
+//     handshake newer than the pre-trial snapshot, or roll back to the DERP
+//     floor + backoff on timeout. Mirrors runReachabilityLoop's verifyTrials
+//     exactly (same evaluateLANTrial outcome type), just sourced from
+//     punchTrials (cross-goroutine safe) instead of a loop-local map.
+//  2. Health-check confirmed direct peers: a live direct WG session only
+//     re-handshakes every ~2min (REKEY_AFTER_TIME) with keepalives in
+//     between, so judge it dead by handshakeFreshWindow (3min) — NOT
+//     punchVerifyInterval's fast 2s cadence — exactly the same reasoning
+//     runReachabilityLoop's modeLANDirect branch documents.
+//
+// Runs unconditionally whenever dBind != nil — NOT gated by
+// POTLUCK_LAN_DIRECT, since WAN punch is the general-purpose direct-path
+// upgrade over the always-on DERP floor, independent of the opt-in same-LAN
+// fast path.
+//
+// Peers currently owned by the LAN mechanism (modeLANTrial / modeLANDirect)
+// are never touched here — modes.get returning anything other than
+// modePunchTrial / modeDirect for a given peer means this loop has nothing to
+// do for it this tick.
+func runPunchTrialLoop(
+	ctx context.Context,
+	tun *tunnel.Tunnel,
+	ps *peerstate.Store,
+	dBind *derp.DerpBind,
+	bus *events.Bus,
+	modes *modeTracker,
+	trials *punchTrialTracker,
+) {
+	tick := func() {
+		now := time.Now()
+		for _, p := range ps.All() {
+			pubkey := p.WGPublicKey
+			mode := modes.get(pubkey)
+			if mode != modePunchTrial && mode != modeDirect {
+				continue
+			}
+
+			kb, decErr := base64.StdEncoding.DecodeString(pubkey)
+			if decErr != nil || len(kb) != 32 {
+				continue
+			}
+			var pub [32]byte
+			copy(pub[:], kb)
+
+			lastHS, _, _, err := tun.PeerReachability(pubkey)
+			if err != nil {
+				continue
+			}
+
+			if mode == modeDirect {
+				// Direct-health-check: revert to DERP on the SLOW (3min)
+				// freshness window, not the fast trial-verify cadence — see
+				// doc comment above.
+				if !lastHS.IsZero() && time.Since(lastHS) < handshakeFreshWindow {
+					continue
+				}
+				slog.Warn("punch_trial: confirmed direct WAN path went stale, restoring DERP floor",
+					"node_id", p.NodeID,
+					"pubkey_prefix", util.TruncatePubkey(pubkey),
+					"last_handshake_ago", formatHandshakeAge(lastHS),
+				)
+				restoreDERPFloor(tun, dBind, p, pubkey, pub)
+				modes.set(pubkey, modeDERP)
+				trials.setBackoff(pubkey, now.Add(punchTrialBackoff))
+				if bus != nil {
+					bus.Publish(events.NewPeerUpdated(rosterPeerToSnapshot(p, false, true)))
+				}
+				continue
+			}
+
+			// mode == modePunchTrial
+			st, ok := trials.get(pubkey)
+			if !ok {
+				// Trial state missing (shouldn't happen — OnPunchCoord always
+				// calls startTrial before setting modePunchTrial) — nothing to
+				// evaluate against; wait for the next tick / a resync.
+				continue
+			}
+			switch evaluateLANTrial(lastHS, st.preTrialHandshake, st.deadline, now, handshakeFreshWindow) {
+			case trialPending:
+				continue
+			case trialVerified:
+				if err := promoteToDirect(tun, pubkey, p.MeshIP, st.endpoint, punchDirectKeepalive); err != nil {
+					slog.Warn("punch_trial: restoring standard keepalive on verified peer failed (keeping trial keepalive)",
+						"node_id", p.NodeID,
+						"pubkey_prefix", util.TruncatePubkey(pubkey),
+						"err", err,
+					)
+				}
+				modes.set(pubkey, modeDirect)
+				slog.Info("punch_trial: VERIFIED — peer reachable direct cross-network, staying off DERP",
+					"node_id", p.NodeID,
+					"pubkey_prefix", util.TruncatePubkey(pubkey),
+					"endpoint", st.endpoint,
+					"handshake_age", formatHandshakeAge(lastHS),
+				)
+				if bus != nil {
+					bus.Publish(events.NewPeerUpdated(rosterPeerToSnapshot(p, true, false)))
+				}
+			case trialTimedOut:
+				slog.Warn("punch_trial: TIMEOUT — no fresh handshake on punched endpoint, restoring DERP floor + backoff",
+					"node_id", p.NodeID,
+					"pubkey_prefix", util.TruncatePubkey(pubkey),
+					"endpoint", st.endpoint,
+					"backoff_min", int(punchTrialBackoff.Minutes()),
+				)
+				restoreDERPFloor(tun, dBind, p, pubkey, pub)
+				modes.set(pubkey, modeDERP)
+				trials.setBackoff(pubkey, now.Add(punchTrialBackoff))
+			}
+		}
+
+		// Prune trial bookkeeping for peers no longer in the roster (mirrors
+		// runReachabilityLoop's states prune).
+		live := make(map[string]bool, len(ps.All()))
+		for _, p := range ps.All() {
+			live[p.WGPublicKey] = true
+		}
+		trials.prune(live)
+	}
+
+	ticker := time.NewTicker(punchVerifyInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			tick()
+		}
+	}
 }
 
 // punchEntry records when we last issued a request_punch for a given peer.
@@ -1355,11 +1592,38 @@ type rosterHandler struct {
 	// reachability loop still handles re-flipping on later state changes.
 	flipPeerToDERPFn func(pubkey string)
 
-	// modes is the shared per-peer routing-mode tracker (Phase 2). Used here
-	// only to RESET a peer's mode to derp on a same-key rejoin re-sync, so the
-	// LAN trial re-runs cleanly against the freshly re-added WG peer. nil when
+	// modes is the shared per-peer routing-mode tracker (Phase 2/3). Used here
+	// both to RESET a peer's mode to derp on a same-key rejoin re-sync (so the
+	// LAN trial re-runs cleanly against the freshly re-added WG peer) and, as
+	// of Phase 3, to gate/drive the WAN punch trial in OnPunchCoord. nil when
 	// the tracker isn't wired (it always is in main; nil-safe regardless).
 	modes *modeTracker
+
+	// dBind is the DERP bind, needed directly (not just via the isDERPRoutedFn/
+	// flipPeerToDERPFn closures) so OnPunchCoord can turn DERP OFF for a peer
+	// before force-rekeying it to the punched endpoint (SetPeerRouting) and
+	// restoreDERPFloor can turn it back on on trial timeout. nil when
+	// --derp-url isn't set — the punch-trial mechanism requires a DERP floor
+	// to fall back to, so it is a no-op (bare UpdatePeerEndpoint, the
+	// pre-Wave-1 behaviour) in that configuration; see OnPunchCoord.
+	dBind *derp.DerpBind
+
+	// punchTrials is the WAN punch-trial bookkeeping shared with
+	// runPunchTrialLoop (see landirect.go's punchTrialTracker doc). nil when
+	// dBind is nil (same gating as dBind above).
+	punchTrials *punchTrialTracker
+
+	// isSymmetricNATFn reports whether THIS node's own NAT has been classified
+	// as symmetric (external port varies per destination) — see
+	// internal/stun's dual-server NAT classifier. When true, OnPunchCoord
+	// skips starting new punch trials entirely: a symmetric NAT on our own
+	// side means our external mapping for a handshake-init to peer A differs
+	// from the mapping the coordinator/STUN observed, so any trial is a
+	// guaranteed failure. nil (never classified yet, or classification
+	// disabled) is treated as "not symmetric" — fail open to attempting the
+	// trial, since an unclassified NAT is the common case at startup before
+	// the one-shot classifier completes.
+	isSymmetricNATFn func() bool
 
 	// punchMu guards punchState.
 	punchMu    sync.Mutex
@@ -1394,6 +1658,27 @@ func (h *rosterHandler) setFlipPeerToDERPFn(fn func(pubkey string)) {
 // before client.Run (no data race). nil-safe everywhere it's read.
 func (h *rosterHandler) setModeTracker(m *modeTracker) {
 	h.modes = m
+}
+
+// setDBind wires the DERP bind directly (Phase 3 — WAN punch trial). Called
+// in main only when --derp-url is set (dBind != nil); left nil otherwise, in
+// which case OnPunchCoord degrades to a bare UpdatePeerEndpoint (no DERP
+// floor to protect / fall back to).
+func (h *rosterHandler) setDBind(b *derp.DerpBind) {
+	h.dBind = b
+}
+
+// setPunchTrials wires the shared WAN punch-trial tracker (Phase 3). Called
+// in main alongside setDBind, using the same nil-safety story.
+func (h *rosterHandler) setPunchTrials(pt *punchTrialTracker) {
+	h.punchTrials = pt
+}
+
+// setIsSymmetricNATFn wires the NAT-classification query (Phase 3). nil-safe:
+// when never set (e.g. classification hasn't completed, or is unavailable),
+// OnPunchCoord treats every peer as not-symmetric — see the field doc above.
+func (h *rosterHandler) setIsSymmetricNATFn(fn func() bool) {
+	h.isSymmetricNATFn = fn
 }
 
 // setClient wires the signal client back into the handler after construction.
@@ -1655,16 +1940,33 @@ func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
 		h.punchMu.Lock()
 		delete(h.punchState, nodeID)
 		h.punchMu.Unlock()
+		// Clean up WAN punch-trial bookkeeping immediately (runPunchTrialLoop's
+		// periodic prune is a safety net, not the primary cleanup path).
+		if h.punchTrials != nil {
+			h.punchTrials.remove(cached.WGPublicKey)
+		}
+		if h.modes != nil {
+			h.modes.remove(cached.WGPublicKey)
+		}
 	}
 }
 
 // OnPunchCoord is called when the coordinator delivers a punch_coord message
-// to this node. Both the initiator and the responder call UpdatePeerEndpoint
-// so WireGuard's handshake-init fires from both sides concurrently, punching
-// through both NAT mappings simultaneously.
+// to this node. Both the initiator and the responder start a force-rekey
+// punch TRIAL pinned to the peer's endpoint, so WireGuard's handshake-init
+// fires from both sides concurrently, punching through both NAT mappings
+// simultaneously. A verified fresh handshake promotes the peer off DERP to
+// direct routing (modeDirect); a trial timeout rolls it straight back to the
+// DERP floor with a backoff before the next attempt.
 //
 // If peer_endpoint is nil, the peer has not STUN'd yet — log a warning and
 // skip; we'll get another punch_coord when the peer's endpoint is known.
+//
+// This fixes the bug where the peer was proactively (and permanently) flipped
+// to DERP on welcome/roster-add BEFORE this fires, and the old guard skipped
+// the endpoint write whenever the peer was DERP-routed — which, given the
+// proactive flip, was always. See landirect.go's Phase-3 doc comment for the
+// full before/after.
 func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 	if coord.PeerEndpoint == nil || *coord.PeerEndpoint == "" {
 		slog.Warn("punch_coord: peer has no endpoint yet, skipping",
@@ -1681,35 +1983,126 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 		"endpoint", *coord.PeerEndpoint,
 	)
 
-	// If the peer is currently DERP-routed, skip the WG endpoint overwrite.
-	// Otherwise this punch_coord would replace the synthetic derp:<pubkey>
-	// endpoint with a raw IP:port that the NAT can't actually deliver to.
-	// We still let the coordinator's punch broker do its thing on the
-	// other side — if both sides recover direct reachability, the next
-	// successful handshake will trigger the reachability loop to flip the
-	// peer back to direct routing.
-	if h.isDERPRoutedFn != nil && h.isDERPRoutedFn(coord.PeerWGPublicKey) {
-		slog.Debug("punch_coord: peer is DERP-routed, skipping WG endpoint overwrite",
+	// No DERP bind configured at all (--derp-url unset): there is no floor to
+	// protect and no trial/verify machinery wired up (dBind/punchTrials/modes
+	// are only set alongside it in main). Degrade to the pre-Wave-1 behaviour:
+	// a bare endpoint write. This is the only case where we still call
+	// UpdatePeerEndpoint directly from here.
+	if h.dBind == nil || h.punchTrials == nil || h.modes == nil {
+		if err := h.tun.UpdatePeerEndpoint(coord.PeerWGPublicKey, *coord.PeerEndpoint); err != nil {
+			slog.Error("tunnel: UpdatePeerEndpoint failed in punch_coord handler (no DERP configured)",
+				"peer_node_id", coord.PeerNodeID,
+				"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
+				"err", err,
+			)
+		}
+		return
+	}
+
+	// A peer already in a managed direct-path mode (LAN-owned OR already
+	// trialling/confirmed-direct over WAN) is never re-trialled from here —
+	// let whichever mechanism owns it finish. This replaces the old permanent
+	// "DERP-routed → skip" veto with a narrow one that only skips genuinely
+	// in-flight or already-successful work.
+	switch h.modes.get(coord.PeerWGPublicKey) {
+	case modeLANTrial, modeLANDirect:
+		slog.Debug("punch_coord: peer is LAN-managed, deferring to the LAN-direct trial",
 			"peer_node_id", coord.PeerNodeID,
 			"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
-			"would_have_set", *coord.PeerEndpoint,
+		)
+		return
+	case modePunchTrial, modeDirect:
+		slog.Debug("punch_coord: peer already has an active/confirmed WAN punch trial, skipping duplicate start",
+			"peer_node_id", coord.PeerNodeID,
+			"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
 		)
 		return
 	}
 
-	// Configure the peer's endpoint. This causes wg-go to fire a
-	// handshake-init toward the peer's NAT-mapped address, creating our
-	// side of the hole. The peer does the same simultaneously (they also
-	// received a punch_coord from the coordinator), creating their side.
-	// When both handshake-inits cross in flight, the NATs on both sides
-	// record the mapping and the next inbound packet traverses cleanly.
-	if err := h.tun.UpdatePeerEndpoint(coord.PeerWGPublicKey, *coord.PeerEndpoint); err != nil {
-		slog.Error("tunnel: UpdatePeerEndpoint failed in punch_coord handler",
+	kb, decErr := base64.StdEncoding.DecodeString(coord.PeerWGPublicKey)
+	if decErr != nil || len(kb) != 32 {
+		slog.Warn("punch_coord: could not decode peer pubkey, skipping",
+			"peer_node_id", coord.PeerNodeID,
+			"err", decErr,
+		)
+		return
+	}
+	var pub [32]byte
+	copy(pub[:], kb)
+
+	symmetric := h.isSymmetricNATFn != nil && h.isSymmetricNATFn()
+	st, _ := h.punchTrials.get(coord.PeerWGPublicKey)
+	now := time.Now()
+	if !shouldStartPunchTrial(h.modes.get(coord.PeerWGPublicKey), st.backoffUntil, symmetric, now) {
+		slog.Debug("punch_coord: trial suppressed (backoff or local NAT classified symmetric)",
+			"peer_node_id", coord.PeerNodeID,
+			"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
+			"symmetric_nat", symmetric,
+			"backoff_remaining", time.Until(st.backoffUntil).Round(time.Second),
+		)
+		return
+	}
+
+	p, ok := h.ps.Get(coord.PeerNodeID)
+	if !ok {
+		slog.Warn("punch_coord: peer not in local cache, cannot start trial",
+			"peer_node_id", coord.PeerNodeID,
+		)
+		return
+	}
+
+	// Snapshot the pre-trial handshake BEFORE the RemovePeer below wipes it,
+	// exactly like maybeStartLANTrial — evaluateLANTrial's freshness guard
+	// handles the resulting zero-snapshot edge case.
+	preHS, _, _, _ := h.tun.PeerReachability(coord.PeerWGPublicKey)
+
+	// (1) DERP OFF for this peer so outbound packets to the punched endpoint
+	// go over the inner UDP bind, not the relay.
+	h.dBind.SetPeerRouting(pub, false)
+	// (2) Clear the existing (DERP-established) WG session — this is the
+	// force-rekey fix: a bare UpdatePeerEndpoint does NOT make wireguard-go
+	// re-handshake on a live session (see tunnel.go's UpdatePeerEndpoint doc
+	// and the same-key-rejoin history in commit 45b6390).
+	if err := h.tun.RemovePeer(coord.PeerWGPublicKey); err != nil {
+		slog.Warn("punch_coord: RemovePeer before re-pin failed, continuing",
 			"peer_node_id", coord.PeerNodeID,
 			"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
 			"err", err,
 		)
 	}
+	// (3) Re-add pinned to the punched endpoint with a short keepalive so WG
+	// initiates a handshake-init toward it PROMPTLY, even on an idle mesh.
+	// The peer does the same simultaneously (it also received a punch_coord),
+	// so when both handshake-inits cross in flight, the NATs on both sides
+	// record the mapping and the next inbound packet traverses cleanly.
+	trialPeer := tunnel.Peer{
+		PublicKey:           coord.PeerWGPublicKey,
+		AllowedIPs:          []string{p.MeshIP + "/32"},
+		Endpoint:            *coord.PeerEndpoint,
+		PersistentKeepalive: punchTrialKeepalive,
+	}
+	if err := h.tun.AddPeer(trialPeer); err != nil {
+		slog.Error("punch_coord: AddPeer pinned to punched endpoint failed, rolling back to DERP",
+			"peer_node_id", coord.PeerNodeID,
+			"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
+			"err", err,
+		)
+		restoreDERPFloor(h.tun, h.dBind, p, coord.PeerWGPublicKey, pub)
+		h.modes.set(coord.PeerWGPublicKey, modeDERP)
+		return
+	}
+
+	h.modes.set(coord.PeerWGPublicKey, modePunchTrial)
+	h.punchTrials.startTrial(coord.PeerWGPublicKey, *coord.PeerEndpoint, preHS, now.Add(punchTrialDuration))
+
+	slog.Info("punch_coord: WAN direct trial started — DERP off, peer re-pinned to punched endpoint (force-rekey)",
+		"peer_node_id", coord.PeerNodeID,
+		"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
+		"endpoint", *coord.PeerEndpoint,
+		"role", coord.Role,
+		"keepalive_s", punchTrialKeepalive,
+		"deadline_ms", punchTrialDuration.Milliseconds(),
+	)
 }
 
 // maybeSendRequestPunch sends request_punch for the given peer if the peer

@@ -310,14 +310,233 @@ func TestModeTracker_EmptyWhenNeverWritten(t *testing.T) {
 // logs and the UI reachability mode).
 func TestRoutingModeString(t *testing.T) {
 	cases := map[routingMode]string{
-		modeDERP:      "derp",
-		modeLANTrial:  "lan-trial",
-		modeLANDirect: "lan-direct",
+		modeDERP:       "derp",
+		modeLANTrial:   "lan-trial",
+		modeLANDirect:  "lan-direct",
+		modePunchTrial: "punch-trial",
+		modeDirect:     "direct",
 	}
 	for m, want := range cases {
 		if got := m.String(); got != want {
 			t.Errorf("routingMode(%d).String() = %q, want %q", m, got, want)
 		}
+	}
+}
+
+// TestModeTracker_PunchModesAreManaged extends TestModeTracker_DefaultsAndManaged
+// to the Phase-3 WAN modes: modePunchTrial / modeDirect must be treated exactly
+// like modeLANTrial / modeLANDirect by isManaged, since both protect the WG
+// endpoint from a raw-endpoint overwrite (roster_update.Updated / a duplicate
+// punch_coord) while a direct path is being trialled or is confirmed live.
+func TestModeTracker_PunchModesAreManaged(t *testing.T) {
+	mt := newModeTracker()
+	const k = "punch-peer-key"
+
+	for _, m := range []routingMode{modePunchTrial, modeDirect} {
+		mt.set(k, m)
+		if got := mt.get(k); got != m {
+			t.Errorf("after set(%v) get = %v", m, got)
+		}
+		if !mt.isManaged(k) {
+			t.Errorf("mode %v should be managed", m)
+		}
+	}
+
+	// Setting back to derp removes the entry and un-manages it, same as the
+	// LAN modes.
+	mt.set(k, modeDERP)
+	if mt.isManaged(k) {
+		t.Errorf("after set back to derp, must not be managed")
+	}
+	if got := mt.get(k); got != modeDERP {
+		t.Errorf("after set back to derp, get = %v, want modeDERP", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// shouldStartPunchTrial — the WAN twin of shouldStartLANTrial
+// ---------------------------------------------------------------------------
+
+func TestShouldStartPunchTrial(t *testing.T) {
+	now := time.Now()
+	past := now.Add(-time.Minute)
+	future := now.Add(time.Minute)
+
+	cases := []struct {
+		name         string
+		mode         routingMode
+		backoffUntil time.Time
+		symmetricNAT bool
+		want         bool
+	}{
+		{"happy path: derp + no backoff + not symmetric → trial", modeDERP, past, false, true},
+		{"already lan-trial → no punch trial (LAN owns it)", modeLANTrial, past, false, false},
+		{"already lan-direct → no punch trial (LAN owns it)", modeLANDirect, past, false, false},
+		{"already punch-trial → no re-trial", modePunchTrial, past, false, false},
+		{"already direct → no re-trial", modeDirect, past, false, false},
+		{"in backoff → suppressed", modeDERP, future, false, false},
+		{"backoff exactly now (not before) → allowed", modeDERP, now, false, true},
+		{"local NAT symmetric → never trial, even with no backoff", modeDERP, past, true, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := shouldStartPunchTrial(tc.mode, tc.backoffUntil, tc.symmetricNAT, now)
+			if got != tc.want {
+				t.Errorf("shouldStartPunchTrial = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// punchTrialTracker — cross-goroutine trial bookkeeping
+// ---------------------------------------------------------------------------
+
+func TestPunchTrialTracker_EntryDefaultsToZeroValue(t *testing.T) {
+	pt := newPunchTrialTracker()
+	const k = "peer-a"
+
+	if _, ok := pt.get(k); ok {
+		t.Errorf("expected no entry for a never-touched peer")
+	}
+
+	st := pt.entry(k)
+	if st == nil {
+		t.Fatalf("entry() must never return nil")
+	}
+	if !st.deadline.IsZero() || !st.backoffUntil.IsZero() || !st.preTrialHandshake.IsZero() || st.endpoint != "" {
+		t.Errorf("a freshly-created entry must be the zero value, got %+v", *st)
+	}
+}
+
+func TestPunchTrialTracker_StartTrialRecordsFields(t *testing.T) {
+	pt := newPunchTrialTracker()
+	const k = "peer-b"
+
+	now := time.Now()
+	preHS := now.Add(-5 * time.Second)
+	deadline := now.Add(punchTrialDuration)
+
+	pt.startTrial(k, "203.0.113.7:51820", preHS, deadline)
+
+	got, ok := pt.get(k)
+	if !ok {
+		t.Fatalf("expected an entry after startTrial")
+	}
+	if got.endpoint != "203.0.113.7:51820" {
+		t.Errorf("endpoint = %q, want 203.0.113.7:51820", got.endpoint)
+	}
+	if !got.preTrialHandshake.Equal(preHS) {
+		t.Errorf("preTrialHandshake = %v, want %v", got.preTrialHandshake, preHS)
+	}
+	if !got.deadline.Equal(deadline) {
+		t.Errorf("deadline = %v, want %v", got.deadline, deadline)
+	}
+	if !got.backoffUntil.IsZero() {
+		t.Errorf("startTrial must not carry forward a stale backoff, got %v", got.backoffUntil)
+	}
+}
+
+func TestPunchTrialTracker_StartTrialOverwritesPriorBackoff(t *testing.T) {
+	pt := newPunchTrialTracker()
+	const k = "peer-c"
+
+	pt.setBackoff(k, time.Now().Add(punchTrialBackoff))
+	if st, ok := pt.get(k); !ok || st.backoffUntil.IsZero() {
+		t.Fatalf("expected backoff to be recorded before startTrial")
+	}
+
+	pt.startTrial(k, "198.51.100.9:51820", time.Time{}, time.Now().Add(punchTrialDuration))
+	got, ok := pt.get(k)
+	if !ok {
+		t.Fatalf("expected an entry after startTrial")
+	}
+	if !got.backoffUntil.IsZero() {
+		t.Errorf("a fresh trial start must clear the prior backoff, got %v", got.backoffUntil)
+	}
+}
+
+func TestPunchTrialTracker_RemoveAndPrune(t *testing.T) {
+	pt := newPunchTrialTracker()
+	pt.startTrial("peer-x", "1.2.3.4:51820", time.Time{}, time.Now())
+	pt.startTrial("peer-y", "5.6.7.8:51820", time.Time{}, time.Now())
+
+	pt.remove("peer-x")
+	if _, ok := pt.get("peer-x"); ok {
+		t.Errorf("expected peer-x removed")
+	}
+	if _, ok := pt.get("peer-y"); !ok {
+		t.Errorf("expected peer-y to remain after removing only peer-x")
+	}
+
+	pt.startTrial("peer-x", "1.2.3.4:51820", time.Time{}, time.Now())
+	pt.prune(map[string]bool{"peer-y": true}) // peer-x not in the "live" set
+	if _, ok := pt.get("peer-x"); ok {
+		t.Errorf("expected peer-x pruned (not in live set)")
+	}
+	if _, ok := pt.get("peer-y"); !ok {
+		t.Errorf("expected peer-y to survive prune (in live set)")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Composed state-machine walk (WAN twin of TestStateMachine_TrialToDirect /
+// TestStateMachine_TrialToDERPBackoffSuppressesRetrial): derp → punch-trial →
+// direct, and derp → punch-trial → derp+backoff. Reuses evaluateLANTrial
+// directly, matching how runPunchTrialLoop drives it.
+// ---------------------------------------------------------------------------
+
+func TestStateMachine_PunchTrialToDirect(t *testing.T) {
+	const fresh = 3 * time.Minute
+	now := time.Now()
+
+	if !shouldStartPunchTrial(modeDERP, time.Time{}, false, now) {
+		t.Fatalf("expected to start a punch trial")
+	}
+	mode := modePunchTrial
+	preTrial := now
+	deadline := now.Add(punchTrialDuration)
+
+	// Simultaneous-send hole-punch: a fresh handshake lands shortly after,
+	// well within the WAN trial window.
+	verifyAt := now.Add(300 * time.Millisecond)
+	lastHS := now.Add(200 * time.Millisecond)
+	switch evaluateLANTrial(lastHS, preTrial, deadline, verifyAt, fresh) {
+	case trialVerified:
+		mode = modeDirect
+	default:
+		t.Fatalf("expected trialVerified")
+	}
+	if mode != modeDirect {
+		t.Fatalf("final mode = %v, want modeDirect", mode)
+	}
+}
+
+func TestStateMachine_PunchTrialTimeoutBacksOff(t *testing.T) {
+	const fresh = 3 * time.Minute
+	now := time.Now()
+
+	if !shouldStartPunchTrial(modeDERP, time.Time{}, false, now) {
+		t.Fatalf("expected to start a punch trial")
+	}
+	preTrial := now
+	deadline := now.Add(punchTrialDuration)
+
+	// No handshake ever lands (NAT combination doesn't permit a punch) —
+	// deadline passes.
+	verifyAt := deadline.Add(time.Second)
+	if got := evaluateLANTrial(time.Time{}, preTrial, deadline, verifyAt, fresh); got != trialTimedOut {
+		t.Fatalf("expected trialTimedOut, got %v", got)
+	}
+
+	mode := modeDERP
+	backoffUntil := verifyAt.Add(punchTrialBackoff)
+
+	if shouldStartPunchTrial(mode, backoffUntil, false, verifyAt.Add(time.Minute)) {
+		t.Errorf("expected re-trial suppressed during backoff")
+	}
+	if !shouldStartPunchTrial(mode, backoffUntil, false, backoffUntil.Add(time.Second)) {
+		t.Errorf("expected re-trial allowed after backoff elapses")
 	}
 }
 
