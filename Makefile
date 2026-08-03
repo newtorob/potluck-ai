@@ -247,6 +247,13 @@ bench-inference: ## Local-model inference benchmark — gen/prompt-eval tok/s, T
 lint: ## Run the privacy-invariant lint (member_id leaks + contributor in-memory-only). Free, local.
 	@python3 scripts/dev/lint_privacy.py
 
+check-models: ## Check the model catalog against the curated current-gen lineup (add --write or --json via ARGS)
+	@if [ ! -x apps/desktop/python/.venv/bin/python ]; then \
+		echo "==> sidecar venv not found — run 'make sidecar-setup' first"; \
+		exit 1; \
+	fi
+	@apps/desktop/python/.venv/bin/python scripts/check_model_updates.py $(ARGS)
+
 install-hooks: ## Install git hooks (pre-commit privacy lint) into .git/hooks/
 	@if [ ! -d .git ]; then \
 		echo "error: not in a git repo. cd to the repo root and try again."; \
