@@ -608,14 +608,16 @@ function Start-MeshSidecar {
     }
     Pass "coordinator reachable"
 
-    # Derive the DERP relay URL from the coordinator URL host (same machine
-    # in dev, port 8443 cleartext). The relay is the fallback when direct
-    # UDP punch fails (hairpin NAT, symmetric NAT, restrictive firewalls).
-    # Override with $env:POTLUCK_DERP_URL.
+    # DERP relay URL — the fallback when direct UDP punch fails (hairpin
+    # NAT, symmetric NAT, restrictive firewalls). Defaults to the production
+    # relay (services/derp, tcp+tls per internal/derp/client.go); it is NOT
+    # derived from the coordinator URL, since a self-hosted/LAN coordinator
+    # does not imply a self-hosted relay. Override with $env:POTLUCK_DERP_URL,
+    # e.g. tcp+insecure://<lan-host>:8443 for LAN-only dev against a local
+    # services/derp run without TLS.
     $derpUrl = $env:POTLUCK_DERP_URL
     if (-not $derpUrl) {
-        $coordHost = ([Uri]$coordUrl).Host
-        $derpUrl = "tcp+insecure://${coordHost}:8443"
+        $derpUrl = "tcp+tls://derp.trypotluck.ai:443"
     }
     Info "derp relay URL: $derpUrl"
 

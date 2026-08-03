@@ -22,6 +22,7 @@ import (
 	"github.com/potluck-ai/potluck-mesh/internal/localapi"
 	"github.com/potluck-ai/potluck-mesh/internal/peerstate"
 	"github.com/potluck-ai/potluck-mesh/internal/runtimesettings"
+	"github.com/potluck-ai/potluck-mesh/internal/signal"
 	"github.com/potluck-ai/potluck-mesh/internal/signingkey"
 )
 
@@ -267,6 +268,138 @@ func TestHandlePeers_Empty(t *testing.T) {
 	peers, _ := body["peers"].([]any)
 	if len(peers) != 0 {
 		t.Errorf("expected 0 peers, got %d", len(peers))
+	}
+}
+
+// TestHandlePeers_DERPFlippedNotYetReachable_ReportsConnecting verifies the
+// observability fix: a peer that this node has flipped to DERP routing but
+// that has not yet completed a WireGuard handshake must report
+// reachability_mode "connecting" and derp_flipped: true — not a null
+// reachability_mode indistinguishable from "never tried DERP".
+func TestHandlePeers_DERPFlippedNotYetReachable_ReportsConnecting(t *testing.T) {
+	cfg := defaultCfg(t)
+	cfg.PeerStore.Upsert(signal.RosterPeer{
+		NodeID:      "peer-1",
+		NodeName:    "linux-box",
+		MeshIP:      "100.64.0.7",
+		WGPublicKey: "peerPubKeyABC",
+	})
+	// PeerReachFn returns a zero time (no handshake yet).
+	cfg.PeerReachFn = func(pubkeyBase64 string) (time.Time, uint64, uint64, error) {
+		return time.Time{}, 0, 0, nil
+	}
+	cfg.IsDERPRoutedFn = func(pubkeyBase64 string) bool {
+		return pubkeyBase64 == "peerPubKeyABC"
+	}
+
+	client, _ := testServer(t, cfg)
+
+	resp := get(t, client, "/peers")
+	defer resp.Body.Close()
+
+	var body struct {
+		Peers []map[string]any `json:"peers"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(body.Peers) != 1 {
+		t.Fatalf("expected 1 peer, got %d", len(body.Peers))
+	}
+	p := body.Peers[0]
+
+	if reachable, _ := p["reachable"].(bool); reachable {
+		t.Error("reachable: expected false (no handshake yet)")
+	}
+	if flipped, ok := p["derp_flipped"].(bool); !ok || !flipped {
+		t.Errorf("derp_flipped: expected true, got %v", p["derp_flipped"])
+	}
+	if mode, _ := p["reachability_mode"].(string); mode != "connecting" {
+		t.Errorf("reachability_mode: got %v want \"connecting\"", p["reachability_mode"])
+	}
+}
+
+// TestHandlePeers_NotFlippedNotReachable_ReportsNullMode is the control case:
+// a peer that was never DERP-flipped and has no handshake still reports
+// reachability_mode: null and derp_flipped: false — unchanged from prior
+// behavior, so the new "connecting" state doesn't leak onto peers that are
+// simply still trying direct.
+func TestHandlePeers_NotFlippedNotReachable_ReportsNullMode(t *testing.T) {
+	cfg := defaultCfg(t)
+	cfg.PeerStore.Upsert(signal.RosterPeer{
+		NodeID:      "peer-1",
+		NodeName:    "windows-box",
+		MeshIP:      "100.64.0.8",
+		WGPublicKey: "peerPubKeyXYZ",
+	})
+	cfg.PeerReachFn = func(pubkeyBase64 string) (time.Time, uint64, uint64, error) {
+		return time.Time{}, 0, 0, nil
+	}
+	cfg.IsDERPRoutedFn = func(pubkeyBase64 string) bool { return false }
+
+	client, _ := testServer(t, cfg)
+
+	resp := get(t, client, "/peers")
+	defer resp.Body.Close()
+
+	var body struct {
+		Peers []map[string]any `json:"peers"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	p := body.Peers[0]
+
+	if flipped, ok := p["derp_flipped"].(bool); !ok || flipped {
+		t.Errorf("derp_flipped: expected false, got %v", p["derp_flipped"])
+	}
+	if _, present := p["reachability_mode"]; !present {
+		t.Fatal("reachability_mode key missing from response")
+	}
+	if p["reachability_mode"] != nil {
+		t.Errorf("reachability_mode: got %v want null", p["reachability_mode"])
+	}
+}
+
+// TestHandleStatus_PeersConnectingCount verifies the node-level aggregate:
+// GET /status surfaces peers_connecting_count so a systray/global indicator
+// can observe the same "flipped to DERP, handshake pending" state without
+// walking the /peers list.
+func TestHandleStatus_PeersConnectingCount(t *testing.T) {
+	cfg := defaultCfg(t)
+	cfg.PeerStore.Upsert(signal.RosterPeer{
+		NodeID:      "peer-1",
+		NodeName:    "linux-box",
+		MeshIP:      "100.64.0.7",
+		WGPublicKey: "connectingPeer",
+	})
+	cfg.PeerStore.Upsert(signal.RosterPeer{
+		NodeID:      "peer-2",
+		NodeName:    "windows-box",
+		MeshIP:      "100.64.0.8",
+		WGPublicKey: "directPeer",
+	})
+	cfg.PeerReachFn = func(pubkeyBase64 string) (time.Time, uint64, uint64, error) {
+		if pubkeyBase64 == "directPeer" {
+			return time.Now(), 0, 0, nil
+		}
+		return time.Time{}, 0, 0, nil
+	}
+	cfg.IsDERPRoutedFn = func(pubkeyBase64 string) bool {
+		return pubkeyBase64 == "connectingPeer"
+	}
+
+	client, _ := testServer(t, cfg)
+
+	resp := get(t, client, "/status")
+	defer resp.Body.Close()
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["peers_connecting_count"] != float64(1) {
+		t.Errorf("peers_connecting_count: got %v want 1", body["peers_connecting_count"])
 	}
 }
 

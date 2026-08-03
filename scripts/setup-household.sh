@@ -445,12 +445,16 @@ start_mesh_sidecar() {
     fi
     ok "coordinator reachable"
 
-    # Derive the DERP relay URL from the coordinator URL — same host, port 8443,
-    # cleartext for dev. The relay is the fallback path when direct UDP punch
-    # fails (hairpin NAT, symmetric NAT, restrictive firewalls). Without it,
-    # nodes can be roster-aware but unable to exchange traffic.
+    # DERP relay URL — the fallback path when direct UDP punch fails (hairpin
+    # NAT, symmetric NAT, restrictive firewalls). Without it, nodes can be
+    # roster-aware but unable to exchange traffic. Defaults to the production
+    # relay (services/derp, tcp+tls per internal/derp/client.go); it is NOT
+    # derived from the coordinator URL, since a self-hosted/LAN coordinator
+    # does not imply a self-hosted relay. Override with $POTLUCK_DERP_URL,
+    # e.g. tcp+insecure://<lan-host>:8443 for LAN-only dev against a local
+    # services/derp run without TLS.
     local derp_url
-    derp_url="${POTLUCK_DERP_URL:-tcp+insecure://$(echo "$coord_url" | sed -E 's|https?://([^/:]+).*|\1|'):8443}"
+    derp_url="${POTLUCK_DERP_URL:-tcp+tls://derp.trypotluck.ai:443}"
     info "derp relay URL: $derp_url"
 
     # Forward the user's sudo credentials so the chown-to-SUDO_UID logic in

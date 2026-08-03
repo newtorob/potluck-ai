@@ -400,19 +400,46 @@ func (b *DerpBind) Send(bufs [][]byte, ep conn.Endpoint) error {
 		return b.inner.Send(bufs, ep)
 	}
 
-	// Confirm this peer is still in DERP-routing mode. If SetPeerRouting was
-	// called to revert to UDP after wg-go resolved the endpoint, we should
-	// not silently black-hole the packet — log and drop.
-	b.derpMu.RLock()
-	routed := b.derpPeers[se.pubkey]
-	b.derpMu.RUnlock()
+	// The endpoint type itself is sufficient authorization to relay via DERP —
+	// mirror the receive side (derpRecv above), which already trusts a
+	// syntheticEndpoint without ever consulting derpPeers.
+	//
+	// Requiring derpPeers[pubkey] to ALSO be pre-set here (the previous
+	// behavior) created a startup race that black-holed the handshake
+	// response for every DERP-relayed handshake: the vendored wireguard-go
+	// does UNCONDITIONAL endpoint roaming on inbound packets
+	// (SetEndpointFromPacket, disableRoaming=false on desktop) — the instant
+	// this node's derpRecv delivers a peer's DERP-relayed handshake-init with
+	// a syntheticEndpoint, wg-go roams that peer's session onto the synthetic
+	// endpoint and immediately tries to Send() the handshake-response through
+	// it. That can happen before THIS node's own reachability
+	// ticker/roster-flip has called SetPeerRouting(peer, true) — the two
+	// nodes' flip timers are not synchronized. The old code dropped the
+	// response in that window ("peer not in DERP map, dropping"), so the
+	// handshake never converged even though the relay, framing, and auth all
+	// worked.
+	//
+	// Only two things can ever produce a syntheticEndpoint value in the first
+	// place: a legitimate local flip (SetPeerRouting, via flipToDERP /
+	// SetPeerRouting in main.go — out of scope here) or an inbound
+	// DERP-delivered packet (via derpRecv, itself gated by the DERP client's
+	// own peer/session validation upstream). So trusting the endpoint type
+	// here is exactly as safe as trusting it on the receive side, and closes
+	// the race. We opportunistically mark the peer DERP-routed so
+	// IsPeerDERPRouted and subsequent Sends stay consistent without needing
+	// wg-go to re-invoke us.
+	b.derpMu.Lock()
+	alreadyRouted := b.derpPeers[se.pubkey]
+	if !alreadyRouted {
+		b.derpPeers[se.pubkey] = true
+	}
+	b.derpMu.Unlock()
 
-	if !routed {
-		slog.Info("derp_bind: Send to synthetic endpoint but peer not in DERP map, dropping",
+	if !alreadyRouted {
+		slog.Info("derp_bind: Send to synthetic endpoint ahead of local DERP flip — opportunistically marking peer DERP-routed",
 			"dst_prefix", util.TruncatePubkeyBytes(se.pubkey),
 			"bufs", len(bufs),
 		)
-		return nil
 	}
 
 	for _, buf := range bufs {

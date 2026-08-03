@@ -48,6 +48,7 @@ import (
 	"github.com/potluck-ai/potluck-mesh/internal/nodetoken"
 	"github.com/potluck-ai/potluck-mesh/internal/peerstate"
 	"github.com/potluck-ai/potluck-mesh/internal/runtimesettings"
+	"github.com/potluck-ai/potluck-mesh/internal/signal"
 	"github.com/potluck-ai/potluck-mesh/internal/signingkey"
 )
 
@@ -71,6 +72,14 @@ type ReachabilityMode string
 const (
 	ReachDirect ReachabilityMode = "direct"
 	ReachDERP   ReachabilityMode = "derp"
+	// ReachConnecting reports a peer that this node has flipped to DERP
+	// routing (SetPeerRouting(pubkey, true) on the local DerpBind) but for
+	// which no WireGuard handshake has completed yet — either the handshake
+	// is still in flight over the relay, or the relay itself is unreachable.
+	// Without this value, that state was indistinguishable from "never tried
+	// direct yet": both read as reachability_mode: null. New enum value —
+	// additive, existing "direct"/"derp"/null consumers are unaffected.
+	ReachConnecting ReachabilityMode = "connecting"
 )
 
 // PeerReachabilityFunc is the tunnel's reachability query function. Matches
@@ -551,6 +560,13 @@ type statusResponse struct {
 	// the tunnel socket is not up — either the WireGuard device failed to start
 	// or the port was stolen by another process.
 	WGPortListening bool `json:"wg_port_listening"`
+
+	// PeersConnectingCount is the number of roster peers this node has
+	// flipped to DERP routing (see peerResponse.DERPFlipped) that have not
+	// yet completed a WireGuard handshake — i.e. reachability_mode
+	// "connecting" in GET /peers. A whole-node summary so a systray/global
+	// indicator doesn't need to walk the peer list itself. Additive field.
+	PeersConnectingCount int `json:"peers_connecting_count"`
 }
 
 type peerResponse struct {
@@ -564,6 +580,15 @@ type peerResponse struct {
 	Platform         *string  `json:"platform,omitempty"`
 	Reachable        bool     `json:"reachable"`
 	ReachabilityMode *string  `json:"reachability_mode"`
+	// DERPFlipped reports whether this node currently has this peer marked as
+	// DERP-routed (DerpBind.SetPeerRouting flip via IsPeerDERPRouted),
+	// independent of whether a WireGuard handshake has completed over that
+	// route yet. Additive field — safe for older frontends to ignore. Lets
+	// the UI (and debugging) distinguish "flipped to DERP, handshake pending
+	// or relay unreachable" (reachability_mode: "connecting") from "never
+	// flipped, still trying direct" (reachability_mode: null, derp_flipped:
+	// false) — both previously reported as an indistinguishable null.
+	DERPFlipped bool `json:"derp_flipped"`
 	// HandshakeAgeSeconds is the age of the last WireGuard handshake. nil when
 	// no handshake has ever completed (lets the UI tell "stale" from "never").
 	HandshakeAgeSeconds *float64 `json:"handshake_age_seconds,omitempty"`
@@ -595,8 +620,37 @@ type errorDetail struct {
 // ---------------------------------------------------------------------------
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
-	snap := s.state.snapshot(len(s.ps.All()))
+	roster := s.ps.All()
+	snap := s.state.snapshot(len(roster))
+	snap.PeersConnectingCount = s.countPeersConnecting(roster)
 	writeJSON(w, http.StatusOK, snap)
+}
+
+// countPeersConnecting mirrors the reachability_mode computation in
+// handlePeers, but only tallies peers in the "connecting" state (DERP-flipped
+// on this node, handshake not yet complete) — see peerResponse.DERPFlipped
+// and ReachConnecting for why that state needs to be observable at all.
+func (s *Server) countPeersConnecting(roster []signal.RosterPeer) int {
+	if s.isDERPRoutedFn == nil {
+		return 0
+	}
+	n := 0
+	for _, p := range roster {
+		if !s.isDERPRoutedFn(p.WGPublicKey) {
+			continue
+		}
+		reachable := false
+		if s.peerReachFn != nil {
+			lastHS, _, _, err := s.peerReachFn(p.WGPublicKey)
+			if err == nil {
+				reachable = !lastHS.IsZero() && time.Since(lastHS) < 3*time.Minute
+			}
+		}
+		if !reachable {
+			n++
+		}
+	}
+	return n
 }
 
 func (s *Server) handlePeers(w http.ResponseWriter, r *http.Request) {
@@ -641,17 +695,33 @@ func (s *Server) handlePeers(w http.ResponseWriter, r *http.Request) {
 			pr.KeyConfigured = &kc
 		}
 
-		// Reachability mode: DERP vs direct (only meaningful when reachable).
-		if pr.Reachable {
-			var mode string
-			if s.isDERPRoutedFn != nil && s.isDERPRoutedFn(p.WGPublicKey) {
-				mode = string(ReachDERP)
-			} else {
-				mode = string(ReachDirect)
-			}
+		// Reachability mode: DERP vs direct vs connecting.
+		//
+		// derp_flipped is independent of the handshake state — it reflects
+		// this node's local DerpBind routing decision, which can be true well
+		// before (or even without) a completed handshake: the relay may still
+		// be unreachable, or the responder's side of the handshake may not
+		// have converged yet (see internal/derp.DerpBind.Send's doc comment
+		// for the wg-go endpoint-roaming race this exposes). Surfacing it
+		// separately from reachability_mode turns that previously-invisible
+		// window into an observable "connecting" state instead of a null
+		// that's indistinguishable from "hasn't tried DERP at all".
+		derpFlipped := s.isDERPRoutedFn != nil && s.isDERPRoutedFn(p.WGPublicKey)
+		pr.DERPFlipped = derpFlipped
+
+		switch {
+		case pr.Reachable && derpFlipped:
+			mode := string(ReachDERP)
+			pr.ReachabilityMode = &mode
+		case pr.Reachable:
+			mode := string(ReachDirect)
+			pr.ReachabilityMode = &mode
+		case derpFlipped:
+			mode := string(ReachConnecting)
 			pr.ReachabilityMode = &mode
 		}
-		// If unreachable, ReachabilityMode stays nil (JSON null).
+		// Neither reachable nor flipped: ReachabilityMode stays nil (JSON
+		// null) — still trying direct, unchanged from prior behavior.
 
 		out = append(out, pr)
 	}

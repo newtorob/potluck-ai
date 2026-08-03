@@ -344,19 +344,55 @@ func TestSendNonSyntheticDelegatesToInner(t *testing.T) {
 	}
 }
 
-// TestSetPeerRoutingUnroutesDrops verifies that Send to a synthetic endpoint
-// when the peer is NOT in the derpPeers map silently drops (doesn't call relay,
-// doesn't call inner bind).
-func TestSetPeerRoutingUnroutesDrops(t *testing.T) {
+// TestSendToSyntheticEndpointRelaysWithoutPriorFlip verifies the fix for the
+// DERP-responder-drop bug: Send() to a syntheticEndpoint must relay the
+// packet via the DERP client even when SetPeerRouting was never called for
+// that peer on this node (the wireguard-go endpoint-roaming race described in
+// Send's doc comment — a responder can be asked to send a handshake response
+// over a synthetic endpoint before its own reachability ticker has flipped
+// the peer to DERP). Previously this silently dropped the packet ("peer not
+// in DERP map, dropping"), black-holing the handshake response.
+func TestSendToSyntheticEndpointRelaysWithoutPriorFlip(t *testing.T) {
+	frameReceived := make(chan struct{}, 1)
+
+	mr := newMockRelay(t, func(conn net.Conn) {
+		buf := make([]byte, 512)
+		_ = conn.SetDeadline(time.Now().Add(3 * time.Second))
+		n, err := conn.Read(buf)
+		if err != nil || n < 34 {
+			return
+		}
+		frameReceived <- struct{}{}
+		time.Sleep(500 * time.Millisecond)
+	})
+
+	var ourKey [32]byte
+	client := derp.New(mr.addr, func(ctx context.Context) (string, error) {
+		return "tok", nil
+	}, ourKey, func(_ [32]byte, _ []byte) {})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	go client.Run(ctx)
+
+	// Give auth time to complete so sendCh is non-nil.
+	time.Sleep(300 * time.Millisecond)
+
 	fb := newFakeBind()
-	c := derp.New("tcp+insecure://127.0.0.1:1", func(ctx context.Context) (string, error) { return "", nil }, [32]byte{}, func(_ [32]byte, _ []byte) {})
-	b := derp.NewDerpBind(fb, c)
+	b := derp.NewDerpBind(fb, client)
 
 	var destKey [32]byte
 	for i := range destKey {
 		destKey[i] = 0xDD
 	}
-	// Do NOT call SetPeerRouting — peer is not in the map.
+
+	// Deliberately do NOT call SetPeerRouting first — this is the
+	// responder-drop scenario: wg-go resolved a syntheticEndpoint for this
+	// peer (via inbound endpoint roaming) and is calling Send() before this
+	// node's own local flip has happened.
+	if b.IsPeerDERPRouted(destKey) {
+		t.Fatal("precondition: peer should not be DERP-routed yet")
+	}
 
 	epStr := derp.SyntheticEndpointString(destKey)
 	ep, err := b.ParseEndpoint(epStr)
@@ -364,17 +400,22 @@ func TestSetPeerRoutingUnroutesDrops(t *testing.T) {
 		t.Fatalf("ParseEndpoint: %v", err)
 	}
 
-	err = b.Send([][]byte{[]byte("should-be-dropped")}, ep)
-	if err != nil {
+	if err := b.Send([][]byte{[]byte("handshake-response")}, ep); err != nil {
 		t.Fatalf("Send returned error: %v", err)
 	}
 
-	// Neither inner bind nor relay should receive anything.
 	select {
-	case <-fb.sent:
-		t.Fatal("inner bind should not receive sends for synthetic endpoint")
-	case <-time.After(100 * time.Millisecond):
-		// Expected: nothing was sent.
+	case <-frameReceived:
+		// Relay received the frame — the packet was NOT dropped.
+	case <-time.After(3 * time.Second):
+		t.Fatal("relay did not receive DERP frame within 3s — Send silently dropped the packet")
+	}
+
+	// The opportunistic mark must have flipped the peer to DERP-routed so
+	// subsequent state (IsPeerDERPRouted, reachability_mode reporting) is
+	// consistent with what actually happened on the wire.
+	if !b.IsPeerDERPRouted(destKey) {
+		t.Fatal("expected Send to opportunistically mark the peer as DERP-routed")
 	}
 }
 

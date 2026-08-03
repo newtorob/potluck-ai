@@ -9,6 +9,14 @@
 #   @BINARY_PATH@         — absolute path to the installed sidecar binary
 #                              e.g. C:\Program Files\Potluck\bin\potluck-mesh.exe
 #   @COORDINATOR_URL@     — defaults to the cooperative's hosted URL
+#   @DERP_URL@            — DERP relay fallback for when direct UDP punch
+#                              fails; defaults to the production relay
+#                              (services/derp, tcp+tls per
+#                              internal/derp/client.go). Not derived from
+#                              @COORDINATOR_URL@ — a self-hosted/LAN
+#                              coordinator does not imply a self-hosted
+#                              relay. Override at render time for LAN-only
+#                              installs (e.g. tcp+insecure://host:8443).
 #   @KEY_DIR@             — %ProgramData%\Potluck\keys (ACL'd to LocalService)
 #   @LOG_DIR@             — %ProgramData%\Potluck\logs
 #
@@ -23,6 +31,9 @@ param(
 
     [Parameter(Mandatory=$false)]
     [string]$CoordinatorUrl = "@COORDINATOR_URL@",
+
+    [Parameter(Mandatory=$false)]
+    [string]$DerpUrl = "@DERP_URL@",
 
     [Parameter(Mandatory=$false)]
     [string]$KeyDir = "@KEY_DIR@",
@@ -56,7 +67,7 @@ if ($existing) {
 # 3. Register the service. binPath= must use the full path with arguments
 #    inline. The service runs under NT SERVICE\PotluckMesh which is a
 #    virtual account auto-created by SCM when we use that name.
-$binPath = "`"$BinaryPath`" --coordinator-url $CoordinatorUrl --log-format json"
+$binPath = "`"$BinaryPath`" --coordinator-url $CoordinatorUrl --derp-url $DerpUrl --log-format json"
 
 sc.exe create $ServiceName `
     binPath= $binPath `

@@ -39,8 +39,9 @@ Environment=POTLUCK_WG_PRIVATE_KEY_PATH=/var/lib/potluck/mesh/wg.key
 Environment=SUDO_UID=@SUDO_UID@
 Environment=SUDO_GID=@SUDO_GID@
 
-# Coordinator + DERP URLs are templated at install time. The DERP URL is
-# derived from the coordinator URL by install-persistence.sh.
+# Coordinator + DERP URLs are templated at install time. The DERP URL
+# defaults to the production relay (install-persistence.sh DERP_URL_DEFAULT)
+# and is only overridden by --derp-url / POTLUCK_DERP_URL at install time.
 ExecStart=@MESH_BIN@ --coordinator-url @COORD_URL@ --derp-url @DERP_URL@
 
 Restart=on-failure

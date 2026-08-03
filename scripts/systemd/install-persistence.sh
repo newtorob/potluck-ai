@@ -24,7 +24,7 @@
 #   2. Renders potluck-firewall.service from template, installs to
 #      /etc/systemd/system/, enables + starts.
 #   3. Renders potluck-mesh.service from template (filling in mesh binary
-#      path, coordinator URL, derived DERP URL, user's UID/GID), installs,
+#      path, coordinator URL, DERP relay URL, user's UID/GID), installs,
 #      enables + starts.
 #   4. Verifies both units are active.
 #
@@ -100,14 +100,14 @@ require_systemd() {
     command -v systemctl >/dev/null || fail "systemctl not found; this script is Linux-systemd-only"
 }
 
-# Derive DERP URL from coordinator URL the same way setup-household.sh does.
-# coord=http://192.168.1.10:8400 → derp=tcp+insecure://192.168.1.10:8443
-derive_derp_url() {
-    local coord="$1"
-    local host
-    host=$(echo "$coord" | sed -E 's|https?://([^/:]+).*|\1|')
-    echo "tcp+insecure://${host}:8443"
-}
+# Production DERP relay fallback (services/derp, fly.toml app=potluck-derp,
+# custom domain with its own cert — Fly terminates TLS on 443 and forwards
+# cleartext to the relay binary on 8443, so the client-facing scheme is
+# tcp+tls per internal/derp/client.go). This is the shipped default; it is
+# NOT derived from --coordinator-url (a self-hosted/LAN coordinator does not
+# imply a self-hosted relay). Override with --derp-url / POTLUCK_DERP_URL,
+# e.g. for LAN-only dev against a local services/derp run without TLS.
+DERP_URL_DEFAULT="tcp+tls://derp.trypotluck.ai:443"
 
 # Create the dedicated 'potluck' system user if it doesn't exist.
 # Idempotent — re-running --install is a no-op when the user is already there.
@@ -474,7 +474,7 @@ case "$MODE" in
     install)
         require_root "$@"
         [ -n "$COORD_URL" ] || fail "--coordinator-url is required for --install (or set POTLUCK_COORDINATOR_URL)"
-        [ -n "$DERP_URL" ] || DERP_URL=$(derive_derp_url "$COORD_URL")
+        [ -n "$DERP_URL" ] || DERP_URL="$DERP_URL_DEFAULT"
         if [ -z "$TARGET_UID" ] || [ -z "$TARGET_GID" ]; then
             warn "SUDO_UID/SUDO_GID not set — IPC socket will be root-owned."
             warn "CLI tools running as a non-root user will need sudo to talk to it."

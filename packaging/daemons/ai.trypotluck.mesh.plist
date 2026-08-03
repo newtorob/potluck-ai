@@ -42,6 +42,18 @@
   bearer token on disk (internal/nodetoken) for every later coordinator call.
   Do NOT add POTLUCK_COORDINATOR_TOKEN here.
 
+  --derp-url is the production DERP relay fallback (services/derp,
+  fly.toml app=potluck-derp, custom domain derp.trypotluck.ai with its own
+  Let's Encrypt cert — Fly terminates TLS on 443 and forwards cleartext to
+  the relay binary on 8443, so the client-facing scheme is tcp+tls per
+  internal/derp/client.go). Without this flag DERPRelayURL defaults to ""
+  (disabled) and cross-network peers with no direct UDP path simply cannot
+  connect. Because this flag is passed explicitly here, POTLUCK_DERP_URL
+  would NOT override it at runtime (an explicit CLI flag always wins over
+  its own env fallback) — an install-specific relay override, if ever
+  needed, has to go through the same runtime-settings PATCH /settings
+  mechanism described above, not an environment variable.
+
   KNOWN CONSTRAINT — /Applications only
   ---------------------------------------
   ProgramArguments hardcodes the /Applications install path. Because this
@@ -79,6 +91,8 @@
            are co-located with this path (see internal/config Load()). -->
       <string>--wg-private-key-path</string>
       <string>/Library/Application Support/Potluck/mesh/wg.key</string>
+      <string>--derp-url</string>
+      <string>tcp+tls://derp.trypotluck.ai:443</string>
       <string>--log-format</string>
       <string>json</string>
     </array>
