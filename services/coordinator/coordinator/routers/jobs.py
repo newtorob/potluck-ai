@@ -64,6 +64,21 @@ _background_tasks: set[asyncio.Task] = set()
 # should stop blocking the requesting client.
 JOB_TIMEOUT_S = 120.0
 
+# ---- Active first-token failover (streaming endpoint only) ---------------
+#
+# How long we'll wait, per dispatch attempt, for a peer to either produce
+# its FIRST token or signal completion (JobCompleteMessage with zero
+# tokens is a valid empty completion, not a failure). A peer that clears
+# neither bar within this window is presumed dead-on-arrival (hung,
+# black-holed, crashed mid-load) and we fail over to the next-best peer
+# BEFORE any bytes have reached the client -- see `_dispatch_stream_with_failover`.
+FIRST_TOKEN_DEADLINE_S = 5.0
+
+# Hard ceiling on how many peers we'll try for a single streaming request
+# before giving up and returning 503. Bounds worst-case dispatch latency to
+# roughly MAX_DISPATCH_ATTEMPTS * FIRST_TOKEN_DEADLINE_S.
+MAX_DISPATCH_ATTEMPTS = 3
+
 
 # Widest routing tier the requester will accept. The coordinator always tries
 # the closest/most-trusted tier first and widens outward only up to this limit.
@@ -112,7 +127,10 @@ class JobErrorResponse(BaseModel):
 
 
 async def _dispatch_to_peer(
-    db: AsyncSession, req: JobRequest, member_id: uuid.UUID
+    db: AsyncSession,
+    req: JobRequest,
+    member_id: uuid.UUID,
+    exclude_peer_ids: set[uuid.UUID] | None = None,
 ) -> tuple[PeerConnection, Job, JobBuffer, RoutingScope]:
     """Shared dispatch preamble for the sync + streaming job endpoints.
 
@@ -120,6 +138,12 @@ async def _dispatch_to_peer(
     in-memory buffer, and delivers the JobAssignedMessage (502 if the peer is
     unreachable). Returns (peer_conn, job, buf); the caller awaits buf and logs
     its own "dispatched" event.
+
+    `exclude_peer_ids`, when given, is forwarded to `select_peer_for_request`
+    so a peer that already proved dead-on-arrival on an earlier attempt of
+    THIS request (see `_dispatch_stream_with_failover`) is never re-picked.
+    Default None preserves current behavior for every existing caller
+    (including the sync `dispatch_job` endpoint, which does not retry).
 
     CRITICAL PRIVACY POINT: JobAssignedMessage carries ONLY job_id + model_slug
     + prompt + sampling. Adding member_id or any identifying field here is a
@@ -158,6 +182,7 @@ async def _dispatch_to_peer(
         requester_member_id=member_id,
         scope=req.scope,
         circle_pubkeys=circle_pubkeys,
+        exclude_peer_ids=exclude_peer_ids,
     )
     if peer_conn is None:
         # Distinguish the scope-specific failure modes so the caller knows
@@ -556,6 +581,153 @@ async def _finalize_job_in_db(
         logger.exception("job_finalize_failed", job_id=str(job_id))
 
 
+async def _race_first_token(
+    buf: JobBuffer, deadline_s: float
+) -> tuple[str | None, bool]:
+    """Wait for the FIRST of three outcomes on one dispatch attempt's buffer:
+
+      1. A token lands on `buf.token_stream`      -> (token, False)
+      2. `buf.done` fires with NO token yet        -> (None, True)
+      3. `deadline_s` elapses with neither          -> (None, False)
+
+    Implementation: two tasks (`buf.token_stream.get()` and `buf.done.wait()`)
+    are raced via `asyncio.wait(..., return_when=FIRST_COMPLETED, timeout=...)`.
+
+    Loser cleanup: whichever task is still pending when `asyncio.wait`
+    returns is `.cancel()`-ed and awaited (swallowing the resulting
+    CancelledError) so nothing is left dangling. This is safe for the
+    queue getter specifically because `asyncio.Queue.get()` only pops an
+    item off the internal deque as the LAST step of its own coroutine body,
+    after its waiter future has already resolved — so `task.done() is False`
+    is a hard guarantee that no item was silently consumed out from under a
+    cancelled getter. Put differently: a token is only ever "spent" by
+    actually returning it from this function.
+
+    If BOTH tasks happen to be complete at the same time (e.g. the peer's
+    JobCompleteMessage handler both enqueues nothing and sets `done` in the
+    same event-loop tick), the token wins — outcome 1 is checked first,
+    matching the "token arrived -> SUCCESS" priority in the spec.
+    """
+    get_task = asyncio.create_task(buf.token_stream.get())
+    done_task = asyncio.create_task(buf.done.wait())
+    try:
+        finished, _pending = await asyncio.wait(
+            {get_task, done_task},
+            timeout=deadline_s,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if get_task in finished:
+            return get_task.result(), False
+        if done_task in finished:
+            return None, True
+        return None, False
+    finally:
+        for t in (get_task, done_task):
+            if not t.done():
+                t.cancel()
+                try:
+                    await t
+                except asyncio.CancelledError:
+                    pass
+
+
+async def _finalize_abandoned_attempt(job: Job, buf: JobBuffer) -> None:
+    """Finalize an EARLIER dispatch attempt's Job row after failover moved on
+    to a different peer — invariant #6 (no leaked 'dispatched' rows).
+
+    Reuses `_finalize_job_in_db` with `error_category` always non-None, so:
+      - the `jobs` row settles into `status='failed'` (not left dangling at
+        'dispatched' forever), and
+      - the credit-ledger write is gated OFF (invariant #2: a peer that never
+        produced output earns no credit) — same code path a genuine
+        peer-reported error takes.
+
+    Awaited inline (not spawned as a detached background task) because this
+    runs BEFORE the StreamingResponse is returned — we're still holding the
+    request coroutine, so there's no cancellation hazard to design around
+    (unlike the committed job's finalize in `dispatch_job_stream`'s
+    `finally:`, which spawns detached because the client can disconnect the
+    instant `[DONE]` is flushed).
+    """
+    error_category = buf.error_category or "first_token_timeout"
+    error_message = buf.error_message or (
+        f"peer produced no first token within {FIRST_TOKEN_DEADLINE_S}s; "
+        f"coordinator failed over to another peer"
+    )
+    await _finalize_job_in_db(
+        job_id=job.id,
+        error_category=error_category,
+        error_message=error_message,
+        output_tokens=0,
+        duration_ms=0,
+    )
+
+
+async def _dispatch_stream_with_failover(
+    db: AsyncSession, req: JobRequest, member_id: uuid.UUID
+) -> tuple[PeerConnection, Job, JobBuffer, RoutingScope, str | None]:
+    """Resolve a peer that has actually produced a first token (or an
+    empty-but-complete result) BEFORE the caller returns a StreamingResponse.
+
+    HARD INVARIANT: this function must return (or raise) before a single
+    byte reaches the client. Once it returns, the caller yields the stashed
+    `first_token` and is COMMITTED to that peer — there is no failover once
+    streaming has started, ever. See `dispatch_job_stream`.
+
+    Loop up to MAX_DISPATCH_ATTEMPTS times, growing an `excluded` set of
+    peer_ids so a peer that already proved dead-on-arrival for this request
+    can never be re-picked (invariants #3 + #4).
+    """
+    excluded: set[uuid.UUID] = set()
+    last_reason = "no eligible peer"
+
+    for attempt in range(1, MAX_DISPATCH_ATTEMPTS + 1):
+        peer_conn, job, buf, served_scope = await _dispatch_to_peer(
+            db, req, member_id, exclude_peer_ids=excluded
+        )
+
+        token, fired_done_first = await _race_first_token(buf, FIRST_TOKEN_DEADLINE_S)
+
+        if token is not None:
+            # SUCCESS. `token` has been consumed off `buf.token_stream` —
+            # the caller MUST yield it before draining the rest of the queue.
+            return peer_conn, job, buf, served_scope, token
+
+        if fired_done_first and buf.error_category is None:
+            # The peer completed with zero output tokens. An empty-but-valid
+            # completion is a SUCCESS, not a failover trigger (invariant: do
+            # NOT failover an empty-but-valid completion).
+            return peer_conn, job, buf, served_scope, None
+
+        # Dead on arrival: either the peer reported an error before any
+        # token, or FIRST_TOKEN_DEADLINE_S elapsed with nothing at all.
+        last_reason = "peer_error" if buf.error_category is not None else "first_token_timeout"
+        logger.warning(
+            "job_dispatch_first_token_failover",
+            job_id=str(job.id),
+            peer_id=str(peer_conn.peer_id),
+            attempt=attempt,
+            max_attempts=MAX_DISPATCH_ATTEMPTS,
+            reason=last_reason,
+        )
+        # Free the in-flight slot immediately (idempotent — a no-op if the
+        # peer-error path already called this) so scoring for OTHER
+        # concurrent requests doesn't see a phantom job on this peer while
+        # we retry.
+        await complete_job(job.id)
+        # Settle this attempt's Job row + skip credit (invariants #2 + #6).
+        await _finalize_abandoned_attempt(job, buf)
+        excluded.add(peer_conn.peer_id)
+
+    raise HTTPException(
+        status_code=503,
+        detail=(
+            f"No peer produced a first token after {MAX_DISPATCH_ATTEMPTS} "
+            f"attempts (last reason: {last_reason})."
+        ),
+    )
+
+
 @router.post("/stream", dependencies=[Depends(require_coordinator_token)])
 async def dispatch_job_stream(
     req: JobRequest,
@@ -567,9 +739,22 @@ async def dispatch_job_stream(
     Same dispatch semantics as POST /jobs (capability-aware peer pick,
     blinded routing, 503 on no eligible peer) but the response is an
     SSE stream rather than a collected JSON body.
+
+    Active first-token failover: dispatch doesn't commit to a peer until
+    that peer has actually produced its first token (or completed empty).
+    A peer that hangs, black-holes, or errors before its first token never
+    gets a byte in front of the client — `_dispatch_stream_with_failover`
+    retries a different peer instead, up to MAX_DISPATCH_ATTEMPTS. Once
+    ANY token has been yielded below, we are committed: no retry, ever.
     """
-    # ---- 1-3. Pick peer, create job, deliver (shared with the sync endpoint) ---- #
-    peer_conn, job, buf, served_scope = await _dispatch_to_peer(db, req, member_id)
+    # ---- 1-3. Pick peer, create job, deliver, AND wait for the first token
+    # (or empty-complete) before this function returns anything to ASGI. If
+    # every attempt dies before producing output, this raises HTTPException
+    # (still works as a normal error response — no StreamingResponse exists
+    # yet). ---- #
+    peer_conn, job, buf, served_scope, first_token = await _dispatch_stream_with_failover(
+        db, req, member_id
+    )
     job_id = job.id
     logger.info(
         "job_dispatched_stream",
@@ -583,6 +768,15 @@ async def dispatch_job_stream(
     async def _generate() -> AsyncGenerator[str, None]:
         deadline = asyncio.get_running_loop().time() + JOB_TIMEOUT_S
         try:
+            # The first token (if any) was already consumed off the queue by
+            # _dispatch_stream_with_failover while deciding which peer to
+            # commit to. Yield it now, before entering the normal pull loop,
+            # so the client sees it exactly once and in order. From this
+            # line onward we are irreversibly committed to `peer_conn` —
+            # nothing below ever re-dispatches.
+            if first_token is not None:
+                yield _sse_chunk(first_token)
+
             while True:
                 # Bail out cleanly when the peer has signalled completion
                 # AND the queue has drained — no point waiting on a put

@@ -398,6 +398,7 @@ async def pick_peer_for_model(
     owner_member_id: uuid.UUID | None = None,
     enforce_pool_trust: bool = False,
     circle_member_pubkeys: set[str] | None = None,
+    exclude_peer_ids: set[uuid.UUID] | None = None,
 ) -> PeerConnection | None:
     """Pick a connected peer that advertises the requested model_slug.
 
@@ -420,6 +421,13 @@ async def pick_peer_for_model(
     applied via a DB join against member_keys (one row per enrolled device
     key, keyed by public_key -> member_id). No extra trust gating is applied
     for circle peers — the owner chose them; trust is the owner's to grant.
+
+    When exclude_peer_ids is set (first-token failover, routers/jobs.py's
+    `_dispatch_stream_with_failover`), those peer_ids are dropped from
+    eligibility up front, alongside the TTL/quality/capacity excludes below —
+    a peer that already proved dead-on-arrival for THIS request must never be
+    re-picked on a retry attempt. Default None = current behavior (no
+    exclusion), so every existing caller is unaffected.
     """
     from sqlalchemy import select
     from coordinator.models import PeerCapability
@@ -438,6 +446,9 @@ async def pick_peer_for_model(
         )
     )).all()
     eligible_ids = {row[0] for row in rows}
+
+    if exclude_peer_ids:
+        eligible_ids -= exclude_peer_ids
 
     if not eligible_ids:
         return None
@@ -597,6 +608,7 @@ async def select_peer_for_request(
     requester_member_id: uuid.UUID,
     scope: str = "pool",
     circle_pubkeys: "set[str] | None" = None,
+    exclude_peer_ids: "set[uuid.UUID] | None" = None,
 ) -> "tuple[PeerConnection | None, str | None]":
     """Pick a peer honoring the routing scope. `scope` is the WIDEST tier the
     requester accepts; we always try the closest/most-trusted tier first and
@@ -610,12 +622,20 @@ async def select_peer_for_request(
     When scope="circle", circle_pubkeys must be provided (the set of member
     pubkeys from the chosen TrustedCircle). The caller (routers/jobs.py) has
     already validated that the circle belongs to the requester.
+
+    `exclude_peer_ids`, when set, is forwarded to every `pick_peer_for_model`
+    call at every tier — a peer excluded because it was dead-on-arrival on a
+    failover retry must stay excluded whether the retry re-checks My Machines,
+    Circle, or Pool. Default None = current behavior.
     """
     if scope == "circle":
         # Circle scope: dispatch strictly to peers in the circle. No fallback
         # to My Machines or Pool — the caller explicitly chose circle isolation.
         peer = await pick_peer_for_model(
-            db, model_slug, circle_member_pubkeys=circle_pubkeys
+            db,
+            model_slug,
+            circle_member_pubkeys=circle_pubkeys,
+            exclude_peer_ids=exclude_peer_ids,
         )
         if peer is not None:
             return peer, "circle"
@@ -623,7 +643,10 @@ async def select_peer_for_request(
 
     # Tier 1 — My Machines (tried first for mine and pool scopes).
     peer = await pick_peer_for_model(
-        db, model_slug, owner_member_id=requester_member_id
+        db,
+        model_slug,
+        owner_member_id=requester_member_id,
+        exclude_peer_ids=exclude_peer_ids,
     )
     if peer is not None:
         return peer, "mine"
@@ -632,7 +655,9 @@ async def select_peer_for_request(
     # Tier 3 — Open Pool. Gate on reputation: a peer that fell below neutral
     # (fabrication, or sustained failures) must earn its way back before it can
     # serve strangers again.
-    peer = await pick_peer_for_model(db, model_slug, enforce_pool_trust=True)
+    peer = await pick_peer_for_model(
+        db, model_slug, enforce_pool_trust=True, exclude_peer_ids=exclude_peer_ids
+    )
     if peer is not None:
         return peer, "pool"
     return None, None
