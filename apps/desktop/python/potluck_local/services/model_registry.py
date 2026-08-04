@@ -1,7 +1,11 @@
 """Model registry — loads the curated catalog and merges installation status.
 
-The local catalog in potluck_local/data/models.json is the source of truth
-for v0. Cloud sync is a future enhancement.
+The bundled catalog in potluck_local/data/models.json is the offline floor —
+always present, ships inside the packaged app. services.catalog_feed
+periodically fetches a cloud copy in the background and caches it to disk
+(utils.paths.catalog_cache_path()); _load_catalog() below picks whichever of
+the two is FRESHER and structurally valid, never blocking a request on the
+network itself.
 """
 
 from __future__ import annotations
@@ -10,6 +14,7 @@ import importlib.resources
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from potluck_local.utils.paths import models_dir as default_models_dir
 
@@ -18,18 +23,55 @@ logger = logging.getLogger(__name__)
 _catalog: list[dict] | None = None
 
 
+def _load_bundled_catalog() -> dict[str, Any]:
+    ref = importlib.resources.files("potluck_local.data").joinpath("models.json")
+    with ref.open("r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
 def _load_catalog() -> list[dict]:
+    """Return the freshest VALID catalog's model list.
+
+    Bundled is always the fallback. The cached remote feed (written by
+    services.catalog_feed's background refresh) is preferred only when it
+    parses AND its schema_version >= bundled's AND its updated_at >=
+    bundled's (bundled ships with no updated_at, so any remote timestamp
+    beats it once the schema version is compatible). Any error reading
+    either source falls back toward bundled; this never raises and never
+    returns an empty list when bundled has entries.
+    """
     global _catalog
     if _catalog is not None:
         return _catalog
 
-    ref = importlib.resources.files("potluck_local.data").joinpath("models.json")
-    with ref.open("r", encoding="utf-8") as fh:
-        data = json.load(fh)
+    bundled = _load_bundled_catalog()
+    chosen = bundled.get("models", [])
 
-    _catalog = data.get("models", [])
+    try:
+        from potluck_local.services.catalog_feed import read_cached_catalog
+
+        cached = read_cached_catalog()
+    except Exception:  # noqa: BLE001 - cache read must never block catalog load
+        cached = None
+
+    if cached is not None:
+        schema_ok = cached.get("schema_version", 0) >= bundled.get("schema_version", 0)
+        fresh_ok = str(cached.get("updated_at", "")) >= str(bundled.get("updated_at", ""))
+        cached_models = cached.get("models")
+        if schema_ok and fresh_ok and cached_models:
+            chosen = cached_models
+
+    _catalog = chosen
     logger.info("catalog_loaded count=%d", len(_catalog))
     return _catalog
+
+
+def invalidate_cache() -> None:
+    """Drop the in-memory merged catalog so the next _load_catalog() call
+    re-evaluates bundled vs cached-remote. Called by catalog_feed after a
+    successful background refresh lands a new file on disk."""
+    global _catalog
+    _catalog = None
 
 
 def _installed_slugs(base_dir: Path) -> set[str]:
@@ -68,6 +110,13 @@ def list_models() -> list[dict]:
             size = _size_on_disk(base_dir, slug)
             if size is not None:
                 item["size_on_disk"] = size
+
+        # Surface "this catalog entry supersedes something you have installed"
+        # without synthesizing an entry for a model that's been removed from
+        # the catalog — only the still-installed old slugs are listed.
+        upgrade_from = [s for s in entry.get("supersedes", []) if s in installed]
+        if upgrade_from:
+            item["upgrade_from"] = upgrade_from
 
         progress = downloader.get_progress(slug)
         if progress is not None:

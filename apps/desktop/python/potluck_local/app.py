@@ -106,6 +106,7 @@ async def _lifespan(app: FastAPI):  # noqa: ARG001
     from potluck_local.services.memory_db import init_memory_db
     from potluck_local.services.embedding_backfill import run_embedding_backfill
     from potluck_local.services.agent_observability import AgentObserver
+    from potluck_local.services.catalog_feed import refresh_loop as catalog_refresh_loop
 
     logger = logging.getLogger(__name__)
 
@@ -136,6 +137,12 @@ async def _lifespan(app: FastAPI):  # noqa: ARG001
     # Fire-and-forget: backfill embeddings for any memories that don't have them.
     # Runs to completion in the background; never blocks startup or the event loop.
     _track(asyncio.create_task(run_embedding_backfill()))
+
+    # Background model-catalog feed: refresh the cloud catalog once at startup,
+    # then every 6h. Writes only a disk cache (never the bundled data file) and
+    # never blocks a request — model_registry falls back to bundled if the feed
+    # is offline or not yet deployed. See services/catalog_feed.py.
+    _track(asyncio.create_task(catalog_refresh_loop()))
 
     # Stale-session sweep. MCP transports don't always send a clean disconnect
     # (crash, kill, network loss), so without this, rows pile up as "active"

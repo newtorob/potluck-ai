@@ -90,6 +90,19 @@ export function ModelLibrary() {
 
   const { hardware } = useHardware();
 
+  // Surface entries with an available update first, without reordering
+  // everything else — stable partition, not a full re-sort.
+  const sortedModels = [...models].sort((a, b) => {
+    const aHasUpdate = (a.upgrade_from?.length ?? 0) > 0 ? 0 : 1;
+    const bHasUpdate = (b.upgrade_from?.length ?? 0) > 0 ? 0 : 1;
+    return aHasUpdate - bHasUpdate;
+  });
+
+  // Resolve each update's superseded model name from the current catalog so
+  // the badge can say "Newer than X" instead of showing a raw slug.
+  const nameBySlug: Record<string, string> = {};
+  for (const m of models) nameBySlug[m.slug] = m.name;
+
   return (
     <div className="flex h-full flex-col">
       <ViewHeader
@@ -158,7 +171,11 @@ export function ModelLibrary() {
             role="list"
             aria-label="Model catalog"
           >
-            {models.map((model) => (
+            {sortedModels.map((model) => {
+              const upgradeFromSlug = model.upgrade_from?.[0];
+              const upgradeFromName =
+                upgradeFromSlug !== undefined ? nameBySlug[upgradeFromSlug] : undefined;
+              return (
               <div key={model.slug} role="listitem">
                 <ModelCard
                   model={model}
@@ -168,6 +185,7 @@ export function ModelLibrary() {
                   {...(loadError[model.slug] !== undefined
                     ? { loadError: loadError[model.slug] }
                     : {})}
+                  {...(upgradeFromName !== undefined ? { upgradeFromName } : {})}
                   hardware={hardware}
                   onInstall={() => void install(model.slug)}
                   onCancelInstall={() => void cancelInstall(model.slug)}
@@ -176,7 +194,8 @@ export function ModelLibrary() {
                   onDelete={() => void remove(model.slug)}
                 />
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -47,6 +47,12 @@ export interface CatalogModel {
   recommended_tier: ModelTier;
   is_featured: boolean;
   installed: boolean;
+  /**
+   * Slugs of installed models this entry supersedes. Non-empty means this
+   * catalog entry is a newer model than something the user already has
+   * installed. Optional — older sidecar builds / offline won't send it.
+   */
+  upgrade_from?: string[];
   /** Last measured benchmark for this model, if one has been run. */
   benchmark?: {
     tokens_per_sec: number;

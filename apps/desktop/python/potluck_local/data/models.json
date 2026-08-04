@@ -1,5 +1,6 @@
 {
   "schema_version": 2,
+  "updated_at": "2026-08-04T01:24:49Z",
   "models": [
     {
       "slug": "qwen3-1.7b-q4",

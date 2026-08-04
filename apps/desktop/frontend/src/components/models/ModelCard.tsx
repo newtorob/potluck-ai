@@ -13,7 +13,15 @@
  */
 
 import { useState } from 'react';
-import { CheckCircle2, AlertTriangle, XCircle, Loader2, HardDrive, Gauge } from 'lucide-react';
+import {
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Loader2,
+  HardDrive,
+  Gauge,
+  ArrowUpCircle,
+} from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { localApi, type BenchmarkResult } from '@/lib/localApi';
 import { DownloadProgress } from './DownloadProgress';
@@ -90,6 +98,14 @@ interface ModelCardProps {
   isLoading: boolean;
   loadError?: string;
   hardware: HardwareInfo | null;
+  /**
+   * Display name of the installed model this entry supersedes, resolved by
+   * the caller from the current catalog. Undefined when `model.upgrade_from`
+   * is empty/absent, or when the superseded model isn't in the catalog
+   * (older sidecar builds, removed model, etc) — the badge falls back to
+   * generic copy rather than showing a slug.
+   */
+  upgradeFromName?: string;
   onInstall: () => void;
   onCancelInstall: () => void;
   onLoad: () => void;
@@ -108,6 +124,7 @@ export function ModelCard({
   isLoading,
   loadError,
   hardware,
+  upgradeFromName,
   onInstall,
   onCancelInstall,
   onLoad,
@@ -115,6 +132,9 @@ export function ModelCard({
   onDelete,
 }: ModelCardProps) {
   const { slug, name, tier, description, size_bytes, min_ram_gb, min_vram_gb, installed } = model;
+
+  const hasUpdate = (model.upgrade_from?.length ?? 0) > 0;
+  const updateBadgeText = upgradeFromName ? `Newer than ${upgradeFromName}` : 'Update available';
 
   const isDownloading =
     model.download_progress !== undefined &&
@@ -149,6 +169,7 @@ export function ModelCard({
         'flex flex-col gap-3 rounded-xl border bg-card p-5 transition-shadow',
         'hover:shadow-sm',
         isActive && 'border-primary/40 ring-1 ring-primary/20',
+        hasUpdate && !isActive && 'border-amber-500/30',
       )}
       aria-label={name}
     >
@@ -174,6 +195,17 @@ export function ModelCard({
           <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-sage/10 px-2.5 py-0.5 text-xs font-medium text-sage">
             <span className="h-1.5 w-1.5 rounded-full bg-sage animate-pulse" />
             Loaded
+          </span>
+        )}
+
+        {/* Update-available pill */}
+        {!isActive && hasUpdate && (
+          <span
+            className="inline-flex max-w-[160px] shrink-0 items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400"
+            title={updateBadgeText}
+          >
+            <ArrowUpCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
+            <span className="truncate">{updateBadgeText}</span>
           </span>
         )}
       </div>
@@ -233,9 +265,9 @@ export function ModelCard({
               'bg-primary text-primary-foreground hover:bg-primary/90',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             )}
-            aria-label={`Install ${name}`}
+            aria-label={hasUpdate ? `Update to ${name}` : `Install ${name}`}
           >
-            Install
+            {hasUpdate ? 'Update' : 'Install'}
           </button>
         )}
 

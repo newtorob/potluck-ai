@@ -31,6 +31,7 @@ skipped and reported -- the run never crashes.
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import sys
 from dataclasses import dataclass, field
@@ -47,6 +48,16 @@ CATALOG_PATH = (
     / "apps/desktop/python/potluck_local/data/models.json"
 )
 PROPOSED_PATH = CATALOG_PATH.with_name("models.json.proposed")
+
+# The catalog is consumed in TWO places that must stay byte-identical: the
+# desktop sidecar's bundled copy (CATALOG_PATH, the offline floor) and the
+# cloud API's copy (served at GET /models/catalog as the live feed). --write
+# emits a reviewable .proposed next to EACH; after eyeballing them, promote
+# both together, e.g.:
+#   mv apps/desktop/python/potluck_local/data/models.json{.proposed,}
+#   mv services/api/potluck_api/data/models.json{.proposed,}
+CLOUD_CATALOG_PATH = REPO_ROOT / "services/api/potluck_api/data/models.json"
+CLOUD_PROPOSED_PATH = CLOUD_CATALOG_PATH.with_name("models.json.proposed")
 
 SCHEMA_VERSION = 2
 
@@ -680,7 +691,16 @@ def build_proposed_catalog(resolved_lineup: list[ResolvedModel]) -> dict:
                 "supersedes": SUPERSEDES.get(e.slug, []),
             }
         )
-    return {"schema_version": SCHEMA_VERSION, "models": models}
+    # updated_at drives the sidecar's bundled-vs-remote freshness merge
+    # (model_registry._load_catalog): the cloud feed wins only when its
+    # updated_at is >= the bundled catalog's. Stamp both copies identically.
+    updated_at = (
+        datetime.datetime.now(datetime.timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+    return {"schema_version": SCHEMA_VERSION, "updated_at": updated_at, "models": models}
 
 
 # ---------------------------------------------------------------------------
@@ -712,13 +732,18 @@ def main() -> int:
     if args.write:
         proposed = build_proposed_catalog(resolved_lineup)
         skipped = len(resolved_lineup) - len(proposed["models"])
-        with PROPOSED_PATH.open("w", encoding="utf-8") as fh:
-            json.dump(proposed, fh, indent=2)
-            fh.write("\n")
-        msg = f"Wrote {len(proposed['models'])} verified entries to {PROPOSED_PATH}"
+        # Same content to both consumers' .proposed files (sidecar + cloud);
+        # a single json.dumps keeps them byte-identical.
+        payload = json.dumps(proposed, indent=2) + "\n"
+        for path in (PROPOSED_PATH, CLOUD_PROPOSED_PATH):
+            path.write_text(payload, encoding="utf-8")
+            print(f"Wrote {len(proposed['models'])} verified entries to {path}", file=sys.stderr)
         if skipped:
-            msg += f"  ({skipped} skipped -- see errors above)"
-        print(msg, file=sys.stderr)
+            print(f"  ({skipped} skipped -- see errors above)", file=sys.stderr)
+        print(
+            "Review both, then promote together (see CLOUD_CATALOG_PATH comment).",
+            file=sys.stderr,
+        )
 
     return 0
 

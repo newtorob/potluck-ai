@@ -23,6 +23,12 @@ export interface Model {
   minTier: ModelTier;
   status: ModelStatus;
   installed: boolean;
+  /**
+   * Slugs of installed models this entry supersedes. Non-empty means a newer
+   * model is available for something the user already has. Optional — older
+   * sidecar builds won't send it.
+   */
+  upgrade_from?: string[];
 }
 
 export interface InstalledModel extends Model {
