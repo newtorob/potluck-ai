@@ -79,6 +79,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
         logger.info("verification_loop_scheduled")
 
+    # Background peer-liveness reaper: drains + unregisters peers whose
+    # heartbeat has gone stale. See services/peer_reaper.py for why this is
+    # the only backstop for a black-holed peer (no WS ping on /peers/connect).
+    reaper_stop = asyncio.Event()
+    reaper_task: asyncio.Task | None = None
+    if settings.peer_reaper_enabled:
+        from coordinator.services.peer_reaper import run_reaper_loop
+
+        reaper_task = asyncio.create_task(run_reaper_loop(reaper_stop))
+        logger.info("peer_reaper_loop_scheduled")
+
     yield
 
     verification_stop.set()
@@ -86,6 +97,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         verification_task.cancel()
         try:
             await verification_task
+        except asyncio.CancelledError:
+            pass
+
+    reaper_stop.set()
+    if reaper_task is not None:
+        reaper_task.cancel()
+        try:
+            await reaper_task
         except asyncio.CancelledError:
             pass
 

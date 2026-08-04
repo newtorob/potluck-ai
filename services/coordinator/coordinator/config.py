@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     # CI / single-purpose deployments).
     verification_probe_enabled: bool = True
 
+    # Background peer-liveness reaper (services/peer_reaper.py): periodically
+    # drains + unregisters peers whose heartbeat has gone stale (no ping on
+    # /peers/connect means a black-holed peer never fires WebSocketDisconnect
+    # on its own). Set false only for tests/tooling that want full manual
+    # control of the in-memory peer registry.
+    peer_reaper_enabled: bool = True
+
     # Peer attestation: when true, a device key must already be registered in
     # member_keys to attest (strict allowlist — for multi-member / production).
     # When false (default), an unregistered key is bound trust-on-first-use to
