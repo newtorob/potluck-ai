@@ -4,11 +4,16 @@
  * A handful of coordinator routes require the member's login session rather
  * than the (optional) coordinator token:
  *
- *   - POST /mesh/households      (household bootstrap)
- *   - POST /mesh/pairing-tokens  (pairing-token issuance)
- *   - POST /me/device-keys       (device-key pre-registration)
+ *   - POST /mesh/households        (household bootstrap)
+ *   - POST /mesh/pairing-tokens    (pairing-token issuance)
+ *   - POST /me/device-keys         (device-key pre-registration)
+ *   - GET  /me/identity            (own pubkey)
+ *   - GET/POST /me/circles         (list / create trusted circles)
+ *   - DELETE /me/circles/{id}      (delete a circle)
+ *   - POST /me/circles/{id}/members            (add a member)
+ *   - DELETE /me/circles/{id}/members/{pubkey} (remove a member)
  *
- * All three resolve identity via `resolve_session_member_id`, which accepts
+ * All of these resolve identity via `resolve_session_member_id`, which accepts
  * an `Authorization: Bearer <session token>` header — the desktop app's
  * fallback for a cross-origin cookie (see coordinator's
  * `middleware/session_auth.py`).
@@ -34,6 +39,8 @@
 
 import { coordinatorBase } from '@/stores/connectionStore';
 import { useAuthStore } from '@/stores/authStore';
+
+export type CoordinatorSessionMethod = 'GET' | 'POST' | 'DELETE';
 
 export interface CoordinatorSessionResult {
   status: number;
@@ -67,18 +74,21 @@ export function detailOf(body: unknown, fallback = 'unknown error'): string {
 }
 
 /**
- * POST to a session-authed coordinator route. Attaches the member's session
+ * Call a session-authed coordinator route. Attaches the member's session
  * bearer (packaged app: via the main-process proxy; dev: best-effort from
  * the in-memory auth store). Never throws on a non-2xx HTTP response — the
  * caller inspects `status`/`body`; a transport failure resolves `status: 0`.
+ *
+ * `body` is ignored for GET/DELETE — those routes here take none.
  */
 export async function coordinatorSessionRequest(
+  method: CoordinatorSessionMethod,
   path: string,
   body?: unknown,
 ): Promise<CoordinatorSessionResult> {
   const b = bridge();
   if (b) {
-    return b.coordinatorRequest(coordinatorBase(), 'POST', path, body);
+    return b.coordinatorRequest(coordinatorBase(), method, path, body);
   }
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -86,7 +96,7 @@ export async function coordinatorSessionRequest(
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   try {
-    const init: RequestInit = { method: 'POST', headers };
+    const init: RequestInit = { method, headers };
     if (body !== undefined) {
       init.body = JSON.stringify(body);
     }

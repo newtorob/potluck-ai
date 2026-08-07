@@ -284,7 +284,7 @@ export const meshDaemon = {
 export async function issuePairingToken(): Promise<PairingTokenIssueResponse> {
   // Idempotent household-bootstrap; ignore the body, we just need the
   // household row to exist so the next call doesn't 404.
-  const householdRes = await coordinatorSessionRequest('/mesh/households', {
+  const householdRes = await coordinatorSessionRequest('POST', '/mesh/households', {
     name: 'My household',
   });
   if (householdRes.status !== 200 && householdRes.status !== 201) {
@@ -294,7 +294,7 @@ export async function issuePairingToken(): Promise<PairingTokenIssueResponse> {
     );
   }
 
-  const tokenRes = await coordinatorSessionRequest('/mesh/pairing-tokens');
+  const tokenRes = await coordinatorSessionRequest('POST', '/mesh/pairing-tokens');
   if (tokenRes.status !== 200 && tokenRes.status !== 201) {
     throw new CoordinatorError(
       `Could not issue pairing token: ${detailOf(tokenRes.body)}`,

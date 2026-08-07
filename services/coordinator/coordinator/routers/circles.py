@@ -29,7 +29,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from coordinator.crypto import KeyDecodeError, decode_ed25519_public_key
 from coordinator.db.database import get_db
-from coordinator.middleware.auth import require_coordinator_token
 from coordinator.middleware.session_auth import resolve_session_member_id
 from coordinator.models.circle import CircleMember, TrustedCircle
 from coordinator.models.member_key import MemberKey
@@ -129,7 +128,6 @@ async def _load_circle_members(
     "/me/circles",
     response_model=CircleOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def create_circle(
     req: CreateCircleRequest,
@@ -148,7 +146,6 @@ async def create_circle(
 @router.get(
     "/me/circles",
     response_model=CircleListResponse,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def list_circles(
     db: AsyncSession = Depends(get_db),
@@ -173,7 +170,6 @@ async def list_circles(
 @router.delete(
     "/me/circles/{circle_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def delete_circle(
     circle_id: uuid.UUID,
@@ -193,7 +189,6 @@ async def delete_circle(
     "/me/circles/{circle_id}/members",
     response_model=CircleMemberOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def add_circle_member(
     circle_id: uuid.UUID,
@@ -229,7 +224,6 @@ async def add_circle_member(
 @router.delete(
     "/me/circles/{circle_id}/members/{member_pubkey:path}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def remove_circle_member(
     circle_id: uuid.UUID,
@@ -261,7 +255,6 @@ async def remove_circle_member(
 
 @router.get(
     "/me/identity",
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def my_identity(
     db: AsyncSession = Depends(get_db),
@@ -345,7 +338,6 @@ class DeviceKeyOut(BaseModel):
     "/me/device-keys",
     response_model=DeviceKeyOut,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def register_device_key(
     req: DeviceKeyRegisterRequest,

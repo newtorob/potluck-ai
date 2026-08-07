@@ -54,7 +54,7 @@ export async function getContributorDeviceKey(): Promise<string> {
  */
 export async function registerContributorDeviceKey(label?: string): Promise<void> {
   const publicKey = await getContributorDeviceKey();
-  const res = await coordinatorSessionRequest('/me/device-keys', {
+  const res = await coordinatorSessionRequest('POST', '/me/device-keys', {
     public_key: publicKey,
     ...(label ? { label } : {}),
   });

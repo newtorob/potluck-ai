@@ -26,6 +26,11 @@ import type {
 import type { TaskState, TaskStatus, TaskCreateInput, TaskUpdateInput } from '@/types/tasks';
 import type { AgentSession, MemoryPreview, SessionDetail, ToolCall } from '@/types/agents';
 import { coordinatorBase } from '@/stores/connectionStore';
+import {
+  coordinatorSessionRequest,
+  detailOf,
+  type CoordinatorSessionResult,
+} from '@/lib/coordinatorAuth';
 
 const LOCAL_BASE =
   (import.meta.env['VITE_LOCAL_API_URL'] as string | undefined) ?? 'http://127.0.0.1:8321';
@@ -67,6 +72,22 @@ async function handle204(res: Response): Promise<void> {
         : res.statusText;
     throw new Error(`[localApi] ${res.status}: ${msg}`);
   }
+}
+
+/**
+ * Adapts a `coordinatorSessionRequest` result (which never throws) to the
+ * same success/throw contract as `handleResponse`/`handle204`: any 2xx
+ * status (including 204, for the circle/member delete routes, whose body is
+ * unused) resolves the body cast to `T`; everything else throws
+ * `[localApi] {status}: {detail}` — the exact `[localApi] 409: …` shape
+ * CirclesView.tsx pattern-matches on to distinguish "already a member" from
+ * other failures.
+ */
+function fromSessionResult<T>(res: CoordinatorSessionResult): T {
+  if (res.status >= 200 && res.status < 300) {
+    return res.body as T;
+  }
+  throw new Error(`[localApi] ${res.status}: ${detailOf(res.body, 'unknown error')}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -1157,58 +1178,59 @@ export const localApi = {
 
   // ---- Trusted circles (coordinator — Phase 2) ----------------------------
 
+  // Session-authenticated (not the optional coordinator token) — see
+  // coordinatorAuth.ts. The prod coordinator requires a member session for
+  // every /me/* route, so these go through the bearer-attaching bridge
+  // rather than a bare fetch.
   circles: {
     /** GET /me/circles — the calling member's circles with their members. */
     list(): Promise<ListCirclesResponse> {
-      return timedFetch(`${coordinatorBase()}/me/circles`).then((r) =>
-        handleResponse<ListCirclesResponse>(r),
+      return coordinatorSessionRequest('GET', '/me/circles').then((r) =>
+        fromSessionResult<ListCirclesResponse>(r),
       );
     },
 
     /** POST /me/circles { name } — create a new trusted circle. */
     create(name: string): Promise<Circle> {
-      return timedFetch(`${coordinatorBase()}/me/circles`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      }).then((r) => handleResponse<Circle>(r));
+      return coordinatorSessionRequest('POST', '/me/circles', { name }).then((r) =>
+        fromSessionResult<Circle>(r),
+      );
     },
 
     /** DELETE /me/circles/{circle_id} — delete a circle and all its members. */
     delete(circleId: string): Promise<void> {
-      return timedFetch(`${coordinatorBase()}/me/circles/${encodeURIComponent(circleId)}`, {
-        method: 'DELETE',
-      }).then((r) => handle204(r));
+      return coordinatorSessionRequest(
+        'DELETE',
+        `/me/circles/${encodeURIComponent(circleId)}`,
+      ).then((r) => fromSessionResult<void>(r));
     },
 
     /** POST /me/circles/{circle_id}/members { member_pubkey } — add a member.
      *  Throws a [localApi] 409: … error on duplicate. */
     addMember(circleId: string, memberPubkey: string): Promise<CircleMember> {
-      return timedFetch(
-        `${coordinatorBase()}/me/circles/${encodeURIComponent(circleId)}/members`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ member_pubkey: memberPubkey }),
-        },
-      ).then((r) => handleResponse<CircleMember>(r));
+      return coordinatorSessionRequest(
+        'POST',
+        `/me/circles/${encodeURIComponent(circleId)}/members`,
+        { member_pubkey: memberPubkey },
+      ).then((r) => fromSessionResult<CircleMember>(r));
     },
 
     /** DELETE /me/circles/{circle_id}/members/{member_pubkey} — remove a member. */
     removeMember(circleId: string, memberPubkey: string): Promise<void> {
-      return timedFetch(
-        `${coordinatorBase()}/me/circles/${encodeURIComponent(circleId)}/members/${encodeURIComponent(memberPubkey)}`,
-        { method: 'DELETE' },
-      ).then((r) => handle204(r));
+      return coordinatorSessionRequest(
+        'DELETE',
+        `/me/circles/${encodeURIComponent(circleId)}/members/${encodeURIComponent(memberPubkey)}`,
+      ).then((r) => fromSessionResult<void>(r));
     },
   },
 
   // ---- Identity (coordinator — Phase 2) -----------------------------------
 
-  /** GET /me/identity — the calling member's own public key. */
+  /** GET /me/identity — the calling member's own public key.
+   *  Session-authenticated — see coordinatorAuth.ts. */
   getMyIdentity(): Promise<MyIdentityResponse> {
-    return timedFetch(`${coordinatorBase()}/me/identity`).then((r) =>
-      handleResponse<MyIdentityResponse>(r),
+    return coordinatorSessionRequest('GET', '/me/identity').then((r) =>
+      fromSessionResult<MyIdentityResponse>(r),
     );
   },
 

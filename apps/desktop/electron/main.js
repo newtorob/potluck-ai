@@ -977,12 +977,15 @@ ipcMain.handle('cloud:request', async (_evt, method, reqPath, body) => {
 // A small, path-allowlisted proxy for the handful of coordinator routes that
 // require the member's login session rather than the (optional) coordinator
 // token: POST /mesh/households + POST /mesh/pairing-tokens (household
-// bootstrap — coordinator/routers/mesh.py) and POST /me/device-keys (device
-// key pre-registration for REQUIRE_REGISTERED_KEYS=true — coordinator's
-// routers/circles.py). All three resolve identity via
-// `resolve_session_member_id`, which accepts an `Authorization: Bearer
-// <session token>` header as the desktop-app fallback for a cross-origin
-// cookie (see coordinator/middleware/session_auth.py).
+// bootstrap — coordinator/routers/mesh.py), POST /me/device-keys (device key
+// pre-registration for REQUIRE_REGISTERED_KEYS=true), and the trusted-circle
+// + identity routes (GET /me/identity, GET/POST /me/circles, DELETE
+// /me/circles/{id}, POST /me/circles/{id}/members, DELETE
+// /me/circles/{id}/members/{pubkey} — coordinator's routers/circles.py). All
+// of these resolve identity via `resolve_session_member_id`, which accepts
+// an `Authorization: Bearer <session token>` header as the desktop-app
+// fallback for a cross-origin cookie (see
+// coordinator/middleware/session_auth.py).
 //
 // Unlike `cloud:request` above, the target ORIGIN is caller-supplied: the
 // coordinator is a member-operated node the user points the app at (LAN IP,
@@ -993,21 +996,58 @@ ipcMain.handle('cloud:request', async (_evt, method, reqPath, body) => {
 // localhost origins for exactly this). What this bridge protects is the
 // bearer token itself — it stays main-process-only, same as cloud:request,
 // and is attached here rather than ever being handed to renderer JS. The
-// path allowlist below is defence in depth so this can't become a generic
-// "attach my session token to any request" primitive.
-const COORDINATOR_SESSION_PATHS = new Set([
-  '/mesh/households',
-  '/mesh/pairing-tokens',
-  '/me/device-keys',
+// route allowlist below is defence in depth so this can't become a generic
+// "attach my session token to any request" primitive: static routes are
+// exact-matched (method + path), and the two circle routes with a dynamic
+// segment are matched by a tight pattern rather than a wildcard — no `*`,
+// no free-form path-prefix check.
+const COORDINATOR_SESSION_METHODS = new Set(['GET', 'POST', 'DELETE']);
+
+// Static routes — exact `METHOD path` match.
+const COORDINATOR_SESSION_EXACT_ROUTES = new Set([
+  'POST /mesh/households',
+  'POST /mesh/pairing-tokens',
+  'POST /me/device-keys',
+  'GET /me/identity',
+  'GET /me/circles',
+  'POST /me/circles',
 ]);
+
+// Dynamic circle routes. `id` is the circle's Postgres UUID; `pubkey` is a
+// contributor device key, base64url-encoded with no padding (see
+// potluck_local/contributor/keys.py:public_key_b64), bounded to the
+// coordinator's _PUBKEY_MAX_LEN (512 — circles.py). Both are validated by
+// regex, not just split on `/`, so a crafted path segment (e.g. containing
+// `../` or another `/`) can't smuggle a different route through the proxy.
+const COORDINATOR_CIRCLE_ID_RE = /^[0-9a-f-]{36}$/i;
+const COORDINATOR_PUBKEY_RE = /^[A-Za-z0-9_-]{1,512}$/;
+const COORDINATOR_SESSION_DYNAMIC_ROUTES = [
+  { method: 'DELETE', pattern: /^\/me\/circles\/([^/]+)$/ },
+  { method: 'POST', pattern: /^\/me\/circles\/([^/]+)\/members$/ },
+  { method: 'DELETE', pattern: /^\/me\/circles\/([^/]+)\/members\/([^/]+)$/ },
+];
+
+function isAllowedCoordinatorSessionRoute(method, reqPath) {
+  if (COORDINATOR_SESSION_EXACT_ROUTES.has(`${method} ${reqPath}`)) return true;
+  for (const route of COORDINATOR_SESSION_DYNAMIC_ROUTES) {
+    if (route.method !== method) continue;
+    const match = route.pattern.exec(reqPath);
+    if (!match) continue;
+    const [, circleId, pubkey] = match;
+    if (!COORDINATOR_CIRCLE_ID_RE.test(circleId)) continue;
+    if (pubkey !== undefined && !COORDINATOR_PUBKEY_RE.test(pubkey)) continue;
+    return true;
+  }
+  return false;
+}
 
 ipcMain.handle(
   'coordinator:session-request',
   async (_evt, baseUrl, method, reqPath, body) => {
-    if (typeof method !== 'string' || method !== 'POST') {
+    if (typeof method !== 'string' || !COORDINATOR_SESSION_METHODS.has(method)) {
       return { status: 400, body: { detail: 'method not allowed' } };
     }
-    if (typeof reqPath !== 'string' || !COORDINATOR_SESSION_PATHS.has(reqPath)) {
+    if (typeof reqPath !== 'string' || !isAllowedCoordinatorSessionRoute(method, reqPath)) {
       return { status: 400, body: { detail: 'path not allowed' } };
     }
 
