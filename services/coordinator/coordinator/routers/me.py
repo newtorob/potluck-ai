@@ -18,7 +18,6 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from coordinator.db.database import get_db
-from coordinator.middleware.auth import require_coordinator_token
 from coordinator.middleware.session_auth import resolve_session_member_id
 from coordinator.models.credit import CreditLedger
 from coordinator.models.job import Job
@@ -37,7 +36,6 @@ router = APIRouter(tags=["me"])
 @router.get(
     "/me/credit-balance",
     response_model=CreditBalanceResponse,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def credit_balance(
     db: AsyncSession = Depends(get_db),
@@ -99,7 +97,6 @@ async def credit_balance(
 @router.get(
     "/me/credit-history",
     response_model=CreditHistoryResponse,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def credit_history(
     direction: str | None = Query(default=None, pattern="^(earned|spent)$"),
@@ -174,7 +171,6 @@ class ContributionsResponse(BaseModel):
 @router.get(
     "/me/contributions",
     response_model=ContributionsResponse,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def my_contributions(
     days: int = Query(default=7, ge=1, le=31),
@@ -323,7 +319,6 @@ def _week_start_utc(n_weeks_ago: int, now: datetime) -> date:
 @router.get(
     "/me/contributions/weekly",
     response_model=WeeklyContributionsResponse,
-    dependencies=[Depends(require_coordinator_token)],
 )
 async def my_contributions_weekly(
     weeks: int = Query(default=8, ge=1, le=26),

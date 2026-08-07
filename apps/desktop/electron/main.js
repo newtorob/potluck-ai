@@ -38,6 +38,16 @@ let pythonProcess = null;
 let mainWindow = null;
 let restartAttempts = 0;
 
+// The coordinator origin the renderer is currently pointed at (Phase G control
+// plane — connectionStore.ts's coordinatorUrl). Runtime-mutable and user-
+// overridable, so main can't hardcode it; the renderer pushes it via the
+// 'coordinator:set-base' IPC channel (see the handler near the coordinator
+// session-auth bridge below) on startup and on every change. Null until the
+// renderer's first push. Used ONLY to scope which requests the
+// onBeforeSendHeaders injector attaches the member session bearer to — see
+// that handler for why the scoping matters.
+let coordinatorOrigin = null;
+
 // Deep-link state (magic-link sign-in via the potluck:// scheme).
 // pendingDeepLink buffers a URL that arrived before the renderer was ready to
 // receive it (cold start, or macOS open-url before the window exists). The
@@ -400,21 +410,55 @@ async function createWindow() {
     mainWindow.show();
   });
 
-  // Inject the sidecar auth token into every renderer request to the local API.
-  // Production only: the same token is passed to the spawned sidecar via env, and
-  // the sidecar rejects non-exempt requests that lack it. In dev the sidecar is
-  // started by dev:python with no token (gate off), so injecting one here would
-  // mismatch and 401 every call — hence the app.isPackaged guard.
+  // Inject auth into renderer→{sidecar,coordinator} requests. Production only:
+  // in dev the sidecar runs with no token (gate off) and the coordinator is
+  // reached from localhost:5173 with the in-memory authStore bearer attached
+  // by the renderer itself — injecting here would mismatch/duplicate, hence
+  // the app.isPackaged guard.
+  //
+  // session.defaultSession.webRequest.onBeforeSendHeaders is a SINGLE-listener
+  // setter — calling it twice REPLACES the first registration. So this one
+  // handler does both jobs, branching on the request's origin:
+  //   - sidecar origin (127.0.0.1/localhost:PYTHON_PORT) -> SIDECAR_TOKEN
+  //     bearer (unchanged from before; the sidecar rejects non-exempt
+  //     requests that lack it — the same token is passed to the spawned
+  //     sidecar via env).
+  //   - the currently-configured coordinator origin (pushed from the
+  //     renderer over 'coordinator:set-base' — see the handler below, and
+  //     connectionStore.ts for where the renderer tracks it) -> the member
+  //     session bearer, so SSE requests like /jobs/stream (which cannot go
+  //     through the buffering coordinator:session-request bridge — that
+  //     reads the whole body with res.text(), which does not work for a
+  //     live stream) still carry a session. No coordinator origin known yet,
+  //     or the token isn't loaded -> inject nothing for it.
+  //   - anything else -> untouched. This scoping is a security boundary: the
+  //     session bearer must only ever go to the exact coordinator origin the
+  //     user configured, never broadcast to arbitrary hosts.
+  // The URL filter is widened from sidecar-only to all http/https so the
+  // coordinator branch is even seen; that's fine because the else-branch
+  // above forwards non-matching requests' headers unmodified.
   if (app.isPackaged) {
     session.defaultSession.webRequest.onBeforeSendHeaders(
-      {
-        urls: [
-          `http://127.0.0.1:${PYTHON_PORT}/*`,
-          `http://localhost:${PYTHON_PORT}/*`,
-        ],
-      },
+      { urls: ['http://*/*', 'https://*/*'] },
       (details, callback) => {
-        details.requestHeaders['Authorization'] = `Bearer ${SIDECAR_TOKEN}`;
+        let origin;
+        try {
+          origin = new URL(details.url).origin;
+        } catch (_) {
+          callback({ requestHeaders: details.requestHeaders });
+          return;
+        }
+        if (
+          origin === `http://127.0.0.1:${PYTHON_PORT}` ||
+          origin === `http://localhost:${PYTHON_PORT}`
+        ) {
+          details.requestHeaders['Authorization'] = `Bearer ${SIDECAR_TOKEN}`;
+        } else if (coordinatorOrigin && origin === coordinatorOrigin) {
+          const sessionToken = loadCloudToken();
+          if (sessionToken) {
+            details.requestHeaders['Authorization'] = `Bearer ${sessionToken}`;
+          }
+        }
         callback({ requestHeaders: details.requestHeaders });
       }
     );
@@ -978,11 +1022,15 @@ ipcMain.handle('cloud:request', async (_evt, method, reqPath, body) => {
 // require the member's login session rather than the (optional) coordinator
 // token: POST /mesh/households + POST /mesh/pairing-tokens (household
 // bootstrap — coordinator/routers/mesh.py), POST /me/device-keys (device key
-// pre-registration for REQUIRE_REGISTERED_KEYS=true), and the trusted-circle
+// pre-registration for REQUIRE_REGISTERED_KEYS=true), the trusted-circle
 // + identity routes (GET /me/identity, GET/POST /me/circles, DELETE
 // /me/circles/{id}, POST /me/circles/{id}/members, DELETE
-// /me/circles/{id}/members/{pubkey} — coordinator's routers/circles.py). All
-// of these resolve identity via `resolve_session_member_id`, which accepts
+// /me/circles/{id}/members/{pubkey} — coordinator's routers/circles.py), and
+// the credit/contribution routes (GET /me/credit-balance, GET
+// /me/credit-history, GET /me/contributions, GET /me/contributions/weekly —
+// coordinator's routers/me.py), and GET /jobs/stats (own requester-side job
+// counts — coordinator/routers/jobs.py). All of these resolve identity via
+// `resolve_session_member_id`, which accepts
 // an `Authorization: Bearer <session token>` header as the desktop-app
 // fallback for a cross-origin cookie (see
 // coordinator/middleware/session_auth.py).
@@ -1011,6 +1059,11 @@ const COORDINATOR_SESSION_EXACT_ROUTES = new Set([
   'GET /me/identity',
   'GET /me/circles',
   'POST /me/circles',
+  'GET /me/credit-balance',
+  'GET /me/credit-history',
+  'GET /me/contributions',
+  'GET /me/contributions/weekly',
+  'GET /jobs/stats',
 ]);
 
 // Dynamic circle routes. `id` is the circle's Postgres UUID; `pubkey` is a
@@ -1028,10 +1081,14 @@ const COORDINATOR_SESSION_DYNAMIC_ROUTES = [
 ];
 
 function isAllowedCoordinatorSessionRoute(method, reqPath) {
-  if (COORDINATOR_SESSION_EXACT_ROUTES.has(`${method} ${reqPath}`)) return true;
+  // The credit/contribution GETs carry query params (?days=, ?weeks=, etc.);
+  // match the allowlist against the path only, never the query string.
+  const queryIdx = reqPath.indexOf('?');
+  const pathOnly = queryIdx === -1 ? reqPath : reqPath.slice(0, queryIdx);
+  if (COORDINATOR_SESSION_EXACT_ROUTES.has(`${method} ${pathOnly}`)) return true;
   for (const route of COORDINATOR_SESSION_DYNAMIC_ROUTES) {
     if (route.method !== method) continue;
-    const match = route.pattern.exec(reqPath);
+    const match = route.pattern.exec(pathOnly);
     if (!match) continue;
     const [, circleId, pubkey] = match;
     if (!COORDINATOR_CIRCLE_ID_RE.test(circleId)) continue;
@@ -1095,6 +1152,25 @@ ipcMain.handle(
     }
   },
 );
+
+// Lets the renderer tell main which coordinator origin is currently active
+// (connectionStore.ts's coordinatorUrl — user-overridable and runtime-mutable
+// via adoptSidecarUrl/hydrateFromSidecar, so main cannot hardcode it). Stores
+// the ORIGIN only, not the full URL, and only via new URL().origin — never a
+// raw string compare — so the onBeforeSendHeaders injector above can scope the
+// member session bearer to exactly this host. Renderer calls this once at
+// startup and again on every coordinatorUrl change (see connectionStore.ts's
+// initCoordinatorBaseSync). Malformed/empty input is ignored, leaving the
+// previous value (or null) in place rather than clearing it on a transient
+// bad call.
+ipcMain.handle('coordinator:set-base', (_evt, baseUrl) => {
+  if (typeof baseUrl !== 'string' || baseUrl.length === 0) return;
+  try {
+    coordinatorOrigin = new URL(baseUrl).origin;
+  } catch (_) {
+    // Ignore — keep whatever coordinatorOrigin was already set to.
+  }
+});
 
 // ─── Auto-updater ────────────────────────────────────────────────────────────
 

@@ -347,12 +347,13 @@ async def register_device_key(
     """Register a device Ed25519 public key to the calling (session-
     authenticated) member.
 
-    Auth: gated the same way as every other `/me/*` route —
-    `require_coordinator_token` (bearer-token transport gate) plus
-    `resolve_session_member_id` (the real identity gate: with
-    `POTLUCK_SESSION_AUTH_ENABLED=1` this 401s without a valid
+    Auth: gated by `resolve_session_member_id` only (the real identity
+    gate: with `POTLUCK_SESSION_AUTH_ENABLED=1` this 401s without a valid
     `potluck_session` cookie / bearer session token; in dev passthrough it
-    resolves to the fixture member, matching every other `/me/*` endpoint).
+    resolves to the fixture member). Deliberately NOT gated by
+    `require_coordinator_token` — this route is called directly by the
+    desktop frontend, which can never hold the coordinator's shared secret
+    (see the module docstring's "frontend-direct" invariant).
 
     Validates `public_key` decodes to a 32-byte Ed25519 key (same check the
     WS attestation handshake applies), then inserts a `member_keys` row with

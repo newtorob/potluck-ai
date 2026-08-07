@@ -575,7 +575,12 @@ export const localApi = {
       body: JSON.stringify(body),
     };
     if (options.abortSignal) init.signal = options.abortSignal;
-    // Streaming SSE — raw fetch, no timeout (long-lived); caller owns the abort.
+    // coordinator-bare-fetch-ok: SSE stream — can't route through the
+    // buffering coordinatorSessionRequest bridge (res.text() can't consume a
+    // live stream). Authenticated at the NETWORK layer instead: main.js's
+    // onBeforeSendHeaders injector (packaged app only) attaches the member
+    // session bearer to requests matching the coordinator origin the
+    // renderer pushes via 'coordinator:set-base' — see connectionStore.ts.
     return nativeFetch(`${coordinatorBase()}/jobs/stream`, init);
   },
 
@@ -1103,7 +1108,10 @@ export const localApi = {
 
   network: {
     /** GET /transparency/fleet on the coordinator. Aggregate-only — no
-     *  peer_id / hostname / individual peer fields, by manifesto rule. */
+     *  peer_id / hostname / individual peer fields, by manifesto rule.
+     *  coordinator-bare-fetch-ok: no auth dependency server-side (see
+     *  coordinator/routers/transparency.py) — a public transparency route,
+     *  aggregate fleet stats only, no per-member data. */
     fleet(): Promise<FleetSummary> {
       return timedFetch(`${coordinatorBase()}/transparency/fleet`).then((r) =>
         handleResponse<FleetSummary>(r),
@@ -1115,7 +1123,10 @@ export const localApi = {
      *  chat composer's Network-mode toggle). Resolves to `true` only when
      *  the response is a 2xx; any other outcome (5xx, network error,
      *  timeout) resolves to `false` rather than throwing — callers should
-     *  not need a try/catch for this. */
+     *  not need a try/catch for this.
+     *  coordinator-bare-fetch-ok: /health has no auth dependency server-side
+     *  (see coordinator/routers/health.py) — a public liveness probe, and
+     *  the only way to gate the toggle before a session may even exist. */
     health(timeoutMs = 2000): Promise<boolean> {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -1126,39 +1137,49 @@ export const localApi = {
     },
 
     /** GET /jobs/stats on the coordinator. Returns this member's
-     *  requester-side counts + average latency for the last 24h. */
+     *  requester-side counts + average latency for the last 24h.
+     *  Session-authenticated — see coordinatorAuth.ts. (Was previously also
+     *  gated by the coordinator token server-side; that dependency was
+     *  dropped since this route is called directly by the frontend, which
+     *  can never hold the coordinator's shared secret — see
+     *  coordinator/routers/jobs.py.) */
     myStats(): Promise<MyJobStats> {
-      return timedFetch(`${coordinatorBase()}/jobs/stats`).then((r) =>
-        handleResponse<MyJobStats>(r),
+      return coordinatorSessionRequest('GET', '/jobs/stats').then((r) =>
+        fromSessionResult<MyJobStats>(r),
       );
     },
 
     /** GET /me/contributions — per-machine served + earned for the member's
-     *  own machines over the last `days` (default 7). Own-machine data only. */
+     *  own machines over the last `days` (default 7). Own-machine data only.
+     *  Session-authenticated — see coordinatorAuth.ts. */
     myContributions(days = 7): Promise<ContributionsResponse> {
-      return timedFetch(`${coordinatorBase()}/me/contributions?days=${days}`).then((r) =>
-        handleResponse<ContributionsResponse>(r),
+      return coordinatorSessionRequest('GET', `/me/contributions?days=${days}`).then((r) =>
+        fromSessionResult<ContributionsResponse>(r),
       );
     },
 
     /** GET /me/contributions/weekly — week-by-week history, oldest-first.
-     *  Returns `weeks` weeks of data (zero-filled); default 8. */
+     *  Returns `weeks` weeks of data (zero-filled); default 8.
+     *  Session-authenticated — see coordinatorAuth.ts. */
     myContributionsWeekly(weeks = 8): Promise<ContributionsWeeklyResponse> {
-      return timedFetch(`${coordinatorBase()}/me/contributions/weekly?weeks=${weeks}`).then((r) =>
-        handleResponse<ContributionsWeeklyResponse>(r),
+      return coordinatorSessionRequest('GET', `/me/contributions/weekly?weeks=${weeks}`).then((r) =>
+        fromSessionResult<ContributionsWeeklyResponse>(r),
       );
     },
   },
 
   // ---- Credits (coordinator — Phase G m4 ledger) -------------------------
+  // Session-authenticated (not the optional coordinator token) — see
+  // coordinatorAuth.ts. Both routes are under /me/*, which the prod
+  // coordinator requires a member session for.
 
   credits: {
     /** GET /me/credit-balance — aggregated earned / spent / net plus
      *  per-model breakdown. Decimal fields arrive as strings; keep them
      *  that way — parse/format only at the render layer. */
     balance(): Promise<CreditBalance> {
-      return timedFetch(`${coordinatorBase()}/me/credit-balance`).then((r) =>
-        handleResponse<CreditBalance>(r),
+      return coordinatorSessionRequest('GET', '/me/credit-balance').then((r) =>
+        fromSessionResult<CreditBalance>(r),
       );
     },
 
@@ -1170,8 +1191,8 @@ export const localApi = {
       if (opts.direction !== undefined) params.set('direction', opts.direction);
       if (opts.limit !== undefined) params.set('limit', String(opts.limit));
       const qs = params.toString();
-      return timedFetch(`${coordinatorBase()}/me/credit-history${qs ? `?${qs}` : ''}`).then((r) =>
-        handleResponse<CreditHistory>(r),
+      return coordinatorSessionRequest('GET', `/me/credit-history${qs ? `?${qs}` : ''}`).then((r) =>
+        fromSessionResult<CreditHistory>(r),
       );
     },
   },

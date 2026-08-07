@@ -12,6 +12,11 @@
  *   - DELETE /me/circles/{id}      (delete a circle)
  *   - POST /me/circles/{id}/members            (add a member)
  *   - DELETE /me/circles/{id}/members/{pubkey} (remove a member)
+ *   - GET  /me/credit-balance      (own credit ledger balance)
+ *   - GET  /me/credit-history      (own credit ledger entries)
+ *   - GET  /me/contributions       (own machines' served/earned, last N days)
+ *   - GET  /me/contributions/weekly (own machines' served/earned, weekly)
+ *   - GET  /jobs/stats             (own requester-side job counts, last 24h)
  *
  * All of these resolve identity via `resolve_session_member_id`, which accepts
  * an `Authorization: Bearer <session token>` header — the desktop app's

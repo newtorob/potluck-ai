@@ -159,6 +159,20 @@ contextBridge.exposeInMainWorld('potluck', {
      */
     coordinatorRequest: (baseUrl, method, path, body) =>
       ipcRenderer.invoke('coordinator:session-request', baseUrl, method, path, body),
+    /**
+     * Tells main which coordinator origin the renderer is currently pointed
+     * at (connectionStore.ts's coordinatorUrl), so main's
+     * onBeforeSendHeaders injector can attach the member session bearer to
+     * renderer→coordinator requests that never go through an IPC bridge —
+     * e.g. streamNetworkJob's SSE POST to /jobs/stream, which can't be
+     * buffered through coordinatorRequest above (that reads the whole
+     * response body; a live stream can't cross that boundary). Call once at
+     * startup and again whenever coordinatorUrl changes.
+     * @param {string} baseUrl
+     * @returns {Promise<void>}
+     */
+    setCoordinatorBase: (baseUrl) =>
+      ipcRenderer.invoke('coordinator:set-base', String(baseUrl)),
   },
 
   // ── Mesh sidecar bridge ────────────────────────────────────────────────────

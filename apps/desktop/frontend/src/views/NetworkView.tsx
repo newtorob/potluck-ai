@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Globe2, Layers, Activity, Cpu, BarChart3, TrendingUp, TrendingDown, Minus, type LucideIcon } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { localApi } from '@/lib/localApi';
@@ -29,6 +30,11 @@ import { relativeTime } from '@/lib/timeFormat';
 import { formatModelName } from '@/lib/modelName';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
+import {
+  classifyCoordinatorError,
+  defaultCoordinatorErrorCopy,
+  type CoordinatorFailureState,
+} from '@/lib/coordinatorError';
 
 const FLEET_POLL_MS = 5_000;
 const CREDIT_POLL_MS = 30_000;
@@ -57,7 +63,7 @@ export function NetworkView() {
 
   const [balance, setBalance] = useState<CreditBalance | null>(null);
   const [history, setHistory] = useState<CreditHistory | null>(null);
-  const [creditError, setCreditError] = useState<string | null>(null);
+  const [creditError, setCreditError] = useState<CoordinatorFailureState | null>(null);
   const [isFetchingCredits, setIsFetchingCredits] = useState(true);
 
   // Stable refs so polling closures always capture the latest fetch fns.
@@ -89,9 +95,7 @@ export function NetworkView() {
       setHistory(h);
       setCreditError(null);
     } catch (err) {
-      setCreditError(
-        err instanceof Error ? err.message : 'Credit fetch failed',
-      );
+      setCreditError(classifyCoordinatorError(err));
     } finally {
       setIsFetchingCredits(false);
     }
@@ -635,13 +639,34 @@ function SmallStat({ label, value }: { label: string; value: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Credit error note — shared by the balance card and history list. Classified
+// so a 401 (session expired) reads as "sign in," not "coordinator unreachable."
+// ---------------------------------------------------------------------------
+
+function CreditErrorNote({ error }: { error: CoordinatorFailureState }) {
+  if (error.kind === 'unauthenticated') {
+    return (
+      <p className="text-sm text-muted-foreground/70">
+        You're signed out.{' '}
+        <Link to="/membership" className="underline underline-offset-2 hover:text-foreground">
+          Sign in
+        </Link>{' '}
+        to see your credits.
+      </p>
+    );
+  }
+  const copy = defaultCoordinatorErrorCopy(error);
+  return <p className="text-sm text-muted-foreground/70">{copy.title}. {copy.description}</p>;
+}
+
+// ---------------------------------------------------------------------------
 // Credit balance card
 // ---------------------------------------------------------------------------
 
 interface CreditBalanceCardProps {
   balance: CreditBalance | null;
   isLoading: boolean;
-  error: string | null;
+  error: CoordinatorFailureState | null;
 }
 
 function CreditBalanceCard({ balance, isLoading, error }: CreditBalanceCardProps) {
@@ -650,11 +675,7 @@ function CreditBalanceCard({ balance, isLoading, error }: CreditBalanceCardProps
   }
 
   if (error !== null && balance === null) {
-    return (
-      <p className="text-sm text-muted-foreground/70">
-        Coordinator unreachable. Check connection.
-      </p>
-    );
+    return <CreditErrorNote error={error} />;
   }
 
   if (balance === null) return null;
@@ -739,7 +760,7 @@ function CreditBalanceCard({ balance, isLoading, error }: CreditBalanceCardProps
 interface CreditHistoryListProps {
   history: CreditHistory | null;
   isLoading: boolean;
-  error: string | null;
+  error: CoordinatorFailureState | null;
 }
 
 function CreditHistoryList({ history, isLoading, error }: CreditHistoryListProps) {
@@ -748,11 +769,7 @@ function CreditHistoryList({ history, isLoading, error }: CreditHistoryListProps
   }
 
   if (error !== null && history === null) {
-    return (
-      <p className="text-sm text-muted-foreground/70">
-        Coordinator unreachable. Check connection.
-      </p>
-    );
+    return <CreditErrorNote error={error} />;
   }
 
   if (history === null || history.entries.length === 0) {

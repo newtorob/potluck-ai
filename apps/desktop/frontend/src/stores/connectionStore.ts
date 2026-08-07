@@ -241,3 +241,43 @@ export function isCoordinatorMismatched(
 ): boolean {
   return sidecarReportedUrl !== null && sidecarReportedUrl !== coordinatorUrl;
 }
+
+// ---------------------------------------------------------------------------
+// Main-process sync (packaged app only)
+// ---------------------------------------------------------------------------
+//
+// main.js's onBeforeSendHeaders injector attaches the member session bearer
+// to renderer→coordinator requests that can't go through the buffering
+// coordinator:session-request IPC bridge — chiefly streamNetworkJob's SSE
+// POST to /jobs/stream (see localApi.ts). That injector scopes the bearer to
+// an exact origin for security, and origin is user-overridable/runtime-
+// mutable (setCoordinatorUrl, adoptSidecarUrl, hydrateFromSidecar all change
+// it), so main can't hardcode it — the renderer has to push it over.
+
+/** Best-effort push of `url` to main via window.potluck.cloud.setCoordinatorBase.
+ *  No-op outside the packaged app (that bridge only exists there — preload.js). */
+function pushCoordinatorBaseToMain(url: string): void {
+  if (typeof window === 'undefined') return;
+  const setBase = (
+    window as unknown as {
+      potluck?: { cloud?: { setCoordinatorBase?: (url: string) => Promise<void> } };
+    }
+  ).potluck?.cloud?.setCoordinatorBase;
+  if (setBase) void setBase(url);
+}
+
+/**
+ * Wires this store to the main process: pushes the current coordinatorUrl
+ * immediately, then again on every subsequent change (user override, sidecar
+ * adoption, durable-config hydration — anything that calls `set()` here).
+ * Call once, on app mount. Safe in dev/browser — pushCoordinatorBaseToMain
+ * no-ops when window.potluck is absent.
+ */
+export function initCoordinatorBaseSync(): void {
+  pushCoordinatorBaseToMain(useConnectionStore.getState().coordinatorUrl);
+  useConnectionStore.subscribe((state, prevState) => {
+    if (state.coordinatorUrl !== prevState.coordinatorUrl) {
+      pushCoordinatorBaseToMain(state.coordinatorUrl);
+    }
+  });
+}

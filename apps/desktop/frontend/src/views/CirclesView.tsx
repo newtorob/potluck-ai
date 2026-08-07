@@ -19,13 +19,19 @@
  *   user needs to copy an exact string.
  *
  * Error handling policy:
- *   Coordinator unreachable = calm "check connection" empty state, no
- *   error wall. Duplicate-member 409 = inline "already a member" note.
+ *   A failed load never shows one misleading catch-all message — it's
+ *   classified (coordinatorError.ts) into what actually happened: signed
+ *   out (401) gets a sign-in prompt, a coordinator misconfiguration (403)
+ *   gets a diagnosable message, and unreachable/server-error get a calm
+ *   empty state with a Retry button. None of these bubble past this view —
+ *   the app shell (Sidebar/StatusBar) stays up regardless.
+ *   Duplicate-member 409 = inline "already a member" note.
  *   All destructive actions confirm inline (not a modal) following the
  *   HouseholdView pattern.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Users,
   Copy,
@@ -44,6 +50,18 @@ import type { Circle, CircleMember } from '@/lib/localApi';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { relativeTime } from '@/lib/timeFormat';
+import {
+  classifyCoordinatorError,
+  defaultCoordinatorErrorCopy,
+  type CoordinatorFailureState,
+} from '@/lib/coordinatorError';
+
+const primaryButtonClass = cn(
+  'inline-flex h-9 items-center gap-1.5 rounded-lg px-4',
+  'bg-primary text-sm font-medium text-primary-foreground',
+  'hover:bg-primary/90 transition-colors',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+);
 
 // ---------------------------------------------------------------------------
 // Root
@@ -53,9 +71,14 @@ export function CirclesView() {
   const [circles, setCircles] = useState<Circle[]>([]);
   const [myKey, setMyKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<CoordinatorFailureState | null>(null);
 
+  // Note: `list()` failing is the failure this view classifies and renders.
+  // `getMyIdentity()` failing is swallowed (`.catch(() => null)`) — the key
+  // card already has its own "didn't return an identity" fallback below, so
+  // one call's failure doesn't need to block the whole view.
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const [listRes, identityRes] = await Promise.all([
         localApi.circles.list(),
@@ -63,9 +86,9 @@ export function CirclesView() {
       ]);
       setCircles(listRes.circles);
       setMyKey(identityRes?.member_pubkey ?? null);
-      setFetchError(null);
-    } catch {
-      setFetchError('coordinator_unreachable');
+      setErrorState(null);
+    } catch (err) {
+      setErrorState(classifyCoordinatorError(err));
     } finally {
       setLoading(false);
     }
@@ -75,16 +98,44 @@ export function CirclesView() {
     void load();
   }, [load]);
 
-  // Coordinator unreachable — calm state, not a wall.
-  if (!loading && fetchError !== null) {
+  if (!loading && errorState !== null) {
+    // Signed out — this is not "the coordinator is down," it's "you need to
+    // sign in." Distinct empty state, no error tone, wired to the app's
+    // existing sign-in flow (the /membership route's magic-link form).
+    if (errorState.kind === 'unauthenticated') {
+      return (
+        <div className="flex h-full flex-col">
+          <CirclesHeader count={null} />
+          <EmptyState
+            icon={Users}
+            title="Sign in to use circles"
+            description="Trusted circles are tied to your account. Sign in to see and manage them."
+            primaryAction={
+              <Link to="/membership" className={primaryButtonClass}>
+                Sign in
+              </Link>
+            }
+          />
+        </div>
+      );
+    }
+
+    // Coordinator misconfiguration (403), unreachable, or a 5xx — calm
+    // state with a Retry, not a wall. Copy is classified, not guessed.
+    const copy = defaultCoordinatorErrorCopy(errorState);
     return (
       <div className="flex h-full flex-col">
         <CirclesHeader count={null} />
         <EmptyState
           icon={Users}
-          tone="warning"
-          title="Can't reach the coordinator"
-          description="The coordinator isn't responding. Trusted circles require a coordinator connection. Check that it's running and reachable, then come back."
+          tone={errorState.kind === 'forbidden' ? 'destructive' : 'warning'}
+          title={copy.title}
+          description={copy.description}
+          primaryAction={
+            <button type="button" onClick={() => void load()} className={primaryButtonClass}>
+              Retry
+            </button>
+          }
         />
       </div>
     );

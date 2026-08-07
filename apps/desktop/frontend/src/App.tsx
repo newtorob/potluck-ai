@@ -25,6 +25,7 @@ import { FirstRun } from '@/views/FirstRun';
 import { useModelStore } from '@/stores/modelStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useMeshStore } from '@/stores/meshStore';
+import { initCoordinatorBaseSync } from '@/stores/connectionStore';
 import { useUiPrefsStore } from '@/stores/uiPrefsStore';
 import { localApi } from '@/lib/localApi';
 import { autoLoadOnStartup } from '@/lib/appPrefs';
@@ -106,6 +107,17 @@ export default function App() {
   // app's lifetime (no stop on unmount).
   useEffect(() => {
     useMeshStore.getState().start();
+  }, []);
+
+  // Push the coordinator origin to the Electron main process (packaged app
+  // only — no-op in dev/browser) so its onBeforeSendHeaders injector knows
+  // which host to attach the member session bearer to for coordinator
+  // requests that bypass the buffering IPC bridge (streamNetworkJob's SSE
+  // stream — see localApi.ts). Pushes once now, then again on every
+  // subsequent coordinatorUrl change (user edit, sidecar adoption, durable
+  // hydration) via a store subscription — see connectionStore.ts.
+  useEffect(() => {
+    initCoordinatorBaseSync();
   }, []);
 
   // Make the default launch state "alive": once the model list has settled,

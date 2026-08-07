@@ -430,7 +430,7 @@ async def job_feedback(
     return {"recorded": True}
 
 
-@router.get("/stats", dependencies=[Depends(require_coordinator_token)])
+@router.get("/stats")
 async def my_job_stats(
     db: AsyncSession = Depends(get_db),
     member_id: uuid.UUID = Depends(resolve_session_member_id),
@@ -728,7 +728,7 @@ async def _dispatch_stream_with_failover(
     )
 
 
-@router.post("/stream", dependencies=[Depends(require_coordinator_token)])
+@router.post("/stream")
 async def dispatch_job_stream(
     req: JobRequest,
     db: AsyncSession = Depends(get_db),

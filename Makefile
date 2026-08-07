@@ -19,7 +19,7 @@ COMPOSE ?= $(shell \
   fi)
 
 .PHONY: help setup check-python check-docker up down restart logs api-logs pg-logs coord-logs migrate psql \
-        api-shell coord-shell test test-api test-coordinator test-sidecar test-go m3-smoke mesh-smoke lint install-hooks dev desktop frontend \
+        api-shell coord-shell test test-api test-coordinator test-sidecar test-go m3-smoke mesh-smoke lint smoke-prod install-hooks dev desktop frontend \
         sidecar sidecar-setup sidecar-go installer-deps installer-bundle installer-mac installer-win installer-linux installer-clean \
         coordinator coordinator-setup frontend-setup electron-setup ps status clean reset eval-retrieval bench \
         bench-inference bench-inference-get-models \
@@ -246,6 +246,11 @@ bench-inference: ## Local-model inference benchmark — gen/prompt-eval tok/s, T
 
 lint: ## Run the privacy-invariant lint (member_id leaks + contributor in-memory-only). Free, local.
 	@python3 scripts/dev/lint_privacy.py
+
+smoke-prod: ## Post-deploy smoke test against LIVE prod (api.trypotluck.ai + coordinator.trypotluck.ai). Safe/read-only by default.
+	@echo "==> Not wired to CI -- run manually after every coordinator/api deploy (see docs/launch/production-launch-checklist.md)."
+	@echo "==> Opt-in deeper checks: SMOKE_ARGS='--with-session TOKEN' or SMOKE_ARGS='--send-email you@example.com'"
+	@bash scripts/smoke_prod.sh $(SMOKE_ARGS)
 
 check-models: ## Check the model catalog against the curated current-gen lineup (add --write or --json via ARGS)
 	@if [ ! -x apps/desktop/python/.venv/bin/python ]; then \
