@@ -18,9 +18,10 @@
     "prepack:mcp": "bash scripts/sign-sidecars.sh ../python/dist/potluck-mcp && cp -R ../python/dist/potluck-mcp resources/python/",
     "prepack:mesh": "make -C ../go/potluck-mesh build && bash scripts/sign-sidecars.sh ../go/potluck-mesh/dist && rm -rf resources/mesh && mkdir -p resources/mesh && cp ../go/potluck-mesh/dist/potluck-mesh* resources/mesh/",
     "prepack:mesh-helper": "bash native/mesh-helper/build.sh",
-    "prepack": "pnpm run prepack:frontend && pnpm run prepack:python && pnpm run prepack:mcp && pnpm run prepack:mesh && pnpm run prepack:mesh-helper",
+    "prepack:build-info": "node scripts/generate-build-info.js",
+    "prepack": "pnpm run prepack:frontend && pnpm run prepack:python && pnpm run prepack:mcp && pnpm run prepack:mesh && pnpm run prepack:mesh-helper && pnpm run prepack:build-info",
     "package": "pnpm run prepack && pnpm run build",
-    "clean": "rimraf dist out resources/python resources/mesh resources/mesh-helper"
+    "clean": "rimraf dist out resources/python resources/mesh resources/mesh-helper build-info.json"
   },
   "build": {
     "afterSign": "scripts/notarize.js",
@@ -38,7 +39,8 @@
     "files": [
       "main.js",
       "preload.js",
-      "icons/**/*"
+      "icons/**/*",
+      "build-info.json"
     ],
     "extraResources": [
       {

@@ -1,7 +1,7 @@
 'use strict';
 
 const { app, BrowserWindow, shell, ipcMain, dialog, Notification, nativeImage, session } = require('electron');
-const { spawn, execFile } = require('child_process');
+const { spawn, execFile, execFileSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -65,6 +65,76 @@ log.transports.file.resolvePathFn = () =>
   path.join(app.getPath('userData'), 'logs', 'main.log');
 log.transports.file.level = 'debug';
 log.transports.console.level = 'debug';
+
+// ─── Build stamp (staleness detection) ───────────────────────────────────────
+//
+// The bug this exists to prevent: a build pipeline step (e.g. only rebuilding
+// the frontend) can silently leave a WEEK-OLD compiled app installed while
+// looking like a fresh build, because nothing on disk told you which git
+// commit — or even which day — the running app was actually built from. This
+// stamp makes that detectable: the frontend can render a badge, and it's
+// logged here on every launch so it's in the log file too.
+//
+// Packaged: scripts/generate-build-info.js writes build-info.json into this
+// same directory at build time (wired into package.json's prepack chain and
+// the root Makefile's installer-bundle target) — see that script for exactly
+// what it captures. Read once at startup; the file is static for the life of
+// a packaged build so there's no reason to re-read it.
+//
+// Dev (`make desktop`): there is no packaged bundle and no prepack step, so
+// compute the same shape live from git. Best-effort only — a dev checkout
+// with no .git (unlikely, but not our problem to hard-fail over) degrades to
+// sha:"unknown" rather than blocking app startup.
+function loadBuildInfo() {
+  if (app.isPackaged) {
+    try {
+      const raw = fs.readFileSync(path.join(__dirname, 'build-info.json'), 'utf8');
+      const parsed = JSON.parse(raw);
+      return {
+        sha: typeof parsed.sha === 'string' ? parsed.sha : 'unknown',
+        builtAt: typeof parsed.builtAt === 'string' ? parsed.builtAt : 'unknown',
+        packaged: true,
+        dirty: !!parsed.dirty,
+      };
+    } catch (err) {
+      log.warn(`[build] Failed to read build-info.json: ${err.message}`);
+      return { sha: 'unknown', builtAt: 'unknown', packaged: true, dirty: false };
+    }
+  }
+
+  try {
+    const repoRoot = path.join(__dirname, '..', '..', '..');
+    const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    }).trim();
+    const dirty =
+      execFileSync('git', ['status', '--porcelain'], { cwd: repoRoot, encoding: 'utf8' }).trim()
+        .length > 0;
+    return { sha, builtAt: new Date().toISOString(), packaged: false, dirty };
+  } catch (err) {
+    log.warn(`[build] Failed to compute dev build info from git: ${err.message}`);
+    return { sha: 'dev', builtAt: new Date().toISOString(), packaged: false };
+  }
+}
+
+const BUILD_INFO = loadBuildInfo();
+log.info(
+  `[build] sha=${BUILD_INFO.sha} builtAt=${BUILD_INFO.builtAt} packaged=${BUILD_INFO.packaged}`
+    + (BUILD_INFO.dirty ? ' dirty=true' : '')
+);
+
+// Synchronous by design: preload runs before any page script and assigns this
+// straight into the exposed object (see preload.js) so the renderer can read
+// window.potluck.app.buildInfo as a plain value with no await — a build
+// stamp is static for the process lifetime, so there is nothing to be async
+// about. ipcRenderer.sendSync blocks only the preload script, not the page.
+// `version` (app.getVersion(), e.g. "0.1.0") rides alongside sha/builtAt so a
+// frontend agent can compare it against the server's minimum/latest without a
+// second round trip — shape is { version, sha, builtAt, packaged, dirty? }.
+ipcMain.on('app:get-build-info-sync', (event) => {
+  event.returnValue = { version: app.getVersion(), ...BUILD_INFO };
+});
 
 // ─── Deep linking (potluck:// magic-link sign-in) ────────────────────────────
 
@@ -410,59 +480,65 @@ async function createWindow() {
     mainWindow.show();
   });
 
-  // Inject auth into renderer→{sidecar,coordinator} requests. Production only:
-  // in dev the sidecar runs with no token (gate off) and the coordinator is
-  // reached from localhost:5173 with the in-memory authStore bearer attached
-  // by the renderer itself — injecting here would mismatch/duplicate, hence
-  // the app.isPackaged guard.
+  // Inject auth into renderer→{sidecar,coordinator} requests.
   //
   // session.defaultSession.webRequest.onBeforeSendHeaders is a SINGLE-listener
   // setter — calling it twice REPLACES the first registration. So this one
-  // handler does both jobs, branching on the request's origin:
+  // handler does both jobs, branching on the request's origin, with an
+  // independent packaged-only guard on the sidecar branch only:
   //   - sidecar origin (127.0.0.1/localhost:PYTHON_PORT) -> SIDECAR_TOKEN
-  //     bearer (unchanged from before; the sidecar rejects non-exempt
-  //     requests that lack it — the same token is passed to the spawned
-  //     sidecar via env).
+  //     bearer, PACKAGED ONLY. In dev the sidecar is started via `pnpm
+  //     dev:python` with no token (its own auth gate is off), so injecting
+  //     one there would be inert at best; the guard keeps that explicit
+  //     rather than relying on it being a no-op.
   //   - the currently-configured coordinator origin (pushed from the
   //     renderer over 'coordinator:set-base' — see the handler below, and
   //     connectionStore.ts for where the renderer tracks it) -> the member
   //     session bearer, so SSE requests like /jobs/stream (which cannot go
   //     through the buffering coordinator:session-request bridge — that
   //     reads the whole body with res.text(), which does not work for a
-  //     live stream) still carry a session. No coordinator origin known yet,
-  //     or the token isn't loaded -> inject nothing for it.
+  //     live stream) still carry a session. Runs in BOTH dev and packaged:
+  //     unlike the sidecar, dev's coordinator calls hit a real coordinator
+  //     (local or hosted) that enforces the same session auth prod does, so
+  //     the dev app's network-chat streaming needs the same bearer prod
+  //     gets. No coordinator origin known yet, or the token isn't loaded ->
+  //     inject nothing for it.
   //   - anything else -> untouched. This scoping is a security boundary: the
   //     session bearer must only ever go to the exact coordinator origin the
   //     user configured, never broadcast to arbitrary hosts.
   // The URL filter is widened from sidecar-only to all http/https so the
   // coordinator branch is even seen; that's fine because the else-branch
-  // above forwards non-matching requests' headers unmodified.
-  if (app.isPackaged) {
-    session.defaultSession.webRequest.onBeforeSendHeaders(
-      { urls: ['http://*/*', 'https://*/*'] },
-      (details, callback) => {
-        let origin;
-        try {
-          origin = new URL(details.url).origin;
-        } catch (_) {
-          callback({ requestHeaders: details.requestHeaders });
-          return;
-        }
-        if (
-          origin === `http://127.0.0.1:${PYTHON_PORT}` ||
-          origin === `http://localhost:${PYTHON_PORT}`
-        ) {
-          details.requestHeaders['Authorization'] = `Bearer ${SIDECAR_TOKEN}`;
-        } else if (coordinatorOrigin && origin === coordinatorOrigin) {
-          const sessionToken = loadCloudToken();
-          if (sessionToken) {
-            details.requestHeaders['Authorization'] = `Bearer ${sessionToken}`;
-          }
-        }
+  // above forwards non-matching requests' headers unmodified. Registered
+  // unconditionally (not gated on app.isPackaged) so the coordinator branch
+  // is live in dev too — the sidecar branch's own app.isPackaged check below
+  // keeps that half prod-only.
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['http://*/*', 'https://*/*'] },
+    (details, callback) => {
+      let origin;
+      try {
+        origin = new URL(details.url).origin;
+      } catch (_) {
         callback({ requestHeaders: details.requestHeaders });
+        return;
       }
-    );
+      if (
+        app.isPackaged
+        && (origin === `http://127.0.0.1:${PYTHON_PORT}` || origin === `http://localhost:${PYTHON_PORT}`)
+      ) {
+        details.requestHeaders['Authorization'] = `Bearer ${SIDECAR_TOKEN}`;
+      } else if (coordinatorOrigin && origin === coordinatorOrigin) {
+        const sessionToken = loadCloudToken();
+        if (sessionToken) {
+          details.requestHeaders['Authorization'] = `Bearer ${sessionToken}`;
+        }
+        details.requestHeaders['X-Potluck-Client-Version'] = app.getVersion();
+      }
+      callback({ requestHeaders: details.requestHeaders });
+    }
+  );
 
+  if (app.isPackaged) {
     // Content-Security-Policy — defence-in-depth for the renderer. We already run
     // sandbox:true + contextIsolation, load only local file:// content, and send
     // external navigations to the OS browser, so a renderer compromise has a small
@@ -584,19 +660,76 @@ ipcMain.handle('show-notification', (_event, title, body) => {
 
 ipcMain.handle('get-app-version', () => app.getVersion());
 
+// True only when this build can actually self-update: it must be packaged AND
+// electron-builder must have emitted app-update.yml (the publish-feed config).
+// A `--dir` / dogfood / unsigned local build is packaged but omits that file,
+// so calling checkForUpdates/downloadUpdate would throw
+// "ENOENT ... app-update.yml" and surface a bogus "update failed" banner.
+// Treat those builds as "updates disabled" and no-op everywhere.
+function isUpdaterConfigured() {
+  return (
+    app.isPackaged &&
+    fs.existsSync(path.join(process.resourcesPath, 'app-update.yml'))
+  );
+}
+
 // ─── Auto-updater IPC (renderer-driven download + install) ───────────────────
 // autoDownload is off, so the renderer decides when to pull the update (banner
 // "Download") and when to restart into it ("Restart"). These are registered
-// unconditionally so the facade never rejects; in dev there is simply no update.
+// unconditionally so the facade never rejects; a build with no update feed
+// (dev / dir / unsigned) returns a benign { status: 'unavailable' }.
 ipcMain.handle('updater:download', async () => {
+  if (!isUpdaterConfigured()) return { status: 'unavailable' };
   log.info('[updater] Renderer requested download.');
   return autoUpdater.downloadUpdate();
 });
 
 ipcMain.handle('updater:quit-and-install', () => {
+  if (!isUpdaterConfigured()) return { status: 'unavailable' };
   log.info('[updater] Renderer requested restart-to-install.');
   // Defer so the IPC reply flushes before the app tears itself down.
   setImmediate(() => autoUpdater.quitAndInstall());
+});
+
+// update:check / update:download / update:install — same three actions as
+// updater:download / updater:quit-and-install above, added under the
+// update:* names for the updater-namespaced preload API (window.potluck.
+// updater). Kept alongside the older channels rather than renaming them, so
+// nothing already wired to updater:download / updater:quit-and-install
+// breaks. All three no-op with a benign { status: 'unavailable' } when this
+// build has no update feed (isUpdaterConfigured() false): electron-updater
+// throws "ENOENT ... app-update.yml" if you call checkForUpdates/
+// downloadUpdate/quitAndInstall on a dev / --dir / unsigned build.
+ipcMain.handle('update:check', async () => {
+  if (!isUpdaterConfigured()) return { status: 'unavailable' };
+  log.info('[updater] Renderer requested a manual update check.');
+  try {
+    await autoUpdater.checkForUpdates();
+    return { status: 'ok' };
+  } catch (err) {
+    log.error(`[updater] Manual check failed: ${err.message}`);
+    return { status: 'error', message: err.message };
+  }
+});
+
+ipcMain.handle('update:download', async () => {
+  if (!isUpdaterConfigured()) return { status: 'unavailable' };
+  log.info('[updater] Renderer requested download.');
+  try {
+    await autoUpdater.downloadUpdate();
+    return { status: 'ok' };
+  } catch (err) {
+    log.error(`[updater] Download failed: ${err.message}`);
+    return { status: 'error', message: err.message };
+  }
+});
+
+ipcMain.handle('update:install', () => {
+  if (!isUpdaterConfigured()) return { status: 'unavailable' };
+  log.info('[updater] Renderer requested restart-to-install.');
+  // Defer so the IPC reply flushes before the app tears itself down.
+  setImmediate(() => autoUpdater.quitAndInstall());
+  return { status: 'ok' };
 });
 
 // Renderer pulls any deep link that arrived before it was ready (cold start).
@@ -982,7 +1115,7 @@ ipcMain.handle('cloud:request', async (_evt, method, reqPath, body) => {
     return { status: 400, body: { detail: 'path must start with /' } };
   }
 
-  const headers = { Accept: 'application/json' };
+  const headers = { Accept: 'application/json', 'X-Potluck-Client-Version': app.getVersion() };
   const token = loadCloudToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const init = { method, headers };
@@ -1118,7 +1251,7 @@ ipcMain.handle(
       return { status: 400, body: { detail: 'unsupported protocol' } };
     }
 
-    const headers = { Accept: 'application/json' };
+    const headers = { Accept: 'application/json', 'X-Potluck-Client-Version': app.getVersion() };
     const token = loadCloudToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
     const init = { method, headers };
@@ -1174,10 +1307,18 @@ ipcMain.handle('coordinator:set-base', (_evt, baseUrl) => {
 
 // ─── Auto-updater ────────────────────────────────────────────────────────────
 
+const UPDATE_CHECK_INITIAL_DELAY_MS = 10_000; // 10s after startup
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
 function setupAutoUpdater() {
-  // Only run the updater inside a packaged build; electron-updater will throw
-  // in development because there is no published release to compare against.
-  if (!app.isPackaged) return;
+  // Only run the updater when this build can actually self-update: packaged AND
+  // app-update.yml present (see isUpdaterConfigured). A `--dir` / dogfood /
+  // unsigned local build is packaged but has no app-update.yml, so a check would
+  // throw "ENOENT ... app-update.yml" and surface a bogus "update failed" banner.
+  if (!isUpdaterConfigured()) {
+    log.info('[updater] Disabled for this build (no app-update.yml — dev/dir/unsigned).');
+    return;
+  }
 
   autoUpdater.logger = log;
   autoUpdater.autoDownload = false;
@@ -1187,6 +1328,15 @@ function setupAutoUpdater() {
     log.info(`[updater] Update available: ${info.version}`);
     if (mainWindow) {
       mainWindow.webContents.send('update-available', info.version);
+    }
+  });
+
+  // Forwarded so the UI can show "up to date" rather than sitting on a
+  // perpetual "checking..." state after a check comes back negative.
+  autoUpdater.on('update-not-available', (info) => {
+    log.info(`[updater] No update available (current: ${info && info.version}).`);
+    if (mainWindow) {
+      mainWindow.webContents.send('update-not-available');
     }
   });
 
@@ -1210,7 +1360,21 @@ function setupAutoUpdater() {
     }
   });
 
-  autoUpdater.checkForUpdatesAndNotify();
+  // Initial check shortly after startup, then re-check on a fixed interval —
+  // autoDownload stays false throughout, so these only ever surface an
+  // 'update-available'/'update-not-available' event; the user consents to
+  // the actual download from the UI (update:download / updater:download).
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      log.error(`[updater] Initial check failed: ${err.message}`);
+    });
+  }, UPDATE_CHECK_INITIAL_DELAY_MS);
+
+  setInterval(() => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      log.error(`[updater] Periodic check failed: ${err.message}`);
+    });
+  }, UPDATE_CHECK_INTERVAL_MS);
 }
 
 // ─── Graceful shutdown ───────────────────────────────────────────────────────

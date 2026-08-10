@@ -13,11 +13,13 @@ from slowapi.errors import RateLimitExceeded
 
 from potluck_api.config import get_settings
 from potluck_api.db.database import close_db, init_db
+from potluck_api.middleware.client_version import ClientVersionMiddleware
 from potluck_api.middleware.rate_limit import limiter
 from potluck_api.routers import (
     admin,
     auth,
     billing,
+    client,
     discourse_sso,
     governance,
     health,
@@ -85,11 +87,18 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Reads the optional X-Potluck-Client-Version header off every request for
+    # observability (see middleware/client_version.py). Never rejects a request.
+    app.add_middleware(ClientVersionMiddleware)
+
     # ------------------------------------------------------------------ #
     # Routers                                                              #
     # ------------------------------------------------------------------ #
     # Health — no prefix, no auth
     app.include_router(health.router)
+
+    # Client version handshake — GET /client/version
+    app.include_router(client.router, prefix="/client")
 
     # Auth endpoints live at /auth/...
     # discourse_sso also hangs off /auth (GET /auth/discourse-sso)

@@ -1,39 +1,53 @@
 /**
- * UpdateBanner — a thin top strip that drives the auto-update flow the main
- * process exposes over IPC.
+ * UpdateBanner — a thin top strip that drives the auto-update flow exposed
+ * over window.potluck.updater.
  *
- * The updater runs with autoDownload off, so this is the only surface that
- * turns a detected update into an installed one: it offers "Download", shows
- * progress, then "Restart to update" once the download completes. Without it the
- * app would detect an update (electron/main.js emits `update-available`) and
- * then dead-end. Outside Electron every ipc.onUpdate* call no-ops, so this
- * renders nothing in a browser dev session.
+ * On mount, if the build is packaged and the updater bridge is present, it
+ * kicks off a check(). It then subscribes to the updater's events for the
+ * lifetime of the app shell (this component is never unmounted while the
+ * user is signed in) and mirrors them into updateStore — the same store the
+ * version-handshake "soft available" nudge (see updateStore.checkVersionHandshake,
+ * driven from App.tsx) and the Settings status line read from, so all three
+ * surfaces agree.
  *
- * Pairs with setupAutoUpdater() in electron/main.js.
+ * Outside Electron, or before main/preload ship window.potluck.updater,
+ * every ipc.onUpdate* call is a safe no-op — this renders nothing there.
+ *
+ * Pairs with the updater wiring in electron/main.js.
  */
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { X } from 'lucide-react';
 import { ipc } from '@/lib/ipc';
-
-type Phase = 'idle' | 'available' | 'downloading' | 'ready' | 'error';
+import { useUpdateStore } from '@/stores/updateStore';
 
 export function UpdateBanner() {
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [version, setVersion] = useState<string | null>(null);
-  const [percent, setPercent] = useState(0);
+  const phase = useUpdateStore((s) => s.phase);
+  const version = useUpdateStore((s) => s.version);
+  const percent = useUpdateStore((s) => s.percent);
+  const dismissed = useUpdateStore((s) => s.dismissed);
+  const errorMessage = useUpdateStore((s) => s.errorMessage);
 
   useEffect(() => {
-    const offAvailable = ipc.onUpdateAvailable((v) => {
-      setVersion(v);
-      setPhase('available');
-    });
-    const offProgress = ipc.onUpdateProgress((p) => {
-      setPercent(p);
-      setPhase('downloading');
-    });
-    const offDownloaded = ipc.onUpdateDownloaded(() => setPhase('ready'));
-    const offError = ipc.onUpdateError(() => setPhase('error'));
+    const offAvailable = ipc.onUpdateAvailable((v) => useUpdateStore.getState().setAvailable(v));
+    const offNotAvailable = ipc.onUpdateNotAvailable(() =>
+      useUpdateStore.getState().setNotAvailable(),
+    );
+    const offProgress = ipc.onUpdateProgress((p) => useUpdateStore.getState().setProgress(p));
+    const offDownloaded = ipc.onUpdateDownloaded(() => useUpdateStore.getState().setDownloaded());
+    const offError = ipc.onUpdateError((m) => useUpdateStore.getState().setError(m));
+
+    // Kick off a check on mount. Only meaningful in a packaged build with
+    // the updater bridge present — buildInfo defaults to "packaged" when
+    // absent (an older build predating buildInfo), since ipc.hasUpdater is
+    // the real safety gate: check() is a no-op whenever the bridge is gone.
+    const packaged = ipc.buildInfo?.packaged !== false;
+    if (packaged && ipc.hasUpdater) {
+      useUpdateStore.getState().check();
+    }
+
     return () => {
       offAvailable();
+      offNotAvailable();
       offProgress();
       offDownloaded();
       offError();
@@ -41,12 +55,12 @@ export function UpdateBanner() {
   }, []);
 
   if (phase === 'idle') return null;
+  if (phase === 'available' && dismissed) return null;
 
-  const download = () => {
-    setPhase('downloading');
-    void ipc.downloadUpdate();
-  };
-  const restart = () => void ipc.quitAndInstall();
+  const download = () => useUpdateStore.getState().download();
+  const restart = () => useUpdateStore.getState().install();
+  const dismiss = () => useUpdateStore.getState().dismiss();
+  const retry = () => useUpdateStore.getState().download();
 
   return (
     <div
@@ -63,6 +77,14 @@ export function UpdateBanner() {
             className="font-medium underline underline-offset-2 hover:no-underline"
           >
             Download
+          </button>
+          <button
+            type="button"
+            onClick={dismiss}
+            aria-label="Dismiss"
+            className="text-sky-700/70 hover:text-sky-700 dark:text-sky-300/70 dark:hover:text-sky-300"
+          >
+            <X className="h-3.5 w-3.5" />
           </button>
         </>
       )}
@@ -83,7 +105,16 @@ export function UpdateBanner() {
       )}
 
       {phase === 'error' && (
-        <span>Update failed to download. It will retry on the next launch.</span>
+        <>
+          <span>Update failed to download{errorMessage ? `: ${errorMessage}` : ''}.</span>
+          <button
+            type="button"
+            onClick={retry}
+            className="font-medium underline underline-offset-2 hover:no-underline"
+          >
+            Retry
+          </button>
+        </>
       )}
     </div>
   );

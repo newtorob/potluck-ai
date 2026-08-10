@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { StatusBar } from '@/components/layout/StatusBar';
 import { SidecarReconnectingBanner } from '@/components/layout/SidecarReconnectingBanner';
 import { UpdateBanner } from '@/components/layout/UpdateBanner';
+import { UpdateRequiredGate } from '@/components/layout/UpdateRequiredGate';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { ChatView } from '@/views/ChatView';
 import { ModelLibrary } from '@/views/ModelLibrary';
@@ -25,6 +26,7 @@ import { FirstRun } from '@/views/FirstRun';
 import { useModelStore } from '@/stores/modelStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useMeshStore } from '@/stores/meshStore';
+import { useUpdateStore } from '@/stores/updateStore';
 import { initCoordinatorBaseSync } from '@/stores/connectionStore';
 import { useUiPrefsStore } from '@/stores/uiPrefsStore';
 import { localApi } from '@/lib/localApi';
@@ -40,6 +42,12 @@ import { WeeklyReceiptToast } from '@/components/household/WeeklyReceiptToast';
  * AuthGate requires a signed-in account before Sidebar/routes render — see
  * apps/desktop/frontend/src/components/auth/AuthGate.tsx for the loading /
  * sign-in-wall / offline-cached-account decision.
+ *
+ * Above all of that sits the update version gate: a client below the
+ * server-reported minimum version renders UpdateRequiredGate instead of
+ * anything else (see updateStore.checkVersionHandshake, called on mount
+ * below). See also UpdateBanner for the non-blocking "update available"
+ * strip driven by the local auto-updater.
  *
  * Routes:
  *   /chat        — streaming chat interface
@@ -120,6 +128,18 @@ export default function App() {
     initCoordinatorBaseSync();
   }, []);
 
+  // Version handshake: GET /client/version and compare against the running
+  // build. Below `minimum` sets updateStore.blocked, which the early return
+  // below turns into the full-screen UpdateRequiredGate — the backstop that
+  // stands in for whatever cryptic failure an old client would otherwise hit
+  // against a changed backend. Below `latest` (but not blocked) nudges the
+  // same "available" banner state UpdateBanner drives from the local
+  // auto-updater. Never blocks on a failed/absent response — see
+  // updateStore.checkVersionHandshake.
+  useEffect(() => {
+    void useUpdateStore.getState().checkVersionHandshake();
+  }, []);
+
   // Make the default launch state "alive": once the model list has settled,
   // auto-load the last-active model (fallback: smallest installed) so the user
   // lands ready-to-chat instead of on "No model loaded". Runs once, only when
@@ -151,6 +171,7 @@ export default function App() {
 
   const onboardingCompleted = useUiPrefsStore((s) => s.onboardingCompleted);
   const hasInstalledModels = models.some((m) => m.installed);
+  const updateBlocked = useUpdateStore((s) => s.blocked);
 
   // Latch the "should show wizard" decision after the first settled fetch.
   // Without this, completing the onboarding install flips hasInstalledModels
@@ -165,6 +186,15 @@ export default function App() {
 
   // Only gate once the fetch has settled to avoid a false-positive flash
   const showFirstRun = fetchSettled && !onboardingCompleted && wizardLatched.current;
+
+  // Universal update backstop: a client below the server-reported `minimum`
+  // version blocks here, before anything else renders — including the
+  // magic-link bounce page below. Whatever changed on the backend, an old
+  // client shows this one clear screen instead of a cryptic downstream
+  // failure. See the version-handshake effect above / updateStore.ts.
+  if (updateBlocked) {
+    return <UpdateRequiredGate />;
+  }
 
   // Standalone magic-link verify/bounce page — rendered outside the app shell
   // (no sidebar/status bar). In a browser it bounces to the potluck:// scheme;

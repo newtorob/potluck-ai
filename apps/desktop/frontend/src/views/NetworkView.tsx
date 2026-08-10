@@ -59,7 +59,9 @@ export function NetworkView() {
   const [myStats, setMyStats] = useState<MyJobStats | null>(null);
   const [contributions, setContributions] = useState<ContributionsResponse | null>(null);
   const [fleetError, setFleetError] = useState<string | null>(null);
-  const [isFetchingFleet, setIsFetchingFleet] = useState(true);
+  // Only the setter is read now (the fleet sections render null-safe, and an
+  // empty pool shows the first-peer panel rather than a full-page empty state).
+  const [, setIsFetchingFleet] = useState(true);
 
   const [balance, setBalance] = useState<CreditBalance | null>(null);
   const [history, setHistory] = useState<CreditHistory | null>(null);
@@ -169,29 +171,12 @@ export function NetworkView() {
   const onlineNow = fleet?.peers.online_now ?? 0;
   const hasPeers = onlineNow > 0;
 
-  // ---- empty state -------------------------------------------------------
-
-  if (!isFetchingFleet && fleet !== null && !hasPeers) {
-    return (
-      <div className="flex h-full flex-col">
-        <NetworkHeader fleet={null} />
-        <EmptyState
-          icon={Globe2}
-          title="No peers online right now"
-          description={
-            <>
-              When members run the contributor sidecar, they show up here.
-              You can also <span className="font-medium text-foreground">be the first peer</span>.
-              Flip on inference in <span className="font-medium text-foreground">Settings</span> and your
-              machine joins the network.
-            </>
-          }
-        />
-      </div>
-    );
-  }
-
   // ---- error state -------------------------------------------------------
+  // Note: an empty pool (no other peers) is NOT an empty state — we still show
+  // the member's own usage, contributions, and credits below, plus a
+  // "be the first peer" panel in place of the aggregate fleet card. Collapsing
+  // the whole page to a single "no peers" message hid everything that is
+  // actually about you.
 
   if (fleetError !== null && fleet === null) {
     return (
@@ -200,11 +185,11 @@ export function NetworkView() {
         <EmptyState
           icon={Globe2}
           tone="warning"
-          title="Couldn't reach the coordinator"
+          title="Can't reach the network right now"
           description={
             <>
-              Make sure the coordinator is running (<code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">make up</code>)
-              and reachable at the configured URL. Network mode in chat won't work until this is fixed.
+              Potluck can't reach the coordinator. Check your internet connection.
+              Local chat still works. Network and circle routing resume once the connection is back.
             </>
           }
         />
@@ -219,17 +204,26 @@ export function NetworkView() {
       <NetworkHeader fleet={fleet} balance={balance} />
 
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
-        {/* Aggregate fleet card */}
-        <section aria-label="Aggregate fleet stats">
-          <SectionHeader>The network right now</SectionHeader>
-          <FleetCard fleet={fleet} />
-        </section>
+        {/* Pool state. When no other peers are online, show a useful
+            "be the first peer" panel instead of a wall of zeros; the member's
+            own sections below still render either way. */}
+        {fleet !== null && !hasPeers ? (
+          <FirstPeerPanel />
+        ) : (
+          <>
+            {/* Aggregate fleet card */}
+            <section aria-label="Aggregate fleet stats">
+              <SectionHeader>The network right now</SectionHeader>
+              <FleetCard fleet={fleet} />
+            </section>
 
-        {/* Available models — pick which one network requests use */}
-        <section aria-label="Available models">
-          <SectionHeader>Models the network can serve</SectionHeader>
-          <ModelChips models={fleet?.models ?? []} />
-        </section>
+            {/* Available models — pick which one network requests use */}
+            <section aria-label="Available models">
+              <SectionHeader>Models the network can serve</SectionHeader>
+              <ModelChips models={fleet?.models ?? []} />
+            </section>
+          </>
+        )}
 
         {/* Your usage */}
         <section aria-label="Your usage">
@@ -355,6 +349,52 @@ function NetBalancePill({ net }: { net: string }) {
       )}
       {isPositive ? '+' : ''}{fmtCredits(net)} credits
     </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// First-peer panel — shown when the pool has no other members online. This is
+// the common state before launch, so it must be useful, not a dead end.
+// ---------------------------------------------------------------------------
+
+function FirstPeerPanel() {
+  return (
+    <section aria-label="Be the first peer">
+      <div className="rounded-xl border border-border/60 bg-card p-6">
+        <div className="flex items-start gap-4">
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-primary/30 bg-primary/10 text-primary"
+            aria-hidden="true"
+          >
+            <Globe2 className="h-5 w-5" />
+          </div>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <h3 className="font-serif text-lg tracking-display text-foreground">
+                The network is quiet right now
+              </h3>
+              <p className="max-w-xl text-sm text-muted-foreground">
+                No other members are online yet. This page fills in as contributors
+                join: who is online, which models they serve, and the jobs and tokens
+                flowing across the network.
+              </p>
+            </div>
+            <p className="max-w-xl text-sm text-muted-foreground">
+              You can be the first peer. Turn on{' '}
+              <span className="font-medium text-foreground">Allow open-pool routing</span> in{' '}
+              <Link
+                to="/settings"
+                className="underline underline-offset-2 hover:text-foreground"
+              >
+                Settings, Connect tools
+              </Link>{' '}
+              and your machine joins the pool, ready to serve other members when they
+              come online. Your own usage, contributions, and credits are below.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

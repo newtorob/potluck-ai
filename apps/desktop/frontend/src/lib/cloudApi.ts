@@ -7,10 +7,16 @@
  * IMPORTANT: This API never receives chat messages or model weights.
  * Only account and membership data crosses the network.
  *
- * Transport is dual-path (see `request` below): the packaged app renders from
- * file:// where browser CORS blocks direct calls, so it proxies through the
- * Electron main process (`potluck.cloud`) with a bearer token held in main; the
- * dev renderer runs on http://localhost:5173 and uses plain fetch + cookie.
+ * Transport is dual-path (see `request` below): whenever the app is running
+ * inside Electron — packaged (file://) or dev (`make desktop`, renderer on
+ * http://localhost:5173, still Electron) — the preload bridge
+ * (`window.potluck.cloud`) is present, so we proxy through the Electron main
+ * process with a bearer token held in main. That's true in both cases: main
+ * exposes the same bridge unconditionally, and using it in dev too avoids a
+ * SameSite=Lax cookie that never survives the localhost -> api.trypotluck.ai
+ * cross-origin hop. Only a plain browser tab with no Electron host (e.g.
+ * opening localhost:5173 directly in Chrome for UI-only work) has no bridge
+ * and falls back to plain fetch + cookie.
  * See guide §4.5 and services/api/ for the server-side counterpart.
  */
 
@@ -21,6 +27,7 @@ import type {
   MembershipPlan,
   AdminMembersPage,
   AdminMemberSummary,
+  ClientVersionInfo,
 } from '@/types/api';
 
 const CLOUD_BASE =
@@ -31,7 +38,7 @@ const CLOUD_BASE =
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/** The Electron main-process cloud bridge, present only in the packaged app. */
+/** The Electron main-process cloud bridge, present whenever running inside Electron (dev or packaged). */
 interface CloudBridge {
   request: (
     method: string,
@@ -60,15 +67,15 @@ export class CloudApiError extends Error {
 }
 
 /**
- * Return the main-process bridge when we must route through it (packaged app,
- * file:// origin, where browser CORS blocks direct calls). In dev the renderer
- * is http://localhost:5173 (CORS-allowlisted), so this is undefined and we use
- * plain fetch + cookie.
+ * Return the main-process bridge whenever it's actually present on
+ * `window.potluck` — true for both packaged (file://) and dev
+ * (`make desktop`, http://localhost:5173) Electron windows, since preload
+ * exposes `potluck.cloud` unconditionally. Only a bridge-less plain browser
+ * tab falls through to undefined, which routes `request()` to fetch + cookie
+ * instead.
  */
 function cloudBridge(): CloudBridge | undefined {
-  if (typeof window === 'undefined' || window.location.protocol !== 'file:') {
-    return undefined;
-  }
+  if (typeof window === 'undefined') return undefined;
   return (window as unknown as { potluck?: { cloud?: CloudBridge } }).potluck?.cloud;
 }
 
@@ -159,9 +166,10 @@ export const cloudApi = {
    * active session. Callers must call `commitSession()` only after that
    * confirmation; on cancel, simply drop the returned session.
    *
-   * The web/dev cookie transport is the one exception: the server sets the
-   * httpOnly cookie as a side effect of this GET itself, before we ever see
-   * the response. If the caller cancels, call `logout()` to revoke it.
+   * The cookie transport (plain browser, no Electron bridge) is the one
+   * exception: the server sets the httpOnly cookie as a side effect of this
+   * GET itself, before we ever see the response. If the caller cancels, call
+   * `logout()` to revoke it.
    */
   async verifyMagicLink(token: string): Promise<Session> {
     return request<Session>('GET', `/auth/callback?token=${encodeURIComponent(token)}`);
@@ -177,8 +185,9 @@ export const cloudApi = {
     if (bridge && session.token) {
       await bridge.setToken(session.token);
     }
-    // Cookie transport (dev/browser): the httpOnly cookie was already set by
-    // the /auth/callback response itself — nothing further to persist here.
+    // Cookie transport (plain browser, no bridge): the httpOnly cookie was
+    // already set by the /auth/callback response itself — nothing further to
+    // persist here.
   },
 
   /** POST /auth/logout — revokes the server-side session and clears the token */
@@ -196,9 +205,10 @@ export const cloudApi = {
    * because offline" (token present, /me just failed to reach the server)
    * apart from "signed out, no account on this machine".
    *
-   * Only meaningful for the packaged app's bridge transport. The dev/browser
-   * cookie transport has no client-readable equivalent (the cookie is
-   * httpOnly) — this resolves `null` there, meaning "unknown", not `false`.
+   * Only meaningful for the bridge transport (any Electron window, dev or
+   * packaged). The plain-browser cookie transport has no client-readable
+   * equivalent (the cookie is httpOnly) — this resolves `null` there,
+   * meaning "unknown", not `false`.
    */
   async hasToken(): Promise<boolean | null> {
     const bridge = cloudBridge();
@@ -214,6 +224,18 @@ export const cloudApi = {
    */
   async clearToken(): Promise<void> {
     await cloudBridge()?.clearToken();
+  },
+
+  // ---- Client version handshake ---------------------------------------------
+
+  /**
+   * GET /client/version — public, unauthenticated. May 404 until the
+   * endpoint is deployed; callers must treat ANY failure (404, network,
+   * anything) as "no version info available" and never block on it. See
+   * the version gate in App.tsx / updateStore.ts.
+   */
+  getClientVersion(): Promise<ClientVersionInfo> {
+    return get<ClientVersionInfo>('/client/version');
   },
 
   // ---- Member --------------------------------------------------------------

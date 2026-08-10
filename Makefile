@@ -20,7 +20,8 @@ COMPOSE ?= $(shell \
 
 .PHONY: help setup check-python check-docker up down restart logs api-logs pg-logs coord-logs migrate psql \
         api-shell coord-shell test test-api test-coordinator test-sidecar test-go m3-smoke mesh-smoke lint smoke-prod install-hooks dev desktop frontend \
-        sidecar sidecar-setup sidecar-go installer-deps installer-bundle installer-mac installer-win installer-linux installer-clean \
+        sidecar sidecar-setup sidecar-go installer-deps installer-bundle installer-mac installer-mac-dir installer-win installer-linux installer-clean \
+        install-mac-app kill dogfood \
         coordinator coordinator-setup frontend-setup electron-setup ps status clean reset eval-retrieval bench \
         bench-inference bench-inference-get-models \
         demo-setup demo-capture demo-video
@@ -311,10 +312,16 @@ installer-bundle: installer-deps sidecar-go ## Bundle both Python sidecar binari
 	@cd apps/desktop/frontend && pnpm exec vite build
 	@echo "==> Staging into apps/desktop/electron/resources/"
 	@cd apps/desktop/electron && pnpm run prepack:python && pnpm run prepack:mcp && pnpm run prepack:mesh && pnpm run prepack:mesh-helper
+	@echo "==> Stamping build info (git sha + build time + dirty flag)"
+	@cd apps/desktop/electron && pnpm run prepack:build-info
 
 installer-mac: installer-bundle ## Build unsigned macOS installer (.dmg + .zip). Signing requires Apple Developer cert.
 	@echo "==> Building macOS installer (unsigned — needs CSC_LINK + APPLE_ID env for signing)"
 	@cd apps/desktop/electron && CSC_IDENTITY_AUTO_DISCOVERY=false pnpm run build:mac
+
+installer-mac-dir: installer-bundle ## Fast unsigned macOS build: unpacked .app only (no dmg/zip/notarize/hash). For local dogfooding — see 'make dogfood'.
+	@echo "==> Building macOS .app (unpacked --dir, unsigned, no notarization)"
+	@cd apps/desktop/electron && CSC_IDENTITY_AUTO_DISCOVERY=false pnpm exec electron-builder --mac --arm64 --dir
 
 installer-win: installer-bundle ## Build unsigned Windows installer (.exe via NSIS). Signing requires EV cert.
 	@echo "==> Building Windows installer (unsigned — needs CSC_LINK env for signing)"
@@ -328,6 +335,89 @@ installer-clean: ## Remove staged installer artifacts + electron-builder output
 	@cd apps/desktop/electron && pnpm run clean
 	@rm -rf apps/desktop/python/dist apps/desktop/python/build
 	@rm -rf apps/desktop/go/potluck-mesh/dist
+
+install-mac-app: installer-mac-dir ## Install the freshly-built unpacked .app to /Applications, replacing any existing copy. Does NOT kill running processes first — run 'make kill' (or use 'make dogfood') if the old app might be running.
+	@SRC="apps/desktop/electron/out/mac-arm64/Potluck AI.app"; \
+	if [ ! -d "$$SRC" ]; then \
+		echo "error: built app not found at $$SRC (expected output of 'electron-builder --mac --arm64 --dir')"; \
+		exit 1; \
+	fi; \
+	echo "==> Installing to /Applications (replacing any existing copy)"; \
+	rm -rf "/Applications/Potluck AI.app"; \
+	ditto "$$SRC" "/Applications/Potluck AI.app"; \
+	echo "==> Installed: /Applications/Potluck AI.app"
+
+# make dogfood — the whole loop, one command: kill every running Potluck desktop
+# process, do a fresh unsigned unpacked build from the current working tree, install
+# it over whatever was in /Applications, then print the installed build's stamp
+# (git sha + build time + dirty flag, read back from the just-installed .app so
+# what's printed is ALWAYS what's actually on disk, not what we assume we built).
+# This is the fix for "I rebuilt but the app is still stale": running this command
+# is the only way 'I rebuilt' is allowed to mean anything other than 'the running
+# app is replaced.'
+dogfood: ## Kill + fresh build + install to /Applications + print the installed build stamp. Run this after every local change instead of trusting a stale running app.
+	@$(MAKE) kill
+	@$(MAKE) install-mac-app
+	@echo "==> Installed build stamp:"
+	@INFO="apps/desktop/electron/build-info.json"; \
+	VERSION=$$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "/Applications/Potluck AI.app/Contents/Info.plist" 2>/dev/null || echo unknown); \
+	SHA=$$(grep -o '"sha": *"[^"]*"' "$$INFO" 2>/dev/null | sed -E 's/.*"([^"]+)"$$/\1/' || echo unknown); \
+	BUILT_AT=$$(grep -o '"builtAt": *"[^"]*"' "$$INFO" 2>/dev/null | sed -E 's/.*"([^"]+)"$$/\1/' || echo unknown); \
+	DIRTY=$$(grep -o '"dirty": *[a-z]*' "$$INFO" 2>/dev/null | sed -E 's/.*: *//' || echo unknown); \
+	MTIME=$$(stat -f "%Sm" "/Applications/Potluck AI.app" 2>/dev/null || echo unknown); \
+	echo "    version:   $$VERSION"; \
+	echo "    sha:       $$SHA (dirty=$$DIRTY)"; \
+	echo "    built at:  $$BUILT_AT"; \
+	echo "    installed: /Applications/Potluck AI.app (mtime $$MTIME)"; \
+	echo "==> 'I rebuilt' now means 'the running app is replaced.'"
+
+# ---------- teardown (kill everything before rebuilding, so a rebuild can't run against a stale app) ----------
+
+# make kill — tear down every Potluck DESKTOP process so a rebuild is never
+# validated against a stale running instance. Deliberately narrow patterns:
+#   - Potluck AI.app bundle processes (Electron main + helpers + the mesh
+#     daemon/mesh-helper when they run from inside the installed bundle)
+#   - the Python sidecar bound to :8321 (packaged binary or dev `python -m
+#     potluck_local.app`)
+#   - the contributor client (potluck_local.contributor.client)
+#   - a dev-built Go mesh binary run standalone outside the app bundle
+#   - the dev backend's Docker containers (api/postgres/derp)
+# Deliberately does NOT match: `potluck-mcp --stdio` (the MCP memory/task
+# server other tooling depends on) or unrelated processes from other repos
+# (e.g. a `vite` dev server for a different project). If the mesh daemon is
+# running as root (the SMAppService LaunchDaemon, PPID 1) this can't send it
+# a signal without sudo — it prints the exact command instead of failing.
+kill: ## Tear down all Potluck DESKTOP processes (app bundle, sidecar :8321, mesh, contributor client) + stop dev backend containers. Leaves potluck-mcp and unrelated processes untouched. Idempotent.
+	@echo "==> Killing Potluck AI.app bundle processes (Electron main/helpers, mesh daemon, mesh-helper)"
+	@for pid in $$(pgrep -f '/Applications/Potluck AI\.app/' 2>/dev/null); do \
+		owner="$$(ps -o user= -p $$pid 2>/dev/null | tr -d ' ')"; \
+		cmd="$$(ps -o comm= -p $$pid 2>/dev/null)"; \
+		if [ "$$owner" = "root" ]; then \
+			echo "    root-owned, cannot kill without sudo: pid $$pid [$$cmd]"; \
+			echo "    -> sudo kill -9 $$pid"; \
+		else \
+			echo "    killing pid $$pid [$$cmd] (owner=$$owner)"; \
+			kill -9 $$pid 2>/dev/null || true; \
+		fi; \
+	done
+	@echo "==> Killing Python sidecar on :8321"
+	@pids="$$(lsof -ti tcp:8321 2>/dev/null)"; \
+	if [ -n "$$pids" ]; then \
+		for pid in $$pids; do echo "    killing pid $$pid (listening on :8321)"; kill -9 $$pid 2>/dev/null || true; done; \
+	else \
+		echo "    nothing listening on :8321"; \
+	fi
+	@pkill -9 -f 'potluck_local\.app' 2>/dev/null && echo "    killed lingering dev sidecar process(es) (potluck_local.app)" || true
+	@echo "==> Killing contributor client (potluck_local.contributor.client)"
+	@pkill -9 -f 'potluck_local\.contributor\.client' 2>/dev/null && echo "    killed contributor client process(es)" || true
+	@echo "==> Killing dev-built Go mesh binary (outside the app bundle), if any"
+	@for pid in $$(pgrep -f 'go/potluck-mesh/dist/potluck-mesh' 2>/dev/null); do \
+		echo "    killing pid $$pid"; \
+		kill -9 $$pid 2>/dev/null || true; \
+	done
+	@echo "==> Stopping dev backend containers (ignored if not running)"
+	@docker stop potluck-api potluck-postgres potluck-derp >/dev/null 2>&1 || true
+	@echo "==> make kill done."
 
 # ---------- coordinator (Phase G control plane, native run) ----------
 

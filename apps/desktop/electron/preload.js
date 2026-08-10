@@ -23,6 +23,18 @@ contextBridge.exposeInMainWorld('potluck', {
     chrome: process.versions.chrome,
   },
 
+  // ── Build stamp (staleness detection) ──────────────────────────────────────
+  //
+  // Static value, not a function — computed once in main.js at startup (see
+  // main.js's loadBuildInfo()) and read here via a synchronous IPC call so it
+  // is available immediately, with no await, for a "you're running build X"
+  // badge. Shape: { version, sha, builtAt, packaged, dirty? }. `version` is
+  // app.getVersion() (e.g. "0.1.0") — for comparing against the server's
+  // minimum/latest version to detect a stale client.
+  app: {
+    buildInfo: ipcRenderer.sendSync('app:get-build-info-sync'),
+  },
+
   // ── IPC: Electron API proxies ──────────────────────────────────────────────
 
   /**
@@ -105,6 +117,96 @@ contextBridge.exposeInMainWorld('potluck', {
    * @returns {Promise<void>}
    */
   quitAndInstall: () => ipcRenderer.invoke('updater:quit-and-install'),
+
+  // ── Updater (namespaced) ────────────────────────────────────────────────────
+  //
+  // Same underlying electron-updater flow as the flat onUpdate*/downloadUpdate/
+  // quitAndInstall members above (kept for back-compat) — this is the
+  // updater-focused surface: window.potluck.updater.{check,download,install}
+  // plus on*() subscriptions that mirror the update:* / update-* IPC channels
+  // main.js registers. autoDownload is off in main.js, so check() only ever
+  // resolves an available/not-available event; download() and install() are
+  // explicit user actions from the UI (e.g. a "Download update" / "Restart to
+  // update" banner).
+  updater: {
+    /**
+     * Ask main to check the update feed now. In dev (unpackaged) this
+     * resolves { status: 'dev' } rather than throwing — there is no
+     * published release to diff against outside a packaged build.
+     * @returns {Promise<{ status: 'ok' | 'dev' | 'error', message?: string }>}
+     */
+    check: () => ipcRenderer.invoke('update:check'),
+
+    /**
+     * Start downloading the update main already found. Progress arrives via
+     * onProgress, completion via onDownloaded.
+     * @returns {Promise<{ status: 'ok' | 'dev' | 'error', message?: string }>}
+     */
+    download: () => ipcRenderer.invoke('update:download'),
+
+    /**
+     * Quit and install a downloaded update (relaunches the app).
+     * @returns {Promise<{ status: 'ok' | 'dev' }>}
+     */
+    install: () => ipcRenderer.invoke('update:install'),
+
+    /**
+     * Register a callback that fires when a new version is available.
+     * @param {(version: string) => void} callback
+     * @returns {() => void} Unsubscribe function.
+     */
+    onAvailable: (callback) => {
+      const handler = (_event, version) => callback(version);
+      ipcRenderer.on('update-available', handler);
+      return () => ipcRenderer.removeListener('update-available', handler);
+    },
+
+    /**
+     * Register a callback that fires when a check comes back with no update
+     * (i.e. the app is already current).
+     * @param {() => void} callback
+     * @returns {() => void} Unsubscribe function.
+     */
+    onNotAvailable: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on('update-not-available', handler);
+      return () => ipcRenderer.removeListener('update-not-available', handler);
+    },
+
+    /**
+     * Register a callback for download progress (0-100) while an update pulls.
+     * @param {(percent: number) => void} callback
+     * @returns {() => void} Unsubscribe function.
+     */
+    onProgress: (callback) => {
+      const handler = (_event, percent) => callback(percent);
+      ipcRenderer.on('update-progress', handler);
+      return () => ipcRenderer.removeListener('update-progress', handler);
+    },
+
+    /**
+     * Register a callback that fires when the update has been downloaded and
+     * is ready to install on next restart.
+     * @param {() => void} callback
+     * @returns {() => void} Unsubscribe function.
+     */
+    onDownloaded: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on('update-downloaded', handler);
+      return () => ipcRenderer.removeListener('update-downloaded', handler);
+    },
+
+    /**
+     * Register a callback for updater errors (check/download/install failures).
+     * @param {(message: string) => void} callback
+     * @returns {() => void} Unsubscribe function.
+     */
+    onError: (callback) => {
+      const handler = (_event, message) => callback(message);
+      ipcRenderer.on('update-error', handler);
+      return () => ipcRenderer.removeListener('update-error', handler);
+    },
+  },
 
   // ── Deep links (potluck:// magic-link sign-in) ─────────────────────────────
 

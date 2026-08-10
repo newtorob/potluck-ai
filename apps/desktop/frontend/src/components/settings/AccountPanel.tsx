@@ -8,13 +8,31 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Sparkles, LogOut } from 'lucide-react';
+import { User, Sparkles, LogOut, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { ipc } from '@/lib/ipc';
+import { useUpdateStore } from '@/stores/updateStore';
 
 export function AccountPanel() {
   const navigate = useNavigate();
   const { isSignedIn, memberProfile, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
+
+  // ── Version + update status ────────────────────────────────────────────
+  const buildInfo = ipc.buildInfo;
+  const updatePhase = useUpdateStore((s) => s.phase);
+  const updateVersion = useUpdateStore((s) => s.version);
+  const updatePercent = useUpdateStore((s) => s.percent);
+  const updateStatusText =
+    updatePhase === 'downloading'
+      ? `Downloading update… ${updatePercent}%`
+      : updatePhase === 'ready'
+        ? 'Update ready — restart to install'
+        : updatePhase === 'available'
+          ? `Update available${updateVersion ? ` (v${updateVersion})` : ''}`
+          : updatePhase === 'error'
+            ? 'Update check failed'
+            : 'Up to date';
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -108,6 +126,31 @@ export function AccountPanel() {
             Access to the contributor network: share idle GPU compute, run larger models
           </li>
         </ul>
+      </div>
+
+      {/* Version + update status */}
+      <div className="rounded-xl border border-border bg-card p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm text-foreground">
+              v{buildInfo?.version ?? ipc.runningVersion}
+              {buildInfo?.sha && (
+                <span className="ml-1.5 font-mono text-xs text-muted-foreground">
+                  {buildInfo.sha.slice(0, 7)}
+                </span>
+              )}
+            </p>
+            <p className="text-xs text-muted-foreground">{updateStatusText}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => useUpdateStore.getState().check()}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Check for updates
+          </button>
+        </div>
       </div>
     </div>
   );

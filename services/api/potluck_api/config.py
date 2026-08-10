@@ -52,6 +52,14 @@ class Settings(BaseSettings):
     # Sentry — empty string disables SDK init
     sentry_dsn: str = ""
 
+    # Client version handshake — GET /client/version. The desktop app polls
+    # this on launch and self-blocks with an "Update required" screen if its
+    # own version is below `client_minimum_version`. Defaults are today's
+    # shipped build so a freshly-deployed API never falsely blocks it.
+    client_latest_version: str = "0.1.0"
+    client_minimum_version: str = "0.1.0"
+    client_notes_url: str = "https://trypotluck.ai"
+
     @field_validator("env")
     @classmethod
     def validate_env(cls, v: str) -> str:

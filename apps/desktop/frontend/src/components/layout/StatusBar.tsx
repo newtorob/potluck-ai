@@ -31,6 +31,7 @@ import { cn } from '@/components/ui/cn';
 import { useHealth } from '@/hooks/useHealth';
 import { useChatStore } from '@/stores/chatStore';
 import { useMeshStore } from '@/stores/meshStore';
+import { useConnectionStore } from '@/stores/connectionStore';
 import { useAuth } from '@/hooks/useAuth';
 import { ipc } from '@/lib/ipc';
 import { formatModelName } from '@/lib/modelName';
@@ -108,8 +109,9 @@ export function StatusBar() {
         </>
       )}
 
-      {/* Right-aligned: app version */}
+      {/* Right-aligned: dev/env indicator (dev builds only) + app version */}
       <div className="ml-auto flex items-center gap-3">
+        <DevBadge />
         {appVersion !== null && (
           <span className="font-mono text-[10px] text-muted-foreground/60">
             v{appVersion}
@@ -293,4 +295,71 @@ function MeshPill() {
 
 function Divider() {
   return <span className="h-3 w-px bg-border" aria-hidden="true" />;
+}
+
+// ---------------------------------------------------------------------------
+// DevBadge — non-prod build indicator (so a dev window is never mistaken for
+// packaged prod, and it's always clear which cloud API / coordinator a dev
+// session is actually talking to). Renders nothing in a packaged prod build.
+// ---------------------------------------------------------------------------
+
+/** Shape written by the Electron main process at build time, if present.
+ *  Read defensively everywhere below — this may not exist yet. */
+interface BuildInfo {
+  sha?: string;
+  builtAt?: string;
+  packaged?: boolean;
+  dirty?: boolean;
+}
+
+/** Best-effort host-only display of a URL; falls back to the raw string
+ *  (e.g. an unparsable localStorage override) rather than throwing. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+function DevBadge() {
+  const coordinatorUrl = useConnectionStore((s) => s.coordinatorUrl);
+  const buildInfo = (window as unknown as { potluck?: { app?: { buildInfo?: BuildInfo } } })
+    .potluck?.app?.buildInfo;
+
+  // Vite's compile-time DEV flag is the primary signal (always false in a
+  // packaged prod build); buildInfo.packaged === false backs it up once the
+  // main process starts stamping it.
+  const isDev = import.meta.env.DEV || buildInfo?.packaged === false;
+  if (!isDev) return null;
+
+  const cloudBase =
+    (import.meta.env['VITE_CLOUD_API_URL'] as string | undefined) ?? 'https://api.trypotluck.ai';
+
+  const stamp = buildInfo?.sha
+    ? `${buildInfo.sha.slice(0, 7)}${buildInfo.dirty ? '+dirty' : ''}` +
+      (buildInfo.builtAt ? ` built ${new Date(buildInfo.builtAt).toLocaleString()}` : '')
+    : null;
+
+  const tooltip = [
+    'Mode: dev',
+    `Cloud API: ${cloudBase}`,
+    `Coordinator: ${coordinatorUrl}`,
+    stamp ? `Build: ${stamp}` : null,
+  ]
+    .filter((line): line is string => line !== null)
+    .join('\n');
+
+  return (
+    <span
+      className={cn(
+        'rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5',
+        'font-mono text-[10px] font-medium text-amber-700 dark:text-amber-300',
+      )}
+      title={tooltip}
+      aria-label={tooltip}
+    >
+      DEV · {hostOf(cloudBase)}
+    </span>
+  );
 }

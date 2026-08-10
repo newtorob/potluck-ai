@@ -10,6 +10,34 @@
  * See apps/desktop/electron/preload.js for the full bridge definition.
  */
 
+/**
+ * window.potluck.updater — the renderer-driven auto-update bridge. All
+ * methods/events are optional at the type level: main/preload may not have
+ * shipped this yet (or a given platform/build may omit it), and every
+ * consumer below degrades to a safe no-op when it's absent.
+ */
+interface UpdaterBridge {
+  check: () => void | Promise<void>;
+  download: () => void | Promise<void>;
+  install: () => void | Promise<void>;
+  onAvailable: (callback: (version: string) => void) => () => void;
+  onNotAvailable: (callback: () => void) => () => void;
+  onProgress: (callback: (percent: number) => void) => () => void;
+  onDownloaded: (callback: () => void) => () => void;
+  onError: (callback: (message: string) => void) => () => void;
+}
+
+/** Shape written by the Electron main process at build time, if present.
+ *  Read defensively everywhere — this may not exist yet. `version` is the
+ *  running app's semver, e.g. "0.1.0". */
+export interface BuildInfo {
+  version: string;
+  sha?: string;
+  builtAt?: string;
+  packaged?: boolean;
+  dirty?: boolean;
+}
+
 interface PotluckBridge {
   platform: string;
   arch: string;
@@ -22,13 +50,18 @@ interface PotluckBridge {
   getAppVersion: () => Promise<string>;
   onDeepLink?: (callback: (url: string) => void) => () => void;
   getInitialDeepLink?: () => Promise<string | null>;
-  onUpdateAvailable?: (callback: (version: string) => void) => () => void;
-  onUpdateDownloaded?: (callback: () => void) => () => void;
-  onUpdateProgress?: (callback: (percent: number) => void) => () => void;
-  onUpdateError?: (callback: (message: string) => void) => () => void;
-  downloadUpdate?: () => Promise<void>;
-  quitAndInstall?: () => Promise<void>;
+  updater?: UpdaterBridge;
+  app?: { buildInfo?: BuildInfo };
 }
+
+/**
+ * Bundled fallback for the running app's version, used only when
+ * window.potluck.app.buildInfo is absent (a preload that predates
+ * buildInfo, or a plain browser dev session). Keep in sync with
+ * package.json's "version" — this is a last-resort fallback, never the
+ * source of truth.
+ */
+const BUNDLED_VERSION_FALLBACK = '0.1.0';
 
 /** Safely read the Electron context bridge, or undefined in plain browser */
 function getBridge(): PotluckBridge | undefined {
@@ -95,44 +128,73 @@ export const ipc = {
     return (await getBridge()?.getInitialDeepLink?.()) ?? null;
   },
 
-  // ── Auto-update (renderer-driven download + install) ──────────────────────
-  // All no-op safely outside Electron so the UpdateBanner never renders there.
+  // ── Auto-update (renderer-driven check/download/install) ──────────────────
+  // All no-op safely outside Electron, or when main/preload hasn't shipped
+  // window.potluck.updater yet — so the update UI never throws, it just
+  // never has anything to show.
 
-  /** Fires when a newer version is published. Returns an unsubscribe fn. */
-  onUpdateAvailable(callback: (version: string) => void): () => void {
-    const bridge = getBridge();
-    if (!bridge?.onUpdateAvailable) return () => {};
-    return bridge.onUpdateAvailable(callback);
+  /** The build stamp written by the main process, if present. */
+  get buildInfo(): BuildInfo | undefined {
+    return getBridge()?.app?.buildInfo;
   },
 
-  /** Fires when the update finished downloading and is ready to install. */
-  onUpdateDownloaded(callback: () => void): () => void {
-    const bridge = getBridge();
-    if (!bridge?.onUpdateDownloaded) return () => {};
-    return bridge.onUpdateDownloaded(callback);
+  /** The running app's semver — buildInfo.version, or the bundled fallback. */
+  get runningVersion(): string {
+    return getBridge()?.app?.buildInfo?.version ?? BUNDLED_VERSION_FALLBACK;
   },
 
-  /** Fires with download progress (0-100) while the update pulls. */
-  onUpdateProgress(callback: (percent: number) => void): () => void {
-    const bridge = getBridge();
-    if (!bridge?.onUpdateProgress) return () => {};
-    return bridge.onUpdateProgress(callback);
+  /** True only when window.potluck.updater is actually present. */
+  get hasUpdater(): boolean {
+    return getBridge()?.updater !== undefined;
   },
 
-  /** Fires when a download/install error occurs. */
-  onUpdateError(callback: (message: string) => void): () => void {
-    const bridge = getBridge();
-    if (!bridge?.onUpdateError) return () => {};
-    return bridge.onUpdateError(callback);
+  /** Ask the main process to check for an update. Safe to call speculatively. */
+  async checkForUpdate(): Promise<void> {
+    await getBridge()?.updater?.check();
   },
 
   /** Begin downloading the available update. */
   async downloadUpdate(): Promise<void> {
-    return getBridge()?.downloadUpdate?.();
+    await getBridge()?.updater?.download();
   },
 
-  /** Quit and install a downloaded update (relaunches the app). */
-  async quitAndInstall(): Promise<void> {
-    return getBridge()?.quitAndInstall?.();
+  /** Install the downloaded update (relaunches the app). */
+  async installUpdate(): Promise<void> {
+    await getBridge()?.updater?.install();
+  },
+
+  /** Fires when a newer version is published. Returns an unsubscribe fn. */
+  onUpdateAvailable(callback: (version: string) => void): () => void {
+    const updater = getBridge()?.updater;
+    if (!updater) return () => {};
+    return updater.onAvailable(callback);
+  },
+
+  /** Fires when a check completes and the running version is already current. */
+  onUpdateNotAvailable(callback: () => void): () => void {
+    const updater = getBridge()?.updater;
+    if (!updater) return () => {};
+    return updater.onNotAvailable(callback);
+  },
+
+  /** Fires with download progress (0-100) while the update pulls. */
+  onUpdateProgress(callback: (percent: number) => void): () => void {
+    const updater = getBridge()?.updater;
+    if (!updater) return () => {};
+    return updater.onProgress(callback);
+  },
+
+  /** Fires when the update finished downloading and is ready to install. */
+  onUpdateDownloaded(callback: () => void): () => void {
+    const updater = getBridge()?.updater;
+    if (!updater) return () => {};
+    return updater.onDownloaded(callback);
+  },
+
+  /** Fires when a check/download/install error occurs. */
+  onUpdateError(callback: (message: string) => void): () => void {
+    const updater = getBridge()?.updater;
+    if (!updater) return () => {};
+    return updater.onError(callback);
   },
 };

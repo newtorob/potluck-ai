@@ -70,6 +70,16 @@ export interface Session {
   email?: string;
 }
 
+/** GET /client/version — public, unauthenticated version handshake. */
+export interface ClientVersionInfo {
+  /** Newest published desktop version. */
+  latest: string;
+  /** Oldest desktop version still allowed to run; below this, the app blocks. */
+  minimum: string;
+  /** Optional link to release notes / the download page. */
+  notesUrl?: string;
+}
+
 export interface GovernanceProposal {
   id: string;
   title: string;
