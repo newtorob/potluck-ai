@@ -56,6 +56,14 @@ let coordinatorOrigin = null;
 let pendingDeepLink = null;
 let rendererReady = false;
 
+// True once the user has consented to an update download (via update:download /
+// updater:download). Gates the auto-updater 'error' event: a failed background
+// CHECK (feed unreachable, transient network, releases.* hiccup) must stay
+// silent — only an error during a user-initiated download/install surfaces a
+// banner. A released user must never see "update failed" for something they
+// did not do.
+let updateDownloadStarted = false;
+
 // app.isQuitting is set in before-quit to stop the crash-restart loop.
 app.isQuitting = false;
 
@@ -681,6 +689,7 @@ function isUpdaterConfigured() {
 ipcMain.handle('updater:download', async () => {
   if (!isUpdaterConfigured()) return { status: 'unavailable' };
   log.info('[updater] Renderer requested download.');
+  updateDownloadStarted = true;
   return autoUpdater.downloadUpdate();
 });
 
@@ -715,6 +724,7 @@ ipcMain.handle('update:check', async () => {
 ipcMain.handle('update:download', async () => {
   if (!isUpdaterConfigured()) return { status: 'unavailable' };
   log.info('[updater] Renderer requested download.');
+  updateDownloadStarted = true;
   try {
     await autoUpdater.downloadUpdate();
     return { status: 'ok' };
@@ -1348,14 +1358,21 @@ function setupAutoUpdater() {
 
   autoUpdater.on('update-downloaded', () => {
     log.info('[updater] Update downloaded — ready to install on restart.');
+    updateDownloadStarted = false;
     if (mainWindow) {
       mainWindow.webContents.send('update-downloaded');
     }
   });
 
+  // Only surface an error banner when the user actually started a download or
+  // install (updateDownloadStarted). A failed background CHECK — feed
+  // unreachable at launch, transient network, a releases.* hiccup — is logged
+  // but stays silent, so a released user is never nagged for something they did
+  // not do.
   autoUpdater.on('error', (err) => {
     log.error(`[updater] Error: ${err.message}`);
-    if (mainWindow) {
+    if (updateDownloadStarted && mainWindow) {
+      updateDownloadStarted = false;
       mainWindow.webContents.send('update-error', err.message);
     }
   });
