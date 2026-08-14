@@ -77,14 +77,30 @@ export function MeshEnablePanel({ bridge, daemonStatus, onChanged }: MeshEnableP
     return <RequiresApprovalPanel onChanged={onChanged} />;
   }
 
-  return <NotInstalledPanel onChanged={onChanged} />;
+  return <NotInstalledPanel platform={daemonStatus?.platform} onChanged={onChanged} />;
 }
 
 // ---------------------------------------------------------------------------
 // not_installed
 // ---------------------------------------------------------------------------
 
-function NotInstalledPanel({ onChanged }: { onChanged: () => void }) {
+/** Platform-specific wording for the one-time approval prompt the user will
+ *  see when they click "Enable." macOS asks via System Settings > Login
+ *  Items (a separate approval step — see RequiresApprovalPanel below);
+ *  Linux asks via a single polkit/pkexec password prompt with no separate
+ *  approval step. Falls back to generic wording if platform is unknown
+ *  (daemonStatus hasn't loaded yet). */
+function approvalPromptCopy(platform: string | undefined): string {
+  if (platform === 'linux') {
+    return "This installs a small background service so your machines can reach each other. You'll get one authentication prompt the first time.";
+  }
+  if (platform === 'darwin') {
+    return "This installs a small background service so your machines can reach each other. You'll get one approval prompt from macOS the first time.";
+  }
+  return 'This installs a small background service so your machines can reach each other. You’ll get one approval prompt the first time.';
+}
+
+function NotInstalledPanel({ platform, onChanged }: { platform?: string; onChanged: () => void }) {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,7 +124,7 @@ function NotInstalledPanel({ onChanged }: { onChanged: () => void }) {
     <EmptyState
       icon={Power}
       title="Turn on mesh networking"
-      description="This installs a small background service so your machines can reach each other. You'll get one approval prompt from macOS the first time."
+      description={approvalPromptCopy(platform)}
       primaryAction={
         <button type="button" onClick={() => void handleEnable()} disabled={working} className={buttonClass}>
           {working ? (

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<policyconfig>
+  <!--
+    Potluck mesh sidecar — Linux polkit action.
+
+    NOTE ON THIS COMMENT'S PLACEMENT AND WORDING: XML forbids the two-hyphen
+    sequence anywhere inside a comment body (only legal as the closing
+    marker) — libxml2/glib's parser, which polkitd uses, rejects the WHOLE
+    FILE on that violation, and polkitd 0.105 (Ubuntu 22.04's version) does
+    this silently: `pkaction` just reports "No action with action id ..."
+    with nothing explaining why in the polkit journal (confirmed
+    empirically while building this file — a CLI-flag example originally
+    written here with real double-hyphen flags broke registration). So:
+    no double hyphens anywhere below, and this comment sits AFTER
+    <policyconfig>, not between the DOCTYPE and the root element, purely
+    for readability (that placement was NOT itself the bug).
+
+    Installed to /usr/share/polkit-1/actions/ai.trypotluck.mesh.policy by
+    the .deb/.rpm postinst (or, in dev, by hand — see
+    packaging/linux/README.md).
+
+    This binds ONE fixed action id to ONE fixed, root-owned, non-writable
+    script path via org.freedesktop.policykit.exec.path. That annotation is
+    what gives us a friendly branded prompt ("Install and start Potluck
+    mesh networking") instead of pkexec's generic "Authenticate to run
+    /path/to/script" message — see mesh-install-helper.sh's header comment
+    for why the path itself, not this policy file, is the actual security
+    boundary: pkexec independently refuses to run anything that isn't
+    root-owned and non-group/other-writable, regardless of what this file
+    says. This file only controls the PROMPT and the AUTHORIZATION RULE
+    (who gets asked, and what "yes" requires); it does not and cannot
+    expand what the target script is allowed to do.
+
+    main.js's mesh:enable IPC handler on Linux invokes pkexec against this
+    exact helper path with a fixed "install" subcommand and a fixed set of
+    flags (coordinator url, derp url, mesh binary path, uid, gid) — see
+    mesh-install-helper.sh's own header comment for the literal argument
+    list, since it can't be spelled out here without hyphens. main.js NEVER
+    constructs this action id or policy content itself, and
+    the renderer never sees or influences the pkexec invocation directly
+    (it only calls the whitelisted mesh:enable IPC channel with no
+    arguments of its own — see main.js's ipcMain.handle('mesh:enable', ...)
+    for the fixed argument list actually passed).
+
+    auth_admin (not auth_admin_keep): every install/uninstall re-prompts.
+    This is a rare, one-time-per-machine action (or an explicit
+    user-initiated uninstall) — we deliberately do NOT cache admin auth
+    across calls the way a frequently-used action might, since that would
+    leave a wider window where ANY process could pkexec this script
+    without a fresh password.
+  -->
+  <vendor>Potluck AI</vendor>
+  <vendor_url>https://trypotluck.ai</vendor_url>
+
+  <action id="ai.trypotluck.mesh.install">
+    <description>Install and manage the Potluck mesh networking service</description>
+    <message>Authentication is required to install Potluck's mesh networking service</message>
+    <icon_name>ai.trypotluck.app</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/potluck/mesh-install-helper.sh</annotate>
+  </action>
+</policyconfig>

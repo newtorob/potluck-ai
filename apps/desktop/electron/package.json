@@ -4,6 +4,7 @@
   "description": "Potluck AI — local-first AI on a member-operated mesh network",
   "main": "main.js",
   "author": "Potluck AI",
+  "homepage": "https://trypotluck.ai",
   "license": "AGPL-3.0",
   "scripts": {
     "dev": "concurrently --kill-others --names \"VITE,PY,ELECTRON\" --prefix-colors \"magenta,yellow,cyan\" \"pnpm --dir ../frontend dev\" \"pnpm run dev:python\" \"wait-on http-get://localhost:5173 http-get://127.0.0.1:8321/health && cross-env NODE_ENV=development electron .\"",
@@ -57,6 +58,14 @@
         "from": "./resources/mesh/",
         "to": "mesh",
         "filter": ["**/*"]
+      },
+      {
+        "from": "../../../packaging/linux/mesh-install-helper.sh",
+        "to": "mesh-install-helper.sh"
+      },
+      {
+        "from": "../../../packaging/linux/polkit/ai.trypotluck.mesh.policy",
+        "to": "ai.trypotluck.mesh.policy"
       }
     ],
     "mac": {
@@ -91,15 +100,18 @@
     "linux": {
       "icon": "icons/icon.png",
       "target": [
-        { "target": "AppImage", "arch": ["x64", "arm64"] },
-        { "target": "deb", "arch": ["x64", "arm64"] },
-        { "target": "rpm", "arch": ["x64", "arm64"] }
+        { "target": "AppImage", "arch": ["x64"] },
+        { "target": "deb", "arch": ["x64"] }
       ],
       "category": "Utility",
       "synopsis": "Member-operated mesh for local-first AI",
       "description": "Potluck is local-first AI that runs on machines you own. Local-first memory for AI coding agents, a WireGuard mesh between your machines, and a member-operated compute network.",
       "maintainer": "Potluck AI <hello@trypotluck.ai>",
       "vendor": "Potluck AI"
+    },
+    "deb": {
+      "afterInstall": "../../../packaging/linux/deb-postinst.sh",
+      "depends": ["libgtk-3-0", "libnotify4", "libnss3", "libxss1", "libxtst6", "xdg-utils", "libatspi2.0-0", "libuuid1", "libsecret-1-0", "policykit-1"]
     },
     "publish": {
       "provider": "generic",

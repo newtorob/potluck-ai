@@ -782,7 +782,22 @@ function meshSocketPath() {
     // unreliable. The Go sidecar's defaultSocketPath uses /tmp on Mac.
     return '/tmp/potluck-mesh.sock';
   }
-  // Linux: XDG_RUNTIME_DIR or /run/user/$UID fallback.
+  // Linux: prefer the fixed system-wide path the app-driven root systemd
+  // unit (packaging/linux/mesh-install-helper.sh) and the planned .deb/.rpm
+  // unattended unit (packaging/daemons/potluck-mesh.service) both pin via
+  // POTLUCK_LOCAL_API_SOCKET=/run/potluck-mesh.sock. A per-user
+  // XDG_RUNTIME_DIR/$UID path doesn't work for a system-level daemon: it
+  // may start before first login (the dir doesn't exist yet) and gets torn
+  // down + recreated on every relogin (the socket file would vanish even
+  // though the daemon is still running) — see the header comment in
+  // mesh-install-helper.sh for the full reasoning. Fall back to the
+  // per-user XDG path only when the fixed path isn't present, which covers
+  // a manually-run dev binary (`go run ./cmd/potluck-mesh`, no root, no
+  // systemd) using the Go binary's own defaultSocketPath().
+  const FIXED_LINUX_SOCKET_PATH = '/run/potluck-mesh.sock';
+  if (fs.existsSync(FIXED_LINUX_SOCKET_PATH)) {
+    return FIXED_LINUX_SOCKET_PATH;
+  }
   const xdg = process.env.XDG_RUNTIME_DIR;
   if (xdg && xdg.trim().length > 0) {
     return path.join(xdg, 'potluck-mesh.sock');
@@ -991,6 +1006,167 @@ async function computeMacDaemonStatus() {
   return { platform: 'darwin', state: 'not_installed', detail: `unrecognised helper status: ${token}` };
 }
 
+// ─── Mesh daemon supervision (Linux: root systemd unit via polkit/pkexec) ───
+//
+// Mirrors the macOS section above, but there is no SMAppService-equivalent
+// "register once, OS handles consent + persistence" API on Linux — systemd
+// has no built-in user-consent step, so THIS layer has to (a) drive a
+// polkit/pkexec authorization prompt itself and (b) poll systemd directly
+// for unit state (there's no separate "requires_approval" step the way
+// SMAppService has: pkexec's auth dialog is synchronous — either the user
+// authenticates and the install proceeds, or it doesn't happen at all, so
+// Linux never reports 'requires_approval'; a cancelled/failed pkexec prompt
+// just reports 'not_installed' with a detail string, same shape as macOS's
+// runMeshHelper failure path).
+//
+// The privileged half (rendering + installing + starting the systemd unit)
+// lives entirely in packaging/linux/mesh-install-helper.sh, invoked via
+// pkexec against a FIXED path with a FIXED, whitelisted argument list — see
+// that script's header comment for the full security model and
+// packaging/linux/polkit/ai.trypotluck.mesh.policy for the polkit action
+// that authorizes it. main.js never constructs a shell command from
+// renderer input for this: mesh:enable takes no arguments from the
+// renderer at all (see ipcMain.handle('mesh:enable') below) — every value
+// passed to pkexec here is a fixed constant or a value main.js itself
+// computed (its own uid/gid), never renderer-supplied.
+//
+// Querying unit state (systemctl is-active/is-enabled) needs no privilege,
+// so computeLinuxDaemonStatus() never touches pkexec — only mesh:enable
+// (the install path) does.
+
+/**
+ * Absolute path to the polkit-authorized install helper. In a packaged
+ * .deb/.rpm install this is /usr/lib/potluck/mesh-install-helper.sh (must
+ * match the path baked into ai.trypotluck.mesh.policy's
+ * org.freedesktop.policykit.exec.path annotation — pkexec will refuse to
+ * run anything else with this action's branded prompt). In dev (unpackaged,
+ * app.isPackaged === false) there is no installed helper, so this returns
+ * null and mesh:enable reports 'not_installed' with an explanatory detail —
+ * same "no dev-mode daemon install" posture as getMeshHelperPath() on
+ * macOS.
+ */
+function getLinuxMeshHelperPath() {
+  if (!app.isPackaged || process.platform !== 'linux') {
+    return null;
+  }
+  return '/usr/lib/potluck/mesh-install-helper.sh';
+}
+
+/**
+ * Absolute path to the mesh binary this install should point the systemd
+ * unit's ExecStart at. Must land inside mesh-install-helper.sh's
+ * ALLOWED_MESH_BIN_PREFIXES allowlist — see that script's validate_mesh_bin()
+ * — or the privileged side will refuse it. Mirrors getSidecarPath()'s
+ * resourcesPath resolution for the Python sidecar elsewhere in this file.
+ */
+function getLinuxMeshBinPath() {
+  if (!app.isPackaged) return null;
+  return path.join(process.resourcesPath, 'mesh', 'potluck-mesh');
+}
+
+const LINUX_MESH_INSTALL_TIMEOUT_MS = 30_000;
+
+// Production defaults — same values baked into the macOS LaunchDaemon plist
+// (packaging/daemons/ai.trypotluck.mesh.plist). A self-hosted/LAN
+// coordinator override goes through the runtime-settings PATCH /settings
+// mechanism after install, same as macOS; this is only the bootstrap value.
+const LINUX_MESH_COORDINATOR_URL_DEFAULT = 'https://coordinator.trypotluck.ai';
+const LINUX_MESH_DERP_URL_DEFAULT = 'tcp+tls://derp.trypotluck.ai:443';
+
+/**
+ * Runs the install helper via pkexec with a fixed subcommand + fixed
+ * argument shape. Never rejects — same contract as runMeshHelper() above,
+ * for the same reason (every caller needs a `state`, not an exception).
+ */
+function runLinuxMeshHelper(args) {
+  return new Promise((resolve) => {
+    const helperPath = getLinuxMeshHelperPath();
+    if (!helperPath) {
+      resolve({ ok: false, error: 'mesh-install-helper unavailable (dev mode or non-Linux)' });
+      return;
+    }
+    const pkexecBin = '/usr/bin/pkexec';
+    if (!fs.existsSync(pkexecBin)) {
+      resolve({ ok: false, error: 'pkexec not found — polkit is required for mesh install on Linux' });
+      return;
+    }
+    execFile(
+      pkexecBin,
+      [helperPath, ...args],
+      { timeout: LINUX_MESH_INSTALL_TIMEOUT_MS },
+      (err, stdout, stderr) => {
+        if (err) {
+          // pkexec exit code 126 = auth dialog dismissed/declined, 127 = not
+          // authorized. Distinguish "user said no" from "the helper itself
+          // failed" in the detail string so the UI could tell them apart
+          // later even though both map to the same not_installed state today.
+          const reason =
+            err.code === 126
+              ? 'authentication cancelled'
+              : err.code === 127
+                ? 'not authorized'
+                : (stderr && stderr.trim()) || err.message;
+          log.warn(`[mesh-daemon-linux] pkexec helper failed: ${reason}`);
+          resolve({ ok: false, error: reason });
+          return;
+        }
+        resolve({ ok: true, output: stdout.trim() });
+      },
+    );
+  });
+}
+
+/**
+ * Computes Linux daemon status by asking systemd directly (no privilege
+ * needed to read unit state) and, when active, probing the local IPC
+ * socket exactly like computeMacDaemonStatus() does. Uses `systemctl
+ * is-active` rather than parsing `systemctl status` output, which is not a
+ * stable machine-readable format.
+ */
+function systemctlIsActive(unitName) {
+  return new Promise((resolve) => {
+    execFile('systemctl', ['is-active', unitName], { timeout: 5_000 }, (err, stdout) => {
+      // is-active exits non-zero for every state except "active" — that is
+      // normal/expected here (e.g. "inactive", "failed", "unknown" for a
+      // never-installed unit), not a failure to be logged.
+      resolve(stdout.trim());
+    });
+  });
+}
+
+function unitFileExists(unitName) {
+  return new Promise((resolve) => {
+    execFile('systemctl', ['list-unit-files', unitName], { timeout: 5_000 }, (err, stdout) => {
+      if (err) {
+        resolve(false);
+        return;
+      }
+      resolve(stdout.includes(unitName));
+    });
+  });
+}
+
+async function computeLinuxDaemonStatus() {
+  const exists = await unitFileExists('potluck-mesh.service');
+  if (!exists) {
+    return { platform: 'linux', state: 'not_installed' };
+  }
+  const activeState = await systemctlIsActive('potluck-mesh.service');
+  if (activeState !== 'active') {
+    return { platform: 'linux', state: 'starting', detail: `systemd unit state: ${activeState}` };
+  }
+  try {
+    const res = await meshRequest({ method: 'GET', path: '/status' });
+    if (res.status === 200) {
+      return { platform: 'linux', state: 'running' };
+    }
+    return { platform: 'linux', state: 'starting', detail: `socket responded with HTTP ${res.status}` };
+  } catch (err) {
+    const code = err && err.code ? err.code : (err && err.message) || 'socket unreachable';
+    return { platform: 'linux', state: 'starting', detail: code };
+  }
+}
+
 ipcMain.handle('mesh:daemon-status', async () => {
   if (process.platform === 'darwin') {
     return computeMacDaemonStatus();
@@ -1007,18 +1183,37 @@ ipcMain.handle('mesh:daemon-status', async () => {
     };
   }
   // linux
-  // TODO(linux): supervise potluck-mesh as a systemd system unit, most
-  // likely installed/enabled via a one-time `pkexec` prompt from this IPC
-  // handler (systemd has no user-consent-free root-daemon API like
-  // SMAppService). Not implemented.
-  return {
-    platform: 'linux',
-    state: 'unsupported',
-    detail: 'Linux mesh daemon supervision not implemented (TODO)',
-  };
+  return computeLinuxDaemonStatus();
 });
 
 ipcMain.handle('mesh:enable', async () => {
+  if (process.platform === 'linux') {
+    const meshBin = getLinuxMeshBinPath();
+    if (!meshBin) {
+      return {
+        platform: 'linux',
+        state: 'not_installed',
+        detail: 'mesh install unavailable in dev mode (no packaged mesh binary to point the unit at)',
+      };
+    }
+    // Every argument here is either a fixed production constant or a value
+    // main.js computed itself (this process's own uid/gid) — never
+    // renderer-supplied. See the big comment above this section.
+    const helperResult = await runLinuxMeshHelper([
+      'install',
+      '--coordinator-url', LINUX_MESH_COORDINATOR_URL_DEFAULT,
+      '--derp-url', LINUX_MESH_DERP_URL_DEFAULT,
+      '--mesh-bin', meshBin,
+      '--uid', String(process.getuid ? process.getuid() : ''),
+      '--gid', String(process.getgid ? process.getgid() : ''),
+    ]);
+    if (!helperResult.ok) {
+      return { platform: 'linux', state: 'not_installed', detail: helperResult.error };
+    }
+    log.info('[mesh-daemon-linux] install helper reported success; confirming liveness.');
+    return computeLinuxDaemonStatus();
+  }
+
   if (process.platform !== 'darwin') {
     return {
       platform: process.platform,
