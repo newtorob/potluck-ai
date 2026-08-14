@@ -19,6 +19,18 @@ cryptography==44.*
 aiofiles==24.1.*
 aiosqlite==0.20.*
 numpy==2.1.*
+# torch is a transitive dep of sentence-transformers/umap-learn (the CPU
+# embedding pipeline used by memory search). Potluck never uses torch-CUDA --
+# all LLM inference goes through llama-cpp-python's own backend. Without
+# pinning torch explicitly, pip resolves PyPI's DEFAULT wheel on Linux/Windows,
+# which is the full CUDA build (~2.7 GB of nvidia-* libs) that PyInstaller then
+# bundles whole, bloating the installer ~6x for dead weight. Pin the CPU
+# wheel there via PyTorch's own CPU package index; macOS keeps the default
+# PyPI wheel (CPU/MPS -- no CUDA wheel exists for macOS in the first place,
+# so this line is a no-op there).
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.13.0+cpu ; sys_platform != "darwin"
+torch==2.13.0 ; sys_platform == "darwin"
 sentence-transformers==3.3.*
 umap-learn==0.5.*
 mcp==1.*
