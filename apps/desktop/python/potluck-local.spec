@@ -26,16 +26,8 @@ datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('sentence_transformers')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
-# transformers' newer models/__init__.py builds its lazy-import structure by
-# reading its own .py source files at runtime (AST introspection), not just
-# importing them. collect_all('sentence_transformers') does not recurse into
-# this separate dependency's own package data, so on Windows (where this code
-# path actually fires) the frozen binary fails with:
-#   [WinError 3] The system cannot find the path specified: '...transformers\
-#   models\__init__.pyc' - semantic search degraded
-# because those source files only exist inside the zipped PYZ archive, not as
-# loose files on disk. collect_all('transformers') fixes it the same way the
-# other entries in this file fix their own version of this problem.
+# transformers pulls in tokenizers + model data; collect_all('sentence_transformers')
+# does not recurse into this separate dependency's own package data.
 tmp_ret = collect_all('transformers')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
@@ -53,6 +45,18 @@ tmp_ret = collect_all('setuptools')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
+# transformers' models/__init__.py builds its lazy-import structure by reading
+# its own .py source files at runtime (AST introspection), not just importing
+# them (see transformers.utils.import_utils). Under the default archive mode,
+# pure-Python modules get compiled into the zipped PYZ, so those source files
+# don't exist as loose files on disk -- this only actually bites on Windows
+# (Linux/macOS onedir layouts tolerate it), where the frozen binary fails with:
+#   [WinError 3] The system cannot find the path specified: '...transformers\
+#   models\__init__.pyc' - semantic search degraded
+# collect_all() alone doesn't change *where* a module's bytecode lives, only
+# what data/hiddenimports get pulled in -- module_collection_mode is
+# PyInstaller's documented mechanism for forcing a package to be collected as
+# loose source files instead: https://pyinstaller.org/en/stable/spec-files.html#collect-a-package-as-source-py-files
 a = Analysis(
     ['potluck_local/app.py'],
     pathex=[],
@@ -65,6 +69,7 @@ a = Analysis(
     excludes=[],
     noarchive=False,
     optimize=0,
+    module_collection_mode={'transformers': 'py'},
 )
 pyz = PYZ(a.pure)
 
