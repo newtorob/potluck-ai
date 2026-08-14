@@ -292,7 +292,7 @@ Environment=POTLUCK_LOCAL_API_SOCKET=${SOCKET_PATH}
 # exactly the right user without depending on session-manager quirks.
 Environment=SUDO_UID=${target_uid}
 Environment=SUDO_GID=${target_gid}
-ExecStart=${mesh_bin} --coordinator-url ${coord_url} --derp-url ${derp_url} --log-format json ${extra_args}
+ExecStart="${mesh_bin}" --coordinator-url ${coord_url} --derp-url ${derp_url} --log-format json ${extra_args}
 
 Restart=on-failure
 RestartSec=5
