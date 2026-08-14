@@ -20,7 +20,7 @@ COMPOSE ?= $(shell \
 
 .PHONY: help setup check-python check-docker up down restart logs api-logs pg-logs coord-logs migrate psql \
         api-shell coord-shell test test-api test-coordinator test-sidecar test-go m3-smoke mesh-smoke lint smoke-prod install-hooks dev desktop frontend \
-        sidecar sidecar-setup sidecar-go installer-deps installer-bundle installer-mac installer-mac-dir installer-win installer-linux installer-clean \
+        sidecar sidecar-setup sidecar-go installer-deps installer-bundle installer-mac installer-mac-dir installer-win installer-linux installer-linux-docker installer-clean \
         install-mac-app kill dogfood \
         coordinator coordinator-setup frontend-setup electron-setup ps status clean reset eval-retrieval bench \
         bench-inference bench-inference-get-models \
@@ -330,6 +330,61 @@ installer-win: installer-bundle ## Build unsigned Windows installer (.exe via NS
 installer-linux: installer-bundle ## Build Linux installers (.AppImage + .deb + .rpm)
 	@echo "==> Building Linux installers (AppImage + deb + rpm)"
 	@cd apps/desktop/electron && pnpm run build:linux
+
+# installer-linux-docker — build the Linux .deb + .AppImage entirely inside a
+# linux/amd64 container, so a Linux release never depends on a specific bench
+# box being reachable. PyInstaller cannot cross-compile, so the whole bundle
+# pipeline (Python sidecar incl. llama-cpp-python's compiled C++ backend, the
+# Go mesh sidecar, and electron-builder's dpkg/AppImage packaging) runs
+# natively inside the container. Ubuntu 22.04 matches the glibc on the
+# reference dogfood machine (Pop!_OS 22.04) — see Dockerfile.linux.
+#
+# Only `deb` + `AppImage` at `x64` are built here (not the shared
+# package.json's full [x64,arm64] x [AppImage,deb,rpm] matrix): we only
+# compiled the sidecar for x64 in this container, and rpm needs tooling this
+# image doesn't carry. Bypasses the `build:linux` npm script (which is fixed
+# to the full matrix) and calls electron-builder directly instead.
+#
+# Output: dist-linux/out/ (kept separate from apps/desktop/electron/out/,
+# which is real Mac build output — never mixed with Linux artifacts).
+# dist-linux/_src/ is a disposable clone of HEAD, always recreated fresh so
+# the build can never pick up uncommitted working-tree changes.
+#
+# IMPORTANT: use exactly ONE bind mount (the whole checkout at /build).
+# Do NOT add a second `-v host:/build/some/nested/path` mount inside it —
+# on Docker Desktop for Mac (VirtioFS backend) a bind mount nested inside
+# another bind mount's tree has been observed to wipe the ENTIRE outer
+# mount's host-side directory once the container exits (not just the nested
+# subpath). Electron-builder's own `out/` therefore stays inside the
+# container-only checkout and is copied to dist-linux/out/ from the host
+# *after* the container exits, as a plain `cp`, never as a mount.
+DOCKER_LINUX_IMAGE ?= potluck-linux-builder
+
+installer-linux-docker: ## Build .deb + .AppImage for linux/amd64 inside Docker (no Linux box required). Output: dist-linux/out/
+	@command -v docker >/dev/null 2>&1 || { echo "error: docker not found. install Docker Desktop."; exit 1; }
+	@docker info >/dev/null 2>&1 || { echo "error: docker daemon is not running. open Docker Desktop: open -a Docker"; exit 1; }
+	@echo "==> Building linux/amd64 toolchain image ($(DOCKER_LINUX_IMAGE))"
+	docker build --platform linux/amd64 -f apps/desktop/electron/Dockerfile.linux -t $(DOCKER_LINUX_IMAGE) apps/desktop/electron
+	@echo "==> Cloning a clean checkout of committed HEAD ($$(git rev-parse --short HEAD)) — working-tree changes are never included"
+	@rm -rf dist-linux/_src dist-linux/out
+	@mkdir -p dist-linux
+	git clone --local --quiet . dist-linux/_src
+	@echo "==> Running the containerized build (compiles llama-cpp-python from source — slow, especially under emulation)"
+	docker run --rm --platform linux/amd64 \
+		-v "$(CURDIR)/dist-linux/_src:/build" \
+		-w /build \
+		$(DOCKER_LINUX_IMAGE) \
+		bash -c 'set -euo pipefail; \
+			make sidecar-setup PYTHON_BIN=python3.11; \
+			make frontend-setup; \
+			make electron-setup; \
+			make installer-bundle PYTHON_BIN=python3.11; \
+			cd apps/desktop/electron && pnpm exec electron-builder --linux deb AppImage --x64 && node scripts/hash-release.js'
+	@echo "==> Copying installers out of the container checkout to dist-linux/out/"
+	@mkdir -p dist-linux/out
+	@cp -v dist-linux/_src/apps/desktop/electron/out/*.deb dist-linux/_src/apps/desktop/electron/out/*.AppImage dist-linux/_src/apps/desktop/electron/out/SHA256SUMS dist-linux/out/ 2>/dev/null || true
+	@echo "==> Linux installers:"
+	@ls -lh dist-linux/out/*.deb dist-linux/out/*.AppImage 2>/dev/null || echo "    (none found — check the build log above)"
 
 installer-clean: ## Remove staged installer artifacts + electron-builder output
 	@cd apps/desktop/electron && pnpm run clean

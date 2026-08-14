@@ -1,0 +1,90 @@
+# Dockerfile.linux — linux/amd64 build environment for the Potluck AI desktop
+# installer (.deb + .AppImage).
+#
+# Why this exists: PyInstaller cannot cross-compile, so the Linux sidecar
+# binaries (potluck-local, potluck-mcp — including the compiled
+# llama-cpp-python C++ backend) must be built ON Linux. This image gives us a
+# reproducible Ubuntu 22.04 x86-64 toolchain we can run on any machine with
+# Docker (originally: the Mac, via `--platform linux/amd64` + Rosetta/QEMU
+# emulation), instead of depending on a specific bench box being reachable.
+#
+# Ubuntu 22.04 is deliberate, not arbitrary: it matches the glibc (2.35) on
+# the reference dogfood machine (Pop!_OS 22.04, Ubuntu-based). Building on a
+# newer glibc (e.g. a Debian 12 / Ubuntu 24.04 base) can produce a PyInstaller
+# binary that requires a GLIBC_2.36+ symbol and refuses to run on the actual
+# target machine — glibc forward-compatibility only goes one way.
+#
+# This image is toolchain-only. It does NOT COPY the repo in — the Makefile
+# target (`installer-linux-docker`) bind-mounts a clean checkout of HEAD at
+# container run time, so rebuilding the image is only needed when the
+# toolchain itself changes (new Python/Node/Go version), not on every commit.
+#
+# Build:  docker build --platform linux/amd64 -f Dockerfile.linux -t potluck-linux-builder .
+# Run:    see the `installer-linux-docker` Makefile target at the repo root.
+
+FROM --platform=linux/amd64 ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    PYTHON_BIN=python3.11 \
+    PATH=/usr/local/go/bin:/root/go/bin:$PATH
+
+# ── Base toolchain ──────────────────────────────────────────────────────────
+# build-essential + cmake: compiling llama-cpp-python==0.3.* (scikit-build-core
+# + CMake C++ build of llama.cpp) — this is the slowest step, especially under
+# amd64 emulation on Apple Silicon.
+# python3.11 via deadsnakes: Ubuntu 22.04 ships 3.10 by default; the repo's
+# Makefile requires 3.11+.
+# fakeroot + dpkg: electron-builder's `deb` target shells out to dpkg-deb.
+# squashfs-tools: electron-builder's `AppImage` target builds a squashfs image.
+# file: used by the validation step (ELF architecture check) and by
+# sign-sidecars.sh's Mach-O detector (no-ops correctly on Linux either way).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        software-properties-common \
+        ca-certificates \
+        curl \
+        wget \
+        gnupg \
+        git \
+        build-essential \
+        cmake \
+        ninja-build \
+        pkg-config \
+        fakeroot \
+        dpkg \
+        squashfs-tools \
+        libarchive-tools \
+        desktop-file-utils \
+        file \
+        xz-utils \
+        unzip \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        python3.11 \
+        python3.11-venv \
+        python3.11-dev \
+        python3.11-distutils \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Go (matches apps/desktop/go/potluck-mesh/go.mod's `go 1.22`) ───────────
+RUN curl -fsSL https://go.dev/dl/go1.22.12.linux-amd64.tar.gz -o /tmp/go.tar.gz \
+    && tar -C /usr/local -xzf /tmp/go.tar.gz \
+    && rm /tmp/go.tar.gz
+
+# ── Node 20 + pnpm (frontend + electron-builder) ────────────────────────────
+# Corepack transparently switches per-project to whatever `packageManager`
+# each package.json pins (the frontend pins pnpm@9.15.0) — the version
+# `prepare`d here is only the fallback default for apps/desktop/electron,
+# which has no pin of its own. It must be pnpm 10.x: its pnpm-workspace.yaml
+# uses the `allowBuilds` key, which pnpm 9 doesn't understand and rejects
+# with "packages field missing or empty". 10.33.0 matches the version
+# already in use on the reference Mac build host.
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get update && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/* \
+    && corepack enable \
+    && corepack prepare pnpm@10.33.0 --activate
+
+WORKDIR /build
+
+CMD ["bash"]
