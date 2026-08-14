@@ -26,6 +26,19 @@ datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('sentence_transformers')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
+# transformers' newer models/__init__.py builds its lazy-import structure by
+# reading its own .py source files at runtime (AST introspection), not just
+# importing them. collect_all('sentence_transformers') does not recurse into
+# this separate dependency's own package data, so on Windows (where this code
+# path actually fires) the frozen binary fails with:
+#   [WinError 3] The system cannot find the path specified: '...transformers\
+#   models\__init__.pyc' - semantic search degraded
+# because those source files only exist inside the zipped PYZ archive, not as
+# loose files on disk. collect_all('transformers') fixes it the same way the
+# other entries in this file fix their own version of this problem.
+tmp_ret = collect_all('transformers')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+
 # umap has numba JIT artefacts; collect-all ensures the compiled cache is present.
 tmp_ret = collect_all('umap')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
