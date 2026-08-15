@@ -98,6 +98,49 @@ func TestSyntheticEndpointRoundTrip(t *testing.T) {
 	}
 }
 
+// TestIsSyntheticEndpointPrefix_MatchesBothFullAndAbbreviatedForms verifies the
+// UAPI-drift-detection helper matches BOTH the round-trippable 64-hex form
+// (SyntheticEndpointString, what we write via UpdatePeerEndpoint) AND the
+// abbreviated 8-hex-char form (syntheticEndpoint.DstToString(), what
+// wireguard-go's UAPI GET actually echoes back for a peer's live endpoint —
+// see internal/tunnel's Tunnel.PeerEndpoint doc) — while still rejecting a
+// real ip:port, which is exactly the "peer roamed off DERP" signal callers
+// need to detect.
+func TestIsSyntheticEndpointPrefix_MatchesBothFullAndAbbreviatedForms(t *testing.T) {
+	var key [32]byte
+	for i := range key {
+		key[i] = byte(i * 5)
+	}
+	full := derp.SyntheticEndpointString(key) // "derp:" + 64 hex chars
+	abbrev := "derp:" + fullHexPrefix(key)    // "derp:" + 8 hex chars, DstToString's form
+
+	if !derp.IsSyntheticEndpointPrefix(full) {
+		t.Errorf("expected full synthetic form %q to match", full)
+	}
+	if !derp.IsSyntheticEndpointPrefix(abbrev) {
+		t.Errorf("expected abbreviated synthetic form %q to match", abbrev)
+	}
+	if derp.IsSyntheticEndpointPrefix("192.168.1.20:51820") {
+		t.Errorf("expected a real ip:port to NOT match (this is the roamed-away case callers must detect)")
+	}
+	if derp.IsSyntheticEndpointPrefix("") {
+		t.Errorf("expected empty string to NOT match")
+	}
+}
+
+// fullHexPrefix returns the first 4 bytes of key as lowercase hex — mirrors
+// syntheticEndpoint.DstToString()'s "derp:%x" over pubkey[:4] without
+// depending on an unexported type.
+func fullHexPrefix(key [32]byte) string {
+	const hexdigits = "0123456789abcdef"
+	out := make([]byte, 8)
+	for i := 0; i < 4; i++ {
+		out[i*2] = hexdigits[key[i]>>4]
+		out[i*2+1] = hexdigits[key[i]&0xf]
+	}
+	return string(out)
+}
+
 // TestNonSyntheticEndpointDelegates verifies ParseEndpoint for a non-derp string
 // falls through to the inner bind's ParseEndpoint.
 func TestNonSyntheticEndpointDelegates(t *testing.T) {

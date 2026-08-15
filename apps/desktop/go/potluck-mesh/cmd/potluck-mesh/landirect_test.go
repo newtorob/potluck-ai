@@ -124,6 +124,56 @@ func TestSameLANEndpoint_MalformedCandidatesSkipped(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// punchTargetEndpoint — same-NAT hairpin correctness fix for OnPunchCoord
+// ---------------------------------------------------------------------------
+
+func TestPunchTargetEndpoint_PrefersLANCandidateOverWANHairpin(t *testing.T) {
+	// The exact prod scenario this fixes: two peers behind the same home NAT
+	// (same public IP) both advertise a LAN candidate on the shared /24. The
+	// coordinator-supplied WAN endpoint is the shared public IP — a
+	// guaranteed-fail hairpin target on routers that don't support it — so the
+	// LAN candidate must win.
+	myNets := []net.IPNet{mustIPNet(t, "192.168.4.96/24")}
+	peerLocalEps := []string{"192.168.4.94:51820"}
+	wanEp := "104.251.240.225:16383" // same public IP as this node's own external endpoint
+
+	got := punchTargetEndpoint(myNets, peerLocalEps, wanEp)
+	if got != "192.168.4.94:51820" {
+		t.Errorf("got %q, want the LAN candidate 192.168.4.94:51820 (not the WAN/hairpin endpoint)", got)
+	}
+}
+
+func TestPunchTargetEndpoint_FallsBackToWANWhenNoLANCandidate(t *testing.T) {
+	// Genuinely different networks (the normal cross-NAT case): no co-subnet
+	// candidate exists, so the coordinator's WAN endpoint must pass through
+	// unchanged — this must be a no-op for every peer that isn't same-LAN.
+	myNets := []net.IPNet{mustIPNet(t, "192.168.1.10/24")}
+	peerLocalEps := []string{"10.0.0.5:51820"} // peer's own (different) LAN
+	wanEp := "203.0.113.9:41234"
+
+	got := punchTargetEndpoint(myNets, peerLocalEps, wanEp)
+	if got != wanEp {
+		t.Errorf("got %q, want the WAN endpoint unchanged %q", got, wanEp)
+	}
+}
+
+func TestPunchTargetEndpoint_IgnoresDockerBridgeCandidate(t *testing.T) {
+	// A peer that advertises a docker0-style bridge candidate ALONGSIDE its
+	// real LAN address (pre-filtering, or an older peer's roster payload)
+	// must still resolve to the real LAN candidate, not the unroutable bridge
+	// address — sameLANEndpoint's co-subnet test naturally rejects the bridge
+	// subnet since it doesn't co-subnet under my mask.
+	myNets := []net.IPNet{mustIPNet(t, "192.168.4.96/24")}
+	peerLocalEps := []string{"172.17.0.1:51820", "192.168.4.94:51820"}
+	wanEp := "104.251.240.225:16383"
+
+	got := punchTargetEndpoint(myNets, peerLocalEps, wanEp)
+	if got != "192.168.4.94:51820" {
+		t.Errorf("got %q, want the real LAN candidate, not the docker bridge or WAN endpoint", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // shouldStartLANTrial — derp→trial gate
 // ---------------------------------------------------------------------------
 

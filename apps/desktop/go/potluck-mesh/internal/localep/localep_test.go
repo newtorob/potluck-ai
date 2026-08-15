@@ -81,6 +81,49 @@ func TestCandidatesFromIPs_NoTailnetEverAdvertised(t *testing.T) {
 	}
 }
 
+// TestIsVirtualInterfaceName covers the container/bridge/VM adapter prefixes
+// that must never contribute a LAN candidate — the reproduction case being
+// Docker's default bridge (docker0 at 172.17.0.1), which is a valid RFC1918
+// address that util.PrivateLAN alone cannot distinguish from a real LAN NIC.
+func TestIsVirtualInterfaceName(t *testing.T) {
+	virtual := []string{
+		"docker0", "br-a1b2c3d4e5f6", "veth3f8a2b1", "cni0", "flannel.1",
+		"podman0", "podman1", "virbr0", "vmnet1", "vmnet8", "vboxnet0",
+		// Case-insensitive (Windows adapter friendly names vary in case).
+		"Docker0", "VMnet1",
+	}
+	for _, name := range virtual {
+		if !isVirtualInterfaceName(name) {
+			t.Errorf("isVirtualInterfaceName(%q) = false, want true", name)
+		}
+	}
+
+	real := []string{"en0", "en1", "eth0", "wlan0", "Ethernet", "Wi-Fi", "Ethernet 2", "utun9"}
+	for _, name := range real {
+		if isVirtualInterfaceName(name) {
+			t.Errorf("isVirtualInterfaceName(%q) = true, want false (real adapter)", name)
+		}
+	}
+}
+
+// TestCandidatesFromIPs_DoesNotFilterByIP verifies candidatesFromIPs itself
+// (the pure IP-list filter) has no interface-name awareness — the docker0
+// exclusion happens one layer up, in LocalCandidates' interface enumeration,
+// which candidatesFromIPs is deliberately decoupled from for testability.
+// This guards against a future refactor accidentally duplicating (or losing)
+// the virtual-interface filter in the wrong layer.
+func TestCandidatesFromIPs_DoesNotFilterByIP(t *testing.T) {
+	// 172.17.0.1 is docker0's typical default-bridge address — a plain
+	// RFC1918 IP with nothing to distinguish it at the IP-list level. The
+	// filter that excludes it lives in LocalCandidates (interface.Name), not
+	// here, so candidatesFromIPs must pass it through.
+	in := []net.IP{net.ParseIP("172.17.0.1")}
+	got := candidatesFromIPs(in, 51820)
+	if len(got) != 1 || got[0] != "172.17.0.1:51820" {
+		t.Fatalf("expected candidatesFromIPs to pass through 172.17.0.1 unfiltered, got %v", got)
+	}
+}
+
 // TestLocalIPNets_HostInvariants runs against the real host interfaces and
 // asserts the invariants for the Phase-2 co-subnet input: every returned IPNet
 // has a 4-byte RFC1918 IP and a non-empty mask, and nothing loopback/link-local/

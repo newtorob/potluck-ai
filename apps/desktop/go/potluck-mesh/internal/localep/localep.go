@@ -20,6 +20,7 @@ import (
 	"net"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/potluck-ai/potluck-mesh/internal/util"
 )
@@ -30,6 +31,56 @@ import (
 // keeps the roster payload bounded. Matches the server-side cap in the
 // coordinator's SignalEndpointUpdate validator.
 const maxCandidates = 4
+
+// virtualInterfacePrefixes are interface-name prefixes for container/bridge/
+// virtualization adapters that hand out RFC1918-looking addresses (e.g.
+// Docker's default docker0 bridge at 172.17.0.1, a per-network br-xxxxxxxx,
+// libvirt's virbr0, Podman's podman0) but are NEVER a usable path to another
+// physical host on the LAN — the address is only reachable from the same
+// machine's own network namespace. util.PrivateLAN only filters by IP range
+// (RFC1918), which cannot tell a real LAN adapter apart from a virtual one
+// sharing the same address space, so we filter by interface name too.
+//
+// Two concrete failure modes this prevents:
+//  1. sameLANEndpoint (cmd/potluck-mesh/landirect.go) would still find the
+//     genuine LAN candidate later in a peer's list even with a virtual one
+//     ahead of it (it scans the whole list), but advertising an address nobody
+//     can route to is pure noise on the wire and in every peer's roster.
+//  2. maxCandidates caps the advertised list at 4. A host with several virtual
+//     bridges (docker0 + a couple of compose per-project networks + a VPN
+//     client's tun adapter) can fill the cap with unreachable addresses and
+//     push the one real LAN candidate out entirely — turning "noise" into an
+//     actual same-LAN direct-path regression.
+//
+// Deliberately name-prefix based (not exhaustive by design): this only needs
+// to catch the common container/VM engines that default to RFC1918 bridge
+// subnets. A real physical adapter is never named "docker0", "br-…", etc., so
+// false positives are not a practical concern on any of the three desktop
+// platforms this ships on.
+var virtualInterfacePrefixes = []string{
+	"docker",  // Docker default bridge (docker0) + docker-proxy adapters
+	"br-",     // Docker user-defined bridge networks (br-<network-id>)
+	"veth",    // Docker/Linux container veth pair endpoints
+	"cni",     // Kubernetes CNI bridges (cni0, etc.)
+	"flannel", // Kubernetes Flannel overlay adapters
+	"podman",  // Podman's default bridge (podman0/podman1)
+	"virbr",   // libvirt/KVM default NAT bridge (virbr0)
+	"vmnet",   // VMware host-only/NAT adapters (vmnet1/vmnet8)
+	"vboxnet", // VirtualBox host-only adapters
+}
+
+// isVirtualInterfaceName reports whether ifName matches a known container/
+// bridge/virtualization adapter prefix (case-insensitive — Windows adapter
+// friendly names can vary in case).
+func isVirtualInterfaceName(ifName string) bool {
+	lower := strings.ToLower(ifName)
+	for _, p := range virtualInterfacePrefixes {
+		if strings.HasPrefix(lower, p) {
+			return true
+		}
+	}
+	return false
+}
 
 // LocalCandidates enumerates the host's network interfaces and returns its
 // private-LAN WireGuard endpoints formatted as "ip:<wgPort>", sorted and
@@ -47,8 +98,13 @@ func LocalCandidates(wgPort int) []string {
 
 	var ips []net.IP
 	for _, ifi := range ifaces {
-		// Skip interfaces that are down or loopback (same as lanpair).
+		// Skip interfaces that are down or loopback (same as lanpair), and
+		// container/bridge/VM adapters that can never be a usable path to
+		// another physical host (see isVirtualInterfaceName's doc).
 		if ifi.Flags&net.FlagUp == 0 || ifi.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		if isVirtualInterfaceName(ifi.Name) {
 			continue
 		}
 		addrs, err := ifi.Addrs()
@@ -86,6 +142,9 @@ func LocalIPNets() []net.IPNet {
 	var out []net.IPNet
 	for _, ifi := range ifaces {
 		if ifi.Flags&net.FlagUp == 0 || ifi.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		if isVirtualInterfaceName(ifi.Name) {
 			continue
 		}
 		addrs, err := ifi.Addrs()

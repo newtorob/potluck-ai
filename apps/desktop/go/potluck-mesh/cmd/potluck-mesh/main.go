@@ -1131,6 +1131,34 @@ func runReachabilityLoop(
 				}
 			}
 
+			// DERP-drift self-heal: wireguard-go performs UNCONDITIONAL endpoint
+			// roaming on inbound packets (SetEndpointFromPacket) with no way to
+			// opt a specific peer out. A single stray raw-UDP packet from a peer
+			// we believe is DERP-routed — e.g. a leftover hole-punch retry, or an
+			// occasional packet that slips through an otherwise-failing NAT
+			// hairpin (the same-NAT scenario this loop's punch-trial sibling
+			// guards against) — silently roams the peer's LIVE endpoint off the
+			// synthetic DERP address and onto a raw ip:port. DerpBind.Send then
+			// falls straight through to raw UDP for that peer (see its doc), so a
+			// hairpin-incapable NAT black-holes all data even though the peer
+			// still reads "reachable" (control traffic, e.g. keepalive-driven
+			// handshake, keeps completing) — the wireguard-go analogue of the
+			// same-key-rejoin bug: handshake succeeds, data doesn't. Only checked
+			// for peers we actually manage as DERP-routed and NOT presently owned
+			// by a LAN/punch trial (those modes intentionally pin a non-synthetic
+			// endpoint); flipToDERP is idempotent, so re-asserting is a cheap
+			// UAPI round-trip when nothing has drifted.
+			if peerDerpBind != nil && st.derpRouted && st.mode == modeDERP {
+				if liveEp, epErr := tun.PeerEndpoint(pubkey); epErr == nil && liveEp != "" && !derp.IsSyntheticEndpointPrefix(liveEp) {
+					slog.Warn("derp_fallback: peer's live WG endpoint drifted off the DERP relay (wireguard-go auto-roam), re-asserting the flip",
+						"node_id", p.NodeID,
+						"pubkey_prefix", util.TruncatePubkey(pubkey),
+						"drifted_to", liveEp,
+					)
+					flipToDERP(tun, peerDerpBind, pubkey, pubkeyBytes)
+				}
+			}
+
 			// Phase 2: peers in a LAN-managed mode are handled separately from the
 			// legacy DERP reachability/flip logic below.
 			//
@@ -1951,6 +1979,36 @@ func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
 	}
 }
 
+// punchTargetEndpoint picks the endpoint a WAN punch trial should actually
+// pin to for this peer: the peer's own same-LAN candidate if one co-subnets
+// with one of our interfaces, otherwise the coordinator-supplied WAN endpoint
+// unchanged.
+//
+// Why this cannot wait for the opt-in POTLUCK_LAN_DIRECT trial: two peers
+// behind the SAME NAT (one home router, one public IP) get a punch_coord
+// whose PeerEndpoint is that shared public IP:port — i.e. a NAT-HAIRPIN
+// target. Many consumer routers simply do not support hairpin NAT (routing a
+// packet sent to your own public IP back inside), so a trial pinned to that
+// address is not "a slower path" the way a real cross-network direct upgrade
+// might be — it is a GUARANTEED, permanent failure that repeats forever
+// (backoff just controls the retry cadence, not the outcome). Preferring a
+// LAN candidate here is a correctness fix for that guaranteed-failure case,
+// not the latency optimization POTLUCK_LAN_DIRECT gates — so it runs
+// unconditionally, exactly like the rest of the WAN punch mechanism (see the
+// Phase-3 doc comment in landirect.go).
+//
+// Reuses sameLANEndpoint (landirect.go) — the same co-subnet-under-my-mask
+// test the opt-in LAN trial uses — so a peer on a genuinely different LAN
+// still gets the coordinator's WAN endpoint untouched. localNets is passed in
+// (rather than called here) so callers that already computed it once don't
+// pay for a second interface enumeration.
+func punchTargetEndpoint(localNets []net.IPNet, peerLocalEndpoints []string, wanEndpoint string) string {
+	if lanEp, ok := sameLANEndpoint(localNets, peerLocalEndpoints); ok {
+		return lanEp
+	}
+	return wanEndpoint
+}
+
 // OnPunchCoord is called when the coordinator delivers a punch_coord message
 // to this node. Both the initiator and the responder start a force-rekey
 // punch TRIAL pinned to the peer's endpoint, so WireGuard's handshake-init
@@ -1976,11 +2034,32 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 		return
 	}
 
+	// Same-NAT / same-LAN correctness fix (see punchTargetEndpoint's doc):
+	// substitute a same-LAN candidate for the coordinator's WAN endpoint when
+	// one exists, BEFORE anything below pins to it. Looked up from the local
+	// peerstate cache (already carries the peer's advertised LocalEndpoints
+	// from the roster), not the coordinator payload — punch_coord only ever
+	// carries the WAN endpoint. Unconditional (not gated by any lookup
+	// failure below): if the peer isn't cached yet, targetEndpoint just stays
+	// the WAN endpoint, matching prior behaviour exactly.
+	targetEndpoint := *coord.PeerEndpoint
+	if p, ok := h.ps.Get(coord.PeerNodeID); ok {
+		if lanEp := punchTargetEndpoint(localep.LocalIPNets(), p.LocalEndpoints, targetEndpoint); lanEp != targetEndpoint {
+			slog.Info("punch_coord: same-LAN candidate found, preferring it over the WAN/hairpin endpoint",
+				"peer_node_id", coord.PeerNodeID,
+				"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
+				"wan_endpoint", targetEndpoint,
+				"lan_endpoint", lanEp,
+			)
+			targetEndpoint = lanEp
+		}
+	}
+
 	slog.Info("punch_coord received",
 		"peer_node_id", coord.PeerNodeID,
 		"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
 		"role", coord.Role,
-		"endpoint", *coord.PeerEndpoint,
+		"endpoint", targetEndpoint,
 	)
 
 	// No DERP bind configured at all (--derp-url unset): there is no floor to
@@ -1989,7 +2068,7 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 	// a bare endpoint write. This is the only case where we still call
 	// UpdatePeerEndpoint directly from here.
 	if h.dBind == nil || h.punchTrials == nil || h.modes == nil {
-		if err := h.tun.UpdatePeerEndpoint(coord.PeerWGPublicKey, *coord.PeerEndpoint); err != nil {
+		if err := h.tun.UpdatePeerEndpoint(coord.PeerWGPublicKey, targetEndpoint); err != nil {
 			slog.Error("tunnel: UpdatePeerEndpoint failed in punch_coord handler (no DERP configured)",
 				"peer_node_id", coord.PeerNodeID,
 				"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
@@ -2078,7 +2157,7 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 	trialPeer := tunnel.Peer{
 		PublicKey:           coord.PeerWGPublicKey,
 		AllowedIPs:          []string{p.MeshIP + "/32"},
-		Endpoint:            *coord.PeerEndpoint,
+		Endpoint:            targetEndpoint,
 		PersistentKeepalive: punchTrialKeepalive,
 	}
 	if err := h.tun.AddPeer(trialPeer); err != nil {
@@ -2093,12 +2172,12 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 	}
 
 	h.modes.set(coord.PeerWGPublicKey, modePunchTrial)
-	h.punchTrials.startTrial(coord.PeerWGPublicKey, *coord.PeerEndpoint, preHS, now.Add(punchTrialDuration))
+	h.punchTrials.startTrial(coord.PeerWGPublicKey, targetEndpoint, preHS, now.Add(punchTrialDuration))
 
 	slog.Info("punch_coord: WAN direct trial started — DERP off, peer re-pinned to punched endpoint (force-rekey)",
 		"peer_node_id", coord.PeerNodeID,
 		"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
-		"endpoint", *coord.PeerEndpoint,
+		"endpoint", targetEndpoint,
 		"role", coord.Role,
 		"keepalive_s", punchTrialKeepalive,
 		"deadline_ms", punchTrialDuration.Milliseconds(),

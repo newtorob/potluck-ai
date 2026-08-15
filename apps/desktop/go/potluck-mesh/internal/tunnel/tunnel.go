@@ -580,6 +580,72 @@ func (t *Tunnel) PeerReachability(pubkeyBase64 string) (lastHandshake time.Time,
 	return lastHandshake, rx, tx, nil
 }
 
+// PeerEndpoint returns the LIVE endpoint wireguard-go currently has configured
+// for the named peer, straight from the UAPI — i.e. what Send() will actually
+// dispatch to next, not what we last told it to use via UpdatePeerEndpoint/
+// AddPeer. Returns "" if the peer has no endpoint configured (e.g. never
+// received a packet yet) or is not found.
+//
+// Caveat for DERP-routed peers: the UAPI serializes the endpoint via
+// conn.Endpoint.DstToString(), which for our synthetic DERP endpoint
+// (internal/derp/bind.go's syntheticEndpoint) returns the ABBREVIATED
+// "derp:<8-char-hex-prefix>" logging form, not the full round-trippable
+// derp.SyntheticEndpointString() value. Callers that need to detect "is this
+// peer still DERP-routed" must check the "derp:" prefix, not compare for
+// equality against SyntheticEndpointString.
+//
+// Why this exists: wireguard-go performs UNCONDITIONAL endpoint roaming on
+// inbound packets (SetEndpointFromPacket) — it silently repoints a peer's
+// active endpoint to wherever an authenticated inbound packet from that peer
+// last arrived FROM, with no way to opt a specific peer out. For a
+// DERP-managed peer (flipToDERP has pinned the synthetic "derp:<pubkey>"
+// endpoint), a single stray raw-UDP packet from the peer — e.g. a leftover
+// hole-punch retry sent before both sides had converged on DERP, or an
+// occasional packet that slips through an otherwise-failing NAT hairpin —
+// is enough to silently roam the peer OFF the synthetic endpoint and onto a
+// real ip:port that may not reliably route (see internal/derp/bind.go's
+// DerpBind.Send doc: a non-synthetic endpoint falls straight through to raw
+// UDP). The peer then looks "reachable" (recent handshake, control traffic
+// flows) while application data silently black-holes — the wireguard-go
+// analogue of the same-key-rejoin bug (handshake succeeds, data doesn't).
+// Callers use this to detect that drift and re-assert flipToDERP.
+func (t *Tunnel) PeerEndpoint(pubkeyBase64 string) (string, error) {
+	pubkeyHex, err := base64ToHex(pubkeyBase64)
+	if err != nil {
+		return "", fmt.Errorf("tunnel: decode pubkey for endpoint check: %w", err)
+	}
+
+	t.mu.Lock()
+	uapiText, ipcErr := t.dev.IpcGet()
+	t.mu.Unlock()
+
+	if ipcErr != nil {
+		return "", fmt.Errorf("tunnel: IpcGet: %w", ipcErr)
+	}
+
+	inPeer := false
+	endpoint := ""
+	for _, line := range strings.Split(uapiText, "\n") {
+		line = strings.TrimRight(line, "\r")
+		if line == "" {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		switch k {
+		case "public_key":
+			inPeer = strings.EqualFold(v, pubkeyHex)
+		case "endpoint":
+			if inPeer {
+				endpoint = v
+			}
+		}
+	}
+	return endpoint, nil
+}
+
 // IsPeerConfigured reports whether the WG device currently has a peer with the
 // given public key configured. It lets callers distinguish "this peer's key
 // isn't provisioned on the tunnel" (a stale/drifted key after a re-pair — fixed

@@ -50,6 +50,7 @@ import (
 	"log/slog"
 	"net"
 	"net/netip"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -130,6 +131,23 @@ func SyntheticEndpointString(pubkey [32]byte) string {
 func IsSyntheticEndpointFormat(s string) bool {
 	_, ok := parseSyntheticEndpoint(s)
 	return ok
+}
+
+// IsSyntheticEndpointPrefix reports whether s LOOKS like a synthetic DERP
+// endpoint by prefix alone — "derp:" followed by anything. Unlike
+// IsSyntheticEndpointFormat (which requires the full 64-hex-char round-trip
+// form written by SyntheticEndpointString), this also matches the ABBREVIATED
+// "derp:<8-char-hex-prefix>" form that syntheticEndpoint.DstToString()
+// produces, which is what wireguard-go's UAPI GET actually echoes back for a
+// peer's live endpoint (uapi.go serializes via DstToString(), not the
+// original ParseEndpoint input string). Callers reading UAPI's endpoint=
+// field to check "is this peer still DERP-routed" (e.g. detecting
+// wireguard-go's automatic endpoint-roaming silently knocking a peer off the
+// relay — see internal/tunnel's Tunnel.PeerEndpoint doc) must use this, not
+// IsSyntheticEndpointFormat, or a genuinely-still-DERP-routed peer would
+// false-positive as "drifted."
+func IsSyntheticEndpointPrefix(s string) bool {
+	return strings.HasPrefix(s, syntheticEndpointKey)
 }
 
 // parseSyntheticEndpoint parses a string written by SyntheticEndpointString.
