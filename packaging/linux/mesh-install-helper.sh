@@ -207,7 +207,11 @@ default_mesh_bin() {
 handoff_legacy_unit_if_present() {
   [ -f "$UNIT_PATH" ] || return 0
   local existing_user
-  existing_user="$(grep -E '^User=' "$UNIT_PATH" 2>/dev/null | head -1 | cut -d= -f2 | tr -d '[:space:]')"
+  # NB: append '|| true' — grep exits 1 when the existing unit has no User=
+  # line (i.e. it already runs as root), and under `set -euo pipefail` that
+  # failing command substitution would abort do_install before it re-renders
+  # the unit. A rootless existing unit is the normal case, not an error.
+  existing_user="$(grep -E '^User=' "$UNIT_PATH" 2>/dev/null | head -1 | cut -d= -f2 | tr -d '[:space:]' || true)"
   if [ "$existing_user" = "potluck" ]; then
     log "found existing headless potluck-mesh.service (User=potluck) — stopping it before app-driven install; WG key at $KEY_PATH will be reused as-is (root can read it regardless of its potluck:potluck ownership)"
     systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true
