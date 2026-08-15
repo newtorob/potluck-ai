@@ -941,6 +941,10 @@ func runReachabilityLoop(
 			modes.set(pubkey, modeDERP)
 			return
 		}
+		// Defensive: guarantee the kernel host route exists now that this
+		// peer's active data path is the LAN endpoint — see ensurePeerRoute's
+		// doc for why it can otherwise be silently missing.
+		ensurePeerRoute(tun, p)
 
 		st.mode = modeLANTrial
 		st.preTrialHandshake = preHS
@@ -1011,6 +1015,8 @@ func runReachabilityLoop(
 						"err", err,
 					)
 				}
+				// Defensive re-assert — see ensurePeerRoute's doc.
+				ensurePeerRoute(tun, p)
 				st.mode = modeLANDirect
 				st.reachable = true
 				st.derpRouted = false
@@ -1354,6 +1360,47 @@ func runReachabilityLoop(
 	}
 }
 
+// ensurePeerRoute defensively (re-)installs the kernel host route for a
+// peer's mesh IP at every point that pins (or re-pins) an active data path —
+// LAN trial start/verify, WAN punch trial start/verify, and the DERP floor.
+// addPeerHostRoute is idempotent (an "already exists" result is success), so
+// calling this on the steady-state case is a cheap no-op `route`/`ip` shell
+// invocation, not a correctness risk.
+//
+// Why this exists (found live against prod household 00000000, 2026-08-14):
+// the comment this replaces documented an invariant that held for the TRIAL
+// mechanisms in isolation — none of THEM call RemovePeerRoute — but missed a
+// cross-cutting case. OnRosterUpdate's Removed handler DOES call
+// RemovePeerRoute (correctly, for an actual peer departure) whenever the
+// coordinator broadcasts a roster removal — including a transient one, e.g.
+// the peer's own daemon restarting and momentarily dropping its coordinator
+// connection. If that peer's WG session is then revived via OnPunchCoord or
+// the LAN trial (which manage the crypto session pinned to a real endpoint,
+// not a fresh roster "Added" event — only OnRosterUpdate's Added branch calls
+// AddPeerRoute), the kernel host route is never reinstalled. The result:
+// handshakes complete and keepalives flow (WG's own UDP socket addresses the
+// peer's pinned endpoint directly, bypassing the kernel routing table
+// entirely), so the peer reads reachable=true / mode=direct — but ALL
+// application traffic addressed to the peer's mesh IP falls through to the
+// default gateway instead of the TUN interface and is silently dropped by
+// the physical router, which has no idea what a 100.64.0.0/10 mesh IP is.
+// 100% ping/TCP loss on a peer that looks perfectly healthy — the routing­
+// table analogue of the same-key-rejoin bug, not an endpoint-roaming one.
+// Calling this at every "a peer just became my active data path" moment
+// closes the gap regardless of which mechanism (re-)established the session.
+func ensurePeerRoute(tun *tunnel.Tunnel, p msignal.RosterPeer) {
+	if p.MeshIP == "" {
+		return
+	}
+	if err := tun.AddPeerRoute(p.MeshIP); err != nil {
+		slog.Warn("tunnel: ensurePeerRoute failed — peer may be reachable (handshake/keepalive) but black-holed for application traffic",
+			"node_id", p.NodeID,
+			"mesh_ip", p.MeshIP,
+			"err", err,
+		)
+	}
+}
+
 // restoreDERPFloor brings a peer that was clobbered by a LAN trial back to a
 // clean, working DERP relay session — the SAFETY FLOOR after a failed (or
 // stale) direct-LAN attempt.
@@ -1369,14 +1416,11 @@ func runReachabilityLoop(
 // The result is byte-for-byte the same WG peer config a fresh roster-add would
 // produce, so the relay path comes back exactly as it would on first contact.
 //
-// Kernel route invariant: maybeStartLANTrial calls tun.RemovePeer (which
-// removes the WG peer from the device) but does NOT call tun.RemovePeerRoute
-// (which would remove the kernel host route). The kernel route for this peer's
-// mesh IP therefore remains installed pointing at the TUN interface throughout
-// the trial and rollback. restoreDERPFloor does NOT need to call AddPeerRoute;
-// the existing route is always present. This invariant must hold: if anything
-// in the trial path ever starts calling RemovePeerRoute, a matching
-// AddPeerRoute call must be added here.
+// Kernel route: also calls ensurePeerRoute defensively (see its doc for why
+// the route can go missing from under a peer independently of anything this
+// trial machinery itself does) — restoreDERPFloor is the safety-net floor
+// every path eventually lands on, so it is the cheapest place to guarantee
+// the invariant holds even if a caller upstream forgot.
 //
 // Correctness of the DERP floor: after this returns, (a) the peer exists on the
 // WG device with allowed-ips = mesh-IP/32, (b) dBind has the peer marked
@@ -1398,6 +1442,7 @@ func restoreDERPFloor(tun *tunnel.Tunnel, dBind *derp.DerpBind, p msignal.Roster
 			"err", err,
 		)
 	}
+	ensurePeerRoute(tun, p)
 	flipToDERP(tun, dBind, pubkeyBase64, pubkeyBytes)
 }
 
@@ -1546,6 +1591,14 @@ func runPunchTrialLoop(
 						"err", err,
 					)
 				}
+				// Defensive re-assert — see ensurePeerRoute's doc. This is the
+				// exact promotion point the live incident traced back to: the
+				// peer verifies direct (handshake/keepalive succeed via WG's
+				// own UDP socket, which doesn't need the kernel route) while
+				// the route silently stayed missing from an earlier roster
+				// "Removed" blip, black-holing all application traffic despite
+				// reachable=true/mode=direct.
+				ensurePeerRoute(tun, p)
 				modes.set(pubkey, modeDirect)
 				slog.Info("punch_trial: VERIFIED — peer reachable direct cross-network, staying off DERP",
 					"node_id", p.NodeID,
@@ -2034,16 +2087,22 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 		return
 	}
 
+	// Fetched once, reused below: the LAN-candidate check, the no-DERP bare
+	// path's route re-assert, AND the full trial path all need the cached
+	// RosterPeer. A single lookup avoids fetching it twice and keeps "peer
+	// not cached" behaving identically everywhere it matters.
+	p, pOK := h.ps.Get(coord.PeerNodeID)
+
 	// Same-NAT / same-LAN correctness fix (see punchTargetEndpoint's doc):
 	// substitute a same-LAN candidate for the coordinator's WAN endpoint when
 	// one exists, BEFORE anything below pins to it. Looked up from the local
 	// peerstate cache (already carries the peer's advertised LocalEndpoints
 	// from the roster), not the coordinator payload — punch_coord only ever
-	// carries the WAN endpoint. Unconditional (not gated by any lookup
-	// failure below): if the peer isn't cached yet, targetEndpoint just stays
-	// the WAN endpoint, matching prior behaviour exactly.
+	// carries the WAN endpoint. Unconditional (not gated by pOK): if the peer
+	// isn't cached yet, targetEndpoint just stays the WAN endpoint, matching
+	// prior behaviour exactly.
 	targetEndpoint := *coord.PeerEndpoint
-	if p, ok := h.ps.Get(coord.PeerNodeID); ok {
+	if pOK {
 		if lanEp := punchTargetEndpoint(localep.LocalIPNets(), p.LocalEndpoints, targetEndpoint); lanEp != targetEndpoint {
 			slog.Info("punch_coord: same-LAN candidate found, preferring it over the WAN/hairpin endpoint",
 				"peer_node_id", coord.PeerNodeID,
@@ -2061,6 +2120,22 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 		"role", coord.Role,
 		"endpoint", targetEndpoint,
 	)
+
+	// Defensive kernel-route re-assert (see ensurePeerRoute's doc): a
+	// punch_coord means this peer's active data path is about to be pinned
+	// (below, or via the bare no-DERP write) to a REAL endpoint — direct or
+	// LAN — not the DERP synthetic one. If the roster "Removed" handler ever
+	// tore down this peer's kernel route (e.g. the peer's own daemon
+	// restarting and momentarily dropping its coordinator connection) and it
+	// came back via punch_coord rather than a fresh roster "Added" event, the
+	// route would otherwise stay missing forever: handshakes/keepalives
+	// address the peer's endpoint directly over WG's own UDP socket and don't
+	// need the kernel route at all, so the peer reads reachable=true while
+	// every byte of actual application traffic silently falls through to the
+	// default gateway. Cheap no-op when the route is already present.
+	if pOK {
+		ensurePeerRoute(h.tun, p)
+	}
 
 	// No DERP bind configured at all (--derp-url unset): there is no floor to
 	// protect and no trial/verify machinery wired up (dBind/punchTrials/modes
@@ -2122,8 +2197,7 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 		return
 	}
 
-	p, ok := h.ps.Get(coord.PeerNodeID)
-	if !ok {
+	if !pOK {
 		slog.Warn("punch_coord: peer not in local cache, cannot start trial",
 			"peer_node_id", coord.PeerNodeID,
 		)
