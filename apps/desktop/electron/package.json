@@ -1,6 +1,6 @@
 {
   "name": "potluck-ai-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Potluck AI — local-first AI on a member-operated mesh network",
   "main": "main.js",
   "author": "Potluck AI",
