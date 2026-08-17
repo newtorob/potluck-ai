@@ -9,90 +9,142 @@ import (
 	"strings"
 )
 
-// allowMeshInbound ensures the ufw rules a Linux mesh node needs to be
-// reachable for actual DATA, not just the WireGuard control channel. Opens
-// TWO things, mirroring firewall_windows.go's rationale exactly:
+// allowMeshInbound ensures a Linux mesh node is reachable for actual DATA, not
+// just the WireGuard control channel. It opens TWO things, mirroring
+// firewall_windows.go's rationale exactly:
 //
-//  1. The mesh TUN INTERFACE (potluck0/wg-mesh/etc). Every packet that
-//     arrives on it has already been authenticated + decrypted by WireGuard,
-//     so the interface itself is the trust boundary — there is no value in
-//     enumerating ports.
+//  1. The mesh TUN INTERFACE (potluck0). Every packet that arrives on it has
+//     already been authenticated + decrypted by WireGuard, so the interface
+//     itself is the trust boundary — no value in enumerating ports.
 //  2. The WG TRANSPORT port (UDP wgPort) inbound on the PHYSICAL NIC, so an
-//     encrypted handshake-init from a direct LAN/WAN peer that hasn't yet
-//     seen an outbound packet from this node (no conntrack state yet) isn't
-//     dropped before it ever reaches wireguard-go's own socket.
+//     encrypted handshake/data packet from a direct LAN/WAN peer with no prior
+//     conntrack state isn't dropped before it reaches wireguard-go's socket.
+//     THIS is what lets a same-LAN peer connect DIRECT instead of falling back
+//     to the DERP relay — without it, inbound WG on the wire is dropped and the
+//     only path that survives is the node's own outbound-initiated DERP
+//     connection (observed live: reachable=true but ~140ms relayed instead of
+//     <5ms LAN-direct, household 00000000).
 //
-// Why this exists (found live against prod household 00000000, 2026-08-14 —
-// see firewall_unix.go's doc for the full trace): a stock Ubuntu/Pop!_OS
-// install commonly ships ufw active with a default-deny INPUT policy. ufw's
-// stateful conntrack lets WireGuard's own UDP handshake/keepalive traffic
-// through — it rides on the connection state created by THIS node's own
-// outbound punch/keepalive — so a peer reads reachable=true with a fresh
-// handshake. But the DECRYPTED IP packets WireGuard hands to the mesh TUN
-// interface (ICMP, TCP SYNs, any real application traffic) are a genuinely
-// NEW, unrelated flow from ufw's point of view and hit the default-deny
-// INPUT policy with no matching ALLOW rule — silently dropped. The result is
-// exactly what was observed: reachable=true / mode="direct" / fresh
-// handshake on BOTH sides, 100% ping/TCP loss in BOTH directions.
+// Why direct iptables and NOT ufw (the previous implementation): a stock
+// Ubuntu/Pop!_OS box commonly has a default-deny INPUT policy (`:INPUT DROP`),
+// sometimes with ufw *disabled* (the policy is left behind, or set by another
+// manager). `ufw allow` only takes effect while ufw is active AND its chains
+// are traversed before the drop — verified live that it does NOT reliably
+// override the drop on such a box (ping stayed 100% loss with the ufw rule
+// present). Inserting an ACCEPT at the TOP of the kernel INPUT chain is the
+// one thing that always wins, regardless of ufw/firewalld state. On modern
+// distros `iptables` is the iptables-nft shim, so this programs nftables under
+// the hood; we also touch ip6tables for v6 transport. The ufw calls are kept
+// as a best-effort secondary so a purely-ufw-managed host also records the
+// intent, but correctness no longer depends on them.
 //
-// Scope: this only manages ufw (confirmed present+active on the reproduction
-// machine via `systemctl is-active ufw`). If ufw is not installed, this is a
-// no-op — we don't guess at firewalld/nftables/bare-iptables configuration
-// on a machine that isn't using ufw; TODO(post-launch): cover those the same
-// way if a fleet member reports the same symptom without ufw involved.
+// Idempotent: each rule is `-C`-checked before `-I`, so re-running on every
+// mesh bring-up (which is also what makes it survive a reboot — the daemon
+// re-applies on start) never stacks duplicates.
 //
-// Idempotent: `ufw allow` on an already-present rule exits 0 ("Skipping
-// adding existing rule"), so re-running this on every mesh bring-up (same
-// spirit as Windows' ActiveStore rules) is always safe.
-//
-// Requires root, which the sidecar already has on Linux (creating the potluck0
-// TUN device needs it — see the systemd unit's lack of User=).
+// Requires root, which the sidecar already has on Linux (creating potluck0
+// needs it — see the systemd unit's lack of User=).
 func allowMeshInbound(ifName string, wgPort int) error {
-	if _, err := exec.LookPath("ufw"); err != nil {
-		slog.Debug("tunnel: ufw not installed, skipping mesh inbound firewall rules",
-			"interface", ifName, "wg_port", wgPort,
+	portSpec := fmt.Sprintf("%d", wgPort)
+
+	// The two INPUT accepts, as argument vectors (after the "-C INPUT" /
+	// "-I INPUT 1" prefix). Order: interface accept first, then WG port.
+	rules := [][]string{
+		{"-i", ifName, "-j", "ACCEPT"},
+		{"-p", "udp", "--dport", portSpec, "-j", "ACCEPT"},
+	}
+
+	var firstErr error
+	applied := 0
+	// v4 is the load-bearing one (mesh IPs are 100.64.0.0/10 v4); v6 is
+	// belt-and-suspenders for a v6 WG transport and is non-fatal if absent.
+	for _, bin := range []string{"iptables", "ip6tables"} {
+		path, err := exec.LookPath(bin)
+		if err != nil {
+			if bin == "iptables" {
+				// No iptables at all is genuinely unusual on Linux; surface it
+				// so the fall-through to ufw-only (below) is at least logged.
+				slog.Warn("tunnel: iptables not found; mesh inbound relies on ufw only",
+					"interface", ifName, "wg_port", wgPort,
+				)
+			}
+			continue
+		}
+		for _, rule := range rules {
+			if ensureIptablesInputAccept(path, rule) {
+				applied++
+			} else if firstErr == nil {
+				firstErr = fmt.Errorf("allowMeshInbound: %s %v: rule could not be applied", bin, rule)
+			}
+		}
+	}
+
+	// Best-effort ufw mirror (secondary; correctness does not depend on it).
+	if _, err := exec.LookPath("ufw"); err == nil {
+		_ = exec.Command("ufw", "allow", "in", "on", ifName).Run()
+		_ = exec.Command("ufw", "allow", "in", fmt.Sprintf("%d/udp", wgPort)).Run()
+	}
+
+	if applied > 0 {
+		slog.Info("tunnel: mesh inbound iptables rules ensured",
+			"interface", ifName, "wg_port", wgPort, "rules_present", applied,
 		)
 		return nil
 	}
-
-	// (1) interface rule — allow everything WireGuard has already decrypted.
-	ifOut, ifErr := exec.Command("ufw", "allow", "in", "on", ifName).CombinedOutput()
-	if ifErr != nil {
-		return fmt.Errorf("allowMeshInbound: ufw allow in on %s: %w: %s", ifName, ifErr, strings.TrimSpace(string(ifOut)))
+	if firstErr != nil {
+		return firstErr
 	}
-
-	// (2) WG transport port rule (physical NIC) — so a fresh inbound
-	// handshake-init from a peer with no prior conntrack state isn't dropped.
-	portSpec := fmt.Sprintf("%d/udp", wgPort)
-	portOut, portErr := exec.Command("ufw", "allow", "in", portSpec).CombinedOutput()
-	if portErr != nil {
-		return fmt.Errorf("allowMeshInbound: ufw allow in %s: %w: %s", portSpec, portErr, strings.TrimSpace(string(portOut)))
-	}
-
-	slog.Info("tunnel: mesh inbound ufw rules ensured",
-		"interface", ifName, "wg_port", wgPort,
-	)
+	// Nothing to do (no iptables/ip6tables present) — not an error.
 	return nil
 }
 
-// removeMeshInbound deletes both rules added by allowMeshInbound. Best-effort:
-// ufw not installed, the rule already gone, or ufw refusing the delete are all
-// swallowed (debug-logged) — matching firewall_windows.go's contract that a
-// missing rule on teardown is never an error.
+// ensureIptablesInputAccept checks whether an INPUT ACCEPT rule already exists
+// (`iptables -C INPUT <rule>`) and inserts it at the top (`-I INPUT 1 <rule>`)
+// if not. Returns true if the rule is present afterward. Best-effort: a failed
+// insert is logged, not fatal, so one family/rule failing doesn't abort the
+// rest.
+func ensureIptablesInputAccept(path string, rule []string) bool {
+	check := append([]string{"-C", "INPUT"}, rule...)
+	if err := exec.Command(path, check...).Run(); err == nil {
+		return true // already present
+	}
+	ins := append([]string{"-I", "INPUT", "1"}, rule...)
+	if out, err := exec.Command(path, ins...).CombinedOutput(); err != nil {
+		slog.Warn("tunnel: failed to insert mesh INPUT accept",
+			"iptables", path, "rule", strings.Join(rule, " "),
+			"error", err, "out", strings.TrimSpace(string(out)),
+		)
+		return false
+	}
+	return true
+}
+
+// removeMeshInbound deletes the rules added by allowMeshInbound. Best-effort:
+// a missing rule on teardown is never an error (matches firewall_windows.go).
 func removeMeshInbound(ifName string, wgPort int) error {
-	if _, err := exec.LookPath("ufw"); err != nil {
-		return nil
+	portSpec := fmt.Sprintf("%d", wgPort)
+	rules := [][]string{
+		{"-i", ifName, "-j", "ACCEPT"},
+		{"-p", "udp", "--dport", portSpec, "-j", "ACCEPT"},
 	}
-	if out, err := exec.Command("ufw", "delete", "allow", "in", "on", ifName).CombinedOutput(); err != nil {
-		slog.Debug("tunnel: removeMeshInbound interface rule (ignored)",
-			"interface", ifName, "error", err, "out", strings.TrimSpace(string(out)),
-		)
+	for _, bin := range []string{"iptables", "ip6tables"} {
+		path, err := exec.LookPath(bin)
+		if err != nil {
+			continue
+		}
+		for _, rule := range rules {
+			// Delete every copy (in case an older build stacked duplicates).
+			for i := 0; i < 8; i++ {
+				del := append([]string{"-D", "INPUT"}, rule...)
+				if err := exec.Command(path, del...).Run(); err != nil {
+					break
+				}
+			}
+		}
 	}
-	portSpec := fmt.Sprintf("%d/udp", wgPort)
-	if out, err := exec.Command("ufw", "delete", "allow", "in", portSpec).CombinedOutput(); err != nil {
-		slog.Debug("tunnel: removeMeshInbound port rule (ignored)",
-			"wg_port", wgPort, "error", err, "out", strings.TrimSpace(string(out)),
-		)
+	if _, err := exec.LookPath("ufw"); err == nil {
+		_ = exec.Command("ufw", "delete", "allow", "in", "on", ifName).Run()
+		_ = exec.Command("ufw", "delete", "allow", "in", fmt.Sprintf("%d/udp", wgPort)).Run()
 	}
 	return nil
 }
