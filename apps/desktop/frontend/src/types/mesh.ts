@@ -103,6 +103,29 @@ export interface PairingTokenIssueResponse {
   created_at: string; // ISO 8601
 }
 
+// GET /mesh/households/current — the member's own household + machines already
+// in it, so the app can offer a one-tap "join your household" instead of a
+// pairing code (Tier 1). Session-authed; `household` is null when the member
+// has no household yet (this is their first machine).
+export interface HouseholdMachine {
+  node_id: string;
+  node_name: string;
+  platform: string | null;
+  mesh_ip: string;
+  last_seen_at: string | null; // ISO 8601
+}
+
+export interface CurrentHouseholdResponse {
+  household: {
+    id: string;
+    owner_member_id: string;
+    name: string;
+    mesh_cidr: string;
+    created_at: string;
+  } | null;
+  machines: HouseholdMachine[];
+}
+
 // ---------------------------------------------------------------------------
 // Bridge transport result (Electron main.js → renderer)
 // ---------------------------------------------------------------------------

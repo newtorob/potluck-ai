@@ -63,10 +63,15 @@ import {
   type CapacityResult,
 } from '@/lib/capacity';
 import { useModelStore, type ModelTier } from '@/stores/modelStore';
-import { meshClient, issuePairingToken, MeshApiError } from '@/lib/meshClient';
+import {
+  meshClient,
+  issuePairingToken,
+  getCurrentHousehold,
+  MeshApiError,
+} from '@/lib/meshClient';
 import { relativeTime } from '@/lib/timeFormat';
 import { formatModelName } from '@/lib/modelName';
-import type { MeshPeer, MeshStatus } from '@/types/mesh';
+import type { MeshPeer, MeshStatus, HouseholdMachine } from '@/types/mesh';
 import { AddMachineWizard } from '@/components/household/AddMachineWizard';
 import { MeshEnablePanel } from '@/components/household/MeshEnablePanel';
 import { CoordinatorMismatchBanner } from '@/components/household/CoordinatorMismatchBanner';
@@ -286,56 +291,51 @@ function HouseholdHeader({ status }: { status: MeshStatus | null }) {
 // Unpaired state — two onboarding paths
 // ---------------------------------------------------------------------------
 
-function UnpairedPanels({ onPaired }: { onPaired: () => void }) {
-  return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <BeFirstPanel onPaired={onPaired} />
-      <JoinExistingPanel onPaired={onPaired} />
-    </div>
-  );
-}
+const primaryButtonClass = cn(
+  'inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3.5',
+  'bg-primary text-primary-foreground text-sm font-medium',
+  'hover:bg-primary/90 transition-colors',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+  'disabled:cursor-not-allowed disabled:opacity-60',
+);
 
-function BeFirstPanel({ onPaired }: { onPaired: () => void }) {
+const smallButtonClass = cn(
+  'inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium',
+  'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+  'disabled:cursor-not-allowed disabled:opacity-60',
+);
+
+/** Shared "mint a pairing token for MY household + redeem it locally" action.
+ *  Setting up the first machine and one-tap-joining your existing household are
+ *  the exact same coordinator dance (idempotent household + pairing token +
+ *  local /pair); only the surrounding copy differs. Includes the stale-key
+ *  recovery (a leftover wg.key marks the sidecar 'enrolled' even after the
+ *  coordinator forgot it) and the wrong-coordinator "switch and retry" path. */
+function useJoinHousehold(onPaired: () => void) {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [switchToUrl, setSwitchToUrl] = useState<string | null>(null);
 
-  async function pairOnce(token: string): Promise<void> {
-    await meshClient.pair({ pairing_token: token });
-  }
-
-  async function handleSetup() {
+  async function join() {
     setError(null);
     setSwitchToUrl(null);
     setWorking(true);
     try {
       const token = await issuePairingToken();
       try {
-        await pairOnce(token.token);
+        await meshClient.pair({ pairing_token: token.token });
       } catch (err) {
-        // Stale-key recovery: the sidecar persists wg.key on disk and
-        // marks itself enrolled at startup whenever the file exists.
-        // If the coordinator's DB was wiped (or this is a fresh dev
-        // setup), the local "enrolled" flag is out of sync with the
-        // coordinator's view of the world. Auto-unpair wipes the key,
-        // then we re-issue a token (the first one was single-use so
-        // it's now consumed even though the pair errored) and retry.
         if (err instanceof MeshApiError && err.code === 'already_enrolled') {
           await meshClient.unpair();
           const fresh = await issuePairingToken();
-          await pairOnce(fresh.token);
+          await meshClient.pair({ pairing_token: fresh.token });
         } else {
           throw err;
         }
       }
       onPaired();
     } catch (err) {
-      // Covers a stale coordinator override: either issuePairingToken() was
-      // rejected directly (CoordinatorError 401), or it succeeded against
-      // the wrong coordinator and the mesh daemon's own upstream redemption
-      // in pairOnce() was rejected (MeshApiError 'coordinator_error'). Both
-      // get an actionable "switch and retry" when this machine's daemon
-      // reports a different coordinator than the app is using.
       const info = describeCoordinatorAuthError(err, {
         coordinatorUrl: useConnectionStore.getState().coordinatorUrl,
         sidecarReportedUrl: useConnectionStore.getState().sidecarReportedUrl,
@@ -347,11 +347,156 @@ function BeFirstPanel({ onPaired }: { onPaired: () => void }) {
     }
   }
 
-  function handleSwitchAndRetry() {
+  function switchAndRetry() {
     if (switchToUrl === null) return;
     useConnectionStore.getState().setCoordinatorUrl(switchToUrl);
-    void handleSetup();
+    void join();
   }
+
+  return { working, error, switchToUrl, join, switchAndRetry };
+}
+
+/** Tier 1: when the signed-in account already has a household, offer a one-tap
+ *  join with no code. Otherwise treat this as the first machine. Pasting an
+ *  invite code (for joining a DIFFERENT account's household) is demoted to a
+ *  secondary link so it never competes with the primary path. */
+function UnpairedPanels({ onPaired }: { onPaired: () => void }) {
+  const [detect, setDetect] = useState<
+    | { status: 'loading' }
+    | { status: 'has_household'; machines: HouseholdMachine[] }
+    | { status: 'first' }
+  >({ status: 'loading' });
+  const [showInvite, setShowInvite] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await getCurrentHousehold();
+        if (cancelled) return;
+        setDetect(
+          res.household && res.machines.length > 0
+            ? { status: 'has_household', machines: res.machines }
+            : { status: 'first' },
+        );
+      } catch {
+        // Detection is best-effort: if the coordinator is unreachable, fall
+        // back to the manual paths rather than blocking onboarding.
+        if (!cancelled) setDetect({ status: 'first' });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (detect.status === 'loading') {
+    return (
+      <div className="flex items-center justify-center gap-2.5 rounded-2xl border border-border bg-card p-8 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+        Checking your household…
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {detect.status === 'has_household' ? (
+        <JoinYourHouseholdPanel machines={detect.machines} onPaired={onPaired} />
+      ) : (
+        <BeFirstPanel onPaired={onPaired} />
+      )}
+      {showInvite ? (
+        <JoinExistingPanel onPaired={onPaired} />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShowInvite(true)}
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
+          Have an invite code from someone else?
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** One-tap "join your own household" — no code. Reuses the same pairing action
+ *  as first-machine setup. */
+function JoinYourHouseholdPanel({
+  machines,
+  onPaired,
+}: {
+  machines: HouseholdMachine[];
+  onPaired: () => void;
+}) {
+  const { working, error, switchToUrl, join, switchAndRetry } = useJoinHousehold(onPaired);
+  const names = machines.map((m) => m.node_name).filter(Boolean);
+  const summary =
+    names.length === 1
+      ? names[0]
+      : names.length === 2
+        ? `${names[0]} and ${names[1]}`
+        : `${names[0]} and ${names.length - 1} others`;
+
+  return (
+    <div className="rounded-2xl border border-primary/25 bg-card p-5 space-y-3 shadow-hearth-sm">
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/12 ring-1 ring-primary/20">
+          <Network className="h-4 w-4 text-primary" aria-hidden="true" />
+        </div>
+        <h2 className="font-serif text-base leading-tight tracking-display text-foreground">
+          Join your household
+        </h2>
+      </div>
+      <p className="text-sm text-muted-foreground leading-snug">
+        You&apos;re already signed in on {summary}. Add this machine to your mesh
+        with one tap. No code needed.
+      </p>
+
+      <ul className="space-y-1">
+        {machines.slice(0, 4).map((m) => (
+          <li key={m.node_id} className="flex items-center gap-2 text-sm text-foreground">
+            <Monitor className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+            <span>{m.node_name}</span>
+            {m.platform && <span className="text-xs text-muted-foreground">· {m.platform}</span>}
+          </li>
+        ))}
+      </ul>
+
+      {error !== null && (
+        <div className="space-y-1.5">
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+          {switchToUrl !== null && (
+            <button type="button" onClick={switchAndRetry} disabled={working} className={smallButtonClass}>
+              Switch and try again
+            </button>
+          )}
+        </div>
+      )}
+
+      <button type="button" onClick={() => void join()} disabled={working} className={primaryButtonClass}>
+        {working ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Joining…
+          </>
+        ) : (
+          <>
+            <Plus className="h-3.5 w-3.5" />
+            Join household
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
+function BeFirstPanel({ onPaired }: { onPaired: () => void }) {
+  const { working, error, switchToUrl, join, switchAndRetry } = useJoinHousehold(onPaired);
 
   return (
     <div className="rounded-2xl border border-primary/25 bg-card p-5 space-y-3 shadow-hearth-sm">
@@ -376,14 +521,9 @@ function BeFirstPanel({ onPaired }: { onPaired: () => void }) {
           {switchToUrl !== null && (
             <button
               type="button"
-              onClick={handleSwitchAndRetry}
+              onClick={switchAndRetry}
               disabled={working}
-              className={cn(
-                'inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium',
-                'bg-primary text-primary-foreground hover:bg-primary/90 transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                'disabled:cursor-not-allowed disabled:opacity-60',
-              )}
+              className={smallButtonClass}
             >
               Switch and try again
             </button>
@@ -391,18 +531,7 @@ function BeFirstPanel({ onPaired }: { onPaired: () => void }) {
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => void handleSetup()}
-        disabled={working}
-        className={cn(
-          'inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3.5',
-          'bg-primary text-primary-foreground text-sm font-medium',
-          'hover:bg-primary/90 transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-          'disabled:cursor-not-allowed disabled:opacity-60',
-        )}
-      >
+      <button type="button" onClick={() => void join()} disabled={working} className={primaryButtonClass}>
         {working ? (
           <>
             <Loader2 className="h-3.5 w-3.5 animate-spin" />

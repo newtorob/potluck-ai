@@ -281,6 +281,29 @@ class HouseholdResponse(BaseModel):
     created_at: datetime
 
 
+class HouseholdMachine(BaseModel):
+    """One machine already enrolled in the caller's OWN household. Returned by
+    GET /mesh/households/current so the desktop app can offer a one-tap "join
+    your household" instead of a pairing code. These are the member's own
+    machines (session-authed), so exposing name/platform/mesh_ip here is not a
+    peer-identity leak — it's the owner seeing their own devices."""
+
+    node_id: uuid.UUID
+    node_name: str
+    platform: str | None = None
+    mesh_ip: str
+    last_seen_at: datetime | None = None
+
+
+class CurrentHouseholdResponse(BaseModel):
+    """The calling member's household and the machines already in it.
+    `household` is null when the member has no household yet (this is their
+    first machine)."""
+
+    household: HouseholdResponse | None = None
+    machines: list[HouseholdMachine] = Field(default_factory=list)
+
+
 class PairingTokenIssueResponse(BaseModel):
     """Returned by POST /mesh/pairing-tokens.
 

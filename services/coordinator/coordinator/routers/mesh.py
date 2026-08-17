@@ -59,6 +59,7 @@ from coordinator.models.household import Household
 from coordinator.models.mesh_node import MeshNode
 from coordinator.models.pairing import PairingToken
 from coordinator.schemas.mesh import (
+    CurrentHouseholdResponse,
     DERPTokenRequest,
     DERPTokenResponse,
     EnrolledPeer,
@@ -67,6 +68,7 @@ from coordinator.schemas.mesh import (
     HeartbeatRequest,
     HeartbeatResponse,
     HouseholdCreateRequest,
+    HouseholdMachine,
     HouseholdResponse,
     PairingTokenIssueResponse,
     SignalEndpointUpdate,
@@ -236,6 +238,61 @@ async def create_household(
         name=household.name,
         mesh_cidr=str(household.mesh_cidr),
         created_at=household.created_at,
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /mesh/households/current
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/mesh/households/current",
+    response_model=CurrentHouseholdResponse,
+)
+async def get_current_household(
+    db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
+) -> CurrentHouseholdResponse:
+    """Return the calling member's household and the machines already enrolled
+    in it, so the desktop app can offer a one-tap "join your household"
+    (no pairing code) when a signed-in machine isn't paired yet — and never
+    create a duplicate household by mistake.
+
+    Auth: session-only (`resolve_session_member_id`), same as
+    POST /mesh/households — this is a member reading their OWN household and
+    OWN machines, so no node/coordinator token is involved. Returns
+    household=null when the member has no household yet (the caller is the
+    first machine)."""
+    existing = await db.execute(
+        select(Household).where(Household.owner_member_id == member_id)
+    )
+    found = existing.scalar_one_or_none()
+    if found is None:
+        return CurrentHouseholdResponse(household=None, machines=[])
+
+    nodes_result = await db.execute(
+        select(MeshNode).where(MeshNode.household_id == found.id)
+    )
+    machines = [
+        HouseholdMachine(
+            node_id=n.id,
+            node_name=n.node_name,
+            platform=n.platform,
+            mesh_ip=str(n.mesh_ip),
+            last_seen_at=n.last_seen_at,
+        )
+        for n in nodes_result.scalars().all()
+    ]
+    return CurrentHouseholdResponse(
+        household=HouseholdResponse(
+            id=found.id,
+            owner_member_id=found.owner_member_id,
+            name=found.name,
+            mesh_cidr=str(found.mesh_cidr),
+            created_at=found.created_at,
+        ),
+        machines=machines,
     )
 
 

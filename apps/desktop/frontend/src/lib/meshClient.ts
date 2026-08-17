@@ -31,6 +31,7 @@ import type {
   PairRequest,
   EnrollResponse,
   PairingTokenIssueResponse,
+  CurrentHouseholdResponse,
   MeshBridgeResult,
   MeshDaemonStatus,
 } from '@/types/mesh';
@@ -303,4 +304,22 @@ export async function issuePairingToken(): Promise<PairingTokenIssueResponse> {
   }
 
   return tokenRes.body as PairingTokenIssueResponse;
+}
+
+/**
+ * Detect whether the signed-in member already has a household (and which
+ * machines are in it), so the unpaired-machine UI can offer a one-tap "join
+ * your household" instead of a pairing code — and never spawn a duplicate
+ * household. Session-authenticated, same bearer as issuePairingToken().
+ * Returns `{ household: null, machines: [] }` when this is the first machine.
+ */
+export async function getCurrentHousehold(): Promise<CurrentHouseholdResponse> {
+  const res = await coordinatorSessionRequest('GET', '/mesh/households/current');
+  if (res.status !== 200) {
+    throw new CoordinatorError(
+      `Could not read your household: ${detailOf(res.body)}`,
+      res.status,
+    );
+  }
+  return res.body as CurrentHouseholdResponse;
 }

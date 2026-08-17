@@ -1436,6 +1436,7 @@ const COORDINATOR_SESSION_METHODS = new Set(['GET', 'POST', 'DELETE']);
 // Static routes — exact `METHOD path` match.
 const COORDINATOR_SESSION_EXACT_ROUTES = new Set([
   'POST /mesh/households',
+  'GET /mesh/households/current',
   'POST /mesh/pairing-tokens',
   'POST /me/device-keys',
   'GET /me/identity',
