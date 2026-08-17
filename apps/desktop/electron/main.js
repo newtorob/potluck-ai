@@ -1211,20 +1211,195 @@ async function computeLinuxDaemonStatus() {
   }
 }
 
+// ─── Mesh daemon supervision (Windows: SYSTEM Scheduled Task via UAC) ───────
+//
+// Mirrors the macOS/Linux sections above. Windows has neither an
+// SMAppService equivalent nor (for this binary) a real SCM-compliant
+// Windows Service — potluck-mesh.exe is a plain console binary and does not
+// implement the Service Control protocol (StartServiceCtrlDispatcher), so
+// `sc.exe start` on it fails after ~30s ("Cannot start service"). Retrofitting
+// that is a real Go change (golang.org/x/sys/windows/svc), out of scope
+// here. Instead this drives a SYSTEM-run, "At startup" + "run with highest
+// privileges" Scheduled Task — Task Scheduler just launches the .exe
+// directly (no SCM handshake needed), which the existing binary already
+// satisfies, and covers "needs admin for the Wintun adapter" + "persist
+// across reboots" + "restart on crash" the same way the macOS LaunchDaemon
+// and Linux systemd unit do. Verified end-to-end on a real Windows box: the
+// installed task runs the daemon as NT AUTHORITY\SYSTEM and the pipe (see
+// meshSocketPath() above and internal/localapi/listener_windows.go's DACL
+// fix) is reachable from the interactively logged-in desktop user.
+//
+// The privileged half (copying the binary + wintun.dll into an admin-owned
+// directory, and installing/starting the Scheduled Task) lives entirely in
+// packaging/windows/mesh-install-helper.ps1, elevated via a single
+// Start-Process -Verb RunAs prompt (the Windows equivalent of ShellExecute
+// 'runas') against a FIXED script path with a FIXED argument shape — see
+// that script's header comment for the full security model. As on Linux,
+// main.js never constructs anything from renderer input here: mesh:enable
+// takes no arguments from the renderer at all, and every value passed to
+// the helper is a fixed production constant or a path main.js computed
+// itself (getWindowsMeshBinPath()).
+//
+// Querying task state (Get-ScheduledTask) needs no elevation, so
+// computeWindowsDaemonStatus() never elevates — only mesh:enable (the
+// install path) does.
+
+const WINDOWS_MESH_TASK_NAME = 'PotluckMesh';
+const WINDOWS_MESH_INSTALL_TIMEOUT_MS = 60_000; // includes the UAC prompt wait
+
+// Production defaults — same values baked into the macOS LaunchDaemon plist
+// and passed to the Linux install helper above.
+const WINDOWS_MESH_COORDINATOR_URL_DEFAULT = 'https://coordinator.trypotluck.ai';
+const WINDOWS_MESH_DERP_URL_DEFAULT = 'tcp+tls://derp.trypotluck.ai:443';
+
+/**
+ * Absolute path to the fixed, app-shipped PowerShell install helper. In a
+ * packaged build this is process.resourcesPath\mesh-install-helper.ps1 (see
+ * the win.extraResources entry in package.json). In dev (unpackaged) there
+ * is no packaged helper to elevate, so this returns null and mesh:enable
+ * reports 'not_installed' with an explanatory detail — same "no dev-mode
+ * daemon install" posture as getMeshHelperPath()/getLinuxMeshHelperPath().
+ */
+function getWindowsMeshHelperPath() {
+  if (!app.isPackaged || process.platform !== 'win32') {
+    return null;
+  }
+  return path.join(process.resourcesPath, 'mesh-install-helper.ps1');
+}
+
+/**
+ * Absolute path to the SOURCE mesh binary this install should copy from
+ * (see mesh-install-helper.ps1's header comment for why it copies rather
+ * than execing this path directly — electron-builder's NSIS default is a
+ * per-user install directory, not an admin-owned one). Mirrors
+ * getLinuxMeshBinPath()'s resourcesPath resolution.
+ */
+function getWindowsMeshBinPath() {
+  if (!app.isPackaged) return null;
+  return path.join(process.resourcesPath, 'mesh', 'potluck-mesh.exe');
+}
+
+/**
+ * Runs the install helper elevated via a single UAC prompt
+ * (Start-Process -Verb RunAs — the Win32 ShellExecute 'runas' verb) and
+ * waits for it to finish. Never rejects — same contract as
+ * runMeshHelper()/runLinuxMeshHelper() above.
+ *
+ * `args` must only ever contain fixed production constants or values
+ * main.js computed itself; see the big security-model comment above. Each
+ * arg is embedded as a single-quoted PowerShell string literal (with `'`
+ * doubled per PowerShell's own escaping rule) inside the -Command passed to
+ * the UNELEVATED launcher powershell.exe process — execFile invokes that
+ * launcher directly (no shell), so there is no separate shell-quoting layer
+ * to worry about beyond PowerShell's own single-quote escaping.
+ */
+function runWindowsMeshHelperElevated(args) {
+  return new Promise((resolve) => {
+    const helperPath = getWindowsMeshHelperPath();
+    if (!helperPath) {
+      resolve({ ok: false, error: 'mesh-install-helper unavailable (dev mode or non-Windows)' });
+      return;
+    }
+    const childArgs = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', helperPath, ...args];
+    const psQuote = (s) => `'${String(s).replace(/'/g, "''")}'`;
+    const psArgList = childArgs.map(psQuote).join(',');
+    // 1223 = ERROR_CANCELLED — the standard Win32 code for "the user declined
+    // the UAC prompt." Surfaced as a distinct, recognisable error string.
+    const command =
+      `$ErrorActionPreference='Stop'; try { `
+      + `$p = Start-Process -FilePath 'powershell.exe' -ArgumentList @(${psArgList}) `
+      + `-Verb RunAs -Wait -PassThru -WindowStyle Hidden; exit $p.ExitCode `
+      + `} catch { exit 1223 }`;
+    execFile(
+      'powershell.exe',
+      ['-NoProfile', '-Command', command],
+      { timeout: WINDOWS_MESH_INSTALL_TIMEOUT_MS },
+      (err) => {
+        if (err) {
+          const code = typeof err.code === 'number' ? err.code : null;
+          const reason = code === 1223 ? 'elevation cancelled by user' : err.message;
+          log.warn(`[mesh-daemon-windows] elevated helper failed: ${reason}`);
+          resolve({ ok: false, error: reason });
+          return;
+        }
+        resolve({ ok: true });
+      },
+    );
+  });
+}
+
+/**
+ * Queries the PotluckMesh Scheduled Task's state via a small PowerShell
+ * one-liner. No elevation required to read task state (mirrors
+ * systemctlIsActive() on Linux). Returns null if the task does not exist.
+ */
+function queryWindowsMeshTask() {
+  return new Promise((resolve) => {
+    const ps =
+      `$t = Get-ScheduledTask -TaskName '${WINDOWS_MESH_TASK_NAME}' -ErrorAction SilentlyContinue; `
+      + `if (-not $t) { Write-Output 'absent'; exit }; `
+      + `$info = $t | Get-ScheduledTaskInfo; `
+      + `Write-Output "$($t.State)|$($info.LastTaskResult)|$($info.NumberOfMissedRuns)"`;
+    execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps], { timeout: 5_000 }, (err, stdout) => {
+      const out = String(stdout || '').trim();
+      if (err || out === '' || out === 'absent') {
+        resolve(null);
+        return;
+      }
+      const [state, lastResultRaw, missedRunsRaw] = out.split('|');
+      resolve({
+        state: state || 'Unknown',
+        lastResult: Number(lastResultRaw),
+        missedRuns: Number(missedRunsRaw) || 0,
+      });
+    });
+  });
+}
+
+async function computeWindowsDaemonStatus() {
+  const task = await queryWindowsMeshTask();
+  if (!task) {
+    return { platform: 'win32', state: 'not_installed' };
+  }
+
+  if (task.state !== 'Running') {
+    // LastTaskResult 0 = success (previous run exited cleanly — shouldn't
+    // happen for a long-running daemon, but not itself a failure signal),
+    // 267009 (0x41301) = "task is currently running" (a race with our own
+    // read), 267011 (0x41303) = "task has not yet run". Anything else
+    // non-zero is a real failure result from the last run attempt.
+    const lr = task.lastResult;
+    const isKnownBenign = lr === 0 || lr === 267009 || lr === 267011 || Number.isNaN(lr);
+    if (!isKnownBenign || task.missedRuns >= 3) {
+      return {
+        platform: 'win32',
+        state: 'failed',
+        detail: `scheduled task state=${task.state}, last result=0x${(lr >>> 0).toString(16)}${
+          task.missedRuns ? `, ${task.missedRuns} missed runs` : ''
+        }`,
+      };
+    }
+    return { platform: 'win32', state: 'starting', detail: `scheduled task state: ${task.state}` };
+  }
+
+  try {
+    const res = await meshRequest({ method: 'GET', path: '/status' });
+    if (res.status === 200) {
+      return { platform: 'win32', state: 'running' };
+    }
+    return { platform: 'win32', state: 'starting', detail: `pipe responded with HTTP ${res.status}` };
+  } catch (err) {
+    const code = err && err.code ? err.code : (err && err.message) || 'pipe unreachable';
+    return { platform: 'win32', state: 'starting', detail: code };
+  }
+}
+
 ipcMain.handle('mesh:daemon-status', async () => {
   if (process.platform === 'darwin') {
     return computeMacDaemonStatus();
   }
   if (process.platform === 'win32') {
-    // TODO(windows): supervise potluck-mesh as a Windows Service (installed
-    // at .msi install time, or registered on demand) — no SMAppService
-    // equivalent exists on Windows, so this needs its own mechanism, not a
-    // port of the macOS one. Not implemented.
-    return {
-      platform: 'win32',
-      state: 'unsupported',
-      detail: 'Windows mesh daemon supervision not implemented (TODO)',
-    };
+    return computeWindowsDaemonStatus();
   }
   // linux
   return computeLinuxDaemonStatus();
@@ -1256,6 +1431,32 @@ ipcMain.handle('mesh:enable', async () => {
     }
     log.info('[mesh-daemon-linux] install helper reported success; confirming liveness.');
     return computeLinuxDaemonStatus();
+  }
+
+  if (process.platform === 'win32') {
+    const meshBin = getWindowsMeshBinPath();
+    if (!meshBin) {
+      return {
+        platform: 'win32',
+        state: 'not_installed',
+        detail: 'mesh install unavailable in dev mode (no packaged mesh binary to point the task at)',
+      };
+    }
+    // Every argument here is a fixed production constant or a value main.js
+    // computed itself (getWindowsMeshBinPath()) — never renderer-supplied.
+    // See the big security-model comment above this section, and
+    // mesh-install-helper.ps1's header comment for the elevated half.
+    const helperResult = await runWindowsMeshHelperElevated([
+      'install',
+      '-CoordinatorUrl', WINDOWS_MESH_COORDINATOR_URL_DEFAULT,
+      '-DerpUrl', WINDOWS_MESH_DERP_URL_DEFAULT,
+      '-MeshBin', meshBin,
+    ]);
+    if (!helperResult.ok) {
+      return { platform: 'win32', state: 'not_installed', detail: helperResult.error };
+    }
+    log.info('[mesh-daemon-windows] install helper reported success; confirming liveness.');
+    return computeWindowsDaemonStatus();
   }
 
   if (process.platform !== 'darwin') {

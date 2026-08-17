@@ -303,14 +303,18 @@ contextBridge.exposeInMainWorld('potluck', {
     //
     // Distinct from `request` above: these three drive whether the mesh
     // sidecar is even running as a system daemon, not what it does once it
-    // is. macOS today: backed by SMAppService via a signed helper CLI.
-    // Linux/Windows: always resolve `state: 'unsupported'` (not implemented
-    // yet) — the shape is stable across platforms so the UI can be built
-    // once.
+    // is. macOS: backed by SMAppService via a signed helper CLI. Linux:
+    // a root systemd unit installed via a polkit/pkexec helper. Windows: a
+    // SYSTEM-run Scheduled Task installed via a single UAC elevation prompt
+    // (Start-Process -Verb RunAs against a fixed, app-shipped PowerShell
+    // helper) — see main.js's mesh-daemon-supervision sections for each
+    // platform's exact mechanism.
     //
     // `state` values: 'not_installed' | 'requires_approval' | 'starting' |
-    // 'running' | 'unsupported'. See main.js's mesh-daemon-supervision
-    // section for exactly what each means.
+    // 'running' | 'failed' | 'unsupported'. Not every platform can produce
+    // every value (e.g. only macOS reports 'requires_approval'; Windows and
+    // Linux never do — see main.js for which states each platform's
+    // compute*DaemonStatus() can return).
 
     /**
      * Current mesh daemon status. Safe to poll (e.g. every 2-5s from a

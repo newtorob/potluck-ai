@@ -17,7 +17,7 @@
     "prepack:frontend": "cd ../frontend && pnpm exec vite build",
     "prepack:python": "rm -rf resources/python && mkdir -p resources/python && bash scripts/sign-sidecars.sh ../python/dist/potluck-local && cp -R ../python/dist/potluck-local resources/python/",
     "prepack:mcp": "bash scripts/sign-sidecars.sh ../python/dist/potluck-mcp && cp -R ../python/dist/potluck-mcp resources/python/",
-    "prepack:mesh": "make -C ../go/potluck-mesh build && bash scripts/sign-sidecars.sh ../go/potluck-mesh/dist && rm -rf resources/mesh && mkdir -p resources/mesh && cp ../go/potluck-mesh/dist/potluck-mesh* resources/mesh/",
+    "prepack:mesh": "make -C ../go/potluck-mesh build && bash scripts/sign-sidecars.sh ../go/potluck-mesh/dist && rm -rf resources/mesh && mkdir -p resources/mesh && cp ../go/potluck-mesh/dist/potluck-mesh* resources/mesh/ && ([ -f ../go/potluck-mesh/dist/wintun.dll ] && cp ../go/potluck-mesh/dist/wintun.dll resources/mesh/ || true)",
     "prepack:mesh-helper": "bash native/mesh-helper/build.sh",
     "prepack:build-info": "node scripts/generate-build-info.js",
     "prepack": "pnpm run prepack:frontend && pnpm run prepack:python && pnpm run prepack:mcp && pnpm run prepack:mesh && pnpm run prepack:mesh-helper && pnpm run prepack:build-info",
@@ -95,6 +95,12 @@
       "icon": "icons/icon.ico",
       "target": [
         { "target": "nsis", "arch": ["x64"] }
+      ],
+      "extraResources": [
+        {
+          "from": "../../../packaging/windows/mesh-install-helper.ps1",
+          "to": "mesh-install-helper.ps1"
+        }
       ]
     },
     "linux": {
