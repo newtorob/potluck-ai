@@ -4,10 +4,12 @@ package localapi
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"os/user"
 
 	"github.com/Microsoft/go-winio"
+	"golang.org/x/sys/windows"
 )
 
 // pipeName is the Windows named pipe path. The server creates this; Electron
@@ -15,46 +17,40 @@ import (
 // instance active (no pre-created pipeline instances needed here).
 const pipeName = `\\.\pipe\potluck-mesh`
 
-// platformListen creates a Windows named pipe listener confined to the
-// current user's SID via a DACL. The socketPath parameter is ignored on
-// Windows — the named pipe path is always pipeName.
+// platformListen creates a Windows named pipe listener whose DACL grants
+// access to the account the daemon itself runs as, PLUS (when resolvable)
+// the interactively logged-in desktop user. The socketPath parameter is
+// ignored on Windows — the named pipe path is always pipeName.
 //
-// The DACL "D:P(A;;GA;;;{SID})" grants Generic All to the current user only:
-//   - D:P   — DACL, protected (no inheritance)
-//   - A     — Allow ACE
-//   - GA    — Generic All rights
-//   - {SID} — the current user's SID
+// This is the Windows analog of listener_unix.go's SUDO_UID/console-user
+// socket-chown reconciliation: when this daemon runs as a Windows SERVICE
+// (LocalSystem via the app-driven install — see
+// packaging/windows/mesh-install-helper.ps1) rather than as the
+// interactively logged-in user, user.Current() resolves to the SERVICE
+// ACCOUNT's SID (S-1-5-18 for LocalSystem), not the desktop user's. A DACL
+// granting access only to that SID would leave Electron (running as the
+// logged-in user) unable to connect to the pipe at all — the daemon would
+// run, /status would work locally, but the desktop app would show "mesh
+// unavailable" forever.
 //
-// This prevents other local users (and SYSTEM) from connecting, matching the
-// same-user-only invariant enforced by Unix socket permissions.
-//
-// KNOWN GAP (tracked, not yet fixed — see the SUDO_UID/console-user fix in
-// listener_unix.go for the equivalent macOS/Linux problem): when this
-// sidecar runs as a Windows SERVICE (LocalSystem or a dedicated service
-// account) rather than as the interactively logged-in user, user.Current()
-// above resolves to THAT service account's SID, not the desktop user's. The
-// DACL then grants pipe access only to the service account, and Electron
-// (running as the logged-in user) gets access denied connecting — the exact
-// same class of bug the SUDO_UID gap was for Unix, just via a different
-// mechanism (DACL vs. file chmod/chown).
-//
-// Fixing this properly needs more than a small change: resolve the active
-// interactive session's user SID via WTSGetActiveConsoleSessionId +
-// WTSQueryUserToken (or WTSEnumerateSessions + per-session
-// WTSQuerySessionInformation for WTSUserName), translate that to a SID via
-// LookupAccountName, and grant the DACL to BOTH the service account and that
-// SID (so the service can still administer the pipe and the desktop user can
-// connect to it). That's a real Win32/golang.org/x/sys/windows undertaking —
-// deliberately left out of this change; flagging here so it isn't silently
-// assumed to work once the sidecar ships as a Windows service.
+// buildPipeSDDL is factored out (pure, no Win32 calls) so the DACL string
+// construction is unit-testable without a real console session — see
+// listener_windows_test.go.
 func platformListen(_ string) (net.Listener, error) {
 	u, err := user.Current()
 	if err != nil {
 		return nil, fmt.Errorf("localapi: get current user for pipe DACL: %w", err)
 	}
 
-	// u.Uid is the SID string on Windows (e.g. "S-1-5-21-...").
-	sddl := fmt.Sprintf("D:P(A;;GA;;;%s)", u.Uid)
+	// u.Uid is the SID string on Windows (e.g. "S-1-5-18" for LocalSystem,
+	// "S-1-5-21-..." for a real user account).
+	consoleSID, ok := consoleUserSID()
+	if !ok {
+		slog.Warn("localapi: could not resolve the active console user's SID — pipe DACL grants access only to the account this daemon runs as; if that account differs from the interactively logged-in desktop user (e.g. this daemon running as a Windows Service), the desktop app will not be able to connect",
+			"service_sid", u.Uid)
+	}
+
+	sddl := buildPipeSDDL(u.Uid, consoleSID)
 
 	cfg := &winio.PipeConfig{
 		SecurityDescriptor: sddl,
@@ -65,7 +61,72 @@ func platformListen(_ string) (net.Listener, error) {
 	if err != nil {
 		return nil, fmt.Errorf("localapi: listen named pipe %s: %w", pipeName, err)
 	}
+	if ok && consoleSID != u.Uid {
+		slog.Info("localapi: pipe DACL grants access to both the running account and the active console user",
+			"service_sid", u.Uid, "console_sid", consoleSID)
+	}
 	return ln, nil
+}
+
+// buildPipeSDDL builds the pipe's security descriptor string:
+//
+//	D:P   — DACL, protected (no inheritance)
+//	A     — Allow ACE
+//	GA    — Generic All rights
+//
+// Always grants ownerSID (the account the daemon itself runs as). Also
+// grants consoleSID when it is non-empty and different from ownerSID — the
+// common case being ownerSID = LocalSystem (running as a Windows Service)
+// and consoleSID = the interactively logged-in desktop user Electron runs
+// as. When they're equal (dev: running interactively as the same user that
+// will connect) or consoleSID is empty (no resolvable console session), a
+// single-ACE DACL is emitted, matching the pre-fix behavior.
+func buildPipeSDDL(ownerSID, consoleSID string) string {
+	if consoleSID == "" || consoleSID == ownerSID {
+		return fmt.Sprintf("D:P(A;;GA;;;%s)", ownerSID)
+	}
+	return fmt.Sprintf("D:P(A;;GA;;;%s)(A;;GA;;;%s)", ownerSID, consoleSID)
+}
+
+// consoleUserSID resolves the SID (string form, e.g. "S-1-5-21-...") of the
+// user logged into the active interactive console session, via
+// WTSGetActiveConsoleSessionId -> WTSQueryUserToken -> Token.GetTokenUser().
+// This is the Windows counterpart to listener_unix.go's
+// consoleUsernameLinux/consoleUsernameDarwin.
+//
+// Returns ok=false when there is no active console session (headless, or no
+// one has logged in yet — e.g. right after boot before the Windows Service
+// has anyone to hand the pipe off to) or any step fails. That is a normal,
+// expected outcome, not a fatal error — mirrors the non-fatal contract in
+// listener_unix.go's platformListen.
+func consoleUserSID() (sid string, ok bool) {
+	sessionID := windows.WTSGetActiveConsoleSessionId()
+	// 0xFFFFFFFF means "no active console session" (per WTSGetActiveConsoleSessionId docs).
+	if sessionID == 0xFFFFFFFF {
+		return "", false
+	}
+
+	var token windows.Token
+	if err := windows.WTSQueryUserToken(sessionID, &token); err != nil {
+		slog.Warn("localapi: WTSQueryUserToken failed for active console session", "session_id", sessionID, "err", err)
+		return "", false
+	}
+	defer token.Close()
+
+	tokenUser, err := token.GetTokenUser()
+	if err != nil {
+		slog.Warn("localapi: could not read token user for active console session", "session_id", sessionID, "err", err)
+		return "", false
+	}
+	if tokenUser.User.Sid == nil {
+		return "", false
+	}
+
+	s := tokenUser.User.Sid.String()
+	if s == "" {
+		return "", false
+	}
+	return s, true
 }
 
 // defaultSocketPath returns the named pipe identifier on Windows. This value

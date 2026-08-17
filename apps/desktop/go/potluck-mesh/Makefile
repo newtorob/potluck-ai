@@ -31,6 +31,10 @@ build: ## Build for the current platform into dist/
 	@mkdir -p $(DIST)
 	go build -ldflags "$(LDFLAGS)" -o $(DIST)/potluck-mesh$(shell go env GOEXE) $(CMD)
 	@echo "built: $(DIST)/potluck-mesh$(shell go env GOEXE)"
+	@if [ "$(shell go env GOOS)" = "windows" ]; then \
+		cp third_party/windows/wintun.dll $(DIST)/wintun.dll; \
+		echo "staged: $(DIST)/wintun.dll (see third_party/windows/README.md)"; \
+	fi
 
 run: ## Run the sidecar in the current shell (uses COORDINATOR_URL + DERP_URL)
 	go run $(CMD) --coordinator-url $(COORDINATOR_URL) --derp-url $(DERP_URL)
@@ -42,6 +46,7 @@ build-all: ## Build for all 5 target triples into dist/
 	@$(MAKE) _build GOOS=linux   GOARCH=amd64  OUT=$(DIST)/potluck-mesh-linux-amd64
 	@$(MAKE) _build GOOS=linux   GOARCH=arm64  OUT=$(DIST)/potluck-mesh-linux-arm64
 	@$(MAKE) _build GOOS=windows GOARCH=amd64  OUT=$(DIST)/potluck-mesh-windows-amd64.exe CGO_ENABLED_OVERRIDE=0
+	@cp third_party/windows/wintun.dll $(DIST)/wintun.dll
 	@echo ""
 	@echo "All builds complete:"
 	@ls -lh $(DIST)/
