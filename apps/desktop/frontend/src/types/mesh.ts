@@ -139,6 +139,7 @@ export type MeshDaemonState =
   | 'requires_approval'
   | 'starting'
   | 'running'
+  | 'failed'
   | 'unsupported';
 
 export interface MeshDaemonStatus {

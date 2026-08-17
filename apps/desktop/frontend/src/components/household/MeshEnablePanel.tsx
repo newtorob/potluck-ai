@@ -19,7 +19,7 @@
  */
 
 import { useState } from 'react';
-import { Power, ShieldCheck, ExternalLink, Loader2, WifiOff } from 'lucide-react';
+import { Power, ShieldCheck, ExternalLink, Loader2, WifiOff, RotateCw, AlertTriangle } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { meshDaemon } from '@/lib/meshClient';
@@ -28,7 +28,11 @@ import type { BridgeReachability } from '@/stores/meshStore';
 
 type DaemonBridgeState = Extract<
   BridgeReachability,
-  'daemon_not_installed' | 'daemon_requires_approval' | 'daemon_starting' | 'daemon_unsupported'
+  | 'daemon_not_installed'
+  | 'daemon_requires_approval'
+  | 'daemon_starting'
+  | 'daemon_failed'
+  | 'daemon_unsupported'
 >;
 
 interface MeshEnablePanelProps {
@@ -77,7 +81,70 @@ export function MeshEnablePanel({ bridge, daemonStatus, onChanged }: MeshEnableP
     return <RequiresApprovalPanel onChanged={onChanged} />;
   }
 
+  if (bridge === 'daemon_failed') {
+    return <FailedPanel detail={daemonStatus?.detail} onChanged={onChanged} />;
+  }
+
   return <NotInstalledPanel platform={daemonStatus?.platform} onChanged={onChanged} />;
+}
+
+// ---------------------------------------------------------------------------
+// failed — the service is installed but crashed / is crash-looping. Give the
+// user a Retry (re-runs the same enable/install path) instead of leaving them
+// on an indefinite "Starting…" spinner with no way out.
+// ---------------------------------------------------------------------------
+
+function FailedPanel({ detail, onChanged }: { detail?: string; onChanged: () => void }) {
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleRetry() {
+    setError(null);
+    setWorking(true);
+    try {
+      const result = await meshDaemon.enable();
+      if (result.state === 'not_installed' || result.state === 'failed') {
+        setError(result.detail ?? 'Mesh networking could not start. Please try again.');
+      }
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Mesh networking could not start.');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <EmptyState
+      icon={AlertTriangle}
+      title="Mesh networking didn't start"
+      description="The background mesh service is installed but couldn't start. Retrying reinstalls and restarts it, so it usually clears on the next try."
+      primaryAction={
+        <button type="button" onClick={() => void handleRetry()} disabled={working} className={buttonClass}>
+          {working ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Retrying…
+            </>
+          ) : (
+            <>
+              <RotateCw className="h-3.5 w-3.5" />
+              Retry
+            </>
+          )}
+        </button>
+      }
+      secondaryAction={
+        error !== null ? (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        ) : detail ? (
+          <p className="text-xs text-muted-foreground">{detail}</p>
+        ) : undefined
+      }
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------

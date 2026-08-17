@@ -51,6 +51,7 @@ export type BridgeReachability =
   | 'daemon_not_installed' // mesh daemon never registered (or lost track of)
   | 'daemon_requires_approval' // registered, needs a click in System Settings
   | 'daemon_starting' // registered + approved, socket not answering yet
+  | 'daemon_failed' // installed but the service crashed / crash-looped
   | 'daemon_unsupported' // this platform's daemon supervision isn't built yet
   | 'sidecar_offline' // bridge present, socket not accepting, no daemon info
   | 'reachable';
@@ -203,6 +204,8 @@ function daemonStateToBridge(state: MeshDaemonState): BridgeReachability {
       return 'daemon_requires_approval';
     case 'starting':
       return 'daemon_starting';
+    case 'failed':
+      return 'daemon_failed';
     case 'unsupported':
       return 'daemon_unsupported';
     case 'running':

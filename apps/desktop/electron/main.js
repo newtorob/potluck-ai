@@ -1146,6 +1146,31 @@ function unitFileExists(unitName) {
   });
 }
 
+// Reads a few machine-readable properties of a unit so we can tell a genuine
+// crash / crash-loop apart from a transient startup. NRestarts climbs when
+// systemd's Restart=on-failure keeps relaunching a unit that immediately dies
+// (e.g. a bad ExecStart) — the classic "stuck forever" case a user would
+// otherwise see as an endless "Starting…".
+function systemctlShow(unitName) {
+  return new Promise((resolve) => {
+    execFile(
+      'systemctl',
+      ['show', unitName, '-p', 'ActiveState', '-p', 'SubState', '-p', 'NRestarts', '-p', 'Result'],
+      { timeout: 5_000 },
+      (err, stdout) => {
+        const props = {};
+        String(stdout || '')
+          .split('\n')
+          .forEach((line) => {
+            const eq = line.indexOf('=');
+            if (eq > 0) props[line.slice(0, eq)] = line.slice(eq + 1).trim();
+          });
+        resolve(props);
+      },
+    );
+  });
+}
+
 async function computeLinuxDaemonStatus() {
   const exists = await unitFileExists('potluck-mesh.service');
   if (!exists) {
@@ -1153,6 +1178,25 @@ async function computeLinuxDaemonStatus() {
   }
   const activeState = await systemctlIsActive('potluck-mesh.service');
   if (activeState !== 'active') {
+    // Distinguish a real failure / crash-loop from a transient startup, so the
+    // UI can offer "Retry" instead of spinning on "Starting…" indefinitely.
+    const props = await systemctlShow('potluck-mesh.service');
+    const restarts = Number(props.NRestarts || 0);
+    const failed =
+      activeState === 'failed' ||
+      props.ActiveState === 'failed' ||
+      props.SubState === 'failed' ||
+      (props.Result && props.Result !== 'success' && props.Result !== 'unset') ||
+      restarts >= 3; // auto-restart loop = effectively failed
+    if (failed) {
+      return {
+        platform: 'linux',
+        state: 'failed',
+        detail: `service ${props.ActiveState || activeState}/${props.SubState || '?'}${
+          restarts ? `, ${restarts} restart attempts` : ''
+        }`,
+      };
+    }
     return { platform: 'linux', state: 'starting', detail: `systemd unit state: ${activeState}` };
   }
   try {

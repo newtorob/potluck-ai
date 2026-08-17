@@ -125,6 +125,7 @@ export function HouseholdView() {
     bridge === 'daemon_not_installed' ||
     bridge === 'daemon_requires_approval' ||
     bridge === 'daemon_starting' ||
+    bridge === 'daemon_failed' ||
     bridge === 'daemon_unsupported'
   ) {
     return (
