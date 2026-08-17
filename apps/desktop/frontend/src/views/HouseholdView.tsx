@@ -38,6 +38,7 @@ import {
   Network,
   Wifi,
   Cable,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { ViewHeader } from '@/components/layout/ViewHeader';
@@ -67,6 +68,7 @@ import {
   meshClient,
   issuePairingToken,
   getCurrentHousehold,
+  removeMachine,
   MeshApiError,
 } from '@/lib/meshClient';
 import { relativeTime } from '@/lib/timeFormat';
@@ -946,6 +948,7 @@ function PairedView({
                 peer={peer}
                 diag={report.perPeer[peer.node_id]}
                 caps={capsByNode[peer.node_id]}
+                onRemoved={onUnpaired}
               />
             ))}
           </ul>
@@ -1810,7 +1813,17 @@ function formatCtx(n: number | null | undefined): string | null {
   return n >= 1000 ? `${Math.round(n / 1000)}K ctx` : `${n} ctx`;
 }
 
-function PeerRow({ peer, diag, caps }: { peer: MeshPeer; diag?: PeerDiagnostic | undefined; caps?: PeerCapabilities | undefined }) {
+function PeerRow({
+  peer,
+  diag,
+  caps,
+  onRemoved,
+}: {
+  peer: MeshPeer;
+  diag?: PeerDiagnostic | undefined;
+  caps?: PeerCapabilities | undefined;
+  onRemoved: () => void;
+}) {
   // A specific, actionable reason replaces a bare "Offline" — the warn/error
   // detail is shown inline so the user sees the fix without hovering.
   const showDetail = diag && (diag.severity === 'warn' || diag.severity === 'error');
@@ -1912,8 +1925,80 @@ function PeerRow({ peer, diag, caps }: { peer: MeshPeer; diag?: PeerDiagnostic |
         )}
       </div>
 
-      <PeerStateBadge diag={diag} />
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
+        <PeerStateBadge diag={diag} />
+        {!peer.reachable && <PeerRemoveControl peer={peer} onRemoved={onRemoved} />}
+      </div>
     </li>
+  );
+}
+
+/** Remove a stale/ghost machine (an unreachable roster entry left by a wiped
+ *  or reinstalled machine). Two-step confirm so a live-but-sleeping machine
+ *  isn't dropped by accident. */
+function PeerRemoveControl({ peer, onRemoved }: { peer: MeshPeer; onRemoved: () => void }) {
+  const [phase, setPhase] = useState<'idle' | 'confirm' | 'working'>('idle');
+  const [error, setError] = useState<string | null>(null);
+
+  async function doRemove() {
+    setError(null);
+    setPhase('working');
+    try {
+      await removeMachine(peer.node_id);
+      onRemoved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not remove.');
+      setPhase('idle');
+    }
+  }
+
+  if (phase === 'working') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+        <Loader2 className="h-2.5 w-2.5 animate-spin" aria-hidden="true" />
+        Removing…
+      </span>
+    );
+  }
+
+  if (phase === 'confirm') {
+    return (
+      <span className="inline-flex items-center gap-2 text-[10px]">
+        <button
+          type="button"
+          onClick={() => void doRemove()}
+          className="font-medium text-destructive hover:underline"
+        >
+          Remove
+        </button>
+        <button
+          type="button"
+          onClick={() => setPhase('idle')}
+          className="text-muted-foreground hover:underline"
+        >
+          Cancel
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => setPhase('confirm')}
+        title="Remove this machine from your household"
+        className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/70 hover:text-destructive transition-colors"
+      >
+        <Trash2 className="h-2.5 w-2.5" aria-hidden="true" />
+        Remove
+      </button>
+      {error !== null && (
+        <span className="text-[10px] text-destructive" role="alert">
+          {error}
+        </span>
+      )}
+    </span>
   );
 }
 

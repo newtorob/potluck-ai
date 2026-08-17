@@ -323,3 +323,22 @@ export async function getCurrentHousehold(): Promise<CurrentHouseholdResponse> {
   }
   return res.body as CurrentHouseholdResponse;
 }
+
+/**
+ * Remove a machine from the signed-in member's own household — for dropping a
+ * stale/ghost node left behind when a machine was wiped or reinstalled without
+ * unpairing. Session-authenticated; the coordinator verifies the node belongs
+ * to the caller's household. Idempotent (204 even if already gone).
+ */
+export async function removeMachine(nodeId: string): Promise<void> {
+  const res = await coordinatorSessionRequest(
+    'DELETE',
+    `/mesh/households/current/machines/${nodeId}`,
+  );
+  if (res.status !== 204 && res.status !== 200) {
+    throw new CoordinatorError(
+      `Could not remove machine: ${detailOf(res.body)}`,
+      res.status,
+    );
+  }
+}

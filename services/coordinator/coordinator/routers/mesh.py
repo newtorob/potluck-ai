@@ -297,6 +297,72 @@ async def get_current_household(
 
 
 # ---------------------------------------------------------------------------
+# DELETE /mesh/households/current/machines/{node_id}
+# ---------------------------------------------------------------------------
+
+
+@router.delete(
+    "/mesh/households/current/machines/{node_id}",
+    status_code=204,
+    response_class=Response,
+)
+async def remove_household_machine(
+    node_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
+) -> Response:
+    """Remove a machine from the calling member's OWN household — the
+    member-facing counterpart to the node-authed DELETE /mesh/nodes/{id}
+    (peer cleanup). Lets someone drop a stale/ghost node (a machine that was
+    wiped or reinstalled without unpairing) from their roster, so the app
+    doesn't keep showing dead machines or trying to reach them.
+
+    Auth: session-only (`resolve_session_member_id`) — a member managing their
+    own household, no node/coordinator token. The target must belong to the
+    member's household (else 403), and the member must have a household (else
+    404). Idempotent: 204 even if the node is already gone.
+
+    On success: deletes the row + broadcasts SignalRosterUpdate(removed) so
+    online household-mates drop it from their live roster immediately."""
+    household_result = await db.execute(
+        select(Household).where(Household.owner_member_id == member_id)
+    )
+    household = household_result.scalar_one_or_none()
+    if household is None:
+        raise HTTPException(status_code=404, detail="no household for this member")
+
+    target = await db.get(MeshNode, node_id)
+    if target is None:
+        return Response(status_code=204)  # idempotent
+    if target.household_id != household.id:
+        # Not the member's machine — don't confirm existence across households.
+        raise HTTPException(status_code=403, detail="not a machine in your household")
+
+    target_id_str = str(target.id)
+    household_id = target.household_id
+
+    await db.delete(target)
+    await db.commit()
+
+    logger.info(
+        "mesh_node_removed_by_member",
+        node_id=target_id_str,
+        household_id=str(household_id),
+        member_id=str(member_id),
+    )
+
+    async with get_session_factory()() as broadcast_db:
+        await _broadcast_to_household(
+            household_id,
+            SignalRosterUpdate(removed=[target_id_str]).model_dump(mode="json"),
+            db=broadcast_db,
+            except_node_id=None,
+        )
+
+    return Response(status_code=204)
+
+
+# ---------------------------------------------------------------------------
 # POST /mesh/pairing-tokens
 # ---------------------------------------------------------------------------
 

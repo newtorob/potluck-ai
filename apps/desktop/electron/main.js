@@ -1461,6 +1461,8 @@ const COORDINATOR_SESSION_DYNAMIC_ROUTES = [
   { method: 'DELETE', pattern: /^\/me\/circles\/([^/]+)$/ },
   { method: 'POST', pattern: /^\/me\/circles\/([^/]+)\/members$/ },
   { method: 'DELETE', pattern: /^\/me\/circles\/([^/]+)\/members\/([^/]+)$/ },
+  // Member removes a (stale/ghost) machine from their own household.
+  { method: 'DELETE', pattern: /^\/mesh\/households\/current\/machines\/([0-9a-fA-F-]{36})$/ },
 ];
 
 function isAllowedCoordinatorSessionRoute(method, reqPath) {
