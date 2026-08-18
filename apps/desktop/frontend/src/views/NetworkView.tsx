@@ -25,6 +25,8 @@ import { Globe2, Layers, Activity, Cpu, BarChart3, TrendingUp, TrendingDown, Min
 import { cn } from '@/components/ui/cn';
 import { localApi } from '@/lib/localApi';
 import { useChatStore } from '@/stores/chatStore';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { registerContributorDeviceKey } from '@/lib/deviceKey';
 import type { FleetSummary, MyJobStats, CreditBalance, CreditHistory, CreditHistoryEntry, ContributionsResponse } from '@/lib/localApi';
 import { relativeTime } from '@/lib/timeFormat';
 import { formatModelName } from '@/lib/modelName';
@@ -204,6 +206,14 @@ export function NetworkView() {
       <NetworkHeader fleet={fleet} balance={balance} />
 
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+        {/* Contribute toggle — the persistent home for contributor_mode.
+            Onboarding sets it too, but this is where a member turns serving on
+            or off after setup (household + open-pool requests both gate on it). */}
+        <section aria-label="Contribute compute">
+          <SectionHeader>Contribute compute</SectionHeader>
+          <ContributorToggleCard />
+        </section>
+
         {/* Pool state. When no other peers are online, show a useful
             "be the first peer" panel instead of a wall of zeros; the member's
             own sections below still render either way. */}
@@ -958,5 +968,74 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
     <h2 className="mb-3 font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
       {children}
     </h2>
+  );
+}
+
+/**
+ * ContributorToggleCard — the persistent contributor_mode switch.
+ *
+ * Wired to the same NetworkSettings.contributor_mode boolean the onboarding
+ * "Contribute" step writes. Until this existed, a member who declined during
+ * setup had no in-app way to start serving (household "My machines" routing
+ * and open-pool serving both gate on this flag). Enabling it also registers
+ * this machine's contributor device key, mirroring ConnectStep.
+ */
+function ContributorToggleCard() {
+  const settings = useSettingsStore((s) => s.settings);
+  const isSaving = useSettingsStore((s) => s.isSaving);
+  const updateSettings = useSettingsStore((s) => s.update);
+
+  const contributorMode = settings?.network.contributor_mode ?? false;
+
+  async function handleToggle(next: boolean) {
+    try {
+      await updateSettings({ network: { contributor_mode: next } });
+    } catch {
+      // Rollback is handled by the store.
+      return;
+    }
+    if (next) {
+      // Pre-register the contributor device key so attestation isn't rejected
+      // later. Best-effort, same as ConnectStep — never block the toggle.
+      try {
+        await registerContributorDeviceKey();
+      } catch (err) {
+        console.warn('[NetworkView] device key registration failed:', err);
+      }
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-card/60 p-4">
+      {settings === null ? (
+        <p className="text-sm text-muted-foreground">
+          Settings are still loading. Try again in a moment.
+        </p>
+      ) : (
+        <label className="flex items-start gap-3 cursor-pointer select-none">
+          <Cpu className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <div className="flex-1 space-y-0.5">
+            <p className="text-sm text-foreground">
+              Share spare compute with your network
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              When idle, this machine serves inference requests from your own
+              machines and, when you route to it, the open pool. Required for
+              other machines in your household to answer your{' '}
+              <span className="text-foreground">My machines</span> requests. Off by default.
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            role="switch"
+            aria-label="Share spare compute with your network"
+            checked={contributorMode}
+            disabled={isSaving}
+            onChange={(e) => void handleToggle(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-primary disabled:cursor-not-allowed disabled:opacity-60"
+          />
+        </label>
+      )}
+    </div>
   );
 }
