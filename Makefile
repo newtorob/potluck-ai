@@ -315,9 +315,9 @@ installer-bundle: installer-deps sidecar-go ## Bundle both Python sidecar binari
 	@echo "==> Stamping build info (git sha + build time + dirty flag)"
 	@cd apps/desktop/electron && pnpm run prepack:build-info
 
-installer-mac: installer-bundle ## Build SIGNED macOS installer (.dmg + .zip). Auto-discovers the Developer ID cert in the login keychain and signs; also notarizes when APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID are set (scripts/notarize.js). With no cert/creds it falls back to an unsigned build.
-	@echo "==> Building macOS installer (signs with keychain Developer ID; notarizes if APPLE_* env is set)"
-	@cd apps/desktop/electron && pnpm run build:mac
+installer-mac: installer-bundle ## Build SIGNED macOS installer (.dmg + .zip). Auto-discovers the Developer ID cert in the login keychain and signs; notarizes using creds sourced from ~/.potluck-apple-env if present (else APPLE_* already in env). scripts/notarize.js. With no cert/creds it falls back to an unsigned build.
+	@echo "==> Building macOS installer (signs with keychain Developer ID; notarizes if APPLE_* env or ~/.potluck-apple-env is present)"
+	@sh -c '[ -f "$$HOME/.potluck-apple-env" ] && { echo "==> Sourcing notarization creds from ~/.potluck-apple-env"; . "$$HOME/.potluck-apple-env"; }; cd apps/desktop/electron && pnpm run build:mac'
 
 installer-mac-dir: installer-bundle ## Fast unsigned macOS build: unpacked .app only (no dmg/zip/notarize/hash). For local dogfooding — see 'make dogfood'.
 	@echo "==> Building macOS .app (unpacked --dir, unsigned, no notarization)"
