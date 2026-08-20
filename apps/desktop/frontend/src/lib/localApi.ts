@@ -503,6 +503,75 @@ export interface ContributionsWeeklyResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Usage dashboard (sidecar SQLite, local-only). Everything here is computed
+// and stored on-device; nothing is ever uploaded. Metadata only.
+// ---------------------------------------------------------------------------
+
+export type UsageScope = 'local' | 'my_machines' | 'circle' | 'pool';
+
+export interface UsageSummary {
+  requests: number;
+  input_tokens: number;
+  cache_read_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  sessions: number;
+  active_days: number;
+  active_streak: number;
+  success_rate: number;
+  p95_latency_ms: number;
+  avg_ttft_ms: number;
+}
+
+export interface UsageActivityDay {
+  date: string; // "YYYY-MM-DD"
+  tokens: number;
+  requests: number;
+}
+
+export interface UsageModel {
+  model_slug: string;
+  tokens: number;
+  requests: number;
+}
+
+export interface UsagePace {
+  last_hour_tokens: number;
+  last_24h_tokens: number;
+  wow_change_pct: number | null;
+  cache_hit_rate: number;
+  avg_ttft_ms: number;
+}
+
+export interface UsageScopeBucket {
+  tokens: number;
+  requests: number;
+}
+
+export interface UsageSplit {
+  window_days: number;
+  consumed: Record<UsageScope, UsageScopeBucket>;
+  served: Record<UsageScope, UsageScopeBucket>;
+  consumed_total: number;
+  served_total: number;
+}
+
+/** Metadata-only completion record posted for in-app requests the sidecar
+ *  could not observe itself (circle / pool / my_machines chat routes renderer
+ *  -> coordinator directly). NEVER carries prompt or response content. */
+export interface UsageRecordInput {
+  direction?: 'consumed' | 'served';
+  scope?: UsageScope;
+  model_slug?: string | null;
+  input_tokens?: number;
+  output_tokens?: number;
+  ttft_ms?: number | null;
+  duration_ms?: number | null;
+  ok?: boolean;
+  error_class?: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // API surface
 // ---------------------------------------------------------------------------
 
@@ -1008,6 +1077,49 @@ export const localApi = {
       const match = /filename="([^"]+)"/.exec(cd);
       const filename = match?.[1] ?? `potluck-trace-${sessionId}.json`;
       return { blob, filename };
+    },
+  },
+
+  // ---- Usage dashboard (sidecar SQLite, local-only) ------------------------
+
+  usage: {
+    summary(windowDays = 30): Promise<UsageSummary> {
+      return timedFetch(`${LOCAL_BASE}/usage/summary?window=${windowDays}`).then((r) =>
+        handleResponse<UsageSummary>(r),
+      );
+    },
+
+    activity(rangeDays = 365): Promise<UsageActivityDay[]> {
+      return timedFetch(`${LOCAL_BASE}/usage/activity?range=${rangeDays}`).then((r) =>
+        handleResponse<UsageActivityDay[]>(r),
+      );
+    },
+
+    models(limit = 8): Promise<UsageModel[]> {
+      return timedFetch(`${LOCAL_BASE}/usage/models?limit=${limit}`).then((r) =>
+        handleResponse<UsageModel[]>(r),
+      );
+    },
+
+    pace(): Promise<UsagePace> {
+      return timedFetch(`${LOCAL_BASE}/usage/pace`).then((r) => handleResponse<UsagePace>(r));
+    },
+
+    split(windowDays = 30): Promise<UsageSplit> {
+      return timedFetch(`${LOCAL_BASE}/usage/split?window=${windowDays}`).then((r) =>
+        handleResponse<UsageSplit>(r),
+      );
+    },
+
+    /** Persist a completed in-app request the sidecar could not observe (see
+     *  UsageRecordInput). Fire-and-forget: telemetry must never break a chat,
+     *  so callers ignore the result and swallow errors. */
+    record(input: UsageRecordInput): Promise<{ ok: boolean }> {
+      return timedFetch(`${LOCAL_BASE}/usage/record`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      }).then((r) => handleResponse<{ ok: boolean }>(r));
     },
   },
 

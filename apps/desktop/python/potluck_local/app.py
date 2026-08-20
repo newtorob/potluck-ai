@@ -24,7 +24,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from potluck_local import __version__
-from potluck_local.routers import agents, chat, contributor, gateway, hardware, health, memory, models, ollama, peer, readiness, settings, tasks, vault, verify
+from potluck_local.routers import agents, chat, contributor, gateway, hardware, health, memory, models, ollama, peer, readiness, settings, tasks, usage, vault, verify
 from potluck_local.utils.logging import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -400,6 +400,7 @@ def create_app() -> FastAPI:
     app.include_router(memory.router, prefix="/memory", tags=["memory"])
     app.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
     app.include_router(agents.router, prefix="/agents", tags=["agents"])
+    app.include_router(usage.router, prefix="/usage", tags=["usage"])
     app.include_router(vault.router, prefix="/vault", tags=["vault"])
     app.include_router(peer.router, prefix="/peer", tags=["peer"])
     app.include_router(contributor.router, prefix="/contributor", tags=["contributor"])

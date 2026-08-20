@@ -361,6 +361,23 @@ async def _handle_real_job(
             "real_job_complete job_id=%s output_tokens=%d duration_ms=%d reason=%s",
             job.job_id, token_index, duration_ms, finish_reason,
         )
+        # Usage dashboard: record that this machine SERVED a network request.
+        # The wire deliberately hides whether it was circle or pool (the
+        # coordinator strips scope + identity), so served rows are recorded as
+        # "pool" — "I served the open network" — with NO peer identity, matching
+        # the privacy invariant. Failure-tolerant; never breaks the serve.
+        try:
+            from potluck_local.services.usage_store import record_usage_event
+            await record_usage_event(
+                direction="served",
+                scope="pool",
+                model_slug=serve_slug,
+                output_tokens=token_index,
+                duration_ms=duration_ms,
+                ok=True,
+            )
+        except Exception:
+            logger.debug("usage_record_served_failed job_id=%s", job.job_id, exc_info=True)
     except websockets.ConnectionClosed:
         logger.warning("real_job_aborted_connection_closed job_id=%s", job.job_id)
     except Exception as exc:  # pragma: no cover — defensive

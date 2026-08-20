@@ -278,20 +278,56 @@ async def _fire_extraction(
             logger.debug("chat_observer_log_failed conversation_id=%s", conversation_id)
 
 
+def _estimate_tokens(text: str) -> int:
+    """Rough token count from character length (~4 chars/token). A metadata-only
+    proxy for the Usage dashboard when the runtime doesn't return a usage block
+    (streaming). Never inspects meaning, only length."""
+    return max(0, round(len(text) / 4))
+
+
+async def _record_local_usage(
+    model_slug: str | None,
+    input_tokens: int,
+    output_tokens: int,
+    ttft_ms: int | None,
+    duration_ms: int | None,
+) -> None:
+    """Record one local (scope='local') consumed usage row. Metadata only."""
+    try:
+        from potluck_local.services.usage_store import record_usage_event
+        await record_usage_event(
+            direction="consumed",
+            scope="local",
+            model_slug=model_slug,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            ttft_ms=ttft_ms,
+            duration_ms=duration_ms,
+            ok=True,
+        )
+    except Exception:
+        logger.debug("usage_record_local_failed", exc_info=True)
+
+
 async def _accumulating_stream(
     upstream: AsyncGenerator[str, None],
     raw_messages: list[dict],
     conversation_id: str,
     should_extract: bool,
     active_project: str | None = None,
+    model_slug: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """Wrap the upstream SSE generator, accumulate assistant text, then extract.
 
     Yields each chunk unchanged.  After the generator finishes (or is
     cancelled by a client disconnect), schedules _fire_extraction as a
-    fire-and-forget asyncio task.
+    fire-and-forget asyncio task and records one metadata-only usage row.
     """
+    import time as _time
+
     accumulated: list[str] = []
+    started = _time.monotonic()
+    first_ms: int | None = None
     try:
         async for chunk in upstream:
             # Parse delta content out of each SSE line for accumulation.
@@ -307,6 +343,8 @@ async def _accumulating_stream(
                         .get("content", "")
                     )
                     if delta_content:
+                        if first_ms is None:
+                            first_ms = int((_time.monotonic() - started) * 1000)
                         accumulated.append(delta_content)
                 except Exception:
                     pass  # non-JSON data lines — skip silently
@@ -316,11 +354,20 @@ async def _accumulating_stream(
         # whatever we accumulated.
         raise
     finally:
+        full_content = "".join(accumulated)
         if should_extract and accumulated:
-            full_content = "".join(accumulated)
             asyncio.create_task(
                 _fire_extraction(raw_messages, full_content, conversation_id, active_project)
             )
+        # Usage dashboard: one metadata-only consumed row for this local turn.
+        input_text = "".join(str(m.get("content", "")) for m in raw_messages)
+        await _record_local_usage(
+            model_slug,
+            _estimate_tokens(input_text),
+            _estimate_tokens(full_content),
+            first_ms,
+            int((_time.monotonic() - started) * 1000),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -378,6 +425,7 @@ async def chat_completions(request: ChatRequest) -> object:
                 conversation_id,
                 should_extract,
                 active_project,
+                runtime.current_model_id(),
             ),
             media_type="text/event-stream",
             headers={
@@ -417,6 +465,16 @@ async def chat_completions(request: ChatRequest) -> object:
     # Echo conversation_id in non-streaming response.
     if isinstance(result, dict):
         result["conversation_id"] = conversation_id
+
+    # Usage dashboard: one metadata-only consumed row for this local turn.
+    _usage = result.get("usage", {}) if isinstance(result, dict) else {}
+    await _record_local_usage(
+        runtime.current_model_id(),
+        int(_usage.get("prompt_tokens", 0) or 0),
+        int(_usage.get("completion_tokens", 0) or 0),
+        None,
+        None,
+    )
 
     return result
 

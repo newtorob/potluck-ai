@@ -14,6 +14,7 @@ import { MemoryView } from '@/views/MemoryView';
 import { MemoryMapView } from '@/views/MemoryMapView';
 import { TaskStateView } from '@/views/TaskStateView';
 import { AgentsView } from '@/views/AgentsView';
+import { UsageView } from '@/views/UsageView';
 import { NetworkView } from '@/views/NetworkView';
 import { HouseholdView } from '@/views/HouseholdView';
 import { CirclesView } from '@/views/CirclesView';
@@ -257,6 +258,7 @@ export default function App() {
               <Route path="/memory/map" element={<MemoryMapView />} />
               <Route path="/tasks" element={<TaskStateView />} />
               <Route path="/agents" element={<AgentsView />} />
+              <Route path="/usage" element={<UsageView />} />
               <Route path="/household" element={<HouseholdView />} />
               <Route path="/circles" element={<CirclesView />} />
               <Route path="/readiness" element={<ReadinessView />} />

@@ -28,6 +28,7 @@
 import { create } from 'zustand';
 import type { ChatMessage, Conversation } from '@/types/chat';
 import { localApi } from '@/lib/localApi';
+import type { UsageScope } from '@/lib/localApi';
 import type { PersistedMessage } from '@/lib/localApi';
 import { streamTokens } from '@/lib/streaming';
 import { streamHouseholdInference } from '@/lib/householdInference';
@@ -776,6 +777,34 @@ export const useChatStore = create<ChatState>()((set, get) => {
             }),
             'append:assistant',
           );
+
+          // Usage dashboard (metadata only, never content): record the NETWORK
+          // scopes here because they stream renderer -> coordinator/peer and
+          // never touch this machine's sidecar. Local turns are recorded
+          // server-side in chat.py instead, so we skip them to avoid double
+          // counting. Fire-and-forget: a telemetry write must never break chat.
+          const usageScope: UsageScope | null =
+            routingScope === 'household'
+              ? 'my_machines'
+              : routingScope === 'circle' && activeCircleId !== null
+                ? 'circle'
+                : routingScope === 'cooperative'
+                  ? 'pool'
+                  : null;
+          if (usageScope) {
+            void localApi.usage
+              .record({
+                direction: 'consumed',
+                scope: usageScope,
+                model_slug: networkModelSlug ?? null,
+                output_tokens: finalMsg.meta?.output_tokens ?? undefined,
+                duration_ms: finalMsg.meta?.duration_ms ?? undefined,
+                ok: true,
+              })
+              .catch(() => {
+                /* telemetry is best-effort; never surface to the user */
+              });
+          }
         }
       }
     } catch (err) {

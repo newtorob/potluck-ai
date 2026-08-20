@@ -234,7 +234,7 @@ async def chat_completions_openai(
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(
-            event_stream(),
+            _metered_consumed(event_stream(), _canonical_scope(served_by), served_model),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache", "X-Accel-Buffering": "no",
@@ -266,6 +266,12 @@ async def chat_completions_openai(
     except Exception as exc:  # noqa: BLE001
         logger.exception("gateway_chat_failed")
         raise HTTPException(status_code=500, detail=f"inference failed: {type(exc).__name__}")
+    _usage = result.get("usage", {}) if isinstance(result, dict) else {}
+    await _record_consumed(
+        _canonical_scope(served_by), served_model,
+        input_tokens=int(_usage.get("prompt_tokens", 0) or 0),
+        output_tokens=int(_usage.get("completion_tokens", 0) or 0),
+    )
     return JSONResponse(result, headers={"X-Potluck-Served-By": served_by})
 
 
@@ -541,3 +547,77 @@ async def embeddings_openai(req: EmbeddingRequest):
             "total_tokens": token_count,
         },
     })
+
+
+# ---------------------------------------------------------------------------
+# Usage dashboard recording (metadata only; never content)
+# ---------------------------------------------------------------------------
+#
+# The gateway is the external-tool consumed path (coding agents hitting the
+# OpenAI-compatible API). We record one usage row per completed request with
+# token counts + latency + scope, never prompt/response text.
+
+
+def _canonical_scope(served_by: str) -> str:
+    """Map the gateway's served_by string to a canonical dashboard scope."""
+    s = (served_by or "").lower()
+    if s.startswith("peer:"):
+        return "my_machines"
+    if s in ("pool", "circle"):
+        return s
+    return "local"
+
+
+async def _record_consumed(
+    scope: str,
+    model_slug: str,
+    *,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    ttft_ms: int | None = None,
+    duration_ms: int | None = None,
+    ok: bool = True,
+) -> None:
+    try:
+        from potluck_local.services.usage_store import record_usage_event
+        await record_usage_event(
+            direction="consumed",
+            scope=scope,
+            model_slug=model_slug,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            ttft_ms=ttft_ms,
+            duration_ms=duration_ms,
+            ok=ok,
+        )
+    except Exception:
+        logger.debug("usage_record_consumed_gateway_failed", exc_info=True)
+
+
+async def _metered_consumed(gen, scope: str, model_slug: str):
+    """Wrap the SSE generator to count output tokens + first-token latency +
+    duration, then record one consumed usage row. Content is never inspected:
+    a data chunk that is not the [DONE] sentinel and carries no error counts as
+    one output token. Records in finally so a client disconnect still lands."""
+    started = time.monotonic()
+    first_ms: int | None = None
+    count = 0
+    ok = True
+    try:
+        async for chunk in gen:
+            if isinstance(chunk, str) and chunk.startswith("data: ") and "[DONE]" not in chunk:
+                if '"error"' in chunk:
+                    ok = False
+                else:
+                    if first_ms is None:
+                        first_ms = int((time.monotonic() - started) * 1000)
+                    count += 1
+            yield chunk
+    finally:
+        await _record_consumed(
+            scope, model_slug,
+            output_tokens=count,
+            ttft_ms=first_ms,
+            duration_ms=int((time.monotonic() - started) * 1000),
+            ok=ok,
+        )

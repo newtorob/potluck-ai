@@ -52,6 +52,7 @@ import asyncio
 import logging
 import os
 import socket
+import time
 from typing import AsyncGenerator, Literal
 
 from fastapi import APIRouter, HTTPException
@@ -442,6 +443,8 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
         request.stream,
     )
 
+    served_model = runtime.current_model_id()
+
     if request.stream:
         upstream = runtime.stream_chat(
             messages=messages_for_runtime,
@@ -449,11 +452,12 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
             max_tokens=request.max_tokens,
             stop=request.stop,
         )
-        # Pass through unmodified — no memory accumulation, no extraction,
-        # no observability hooks. The runtime already emits OpenAI-format
-        # SSE chunks the frontend's streamTokens() parser understands.
+        # Pass through unmodified — no memory accumulation, no extraction. The
+        # only thing recorded is a metadata-only usage COUNT (tokens + duration,
+        # never content) for the local Usage dashboard's "served" side; the
+        # serving node still remembers nothing about the request itself.
         return StreamingResponse(
-            _passthrough_stream(upstream),
+            _served_metering_stream(upstream, served_model),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -462,6 +466,7 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
         )
 
     # Non-streaming path — collect the full response.
+    started = time.monotonic()
     chunks: list[str] = []
     async for chunk in runtime.stream_chat(
         messages=messages_for_runtime,
@@ -470,20 +475,52 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
         stop=request.stop,
     ):
         chunks.append(chunk)
+    await _record_served(served_model, _count_content_chunks(chunks),
+                         int((time.monotonic() - started) * 1000))
     # Same OpenAI-compatible non-streaming envelope the local chat
     # endpoint would emit. The runtime's chat() helper would do this
     # for us in a future refactor; for now we just stitch the stream.
     return {"raw_chunks": chunks}
 
 
-async def _passthrough_stream(
+def _count_content_chunks(chunks: list[str]) -> int:
+    """Output-token proxy: count non-empty SSE data chunks, ignoring the
+    [DONE] sentinel. Coarse but metadata-only; good enough for usage stats."""
+    return sum(1 for c in chunks if c and "[DONE]" not in c)
+
+
+async def _record_served(model_slug: str, output_tokens: int, duration_ms: int) -> None:
+    """Record a my_machines SERVED usage row (metadata only, no peer identity)."""
+    try:
+        from potluck_local.services.usage_store import record_usage_event
+        await record_usage_event(
+            direction="served",
+            scope="my_machines",
+            model_slug=model_slug,
+            output_tokens=output_tokens,
+            duration_ms=duration_ms,
+            ok=True,
+        )
+    except Exception:
+        logger.debug("usage_record_served_peer_failed", exc_info=True)
+
+
+async def _served_metering_stream(
     upstream: AsyncGenerator[str, None],
+    model_slug: str,
 ) -> AsyncGenerator[str, None]:
-    """Yield each upstream SSE chunk unchanged. No accumulation, no
-    side effects — the entire point of the peer endpoint is that the
-    serving node remembers nothing about the request."""
-    async for chunk in upstream:
-        yield chunk
+    """Yield each upstream SSE chunk unchanged while counting output tokens and
+    wall-clock, then record one metadata-only 'served' usage row. No content is
+    ever inspected or stored — only the count and duration."""
+    started = time.monotonic()
+    count = 0
+    try:
+        async for chunk in upstream:
+            if chunk and "[DONE]" not in chunk:
+                count += 1
+            yield chunk
+    finally:
+        await _record_served(model_slug, count, int((time.monotonic() - started) * 1000))
 
 
 # ---------------------------------------------------------------------------

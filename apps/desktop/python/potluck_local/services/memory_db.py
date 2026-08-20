@@ -273,6 +273,7 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         await db.execute(_CREATE_VAULT_FILES)
         await db.execute(_CREATE_CONVERSATIONS)
         await db.execute(_CREATE_MESSAGES)
+        await db.execute(_CREATE_USAGE_EVENTS)
 
         # Schema migrations first — indexes below may reference added columns.
         await _add_column_if_missing(db, "memories", "project", "TEXT")
@@ -323,6 +324,9 @@ async def init_memory_db(db_path: Path | None = None) -> None:
             await db.execute(stmt)
 
         for stmt in _OBSERVABILITY_INDICES:
+            await db.execute(stmt)
+
+        for stmt in _USAGE_INDICES:
             await db.execute(stmt)
 
         await db.commit()
@@ -414,6 +418,36 @@ _OBSERVABILITY_INDICES = [
     "CREATE INDEX IF NOT EXISTS idx_mcp_tool_calls_session ON mcp_tool_calls(session_id)",
     "CREATE INDEX IF NOT EXISTS idx_mcp_tool_calls_called_at ON mcp_tool_calls(called_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_mcp_tool_calls_tool_name ON mcp_tool_calls(tool_name)",
+]
+
+# usage_events powers the Usage dashboard (services/usage_store.py). One row per
+# completed inference request, written by each request path. METADATA ONLY:
+# model, token counts, latency, timestamp, scope, ok/fail. NEVER prompt or
+# response content, and NEVER peer identity on `served` rows (a served row means
+# "I served a request for the network", not "I served <peer>"). Same privacy
+# discipline as the /agents args_summary whitelist. All local, never uploaded.
+_CREATE_USAGE_EVENTS = """
+CREATE TABLE IF NOT EXISTS usage_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts TEXT NOT NULL,
+  direction TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  model_slug TEXT,
+  input_tokens INTEGER NOT NULL DEFAULT 0,
+  cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  ttft_ms INTEGER,
+  duration_ms INTEGER,
+  ok INTEGER NOT NULL DEFAULT 1,
+  error_class TEXT
+)
+"""
+
+_USAGE_INDICES = [
+    "CREATE INDEX IF NOT EXISTS idx_usage_events_ts ON usage_events(ts DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_usage_events_direction ON usage_events(direction)",
+    "CREATE INDEX IF NOT EXISTS idx_usage_events_scope ON usage_events(scope)",
+    "CREATE INDEX IF NOT EXISTS idx_usage_events_model ON usage_events(model_slug)",
 ]
 
 
