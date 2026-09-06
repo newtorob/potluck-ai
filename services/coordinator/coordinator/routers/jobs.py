@@ -25,12 +25,12 @@ import json
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Literal, Self
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from coordinator.db.database import get_db, get_session_factory
@@ -103,8 +103,16 @@ class JobRequest(BaseModel):
     # "pool"   -> mine, then the open pool (default; backward-compatible)
     scope: RoutingScope = "pool"
     # Required when scope="circle". Must be a circle owned by the caller.
-    # Omit (or pass null) for all other scopes; has no effect when scope != "circle".
+    # Omit (or pass null) for all other scopes; conflicting intent is rejected.
     circle_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def validate_circle_scope(self) -> Self:
+        if self.scope == "circle" and self.circle_id is None:
+            raise ValueError("circle_id is required when scope='circle'.")
+        if self.circle_id is not None and self.scope != "circle":
+            raise ValueError("circle_id requires scope='circle'.")
+        return self
 
 
 class JobResponse(BaseModel):

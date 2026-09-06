@@ -16,12 +16,14 @@ const history = vi.hoisted(() => ({
 }));
 
 const streamChat = vi.hoisted(() => vi.fn());
+const streamNetworkJob = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/localApi', () => ({
   localApi: {
     history,
     streamChat,
-    streamNetworkJob: vi.fn(),
+    streamNetworkJob,
+    usage: { record: vi.fn().mockResolvedValue({}) },
   },
 }));
 
@@ -44,7 +46,7 @@ function doneSse(): Response {
   });
 }
 
-describe('chatStore — create before append', () => {
+describe('chatStore persistence and routing', () => {
   beforeEach(() => {
     history.create.mockReset();
     history.appendMessage.mockReset().mockResolvedValue({});
@@ -52,6 +54,7 @@ describe('chatStore — create before append', () => {
     history.list.mockReset().mockResolvedValue([]);
     history.delete.mockReset().mockResolvedValue(undefined);
     streamChat.mockReset().mockResolvedValue(doneSse());
+    streamNetworkJob.mockReset().mockResolvedValue(doneSse());
 
     useChatStore.setState({
       conversations: {},
@@ -62,6 +65,7 @@ describe('chatStore — create before append', () => {
       streamingMessageId: null,
       abortController: null,
       routingScope: 'local',
+      activeCircleId: null,
       networkMode: false,
       householdMode: false,
     });
@@ -161,5 +165,37 @@ describe('chatStore — create before append', () => {
       id,
       expect.objectContaining({ role: 'user', content: 'second' }),
     );
+  });
+
+  it('keeps the circle selected at send time while conversation creation is pending', async () => {
+    let resolveCreate!: (value: unknown) => void;
+    history.create.mockImplementation(() => new Promise((resolve) => { resolveCreate = resolve; }));
+    useChatStore.setState({ routingScope: 'circle', activeCircleId: 'selected-circle' });
+    await useChatStore.getState().createConversation();
+
+    const send = useChatStore.getState().sendMessage('private circle prompt');
+    useChatStore.setState({ routingScope: 'cooperative', activeCircleId: null });
+    resolveCreate({});
+    await send;
+
+    expect(streamNetworkJob).toHaveBeenCalledExactlyOnceWith(
+      'private circle prompt',
+      expect.objectContaining({ circleId: 'selected-circle' }),
+    );
+    expect(streamChat).not.toHaveBeenCalled();
+  });
+
+  it('fails without dispatch when circle scope has no selected circle', async () => {
+    history.create.mockResolvedValue({});
+    useChatStore.setState({ routingScope: 'circle', activeCircleId: null });
+
+    await useChatStore.getState().sendMessage('private circle prompt');
+
+    expect(streamChat).not.toHaveBeenCalled();
+    expect(streamNetworkJob).not.toHaveBeenCalled();
+    const state = useChatStore.getState();
+    const messages = state.conversations[state.activeConversationId!]?.messages;
+    expect(messages?.at(-1)).toMatchObject({ status: 'error' });
+    expect(state.isStreaming).toBe(false);
   });
 });

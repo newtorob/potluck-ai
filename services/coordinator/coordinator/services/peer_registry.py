@@ -631,6 +631,8 @@ async def select_peer_for_request(
     if scope == "circle":
         # Circle scope: dispatch strictly to peers in the circle. No fallback
         # to My Machines or Pool — the caller explicitly chose circle isolation.
+        if not circle_pubkeys:
+            return None, None
         peer = await pick_peer_for_model(
             db,
             model_slug,

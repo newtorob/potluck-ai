@@ -36,10 +36,15 @@ from datetime import datetime, timezone
 
 import pytest
 from fastapi import HTTPException
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from coordinator.db.database import close_db, get_session_factory, init_db
+from coordinator.db.database import close_db, get_db, get_session_factory, init_db
+from coordinator.middleware.session_auth import resolve_session_member_id
+from coordinator.models.circle import CircleMember, TrustedCircle
+from coordinator.models.member_key import MemberKey
 from coordinator.models.credit import CreditLedger
 from coordinator.models.job import Job
 from coordinator.models.peer import Peer, PeerCapability, PeerHeartbeat
@@ -162,6 +167,79 @@ def fast_deadline(monkeypatch):
 async def _all_job_ids_for_peers(db: AsyncSession, peer_ids: list[uuid.UUID]) -> list[uuid.UUID]:
     rows = (await db.execute(select(Job.id).where(Job.peer_id.in_(peer_ids)))).all()
     return [r[0] for r in rows]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('replacement_online', [True, False])
+async def test_circle_http_stream_never_fails_over_to_outsiders(fast_deadline, replacement_online):
+    """Exercise HTTP parsing, ownership, real selection, retry and peer delivery."""
+    await init_db()
+    factory = get_session_factory()
+    requester = uuid.uuid4()
+    circle_id = uuid.uuid4()
+    peer_ids: list[uuid.UUID] = []
+    circle_keys: list[str] = []
+    trusted_sockets: list[_WS] = []
+
+    async def finish(buf):
+        await _stream_one_token(buf, delay=0, text='trusted response')
+        await _empty_complete(buf, delay=0)
+
+    async def request_db():
+        async with factory() as db:
+            yield db
+
+    app = FastAPI()
+    app.include_router(jobs_router.router, prefix='/jobs')
+    app.dependency_overrides[get_db] = request_db
+    app.dependency_overrides[resolve_session_member_id] = lambda: requester
+
+    try:
+        async with factory() as db:
+            db.add(TrustedCircle(id=circle_id, owner_member_id=requester, name='private circle'))
+            # Even the caller's own online machine is outside this circle.
+            outside_id, outside_ws = await _mk_peer(db, requester, behavior=finish)
+            peer_ids.append(outside_id)
+
+            # Equal-scoring peers prefer the last registration: hang first,
+            # then retry the other trusted peer (when one is available).
+            behaviors = [finish, _never_respond] if replacement_online else [_never_respond]
+            for behavior in behaviors:
+                member_id = uuid.uuid4()
+                peer_id, ws = await _mk_peer(db, member_id, behavior=behavior)
+                peer_ids.append(peer_id)
+                trusted_sockets.append(ws)
+                peer = await db.get(Peer, peer_id)
+                circle_keys.append(peer.public_key)
+                db.add(MemberKey(public_key=peer.public_key, member_id=member_id, added_via='seed'))
+                db.add(CircleMember(circle_id=circle_id, member_pubkey=peer.public_key))
+            await db.commit()
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+            response = await client.post('/jobs/stream', json={
+                'prompt': 'circle-only prompt', 'model_slug': _MODEL,
+                'scope': 'circle', 'circle_id': str(circle_id),
+            })
+
+        assert outside_ws.sent == [], 'a circle request must never reach an outsider'
+        assert all(len(ws.sent) == 1 for ws in trusted_sockets)
+        if replacement_online:
+            assert response.status_code == 200
+            assert 'trusted response' in response.text
+            assert '"served_scope": "circle"' in response.text
+        else:
+            assert response.status_code == 503
+            assert 'circle' in response.json()['detail']
+    finally:
+        if jobs_router._background_tasks:
+            await asyncio.gather(*list(jobs_router._background_tasks))
+        async with factory() as db:
+            job_ids = await _all_job_ids_for_peers(db, peer_ids)
+            await db.execute(delete(CircleMember).where(CircleMember.circle_id == circle_id))
+            await db.execute(delete(TrustedCircle).where(TrustedCircle.id == circle_id))
+            await db.execute(delete(MemberKey).where(MemberKey.public_key.in_(circle_keys)))
+            await db.commit()
+        await _cleanup(peer_ids, job_ids)
 
 
 # ---------------------------------------------------------------------------

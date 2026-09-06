@@ -497,6 +497,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
     if (get().isStreaming) return;
 
     const state = get();
+    // Keep the user's routing choice for this request across persistence awaits.
+    const { routingScope, networkModelSlug, activeCircleId } = state;
     const maybeId = state.activeConversationId;
 
     // If for any reason there's no active conversation, create one
@@ -597,13 +599,10 @@ export const useChatStore = create<ChatState>()((set, get) => {
       //   household   — direct to a household peer over the mesh
       //                 (full history forwarded; trusted machines we own)
       //   cooperative — through the coordinator to an open-pool peer
-      //                 (single-turn only — JobAssignedMessage has no history slot
-      //                 and bolting one on is a privacy-design exercise)
-      //   circle      — NOT wired in Phase 1; falls back to local with a
-      //                 'circle_unavailable' signal on the message. Must never
-      //                 silently route to cooperative or household.
+      //                 (this desktop path sends only the latest prompt)
+      //   circle      — coordinator dispatch restricted to the selected circle;
+      //                 fail if no circle was selected when the user sent.
       //   local       — this machine's Python sidecar (default)
-      const { routingScope, networkModelSlug, activeCircleId } = get();
       let response: Response;
       // Name of the household machine that served this turn (My Machines path),
       // captured so MessageBubble can render "Ran on <your machine>".
@@ -616,8 +615,11 @@ export const useChatStore = create<ChatState>()((set, get) => {
         });
         response = r;
         householdPeerName = peer.node_name;
-      } else if (routingScope === 'circle' && activeCircleId !== null) {
-        // Phase 2: route through the coordinator but restrict to the chosen circle.
+      } else if (routingScope === 'circle') {
+        if (!activeCircleId) {
+          throw new Error('Choose a trusted circle before sending.');
+        }
+        // Route through the coordinator but restrict to the chosen circle.
         response = await localApi.streamNetworkJob(content, {
           modelSlug: networkModelSlug,
           abortSignal: controller.signal,
@@ -629,8 +631,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           abortSignal: controller.signal,
         });
       } else {
-        // 'local', and 'circle' without a selected circle, both use the local
-        // sidecar. The UI gates send when 'circle' has no activeCircleId.
+        // Local scope uses this machine's sidecar.
         response = await localApi.streamChat(apiMessages, {
           abortSignal: controller.signal,
         });
@@ -797,8 +798,12 @@ export const useChatStore = create<ChatState>()((set, get) => {
                 direction: 'consumed',
                 scope: usageScope,
                 model_slug: networkModelSlug ?? null,
-                output_tokens: finalMsg.meta?.output_tokens ?? undefined,
-                duration_ms: finalMsg.meta?.duration_ms ?? undefined,
+                ...(finalMsg.meta?.output_tokens === undefined
+                  ? {}
+                  : { output_tokens: finalMsg.meta.output_tokens }),
+                ...(finalMsg.meta?.duration_ms === undefined
+                  ? {}
+                  : { duration_ms: finalMsg.meta.duration_ms }),
                 ok: true,
               })
               .catch(() => {

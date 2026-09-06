@@ -610,11 +610,9 @@ export const localApi = {
    * — same shape /chat/completions emits, so streamTokens() consumes
    *   it without any modification.
    *
-   * v0 of "Use contributor network": single-turn dispatch. The full
-   * conversation history is NOT sent — only the latest prompt — because
-   * the coordinator's JobAssignedMessage has no multi-turn slot today
-   * and bolting one on without a thoughtful design is a privacy hazard.
-   * Multi-turn over the network is m4+ work.
+   * This desktop path sends only the latest prompt. Routing scope is always
+   * explicit: a selected circle must never inherit the coordinator's pool
+   * default. Conversation-history sharing is configured separately.
    */
   streamNetworkJob(
     prompt: string,
@@ -630,6 +628,7 @@ export const localApi = {
     const body: Record<string, unknown> = {
       prompt,
       model_slug: options.modelSlug,
+      scope: options.circleId !== undefined ? 'circle' : 'pool',
       sampling: {
         temperature: options.temperature ?? 0.7,
         max_tokens: options.maxTokens ?? 2048,
