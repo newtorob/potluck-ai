@@ -5,12 +5,21 @@
  * write_file / edit_file / run_command are side-effecting and MUST pass through
  * an injectable confirm() gate (the default is a y/N prompt; tests stub it). All
  * paths resolve under the working directory and any path that escapes it is
- * refused.
+ * refused. Containment is checked on the CANONICAL path (symlinks resolved),
+ * not the lexical one; see resolveInCwd.
  */
 
 import { spawn } from "node:child_process";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import {
+  lstat,
+  mkdir,
+  readdir,
+  readFile,
+  readlink,
+  realpath,
+  writeFile,
+} from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { unifiedDiff } from "./diff.js";
 import {
@@ -59,6 +68,9 @@ const MAX_CMD_OUTPUT = 16_000;
 const MAX_SEARCH_HITS = 100;
 const MAX_GLOB_MATCHES = 200;
 const MAX_SEARCH_FILE_BYTES = 2_000_000; // skip very large files when searching
+// Symlink hops canonicalize() will follow by hand before giving up. Bounds a
+// cycle (a -> b -> a), which realpath would report as ELOOP.
+const MAX_SYMLINK_HOPS = 32;
 
 // Verify output is tail-capped (build/type errors cluster at the END), unlike
 // run_command which keeps the head. A rolling buffer bounds memory on a runaway
@@ -78,11 +90,98 @@ function requireString(
   return value;
 }
 
-/** Resolve `p` under `cwd`, refusing anything that escapes the directory. */
-function resolveInCwd(cwd: string, p: string): string {
-  const abs = resolve(cwd, p);
-  const rel = relative(cwd, abs);
-  if (rel !== "" && (rel === ".." || rel.startsWith(".." + "/") || isAbsolute(rel))) {
+/**
+ * Canonicalize `abs` by resolving every symlink along it. When the path does not
+ * exist yet (writing a NEW file), canonicalize the nearest existing ancestor and
+ * re-append the missing tail, so a new file under a symlinked-outside directory
+ * is still judged by where that directory really points.
+ *
+ * `raw` is the caller's original argument, used only to shape a refusal message;
+ * a resolved target is never named in one.
+ */
+async function canonicalize(abs: string, raw: string): Promise<string> {
+  let current = abs;
+  const tail: string[] = [];
+  let hops = 0;
+
+  for (;;) {
+    try {
+      const real = await realpath(current);
+      return tail.length > 0 ? join(real, ...tail) : real;
+    } catch {
+      // realpath reports ENOENT for a genuinely missing component AND for a
+      // DANGLING symlink, so lstat decides which one this is. Calling a dangling
+      // link "missing" judged containment on the link's own in-workspace path
+      // while the open that followed created the file at the link's target,
+      // outside the workspace. One dangling link is enough, and git stores them,
+      // so a cloned repo carried the escape.
+      let target: string | null = null;
+      try {
+        const info = await lstat(current);
+        if (info.isSymbolicLink()) target = await readlink(current);
+      } catch {
+        target = null; // genuinely missing, or unreadable
+      }
+
+      if (target !== null) {
+        if (++hops > MAX_SYMLINK_HOPS) {
+          // A cycle, or a chain too deep to vouch for. Refuse rather than guess.
+          throw new ToolError(`path escapes the working directory: ${raw}`);
+        }
+        // A relative link target is relative to the directory holding the link.
+        current = resolve(dirname(current), target);
+        continue;
+      }
+
+      const parent = dirname(current);
+      // No resolvable ancestor all the way up: fall back to the lexical path.
+      // The fs call that follows will fail on its own, and the containment check
+      // still runs against what we could resolve.
+      if (parent === current) return abs;
+      tail.unshift(basename(current));
+      current = parent;
+    }
+  }
+}
+
+/** True when `target` IS the canonical root or sits underneath it. */
+function withinRoot(root: string, target: string): boolean {
+  // A plain string prefix compare would call /work2 a child of /work, so test
+  // the relative path instead: "" is the root itself, ".." or "../x" climbs out
+  // of it, and an absolute result means a different volume entirely.
+  const rel = relative(root, target);
+  if (rel === "") return true;
+  return rel !== ".." && !rel.startsWith(".." + sep) && !isAbsolute(rel);
+}
+
+/** The workspace root with its own symlinks resolved. */
+function canonicalRoot(cwd: string): Promise<string> {
+  // The root itself is often a symlink: on macOS /tmp resolves to /private/tmp,
+  // so os.tmpdir() workspaces would reject every path inside them if the root
+  // were left uncanonicalized.
+  return canonicalize(resolve(cwd), cwd);
+}
+
+/**
+ * Resolve `p` under `cwd`, refusing anything that escapes the directory.
+ *
+ * The check is on the CANONICAL path, not the lexical one. A lexically-inside
+ * path can be a symlink (or sit under a symlinked directory) whose target is
+ * outside the workspace, and every fs call after this check follows symlinks, so
+ * a lexical-only check let read_file return arbitrary files (audit P1).
+ *
+ * Residual race: this is check-then-use. A symlink swapped between this check
+ * and the open that follows would still be followed. Closing that needs an
+ * O_NOFOLLOW walk of every segment against an open directory handle; accepted as
+ * out of scope for this fix.
+ *
+ * Async because realpath is async. It stays module-private, so the exported tool
+ * API is unchanged; the five call sites simply await it.
+ */
+async function resolveInCwd(cwd: string, p: string): Promise<string> {
+  const root = await canonicalRoot(cwd);
+  const abs = await canonicalize(resolve(cwd, p), p);
+  if (!withinRoot(root, abs)) {
     throw new ToolError(`path escapes the working directory: ${p}`);
   }
   return abs;
@@ -93,7 +192,7 @@ async function readFileTool(
   deps: ToolDeps,
 ): Promise<string> {
   const path = requireString(args, "path");
-  const abs = resolveInCwd(deps.cwd, path);
+  const abs = await resolveInCwd(deps.cwd, path);
   const content = await readFile(abs, "utf8");
   deps.readPaths?.add(abs);
   if (content.length > MAX_FILE_BYTES) {
@@ -107,7 +206,7 @@ async function listDirTool(
   deps: ToolDeps,
 ): Promise<string> {
   const path = typeof args.path === "string" ? args.path : ".";
-  const abs = resolveInCwd(deps.cwd, path);
+  const abs = await resolveInCwd(deps.cwd, path);
   const entries = await readdir(abs, { withFileTypes: true });
   if (entries.length === 0) return "(empty directory)";
   return entries
@@ -128,7 +227,8 @@ async function searchFilesTool(
 ): Promise<string> {
   const query = requireString(args, "query");
   const sub = typeof args.path === "string" ? args.path : ".";
-  const start = resolveInCwd(deps.cwd, sub);
+  const root = await canonicalRoot(deps.cwd);
+  const start = await resolveInCwd(deps.cwd, sub);
   const asLiteral = args.regex === false;
 
   let re: RegExp;
@@ -142,8 +242,10 @@ async function searchFilesTool(
   const hits: string[] = [];
   let truncated = false;
 
-  search: for await (const rel of walkFiles(start, deps.cwd, rules)) {
-    const abs = join(deps.cwd, rel);
+  // `start` is canonical, so the walk is rooted at the canonical root too and
+  // every yielded path stays relative to it.
+  search: for await (const rel of walkFiles(start, root, rules)) {
+    const abs = join(root, rel);
     let content: string;
     try {
       const buf = await readFile(abs);
@@ -181,11 +283,12 @@ async function globTool(
 ): Promise<string> {
   const pattern = requireString(args, "pattern");
   const re = new RegExp(`^${globToRegExp(pattern)}$`);
+  const root = await canonicalRoot(deps.cwd);
   const rules = await loadIgnore(deps.cwd);
   const matches: string[] = [];
   let truncated = false;
 
-  for await (const rel of walkFiles(deps.cwd, deps.cwd, rules)) {
+  for await (const rel of walkFiles(root, root, rules)) {
     if (re.test(rel)) {
       matches.push(rel);
       if (matches.length >= MAX_GLOB_MATCHES) {
@@ -206,7 +309,7 @@ async function writeFileTool(
 ): Promise<string> {
   const path = requireString(args, "path");
   const content = requireString(args, "content");
-  const abs = resolveInCwd(deps.cwd, path);
+  const abs = await resolveInCwd(deps.cwd, path);
 
   let current = "";
   try {
@@ -457,7 +560,7 @@ async function editFileTool(
   const path = requireString(args, "path");
   const oldString = requireString(args, "old_string");
   const newString = requireString(args, "new_string");
-  const abs = resolveInCwd(deps.cwd, path);
+  const abs = await resolveInCwd(deps.cwd, path);
 
   if (oldString.length === 0) {
     throw new ToolError("old_string must not be empty (use write_file for new files)");

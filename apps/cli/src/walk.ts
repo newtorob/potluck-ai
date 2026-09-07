@@ -123,6 +123,18 @@ export async function loadIgnore(root: string): Promise<IgnoreRule[]> {
  * Walk files under `startDir`, yielding each file path relative to `ignoreRoot`
  * (with "/" separators), pruning ignored directories. Entries are visited in a
  * stable, name-sorted order.
+ *
+ * Symlinked entries are skipped outright, which is what keeps the walk inside
+ * the workspace: a symlinked directory can point anywhere, and following it
+ * would hand search_files and glob the contents of files outside the workspace
+ * (audit P1). The alternative, realpath-ing each symlink and keeping the ones
+ * that land inside, costs a syscall per entry and reopens the same check-then-use
+ * race the walk would otherwise not have, for the small benefit of listing
+ * in-workspace aliases; symlinks are skipped instead. Note this was already the
+ * de facto behavior (readdir's Dirent reports a symlink as neither a file nor a
+ * directory), so the guard below makes an accident explicit rather than changing
+ * what the walk yields. Callers still have to confine `startDir` themselves:
+ * readdir DOES follow a symlink handed to it as the walk root.
  */
 export async function* walkFiles(
   startDir: string,
@@ -138,6 +150,7 @@ export async function* walkFiles(
     }
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const e of entries) {
+      if (e.isSymbolicLink()) continue; // never cross a symlink (see above)
       const abs = join(dir, e.name);
       const rel = relative(ignoreRoot, abs).split(sep).join("/");
       if (e.isDirectory()) {
