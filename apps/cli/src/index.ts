@@ -9,10 +9,11 @@
  *
  * Streams the assistant output, renders actions + results, and gates every
  * edit/write/command behind a y/N confirm (auto-approved with --yes in -p mode).
- * In-session commands: /exit, /model, /scope, /help.
+ * In-session commands: /exit, /model, /scope, /verify, /snapshot, /clear, /help.
  */
 
 import { createInterface, type Interface } from "node:readline";
+import { basename } from "node:path";
 import { stdin, stdout, stderr } from "node:process";
 
 import {
@@ -33,6 +34,17 @@ import {
 } from "./config.js";
 import { listModels, type ChatMessage } from "./gateway.js";
 import { runTask, systemPrompt } from "./agent.js";
+import {
+  briefSection,
+  extractSnapshotBody,
+  formatAge,
+  projectRoot,
+  readSnapshot,
+  snapshotHeader,
+  snapshotPath,
+  snapshotRequest,
+  writeSnapshot,
+} from "./snapshot.js";
 import { buildRepoMap } from "./repomap.js";
 import { runVerify } from "./tools.js";
 import { runSetup, printSetupHelp } from "./setup.js";
@@ -155,6 +167,8 @@ function printHelp(): void {
       "  /model [id]   Show or switch the model",
       "  /scope [s]    Show or switch the routing scope (local | mine)",
       "  /verify       Run the verify command now",
+      "  /snapshot     Save a handoff brief for the next session (~/.snapshots)",
+      "  /clear        Clear the conversation and re-read the handoff brief",
       "  /help         Show help",
       "  /exit         Quit",
       "",
@@ -184,10 +198,29 @@ function printBanner(
   stdout.write(
     `${c.dim("type a task, or")} ${c.bold("/help")} ${c.dim("·")} ${c.bold(
       "/model",
-    )} ${c.dim("·")} ${c.bold("/scope")} ${c.dim("·")} ${c.bold("/verify")} ${c.dim(
+    )} ${c.dim("·")} ${c.bold("/scope")} ${c.dim("·")} ${c.bold("/snapshot")} ${c.dim("·")} ${c.bold("/verify")} ${c.dim(
       "·",
     )} ${c.bold("/exit")}\n\n`,
   );
+}
+
+interface BriefState {
+  root: string;
+  file: string;
+  brief: string | null;
+}
+
+/**
+ * Load the handoff brief for this project (written by /snapshot here, or by
+ * Claude Code / Codex through the same store) and announce it when present.
+ */
+async function loadBrief(cwd: string, say: (line: string) => void): Promise<BriefState> {
+  const root = await projectRoot(cwd);
+  const file = snapshotPath(root);
+  const snap = await readSnapshot(file);
+  if (!snap) return { root, file, brief: null };
+  say(c.dim(`handoff brief loaded: ${file} (written ${formatAge(snap.ageMs)} ago)`));
+  return { root, file, brief: briefSection(snap.text, file, snap.ageMs) };
 }
 
 /** Stream a single task to stdout and exit (-p mode). Notices go to stderr. */
@@ -203,8 +236,9 @@ async function runOneShot(
   },
 ): Promise<void> {
   const confirm = oneShotConfirm(opts.yes, (line) => stderr.write(`${line}\n`));
+  const { brief } = await loadBrief(opts.cwd, (line) => stderr.write(`${line}\n`));
   const conversation: ChatMessage[] = [
-    { role: "system", content: systemPrompt(opts.cwd, opts.verifyCommand) },
+    { role: "system", content: systemPrompt(opts.cwd, opts.verifyCommand, brief) },
   ];
   const repoMap = await buildRepoMap(opts.cwd);
   if (repoMap) conversation.push({ role: "system", content: repoMap });
@@ -426,8 +460,9 @@ async function main(): Promise<void> {
   if (initialScope.notice) stdout.write(`${c.yellow(initialScope.notice)}\n`);
 
   const confirm = makeConfirm((q) => ask(q).then((a) => a ?? "n"));
+  const briefState = await loadBrief(cwd, (line) => stdout.write(`${line}\n`));
   const conversation: ChatMessage[] = [
-    { role: "system", content: systemPrompt(cwd, verify.command) },
+    { role: "system", content: systemPrompt(cwd, verify.command, briefState.brief) },
   ];
   const repoMap = await buildRepoMap(cwd);
   if (repoMap) conversation.push({ role: "system", content: repoMap });
@@ -492,6 +527,79 @@ async function main(): Promise<void> {
           stdout.write(`${c.red("could not list models:")} ${c.dim(message)}\n`);
         }
       }
+      continue;
+    }
+    if (line === "/snapshot") {
+      // Ask the model for the brief on a COPY of the conversation so the
+      // request does not linger in the real history, then write the file
+      // ourselves: the store lives outside the workspace confinement and a
+      // deterministic header (time, branch, commit, dirty count) goes on top.
+      const draft = [...conversation];
+      active = new AbortController();
+      stdout.write(`\n${c.dim("potluck ▸ ")}`);
+      try {
+        await runTask(draft, snapshotRequest(), {
+          cfg,
+          model,
+          cwd,
+          confirm,
+          scope,
+          signal: active.signal,
+          verifyCommand: null,
+          maxSteps: 4,
+          callbacks: {
+            onToken: (t) => stdout.write(t),
+            onTurnEnd: () => stdout.write("\n"),
+            onAction: (a) => stdout.write(`${renderAction(a.tool, a.args)}\n`),
+            onToolResult: (r) => stdout.write(`${renderResultPreview(r)}\n`),
+            onNotice: (m) => stdout.write(`${c.yellow(m)}\n`),
+          },
+        });
+      } catch (err) {
+        const message = active.signal.aborted
+          ? "snapshot cancelled"
+          : err instanceof Error
+            ? err.message
+            : String(err);
+        stdout.write(`\n${c.yellow(message)}\n`);
+        active = null;
+        continue;
+      } finally {
+        active = null;
+      }
+      const last = draft[draft.length - 1];
+      const body = last?.role === "assistant" ? extractSnapshotBody(last.content) : "";
+      if (!body) {
+        stdout.write(
+          `${c.yellow("snapshot not written:")} ${c.dim(
+            "the model did not answer with a brief. Try /snapshot again.",
+          )}\n`,
+        );
+        continue;
+      }
+      const header = await snapshotHeader("potluck", briefState.root);
+      await writeSnapshot(briefState.file, {
+        title: basename(briefState.root),
+        header,
+        body,
+      });
+      stdout.write(
+        `${c.green("snapshot written:")} ${briefState.file} ${c.dim("(safe to /clear)")}\n`,
+      );
+      continue;
+    }
+    if (line === "/clear") {
+      const fresh = await loadBrief(cwd, (l) => stdout.write(`${l}\n`));
+      briefState.brief = fresh.brief;
+      conversation.length = 0;
+      conversation.push({
+        role: "system",
+        content: systemPrompt(cwd, verify.command, briefState.brief),
+      });
+      if (repoMap) conversation.push({ role: "system", content: repoMap });
+      stdout.write(
+        `${c.dim("context cleared")}${briefState.brief ? c.dim(" · briefed from the snapshot above") : ""}\n`,
+      );
       continue;
     }
     if (line === "/verify") {

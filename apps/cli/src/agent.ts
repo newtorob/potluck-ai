@@ -182,7 +182,11 @@ export function parseAction(text: string): ParseResult {
 }
 
 /** Build the system prompt that defines the strict action protocol. */
-export function systemPrompt(cwd: string, verifyCommand?: string | null): string {
+export function systemPrompt(
+  cwd: string,
+  verifyCommand?: string | null,
+  brief?: string | null,
+): string {
   const lines = [
     "You are Potluck, a terminal coding agent. Your inference runs on the user's",
     "own machines across the Potluck mesh. Be precise, concise, and safe.",
@@ -246,6 +250,10 @@ export function systemPrompt(cwd: string, verifyCommand?: string | null): string
       "- If verify FAILED, read the errors and fix them with another edit. The task",
       "  is NOT done until verify passes; do not give a final answer while it fails.",
     );
+  }
+
+  if (brief) {
+    lines.push("", brief);
   }
 
   return lines.join("\n");
