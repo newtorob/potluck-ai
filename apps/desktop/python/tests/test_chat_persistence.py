@@ -8,11 +8,21 @@ Each memory_db call opens its own connection to the on-disk file, so reading
 after writing already goes through disk. To make the restart semantics explicit,
 the read phase runs on a fresh event loop and re-runs the idempotent schema init
 (CREATE TABLE IF NOT EXISTS) -- exactly what a cold sidecar start does.
+
+These tests write chat content directly through memory_db, which since the
+2026-09-06 privacy fix refuses to write with privacy.chat_history_enabled off
+(the shipped default). The chat_history_on autouse fixture below turns the
+switch on for this module, which is the state these tests were always about:
+a user who opted into saving chat history expects it to survive a restart.
+See tests/test_chat_history_privacy_gate.py for the switch-off behaviour.
 """
 from __future__ import annotations
 
 import asyncio
 
+import pytest
+
+from potluck_local.services import settings_manager as sm
 from potluck_local.services.memory_db import (
     append_message,
     create_conversation,
@@ -25,6 +35,18 @@ from potluck_local.services.memory_db import (
 
 def _run(coro):
     return asyncio.run(coro)
+
+
+@pytest.fixture(autouse=True)
+def chat_history_on(tmp_path, monkeypatch):
+    """Point settings at an isolated config.json with chat history enabled."""
+    data_dir = tmp_path / "data_dir"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "config.json").write_text(
+        '{"privacy": {"chat_history_enabled": true}}', encoding="utf-8"
+    )
+    monkeypatch.setenv("POTLUCK_DATA_DIR", str(data_dir))
+    monkeypatch.setattr(sm, "_settings_cache", {})
 
 
 def test_conversation_and_messages_survive_restart(tmp_path):

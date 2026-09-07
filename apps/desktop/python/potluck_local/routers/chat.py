@@ -495,6 +495,7 @@ async def chat_completions(request: ChatRequest) -> object:
 
 import uuid as _uuid
 from potluck_local.services.memory_db import (
+    ChatHistoryDisabledError,
     append_message,
     clear_conversation_messages,
     create_conversation as _create_conversation,
@@ -504,6 +505,24 @@ from potluck_local.services.memory_db import (
     update_conversation as _update_conversation,
     update_message,
 )
+
+# Privacy gate for the chat-history writes below, mirroring the memory router.
+# The four content-writing verbs (create/rename a conversation, append/patch a
+# message) refuse with 403 when privacy.chat_history_enabled is off. Reads and
+# deletes are never gated: the user must always be able to see and erase what
+# is already stored, and turning the switch off deletes nothing.
+#
+# The detail is a plain string starting with the stable code
+# "chat_history_disabled" so the frontend can branch on the code rather than
+# on prose that may be reworded.
+CHAT_HISTORY_DISABLED_DETAIL = (
+    "chat_history_disabled: Save chat history is off in Privacy settings"
+)
+
+
+def _chat_history_enabled() -> bool:
+    """Return True when the user has opted into storing chat history."""
+    return get_settings().privacy.chat_history_enabled
 
 
 class ConversationCreateRequest(BaseModel):
@@ -578,14 +597,19 @@ async def list_conversations_endpoint(
 
 @router.post("/conversations", status_code=201)
 async def create_conversation_endpoint(req: ConversationCreateRequest) -> dict:
+    if not _chat_history_enabled():
+        raise HTTPException(status_code=403, detail=CHAT_HISTORY_DISABLED_DETAIL)
     convo_id = req.id or str(_uuid.uuid4())
-    return await _create_conversation(
-        conversation_id=convo_id,
-        title=req.title,
-        project=req.project,
-        network_mode=req.network_mode,
-        network_model_slug=req.network_model_slug,
-    )
+    try:
+        return await _create_conversation(
+            conversation_id=convo_id,
+            title=req.title,
+            project=req.project,
+            network_mode=req.network_mode,
+            network_model_slug=req.network_model_slug,
+        )
+    except ChatHistoryDisabledError:
+        raise HTTPException(status_code=403, detail=CHAT_HISTORY_DISABLED_DETAIL)
 
 
 @router.get("/conversations/{conversation_id}")
@@ -601,14 +625,19 @@ async def patch_conversation_endpoint(
     conversation_id: str,
     req: ConversationUpdateRequest,
 ) -> dict:
-    found = await _update_conversation(
-        conversation_id=conversation_id,
-        title=req.title,
-        network_mode=req.network_mode,
-        network_model_slug=req.network_model_slug,
-        project=req.project,
-        project_set=req.project_set,
-    )
+    if not _chat_history_enabled():
+        raise HTTPException(status_code=403, detail=CHAT_HISTORY_DISABLED_DETAIL)
+    try:
+        found = await _update_conversation(
+            conversation_id=conversation_id,
+            title=req.title,
+            network_mode=req.network_mode,
+            network_model_slug=req.network_model_slug,
+            project=req.project,
+            project_set=req.project_set,
+        )
+    except ChatHistoryDisabledError:
+        raise HTTPException(status_code=403, detail=CHAT_HISTORY_DISABLED_DETAIL)
     if not found:
         raise HTTPException(status_code=404, detail=f"Conversation {conversation_id!r} not found")
     convo = await _get_conversation(conversation_id)
@@ -629,18 +658,23 @@ async def append_message_endpoint(
     conversation_id: str,
     req: MessageAppendRequest,
 ) -> dict:
+    if not _chat_history_enabled():
+        raise HTTPException(status_code=403, detail=CHAT_HISTORY_DISABLED_DETAIL)
     msg_id = req.id or str(_uuid.uuid4())
-    return await append_message(
-        message_id=msg_id,
-        conversation_id=conversation_id,
-        role=req.role,
-        content=req.content,
-        status=req.status,
-        served_by=req.served_by,
-        output_tokens=req.output_tokens,
-        duration_ms=req.duration_ms,
-        finish_reason=req.finish_reason,
-    )
+    try:
+        return await append_message(
+            message_id=msg_id,
+            conversation_id=conversation_id,
+            role=req.role,
+            content=req.content,
+            status=req.status,
+            served_by=req.served_by,
+            output_tokens=req.output_tokens,
+            duration_ms=req.duration_ms,
+            finish_reason=req.finish_reason,
+        )
+    except ChatHistoryDisabledError:
+        raise HTTPException(status_code=403, detail=CHAT_HISTORY_DISABLED_DETAIL)
 
 
 @router.patch("/messages/{message_id}")
@@ -648,15 +682,20 @@ async def patch_message_endpoint(
     message_id: str,
     req: MessageUpdateRequest,
 ) -> dict:
-    found = await update_message(
-        message_id=message_id,
-        content=req.content,
-        status=req.status,
-        served_by=req.served_by,
-        output_tokens=req.output_tokens,
-        duration_ms=req.duration_ms,
-        finish_reason=req.finish_reason,
-    )
+    if not _chat_history_enabled():
+        raise HTTPException(status_code=403, detail=CHAT_HISTORY_DISABLED_DETAIL)
+    try:
+        found = await update_message(
+            message_id=message_id,
+            content=req.content,
+            status=req.status,
+            served_by=req.served_by,
+            output_tokens=req.output_tokens,
+            duration_ms=req.duration_ms,
+            finish_reason=req.finish_reason,
+        )
+    except ChatHistoryDisabledError:
+        raise HTTPException(status_code=403, detail=CHAT_HISTORY_DISABLED_DETAIL)
     if not found:
         raise HTTPException(status_code=404, detail=f"Message {message_id!r} not found")
     return {"id": message_id, "updated": True}

@@ -817,6 +817,37 @@ async def list_projects(db_path: Path | None = None) -> list[dict]:
 # ---------------------------------------------------------------------------
 # Chat history — conversations + messages
 # ---------------------------------------------------------------------------
+#
+# privacy.chat_history_enabled is the user's switch over the two content
+# columns here: conversations.title (the frontend derives it from the first
+# prompt) and messages.content. The routers gate the HTTP surface; this is the
+# second gate, at the persistence boundary, so no future caller can write chat
+# content behind the switch's back. Reads and deletes are never gated — the
+# user must always be able to see and erase what is already stored, and
+# turning the switch off deletes nothing.
+
+
+class ChatHistoryDisabledError(RuntimeError):
+    """Raised when a chat-content write is attempted with the switch off.
+
+    Raised before any SQL runs. A refused write is always an error, never a
+    silent drop: the caller has to find out that its content was not saved.
+    """
+
+
+def _chat_history_enabled() -> bool:
+    """Return True only when privacy.chat_history_enabled is on.
+
+    Fails closed. If settings cannot be read at all (missing module during
+    early import, corrupted file, patched-out dependency), the answer is
+    "do not write", not "write anyway".
+    """
+    try:
+        from potluck_local.services.settings_manager import get_settings
+        settings = get_settings()
+        return bool(getattr(settings.privacy, "chat_history_enabled", False))
+    except Exception:
+        return False
 
 
 async def list_conversations(
@@ -912,7 +943,14 @@ async def create_conversation(
 
     Idempotent: if the id already exists, return the existing row instead
     of raising UNIQUE. Optimistic clients may re-POST create on retry.
+
+    Raises ChatHistoryDisabledError when privacy.chat_history_enabled is off:
+    the title is user content (derived from the first prompt).
     """
+    if not _chat_history_enabled():
+        raise ChatHistoryDisabledError(
+            "chat_history_disabled: refusing to write conversation content"
+        )
     now = _now_iso()
     path = db_path or get_memory_db_path()
     async with aiosqlite.connect(path) as db:
@@ -964,7 +1002,16 @@ async def update_conversation(
     project_set: bool = False,  # distinguish "unchanged" from "set to NULL"
     db_path: Path | None = None,
 ) -> bool:
-    """Patch a conversation. Returns True if the row was found."""
+    """Patch a conversation. Returns True if the row was found.
+
+    Only a title change is gated by privacy.chat_history_enabled — title is
+    the content column here. Metadata-only patches (network_mode, project)
+    stay available with the switch off.
+    """
+    if title is not None and not _chat_history_enabled():
+        raise ChatHistoryDisabledError(
+            "chat_history_disabled: refusing to write conversation content"
+        )
     sets: list[str] = []
     params: list = []
     if title is not None:
@@ -1031,7 +1078,15 @@ async def append_message(
     finish_reason: str | None = None,
     db_path: Path | None = None,
 ) -> dict:
-    """Append a message + bump the conversation's updated_at."""
+    """Append a message + bump the conversation's updated_at.
+
+    Raises ChatHistoryDisabledError when privacy.chat_history_enabled is off:
+    content is the user's prompt or the model's reply.
+    """
+    if not _chat_history_enabled():
+        raise ChatHistoryDisabledError(
+            "chat_history_disabled: refusing to write message content"
+        )
     now = _now_iso()
     path = db_path or get_memory_db_path()
     async with aiosqlite.connect(path) as db:
@@ -1078,7 +1133,16 @@ async def update_message(
     """Patch an existing message. Used to finalize an assistant message
     after streaming completes (status transitions from 'streaming' to
     'complete', and meta fields land if the response came from the
-    contributor network)."""
+    contributor network).
+
+    Only a content change is gated by privacy.chat_history_enabled. Status and
+    meta-only patches stay available with the switch off so an in-flight row
+    can still be finalized.
+    """
+    if content is not None and not _chat_history_enabled():
+        raise ChatHistoryDisabledError(
+            "chat_history_disabled: refusing to write message content"
+        )
     sets: list[str] = []
     params: list = []
     if content is not None:

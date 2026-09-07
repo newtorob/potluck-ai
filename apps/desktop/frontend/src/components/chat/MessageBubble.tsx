@@ -64,10 +64,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <MarkdownContent content={message.content} isStreaming={isStreaming} />
         )}
 
-        {/* Copy button — visible on hover for non-empty messages */}
-        {message.content.length > 0 && !isError && (
-          <CopyButton text={message.content} isUser={isUser} />
-        )}
+        {/* Copy button — visible on hover for non-empty messages. An errored
+            reply keeps whatever streamed in before it failed, and that text is
+            as worth copying as a finished one. */}
+        {message.content.length > 0 && <CopyButton text={message.content} isUser={isUser} />}
 
         {/* "What left my machine" receipt. Renders on every completed
             assistant message so silence is never the only signal that a
@@ -79,6 +79,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             name, only that it left the device. */}
         {!isUser && !isError && !isStreaming && message.content.length > 0 && (
           <RouteReceipt meta={message.meta} />
+        )}
+
+        {/* A reply the user stopped, or one hydrated from history as partial,
+            must not read as a finished answer. */}
+        {!isUser && message.status === 'partial' && (
+          <p className="mt-2 text-[11px] italic text-muted-foreground/80">Stopped early</p>
         )}
       </div>
     </article>
@@ -346,17 +352,33 @@ function MarkdownContent({ content, isStreaming }: { content: string; isStreamin
 
 function ErrorContent({ message }: { message: AppMessage }) {
   const navigate = useNavigate();
+  // errorText can arrive from persisted history or from a lookup that missed,
+  // so it is only trusted once it is actually a string. Anything else is
+  // treated as absent rather than allowed to throw on .toLowerCase().
+  const errorText = typeof message.errorText === 'string' ? message.errorText : null;
+  const lowered = errorText?.toLowerCase() ?? '';
   const isNoModelError =
-    message.errorText?.toLowerCase().includes('no model') === true ||
-    message.errorText?.toLowerCase().includes('503') === true ||
-    message.errorText?.toLowerCase().includes('not loaded') === true;
+    lowered.includes('no model') || lowered.includes('503') || lowered.includes('not loaded');
+  // A reply can fail after tokens have already been read. Those tokens are the
+  // answer the user has; the error line explains why it stops there.
+  const hasPartialAnswer = message.content.length > 0;
 
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="flex items-start gap-2">
+      {hasPartialAnswer && (
+        <div className="text-card-foreground">
+          <MarkdownContent content={message.content} isStreaming={false} />
+        </div>
+      )}
+      <div
+        className={cn(
+          'flex items-start gap-2',
+          hasPartialAnswer && 'border-t border-destructive/25 pt-2.5',
+        )}
+      >
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         <p className="leading-snug">
-          {message.errorText ?? 'An error occurred. Please try again.'}
+          {errorText ?? 'This reply did not finish.'}
         </p>
       </div>
       {isNoModelError && (

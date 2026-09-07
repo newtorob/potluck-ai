@@ -614,7 +614,12 @@ function ConversationItem({
               >
                 {conversation.title}
               </span>
-              <span className="text-[10px] text-muted-foreground/80">{relativeTime}</span>
+              <span className="text-[10px] text-muted-foreground/80">
+                {relativeTime}
+                {conversation.persisted === false && (
+                  <span className="ml-1.5 text-muted-foreground/70">Not saved</span>
+                )}
+              </span>
             </div>
 
             <div

@@ -32,6 +32,11 @@ interface SettingsState {
   // Actions
   fetch: () => Promise<void>;
   update: (patch: DeepPartial<PotluckSettings>) => Promise<void>;
+  /** Seed the store from a GET /settings response someone else already made
+   *  (durablePrefs at App mount). Lets gates that read settings — notably
+   *  privacy.chat_history_enabled — have a real value before the first send,
+   *  with no extra round-trip. Mirrors connectionStore.hydrateFromSidecar. */
+  hydrateFromSidecar: (settings: PotluckSettings) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -74,6 +79,10 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       });
       throw err;
     }
+  },
+
+  hydrateFromSidecar(settings) {
+    set({ settings, isLoaded: true });
   },
 }));
 

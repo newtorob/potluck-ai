@@ -27,6 +27,7 @@ import { localApi } from '@/lib/localApi';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useUiPrefsStore } from '@/stores/uiPrefsStore';
 import { useChatStore } from '@/stores/chatStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { setAutoLoadOnStartup, setContributionReceiptsEnabled } from '@/lib/appPrefs';
 
 /**
@@ -42,6 +43,11 @@ export async function hydrateDurablePrefs(): Promise<void> {
     // Sidecar unreachable — localStorage defaults stay in effect for this launch.
     return;
   }
+
+  // Seed the settings store from this same response. chatStore's chat-history
+  // privacy gate reads it and fails closed while settings are null, so this
+  // must land before the first send. Costs no extra round-trip.
+  useSettingsStore.getState().hydrateFromSidecar(settings);
 
   // Coordinator URL (network section, not the ui dict).
   const coordUrl = settings.network.coordinator_url.trim();

@@ -34,6 +34,7 @@ import { streamTokens } from '@/lib/streaming';
 import { streamHouseholdInference } from '@/lib/householdInference';
 import type { RoutingMode } from '@/lib/householdInference';
 import { useMeshStore } from '@/stores/meshStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { persistUiPref } from '@/lib/sidecarPersist';
 
 const ROUTING_MODE_KEY = 'potluck.household_routing_mode';
@@ -93,8 +94,9 @@ export interface MessageMeta {
   //                 when served_scope === 'mine').
   served_by: 'contributor' | 'local' | 'household';
   /** Coordinator routing tier for the network path: 'mine' = one of your own
-   *  machines, 'pool' = an open-pool peer. Session-only (not persisted). */
-  served_scope?: 'mine' | 'pool';
+   *  machines, 'circle' = a trusted-circle member, 'pool' = an open-pool peer.
+   *  Session-only (not persisted). */
+  served_scope?: 'mine' | 'circle' | 'pool';
   /** Name of the machine that served a 'household' response. Session-only. */
   served_peer?: string;
   output_tokens?: number;
@@ -115,6 +117,10 @@ export interface AppMessage extends ChatMessage {
 export interface AppConversation extends Omit<Conversation, 'messages'> {
   modelSlug: string | null;
   messages: AppMessage[];
+  /** False when this conversation exists only in memory because chat history
+   *  was off when it was created. Hydrated and normally-created conversations
+   *  are true. The Sidebar surfaces the false case as a "Not saved" marker. */
+  persisted?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +227,62 @@ function persistedToAppMessage(p: PersistedMessage): AppMessage {
   return msg;
 }
 
+/** What the coordinator reported when a contributor's turn failed. Recorded
+ *  from the SSE `error` envelope so the terminal decision below can tell a
+ *  failed reply from a finished one. */
+interface StreamFailure {
+  message: string;
+  /** Only the coordinator sends one, and only for its own closed set. Never
+   *  used to decide whether the text is trustworthy: the producer controls
+   *  whether it is present at all. */
+  category?: string;
+}
+
+/** Fixed copy per coordinator error category.
+ *
+ *  A Map, not an object literal: the category is attacker-influenced, and an
+ *  object lookup for "__proto__", "constructor" or "toString" returns an
+ *  inherited value instead of undefined, so `?? fallback` never fires and a
+ *  non-string lands in errorText. */
+const CONTRIBUTOR_ERROR_COPY = new Map<string, string>([
+  ['timeout', 'The contributor timed out before finishing.'],
+  ['peer_disconnected', 'The contributor disconnected before finishing.'],
+  ['oom', 'The contributor ran out of memory.'],
+  ['model_not_loaded', 'The contributor did not have this model loaded.'],
+  ['declined', 'The contributor declined this request.'],
+  ['internal', 'The contributor hit an internal error.'],
+]);
+
+const UNKNOWN_CONTRIBUTOR_ERROR = 'The contributor could not finish this reply.';
+const LOCAL_STREAM_ERROR_PREFIX = 'The reply stopped before it finished.';
+
+/**
+ * Copy for a message that died mid-stream.
+ *
+ * Whether the producer's text can be shown is decided by the routing scope the
+ * client chose for this turn, not by anything on the wire. A remote producer
+ * controls its own envelope: whether a `category` is there, what it says, and
+ * whether the error is a bare string. Keying trust on any of that lets a
+ * contributor put its own words on the user's screen just by omitting a field.
+ *
+ *   local / household  → the user's own machines; show the real message.
+ *   circle/cooperative → someone else's machine; show only copy we wrote,
+ *                        selected by category, whatever shape the error had.
+ */
+function streamFailureText(failure: StreamFailure, scope: RoutingScope): string {
+  const ownMachines = scope === 'local' || scope === 'household';
+  if (!ownMachines) {
+    const copy =
+      failure.category === undefined ? undefined : CONTRIBUTOR_ERROR_COPY.get(failure.category);
+    return typeof copy === 'string' ? copy : UNKNOWN_CONTRIBUTOR_ERROR;
+  }
+  const detail = failure.message.trim();
+  return detail === '' ? LOCAL_STREAM_ERROR_PREFIX : `${LOCAL_STREAM_ERROR_PREFIX} ${detail}`;
+}
+
+/** A stream that ended without the [DONE] sentinel was cut off, not finished. */
+const TRUNCATED_STREAM_TEXT = 'The connection closed before the reply finished.';
+
 /** Best-effort fire-and-forget — wraps a Promise so a sidecar outage
  *  doesn't kill the chat UX. We log the error and move on; in-memory
  *  state remains the user's source of truth for the session. */
@@ -228,6 +290,29 @@ function persist<T>(p: Promise<T>, label: string): void {
   void p.catch((err) => {
     console.warn(`[chatStore] persist:${label} failed`, err);
   });
+}
+
+/** Is the user's chat-history setting on right now?
+ *
+ *  Fails closed: a null settings object (sidecar unreachable, or the store
+ *  has not hydrated yet) counts as off, so no prompt or reply is ever written
+ *  to disk on a guess. settingsStore imports only localApi, so reading it
+ *  from here introduces no import cycle. */
+function historyEnabled(): boolean {
+  return useSettingsStore.getState().settings?.privacy.chat_history_enabled ?? false;
+}
+
+/** Gate for every write that carries conversation *content* (prompts, replies,
+ *  titles). `allowed` is the caller's turn-level snapshot; the fresh
+ *  historyEnabled() read catches a flag flipped mid-turn. `run` is a thunk on
+ *  purpose: the request must not even be constructed when the gate is closed.
+ *
+ *  Metadata-only writes (usage counters) and reads/deletes are NOT gated —
+ *  turning history off hides nothing that is already on disk and must not
+ *  destroy it. */
+function persistContent<T>(allowed: boolean, run: () => Promise<T>, label: string): void {
+  if (!allowed || !historyEnabled()) return;
+  persist(run(), label);
 }
 
 /**
@@ -248,6 +333,15 @@ const pendingCreates = new Map<string, Promise<boolean>>();
  *  produces UNIQUE constraint failed on every subsequent send. */
 const knownPersistedIds = new Set<string>();
 
+/** The chat-history snapshot for the turn currently streaming.
+ *
+ *  abort() runs outside sendMessage (the UI calls it directly), so it can't
+ *  see that turn's local snapshot. Parking it here lets stop honour the same
+ *  rule as every other write site: a turn that began with history off never
+ *  persists anything, not even the partial the user chose to keep on screen.
+ *  Set at the top of sendMessage, cleared when the stream settles. */
+let currentTurnHistoryAllowed = false;
+
 async function ensureConversationPersisted(
   conversationId: string,
   getConvo: () =>
@@ -257,7 +351,11 @@ async function ensureConversationPersisted(
     | undefined,
   networkMode: boolean,
   networkModelSlug: string,
+  allowed: boolean,
 ): Promise<void> {
+  // History off: stay memory-only. No row is created and the id is
+  // deliberately kept out of knownPersistedIds so a later turn re-evaluates.
+  if (!allowed || !historyEnabled()) return;
   if (knownPersistedIds.has(conversationId)) return;
 
   const pending = pendingCreates.get(conversationId);
@@ -326,6 +424,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           messages: [],
           createdAt: new Date(p.created_at).getTime(),
           updatedAt: new Date(p.updated_at).getTime(),
+          persisted: true,
         };
         knownPersistedIds.add(p.id);
       }
@@ -358,6 +457,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
   async createConversation(modelSlug) {
     const id = makeId();
     const now = Date.now();
+    const allowed = historyEnabled();
     const optimistic: AppConversation = {
       id,
       title: 'New chat',
@@ -365,6 +465,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       messages: [],
       createdAt: now,
       updatedAt: now,
+      persisted: allowed,
     };
 
     // Optimistic local insert — the UI reflects the new chat immediately.
@@ -378,26 +479,31 @@ export const useChatStore = create<ChatState>()((set, get) => {
     }
 
     // Persist create, but keep the promise so sendMessage can await it
-    // before appending messages (FK: messages → conversations).
-    const createPromise = localApi.history
-      .create({
-        id,
-        title: 'New chat',
-        network_mode: get().networkMode,
-        network_model_slug: get().networkMode ? get().networkModelSlug : null,
-      })
-      .then(() => {
-        knownPersistedIds.add(id);
-        return true;
-      })
-      .catch((err) => {
-        console.warn('[chatStore] persist:create failed', err);
-        return false;
-      })
-      .finally(() => {
-        pendingCreates.delete(id);
-      });
-    pendingCreates.set(id, createPromise);
+    // before appending messages (FK: messages → conversations). Skipped
+    // entirely when chat history is off: the title is derived from the user's
+    // first prompt, so the conversation row is itself content. The chat stays
+    // fully usable, it just never reaches disk.
+    if (allowed) {
+      const createPromise = localApi.history
+        .create({
+          id,
+          title: 'New chat',
+          network_mode: get().networkMode,
+          network_model_slug: get().networkMode ? get().networkModelSlug : null,
+        })
+        .then(() => {
+          knownPersistedIds.add(id);
+          return true;
+        })
+        .catch((err) => {
+          console.warn('[chatStore] persist:create failed', err);
+          return false;
+        })
+        .finally(() => {
+          pendingCreates.delete(id);
+        });
+      pendingCreates.set(id, createPromise);
+    }
 
     return id;
   },
@@ -490,7 +596,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
         conversations: { ...s.conversations, [id]: { ...convo, title: trimmed } },
       };
     });
-    persist(localApi.history.update(id, { title: trimmed }), 'rename');
+    persistContent(true, () => localApi.history.update(id, { title: trimmed }), 'rename');
   },
 
   async sendMessage(content) {
@@ -499,6 +605,12 @@ export const useChatStore = create<ChatState>()((set, get) => {
     const state = get();
     // Keep the user's routing choice for this request across persistence awaits.
     const { routingScope, networkModelSlug, activeCircleId } = state;
+    // Same idea for the chat-history privacy setting: snapshot it for this
+    // turn so a flag flipped on mid-stream never retroactively saves a
+    // conversation the user started while history was off. Every write also
+    // re-reads the live value, so flipping it off mid-stream stops writes.
+    const historyAllowed = historyEnabled();
+    currentTurnHistoryAllowed = historyAllowed;
     const maybeId = state.activeConversationId;
 
     // If for any reason there's no active conversation, create one
@@ -540,22 +652,45 @@ export const useChatStore = create<ChatState>()((set, get) => {
       () => get().conversations[conversationId],
       get().networkMode,
       get().networkModelSlug,
+      historyAllowed,
     );
+
+    // The row may have been created just now (history was already on) — keep
+    // the sidebar's "Not saved" marker honest either way.
+    const rowExists = knownPersistedIds.has(conversationId);
+    if (get().conversations[conversationId]?.persisted !== rowExists) {
+      set((s) => {
+        const target = s.conversations[conversationId];
+        if (!target) return s;
+        return {
+          conversations: {
+            ...s.conversations,
+            [conversationId]: { ...target, persisted: rowExists },
+          },
+        };
+      });
+    }
 
     // Persist user message immediately. The first-message title rename
     // piggybacks here as a separate update — small extra round-trip but
     // keeps the API surface minimal (no compound endpoint).
-    persist(
-      localApi.history.appendMessage(conversationId, {
-        id: userMessage.id,
-        role: 'user',
-        content,
-        status: 'complete',
-      }),
+    persistContent(
+      historyAllowed,
+      () =>
+        localApi.history.appendMessage(conversationId, {
+          id: userMessage.id,
+          role: 'user',
+          content,
+          status: 'complete',
+        }),
       'append:user',
     );
     if (newTitle !== null) {
-      persist(localApi.history.update(conversationId, { title: newTitle }), 'rename:auto');
+      persistContent(
+        historyAllowed,
+        () => localApi.history.update(conversationId, { title: newTitle }),
+        'rename:auto',
+      );
     }
 
     const assistantId = makeId();
@@ -593,6 +728,20 @@ export const useChatStore = create<ChatState>()((set, get) => {
     const apiMessages: ChatMessage[] = (currentConvo?.messages ?? [])
       .filter((m) => m.id !== assistantId)
       .map((m): ChatMessage => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt }));
+
+    // Usage dashboard (metadata only, never content): the NETWORK scopes stream
+    // renderer -> coordinator/peer and never touch this machine's sidecar, so
+    // the renderer is the only place that can record them. Local turns are
+    // recorded server-side in chat.py, so they stay null here to avoid double
+    // counting. Computed up front because the failure paths report too.
+    const usageScope: UsageScope | null =
+      routingScope === 'household'
+        ? 'my_machines'
+        : routingScope === 'circle' && activeCircleId !== null
+          ? 'circle'
+          : routingScope === 'cooperative'
+            ? 'pool'
+            : null;
 
     try {
       // Branch on routing scope. Four tiers, three active dispatch paths:
@@ -680,9 +829,32 @@ export const useChatStore = create<ChatState>()((set, get) => {
         });
       }
 
+      // How the stream ended, not just that it ended. A normal loop exit means
+      // the body ran out, which happens on success, on a dropped connection,
+      // and on a producer crash alike. Only the [DONE] sentinel proves the
+      // reply is whole.
+      let sawDone = false;
+      let streamError: StreamFailure | null = null;
+
       for await (const event of streamTokens(response)) {
         // Check abort between events
         if (controller.signal.aborted) break;
+
+        if (event.type === 'done') {
+          sawDone = true;
+          break;
+        }
+
+        if (event.type === 'error') {
+          // The error is authoritative. The coordinator's timeout branch still
+          // sends a meta envelope and [DONE] after this (a producer bug), so we
+          // stop reading here rather than let the trailing frames overwrite it.
+          streamError =
+            event.category === undefined
+              ? { message: event.message }
+              : { message: event.message, category: event.category };
+          break;
+        }
 
         if (event.type === 'meta') {
           // Coordinator-only — attach to the in-flight assistant message
@@ -733,8 +905,20 @@ export const useChatStore = create<ChatState>()((set, get) => {
         });
       }
 
-      // Mark complete unless aborted
+      // Terminal decision, unless the user stopped it (abort() owns that case).
+      //
+      //   [DONE], no error  → complete
+      //   error envelope    → error, with the streamed tokens kept as-is
+      //   neither           → error, the connection was cut before the end
       if (!controller.signal.aborted) {
+        const terminalErrorText: string | null =
+          streamError !== null
+            ? streamFailureText(streamError, routingScope)
+            : sawDone
+              ? null
+              : TRUNCATED_STREAM_TEXT;
+        const terminalStatus: MessageStatus = terminalErrorText === null ? 'complete' : 'error';
+
         set((s) => {
           const target = s.conversations[conversationId];
           if (!target) return s;
@@ -746,9 +930,13 @@ export const useChatStore = create<ChatState>()((set, get) => {
               ...s.conversations,
               [conversationId]: {
                 ...target,
-                messages: target.messages.map((m) =>
-                  m.id === assistantId ? { ...m, status: 'complete' } : m,
-                ),
+                messages: target.messages.map((m) => {
+                  if (m.id !== assistantId) return m;
+                  // Content is never rewritten: whatever streamed in stays on
+                  // screen, and the error line sits alongside it.
+                  if (terminalErrorText === null) return { ...m, status: terminalStatus };
+                  return { ...m, status: terminalStatus, errorText: terminalErrorText };
+                }),
               },
             },
           };
@@ -760,38 +948,40 @@ export const useChatStore = create<ChatState>()((set, get) => {
         const finalConvo = get().conversations[conversationId];
         const finalMsg = finalConvo?.messages.find((m) => m.id === assistantId);
         if (finalMsg) {
-          persist(
-            localApi.history.appendMessage(conversationId, {
-              id: assistantId,
-              role: 'assistant',
-              content: finalMsg.content,
-              status: 'complete',
-              // 'household' is session-only — persist only the coordinator-known
-              // values so the history column stays 'contributor' | 'local' | null.
-              served_by:
-                finalMsg.meta?.served_by === 'contributor' || finalMsg.meta?.served_by === 'local'
-                  ? finalMsg.meta.served_by
-                  : null,
-              output_tokens: finalMsg.meta?.output_tokens ?? null,
-              duration_ms: finalMsg.meta?.duration_ms ?? null,
-              finish_reason: finalMsg.meta?.finish_reason ?? null,
-            }),
+          // A failed turn is persisted as what it was: the partial text plus
+          // an 'error' status, which localApi, the sidecar and the schema all
+          // accept. The content is left exactly as it streamed.
+          const persistedFinishReason: string | null =
+            terminalErrorText === null
+              ? (finalMsg.meta?.finish_reason ?? null)
+              : streamError !== null
+                ? 'error'
+                : 'truncated';
+
+          persistContent(
+            historyAllowed,
+            () =>
+              localApi.history.appendMessage(conversationId, {
+                id: assistantId,
+                role: 'assistant',
+                content: finalMsg.content,
+                status: terminalStatus,
+                // 'household' is session-only — persist only the coordinator-known
+                // values so the history column stays 'contributor' | 'local' | null.
+                served_by:
+                  finalMsg.meta?.served_by === 'contributor' || finalMsg.meta?.served_by === 'local'
+                    ? finalMsg.meta.served_by
+                    : null,
+                output_tokens: finalMsg.meta?.output_tokens ?? null,
+                duration_ms: finalMsg.meta?.duration_ms ?? null,
+                finish_reason: persistedFinishReason,
+              }),
             'append:assistant',
           );
 
-          // Usage dashboard (metadata only, never content): record the NETWORK
-          // scopes here because they stream renderer -> coordinator/peer and
-          // never touch this machine's sidecar. Local turns are recorded
-          // server-side in chat.py instead, so we skip them to avoid double
-          // counting. Fire-and-forget: a telemetry write must never break chat.
-          const usageScope: UsageScope | null =
-            routingScope === 'household'
-              ? 'my_machines'
-              : routingScope === 'circle' && activeCircleId !== null
-                ? 'circle'
-                : routingScope === 'cooperative'
-                  ? 'pool'
-                  : null;
+          // Fire-and-forget: a telemetry write must never break chat. A failed
+          // turn is recorded too, otherwise the dashboard reports a success
+          // rate the network did not earn.
           if (usageScope) {
             void localApi.usage
               .record({
@@ -804,7 +994,10 @@ export const useChatStore = create<ChatState>()((set, get) => {
                 ...(finalMsg.meta?.duration_ms === undefined
                   ? {}
                   : { duration_ms: finalMsg.meta.duration_ms }),
-                ok: true,
+                ok: terminalErrorText === null,
+                ...(terminalErrorText === null
+                  ? {}
+                  : { error_class: streamError !== null ? 'stream_error' : 'truncated' }),
               })
               .catch(() => {
                 /* telemetry is best-effort; never surface to the user */
@@ -848,25 +1041,43 @@ export const useChatStore = create<ChatState>()((set, get) => {
         };
       });
 
-      // Persist the failed assistant message so history reflects what
-      // actually happened. Status='error' isn't a valid persisted status
-      // (the schema accepts complete|streaming|partial), so we stamp it
-      // as 'partial' on disk and embed the error in content. UI keeps
-      // the rich error styling because it reads from in-memory state
-      // for the active session.
+      // Persist the failed assistant message so history reflects what actually
+      // happened. 'error' is a real persisted status all the way down (localApi,
+      // the sidecar's append endpoint, the schema), so the row says it failed
+      // instead of hiding an error string inside the content.
       const errConvo = get().conversations[conversationId];
       const errMsg = errConvo?.messages.find((m) => m.id === assistantId);
       if (errMsg) {
-        persist(
-          localApi.history.appendMessage(conversationId, {
-            id: assistantId,
-            role: 'assistant',
-            content: errMsg.content || `[error] ${errorText}`,
-            status: 'partial',
-          }),
+        persistContent(
+          historyAllowed,
+          () =>
+            localApi.history.appendMessage(conversationId, {
+              id: assistantId,
+              role: 'assistant',
+              content: errMsg.content,
+              status: 'error',
+              finish_reason: 'error',
+            }),
           'append:assistant-error',
         );
       }
+
+      // A dispatch that never produced a stream is still a failed network turn.
+      if (usageScope) {
+        void localApi.usage
+          .record({
+            direction: 'consumed',
+            scope: usageScope,
+            model_slug: networkModelSlug ?? null,
+            ok: false,
+            error_class: 'dispatch_error',
+          })
+          .catch(() => {
+            /* telemetry is best-effort; never surface to the user */
+          });
+      }
+    } finally {
+      currentTurnHistoryAllowed = false;
     }
   },
 
@@ -905,17 +1116,19 @@ export const useChatStore = create<ChatState>()((set, get) => {
       const convo = get().conversations[activeConversationId];
       const msg = convo?.messages.find((m) => m.id === streamingMessageId);
       if (msg) {
-        persist(
-          localApi.history.appendMessage(activeConversationId, {
-            id: streamingMessageId,
-            role: 'assistant',
-            content: msg.content,
-            status: 'partial',
-            served_by: msg.meta?.served_by ?? null,
-            output_tokens: msg.meta?.output_tokens ?? null,
-            duration_ms: msg.meta?.duration_ms ?? null,
-            finish_reason: msg.meta?.finish_reason ?? null,
-          }),
+        persistContent(
+          currentTurnHistoryAllowed,
+          () =>
+            localApi.history.appendMessage(activeConversationId, {
+              id: streamingMessageId,
+              role: 'assistant',
+              content: msg.content,
+              status: 'partial',
+              served_by: msg.meta?.served_by ?? null,
+              output_tokens: msg.meta?.output_tokens ?? null,
+              duration_ms: msg.meta?.duration_ms ?? null,
+              finish_reason: msg.meta?.finish_reason ?? null,
+            }),
           'append:assistant-partial',
         );
       }
@@ -928,6 +1141,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     // tests and future "panic clear" UI; not currently bound to any view.
     knownPersistedIds.clear();
     pendingCreates.clear();
+    currentTurnHistoryAllowed = false;
     set({
       conversations: {},
       hydratedIds: new Set(),
