@@ -5,7 +5,8 @@ import { fileURLToPath, URL } from 'node:url';
 
 // Vitest runs the React frontend under jsdom. It reuses the app's "@/" alias
 // so tests import exactly what the app imports. Test files are excluded from
-// the production tsc build (see tsconfig.app.json) and typechecked only here.
+// the production tsc build (see tsconfig.app.json); `pnpm run typecheck`
+// covers them through tsconfig.test.json.
 export default defineConfig({
   plugins: [react()],
   resolve: {

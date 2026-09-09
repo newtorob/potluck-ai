@@ -4,10 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"net"
+	"os"
 	"strings"
 	"testing"
 	"time"
 )
+
+// TestMain moves the whole package off the production port. The desktop
+// app's own potluck-mesh sidecar binds 0.0.0.0:48653 whenever Potluck is
+// running, so a fixed port made `go test` fail on any machine that dogfoods
+// the app. groupPort is a var rather than a const so tests can pick a free
+// one; every listener, unicast and broadcast path reads it at call time.
+func TestMain(m *testing.M) {
+	if c, err := net.ListenPacket("udp4", "0.0.0.0:0"); err == nil {
+		groupPort = c.LocalAddr().(*net.UDPAddr).Port
+		_ = c.Close()
+	}
+	os.Exit(m.Run())
+}
 
 // multicastAvailable probes whether this host can do multicast. Locked-down
 // sandboxes / containers without a multicast interface skip the roundtrip test.

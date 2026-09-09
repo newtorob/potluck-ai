@@ -82,10 +82,20 @@ export function MeshEnablePanel({ bridge, daemonStatus, onChanged }: MeshEnableP
   }
 
   if (bridge === 'daemon_failed') {
-    return <FailedPanel detail={daemonStatus?.detail} onChanged={onChanged} />;
+    return (
+      <FailedPanel
+        {...(daemonStatus?.detail === undefined ? {} : { detail: daemonStatus.detail })}
+        onChanged={onChanged}
+      />
+    );
   }
 
-  return <NotInstalledPanel platform={daemonStatus?.platform} onChanged={onChanged} />;
+  return (
+    <NotInstalledPanel
+      {...(daemonStatus?.platform === undefined ? {} : { platform: daemonStatus.platform })}
+      onChanged={onChanged}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------

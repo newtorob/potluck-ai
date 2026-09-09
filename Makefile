@@ -19,7 +19,7 @@ COMPOSE ?= $(shell \
   fi)
 
 .PHONY: help setup check-python check-docker up down restart logs api-logs pg-logs coord-logs migrate psql \
-        api-shell coord-shell test test-api test-coordinator test-sidecar test-go m3-smoke mesh-smoke lint smoke-prod install-hooks dev desktop frontend \
+        api-shell coord-shell test test-fast test-api test-coordinator test-sidecar test-go test-frontend test-cli test-landing m3-smoke mesh-smoke lint smoke-prod install-hooks dev desktop frontend \
         sidecar sidecar-setup sidecar-go installer-deps installer-bundle installer-mac installer-mac-dir installer-win installer-linux installer-linux-docker installer-clean \
         install-mac-app kill dogfood \
         coordinator coordinator-setup frontend-setup electron-setup ps status clean reset eval-retrieval bench \
@@ -162,11 +162,36 @@ api-shell: check-docker ## Open a bash shell inside the api container
 coord-shell: check-docker ## Open a bash shell inside the coordinator container
 	$(COMPOSE) exec coordinator bash
 
-test: test-api test-coordinator test-sidecar test-go ## Run every test suite (api + coordinator + sidecar + Go)
+test: lint test-frontend test-cli test-landing test-coordinator test-api test-go test-sidecar ## Run every local suite: privacy lint, frontend, CLI, landing, coordinator, api (Docker), Go, sidecar
 
-test-api: check-docker ## Run pytest inside the api container (installs dev deps first)
-	$(COMPOSE) exec -u root api pip install -q -r requirements-dev.txt
-	$(COMPOSE) exec api env PYTHONDONTWRITEBYTECODE=1 pytest -q
+test-fast: LANDING_BUILD=0
+test-fast: lint test-frontend test-cli test-landing ## Fast subset: privacy lint + the three node suites with typechecks (no Docker, no Python, no next build)
+
+test-api: check-docker ## Run the api pytest suite in a throwaway api container (starts Postgres + migrations if needed)
+	$(COMPOSE) run --rm -T -u root api sh -c 'pip install -q -r requirements-dev.txt && env PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider'
+
+test-frontend: ## Run the desktop frontend vitest suite, then typecheck app, test and vite-config files
+	@if [ ! -d apps/desktop/frontend/node_modules ]; then \
+		echo "==> apps/desktop/frontend/node_modules missing: run 'make frontend-setup' first"; \
+		exit 1; \
+	fi
+	@cd apps/desktop/frontend && pnpm exec vitest run && pnpm run typecheck
+
+test-cli: ## Run the CLI vitest suite, then typecheck it
+	@if [ ! -d apps/cli/node_modules ]; then \
+		echo "==> apps/cli/node_modules missing: run 'cd apps/cli && pnpm install' first"; \
+		exit 1; \
+	fi
+	@cd apps/cli && pnpm exec vitest run && pnpm exec tsc --noEmit
+
+LANDING_BUILD ?= 1
+test-landing: ## Run the landing vitest suite + typecheck, then a production next build (LANDING_BUILD=0 skips the build)
+	@if [ ! -d web/landing/node_modules ]; then \
+		echo "==> web/landing/node_modules missing: run 'cd web/landing && pnpm install' first"; \
+		exit 1; \
+	fi
+	@cd web/landing && pnpm exec vitest run && pnpm exec tsc --noEmit
+	@if [ "$(LANDING_BUILD)" != "0" ]; then cd web/landing && pnpm exec next build; fi
 
 test-coordinator: ## Run coordinator pytest suite (privacy invariants etc.) in its venv
 	@if [ ! -x services/coordinator/.venv/bin/pytest ]; then \
