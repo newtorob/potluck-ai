@@ -31,7 +31,7 @@ from coordinator.db.database import close_db, get_session_factory, init_db
 from coordinator.models.credit import CreditLedger
 from coordinator.models.job import Job
 from coordinator.models.peer import Peer
-from coordinator.routers.jobs import _finalize_job_in_db
+from coordinator.routers.jobs import Outcome, _finalize_job_in_db
 
 _MODEL = "qwen2.5:3b-instruct-q4_K_M"
 
@@ -87,6 +87,7 @@ async def test_double_finalize_writes_credits_once() -> None:
         for _ in range(2):
             await _finalize_job_in_db(
                 job_id=job_id,
+                terminal=Outcome.COMPLETED,
                 error_category=None,
                 error_message=None,
                 output_tokens=100,
@@ -167,6 +168,7 @@ async def test_double_finalize_self_served_writes_credits_once() -> None:
         for _ in range(2):
             await _finalize_job_in_db(
                 job_id=job_id,
+                terminal=Outcome.COMPLETED,
                 error_category=None,
                 error_message=None,
                 output_tokens=50,
@@ -176,6 +178,117 @@ async def test_double_finalize_self_served_writes_credits_once() -> None:
         async with factory() as db:
             count = await _count_ledger_rows(db, job_id)
             assert count == 0, "self-served job must never write ledger rows"
+    finally:
+        async with factory() as cleanup_db:
+            async with cleanup_db.begin():
+                if job_id is not None:
+                    await cleanup_db.execute(
+                        delete(CreditLedger).where(CreditLedger.job_id == job_id)
+                    )
+                    await cleanup_db.execute(delete(Job).where(Job.id == job_id))
+                if peer_id is not None:
+                    await cleanup_db.execute(delete(Peer).where(Peer.id == peer_id))
+        await close_db()
+
+
+# ---------------------------------------------------------------------------
+# Terminal-outcome policy matrix (audit finding 5)
+# ---------------------------------------------------------------------------
+#
+# `_finalize_job_in_db` is the single place a job settles. Exactly one
+# outcome mints credits; every other outcome lands the row in "failed" with
+# the reason persisted, writes no ledger rows, and leaves output_tokens /
+# duration_ms untouched (a job that did not complete has no billable work to
+# report). Each case is finalized TWICE to prove the policy is idempotent,
+# not just correct on the first pass.
+#
+# Status vocabulary stays {dispatched, completed, failed} so the stats and
+# contributions queries (routers/me.py, routers/transparency.py,
+# routers/jobs.py::my_job_stats) are unaffected; the granular reason lives in
+# the new nullable `terminal_reason` column.
+
+
+_OUTCOME_MATRIX = [
+    (Outcome.COMPLETED, None, "completed", "completed", 2),
+    (Outcome.TIMEOUT, "timeout", "failed", "timeout", 0),
+    (Outcome.CANCELLED, "client_disconnected", "failed", "cancelled", 0),
+    (Outcome.PEER_ERROR, "inference_failed", "failed", "peer_error", 0),
+    (Outcome.DISPATCH_FAILED, "dispatch_failed", "failed", "dispatch_failed", 0),
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "terminal,error_category,expected_status,expected_reason,expected_credits",
+    _OUTCOME_MATRIX,
+    ids=[case[0].value for case in _OUTCOME_MATRIX],
+)
+async def test_finalize_outcome_matrix(
+    terminal, error_category, expected_status, expected_reason, expected_credits
+) -> None:
+    await init_db()
+    factory = get_session_factory()
+
+    requester_id = uuid.uuid4()
+    contributor_owner_id = uuid.uuid4()
+    peer_id: uuid.UUID | None = None
+    job_id: uuid.UUID | None = None
+
+    try:
+        async with factory() as db:
+            peer = Peer(
+                member_id=contributor_owner_id,
+                public_key=uuid.uuid4().hex,
+                status="active",
+            )
+            db.add(peer)
+            await db.flush()
+            peer_id = peer.id
+
+            job = Job(
+                member_id=requester_id,
+                peer_id=peer.id,
+                model_slug=_MODEL,
+                privacy_mode="pseudonymous",
+                status="dispatched",
+            )
+            db.add(job)
+            await db.flush()
+            job_id = job.id
+            await db.commit()
+
+        for _ in range(2):
+            await _finalize_job_in_db(
+                job_id=job_id,
+                terminal=terminal,
+                error_category=error_category,
+                error_message=None if error_category is None else "descriptive detail",
+                output_tokens=100,
+                duration_ms=1234,
+            )
+
+        async with factory() as db:
+            db_job = await db.get(Job, job_id)
+            assert db_job is not None
+            assert db_job.status == expected_status
+            assert db_job.terminal_reason == expected_reason
+            assert db_job.error_category == error_category
+            assert db_job.completed_at is not None
+
+            if terminal is Outcome.COMPLETED:
+                assert db_job.output_tokens == 100
+                assert db_job.duration_ms == 1234
+            else:
+                assert db_job.output_tokens is None, (
+                    "a job that did not complete reports no billable output"
+                )
+                assert db_job.duration_ms is None
+
+            count = await _count_ledger_rows(db, job_id)
+            assert count == expected_credits, (
+                f"outcome {terminal.value} wrote {count} ledger rows, "
+                f"expected {expected_credits}"
+            )
     finally:
         async with factory() as cleanup_db:
             async with cleanup_db.begin():

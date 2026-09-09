@@ -34,6 +34,22 @@ class Job(Base):
         String(16), nullable=False, server_default=text("'pseudonymous'")
     )
     status: Mapped[str] = mapped_column(String(24), nullable=False)
+    # Coarse lifecycle vocabulary, unchanged: dispatched | completed | failed.
+    # Every aggregate query in the service filters on status == "completed"
+    # (routers/me.py, routers/transparency.py, routers/jobs.py::my_job_stats),
+    # so the vocabulary is frozen and the granular reason lives below.
+    #
+    # terminal_reason: which Outcome settled this row
+    # (routers/jobs.py::Outcome -- completed | timeout | cancelled |
+    # peer_error | dispatch_failed). Nullable with no backfill: rows written
+    # before migration 0011 keep NULL, which reads as "unknown, predates the
+    # single-terminal-outcome contract".
+    terminal_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # The descriptive category that came with the failure, when there was
+    # one. Peer-reported ("inference_failed") or coordinator-synthesized
+    # ("first_token_timeout", "peer_disconnected", "dispatch_failed").
+    # Diagnostic only: nothing routes, scores, or bills off this column.
+    error_category: Mapped[str | None] = mapped_column(String(64), nullable=True)
     input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
