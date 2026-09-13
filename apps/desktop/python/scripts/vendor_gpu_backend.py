@@ -54,6 +54,12 @@ LLAMA_CPP_COMMIT = "4df29be4f4c3673f428170fda944a5b19f743bb8"
 _BASE = "https://github.com/abetlen/llama-cpp-python/releases/download"
 _WHEEL = f"llama_cpp_python-{WRAPPER_VERSION}-py3-none-win_amd64.whl"
 
+# The CPU wheel requirements.txt installs on Windows, recorded here so both
+# halves of the pair are visible in one place. PyPI has no win_amd64 wheel for
+# this version, so requirements.txt names this URL directly.
+CPU_WHEEL_URL = f"{_BASE}/v{WRAPPER_VERSION}/{_WHEEL}"
+CPU_WHEEL_SHA256 = "31590ea000d5aff6f05f1e428048e72318a83709288159a5bd4dabec530080bb"
+
 # Pinned by URL, size and SHA-256. Nothing here resolves "latest".
 #
 # Vulkan is the GPU backend we ship on Windows: one build covers NVIDIA, AMD

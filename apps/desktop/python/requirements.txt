@@ -10,11 +10,19 @@ uvicorn[standard]==0.34.*
 # backend set is vendored separately, pinned by URL + SHA-256, by
 # scripts/vendor_gpu_backend.py, which build.py runs before PyInstaller.
 #
-# Windows is pinned exactly because the vendored native libraries must match
-# this wrapper's ctypes declarations: a floating 0.3.* could resolve a version
-# the vendored set was not built against. Bump the two together, never one.
+# Windows takes the wheel by direct URL for two reasons. PyPI publishes no
+# win_amd64 wheel for this version, so a plain version pin makes pip try to
+# compile llama.cpp from source and fail on a machine with no MSVC. And the
+# vendored GPU libraries must match this wrapper's ctypes declarations exactly:
+# pairing a wrapper with a native library from a different llama.cpp commit
+# gives silent memory corruption rather than an honest import error. This URL
+# and the pins in scripts/vendor_gpu_backend.py move together, never one alone.
+#
+#   sha256 31590ea000d5aff6f05f1e428048e72318a83709288159a5bd4dabec530080bb
+#   7,086,788 bytes, CPU only, llama.cpp b10454
+#
 # macOS (Metal) and Linux keep the existing range; they are not affected.
-llama-cpp-python==0.3.35 ; sys_platform == "win32"
+llama-cpp-python @ https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.35/llama_cpp_python-0.3.35-py3-none-win_amd64.whl ; sys_platform == "win32"
 llama-cpp-python==0.3.* ; sys_platform != "win32"
 httpx==0.28.*
 psutil==6.1.*
