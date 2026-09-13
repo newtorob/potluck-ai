@@ -268,20 +268,29 @@ class LLMRuntime:
                 self._release_model()
 
             requested_gpu_layers = n_gpu_layers
+            requested_n_ctx = n_ctx
             plan = None
             if selection.probed and selection.backend != "cpu":
                 # A backend this module selected after a probe: size the offload
                 # against VRAM that is free right now. Everywhere else (macOS
                 # Metal, the Linux build) keeps the caller's value untouched.
                 plan = llama_backend.plan_gpu_layers(
-                    model_path, requested=n_gpu_layers, devices=llama_backend.describe_devices()
+                    model_path,
+                    requested=n_gpu_layers,
+                    n_ctx=n_ctx,
+                    devices=llama_backend.describe_devices(),
                 )
                 n_gpu_layers = plan.n_gpu_layers
-                if plan.n_gpu_layers != requested_gpu_layers:
+                if plan.n_ctx and plan.n_ctx != n_ctx:
+                    n_ctx = plan.n_ctx
+                if plan.n_gpu_layers != requested_gpu_layers or plan.n_ctx != requested_n_ctx:
                     logger.info(
-                        "gpu_offload_planned requested=%s using=%s reason=%s",
+                        "gpu_offload_planned requested_layers=%s using_layers=%s "
+                        "requested_n_ctx=%s using_n_ctx=%s reason=%s",
                         requested_gpu_layers,
                         plan.n_gpu_layers,
+                        requested_n_ctx,
+                        n_ctx,
                         plan.reason,
                     )
 
@@ -314,6 +323,8 @@ class LLMRuntime:
                 "backend_selection": selection.as_dict(),
                 "requested_n_gpu_layers": requested_gpu_layers,
                 "used_n_gpu_layers": n_gpu_layers,
+                "requested_n_ctx": requested_n_ctx,
+                "used_n_ctx": n_ctx,
                 "offload_plan": plan.as_dict() if plan else None,
                 **load_log,
             }

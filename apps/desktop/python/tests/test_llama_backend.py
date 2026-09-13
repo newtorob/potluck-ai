@@ -130,30 +130,51 @@ def _gpu(free_gb: float, total_gb: float = 8.0) -> dict:
     }
 
 
-def _model_file(tmp_path: Path, gb: float, layers: int | None = 32) -> Path:
+def _model_file(
+    tmp_path: Path,
+    gb: float,
+    layers: int | None = 32,
+    kv_heads: int | None = 8,
+    head_dim: int = 128,
+) -> Path:
+    """A GGUF header just complete enough to size a load, padded to *gb*.
+
+    kv_heads=None omits the attention metadata, which is the "KV cache cannot
+    be sized from this header" case.
+    """
     path = tmp_path / "model.gguf"
     if layers is None:
         path.write_bytes(b"NOTGGUF!")
     else:
-        _write_gguf(path, [("llama.block_count", 4, struct.pack("<I", layers))])
+        kvs = [("llama.block_count", 4, struct.pack("<I", layers))]
+        if kv_heads is not None:
+            kvs += [
+                ("llama.attention.head_count_kv", 4, struct.pack("<I", kv_heads)),
+                ("llama.attention.key_length", 4, struct.pack("<I", head_dim)),
+                ("llama.attention.value_length", 4, struct.pack("<I", head_dim)),
+            ]
+        _write_gguf(path, kvs)
     with open(path, "r+b") as fh:
         fh.seek(int(gb * 1024**3) - 1)
         fh.write(b"\0")
     return path
 
 
-def test_a_pinned_layer_count_is_never_overridden(tmp_path):
-    plan = llama_backend.plan_gpu_layers(
-        _model_file(tmp_path, 0.001), requested=12, devices=[_gpu(0.1)]
+def _plan(model, *, requested=-1, n_ctx=4096, devices=None):
+    return llama_backend.plan_gpu_layers(
+        model, requested=requested, n_ctx=n_ctx, devices=devices
     )
+
+
+def test_a_pinned_layer_count_is_never_overridden(tmp_path):
+    plan = _plan(_model_file(tmp_path, 0.001), requested=12, devices=[_gpu(0.1)])
     assert plan.n_gpu_layers == 12
     assert "pinned" in plan.reason
 
 
 def test_no_gpu_device_means_no_offload(tmp_path):
-    plan = llama_backend.plan_gpu_layers(
+    plan = _plan(
         _model_file(tmp_path, 0.001),
-        requested=-1,
         devices=[{"name": "CPU", "type": "cpu", "free_bytes": 1, "total_bytes": 1}],
     )
     assert plan.n_gpu_layers == 0
@@ -162,16 +183,17 @@ def test_no_gpu_device_means_no_offload(tmp_path):
 
 def test_a_model_that_fits_asks_for_every_layer(tmp_path):
     model = _model_file(tmp_path, 2.5, layers=36)
-    plan = llama_backend.plan_gpu_layers(model, requested=-1, devices=[_gpu(7.5)])
+    plan = _plan(model, devices=[_gpu(7.5)])
     assert plan.n_gpu_layers == -1
+    assert plan.n_ctx == 4096
     assert plan.free_vram_bytes == int(7.5 * 1024**3)
 
 
 def test_a_model_that_does_not_fit_is_sized_down(tmp_path):
     # 6 GiB of weights, 4 GiB free: 3 GiB of budget after the reserve, so
     # roughly half the layers.
-    model = _model_file(tmp_path, 6.0, layers=32)
-    plan = llama_backend.plan_gpu_layers(model, requested=-1, devices=[_gpu(4.0)])
+    model = _model_file(tmp_path, 6.0, layers=32, kv_heads=None)
+    plan = _plan(model, devices=[_gpu(4.0)])
     assert 0 < plan.n_gpu_layers < 32
     assert plan.total_layers == 32
     assert "fit in free VRAM" in plan.reason
@@ -179,7 +201,7 @@ def test_a_model_that_does_not_fit_is_sized_down(tmp_path):
 
 def test_a_card_with_no_room_falls_back_to_the_cpu(tmp_path):
     model = _model_file(tmp_path, 6.0, layers=32)
-    plan = llama_backend.plan_gpu_layers(model, requested=-1, devices=[_gpu(0.5)])
+    plan = _plan(model, devices=[_gpu(0.5)])
     assert plan.n_gpu_layers == 0
     assert "runs on the CPU" in plan.reason
 
@@ -187,18 +209,91 @@ def test_a_card_with_no_room_falls_back_to_the_cpu(tmp_path):
 def test_an_oversized_model_with_no_layer_count_stays_on_the_cpu(tmp_path):
     """Better honest CPU than a guess that streams weights over PCIe per token."""
     model = _model_file(tmp_path, 6.0, layers=None)
-    plan = llama_backend.plan_gpu_layers(model, requested=-1, devices=[_gpu(2.0)])
+    plan = _plan(model, devices=[_gpu(2.0)])
     assert plan.n_gpu_layers == 0
     assert "layer count is unreadable" in plan.reason
 
 
 def test_the_plan_shrinks_with_the_reported_free_memory(tmp_path):
     """Whatever the backend reports as free is what the plan is sized against."""
-    model = _model_file(tmp_path, 5.0, layers=32)
-    idle = llama_backend.plan_gpu_layers(model, requested=-1, devices=[_gpu(7.5)])
-    busy = llama_backend.plan_gpu_layers(model, requested=-1, devices=[_gpu(3.0)])
+    model = _model_file(tmp_path, 5.0, layers=32, kv_heads=None)
+    idle = _plan(model, devices=[_gpu(7.5)])
+    busy = _plan(model, devices=[_gpu(3.0)])
     assert idle.n_gpu_layers == -1
     assert 0 < busy.n_gpu_layers < 32
+
+
+def test_the_kv_cache_counts_against_the_budget(tmp_path):
+    """The bug this covers: 2.3 GB of weights "fit" on an 8 GB card while the
+    KV cache for the auto-tuned 131072-token context asked for 18 GB."""
+    # 36 layers x 8 kv heads x 256 bytes x 2 = 147456 bytes per token.
+    model = _model_file(tmp_path, 2.3, layers=36, kv_heads=8, head_dim=128)
+    plan = _plan(model, n_ctx=131072, devices=[_gpu(7.2)])
+    assert plan.n_gpu_layers == -1
+    assert plan.n_ctx is not None and plan.n_ctx < 131072
+    assert plan.requested_n_ctx == 131072
+    assert "context reduced" in plan.reason
+    # What it settled on must actually fit.
+    assert plan.model_bytes + plan.kv_bytes <= plan.free_vram_bytes
+
+
+def test_a_short_context_that_already_fits_is_left_alone(tmp_path):
+    model = _model_file(tmp_path, 2.3, layers=36, kv_heads=8, head_dim=128)
+    plan = _plan(model, n_ctx=8192, devices=[_gpu(7.2)])
+    assert plan.n_gpu_layers == -1
+    assert plan.n_ctx == 8192
+    assert "KV cache fit in free VRAM" in plan.reason
+
+
+def test_the_context_is_never_shrunk_below_the_floor(tmp_path):
+    """Past the floor, trade layers instead: a GPU is not worth a context so
+    short the conversation cannot hold a turn."""
+    model = _model_file(tmp_path, 4.0, layers=36, kv_heads=8, head_dim=128)
+    plan = _plan(model, n_ctx=131072, devices=[_gpu(5.2)])
+    assert plan.n_ctx >= llama_backend._MIN_GPU_CTX
+
+
+def test_a_header_without_attention_metadata_sizes_weights_only(tmp_path):
+    model = _model_file(tmp_path, 2.0, layers=32, kv_heads=None)
+    plan = _plan(model, n_ctx=131072, devices=[_gpu(7.5)])
+    assert plan.n_gpu_layers == -1
+    assert plan.kv_bytes is None
+    assert "could not be sized" in plan.reason
+
+
+def test_a_pin_leaves_the_context_alone(tmp_path):
+    model = _model_file(tmp_path, 2.3, layers=36, kv_heads=8, head_dim=128)
+    plan = _plan(model, requested=20, n_ctx=131072, devices=[_gpu(7.2)])
+    assert plan.n_gpu_layers == 20
+    assert plan.n_ctx == 131072
+
+
+def test_kv_cache_bytes_matches_llama_cpp(tmp_path):
+    """Checked against llama.cpp's own report: Qwen3 4B at 131072 tokens logged
+    "Vulkan0 KV buffer size = 18432.00 MiB"."""
+    info = {
+        "block_count": 36,
+        "attention.head_count_kv": 8,
+        "attention.key_length": 128,
+        "attention.value_length": 128,
+    }
+    assert llama_backend.kv_cache_bytes(info, 131072) == 18432 * 1024 * 1024
+
+
+def test_kv_cache_bytes_falls_back_to_embedding_over_heads():
+    info = {
+        "block_count": 32,
+        "attention.head_count_kv": 8,
+        "attention.head_count": 32,
+        "embedding_length": 4096,
+    }
+    # head_dim 128, so 32 layers x 8 heads x 256 bytes x 2 = 131072 per token.
+    assert llama_backend.kv_cache_bytes(info, 1) == 131072
+
+
+def test_kv_cache_bytes_is_none_without_enough_metadata():
+    assert llama_backend.kv_cache_bytes({"block_count": 32}, 4096) is None
+    assert llama_backend.kv_cache_bytes({}, 4096) is None
 
 
 # ---------------------------------------------------------------------------

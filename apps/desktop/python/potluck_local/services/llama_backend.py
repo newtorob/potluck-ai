@@ -73,6 +73,11 @@ _DEV_TYPE = {0: "cpu", 1: "gpu", 2: "accel", 3: "igpu"}
 # every token, which is slower than staying on the CPU.
 _VRAM_RESERVE_BYTES = 1024 * 1024 * 1024
 
+# Never shrink the context below this to make a GPU offload fit. Past this
+# point the offload is buying speed the user did not ask to pay for in
+# conversation length, and the CPU at a long context is the better trade.
+_MIN_GPU_CTX = 8192
+
 
 @dataclass
 class Selection:
@@ -506,23 +511,37 @@ def reset_for_tests() -> None:
 # ---------------------------------------------------------------------------
 
 
-def read_gguf_layer_count(path: str | Path) -> int | None:
-    """Read ``*.block_count`` out of a GGUF header. None when unreadable.
+# GGUF metadata keys, by suffix, needed to size a load before it happens.
+# llama.cpp knows all of this, but only after the model is loaded, which is the
+# decision being made here.
+_GGUF_WANTED = (
+    ".block_count",
+    ".attention.head_count_kv",
+    ".attention.key_length",
+    ".attention.value_length",
+    ".attention.head_count",
+    ".embedding_length",
+)
 
-    Layer count is needed to size a partial offload. llama.cpp knows it, but
-    only after the model is loaded, which is the decision we are making.
+
+def read_gguf_model_info(path: str | Path) -> dict[str, int]:
+    """Read the numeric header fields we need, keyed by suffix without the dot.
+
+    Returns whatever was found; an empty dict when the file is not readable
+    GGUF. Never raises.
     """
+    found: dict[str, int] = {}
     try:
         with open(path, "rb") as fh:
             if fh.read(4) != b"GGUF":
-                return None
+                return found
             (version,) = struct.unpack("<I", fh.read(4))
             if version not in (2, 3):
-                return None
+                return found
             fh.read(8)  # tensor_count
             (kv_count,) = struct.unpack("<Q", fh.read(8))
             if kv_count > 100_000:
-                return None
+                return found
 
             def read_str() -> str:
                 (n,) = struct.unpack("<Q", fh.read(8))
@@ -553,22 +572,62 @@ def read_gguf_layer_count(path: str | Path) -> int | None:
             for _ in range(kv_count):
                 key = read_str()
                 (vtype,) = struct.unpack("<I", fh.read(4))
-                if key.endswith(".block_count") and vtype in (4, 5, 10, 11):
-                    raw = fh.read(fixed[vtype])
+                suffix = next((w for w in _GGUF_WANTED if key.endswith(w)), None)
+                if suffix is not None and vtype in (4, 5, 10, 11):
                     fmt = {4: "<I", 5: "<i", 10: "<Q", 11: "<q"}[vtype]
-                    (value,) = struct.unpack(fmt, raw)
-                    return int(value) if 0 < value < 10_000 else None
+                    (value,) = struct.unpack(fmt, fh.read(fixed[vtype]))
+                    if 0 < value < 10_000_000:
+                        found[suffix.lstrip(".")] = int(value)
+                    continue
                 skip_value(vtype)
     except (OSError, struct.error, ValueError, UnicodeDecodeError):
+        return found
+    return found
+
+
+def read_gguf_layer_count(path: str | Path) -> int | None:
+    """Transformer block count, or None when the header is unreadable."""
+    value = read_gguf_model_info(path).get("block_count")
+    return value if value and 0 < value < 10_000 else None
+
+
+def kv_cache_bytes(info: dict[str, int], n_ctx: int) -> int | None:
+    """Bytes the KV cache needs for *n_ctx* tokens, or None when unknowable.
+
+    Mirrors llama.cpp's own arithmetic: every layer holds a key and a value
+    entry per token, per KV head, at 2 bytes each for the f16 default. This is
+    the term the first version of the offload plan missed. On an 8 GB card, a
+    2.3 GB model at a 131072-token context asks for 18 GB of KV cache, and the
+    driver quietly backs the overflow with host memory.
+    """
+    layers = info.get("block_count")
+    kv_heads = info.get("attention.head_count_kv")
+    if not layers or not kv_heads or n_ctx <= 0:
         return None
-    return None
+
+    key_len = info.get("attention.key_length")
+    value_len = info.get("attention.value_length")
+    if not key_len or not value_len:
+        # Older headers omit both and imply embedding_length / head_count.
+        embedding = info.get("embedding_length")
+        heads = info.get("attention.head_count")
+        if not embedding or not heads:
+            return None
+        key_len = value_len = embedding // heads
+        if key_len <= 0:
+            return None
+
+    return layers * kv_heads * (key_len + value_len) * 2 * n_ctx
 
 
 @dataclass
 class OffloadPlan:
     n_gpu_layers: int
     reason: str
+    n_ctx: int | None = None
+    requested_n_ctx: int | None = None
     model_bytes: int | None = None
+    kv_bytes: int | None = None
     total_layers: int | None = None
     free_vram_bytes: int | None = None
 
@@ -576,85 +635,136 @@ class OffloadPlan:
         return {
             "n_gpu_layers": self.n_gpu_layers,
             "reason": self.reason,
+            "n_ctx": self.n_ctx,
+            "requested_n_ctx": self.requested_n_ctx,
             "model_bytes": self.model_bytes,
+            "kv_bytes": self.kv_bytes,
             "total_layers": self.total_layers,
             "free_vram_bytes": self.free_vram_bytes,
         }
+
+
+def _round_down_ctx(n: int) -> int:
+    """Contexts are conventionally multiples of 4096. Keep it tidy."""
+    return (n // 4096) * 4096
 
 
 def plan_gpu_layers(
     model_path: str | Path,
     *,
     requested: int,
+    n_ctx: int,
     devices: list[dict] | None = None,
 ) -> OffloadPlan:
-    """Decide how many layers to put on the GPU for this model, right now.
+    """Decide how many layers go on the GPU, and at what context, for this model.
 
     ``requested >= 0`` is a user pin and is honoured unchanged. ``requested ==
     -1`` means "all layers, automatically", and this is where that becomes a
-    real decision instead of a wish: a model that does not fit in VRAM streams
-    its weights across PCIe on every token, which is slower than running on the
-    CPU, so it is sized to fit or left on the CPU.
+    real decision instead of a wish.
+
+    Weights are not the whole cost. A 2.3 GB model at the auto-tuned context of
+    131072 tokens asks for 18 GB of KV cache, which an 8 GB card cannot hold;
+    the driver quietly backs the overflow with host memory and the first long
+    conversation pays for it across PCIe. So the context is reduced first, the
+    layer count second, and the CPU is the floor.
 
     What "free" means here, exactly: it is the figure ``ggml_backend_dev_memory``
     reports for the device. That tracks what this process has allocated, and on
     some drivers nothing more. Measured on an AMD RX 6600 XT on Windows
     (2026-09-13), the reported figure was identical with a game holding a large
     share of the card and with the machine idle, so it is not a live system-wide
-    budget. The reserve below absorbs the KV cache and compute buffers; it does
-    not make this safe against another application that is already holding
-    several GB. A user on a busy card can pin ``gpu_layers`` instead, and the
-    load report afterwards says where the weights actually went.
+    budget. A user on a busy card can pin ``gpu_layers`` instead, and the load
+    report afterwards says where the weights actually went.
     """
     if requested >= 0:
-        return OffloadPlan(requested, "pinned by the gpu_layers setting")
+        return OffloadPlan(
+            requested, "pinned by the gpu_layers setting", n_ctx=n_ctx, requested_n_ctx=n_ctx
+        )
 
     if devices is None:
         devices = describe_devices()
     gpus = [d for d in devices if d.get("type") in ("gpu", "igpu") and d.get("total_bytes")]
     if not gpus:
-        return OffloadPlan(0, "no GPU device is available to this build")
+        return OffloadPlan(
+            0,
+            "no GPU device is available to this build",
+            n_ctx=n_ctx,
+            requested_n_ctx=n_ctx,
+        )
 
     free = max(int(d.get("free_bytes") or 0) for d in gpus)
     try:
         model_bytes = Path(model_path).stat().st_size
     except OSError:
-        return OffloadPlan(-1, "model size unknown; asking for a full offload")
-
-    budget = free - _VRAM_RESERVE_BYTES
-    if budget >= model_bytes:
         return OffloadPlan(
             -1,
-            "the whole model fits in free VRAM",
-            model_bytes=model_bytes,
-            free_vram_bytes=free,
+            "model size unknown; asking for a full offload",
+            n_ctx=n_ctx,
+            requested_n_ctx=n_ctx,
         )
 
-    total_layers = read_gguf_layer_count(model_path)
-    if not total_layers:
-        return OffloadPlan(
-            0,
-            "the model does not fit in free VRAM and its layer count is unreadable, "
-            "so it runs on the CPU",
-            model_bytes=model_bytes,
-            free_vram_bytes=free,
-        )
+    budget = free - _VRAM_RESERVE_BYTES
+    info = read_gguf_model_info(model_path)
+    total_layers = info.get("block_count")
+    kv_per_token = kv_cache_bytes(info, 1)
 
-    per_layer = model_bytes / total_layers
-    fits = int(budget / per_layer) if budget > 0 else 0
-    fits = max(0, min(total_layers, fits))
-    if fits == 0:
+    def plan(layers: int, reason: str, ctx: int) -> OffloadPlan:
         return OffloadPlan(
-            0,
-            "not enough free VRAM for even one layer, so it runs on the CPU",
+            layers,
+            reason,
+            n_ctx=ctx,
+            requested_n_ctx=n_ctx,
             model_bytes=model_bytes,
+            kv_bytes=(kv_per_token * ctx) if kv_per_token else None,
             total_layers=total_layers,
             free_vram_bytes=free,
         )
-    return OffloadPlan(
-        fits,
-        f"{fits} of {total_layers} layers fit in free VRAM",
-        model_bytes=model_bytes,
-        total_layers=total_layers,
-        free_vram_bytes=free,
-    )
+
+    if kv_per_token is None:
+        # No KV arithmetic available: fall back to weights only, and say so.
+        if budget >= model_bytes:
+            return plan(
+                -1,
+                "the weights fit in free VRAM; the KV cache could not be sized "
+                "from this model's header",
+                n_ctx,
+            )
+        if not total_layers:
+            return plan(
+                0,
+                "the model does not fit in free VRAM and its layer count is "
+                "unreadable, so it runs on the CPU",
+                n_ctx,
+            )
+        fits = max(0, min(total_layers, int(budget / (model_bytes / total_layers))))
+        if fits == 0:
+            return plan(0, "not enough free VRAM for even one layer, so it runs on the CPU", n_ctx)
+        return plan(fits, f"{fits} of {total_layers} layers fit in free VRAM", n_ctx)
+
+    # Everything on the card at the requested context.
+    if budget >= model_bytes + kv_per_token * n_ctx:
+        return plan(-1, "the model and its KV cache fit in free VRAM", n_ctx)
+
+    # Shrink the context until weights plus KV fit.
+    room = budget - model_bytes
+    if room > 0:
+        fitted_ctx = _round_down_ctx(int(room / kv_per_token))
+        if fitted_ctx >= _MIN_GPU_CTX:
+            return plan(
+                -1,
+                f"context reduced from {n_ctx} to {fitted_ctx} so the KV cache fits in VRAM",
+                fitted_ctx,
+            )
+
+    # Context is already at its floor; give the GPU as many layers as it can hold.
+    if total_layers:
+        per_layer = model_bytes / total_layers + kv_per_token * _MIN_GPU_CTX / total_layers
+        fits = max(0, min(total_layers, int(budget / per_layer))) if budget > 0 else 0
+        if fits > 0:
+            return plan(
+                fits,
+                f"{fits} of {total_layers} layers fit at a {_MIN_GPU_CTX}-token context",
+                _MIN_GPU_CTX,
+            )
+
+    return plan(0, "not enough free VRAM for a useful offload, so it runs on the CPU", n_ctx)
