@@ -30,6 +30,11 @@ logger = logging.getLogger(__name__)
 # where the weights ended up without guessing from installed hardware.
 _OFFLOAD_RE = re.compile(r"offloaded (\d+)/(\d+) layers to GPU")
 _BUFFER_RE = re.compile(r"load_tensors:\s+(\S+) model buffer size =\s+([\d.]+) MiB")
+# Weights are only part of what a load puts on the card. A long context can
+# make the KV cache larger than the model, which is how a model that "fits"
+# still ends up spilling.
+_KV_RE = re.compile(r"(\S+) KV buffer size =\s+([\d.]+) MiB")
+_COMPUTE_RE = re.compile(r"(\S+) compute buffer size =\s+([\d.]+) MiB")
 
 # Ring buffer of llama.cpp log lines, so a load report can be built after the
 # fact without leaving a callback that swallows the library's own logging.
@@ -80,6 +85,8 @@ def _parse_load_log(lines: list[str]) -> dict:
     offloaded: int | None = None
     total_layers: int | None = None
     buffers: dict[str, float] = {}
+    kv: dict[str, float] = {}
+    compute: dict[str, float] = {}
     for line in lines:
         m = _OFFLOAD_RE.search(line)
         if m:
@@ -87,10 +94,20 @@ def _parse_load_log(lines: list[str]) -> dict:
         m = _BUFFER_RE.search(line)
         if m:
             buffers[m.group(1)] = float(m.group(2))
+            continue
+        m = _KV_RE.search(line)
+        if m:
+            kv[m.group(1)] = float(m.group(2))
+            continue
+        m = _COMPUTE_RE.search(line)
+        if m:
+            compute[m.group(1)] = float(m.group(2))
     return {
         "offloaded_layers": offloaded,
         "total_layers": total_layers,
         "model_buffer_mib": buffers or None,
+        "kv_buffer_mib": kv or None,
+        "compute_buffer_mib": compute or None,
     }
 
 

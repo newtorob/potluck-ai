@@ -16,6 +16,9 @@ VULKAN_LOG = [
     "load_tensors: offloaded 33/33 layers to GPU\n",
     "load_tensors:      Vulkan0 model buffer size =  5115.49 MiB\n",
     "load_tensors:   CPU_Mapped model buffer size =   344.44 MiB\n",
+    "llama_kv_cache_unified:    Vulkan0 KV buffer size =   256.00 MiB\n",
+    "llama_context:      Vulkan0 compute buffer size =   258.50 MiB\n",
+    "llama_context:  Vulkan_Host compute buffer size =    12.01 MiB\n",
 ]
 
 CPU_LOG = [
@@ -59,6 +62,21 @@ def test_parses_offloaded_layers_and_buffers():
     assert parsed["model_buffer_mib"] == {"Vulkan0": 5115.49, "CPU_Mapped": 344.44}
 
 
+def test_parses_kv_and_compute_buffers():
+    """A long context can put more on the card than the weights do, which is
+    how a model that "fits" still spills. Report it separately."""
+    parsed = _parse_load_log(VULKAN_LOG)
+    assert parsed["kv_buffer_mib"] == {"Vulkan0": 256.00}
+    assert parsed["compute_buffer_mib"] == {"Vulkan0": 258.50, "Vulkan_Host": 12.01}
+
+
+def test_kv_and_compute_buffers_do_not_change_the_device_verdict():
+    """Only the weight buffers decide where the model ran."""
+    devices = [{"name": "Vulkan0", "description": "AMD Radeon RX 6600 XT", "type": "gpu"}]
+    summary = _runtime(_report(VULKAN_LOG, devices)).inference_summary()
+    assert summary["device_kind"] == "gpu"
+
+
 def test_a_cpu_load_reports_no_offload_line():
     parsed = _parse_load_log(CPU_LOG)
     assert parsed["offloaded_layers"] is None
@@ -67,7 +85,13 @@ def test_a_cpu_load_reports_no_offload_line():
 
 def test_unrelated_log_lines_are_ignored():
     parsed = _parse_load_log(["llama_model_loader: loaded meta data\n", "print_info: n_ctx = 4096\n"])
-    assert parsed == {"offloaded_layers": None, "total_layers": None, "model_buffer_mib": None}
+    assert parsed == {
+        "offloaded_layers": None,
+        "total_layers": None,
+        "model_buffer_mib": None,
+        "kv_buffer_mib": None,
+        "compute_buffer_mib": None,
+    }
 
 
 # ---------------------------------------------------------------------------
