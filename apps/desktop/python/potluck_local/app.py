@@ -420,10 +420,44 @@ def main() -> None:
         default=int(os.environ.get("POTLUCK_PORT", "8321")),
         help="Port to listen on (default 8321)",
     )
+    parser.add_argument(
+        "--probe-inference-backend",
+        metavar="LIB_DIR",
+        default=None,
+        help=(
+            "Load the llama.cpp backend set in LIB_DIR, print what it reports as "
+            "JSON, and exit. The sidecar re-invokes itself this way so a GPU "
+            "backend that cannot load takes down a throwaway process instead of "
+            "the sidecar."
+        ),
+    )
     args = parser.parse_args()
+
+    if args.probe_inference_backend:
+        import json as _json
+        from pathlib import Path as _Path
+
+        from potluck_local.services.llama_backend import probe_lib_dir
+
+        print(_json.dumps(probe_lib_dir(_Path(args.probe_inference_backend))))
+        return
 
     dev_mode = os.environ.get("POTLUCK_DEV", "0") == "1"
     setup_logging(dev=dev_mode)
+
+    # Decide which llama.cpp backend set this process loads, before anything
+    # imports llama_cpp (the library resolves its native library at import
+    # time). On platforms that ship a single backend set this is a no-op.
+    from potluck_local.services.llama_backend import select_backend
+
+    selection = select_backend()
+    logger.info(
+        "inference_backend backend=%s lib_dir=%s probed=%s reason=%s",
+        selection.backend,
+        selection.lib_dir or "(wheel default)",
+        selection.probed,
+        selection.reason,
+    )
 
     app = create_app()
     # Bind to all interfaces so household-mesh peers can dial us over the

@@ -4,7 +4,18 @@ fastapi==0.115.*
 # (which ships the breaking Router-init signature) or 1.0 (which dropped on_startup entirely).
 starlette>=0.40,<0.47
 uvicorn[standard]==0.34.*
-llama-cpp-python==0.3.*
+# On Windows the wheel resolved here is CPU only: its llama_cpp/lib holds
+# ggml-cpu.dll and nothing else, so llama_supports_gpu_offload() is false and
+# n_gpu_layers has nothing to offload to. That is the fallback backend. The GPU
+# backend set is vendored separately, pinned by URL + SHA-256, by
+# scripts/vendor_gpu_backend.py, which build.py runs before PyInstaller.
+#
+# Windows is pinned exactly because the vendored native libraries must match
+# this wrapper's ctypes declarations: a floating 0.3.* could resolve a version
+# the vendored set was not built against. Bump the two together, never one.
+# macOS (Metal) and Linux keep the existing range; they are not affected.
+llama-cpp-python==0.3.35 ; sys_platform == "win32"
+llama-cpp-python==0.3.* ; sys_platform != "win32"
 httpx==0.28.*
 psutil==6.1.*
 GPUtil==1.4.*

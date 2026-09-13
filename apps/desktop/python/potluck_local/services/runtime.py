@@ -17,11 +17,81 @@ import asyncio
 import atexit
 import json
 import logging
+import re
 import threading
 import time
+from collections import deque
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# llama.cpp reports what it actually did while loading a model. These are the
+# lines that carry it. Parsing the engine's own output is the only way to say
+# where the weights ended up without guessing from installed hardware.
+_OFFLOAD_RE = re.compile(r"offloaded (\d+)/(\d+) layers to GPU")
+_BUFFER_RE = re.compile(r"load_tensors:\s+(\S+) model buffer size =\s+([\d.]+) MiB")
+
+# Ring buffer of llama.cpp log lines, so a load report can be built after the
+# fact without leaving a callback that swallows the library's own logging.
+_LOG_LINES: deque[str] = deque(maxlen=400)
+_LOG_CALLBACK = None  # keeps the ctypes trampoline alive for the process
+
+
+def _install_log_capture() -> None:
+    """Tee llama.cpp's log into a ring buffer, keeping its stderr behaviour.
+
+    llama-cpp-python installs its own global callback at import time which
+    prints to stderr when the "llama-cpp-python" logger is verbose enough.
+    Replacing it outright would silence the library, so this reproduces that
+    gating and captures the text on the way past. Idempotent.
+    """
+    global _LOG_CALLBACK
+    if _LOG_CALLBACK is not None:
+        return
+    import ctypes
+    import sys as _sys
+
+    import llama_cpp
+
+    try:
+        from llama_cpp._logger import GGML_LOG_LEVEL_TO_LOGGING_LEVEL as _LEVELS
+        from llama_cpp._logger import logger as _lib_logger
+    except Exception:  # noqa: BLE001 - private module; capture still works
+        _LEVELS, _lib_logger = {}, None
+
+    @llama_cpp.llama_log_callback
+    def _callback(level, text, user_data):  # noqa: ANN001
+        try:
+            decoded = text.decode("utf-8", "replace") if text else ""
+        except Exception:  # noqa: BLE001
+            return
+        _LOG_LINES.append(decoded)
+        if _lib_logger is not None:
+            mapped = _LEVELS.get(level)
+            if mapped is not None and _lib_logger.level <= mapped:
+                print(decoded, end="", flush=True, file=_sys.stderr)
+
+    llama_cpp.llama_log_set(_callback, ctypes.c_void_p(0))
+    _LOG_CALLBACK = _callback
+
+
+def _parse_load_log(lines: list[str]) -> dict:
+    """Pull layer placement and per-device buffer sizes out of llama.cpp's log."""
+    offloaded: int | None = None
+    total_layers: int | None = None
+    buffers: dict[str, float] = {}
+    for line in lines:
+        m = _OFFLOAD_RE.search(line)
+        if m:
+            offloaded, total_layers = int(m.group(1)), int(m.group(2))
+        m = _BUFFER_RE.search(line)
+        if m:
+            buffers[m.group(1)] = float(m.group(2))
+    return {
+        "offloaded_layers": offloaded,
+        "total_layers": total_layers,
+        "model_buffer_mib": buffers or None,
+    }
 
 
 class LLMRuntime:
@@ -45,6 +115,10 @@ class LLMRuntime:
         # loads so the Models page + peer rows can show "last bench" without
         # re-running. Populated by benchmark().
         self._benchmarks: dict[str, dict] = {}
+        # What llama.cpp reported while loading the current model: which
+        # backend was selected, how many layers it actually put on the GPU,
+        # and the per-device weight buffers. None when nothing is loaded.
+        self._load_report: dict | None = None
         # Ensure unload runs before ggml-metal's atexit finalize on process exit.
         self._atexit_registered = False
 
@@ -79,6 +153,72 @@ class LLMRuntime:
         """Last benchmark result keyed by model_id (tokens/sec + TTFT)."""
         return dict(self._benchmarks)
 
+    def inference_summary(self) -> dict | None:
+        """Where the loaded model is actually executing, as llama.cpp reported it.
+
+        None when no model is loaded through the llama.cpp path. The shape is
+        the additive `inference` block described in the companion readiness
+        contract, and `execution_verified` is true only when the engine's own
+        load output accounted for this exact model's weights. A detected
+        graphics card, a backend that supports offload, or a requested layer
+        count are not evidence and never set it.
+        """
+        report = self._load_report
+        if not report or self._model is None:
+            return None
+
+        buffers: dict[str, float] = report.get("model_buffer_mib") or {}
+        offloaded = report.get("offloaded_layers")
+        total = report.get("total_layers")
+
+        # Evidence is the per-device weight buffers llama.cpp printed for this
+        # load. Without them we know nothing and say so.
+        verified = bool(buffers)
+
+        # "CUDA_Host" / "Vulkan_Host" are pinned system memory, not device memory.
+        gpu_buffers = {
+            k: v
+            for k, v in buffers.items()
+            if not k.upper().startswith("CPU") and "HOST" not in k.upper()
+        }
+        if not verified:
+            device_kind = "unknown"
+        elif offloaded is not None and total:
+            device_kind = "gpu" if offloaded >= total else ("cpu" if offloaded == 0 else "mixed")
+        else:
+            device_kind = "gpu" if gpu_buffers else "cpu"
+
+        # The buffer name is the ggml device name ("Vulkan0", "CUDA0", "Metal",
+        # "CPU_Mapped"), so the backend label comes from the engine too.
+        backend = "cpu"
+        device_name = "unknown"
+        selection = report.get("backend_selection") or {}
+        devices = {d.get("name"): d for d in (selection.get("devices") or [])}
+        if gpu_buffers:
+            primary = max(gpu_buffers, key=lambda k: gpu_buffers[k])
+            backend = re.sub(r"\d+$", "", primary).lower() or "gpu"
+            device_name = (devices.get(primary) or {}).get("description") or primary
+        else:
+            cpu_dev = devices.get("CPU") or {}
+            device_name = cpu_dev.get("description") or "CPU"
+
+        return {
+            "schema_version": 1,
+            "model_id": self._model_id,
+            "execution_verified": verified,
+            "device_kind": device_kind,
+            "device_name": device_name,
+            "backend": backend,
+        }
+
+    def inference_details(self) -> dict | None:
+        """The full load report behind `inference_summary`, for the diagnostics UI."""
+        if not self._load_report or self._model is None:
+            return None
+        details = dict(self._load_report)
+        details["summary"] = self.inference_summary()
+        return details
+
     def load_model(
         self,
         model_path: str,
@@ -97,11 +237,36 @@ class LLMRuntime:
         free memory. This is "Big Model Mode" — used when a model is too
         large to fit on any single household machine alone.
         """
+        from potluck_local.services import llama_backend
+
+        # Decided once per process, before llama_cpp is imported anywhere.
+        selection = llama_backend.current_selection()
+
         from llama_cpp import Llama  # lazy import — avoids Metal init at import time
+
+        _install_log_capture()
 
         with self._load_lock:
             if self._model is not None:
                 self._release_model()
+
+            requested_gpu_layers = n_gpu_layers
+            plan = None
+            if selection.probed and selection.backend != "cpu":
+                # A backend this module selected after a probe: size the offload
+                # against VRAM that is free right now. Everywhere else (macOS
+                # Metal, the Linux build) keeps the caller's value untouched.
+                plan = llama_backend.plan_gpu_layers(
+                    model_path, requested=n_gpu_layers, devices=llama_backend.describe_devices()
+                )
+                n_gpu_layers = plan.n_gpu_layers
+                if plan.n_gpu_layers != requested_gpu_layers:
+                    logger.info(
+                        "gpu_offload_planned requested=%s using=%s reason=%s",
+                        requested_gpu_layers,
+                        plan.n_gpu_layers,
+                        plan.reason,
+                    )
 
             start = time.monotonic()
             effective_threads = n_threads or 0
@@ -118,14 +283,23 @@ class LLMRuntime:
                 # llama-cpp-python wheels that don't accept the kwarg.
                 kwargs["rpc_servers"] = rpc_servers
 
+            _LOG_LINES.clear()
             model = Llama(**kwargs)
             elapsed = round(time.monotonic() - start, 2)
+            load_log = _parse_load_log(list(_LOG_LINES))
 
             self._model = model
             self._model_path = model_path
             self._model_id = Path(model_path).parent.name
             self._loaded_n_ctx = n_ctx
             self._loaded_rpc_servers = tuple(rpc_servers) if rpc_servers else None
+            self._load_report = {
+                "backend_selection": selection.as_dict(),
+                "requested_n_gpu_layers": requested_gpu_layers,
+                "used_n_gpu_layers": n_gpu_layers,
+                "offload_plan": plan.as_dict() if plan else None,
+                **load_log,
+            }
             # Register after Llama() so our atexit runs before ggml-metal's
             # (atexit is LIFO). Prevents the macOS "python quit unexpectedly /
             # Reopen" dialog when Metal finalize races process exit.
@@ -135,13 +309,16 @@ class LLMRuntime:
 
             logger.info(
                 "model_loaded model_id=%s n_ctx=%d n_gpu_layers=%d n_threads=%s "
-                "rpc_servers=%s load_time=%.2fs",
+                "rpc_servers=%s load_time=%.2fs backend=%s offloaded=%s/%s",
                 self._model_id,
                 n_ctx,
                 n_gpu_layers,
                 effective_threads or "auto",
                 ",".join(rpc_servers) if rpc_servers else "(none)",
                 elapsed,
+                selection.backend,
+                load_log.get("offloaded_layers"),
+                load_log.get("total_layers"),
             )
 
             return {
@@ -152,6 +329,7 @@ class LLMRuntime:
                 "n_gpu_layers": n_gpu_layers,
                 "n_threads": effective_threads or None,
                 "rpc_servers": list(rpc_servers) if rpc_servers else None,
+                "inference": self.inference_summary(),
             }
 
     def load_pipeline(
@@ -400,6 +578,7 @@ class LLMRuntime:
             self._model_id = None
             self._loaded_n_ctx = None
             self._loaded_rpc_servers = None
+            self._load_report = None
             close = getattr(model, "close", None)
             if callable(close):
                 try:

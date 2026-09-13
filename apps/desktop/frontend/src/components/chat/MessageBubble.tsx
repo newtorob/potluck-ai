@@ -3,7 +3,8 @@
  *
  * User messages: right-aligned, primary-tinted bubble.
  * Assistant messages: left-aligned, card bubble with markdown + code highlighting.
- * Error messages: left-aligned, destructive-tinted bubble with "Load a model" CTA.
+ * Error messages: left-aligned, destructive-tinted bubble with a recovery CTA
+ *   matched to the failure (see lib/chatErrorRecovery).
  * Streaming: editorial caret (▎) with caret-blink while status === 'streaming'.
  * Hover: copy-to-clipboard button.
  *
@@ -24,6 +25,7 @@ import { Network, Cpu, Home } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { SafeExternalLink } from '@/components/ui/SafeExternalLink';
 import type { AppMessage } from '@/stores/chatStore';
+import { classifyChatError } from '@/lib/chatErrorRecovery';
 
 interface MessageBubbleProps {
   message: AppMessage;
@@ -356,9 +358,9 @@ function ErrorContent({ message }: { message: AppMessage }) {
   // so it is only trusted once it is actually a string. Anything else is
   // treated as absent rather than allowed to throw on .toLowerCase().
   const errorText = typeof message.errorText === 'string' ? message.errorText : null;
-  const lowered = errorText?.toLowerCase() ?? '';
-  const isNoModelError =
-    lowered.includes('no model') || lowered.includes('503') || lowered.includes('not loaded');
+  // Not every 503 is a missing model: routing failures share the status code,
+  // and sending someone to the model library cannot fix a peer that dropped.
+  const recovery = classifyChatError(errorText);
   // A reply can fail after tokens have already been read. Those tokens are the
   // answer the user has; the error line explains why it stops there.
   const hasPartialAnswer = message.content.length > 0;
@@ -381,17 +383,17 @@ function ErrorContent({ message }: { message: AppMessage }) {
           {errorText ?? 'This reply did not finish.'}
         </p>
       </div>
-      {isNoModelError && (
+      {recovery.action && (
         <button
           type="button"
-          onClick={() => navigate('/models')}
+          onClick={() => navigate(recovery.route)}
           className={cn(
             'self-start rounded-md border border-destructive/40 bg-destructive/5 px-3 py-1 text-xs font-medium',
             'hover:bg-destructive/10 transition-colors duration-fast',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           )}
         >
-          Load a model
+          {recovery.label}
         </button>
       )}
     </div>

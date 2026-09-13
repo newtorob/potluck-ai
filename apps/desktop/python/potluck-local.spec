@@ -1,4 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
+import importlib.util
+from pathlib import Path
+
 from PyInstaller.utils.hooks import collect_all
 
 datas = [('potluck_local/data/models.json', 'potluck_local/data')]
@@ -21,6 +24,34 @@ hiddenimports = [
 # llama_cpp ships compiled C++ extensions + Metal/CUDA dylibs — collect-all is required.
 tmp_ret = collect_all('llama_cpp')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+
+# Extra backend sets installed by scripts/vendor_gpu_backend.py: on Windows,
+# llama_cpp/lib-vulkan beside the CPU-only llama_cpp/lib. The app picks one at
+# runtime via LLAMA_CPP_LIB_PATH (see services/llama_backend.py).
+#
+# These are copied verbatim as datas rather than left to binary analysis, for
+# three reasons: ggml-base.dll and llama.dll differ between the two sets and
+# must not be deduplicated by basename; ggml-vulkan.dll imports vulkan-1.dll,
+# which belongs to the user's graphics driver and must never be vendored out
+# of System32; and PyInstaller has no reason to rewrite libraries that are
+# loaded by explicit path at runtime.
+def _is_extra_backend(entry):
+    dest = str(entry[1]).replace('\\', '/')
+    return dest.startswith('llama_cpp/lib-')
+
+
+datas = [d for d in datas if not _is_extra_backend(d)]
+binaries = [b for b in binaries if not _is_extra_backend(b)]
+
+_llama_spec = importlib.util.find_spec('llama_cpp')
+if _llama_spec and _llama_spec.origin:
+    _llama_pkg = Path(_llama_spec.origin).parent
+    for _backend_dir in sorted(_llama_pkg.glob('lib-*')):
+        if not _backend_dir.is_dir():
+            continue
+        for _f in sorted(_backend_dir.iterdir()):
+            if _f.is_file():
+                datas.append((str(_f), f'llama_cpp/{_backend_dir.name}'))
 
 # sentence_transformers pulls in transformers, tokenizers, and model data.
 tmp_ret = collect_all('sentence_transformers')

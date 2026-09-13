@@ -40,6 +40,56 @@ async def health() -> dict[str, object]:
         # false on the single-stream + llama.cpp paths. The frontend reads this as the
         # source of truth for the shared-batching toggle.
         "continuous_batch": runtime.continuous_batch_active(),
+        # Where the loaded model is actually executing, as llama.cpp reported
+        # it during this exact load. Null when no llama.cpp model is loaded.
+        # `execution_verified` is only true on runtime evidence; a detected
+        # graphics card or a requested layer count never sets it. Carries no
+        # paths, prompts or credentials. Companion clients read this and treat
+        # a missing block as device "unknown".
+        "inference": runtime.inference_summary(),
+    }
+
+
+@router.get("/health/inference")
+async def inference_diagnostics() -> dict[str, object]:
+    """Backend, devices and measured speed for the loaded model.
+
+    Separates three things the app used to conflate: what this build can do,
+    what was asked for, and what actually happened. Anything not measurable
+    right now is null rather than inferred.
+    """
+    from potluck_local.services import llama_backend
+
+    runtime = get_runtime()
+    selection = llama_backend.current_selection()
+
+    build: dict[str, object] = {
+        "backend": selection.backend,
+        "reason": selection.reason,
+        "probed": selection.probed,
+        "available_backends": sorted(llama_backend.available_backends()),
+    }
+    try:
+        import llama_cpp
+
+        build["wrapper_version"] = getattr(llama_cpp, "__version__", None)
+        build["supports_gpu_offload"] = bool(llama_cpp.llama_supports_gpu_offload())
+        devices = llama_backend.describe_devices()
+    except Exception:  # noqa: BLE001 - diagnostics must not fail the request
+        build["wrapper_version"] = None
+        build["supports_gpu_offload"] = None
+        devices = selection.devices
+
+    model_id = runtime.current_model_id()
+    benchmark = runtime.benchmarks().get(model_id) if model_id else None
+
+    return {
+        "build": build,
+        "devices": devices,
+        "loaded": runtime.inference_details(),
+        # Last measured speed for this model, from POST /models/{slug}/benchmark.
+        # Null until one has been run: nothing here is estimated.
+        "benchmark": benchmark,
     }
 
 
