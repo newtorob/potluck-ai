@@ -73,7 +73,12 @@ if [ "$DRY" = "--dry-run" ]; then
   echo "==> DRY RUN — nothing will be uploaded."
 fi
 
-echo "==> Uploading to ${REMOTE}:${BUCKET} (bucket root)"
+# Two passes, on purpose. The update feed names an artifact by URL, so a feed
+# that lands before its installer points every polling client at a 404. rclone
+# transfers in parallel and a 349-byte yml finishes long before a 466 MB exe,
+# so uploading both in one pass leaves exactly that window open. Artifacts
+# first, feed second: a stale feed is harmless, a dangling one is not.
+echo "==> Uploading artifacts to ${REMOTE}:${BUCKET} (bucket root)"
 # shellcheck disable=SC2086 -- DRY_FLAG is intentionally unquoted (empty or --dry-run)
 rclone copy "$OUT" "${REMOTE}:${BUCKET}" \
   --max-depth 1 \
@@ -81,6 +86,12 @@ rclone copy "$OUT" "${REMOTE}:${BUCKET}" \
   --include "*.zip" \
   --include "*.exe" \
   --include "*.blockmap" \
+  --progress $DRY_FLAG
+
+echo "==> Uploading the update feed"
+# shellcheck disable=SC2086
+rclone copy "$OUT" "${REMOTE}:${BUCKET}" \
+  --max-depth 1 \
   --include "latest*.yml" \
   --progress $DRY_FLAG
 
