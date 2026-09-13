@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
-# Publish a freshly-built macOS release to the R2 bucket behind
+# Publish a freshly-built release to the R2 bucket behind
 # releases.trypotluck.ai so the in-app auto-updater can find it.
 #
 # The desktop app updates via electron-updater with a `generic` provider
 # pointed at https://releases.trypotluck.ai (apps/desktop/electron/package.json
 # -> build.publish). For that to work, the bucket ROOT must serve:
-#   - latest-mac.yml            the update feed electron-updater polls
-#   - *-mac.zip (+ .blockmap)   the artifact the updater downloads & applies
+#   - latest-mac.yml / latest.yml / latest-linux.yml   the update feed
+#                               electron-updater polls, one per platform
+#   - *-mac.zip (+ .blockmap)   the artifact the macOS updater applies
 #   - *.dmg     (+ .blockmap)   the fresh-install download (install page link)
-# electron-builder emits all of these into apps/desktop/electron/out/ during a
-# full `make installer-mac`.
+#   - *.exe     (+ .blockmap)   the Windows installer, and what its updater
+#                               applies
+# electron-builder emits these into apps/desktop/electron/out/ during a full
+# `make installer-mac` or `scripts/build-windows-installer.ps1`. Run this from
+# the host that produced the build: each platform builds on its own machine, so
+# the bucket is only ever updated for the platform you just built.
 #
 # PREREQS
 #   1. A signed + notarized build:
@@ -57,7 +62,7 @@ if [ -z "$(find "$OUT" -maxdepth 1 -name 'latest*.yml' -print -quit)" ]; then
 fi
 
 echo "==> Artifacts to publish from $OUT:"
-find "$OUT" -maxdepth 1 \( -name '*.dmg' -o -name '*.zip' -o -name '*.blockmap' -o -name 'latest*.yml' \) \
+find "$OUT" -maxdepth 1 \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.blockmap' -o -name 'latest*.yml' \) \
   -exec basename {} \; | sort | sed 's/^/    /'
 
 # Plain string (not an array): macOS bash 3.2 errors on "${arr[@]}" for an
@@ -74,11 +79,12 @@ rclone copy "$OUT" "${REMOTE}:${BUCKET}" \
   --max-depth 1 \
   --include "*.dmg" \
   --include "*.zip" \
+  --include "*.exe" \
   --include "*.blockmap" \
   --include "latest*.yml" \
   --progress $DRY_FLAG
 
 echo ""
 echo "==> Done. Verify the feed is live:"
-echo "      curl -sI https://releases.trypotluck.ai/latest-mac.yml"
+echo "      curl -sI https://releases.trypotluck.ai/latest-mac.yml   # or latest.yml on Windows"
 echo "    and that it lists the version you just built."
