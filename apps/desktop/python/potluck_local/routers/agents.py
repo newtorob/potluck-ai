@@ -30,8 +30,16 @@ from potluck_local.services.memory_db import (
     session_tool_calls,
 )
 
+from potluck_local.services.memory_safety import redact_credentials
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _memory_preview(content: str) -> str:
+    # Redact before truncating, including credentials spanning the cutoff.
+    safe = redact_credentials(content)
+    return safe[:200] + ("…" if len(safe) > 200 else "")
 
 
 def _deserialize_session(row: dict[str, Any]) -> dict[str, Any]:
@@ -182,7 +190,7 @@ async def export_session_trace(session_id: str) -> Response:
             memories = [
                 {
                     "id": r["id"],
-                    "preview": r["content"][:200] + ("…" if len(r["content"]) > 200 else ""),
+                    "preview": _memory_preview(r["content"]),
                     "category": r["category"],
                     "project": r["project"],
                     "created_at": r["created_at"],
@@ -366,7 +374,7 @@ async def memory_previews(req: MemoryPreviewRequest) -> list[dict]:
     return [
         {
             "id": r["id"],
-            "preview": (r["content"][:200] + ("…" if len(r["content"]) > 200 else "")),
+            "preview": _memory_preview(r["content"]),
             "category": r["category"],
             "project": r["project"],
             "created_at": r["created_at"],

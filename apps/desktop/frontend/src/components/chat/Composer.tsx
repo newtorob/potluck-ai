@@ -240,13 +240,13 @@ function ComposerHint({ isStreaming, modelLoaded, routingScope }: ComposerHintPr
   } else {
     body = (
       <>
-        Runs on this machine. Nothing leaves your device.
+        This chat runs on this machine. Your messages stay here.
       </>
     );
   }
 
   return (
-    <p className="mx-auto mt-2 flex max-w-3xl items-center justify-center gap-1.5 text-[11px] text-muted-foreground/60">
+    <p className="mx-auto mt-2 flex max-w-3xl items-center justify-center gap-1.5 text-xs text-muted-foreground">
       {body}
     </p>
   );

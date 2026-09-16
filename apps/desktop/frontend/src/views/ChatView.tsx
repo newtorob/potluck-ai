@@ -10,7 +10,8 @@
 
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Thermometer, Hash, Layers, Cpu, Home, Globe, Users, ChevronDown, Check } from 'lucide-react';
+import { Thermometer, Hash, Layers, Cpu, Home, Globe, Users, ChevronDown, Check, SlidersHorizontal } from 'lucide-react';
+import { getConnectedPeers } from '@/lib/meshDiagnostics';
 import { cn } from '@/components/ui/cn';
 import { MessageList } from '@/components/chat/MessageList';
 import { Composer } from '@/components/chat/Composer';
@@ -85,8 +86,9 @@ export function ChatView() {
   // Household-peer availability — mesh store polls the sidecar; we gate
   // the household tier on having at least one reachable peer.
   const householdPeersReachable = useMeshStore(
-    (s) => s.peers.some((p) => p.reachable),
+    (s) => getConnectedPeers(s).length > 0,
   );
+  const meshBridge = useMeshStore((s) => s.bridge);
   // Start the mesh store on mount so the selector has live data even when
   // the user hasn't visited /household yet. start() is idempotent.
   const meshStart = useMeshStore((s) => s.start);
@@ -107,10 +109,10 @@ export function ChatView() {
 
   // Auto-clear household scope if no peers are reachable anymore.
   useEffect(() => {
-    if (routingScope === 'household' && !householdPeersReachable) {
+    if (routingScope === 'household' && meshBridge !== 'unknown' && !householdPeersReachable) {
       setRoutingScope('local');
     }
-  }, [routingScope, householdPeersReachable, setRoutingScope]);
+  }, [routingScope, meshBridge, householdPeersReachable, setRoutingScope]);
 
   // Send is possible when there's an inference path: local model, a
   // reachable household peer, a reachable coordinator (cooperative), or a
@@ -127,7 +129,7 @@ export function ChatView() {
   }
 
   function goToHardwareSettings() {
-    navigate('/settings#hardware');
+    navigate('/settings?tab=hardware');
   }
 
   return (
@@ -154,56 +156,73 @@ export function ChatView() {
               onCircleChange={setActiveCircleId}
             />
 
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <InfoChip
-                icon={<Thermometer className="h-3 w-3" />}
-                aria-label="Edit temperature in settings"
-                onClick={goToHardwareSettings}
-              >
-                {!settingsLoaded || !settings ? (
-                  <span className="inline-block h-3 w-6 animate-hearth-pulse rounded bg-muted" aria-hidden="true" />
-                ) : (
-                  // Temperatures above the valid 0–2 range are a "use the model's
-                  // own default" sentinel (e.g. 999) — show that, not the raw number.
-                  settings.runtime.temperature > 2
-                    ? 'Temp default'
-                    : `Temp ${settings.runtime.temperature.toFixed(1)}`
-                )}
-              </InfoChip>
-
-              <InfoChip
-                icon={<Hash className="h-3 w-3" />}
-                aria-label="Edit max output tokens in settings"
-                onClick={goToHardwareSettings}
-              >
-                {!settingsLoaded || !settings ? (
-                  <span className="inline-block h-3 w-8 animate-hearth-pulse rounded bg-muted" aria-hidden="true" />
-                ) : (
-                  `Max ${settings.runtime.max_tokens.toLocaleString()}`
-                )}
-              </InfoChip>
-
-              <InfoChip
-                icon={<Layers className="h-3 w-3" />}
-                aria-label="Edit context size in settings"
-                onClick={goToHardwareSettings}
-              >
-                {!settingsLoaded || !settings ? (
-                  <span className="inline-block h-3 w-8 animate-hearth-pulse rounded bg-muted" aria-hidden="true" />
-                ) : nCtxLoaded != null ? (
-                  `Ctx ${nCtxLoaded.toLocaleString()}`
-                ) : (
-                  <span
-                    className="italic opacity-50"
-                    title="Applies when a model is loaded"
+            <details
+              className="relative"
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.currentTarget.open = false;
+                  event.currentTarget.querySelector('summary')?.focus();
+                }
+              }}
+            >
+              <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+                Options
+              </summary>
+              <div className="absolute right-0 top-full z-30 mt-2 w-64 rounded-lg border border-border bg-popover p-3 shadow-hearth">
+                <p className="mb-3 text-xs font-medium text-popover-foreground">Generation settings</p>
+                <div className="flex flex-col items-stretch gap-2 text-xs text-muted-foreground">
+                  <InfoChip
+                    icon={<Thermometer className="h-3 w-3" />}
+                    aria-label="Edit temperature in settings"
+                    onClick={goToHardwareSettings}
                   >
-                    {settings.runtime.context_size === 0
-                      ? 'Ctx auto'
-                      : `Ctx ${settings.runtime.context_size.toLocaleString()}`}
-                  </span>
-                )}
-              </InfoChip>
-            </div>
+                    {!settingsLoaded || !settings ? (
+                      <span className="inline-block h-3 w-6 animate-hearth-pulse rounded bg-muted" aria-hidden="true" />
+                    ) : (
+                      // Temperatures above the valid 0–2 range are a "use the model's
+                      // own default" sentinel (e.g. 999) — show that, not the raw number.
+                      settings.runtime.temperature > 2
+                        ? 'Temp default'
+                        : `Temp ${settings.runtime.temperature.toFixed(1)}`
+                    )}
+                  </InfoChip>
+
+                  <InfoChip
+                    icon={<Hash className="h-3 w-3" />}
+                    aria-label="Edit max output tokens in settings"
+                    onClick={goToHardwareSettings}
+                  >
+                    {!settingsLoaded || !settings ? (
+                      <span className="inline-block h-3 w-8 animate-hearth-pulse rounded bg-muted" aria-hidden="true" />
+                    ) : (
+                      `Max ${settings.runtime.max_tokens.toLocaleString()}`
+                    )}
+                  </InfoChip>
+
+                  <InfoChip
+                    icon={<Layers className="h-3 w-3" />}
+                    aria-label="Edit context size in settings"
+                    onClick={goToHardwareSettings}
+                  >
+                    {!settingsLoaded || !settings ? (
+                      <span className="inline-block h-3 w-8 animate-hearth-pulse rounded bg-muted" aria-hidden="true" />
+                    ) : nCtxLoaded != null ? (
+                      `Ctx ${nCtxLoaded.toLocaleString()}`
+                    ) : (
+                      <span
+                        className="text-muted-foreground"
+                        title="Applies when a model is loaded"
+                      >
+                        {settings.runtime.context_size === 0
+                          ? 'Ctx auto'
+                          : `Ctx ${settings.runtime.context_size.toLocaleString()}`}
+                      </span>
+                    )}
+                  </InfoChip>
+                </div>
+              </div>
+            </details>
           </>
         }
       />
@@ -470,7 +489,7 @@ function ScopeSelector({
                     <Check className="h-3 w-3 shrink-0 text-primary" aria-hidden="true" />
                   )}
                 </div>
-                <p className="pl-[22px] text-[11px] leading-snug text-muted-foreground">
+                <p className="pl-[22px] text-xs leading-snug text-muted-foreground">
                   {tier.unavailableReason !== undefined
                     ? tier.unavailableReason
                     : tier.hint}
@@ -711,7 +730,7 @@ function EmptyState({ modelLoaded, onSelectPrompt, onGoToModels }: EmptyStatePro
             >
               <span>{prompt}</span>
               <span
-                className="font-serif italic text-sm text-muted-foreground/70 group-hover:text-primary transition-colors duration-fast"
+                className="font-serif italic text-sm text-muted-foreground group-hover:text-primary transition-colors duration-fast"
                 aria-hidden="true"
               >
                 ask &rarr;

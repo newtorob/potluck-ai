@@ -31,7 +31,6 @@ import type { FleetSummary, MyJobStats, CreditBalance, CreditHistory, CreditHist
 import { relativeTime } from '@/lib/timeFormat';
 import { formatModelName } from '@/lib/modelName';
 import { ViewHeader } from '@/components/layout/ViewHeader';
-import { EmptyState } from '@/components/layout/EmptyState';
 import {
   classifyCoordinatorError,
   defaultCoordinatorErrorCopy,
@@ -180,32 +179,19 @@ export function NetworkView() {
   // the whole page to a single "no peers" message hid everything that is
   // actually about you.
 
-  if (fleetError !== null && fleet === null) {
-    return (
-      <div className="flex h-full flex-col">
-        <NetworkHeader fleet={null} />
-        <EmptyState
-          icon={Globe2}
-          tone="warning"
-          title="Can't reach the network right now"
-          description={
-            <>
-              Potluck can't reach the coordinator. Check your internet connection.
-              Local chat still works. Network and circle routing resume once the connection is back.
-            </>
-          }
-        />
-      </div>
-    );
-  }
-
   // ---- normal state ------------------------------------------------------
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <NetworkHeader fleet={fleet} balance={balance} />
+      <NetworkHeader fleet={fleet} balance={balance} unavailable={fleetError !== null} />
 
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6 space-y-8">
+        {fleetError && (
+          <div role="alert" className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+            Network status is unavailable. Local chat and your contribution controls are still available.
+            <button type="button" onClick={() => void fetchFleetRef.current()} className="ml-2 rounded underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Retry</button>
+          </div>
+        )}
         {/* Contribute toggle — the persistent home for contributor_mode.
             Onboarding sets it too, but this is where a member turns serving on
             or off after setup (household + open-pool requests both gate on it). */}
@@ -219,7 +205,7 @@ export function NetworkView() {
             own sections below still render either way. */}
         {fleet !== null && !hasPeers ? (
           <FirstPeerPanel />
-        ) : (
+        ) : fleet !== null ? (
           <>
             {/* Aggregate fleet card */}
             <section aria-label="Aggregate fleet stats">
@@ -233,7 +219,7 @@ export function NetworkView() {
               <ModelChips models={fleet?.models ?? []} />
             </section>
           </>
-        )}
+        ) : null}
 
         {/* Your usage */}
         <section aria-label="Your usage">
@@ -269,7 +255,7 @@ export function NetworkView() {
 
         {/* Privacy footer */}
         <p
-          className="pt-2 text-[11px] text-muted-foreground/70 max-w-2xl"
+          className="pt-2 text-xs text-muted-foreground max-w-2xl"
           aria-label="Privacy note"
         >
           The network numbers above are aggregate. We never show which specific peer
@@ -289,7 +275,9 @@ export function NetworkView() {
 function NetworkHeader({
   fleet,
   balance,
+  unavailable = false,
 }: {
+  unavailable?: boolean;
   fleet: FleetSummary | null;
   balance?: CreditBalance | null;
 }) {
@@ -305,6 +293,7 @@ function NetworkHeader({
     <ViewHeader
       eyebrow="Member-operated"
       title="Network"
+      actions={<Link to="/circles" className="rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Trusted circles</Link>}
       description={
         <span className="flex flex-col gap-1">
           <span>Compute other members are sharing right now, beyond your own machines.</span>
@@ -317,7 +306,7 @@ function NetworkHeader({
                 )}
                 aria-hidden="true"
               />
-              {isAlive
+              {unavailable ? 'Network status unavailable' : fleet === null ? 'Checking network…' : isAlive
                 ? `${onlineNow} member${onlineNow === 1 ? '' : 's'} online`
                 : 'Quiet, no members online right now'}
             </span>
@@ -341,7 +330,7 @@ function NetBalancePill({ net }: { net: string }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums',
+        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums',
         isPositive
           ? 'border-sage/30 bg-sage/10 text-sage dark:text-sage'
           : isNegative
@@ -385,21 +374,15 @@ function FirstPeerPanel() {
               </h3>
               <p className="max-w-xl text-sm text-muted-foreground">
                 No other members are online yet. This page fills in as contributors
-                join: who is online, which models they serve, and the jobs and tokens
+                join: how many are online, the available models, and the jobs and tokens
                 flowing across the network.
               </p>
             </div>
             <p className="max-w-xl text-sm text-muted-foreground">
-              You can be the first peer. Turn on{' '}
-              <span className="font-medium text-foreground">Allow open-pool routing</span> in{' '}
-              <Link
-                to="/settings"
-                className="underline underline-offset-2 hover:text-foreground"
-              >
-                Settings, Connect tools
-              </Link>{' '}
-              and your machine joins the pool, ready to serve other members when they
-              come online. Your own usage, contributions, and credits are below.
+              To offer this machine's loaded model to your own machines, enable{' '}
+              <span className="font-medium text-foreground">Contribute compute</span> above.
+              To ask the network for an answer, choose a network scope in Chat.
+              Your own usage, contributions, and credits are below.
             </p>
           </div>
         </div>
@@ -473,7 +456,7 @@ function StatCard({ icon: Icon, label, value, sub, emphasize, formatLarge }: Sta
         emphasize && !isIdle ? 'border-primary/30' : 'border-border/60',
       )}
     >
-      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <Icon className={cn('h-3 w-3', emphasize && !isIdle ? 'text-primary' : 'text-muted-foreground')} aria-hidden="true" />
         <span className="font-serif italic tracking-hearth-label">
           {label}
@@ -482,7 +465,7 @@ function StatCard({ icon: Icon, label, value, sub, emphasize, formatLarge }: Sta
       <p
         className={cn(
           'mt-1 font-serif tabular-nums leading-tight tracking-display text-3xl',
-          isIdle ? 'text-muted-foreground/40' : emphasize ? 'text-primary' : 'text-foreground',
+          isIdle ? 'text-muted-foreground' : emphasize ? 'text-primary' : 'text-foreground',
         )}
       >
         {display}
@@ -502,7 +485,7 @@ function ModelChips({ models }: { models: { slug: string; online_peer_count: num
 
   if (models.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground/70">
+      <p className="text-sm text-muted-foreground">
         No models currently advertised. Peers report what they serve when they
         connect; this populates as contributors come online.
       </p>
@@ -510,7 +493,7 @@ function ModelChips({ models }: { models: { slug: string; online_peer_count: num
   }
   return (
     <div className="space-y-2">
-      <p className="text-xs text-muted-foreground/70">
+      <p className="text-xs text-muted-foreground">
         Pick the model your network requests should use.
       </p>
       <div className="flex flex-wrap gap-2">
@@ -533,7 +516,7 @@ function ModelChips({ models }: { models: { slug: string; online_peer_count: num
               <span>{formatModelName(m.slug)}</span>
               <span
                 className={cn(
-                  'rounded-full px-1.5 text-[10px] font-medium tabular-nums',
+                  'rounded-full px-1.5 text-xs font-medium tabular-nums',
                   m.online_peer_count > 0
                     ? 'bg-sage/20 text-sage-foreground dark:text-sage'
                     : 'bg-muted text-muted-foreground',
@@ -557,7 +540,7 @@ function ModelChips({ models }: { models: { slug: string; online_peer_count: num
 function MyUsageCard({ stats }: { stats: MyJobStats | null }) {
   if (stats === null) {
     return (
-      <p className="text-sm text-muted-foreground/70">
+      <p className="text-sm text-muted-foreground">
         No requester stats available yet.
       </p>
     );
@@ -602,7 +585,7 @@ function MyUsageCard({ stats }: { stats: MyJobStats | null }) {
 
 /** Map a machine's canary reputation to an honest standing label. */
 function standing(reputation: number | null): { label: string; cls: string } {
-  if (reputation === null) return { label: 'New', cls: 'text-muted-foreground/60' };
+  if (reputation === null) return { label: 'New', cls: 'text-muted-foreground' };
   if (reputation <= 0) return { label: 'Flagged', cls: 'text-destructive' };
   if (reputation >= 0.95) return { label: 'Trusted', cls: 'text-sage' };
   return { label: 'Building', cls: 'text-muted-foreground' };
@@ -611,7 +594,7 @@ function standing(reputation: number | null): { label: string; cls: string } {
 function ContributionsCard({ data }: { data: ContributionsResponse | null }) {
   if (data === null) {
     return (
-      <p className="text-sm text-muted-foreground/70">Loading your machines' activity...</p>
+      <p className="text-sm text-muted-foreground">Loading your machines' activity...</p>
     );
   }
   if (data.machines.length === 0) {
@@ -625,7 +608,7 @@ function ContributionsCard({ data }: { data: ContributionsResponse | null }) {
     <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-border/60 text-left text-[11px] uppercase tracking-hearth-label text-muted-foreground">
+          <tr className="border-b border-border/60 text-left text-xs uppercase tracking-hearth-label text-muted-foreground">
             <th className="px-4 py-2 font-medium">Machine</th>
             <th className="px-4 py-2 text-left font-medium">Standing</th>
             <th className="px-4 py-2 text-right font-medium">Requests</th>
@@ -666,7 +649,7 @@ function ContributionsCard({ data }: { data: ContributionsResponse | null }) {
           </tr>
         </tfoot>
       </table>
-      <p className="border-t border-border/40 px-4 py-2 text-[11px] text-muted-foreground/70">
+      <p className="border-t border-border/40 px-4 py-2 text-xs text-muted-foreground">
         Credits are earned by serving other members. Requests you run on your own machines do not earn credits.
       </p>
     </div>
@@ -677,7 +660,7 @@ function SmallStat({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p
-        className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label"
+        className="font-sans text-xs font-medium text-muted-foreground tracking-hearth-label"
       >
         {label}
       </p>
@@ -696,7 +679,7 @@ function SmallStat({ label, value }: { label: string; value: string }) {
 function CreditErrorNote({ error }: { error: CoordinatorFailureState }) {
   if (error.kind === 'unauthenticated') {
     return (
-      <p className="text-sm text-muted-foreground/70">
+      <p className="text-sm text-muted-foreground">
         You're signed out.{' '}
         <Link to="/membership" className="underline underline-offset-2 hover:text-foreground">
           Sign in
@@ -706,7 +689,7 @@ function CreditErrorNote({ error }: { error: CoordinatorFailureState }) {
     );
   }
   const copy = defaultCoordinatorErrorCopy(error);
-  return <p className="text-sm text-muted-foreground/70">{copy.title}. {copy.description}</p>;
+  return <p className="text-sm text-muted-foreground">{copy.title}. {copy.description}</p>;
 }
 
 // ---------------------------------------------------------------------------
@@ -740,7 +723,7 @@ function CreditBalanceCard({ balance, isLoading, error }: CreditBalanceCardProps
     return (
       <div className="rounded-xl border border-border/60 bg-card p-4">
         <p className="text-sm text-muted-foreground">
-          No activity yet. Toggle network mode in chat to start contributing
+          No activity yet. Choose a network scope in Chat to request an answer
           or consuming from the network.
         </p>
       </div>
@@ -754,7 +737,7 @@ function CreditBalanceCard({ balance, isLoading, error }: CreditBalanceCardProps
         <SmallStat label="Earned (contributor)" value={`${fmtCredits(balance.earned)} cr`} />
         <SmallStat label="Spent (requester)" value={`${fmtCredits(balance.spent)} cr`} />
         <div>
-          <p className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
+          <p className="font-sans text-xs font-medium text-muted-foreground tracking-hearth-label">
             Net balance
           </p>
           <p
@@ -775,7 +758,7 @@ function CreditBalanceCard({ balance, isLoading, error }: CreditBalanceCardProps
       {/* Per-model breakdown */}
       {balance.by_model.length > 0 && (
         <div>
-          <p className="mb-2 font-serif text-[11px] italic text-muted-foreground/70 tracking-hearth-label">
+          <p className="mb-2 font-sans text-xs font-medium text-muted-foreground tracking-hearth-label">
             By model
           </p>
           <div className="space-y-1.5">
@@ -824,7 +807,7 @@ function CreditHistoryList({ history, isLoading, error }: CreditHistoryListProps
 
   if (history === null || history.entries.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground/70">
+      <p className="text-sm text-muted-foreground">
         No credit history yet. Your ledger entries will appear here once
         you contribute to or consume from the network.
       </p>
@@ -837,31 +820,31 @@ function CreditHistoryList({ history, isLoading, error }: CreditHistoryListProps
         <thead>
           <tr className="border-b border-border/60 bg-muted/30">
             <th
-              className="px-3 py-2 text-left font-serif italic text-[11px] text-muted-foreground font-normal tracking-hearth-label"
+              className="px-3 py-2 text-left font-serif italic text-xs text-muted-foreground font-normal tracking-hearth-label"
               scope="col"
             >
               Direction
             </th>
             <th
-              className="px-3 py-2 text-left font-serif italic text-[11px] text-muted-foreground font-normal tracking-hearth-label"
+              className="px-3 py-2 text-left font-serif italic text-xs text-muted-foreground font-normal tracking-hearth-label"
               scope="col"
             >
               Model
             </th>
             <th
-              className="px-3 py-2 text-right font-serif italic text-[11px] text-muted-foreground font-normal tracking-hearth-label"
+              className="px-3 py-2 text-right font-serif italic text-xs text-muted-foreground font-normal tracking-hearth-label"
               scope="col"
             >
               Tokens
             </th>
             <th
-              className="px-3 py-2 text-right font-serif italic text-[11px] text-muted-foreground font-normal tracking-hearth-label"
+              className="px-3 py-2 text-right font-serif italic text-xs text-muted-foreground font-normal tracking-hearth-label"
               scope="col"
             >
               Credits
             </th>
             <th
-              className="px-3 py-2 text-right font-serif italic text-[11px] text-muted-foreground font-normal tracking-hearth-label"
+              className="px-3 py-2 text-right font-serif italic text-xs text-muted-foreground font-normal tracking-hearth-label"
               scope="col"
             >
               When
@@ -901,7 +884,7 @@ function CreditHistoryRow({
       <td className="px-3 py-2">
         <span
           className={cn(
-            'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+            'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium',
             isEarned
               ? 'bg-sage/15 text-sage dark:text-sage'
               : 'bg-muted/60 text-muted-foreground',
@@ -965,7 +948,7 @@ function CreditSkeleton({ rows = 2 }: { rows?: number }) {
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="mb-3 font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
+    <h2 className="mb-3 font-sans text-xs font-medium text-muted-foreground tracking-hearth-label">
       {children}
     </h2>
   );
@@ -1019,10 +1002,10 @@ function ContributorToggleCard() {
               Share spare compute with your network
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              When idle, this machine serves inference requests from your own
-              machines and, when you route to it, the open pool. Required for
-              other machines in your household to answer your{' '}
-              <span className="text-foreground">My machines</span> requests. Off by default.
+              While enabled, this machine can answer requests from your own machines
+              using its loaded model. Turn it off when you need the resources for
+              other work. It does not automatically pause when you are active.
+              Choosing a network scope in Chat is separate: it requests compute from others.
             </p>
           </div>
           <input

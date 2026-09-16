@@ -179,7 +179,7 @@ export function ProjectSwitcher({ compact = false }: ProjectSwitcherProps) {
             >
               <span className="flex items-center gap-2">
                 <span className="flex-1 truncate">{name}</span>
-                <span className="shrink-0 text-[10px] text-muted-foreground/60">
+                <span className="shrink-0 text-xs text-muted-foreground">
                   {projects[i]?.memory_count ?? 0}m · {projects[i]?.task_count ?? 0}t
                 </span>
               </span>

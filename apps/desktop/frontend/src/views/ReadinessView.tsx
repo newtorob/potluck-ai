@@ -47,9 +47,9 @@ const SEV: Record<
 > = {
   ok: {
     icon: CheckCircle2,
-    tone: 'text-emerald-600 dark:text-emerald-400',
-    chip: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-    ring: 'ring-emerald-500/20',
+    tone: 'text-sage',
+    chip: 'bg-sage/10 text-sage',
+    ring: 'ring-sage/20',
   },
   info: {
     icon: Info,
@@ -112,7 +112,7 @@ function Group({
     <section className="overflow-hidden rounded-xl border border-border bg-card">
       <header className="flex items-center gap-2 border-b border-border px-4 py-2.5">
         <Icon className="size-3.5 text-muted-foreground" aria-hidden />
-        <h2 className="text-[11px] font-medium uppercase tracking-hearth-label text-muted-foreground">
+        <h2 className="font-sans text-xs font-medium text-muted-foreground">
           {title}
         </h2>
       </header>
@@ -252,7 +252,7 @@ export function ReadinessView() {
           <MachineGroup checks={machineChecks} gpuVerify={gpuVerify} onVerifyGpu={onVerifyGpu} />
           <Group title="Network" icon={Network} checks={networkChecks} />
 
-          <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
+          <p className="px-1 text-xs leading-relaxed text-muted-foreground">
             Readiness is computed from local signals only: model name, hardware, and
             peer reachability. No prompt or inference content is read. Manage machines
             in{' '}
@@ -286,7 +286,7 @@ function MachineGroup({
     <section className="overflow-hidden rounded-xl border border-border bg-card">
       <header className="flex items-center gap-2 border-b border-border px-4 py-2.5">
         <Cpu className="size-3.5 text-muted-foreground" aria-hidden />
-        <h2 className="text-[11px] font-medium uppercase tracking-hearth-label text-muted-foreground">
+        <h2 className="font-sans text-xs font-medium text-muted-foreground">
           This machine
         </h2>
       </header>
@@ -363,7 +363,7 @@ function GpuVerifyWidget({
           <button
             type="button"
             onClick={onVerify}
-            className="shrink-0 text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none"
+            className="shrink-0 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none"
           >
             Re-run
           </button>
@@ -385,7 +385,7 @@ function GpuVerifyWidget({
           <button
             type="button"
             onClick={onVerify}
-            className="shrink-0 text-[11px] text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none"
+            className="shrink-0 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none"
           >
             Re-run
           </button>

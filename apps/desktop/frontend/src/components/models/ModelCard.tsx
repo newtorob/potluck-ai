@@ -13,6 +13,7 @@
  */
 
 import { useState } from 'react';
+import { checkModelFit, type ModelFit } from '@/lib/modelFit';
 import {
   CheckCircle2,
   AlertTriangle,
@@ -49,26 +50,7 @@ const TIER_COLORS: Record<ModelTier, string> = {
   large: 'bg-primary/10 text-primary',
 };
 
-type Sufficiency = 'ok' | 'borderline' | 'insufficient' | 'unknown';
-
-function checkSufficiency(model: CatalogModel, hardware: HardwareInfo | null): Sufficiency {
-  if (!hardware) return 'unknown';
-
-  const ramOk = hardware.ram_total_gb >= model.min_ram_gb;
-  const ramBorderline = hardware.ram_total_gb >= model.min_ram_gb * 0.8;
-
-  // VRAM check — optional (CPU-only machines have no GPU)
-  const vramOk =
-    hardware.gpu_vram_gb === null || hardware.gpu_vram_gb >= model.min_vram_gb;
-  const vramBorderline =
-    hardware.gpu_vram_gb === null || hardware.gpu_vram_gb >= model.min_vram_gb * 0.8;
-
-  if (ramOk && vramOk) return 'ok';
-  if (ramBorderline && vramBorderline) return 'borderline';
-  return 'insufficient';
-}
-
-const SUFFICIENCY_ICON: Record<Sufficiency, React.ReactNode> = {
+const SUFFICIENCY_ICON: Record<ModelFit, React.ReactNode> = {
   ok: <CheckCircle2 className="h-3.5 w-3.5 text-sage" aria-label="Hardware sufficient" />,
   borderline: (
     <AlertTriangle className="h-3.5 w-3.5 text-amber-500" aria-label="Hardware borderline" />
@@ -94,6 +76,7 @@ function speedGrade(tps: number): { label: string; cls: string } {
 interface ModelCardProps {
   model: CatalogModel;
   isActive: boolean;
+  isRecommended?: boolean;
   isInstalling: boolean;
   isLoading: boolean;
   loadError?: string;
@@ -120,6 +103,7 @@ interface ModelCardProps {
 export function ModelCard({
   model,
   isActive,
+  isRecommended = false,
   isInstalling,
   isLoading,
   loadError,
@@ -141,7 +125,7 @@ export function ModelCard({
     (model.download_progress.status === 'downloading' ||
       model.download_progress.status === 'verifying');
 
-  const sufficiency = checkSufficiency(model, hardware);
+  const sufficiency = checkModelFit(model, hardware);
 
   const [benching, setBenching] = useState(false);
   const [bench, setBench] = useState<BenchmarkResult | null>(null);
@@ -173,6 +157,7 @@ export function ModelCard({
       )}
       aria-label={name}
     >
+      {isRecommended && <p className="text-xs font-medium text-primary">Suggested download</p>}
       {/* Header row */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-1">
@@ -215,7 +200,7 @@ export function ModelCard({
 
       {/* Benchmark: real measured speed for this machine, when available */}
       {(liveBench || benchError) && (
-        <p className="text-[11px]">
+        <p className="text-xs">
           {benchError ? (
             <span className="text-destructive">{benchError}</span>
           ) : liveBench && grade ? (
@@ -223,7 +208,7 @@ export function ModelCard({
               <Gauge className={cn('h-3 w-3', grade.cls)} aria-hidden="true" />
               <span className={cn('font-medium', grade.cls)}>{grade.label}</span>
               <span className="text-foreground">{liveBench.tokens_per_sec} tok/s</span>
-              <span className="text-muted-foreground/40">·</span>
+              <span className="text-muted-foreground">·</span>
               {Math.round(liveBench.ttft_ms)} ms to first token
             </span>
           ) : null}
@@ -238,6 +223,13 @@ export function ModelCard({
           {min_vram_gb > 0 ? ` · ${min_vram_gb} GB VRAM` : ''}
         </span>
       </div>
+
+      <p className="text-xs text-muted-foreground">
+        {sufficiency === 'ok' ? 'Meets the listed memory requirements'
+          : sufficiency === 'borderline' ? 'Close to this machine’s memory limit'
+          : sufficiency === 'insufficient' ? 'Exceeds this machine’s listed memory capacity'
+          : 'Memory requirements shown above'}
+      </p>
 
       {/* Download progress (when in-flight) */}
       {model.download_progress && (
@@ -262,7 +254,9 @@ export function ModelCard({
             onClick={onInstall}
             className={cn(
               'flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
-              'bg-primary text-primary-foreground hover:bg-primary/90',
+              isRecommended
+                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                : 'border border-border text-foreground hover:bg-accent',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             )}
             aria-label={hasUpdate ? `Update to ${name}` : `Install ${name}`}
@@ -383,7 +377,7 @@ export function ModelCard({
       </div>
 
       {/* Slug for debugging / accessibility */}
-      <p className="text-xs text-muted-foreground/40 font-mono truncate">{slug}</p>
+      <p className="text-xs text-muted-foreground font-mono truncate">{slug}</p>
     </article>
   );
 }

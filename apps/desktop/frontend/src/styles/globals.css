@@ -44,7 +44,8 @@
        the brief's #E07856 to sit in "warm and present" instead of
        "BUY NOW." */
     --primary: 16 60% 56%;
-    --primary-foreground: 35 30% 97%;
+    --primary-foreground: 28 22% 7%; /* dark ink remains legible on ember */
+    --primary-text: 16 60% 36%;      /* ember text on paper, separate from fills */
 
     --secondary: 35 22% 88%;         /* warm sand for secondary chrome */
     --secondary-foreground: 28 22% 18%;
@@ -55,12 +56,13 @@
     --accent: 35 22% 90%;            /* hover/selection on cream */
     --accent-foreground: 28 22% 18%;
 
-    --destructive: 8 64% 48%;        /* deep oxblood, not screaming red */
+    --destructive: 8 64% 44%;        /* oxblood fill, including hover contrast */
     --destructive-foreground: 35 30% 97%;
+    --destructive-text: 8 64% 40%;
 
     --border: 32 18% 84%;            /* hairline warm gray */
     --input: 32 18% 84%;
-    --ring: 16 67% 61%;              /* ember focus ring */
+    --ring: 16 60% 42%;              /* visible ember focus on paper */
 
     /* Layered surfaces — for elevation discipline. Light theme uses
        progressively warmer cream tones; dark theme uses warmer charcoals.
@@ -102,7 +104,8 @@
     --popover-foreground: 36 30% 94%;
 
     --primary: 16 60% 56%;
-    --primary-foreground: 28 22% 11%;
+    --primary-foreground: 28 22% 7%;
+    --primary-text: 16 60% 66%;      /* text on charcoal and tinted chips */
 
     --secondary: 28 9% 17%;          /* slightly raised chrome */
     --secondary-foreground: 36 30% 94%;
@@ -113,8 +116,9 @@
     --accent: 28 11% 18%;            /* hover/selection states */
     --accent-foreground: 36 30% 94%;
 
-    --destructive: 8 60% 52%;        /* warm red, not blue-red */
-    --destructive-foreground: 36 30% 94%;
+    --destructive: 8 56% 62%;        /* warm red with readable ink labels */
+    --destructive-foreground: 28 22% 7%;
+    --destructive-text: 8 60% 68%;
 
     --border: 28 9% 19%;             /* hairlines, warm-tinted */
     --input: 28 9% 19%;

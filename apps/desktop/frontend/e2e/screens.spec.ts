@@ -9,7 +9,9 @@ test.describe('Membership', () => {
     await mockBackends(page, { me: null });
     await page.goto('/#/membership');
 
-    await expect(page.getByRole('heading', { name: 'Membership' })).toBeVisible();
+    // Signed-out navigation stops at the app's account gate before Membership.
+    await expect(page.getByRole('heading', { name: 'Sign in to use Potluck' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send magic link' })).toBeVisible();
     await expect(page.getByPlaceholder('you@example.com')).toBeVisible();
 
     await page.screenshot({ path: 'e2e/screens/membership-signed-out.png', fullPage: true });

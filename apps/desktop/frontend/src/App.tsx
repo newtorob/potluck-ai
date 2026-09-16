@@ -244,7 +244,7 @@ export default function App() {
       {/* Thin strip driving the auto-update download/restart flow */}
       <UpdateBanner />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <AuthGate>
           <Sidebar />
 

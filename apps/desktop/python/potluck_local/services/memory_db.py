@@ -329,6 +329,11 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         for stmt in _USAGE_INDICES:
             await db.execute(stmt)
 
+        from potluck_local.services.memory_safety import redact_stored_memories
+        redacted = await redact_stored_memories(db)
+        if redacted:
+            logger.info("memory_credentials_redacted count=%d", redacted)
+
         await db.commit()
 
     _secure_memory_db_files(path)

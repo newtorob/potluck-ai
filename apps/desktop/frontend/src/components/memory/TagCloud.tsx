@@ -47,7 +47,7 @@ interface TagCloudProps {
 export function TagCloud({ activeProject, onKeywordClick }: TagCloudProps) {
   const [keywords, setKeywords] = useState<KeywordFrequency[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -98,9 +98,9 @@ export function TagCloud({ activeProject, onKeywordClick }: TagCloudProps) {
         ) : (
           <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
         )}
-        <span className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">Keywords</span>
+        <span className="font-serif text-xs italic text-muted-foreground tracking-hearth-label">Keywords</span>
         {keywords.length > 0 && (
-          <span className="text-[10px] text-muted-foreground">{keywords.length}</span>
+          <span className="text-xs text-muted-foreground">{keywords.length}</span>
         )}
       </button>
 

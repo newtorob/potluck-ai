@@ -1,7 +1,7 @@
 /**
  * SettingsView — /settings route.
  *
- * Tabbed interface with URL hash persistence (#account, #hardware, #privacy, #advanced).
+ * Tabbed interface with query-string persistence (?tab=account, ?tab=hardware, etc.).
  * Refreshing the page restores the selected tab.
  *
  * Tabs:
@@ -11,7 +11,7 @@
  *   advanced  — model storage path
  */
 
-import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AlertCircle } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { HardwarePanel } from '@/components/settings/HardwarePanel';
@@ -43,9 +43,8 @@ function isValidTab(v: string): v is TabId {
   return TABS.some((t) => t.id === v);
 }
 
-function getTabFromHash(): TabId {
-  const hash = window.location.hash.replace('#', '');
-  return isValidTab(hash) ? hash : 'account';
+function tabFromParam(value: string | null): TabId {
+  return value !== null && isValidTab(value) ? value : 'account';
 }
 
 // ---------------------------------------------------------------------------
@@ -54,19 +53,13 @@ function getTabFromHash(): TabId {
 
 export function SettingsView() {
   const { settings, isLoaded, isSaving, saveError, update } = useSettings();
-  const [activeTab, setActiveTab] = useState<TabId>(getTabFromHash);
-
-  // Sync URL hash when tab changes
-  useEffect(() => {
-    history.replaceState(null, '', `#${activeTab}`);
-  }, [activeTab]);
-
-  // Handle back/forward navigation changing the hash
-  useEffect(() => {
-    const onHashChange = () => setActiveTab(getTabFromHash());
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = tabFromParam(searchParams.get('tab'));
+  const setActiveTab = (tab: TabId) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('tab', tab);
+    setSearchParams(next, { replace: true });
+  };
 
   const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number) => {
     const count = TABS.length;

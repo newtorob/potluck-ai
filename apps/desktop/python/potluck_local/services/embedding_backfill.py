@@ -13,6 +13,8 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from potluck_local.services.memory_safety import redact_credentials
+
 logger = logging.getLogger(__name__)
 
 _BATCH_SIZE = 64
@@ -66,7 +68,7 @@ async def run_embedding_backfill() -> None:
         )
         rows = await cursor.fetchall()
 
-    id_to_content: dict[str, str] = {row["id"]: row["content"] for row in rows}
+    id_to_content = {row["id"]: redact_credentials(row["content"]) for row in rows}
 
     n_done = 0
     for batch_start in range(0, len(missing_ids), _BATCH_SIZE):

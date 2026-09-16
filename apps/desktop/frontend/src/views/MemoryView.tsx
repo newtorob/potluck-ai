@@ -470,7 +470,7 @@ export function MemoryView() {
                 aria-label="Search memories"
                 className={cn(
                   'h-12 w-full rounded-xl border border-input bg-card pl-10 pr-36',
-                  'text-[15px] text-foreground placeholder:text-muted-foreground/80',
+                  'text-[15px] text-foreground placeholder:text-muted-foreground',
                   'shadow-hearth-sm',
                   'focus:outline-none focus:border-primary/40 focus:shadow-hearth focus:ring-2 focus:ring-ring/50',
                   'transition-all duration-base',
@@ -519,7 +519,7 @@ export function MemoryView() {
                 {!searchQuery && (
                   <kbd
                     aria-hidden="true"
-                    className="hidden rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline-flex"
+                    className="hidden rounded border border-border bg-muted px-1.5 py-0.5 text-xs text-muted-foreground sm:inline-flex"
                   >
                     /
                   </kbd>
@@ -752,7 +752,7 @@ export function MemoryView() {
           {/* Footer */}
           <div className="border-t border-border pt-4 text-center">
             <Link
-              to="/settings#privacy"
+              to="/settings?tab=privacy"
               className={cn(
                 'text-xs text-muted-foreground hover:text-foreground transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded',
@@ -956,7 +956,7 @@ function ProjectFilterChips({ projects, activeProject, filter, onFilterChange }:
       ))}
 
       {isTemporary && (
-        <span className="text-[10px] text-muted-foreground/60 italic">(temporary)</span>
+        <span className="text-xs text-muted-foreground italic">(temporary)</span>
       )}
     </div>
   );

@@ -16,7 +16,7 @@
  * Design notes:
  *   - h-7 (28px) — small enough to not steal real estate, large enough
  *     for 3:1 contrast text
- *   - text-[11px] — matches the editorial small-caps used elsewhere
+ *   - text-xs — matches the editorial small-caps used elsewhere
  *   - border-t hairline only; no shadow stack
  *   - All indicators are status-only; settings toggles live on /settings
  *   - Network mode pill is clickable and opens the per-session network
@@ -29,7 +29,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/components/ui/cn';
 import { useHealth } from '@/hooks/useHealth';
-import { useChatStore } from '@/stores/chatStore';
+import { useChatStore, type RoutingScope } from '@/stores/chatStore';
 import { useMeshStore } from '@/stores/meshStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useAuth } from '@/hooks/useAuth';
@@ -51,23 +51,15 @@ export function StatusBar() {
     return () => { cancelled = true; };
   }, []);
 
-  // Network mode reflects chatStore.networkMode — the same flag the
-  // chat-composer toggle flips. Off = nothing leaves the device;
-  // Per-session = the chat composer is currently set to route via the
-  // contributor network on next send.
-  //
-  // The pill stays a STATUS indicator (not a toggle) — flipping network
-  // mode happens at the place the user can also see what they're about
-  // to send (the composer), per the brief's "agent-neutral, opt-in,
-  // never global" rule (memory e555655d).
-  const networkOn = useChatStore((s) => s.networkMode);
-  const networkMode: 'off' | 'per-session' | 'standby' = networkOn ? 'per-session' : 'off';
+  // Show the selected chat destination, including household and circle scope.
+  // Receiving an answer and offering compute are independent controls.
+  const routingScope = useChatStore((s) => s.routingScope);
 
   return (
     <footer
       className={cn(
-        'flex h-7 shrink-0 items-center gap-4 border-t border-border bg-card px-4',
-        'text-[11px] text-muted-foreground select-none',
+        'flex h-8 shrink-0 items-center gap-3 overflow-x-auto border-t border-border bg-card px-4',
+        'text-xs text-muted-foreground select-none',
       )}
       aria-label="Application status"
     >
@@ -82,7 +74,7 @@ export function StatusBar() {
 
       <StatusItem
         active={sidecarUp}
-        label={sidecarUp ? 'Sidecar up' : 'Sidecar offline'}
+        label={sidecarUp ? 'Local engine ready' : 'Local engine offline'}
         tooltip={sidecarUp
           ? 'Local Python backend is responding on 127.0.0.1:8321.'
           : 'Local Python backend is unreachable.'}
@@ -92,7 +84,7 @@ export function StatusBar() {
 
       <Divider />
 
-      <NetworkPill mode={networkMode} />
+      <NetworkPill scope={routingScope} />
 
       {/* Shown only in the offline-account case: signed in on a cached
           token but the cloud API couldn't confirm it (see AuthGate /
@@ -113,7 +105,7 @@ export function StatusBar() {
       <div className="ml-auto flex items-center gap-3">
         <DevBadge />
         {appVersion !== null && (
-          <span className="font-mono text-[10px] text-muted-foreground/60">
+          <span className="font-mono text-xs text-muted-foreground">
             v{appVersion}
           </span>
         )}
@@ -172,32 +164,30 @@ function StatusItem({ active, label, tooltip, href }: StatusItemProps) {
 // NetworkPill — agent-neutral framing per memory e555655d
 // ---------------------------------------------------------------------------
 
-interface NetworkPillProps {
-  mode: 'off' | 'per-session' | 'standby';
-}
+function NetworkPill({ scope }: { scope: RoutingScope }) {
+  const labels: Record<RoutingScope, string> = {
+    local: 'Chat: This machine', household: 'Chat: My machines',
+    circle: 'Chat: Trusted circle', cooperative: 'Chat: Open pool',
+  };
+  const tips: Record<RoutingScope, string> = {
+    local: 'Your next chat message runs on this machine. Change scope in Chat.',
+    household: 'Your next chat message routes to one of your own machines. Change scope in Chat.',
+    circle: 'Your next chat message routes through your selected trusted circle. Change scope in Chat.',
+    cooperative: 'Your next chat message routes through the open pool. Change scope in Chat.',
+  };
+  const label = labels[scope];
+  const tooltip = tips[scope];
+  const local = scope === 'local';
 
-function NetworkPill({ mode }: NetworkPillProps) {
-  const label =
-    mode === 'off'      ? 'Network: Off'
-    : mode === 'standby' ? 'Network: Standby'
-    : 'Network: On';
-
-  const tooltip =
-    mode === 'off'      ? 'Nothing leaves your machine. Toggle on in the chat composer.'
-    : mode === 'standby' ? 'Network ready but inactive. Opt in per session.'
-    : 'Your next chat send routes through the contributor network. Aggregate stats in /network.';
-
-  // Click-through goes to /network (the observability view), not
-  // /settings — the user wants to SEE the network state, not change a
-  // setting. Toggling happens in the chat composer.
+  // Scope changes belong beside the message the member is about to send.
   return (
     <Link
-      to="/network"
+      to="/chat"
       className={cn(
         'flex items-center gap-1.5 rounded-full border px-2 py-0.5',
-        'text-[10px] font-medium transition-colors',
+        'text-xs font-medium transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        mode === 'off'
+        local
           ? 'border-border/60 bg-muted/40 text-muted-foreground hover:text-foreground hover:border-border'
           // Active state borrows the chat composer's ember treatment so
           // the routing-decision signal looks the same wherever the user
@@ -210,7 +200,7 @@ function NetworkPill({ mode }: NetworkPillProps) {
       <span
         className={cn(
           'inline-block h-1.5 w-1.5 rounded-full',
-          mode === 'off' ? 'bg-muted-foreground/50' : 'bg-sage animate-hearth-pulse',
+          local ? 'bg-muted-foreground/50' : 'bg-sage animate-hearth-pulse',
         )}
         aria-hidden="true"
       />
@@ -354,7 +344,7 @@ function DevBadge() {
     <span
       className={cn(
         'rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5',
-        'font-mono text-[10px] font-medium text-amber-700 dark:text-amber-300',
+        'font-mono text-xs font-medium text-amber-700 dark:text-amber-300',
       )}
       title={tooltip}
       aria-label={tooltip}

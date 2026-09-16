@@ -65,6 +65,7 @@ interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
+  children?: NavItem[];
 }
 
 // Primary: the product story in narrative order — chat → your own machines →
@@ -72,10 +73,14 @@ interface NavItem {
 // and sits at #2, not buried below the workspace tools.
 const PRIMARY_NAV: NavItem[] = [
   { to: '/chat', label: 'Chat', icon: MessageSquare },
-  { to: '/household', label: 'My Machines', icon: Home },
-  { to: '/readiness', label: 'Readiness', icon: Gauge },
-  { to: '/network', label: 'Network', icon: Globe2 },
-  { to: '/circles', label: 'Circles', icon: Users },
+  {
+    to: '/household', label: 'My Machines', icon: Home,
+    children: [{ to: '/readiness', label: 'Readiness', icon: Gauge }],
+  },
+  {
+    to: '/network', label: 'Network', icon: Globe2,
+    children: [{ to: '/circles', label: 'Trusted circles', icon: Users }],
+  },
   { to: '/models', label: 'Models', icon: Package },
 ];
 
@@ -134,7 +139,7 @@ export function Sidebar() {
   return (
     <nav
       className={cn(
-        'flex shrink-0 flex-col border-r border-border bg-card',
+        'flex min-h-0 shrink-0 flex-col border-r border-border bg-card',
         expanded ? 'w-60' : 'w-16',
         'transition-[width] duration-200',
       )}
@@ -142,7 +147,7 @@ export function Sidebar() {
     >
       {/* Logo block — Potluck mark + wordmark */}
       <div className={cn(
-        'flex items-center border-b border-border px-3 py-4',
+        'flex shrink-0 items-center border-b border-border px-3 py-4',
         expanded ? 'justify-start gap-2.5' : 'justify-center',
       )}>
         <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/12 ring-1 ring-primary/20">
@@ -158,48 +163,48 @@ export function Sidebar() {
       {/* Project switcher */}
       {expanded && <ProjectSwitcher />}
 
-      {/* Primary nav — the product story. Collapsible so a chat-heavy user
-          can reclaim vertical space for the Chats list below. */}
-      <NavGroup
-        id="navigate"
-        label="Navigate"
-        items={PRIMARY_NAV}
-        sidebarExpanded={expanded}
-        collapsed={!!navGroupsCollapsed.navigate}
-        onToggle={() => setNavGroupCollapsed('navigate', !navGroupsCollapsed.navigate)}
-        className="pt-3 pb-2"
-      />
-
-      {/* Workspace group — coding-agent / memory surfaces */}
-      <NavGroup
-        id="workspace"
-        label="Workspace"
-        items={WORKSPACE_NAV}
-        sidebarExpanded={expanded}
-        collapsed={!!navGroupsCollapsed.workspace}
-        onToggle={() => setNavGroupCollapsed('workspace', !navGroupsCollapsed.workspace)}
-        className="border-t border-border/50 pt-2 pb-3"
-      />
-
-      {/* Conversations — only on /chat AND only when expanded */}
-      {isChat && expanded && (
-        <ConversationList
-          conversations={conversations}
-          activeConversationId={activeConversationId}
-          isStreaming={isStreaming}
-          onCreate={() => void createConversation()}
-          onSwitch={(id) => void switchConversation(id)}
-          onDelete={(id) => void deleteConversation(id)}
-          onRename={(id, title) => void renameConversation(id, title)}
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+        {/* Primary nav — the product story. Collapsible so a chat-heavy user
+            can reclaim vertical space for the Chats list below. */}
+        <NavGroup
+          id="navigate"
+          label="Navigate"
+          items={PRIMARY_NAV}
+          sidebarExpanded={expanded}
+          collapsed={!!navGroupsCollapsed.navigate}
+          onToggle={() => setNavGroupCollapsed('navigate', !navGroupsCollapsed.navigate)}
+          className="pt-3 pb-2"
         />
-      )}
 
-      {/* Spacer when no conversations panel */}
-      {(!isChat || !expanded) && <div className="flex-1" />}
+        {/* Workspace group — coding-agent / memory surfaces */}
+        <NavGroup
+          id="workspace"
+          label="Workspace"
+          items={WORKSPACE_NAV}
+          sidebarExpanded={expanded}
+          collapsed={navGroupsCollapsed.workspace ?? !WORKSPACE_NAV.some((item) => item.to === location.pathname)}
+          onToggle={() => setNavGroupCollapsed('workspace', !(navGroupsCollapsed.workspace ?? !WORKSPACE_NAV.some((item) => item.to === location.pathname)))}
+          className="border-t border-border/50 pt-2 pb-3"
+        />
+
+        {/* Conversations — only on /chat AND only when expanded */}
+        {isChat && expanded && (
+          <ConversationList
+            conversations={conversations}
+            activeConversationId={activeConversationId}
+            isStreaming={isStreaming}
+            onCreate={() => void createConversation()}
+            onSwitch={(id) => void switchConversation(id)}
+            onDelete={(id) => void deleteConversation(id)}
+            onRename={(id, title) => void renameConversation(id, title)}
+          />
+        )}
+
+      </div>
 
       {/* Secondary nav (Membership, Settings) */}
       <div className={cn(
-        'border-t border-border py-2',
+        'shrink-0 border-t border-border py-2',
         expanded ? 'px-2' : 'flex flex-col items-center px-3',
       )}>
         {SECONDARY_NAV.map((item) => (
@@ -255,7 +260,7 @@ function NavGroup({
     return (
       <div className={cn('flex flex-col items-center gap-0.5 px-3', className)}>
         {items.map((item) => (
-          <NavItemLink key={item.to} item={item} expanded={false} />
+          <NavItemBranch key={item.to} item={item} expanded={false} />
         ))}
       </div>
     );
@@ -271,7 +276,7 @@ function NavGroup({
         aria-controls={listId}
         className={cn(
           'group/hdr flex items-center gap-1 rounded-md px-2 pb-1 pt-0.5',
-          'text-muted-foreground/70 hover:text-foreground transition-colors',
+          'text-muted-foreground hover:text-foreground transition-colors',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         )}
       >
@@ -282,14 +287,14 @@ function NavGroup({
           )}
           aria-hidden="true"
         />
-        <span className="font-serif text-[11px] italic tracking-hearth-label">
+        <span className="text-xs font-medium">
           {label}
         </span>
       </button>
       {!collapsed && (
         <div id={listId} className="flex flex-col gap-0.5">
           {items.map((item) => (
-            <NavItemLink key={item.to} item={item} expanded />
+            <NavItemBranch key={item.to} item={item} expanded />
           ))}
         </div>
       )}
@@ -304,6 +309,25 @@ function NavGroup({
 interface NavItemLinkProps {
   item: NavItem;
   expanded: boolean;
+}
+
+function NavItemBranch({ item, expanded }: NavItemLinkProps) {
+  const { pathname } = useLocation();
+  const showChildren = pathname === item.to
+    || item.children?.some((child) => child.to === pathname);
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <NavItemLink item={item} expanded={expanded} />
+      {showChildren && item.children && (
+        <div className={cn('flex flex-col gap-0.5', expanded && 'pl-4')}>
+          {item.children.map((child) => (
+            <NavItemLink key={child.to} item={child} expanded={expanded} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function NavItemLink({ item, expanded }: NavItemLinkProps) {
@@ -405,7 +429,7 @@ function ChromeButton({ onClick, label, title, icon: Icon }: ChromeButtonProps) 
       aria-label={label}
       title={title}
       className={cn(
-        'flex h-7 w-7 items-center justify-center rounded-md',
+        'flex h-8 w-8 items-center justify-center rounded-md',
         'text-muted-foreground hover:text-foreground hover:bg-accent transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
       )}
@@ -439,10 +463,10 @@ function ConversationList({
   onRename,
 }: ConversationListProps) {
   return (
-    <div className="flex flex-1 flex-col overflow-hidden border-t border-border">
+    <div className="flex flex-col border-t border-border">
       <div className="flex items-center justify-between px-3 py-2">
         <span
-          className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label"
+          className="text-xs font-medium text-muted-foreground"
         >
           Chats
         </span>
@@ -464,7 +488,7 @@ function ConversationList({
       </div>
 
       <ul
-        className="flex-1 overflow-y-auto px-2 pb-3"
+        className="px-2 pb-3"
         aria-label="Conversations"
       >
         {conversations.length === 0 ? (
@@ -614,10 +638,10 @@ function ConversationItem({
               >
                 {conversation.title}
               </span>
-              <span className="text-[10px] text-muted-foreground/80">
+              <span className="text-xs text-muted-foreground">
                 {relativeTime}
                 {conversation.persisted === false && (
-                  <span className="ml-1.5 text-muted-foreground/70">Not saved</span>
+                  <span className="ml-1.5 text-muted-foreground">Not saved</span>
                 )}
               </span>
             </div>
@@ -678,4 +702,3 @@ function ConversationItem({
     </li>
   );
 }
-

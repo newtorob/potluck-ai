@@ -30,11 +30,11 @@ import type { PeerCapabilities } from '@/lib/householdInference';
  *  mirroring the roster's PeerStateBadge palette. */
 const STATE_COLOR: Record<PeerState, string> = {
   direct: 'text-sage',
-  relayed: 'text-amber-500',
+  relayed: 'text-sage',
   connecting: 'text-muted-foreground',
   no_data_plane: 'text-destructive',
   key_drift: 'text-amber-500',
-  status_unknown: 'text-muted-foreground/50',
+  status_unknown: 'text-muted-foreground',
 };
 
 /** Direct links are solid; everything else is dashed (degraded or coming up). */
@@ -107,25 +107,18 @@ export function MeshMap({
     };
   });
 
-  // Plain-language health line (Deco's "Everything looks good").
-  const offline = peerNodes.filter(
-    (n) => n.state === 'no_data_plane' || n.state === 'status_unknown',
-  ).length;
-  const relayed = peerNodes.filter((n) => n.state === 'relayed').length;
-  const health = deriveHealth({
-    coordConnected: status.coordinator_connection === 'connected',
-    coordConnecting: status.coordinator_connection === 'connecting',
-    machines: peers.length + 1,
-    offline,
-    relayed,
-  });
+  const health = {
+    text: report.headline,
+    Icon: report.ok ? CheckCircle2 : report.overall === 'info' ? Loader2 : AlertCircle,
+    color: report.ok ? 'text-sage' : report.overall === 'error' ? 'text-destructive' : 'text-muted-foreground',
+  };
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card p-4 shadow-hearth-sm">
       {/* Health line */}
       <div className="mb-2 flex items-center justify-center gap-1.5 text-xs">
         <health.Icon
-          className={cn('h-3.5 w-3.5', health.color, health.spin && 'animate-spin')}
+          className={cn('h-3.5 w-3.5', health.color)}
           aria-hidden="true"
         />
         <span className="font-medium text-foreground">{health.text}</span>
@@ -209,7 +202,7 @@ export function MeshMap({
       </div>
 
       {/* Legend */}
-      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <LegendDot className="text-sage" label="Direct" />
         <LegendDot className="text-amber-500" label="Relayed" />
         <LegendDot className="text-destructive" label="Offline" />
@@ -275,52 +268,19 @@ function NodeCard({
             </span>
           )}
         </div>
-        <span className="max-w-full truncate text-[11px] font-medium text-foreground">{title}</span>
+        <span className="max-w-full truncate text-xs font-medium text-foreground">{title}</span>
         {subtitle && (
-          <span className="max-w-full truncate font-mono text-[9px] text-muted-foreground/80">
+          <span className="max-w-full truncate font-mono text-[11px] text-muted-foreground">
             {subtitle}
           </span>
         )}
-        <span className="flex max-w-full items-center gap-1 text-[9px] text-muted-foreground">
+        <span className="flex max-w-full items-center gap-1 text-[11px] text-muted-foreground">
           <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full bg-current', stateColor)} aria-hidden="true" />
           <span className="truncate">{stateLabel}</span>
         </span>
       </div>
     </div>
   );
-}
-
-function deriveHealth(args: {
-  coordConnected: boolean;
-  coordConnecting: boolean;
-  machines: number;
-  offline: number;
-  relayed: number;
-}): { text: string; Icon: IconType; color: string; spin?: boolean } {
-  if (args.coordConnecting) {
-    return { text: 'Connecting to the coordinator…', Icon: Loader2, color: 'text-muted-foreground', spin: true };
-  }
-  if (!args.coordConnected) {
-    return { text: 'Coordinator unreachable', Icon: AlertCircle, color: 'text-destructive' };
-  }
-  if (args.offline > 0) {
-    return {
-      text: `${args.offline} machine${args.offline === 1 ? '' : 's'} offline`,
-      Icon: AlertCircle,
-      color: 'text-amber-500',
-    };
-  }
-  if (args.relayed > 0) {
-    return {
-      text: `Mesh up · ${args.machines} machines · ${args.relayed} relayed`,
-      Icon: CheckCircle2,
-      color: 'text-amber-500',
-    };
-  }
-  if (args.machines === 1) {
-    return { text: 'Mesh up · just this machine', Icon: CheckCircle2, color: 'text-sage' };
-  }
-  return { text: `Everything looks good · ${args.machines} machines`, Icon: CheckCircle2, color: 'text-sage' };
 }
 
 function LegendDot({ className, label }: { className: string; label: string }) {

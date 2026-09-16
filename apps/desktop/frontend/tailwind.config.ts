@@ -7,6 +7,19 @@ const config: Config = {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      // Text needs different contrast from a filled button. Keep the ember
+      // fill identical across themes while making existing semantic text
+      // utilities readable on paper, charcoal, and lightly tinted chips.
+      textColor: {
+        primary: {
+          DEFAULT: 'hsl(var(--primary-text) / <alpha-value>)',
+          foreground: 'hsl(var(--primary-foreground) / <alpha-value>)',
+        },
+        destructive: {
+          DEFAULT: 'hsl(var(--destructive-text) / <alpha-value>)',
+          foreground: 'hsl(var(--destructive-foreground) / <alpha-value>)',
+        },
+      },
       colors: {
         // shadcn/ui-compatible CSS variable tokens.
         // Each color maps to an HSL CSS variable so shadcn components

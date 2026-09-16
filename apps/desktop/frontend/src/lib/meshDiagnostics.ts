@@ -87,6 +87,14 @@ export interface DiagnosticsInput {
   peers: MeshPeer[];
 }
 
+/** A roster entry is not a connection. Never route using stale reachability
+ * after the local mesh service has stopped. Coordinator outages alone do not
+ * invalidate a working tunnel. */
+export function getConnectedPeers({ bridge, status, peers }: DiagnosticsInput): MeshPeer[] {
+  if (bridge !== 'reachable' || status?.mesh_status !== 'running' || !status.node_id) return [];
+  return peers.filter((peer) => peer.reachable);
+}
+
 // ---------------------------------------------------------------------------
 // Severity helpers
 // ---------------------------------------------------------------------------
@@ -112,6 +120,21 @@ const CONNECTING_GRACE_MS = 15_000;
 export function deriveDiagnostics(input: DiagnosticsInput, now: number = Date.now()): DiagnosticsReport {
   const { bridge, status, peers } = input;
   const global: Diagnostic[] = [];
+
+  const daemonState = {
+    daemon_not_installed: 'Set up the mesh in My Machines',
+    daemon_requires_approval: 'Mesh needs system approval',
+    daemon_starting: 'Mesh starting…',
+    daemon_failed: 'Mesh service failed to start',
+    daemon_unsupported: 'Mesh is unavailable on this platform',
+  };
+  if (bridge in daemonState) {
+    const title = daemonState[bridge as keyof typeof daemonState];
+    return report([{
+      code: bridge.toUpperCase(), layer: 'local',
+      severity: bridge === 'daemon_failed' ? 'error' : 'info', title, detail: title,
+    }], {}, title);
+  }
 
   // --- L0: local — is the mesh sidecar even reachable from the UI? -----------
   if (bridge === 'bridge_missing') {
@@ -153,7 +176,7 @@ export function deriveDiagnostics(input: DiagnosticsInput, now: number = Date.no
 
   // bridge === 'unknown' (first tick) or 'reachable'. Without a status payload
   // yet, we can't assess — stay quiet rather than flash a false error.
-  if (!status) {
+  if (!status || bridge === 'unknown') {
     return report([], {}, 'Checking mesh…');
   }
 
@@ -210,6 +233,8 @@ export function deriveDiagnostics(input: DiagnosticsInput, now: number = Date.no
     default:
       break; // healthy — continue to coordinator + peers
   }
+
+  if (!status.node_id) return report([], {}, 'Mesh not set up');
 
   // --- L1: coordinator (control plane) --------------------------------------
   // The data plane (WireGuard) is independent of the coordinator, so a peer
@@ -335,9 +360,9 @@ function derivePeer(peer: MeshPeer, coordinatorTrustworthy: boolean, now: number
     severity: 'warn',
     label: hadHandshake ? 'Tunnel dropped' : 'No tunnel',
     detail: hadHandshake
-      ? 'The encrypted tunnel was up but has gone quiet. Often a VPN reconnect, sleep/wake, or a network change broke the data path.'
-      : 'The coordinator can see this machine, but no encrypted tunnel ever formed. Typically a firewall or VPN kill-switch blocking the mesh on one side.',
-    fix: 'On both machines, allow the mesh interface past any VPN/firewall (a kill-switch will silently drop it).',
+      ? 'The encrypted tunnel was connected but is no longer responding. The machine may be asleep or its network may have changed.'
+      : 'This machine is enrolled, but there is no active encrypted connection. Enrollment alone does not confirm that it is online.',
+    fix: 'Check that Potluck and the mesh are running on both machines. If both are awake and connected to the internet, check their VPN and firewall settings.',
   };
 }
 
@@ -360,6 +385,8 @@ function computeHeadline(
   }
 
   const peerStates = Object.values(perPeer);
+  const keyDrift = peerStates.filter((p) => p.state === 'key_drift').length;
+  if (keyDrift > 0) return `${keyDrift} machine${keyDrift === 1 ? '' : 's'} need${keyDrift === 1 ? 's' : ''} a key refresh`;
   const blocked = peerStates.filter((p) => p.state === 'no_data_plane').length;
   if (blocked > 0) {
     return blocked === 1 ? '1 machine has no tunnel' : `${blocked} machines have no tunnel`;
@@ -367,11 +394,15 @@ function computeHeadline(
 
   if (worstGlobal && worstGlobal.severity === 'info') return worstGlobal.title;
 
+  const connecting = peerStates.filter((p) => p.state === 'connecting').length;
+  if (connecting > 0) return `Connecting to ${connecting} machine${connecting === 1 ? '' : 's'}…`;
+
   if (peerCount === 0) return 'Mesh up, no other machines yet';
   const relayed = peerStates.filter((p) => p.state === 'relayed').length;
   const direct = peerStates.filter((p) => p.state === 'direct').length;
-  if (relayed > 0 && direct === 0) return 'Mesh healthy, connected via relay';
-  return 'Mesh healthy';
+  const connected = direct + relayed;
+  if (connected === 0) return 'No connected machines';
+  return `${connected} machine${connected === 1 ? '' : 's'} connected${relayed > 0 && direct === 0 ? ' via relay' : ''}`;
 }
 
 function report(

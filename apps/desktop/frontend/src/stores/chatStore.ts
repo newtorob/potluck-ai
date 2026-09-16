@@ -1,3 +1,4 @@
+import { getConnectedPeers } from '@/lib/meshDiagnostics';
 /**
  * Chat store — conversations, streaming state, and send/abort actions.
  *
@@ -757,7 +758,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       // captured so MessageBubble can render "Ran on <your machine>".
       let householdPeerName: string | null = null;
       if (routingScope === 'household') {
-        const peers = useMeshStore.getState().peers;
+        const peers = getConnectedPeers(useMeshStore.getState());
         const { response: r, peer } = await streamHouseholdInference(apiMessages, peers, {
           abortSignal: controller.signal,
           routingMode: get().routingMode,

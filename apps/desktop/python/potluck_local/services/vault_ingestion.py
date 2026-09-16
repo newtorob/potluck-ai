@@ -185,7 +185,10 @@ async def _ingest_file(
     sha: str,
 ) -> int:
     """Insert chunks for a file into memories + queue embeddings. Returns count."""
-    chunks = chunk_markdown(text)
+    from potluck_local.services.memory_safety import redact_credentials
+
+    # Redact before chunking so a private key cannot be split across records.
+    chunks = chunk_markdown(redact_credentials(text))
     if not chunks:
         return 0
 

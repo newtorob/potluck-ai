@@ -244,7 +244,8 @@ def schedule_embed_memory(memory_id: str, content: str) -> None:
             from potluck_local.services.memory_db import save_embedding
 
             embedder = get_embedder()
-            vec = await embedder.embed(content)
+            from potluck_local.services.memory_safety import redact_credentials
+            vec = await embedder.embed(redact_credentials(content))
             if vec is not None:
                 await save_embedding(memory_id, vec, embedder.MODEL_NAME)
                 await get_cluster_cache().invalidate_all()

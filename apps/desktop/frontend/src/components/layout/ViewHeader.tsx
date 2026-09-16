@@ -76,7 +76,7 @@ export function ViewHeader({
         <div className="min-w-0 flex-1">
           {eyebrow !== undefined && (
             <p
-              className="mb-0.5 font-serif text-[11px] italic text-muted-foreground tracking-hearth-label"
+              className="mb-1 text-xs font-medium text-muted-foreground"
             >
               {eyebrow}
             </p>
@@ -87,7 +87,7 @@ export function ViewHeader({
             </h1>
             {typeof count === 'number' && count > 0 && (
               <span
-                className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+                className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
                 aria-label={`${count} items`}
               >
                 {count.toLocaleString()}
@@ -100,9 +100,9 @@ export function ViewHeader({
         </div>
 
         {(tools !== undefined || actions !== undefined) && (
-          <div className="flex shrink-0 items-center gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
             {tools !== undefined && (
-              <div className="flex items-center gap-2">{tools}</div>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">{tools}</div>
             )}
             {actions !== undefined && (
               <div className="flex items-center gap-2">{actions}</div>

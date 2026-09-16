@@ -156,7 +156,7 @@ export function deriveReadiness(input: ReadinessInput): ReadinessReport {
         severity: 'warn',
         title: 'VPN may be blocking the mesh',
         detail: input.vpnConflict.detail || 'A VPN is active that may prevent direct mesh connections.',
-        fix: 'Turn off the VPN, or allow LAN and mesh routes through it. For Mullvad, stop the daemon (sudo systemctl stop mullvad-daemon). Do not just disconnect: a plain disconnect leaves the kill-switch on and can cut the mesh entirely.',
+        fix: 'Check whether your VPN allows local network and mesh connections. Keep its protection enabled for other traffic.',
       });
     } else {
       checks.push({
@@ -175,17 +175,17 @@ export function deriveReadiness(input: ReadinessInput): ReadinessReport {
         code: 'WG_PORT',
         group: 'network',
         severity: 'ok',
-        title: 'Mesh port open',
-        detail: 'The WireGuard port is bound and ready to accept peer connections.',
+        title: 'Mesh port listening',
+        detail: 'The mesh is listening locally. A connected tunnel confirms whether another machine can reach it.',
       });
     } else {
       checks.push({
         code: 'WG_PORT',
         group: 'network',
         severity: 'warn',
-        title: 'Mesh port not open',
+        title: 'Mesh port not listening',
         detail: 'The WireGuard port is not listening on this machine. Peers may not be able to connect directly.',
-        fix: 'Check that your firewall allows UDP on the mesh port (default 51820). If another WireGuard instance is running, stop it first.',
+        fix: 'Check that the mesh service is running. Another service may be using its port; inspect the mesh logs if restarting Potluck does not help.',
       });
     }
   }
@@ -223,11 +223,8 @@ export function deriveReadiness(input: ReadinessInput): ReadinessReport {
     }
     for (const p of peerChecks) {
       const name = nameById.get(p.peerId) ?? 'A machine';
-      // Relayed is "connected but suboptimal" — the diagnostics engine rates it
-      // ok (it works), but My Machines colors it amber, and a green "all good"
-      // check sitting next to a Fix line reads wrong. Surface it as attention
-      // here to match, without alarming.
-      const severity = p.state === 'relayed' ? 'warn' : p.severity;
+      // A working relay is a connection; use the shared diagnostic severity.
+      const severity = p.severity;
       checks.push({
         code: `PEER_${p.peerId}`,
         group: 'network',

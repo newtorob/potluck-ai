@@ -19,6 +19,7 @@
  */
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Home,
   Plus,
@@ -79,7 +80,7 @@ import { MeshEnablePanel } from '@/components/household/MeshEnablePanel';
 import { CoordinatorMismatchBanner } from '@/components/household/CoordinatorMismatchBanner';
 import { describeCoordinatorAuthError } from '@/lib/coordinatorErrorMessage';
 import { ContributionReceiptsCard } from '@/components/household/ContributionReceiptsCard';
-import { deriveDiagnostics, type PeerDiagnostic } from '@/lib/meshDiagnostics';
+import { deriveDiagnostics, getConnectedPeers, type PeerDiagnostic } from '@/lib/meshDiagnostics';
 import { PreflightBanner } from '@/components/household/PreflightBanner';
 import { contributionReceiptsEnabled } from '@/lib/appPrefs';
 
@@ -215,13 +216,12 @@ export function HouseholdView() {
 
           {/* Privacy footer — same treatment as /network */}
           <p
-            className="pt-2 text-[11px] text-muted-foreground/70 max-w-2xl"
+            className="pt-2 text-xs text-muted-foreground max-w-2xl"
             aria-label="Privacy note"
           >
-            Your machines stay private. Peer names, mesh IPs, and reachability
-            details on this page never leave your machines. The coordinator
-            knows this group exists but the wider network has no
-            view into who's in it.
+            Your prompts travel directly between your machines over encrypted tunnels.
+            The coordinator stores enrollment details, including machine names and
+            mesh addresses, to connect them. Other members cannot browse your household.
           </p>
         </div>
       </div>
@@ -243,13 +243,17 @@ export function HouseholdView() {
 // ---------------------------------------------------------------------------
 
 function HouseholdHeader({ status }: { status: MeshStatus | null }) {
-  const onlineCount = status?.peers_online_count ?? 0;
-  const meshUp = status?.mesh_status === 'running';
+  const peers = useMeshStore((s) => s.peers);
+  const bridge = useMeshStore((s) => s.bridge);
+  const report = deriveDiagnostics({ bridge, status, peers });
+  const connectedCount = getConnectedPeers({ bridge, status, peers }).length;
+  const meshUp = bridge === 'reachable' && status?.mesh_status === 'running';
 
   return (
     <ViewHeader
       eyebrow="Private mesh"
       title="My Machines"
+      actions={<Link to="/readiness" className="rounded-md border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Check readiness</Link>}
       description={
         <span className="flex flex-col gap-1">
           <span>Your machines and how they connect to each other.</span>
@@ -258,25 +262,26 @@ function HouseholdHeader({ status }: { status: MeshStatus | null }) {
               <span
                 className={cn(
                   'inline-block h-2 w-2 rounded-full',
-                  meshUp
-                    ? 'bg-sage animate-hearth-pulse'
-                    : status?.mesh_status === 'error'
-                      ? 'bg-destructive'
-                      : 'bg-muted-foreground/40',
+                  report.overall === 'error' ? 'bg-destructive'
+                    : report.overall === 'warn' ? 'bg-amber-500'
+                    : meshUp && connectedCount > 0 ? 'bg-sage animate-hearth-pulse'
+                    : 'bg-muted-foreground/40',
                 )}
                 aria-hidden="true"
               />
               {meshUp
-                ? `Mesh up · ${onlineCount} machine${onlineCount === 1 ? '' : 's'} online`
+                ? status?.node_id
+                  ? `${peers.length} enrolled · ${connectedCount} connected`
+                  : 'Ready to set up'
                 : status?.mesh_status === 'error'
                   ? 'Mesh error'
                   : status?.mesh_status === 'starting'
                     ? 'Starting…'
-                    : 'Mesh not set up'}
+                    : status?.node_id ? report.headline : 'Mesh not set up'}
             </span>
             {status?.mesh_ip && (
               <span
-                className="font-mono text-[11px] text-muted-foreground/70"
+                className="font-mono text-xs text-muted-foreground"
                 title="Your mesh IP within this household"
               >
                 {status.mesh_ip}
@@ -733,7 +738,7 @@ export function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
               disabled={working || capped}
               className={cn(
                 'w-28 rounded-lg border border-input bg-background px-3 py-2',
-                'font-mono text-sm tracking-widest text-foreground placeholder:text-muted-foreground/50',
+                'font-mono text-sm tracking-widest text-foreground placeholder:text-muted-foreground',
                 'focus:outline-none focus:ring-2 focus:ring-ring',
                 'disabled:cursor-not-allowed disabled:opacity-60',
               )}
@@ -764,7 +769,7 @@ export function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
       <div className="space-y-2">
         <label
           htmlFor="join-token"
-          className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label"
+          className="font-sans text-xs font-medium text-muted-foreground tracking-hearth-label"
         >
           Pairing token
         </label>
@@ -779,7 +784,7 @@ export function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
           disabled={working}
           className={cn(
             'w-full rounded-lg border border-input bg-background px-3 py-2',
-            'font-mono text-sm text-foreground placeholder:text-muted-foreground/50',
+            'font-mono text-sm text-foreground placeholder:text-muted-foreground',
             'focus:outline-none focus:ring-2 focus:ring-ring',
             'disabled:cursor-not-allowed disabled:opacity-60',
           )}
@@ -840,10 +845,11 @@ function PairedView({
   // Probe each reachable peer's live capabilities (model, hardware, load) so the
   // roster shows what each machine can actually do, not just whether it's up.
   // Reuses the same /peer/capabilities probe the capacity + big-model cards use.
+  const connectedPeers = useMemo(() => getConnectedPeers({ bridge, status, peers }), [bridge, status, peers]);
   const [capsByNode, setCapsByNode] = useState<Record<string, PeerCapabilities>>({});
   useEffect(() => {
     let cancelled = false;
-    const reachable = peers.filter((p) => p.reachable);
+    const reachable = connectedPeers;
     if (reachable.length === 0) {
       setCapsByNode({});
       return;
@@ -861,7 +867,7 @@ function PairedView({
     return () => {
       cancelled = true;
     };
-  }, [peers]);
+  }, [connectedPeers]);
 
   return (
     <div className="space-y-8">
@@ -869,7 +875,7 @@ function PairedView({
       <PreflightBanner report={report} />
 
       {/* Hero payoff — leads with the differentiator, not the status plumbing. */}
-      <MeshPayoffCard peers={peers} onAddMachine={onAddMachine} />
+      <MeshPayoffCard peers={connectedPeers} enrolledCount={peers.length} capsByNode={capsByNode} onAddMachine={onAddMachine} />
 
       {/* Household map — Deco-style radial view of the mesh, each machine
           coloured by the same diagnostics the roster list uses. */}
@@ -902,7 +908,7 @@ function PairedView({
                     node_name (that lives on the server side). */}
                 {status.mesh_ip}
               </p>
-              <p className="text-[11px] text-muted-foreground/80">
+              <p className="text-xs text-muted-foreground">
                 {status.coordinator_connection === 'connected'
                   ? 'Connected to the coordinator'
                   : status.coordinator_connection === 'connecting'
@@ -958,23 +964,23 @@ function PairedView({
       {/* Capacity — "your network can run X fast / Y good / Z slow".
           Renders only when at least one peer is reachable; computes from
           live /peer/capabilities probes. */}
-      {peers.some((p) => p.reachable) && (
+      {connectedPeers.length > 0 && (
         <section aria-label="Network capacity">
           <SectionHeader>Your network can run</SectionHeader>
-          <CapacityCard peers={peers} />
+          <CapacityCard peers={connectedPeers} />
         </section>
       )}
 
       {/* Big Model Mode — gated on at least one peer offering rpc compute.
           The component itself probes on mount + shows nothing if none. */}
       <section aria-label="Big Model Mode">
-        <BigModelModeCard peers={peers} />
+        <BigModelModeCard peers={connectedPeers} />
       </section>
 
       {/* Pipeline mode — split a model's layers across machines (WAN-viable
           sibling of Big Model Mode). Self-hides when no peer is eligible. */}
       <section aria-label="Pipeline mode">
-        <PipelineModeCard peers={peers} />
+        <PipelineModeCard peers={connectedPeers} />
       </section>
 
       {/* Routing strategy — only matters when there's more than one peer */}
@@ -1007,12 +1013,16 @@ function PairedView({
  */
 function MeshPayoffCard({
   peers,
+  enrolledCount,
+  capsByNode,
   onAddMachine,
 }: {
   peers: MeshPeer[];
+  enrolledCount: number;
+  capsByNode: Record<string, PeerCapabilities>;
   onAddMachine: () => void;
 }) {
-  const reachable = peers.filter((p) => p.reachable);
+  const reachable = peers.filter((p) => capsByNode[p.node_id]?.available_for_inference);
   const live = reachable.length > 0;
   const shownNames = reachable.slice(0, 3).map((p) => p.node_name);
   const extra = reachable.length - shownNames.length;
@@ -1025,24 +1035,29 @@ function MeshPayoffCard({
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
         {live ? (
           <>
-            Ask from this machine and Potluck can run a model too big for it on{' '}
+            Ask from this machine using a model loaded on{' '}
             <span className="font-medium text-foreground">
               {reachable.length === 1
                 ? shownNames[0]
                 : `${reachable.length} of your other machines`}
             </span>
-            , privately over your own WireGuard mesh. No cloud, no one else's hardware.
+            , over your encrypted household connection.
           </>
         ) : peers.length > 0 ? (
           <>
-            Your other machines are offline right now. Bring one online and you can run models
-            bigger than this machine can hold, privately over your own mesh.
+            {peers.length} machine{peers.length === 1 ? ' is' : 's are'} connected.
+            To serve a request, a machine also needs a loaded model and Contribute compute enabled.
+            Check its readiness below.
+          </>
+        ) : enrolledCount > 0 ? (
+          <>
+            Your other machines are enrolled but have no active connection. Open Potluck
+            on both machines and use Check readiness to find what needs attention.
           </>
         ) : (
           <>
             Right now it's just this machine. Pair a second one and your laptop can borrow your
-            desktop's GPU to run models bigger than any single box can hold, privately over your own
-            mesh.
+            desktop's GPU and use models loaded there, privately over your own mesh.
           </>
         )}
       </p>
@@ -1069,6 +1084,10 @@ function MeshPayoffCard({
               <span className="text-xs text-muted-foreground">+{extra} more</span>
             )}
           </>
+        ) : enrolledCount > 0 ? (
+          <Link to="/readiness" className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            Check connections
+          </Link>
         ) : (
           <button
             type="button"
@@ -1191,7 +1210,7 @@ function CapacityCard({ peers }: { peers: MeshPeer[] }) {
           <CapacityPill key={bucket.bucket} result={bucket} />
         ))}
       </ul>
-      <p className="mt-3 text-[11px] text-muted-foreground/70">
+      <p className="mt-3 text-xs text-muted-foreground">
         Buckets reflect the best single peer for each model size. fast = &gt;20 tok/s, good = 8-20, slow = 1-8.
         {snapshot.buckets.some((b) => b.measured) && (
           <> A filled dot marks a live benchmark; the rest are conservative estimates.</>
@@ -1234,7 +1253,7 @@ function CapacityPill({ result }: { result: CapacityResult }) {
         />
       )}
       {result.bigModelEligible && (
-        <span className="text-[10px] opacity-70" aria-label="via Big Model pooling">·pool</span>
+        <span className="text-xs opacity-70" aria-label="via Big Model pooling">·pool</span>
       )}
     </li>
   );
@@ -1379,7 +1398,7 @@ function BigModelModeCard({ peers }: { peers: MeshPeer[] }) {
               {(loadedRpcServers ?? []).map((ep) => (
                 <li
                   key={ep}
-                  className="font-mono text-[11px] text-muted-foreground"
+                  className="font-mono text-xs text-muted-foreground"
                 >
                   {ep}
                 </li>
@@ -1399,15 +1418,15 @@ function BigModelModeCard({ peers }: { peers: MeshPeer[] }) {
             </p>
             <ul className="space-y-0.5">
               {eligible.map(({ peer, capabilities }) => (
-                <li key={peer.node_id} className="text-[11px] text-muted-foreground">
+                <li key={peer.node_id} className="text-xs text-muted-foreground">
                   <span className="font-medium text-foreground/85">{peer.node_name}</span>
                   {capabilities.hardware?.gpu_vram_gb && (
-                    <span className="mx-1.5 text-muted-foreground/40">·</span>
+                    <span className="mx-1.5 text-muted-foreground">·</span>
                   )}
                   {capabilities.hardware?.gpu_vram_gb && (
                     <span>{capabilities.hardware.gpu_vram_gb} GB VRAM</span>
                   )}
-                  <span className="mx-1.5 text-muted-foreground/40">·</span>
+                  <span className="mx-1.5 text-muted-foreground">·</span>
                   <span className="font-mono">{capabilities.rpc_endpoint}</span>
                 </li>
               ))}
@@ -1423,7 +1442,7 @@ function BigModelModeCard({ peers }: { peers: MeshPeer[] }) {
       )}
 
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] text-muted-foreground/80 leading-snug">
+        <p className="text-xs text-muted-foreground leading-snug">
           {isOn
             ? 'Disabling reloads the model locally, dropping the peers.'
             : activeModelId
@@ -1591,7 +1610,7 @@ function PipelineModeCard({ peers }: { peers: MeshPeer[] }) {
             <p className="text-xs font-medium text-foreground">
               Active: {loadedPipeline?.model_id} split across the household
             </p>
-            <p className="font-mono text-[11px] text-muted-foreground">
+            <p className="font-mono text-xs text-muted-foreground">
               head {loadedPipeline?.head_layers}/{loadedPipeline?.n_layers} layers on{' '}
               {loadedPipeline?.device} · next hop {loadedPipeline?.downstream}
             </p>
@@ -1609,11 +1628,11 @@ function PipelineModeCard({ peers }: { peers: MeshPeer[] }) {
             </p>
             <ul className="space-y-0.5">
               {eligible.map(({ peer, capabilities }) => (
-                <li key={peer.node_id} className="text-[11px] text-muted-foreground">
+                <li key={peer.node_id} className="text-xs text-muted-foreground">
                   <span className="font-medium text-foreground/85">{peer.node_name}</span>
                   {capabilities.hardware?.gpu_vram_gb && (
                     <>
-                      <span className="mx-1.5 text-muted-foreground/40">·</span>
+                      <span className="mx-1.5 text-muted-foreground">·</span>
                       <span>{capabilities.hardware.gpu_vram_gb} GB VRAM</span>
                     </>
                   )}
@@ -1631,7 +1650,7 @@ function PipelineModeCard({ peers }: { peers: MeshPeer[] }) {
         <label className="flex items-start justify-between gap-3 cursor-pointer">
           <span className="min-w-0">
             <span className="block text-xs font-medium text-foreground">Shared batching</span>
-            <span className="mt-0.5 block text-[11px] text-muted-foreground leading-snug">
+            <span className="mt-0.5 block text-xs text-muted-foreground leading-snug">
               Serve several agents at once through one shared pass. Helps when
               multiple tools hit this machine together; no change for a single chat.
             </span>
@@ -1646,7 +1665,7 @@ function PipelineModeCard({ peers }: { peers: MeshPeer[] }) {
           />
         </label>
         {isOn && (
-          <p className="mt-1.5 text-[11px] text-muted-foreground/80 leading-snug">
+          <p className="mt-1.5 text-xs text-muted-foreground leading-snug">
             {continuousBatch
               ? 'On for the loaded chain.'
               : 'Off for the loaded chain. Disable, toggle, then re-enable to change it.'}
@@ -1661,7 +1680,7 @@ function PipelineModeCard({ peers }: { peers: MeshPeer[] }) {
       )}
 
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] text-muted-foreground/80 leading-snug">
+        <p className="text-xs text-muted-foreground leading-snug">
           {isOn
             ? 'Disabling reloads the model locally, dropping the peers.'
             : activeModelId
@@ -1781,7 +1800,7 @@ function CapChip({ children, tone = 'default' }: { children: ReactNode; tone?: '
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded px-1.5 py-0.5 text-[11px]',
+        'inline-flex items-center rounded px-1.5 py-0.5 text-xs',
         tone === 'sage' && 'bg-sage/10 text-sage',
         tone === 'amber' && 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
         tone === 'default' && 'bg-muted text-muted-foreground',
@@ -1849,17 +1868,17 @@ function PeerRow({
         <p className="font-medium text-foreground truncate">
           {peer.node_name}
         </p>
-        <p className="text-[11px] text-muted-foreground/80 truncate">
+        <p className="text-xs text-muted-foreground truncate">
           <span className="font-mono">{peer.mesh_ip}</span>
           {peer.platform && (
             <>
-              <span className="mx-1.5 text-muted-foreground/40">·</span>
+              <span className="mx-1.5 text-muted-foreground">·</span>
               {peer.platform}
             </>
           )}
           {peer.last_seen_at && (
             <>
-              <span className="mx-1.5 text-muted-foreground/40">·</span>
+              <span className="mx-1.5 text-muted-foreground">·</span>
               last seen {relativeTime(peer.last_seen_at)}
             </>
           )}
@@ -1906,14 +1925,14 @@ function PeerRow({
             which machine to wire. Copy is plain + honest — no hype. */}
         {caps?.link_type === 'wifi' &&
           (caps.available_for_pipeline ?? caps.available_for_big_model) && (
-            <p className="mt-1.5 flex items-start gap-1.5 text-[11px] leading-snug text-amber-700 dark:text-amber-300">
+            <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-snug text-amber-700 dark:text-amber-300">
               <Wifi className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
               On WiFi. Wiring it (Ethernet) makes distributed inference faster and steadier.
             </p>
           )}
 
         {showDetail && (
-          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
             {diag.detail}
             {diag.fix && (
               <>
@@ -1954,7 +1973,7 @@ function PeerRemoveControl({ peer, onRemoved }: { peer: MeshPeer; onRemoved: () 
 
   if (phase === 'working') {
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
         <Loader2 className="h-2.5 w-2.5 animate-spin" aria-hidden="true" />
         Removing…
       </span>
@@ -1963,7 +1982,7 @@ function PeerRemoveControl({ peer, onRemoved }: { peer: MeshPeer; onRemoved: () 
 
   if (phase === 'confirm') {
     return (
-      <span className="inline-flex items-center gap-2 text-[10px]">
+      <span className="inline-flex items-center gap-2 text-xs">
         <button
           type="button"
           onClick={() => void doRemove()}
@@ -1988,13 +2007,13 @@ function PeerRemoveControl({ peer, onRemoved }: { peer: MeshPeer; onRemoved: () 
         type="button"
         onClick={() => setPhase('confirm')}
         title="Remove this machine from your household"
-        className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/70 hover:text-destructive transition-colors"
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
       >
         <Trash2 className="h-2.5 w-2.5" aria-hidden="true" />
         Remove
       </button>
       {error !== null && (
-        <span className="text-[10px] text-destructive" role="alert">
+        <span className="text-xs text-destructive" role="alert">
           {error}
         </span>
       )}
@@ -2013,7 +2032,7 @@ function PeerStateBadge({ diag }: { diag?: PeerDiagnostic | undefined }) {
     direct: { icon: Link2, cls: 'border-sage/30 bg-sage/10 text-sage' },
     relayed: {
       icon: RadioTower,
-      cls: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+      cls: 'border-sage/30 bg-sage/10 text-sage',
     },
     connecting: {
       icon: Loader2,
@@ -2039,7 +2058,7 @@ function PeerStateBadge({ diag }: { diag?: PeerDiagnostic | undefined }) {
     <span
       className={cn(
         'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5',
-        'text-[10px] font-medium',
+        'text-xs font-medium',
         v.cls,
       )}
       title={title}
@@ -2181,7 +2200,7 @@ function UnpairControl({ onUnpaired }: { onUnpaired: () => void }) {
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="mb-3 font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
+    <h2 className="mb-3 font-sans text-xs font-medium text-muted-foreground tracking-hearth-label">
       {children}
     </h2>
   );

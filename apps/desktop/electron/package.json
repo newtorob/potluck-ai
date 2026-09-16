@@ -1,6 +1,6 @@
 {
   "name": "potluck-ai-desktop",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Potluck AI — local-first AI on a member-operated mesh network",
   "main": "main.js",
   "author": "Potluck AI",
@@ -26,6 +26,7 @@
   },
   "build": {
     "afterSign": "scripts/notarize.js",
+    "beforePack": "scripts/check-native-architecture.js",
     "appId": "ai.trypotluck.app",
     "productName": "Potluck AI",
     "protocols": [
