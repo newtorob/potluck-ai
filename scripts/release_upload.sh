@@ -45,7 +45,7 @@ BUCKET="${2:?R2 bucket name mapped to releases.trypotluck.ai — see PREREQS #3}
 DRY="${3:-}"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="$REPO_ROOT/apps/desktop/electron/out"
+OUT="${RELEASE_OUT_DIR:-$REPO_ROOT/apps/desktop/electron/out}"
 
 if [ ! -d "$OUT" ]; then
   echo "error: no build output at $OUT" >&2
@@ -56,13 +56,13 @@ fi
 # Guard: refuse to publish if the feed file is missing (a --dir/dogfood build
 # produces no latest-mac.yml, so publishing it would give users a broken feed).
 if [ -z "$(find "$OUT" -maxdepth 1 -name 'latest*.yml' -print -quit)" ]; then
-  echo "error: no latest-mac.yml in $OUT — this is not a full 'make installer-mac' build." >&2
+  echo "error: no updater feed in $OUT — this is not a complete release build." >&2
   echo "       (a '--dir'/dogfood build cannot be published; it has no update feed.)" >&2
   exit 1
 fi
 
 echo "==> Artifacts to publish from $OUT:"
-find "$OUT" -maxdepth 1 \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.blockmap' -o -name 'latest*.yml' \) \
+find "$OUT" -maxdepth 1 \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -name '*.deb' -o -name '*.AppImage' -o -name 'SHA256SUMS*' -o -name '*.blockmap' -o -name 'latest*.yml' \) \
   -exec basename {} \; | sort | sed 's/^/    /'
 
 # Plain string (not an array): macOS bash 3.2 errors on "${arr[@]}" for an
@@ -85,8 +85,21 @@ rclone copy "$OUT" "${REMOTE}:${BUCKET}" \
   --include "*.dmg" \
   --include "*.zip" \
   --include "*.exe" \
+  --include "*.deb" \
+  --include "*.AppImage" \
+  --include "SHA256SUMS*" \
   --include "*.blockmap" \
   --progress $DRY_FLAG
+
+# Check the complete upload before making any feed point to it. --download
+# verifies bytes even when the object store has no comparable checksum.
+if [ "$DRY" != "--dry-run" ]; then
+  rclone check "$OUT" "${REMOTE}:${BUCKET}" --one-way --download \
+    --max-depth 1 \
+    --include "*.dmg" --include "*.zip" --include "*.exe" \
+    --include "*.deb" --include "*.AppImage" --include "SHA256SUMS*" \
+    --include "*.blockmap"
+fi
 
 echo "==> Uploading the update feed"
 # shellcheck disable=SC2086
