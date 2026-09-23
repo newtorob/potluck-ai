@@ -42,7 +42,7 @@ async function main() {
     POTLUCK_BIND_HOST: '127.0.0.1', HF_HUB_OFFLINE: '1',
     POTLUCK_LOCAL_API_SOCKET: path.join(directory, 'absent.sock'), NO_COLOR: '1' };
   for (const key of ['POTLUCK_GATEWAY_KEY', 'POTLUCK_SIDECAR_TOKEN', 'POTLUCK_MEMORY_DB_PATH']) delete env[key];
-  const entry = path.join(root, 'apps/cli/dist/index.js');
+  const entry = process.env.POTLUCK_CLI_ENTRY || path.join(root, 'apps/cli/dist/index.js');
   const cli = async args => {
     const pending = run(process.execPath, [entry, ...args, '--json', '--timeout', '30000'], { env, cwd: nested, timeout: 45000 });
     pending.child.stdin.end();
@@ -86,7 +86,7 @@ async function main() {
     const settings = await read('config.json');
     const cfg = { baseURL: env.POTLUCK_GATEWAY_URL, apiKey: settings.gateway.api_key, enabled: true,
       modelLock: { ...lock, path: path.join(project, 'potluck.lock') } };
-    const { streamChat } = await import(pathToFileURL(path.join(root, 'apps/cli/dist/gateway.js')));
+    const { streamChat } = await import(pathToFileURL(path.join(path.dirname(entry), 'gateway.js')));
     let output = '';
     for await (const token of streamChat(cfg, [{ role: 'user', content: 'Reply with the digit 4. /no_think' }], {
       model: slug, scope: 'local', maxTokens: 64, temperature: 0, signal: AbortSignal.timeout(120000),
@@ -144,7 +144,7 @@ async function main() {
     let stopped = false;
     try { await cli(['down']); stopped = true; } catch { /* retain private logs for diagnosis */ }
     const report = { passed: passed && stopped, stopped, checks, directory, platform: process.platform,
-      architecture: process.arch, date: new Date().toISOString() };
+      architecture: process.arch, cli: entry, runtime: env.POTLUCK_RUNTIME_BIN || 'automatic discovery', date: new Date().toISOString() };
     await fs.writeFile(path.join(directory, 'report.json'), JSON.stringify(report, null, 2), { mode: 0o600 });
     process.stdout.write(JSON.stringify(report, null, 2) + '\n');
     if (!report.passed) process.exitCode = 1;
