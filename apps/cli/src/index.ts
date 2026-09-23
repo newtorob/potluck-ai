@@ -63,6 +63,7 @@ import { runOperation } from "./operations.js";
 import { plainText } from "./logs.js";
 import { RuntimeError } from "./runtime.js";
 import { ControlError } from "./control.js";
+import { beginSession, loadSession, saveSession, type SavedSession } from "./sessions.js";
 
 const VERSION = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
 
@@ -89,6 +90,7 @@ function printHelp(): void {
       '  potluck run "prompt"           plain inference, with optional piped stdin',
       "  potluck launch aider           use an installed Aider with Potluck",
       "  potluck contribute status      control contribution, schedules and limits",
+      "  potluck sessions list          list private saved agent sessions",
       "  potluck gateway enable         enable the local gateway",
       "  potluck status [--json]        inspect runtime, connection and models",
       "  potluck doctor [--json]        diagnose setup/connection problems",
@@ -99,6 +101,8 @@ function printHelp(): void {
       "      --scope <s>        Routing scope: local | mine (default from cli.json)",
       "      --verify <cmd>     Build/test command run after each edit (default: auto-detect)",
       "      --no-verify        Disable the post-edit verify step",
+      "      --save-session     Save completed turns privately (requires project pin)",
+      "      --resume <id>      Continue saved history with the same project/model/scope",
       '  -p, --print "task"     Run a single task non-interactively, then exit',
       "  -y, --yes              In -p mode, auto-approve edits/writes/commands",
       "  -h, --help             Show this help",
@@ -180,6 +184,7 @@ async function runOneShot(
     cwd: string;
     yes: boolean;
     verifyCommand: string | null;
+    session?: SavedSession;
   },
 ): Promise<void> {
   const confirm = oneShotConfirm(opts.yes, (line) => stderr.write(`${line}\n`));
@@ -189,6 +194,7 @@ async function runOneShot(
   ];
   const repoMap = await buildRepoMap(opts.cwd);
   if (repoMap) conversation.push({ role: "system", content: repoMap });
+  if (opts.session) conversation.push(...opts.session.history);
   if (!opts.verifyCommand) {
     stderr.write(
       c.dim(
@@ -218,6 +224,10 @@ async function runOneShot(
         ),
     },
   });
+  if (opts.session) {
+    await saveSession(opts.session, conversation);
+    stderr.write(`Session saved: ${opts.session.id}\n`);
+  }
 }
 
 /**
@@ -320,6 +330,7 @@ async function main(): Promise<void> {
   const projectLock = await readProjectModelLock(cwd);
   pinnedModel(projectLock, args.model);
   cfg.modelLock = projectLock;
+  const previousSession = args.resume ? await loadSession(args.resume) : undefined;
 
   let verify = await resolveVerify({
     cwd,
@@ -363,10 +374,11 @@ async function main(): Promise<void> {
     const capWarn = modelCapabilityWarning(model);
     if (capWarn) stderr.write(`${c.yellow(capWarn)}\n`);
 
-    const { scope, notice } = resolveScope(args.scope, cli.scope);
+    const { scope, notice } = resolveScope(args.scope ?? previousSession?.scope, cli.scope);
     if (notice) stderr.write(`${c.yellow(notice)}\n`);
 
     try {
+      const session = args.saveSession || previousSession ? await beginSession(cwd, projectLock, scope, previousSession) : undefined;
       await runOneShot(args.task.trim(), {
         cfg,
         model,
@@ -374,6 +386,7 @@ async function main(): Promise<void> {
         cwd,
         yes: args.yes,
         verifyCommand: verify.command,
+        session,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -436,8 +449,11 @@ async function main(): Promise<void> {
   const capWarn = modelCapabilityWarning(model);
   if (capWarn) stdout.write(`${c.yellow(capWarn)}\n`);
 
-  const initialScope = resolveScope(args.scope, cli.scope);
+  const initialScope = resolveScope(args.scope ?? previousSession?.scope, cli.scope);
   let scope: Scope = initialScope.scope;
+  let session: SavedSession | undefined;
+  try { if (args.saveSession || previousSession) session = await beginSession(cwd, projectLock, scope, previousSession); }
+  catch (error) { stderr.write(`${(error as Error).message}\n`); process.exitCode = 1; rl.close(); return; }
   if (initialScope.notice) stdout.write(`${c.yellow(initialScope.notice)}\n`);
 
   const confirm = makeConfirm((q) => ask(q).then((a) => a ?? "n"));
@@ -447,6 +463,10 @@ async function main(): Promise<void> {
   ];
   const repoMap = await buildRepoMap(cwd);
   if (repoMap) conversation.push({ role: "system", content: repoMap });
+  if (session) {
+    conversation.push(...session.history);
+    stdout.write(`Session ${session.id}${previousSession ? ` (continued from ${previousSession.id})` : ""}. Completed turns will be saved privately.\n`);
+  }
 
   // Ctrl-C cancels the active turn; at an idle prompt it exits.
   let active: AbortController | null = null;
@@ -477,6 +497,7 @@ async function main(): Promise<void> {
       const target = line.slice("/scope".length).trim();
       if (target) {
         const resolved = normalizeScope(target, scope);
+        if (session && resolved.scope !== session.scope) { stdout.write("Start a new session to change its routing scope.\n"); continue; }
         if (resolved.notice) stdout.write(`${c.yellow(resolved.notice)}\n`);
         scope = resolved.scope;
         stdout.write(`${c.dim("scope set to")} ${c.yellow(scope)}\n`);
@@ -638,6 +659,10 @@ async function main(): Promise<void> {
             ),
         },
       });
+      if (session) {
+        try { await saveSession(session, conversation); }
+        catch (error) { stdout.write(`Session save failed: ${(error as Error).message}\n`); }
+      }
     } catch (err) {
       if (active.signal.aborted) {
         stdout.write(`\n${c.yellow("✗ turn cancelled")}\n`);

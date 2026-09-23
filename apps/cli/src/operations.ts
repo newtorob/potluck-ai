@@ -1,6 +1,7 @@
 import { launchAider } from "./launch.js";
 import { manageContribution, formatContribution } from "./contribute.js";
 import { runInference } from "./inference.js";
+import { manageSessions } from "./sessions.js";
 import type { CliArgs } from "./args.js";
 import { diagnose, formatDiagnostics } from "./diagnostics.js";
 import { plainText, readLogs } from "./logs.js";
@@ -12,6 +13,7 @@ import { serveRuntime } from "./serve.js";
 import { manageService } from "./service.js";
 
 export function operationHelp(command: string): string {
+  if (command === "sessions") return "Usage: potluck sessions list [--json]\n       potluck sessions delete <session-id> [--json]\nOpt in with potluck --save-session or potluck --resume <id>. History is stored privately on this machine and requires a project model pin. Resume from the original working directory. Each resume forks a new session; saved tool calls are never replayed.\n";
   if (command === "run") return 'Usage: potluck run ["prompt"] [--model <id>] [--scope local|mine] [--max-tokens 1-32768] [--timeout 1-300000] [--json]\nPlain inference with no file-editing tools. Piped stdin is appended to the prompt (combined limit 1 MiB). Project model locks apply. Default timeout: 120000 ms. Text streams to stdout; JSON is emitted only after a complete response. Exit 124: timeout; 130: cancelled; 1: inference failed; 2: invalid input.\n';
   if (command === "contribute") return "Usage: potluck contribute status|on|off [--json]\n       potluck contribute limits [--jobs 0-64] [--max-tokens 1-32768] [--min-free-memory GiB]\n       potluck contribute schedule HH:MM-HH:MM [--days mon,tue,...] [--timezone Area/City]\n       potluck contribute schedule off\nControls coordinator jobs served by this runtime. Schedule boundaries stop new admissions; existing jobs finish. Overnight windows belong to the starting weekday. Free-memory checks are an admission threshold, not a process memory ceiling. No GPU-percentage throttle is claimed. Off stops the contributor connection.\n";
   if (command === "launch") return "Usage: potluck launch aider [--model <id>] [--scope local|mine] [--message <prompt>]\nLaunch installed Aider through a temporary authenticated local bridge that enforces the selected model, scope and project lock. Existing tool config files remain unchanged.\n";
@@ -35,6 +37,12 @@ export function operationHelp(command: string): string {
 export async function runOperation(args: CliArgs, out: (value: string) => void): Promise<number> {
   if (args.help) { out(operationHelp(args.command!)); return 0; }
   if (args.command === "run") return runInference(args, out);
+  if (args.command === "sessions") {
+    const report = await manageSessions(args.action!, args.target);
+    out(args.json ? JSON.stringify(report) + "\n" : plainText(report.deleted ? `Deleted session ${report.deleted}.\n` :
+      ((report.sessions as Array<Record<string, unknown>>).map(s => `${s.id}\t${s.model}\t${s.scope}\t${s.updatedAt}\t${s.cwd}`).join("\n") || "No saved sessions.") + `\n${report.unreadable ? `${report.unreadable} unreadable session(s) skipped.\n` : ""}`));
+    return 0;
+  }
   if (args.command === "contribute") {
     const report = await manageContribution(args);
     out(args.json ? JSON.stringify(report) + "\n" : plainText(formatContribution(report)));

@@ -1,7 +1,7 @@
 /** Parse commands before touching config, starting a REPL, or making requests. */
 export class UsageError extends Error {}
 
-export type Command = "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
+export type Command = "sessions" | "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
 export interface CliArgs {
   help: boolean;
   version: boolean;
@@ -36,9 +36,11 @@ export interface CliArgs {
   minFreeMemory?: number;
   days?: string;
   timezone?: string;
+  saveSession?: boolean;
+  resume?: string;
 }
 
-const commands = new Set<Command>(["run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
+const commands = new Set<Command>(["sessions", "run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
 
 export function parseArgs(argv: string[]): CliArgs {
   const out: CliArgs = { help: false, version: false, print: false, yes: false,
@@ -67,6 +69,8 @@ export function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--sign-in") out.signIn = true;
     else if (arg === "--connect") out.connect = true;
     else if (arg === "--preferences") out.preferences = true;
+    else if (arg === "--save-session") out.saveSession = true;
+    else if (flag === "--resume") out.resume = value();
     else if (arg === "--with-model") out.withModel = true;
     else if (flag === "--jobs" || flag === "--max-tokens") {
       const v = value(), min = flag === "--jobs" ? 0 : 1, max = flag === "--jobs" ? 64 : 32768;
@@ -106,7 +110,10 @@ export function parseArgs(argv: string[]): CliArgs {
       throw new UsageError("Unknown command. Run potluck --help, or use potluck -p \"task\".");
     }
     out.command = positional[0] as Command;
-    if (out.command === "run") {
+    if (out.command === "sessions") {
+      out.action = positional[1] || "list"; out.target = positional[2];
+      if (!["list", "delete"].includes(out.action) || positional.length > 3 || (out.target && out.action !== "delete") || (!out.help && out.action === "delete" && !out.target)) throw new UsageError("Use sessions list or sessions delete <session-id>.");
+    } else if (out.command === "run") {
       if (positional.length > 2) throw new UsageError('Quote your prompt: potluck run "Summarize this".');
       out.task = positional[1];
     } else if (out.command === "contribute") {
@@ -138,6 +145,8 @@ export function parseArgs(argv: string[]): CliArgs {
       if (out.action === "invite" && !out.output && !out.help) throw new UsageError("Use household invite --output <private-file>.");
     } else if (positional.length !== 1) throw new UsageError("Unexpected argument. Run potluck --help.");
   }
+  if (out.command && (out.saveSession || out.resume)) throw new UsageError("--save-session and --resume apply to the coding agent, not management commands.");
+  if (out.saveSession && out.resume) throw new UsageError("--resume already saves the continued session.");
   const operation = out.command;
   const allowed: Record<string, string[]> = {
     "--jobs": ["contribute"], "--max-tokens": ["contribute", "run"], "--min-free-memory": ["contribute"], "--days": ["contribute"], "--timezone": ["contribute"],
