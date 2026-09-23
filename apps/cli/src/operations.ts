@@ -1,3 +1,4 @@
+import { launchAider } from "./launch.js";
 import type { CliArgs } from "./args.js";
 import { diagnose, formatDiagnostics } from "./diagnostics.js";
 import { plainText, readLogs } from "./logs.js";
@@ -9,6 +10,7 @@ import { serveRuntime } from "./serve.js";
 import { manageService } from "./service.js";
 
 export function operationHelp(command: string): string {
+  if (command === "launch") return "Usage: potluck launch aider [--model <id>] [--scope local|mine] [--message <prompt>]\nLaunch installed Aider through a temporary authenticated local bridge that enforces the selected model, scope and project lock. Existing tool config files remain unchanged.\n";
   if (command === "serve") return "Usage: potluck serve\nRun the shared runtime in the foreground for launchd, systemd, or brew services. Waits while another launcher owns it. Ctrl-C stops only this launcher's child.\n";
   if (command === "service") return "Usage: potluck service [install|uninstall|start|stop|restart|status] [--json]\nManage the current user's runtime service on macOS/Linux. install enables startup at login and starts it. stop keeps login startup enabled; uninstall removes it and keeps your data.\nHomebrew installations use brew services. Linux startup without a login requires administrator-configured user lingering.\n";
   if (command === "setup") return "Usage: potluck setup [--no-input] [--with-model|--model <id>] [--enable-gateway] [--sign-in] [--connect] [--name <machine-name>] [--json]\nStart the local engine and resume setup. Interactive setup recommends, downloads, loads and tests a fitting model; unattended model setup requires --with-model or --model. Gateway access, account login, and household connection require opt-in.\nWith --json/--no-input only explicitly requested steps run. Browser approval can happen on another device.\nUse potluck setup --preferences for coding-agent defaults.\n";
@@ -28,6 +30,7 @@ export function operationHelp(command: string): string {
 
 export async function runOperation(args: CliArgs, out: (value: string) => void): Promise<number> {
   if (args.help) { out(operationHelp(args.command!)); return 0; }
+  if (args.command === "launch") return launchAider(args);
   if (args.command === "serve") return serveRuntime();
   if (args.command === "service") {
     const report = await manageService(args.action!, args.timeout);

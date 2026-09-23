@@ -34,7 +34,7 @@ import {
   type VerifyResolution,
 } from "./config.js";
 import { listModels, type ChatMessage } from "./gateway.js";
-import { readProjectModelLock, pinnedModel } from "./model-lock.js";
+import { readProjectModelLock, pinnedModel, ModelLockError } from "./model-lock.js";
 import { runTask, systemPrompt } from "./agent.js";
 import {
   briefSection,
@@ -271,7 +271,7 @@ async function main(): Promise<void> {
     try {
       process.exitCode = await runOperation(args, (text) => stdout.write(text));
     } catch (error) {
-      const message = error instanceof RuntimeError || error instanceof ControlError || error instanceof UsageError ? error.message
+      const message = error instanceof ModelLockError || error instanceof RuntimeError || error instanceof ControlError || error instanceof UsageError ? error.message
         : "Could not complete the command. Check endpoint configuration and local file permissions.";
       if (args.json) stdout.write(JSON.stringify({ schemaVersion: 1, error: { code: "operation_failed", message } }) + "\n");
       else stderr.write(plainText(message) + "\n");

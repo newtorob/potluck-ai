@@ -1,7 +1,7 @@
 /** Parse commands before touching config, starting a REPL, or making requests. */
 export class UsageError extends Error {}
 
-export type Command = "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
+export type Command = "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
 export interface CliArgs {
   help: boolean;
   version: boolean;
@@ -30,9 +30,10 @@ export interface CliArgs {
   connect?: boolean;
   preferences?: boolean;
   withModel?: boolean;
+  message?: string;
 }
 
-const commands = new Set<Command>(["setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
+const commands = new Set<Command>(["launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
 
 export function parseArgs(argv: string[]): CliArgs {
   const out: CliArgs = { help: false, version: false, print: false, yes: false,
@@ -62,6 +63,7 @@ export function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--connect") out.connect = true;
     else if (arg === "--preferences") out.preferences = true;
     else if (arg === "--with-model") out.withModel = true;
+    else if (flag === "--message") out.message = value();
     else if (flag === "--name") out.name = value();
     else if (flag === "--output") out.output = value();
     else if (flag === "--invite-file") out.inviteFile = value();
@@ -88,7 +90,10 @@ export function parseArgs(argv: string[]): CliArgs {
       throw new UsageError("Unknown command. Run potluck --help, or use potluck -p \"task\".");
     }
     out.command = positional[0] as Command;
-    if (out.command === "service") {
+    if (out.command === "launch") {
+      out.action = positional[1];
+      if ((!out.help && out.action !== "aider") || positional.length > 2) throw new UsageError("Use potluck launch aider [--model <id>] [--scope local|mine] [--message <prompt>].");
+    } else if (out.command === "service") {
       out.action = positional[1] || "status";
       if (positional.length > 2 || !["install", "uninstall", "start", "stop", "restart", "status"].includes(out.action)) throw new UsageError("Use potluck service install|uninstall|start|stop|restart|status.");
     } else if (out.command === "models") {
@@ -113,7 +118,7 @@ export function parseArgs(argv: string[]): CliArgs {
     "--wait": ["login"], "--no-wait": ["login"], "--local": ["logout"],
     "--name": ["household", "connect", "setup"], "--output": ["household"],
     "--invite-file": ["connect"], "--no-input": ["setup"], "--enable-gateway": ["setup"],
-    "--with-model": ["setup"], "--sign-in": ["setup"], "--connect": ["setup"], "--preferences": ["setup"],
+    "--message": ["launch"], "--with-model": ["setup"], "--sign-in": ["setup"], "--connect": ["setup"], "--preferences": ["setup"],
   };
   for (const [flag, supported] of Object.entries(allowed)) {
     if (seen.has(flag) && !supported.includes(out.command || "")) throw new UsageError(`${flag} requires ${supported.join(" or ")}.`);
@@ -123,12 +128,13 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.command === "household" && ((out.name && out.action !== "create") || (out.output && out.action !== "invite"))) throw new UsageError("--name requires household create; --output requires household invite.");
   if (out.preferences && (out.noInput || out.json || out.enableGateway || out.signIn || out.connect || out.name || out.model || out.withModel)) throw new UsageError("--preferences is an interactive preferences-only wizard.");
   if (["up", "down"].includes(out.command || "") && !seen.has("--timeout")) out.timeout = 15000;
+  if (out.command === "launch" && out.json) throw new UsageError("launch runs an external tool; JSON output is not supported.");
   if (out.command === "serve" && (out.json || seen.has("--timeout"))) throw new UsageError("serve runs in the foreground; use service status --json for reports.");
   if (out.command === "models" && !seen.has("--timeout")) out.timeout = 30000;
   if (["setup", "login", "logout", "household", "connect", "disconnect"].includes(out.command || "") && !seen.has("--timeout")) out.timeout = 30000;
   if (out.command && out.version) throw new UsageError("--version must be used without a command.");
   if (out.command === "logs" && seen.has("--timeout")) throw new UsageError("--timeout applies to status, doctor, up, and down.");
-  if (out.command && (out.print || (out.model && out.command !== "setup") || out.verify || out.noVerify || out.yes)) {
+  if (out.command && (out.print || (out.model && !["setup", "launch"].includes(out.command)) || out.verify || out.noVerify || out.yes)) {
     throw new UsageError("Agent options cannot be combined with a management command.");
   }
   if (!operation && (out.json || seen.has("--timeout"))) {
@@ -137,7 +143,7 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.command !== "logs" && (seen.has("--source") || seen.has("--lines"))) {
     throw new UsageError("--source and --lines require logs.");
   }
-  if (out.scope && out.command && !["status", "doctor"].includes(out.command)) {
+  if (out.scope && out.command && !["status", "doctor", "launch"].includes(out.command)) {
     throw new UsageError("--scope is supported by status, doctor, and the coding agent.");
   }
   if (operation && out.scope && !["local", "mine"].includes(out.scope)) {
