@@ -11,7 +11,7 @@ import { manageService } from "./service.js";
 export function operationHelp(command: string): string {
   if (command === "serve") return "Usage: potluck serve\nRun the shared runtime in the foreground for launchd, systemd, or brew services. Waits while another launcher owns it. Ctrl-C stops only this launcher's child.\n";
   if (command === "service") return "Usage: potluck service [install|uninstall|start|stop|restart|status] [--json]\nManage the current user's runtime service on macOS/Linux. install enables startup at login and starts it. stop keeps login startup enabled; uninstall removes it and keeps your data.\nHomebrew installations use brew services. Linux startup without a login requires administrator-configured user lingering.\n";
-  if (command === "setup") return "Usage: potluck setup [--no-input] [--enable-gateway] [--sign-in] [--connect] [--name <machine-name>] [--json]\nStart the local engine and resume setup. Gateway access, account login, and household connection require opt-in.\nWith --json/--no-input only explicitly requested steps run. Browser approval can happen on another device.\nUse potluck setup --preferences for coding-agent defaults.\n";
+  if (command === "setup") return "Usage: potluck setup [--no-input] [--with-model|--model <id>] [--enable-gateway] [--sign-in] [--connect] [--name <machine-name>] [--json]\nStart the local engine and resume setup. Interactive setup recommends, downloads, loads and tests a fitting model; unattended model setup requires --with-model or --model. Gateway access, account login, and household connection require opt-in.\nWith --json/--no-input only explicitly requested steps run. Browser approval can happen on another device.\nUse potluck setup --preferences for coding-agent defaults.\n";
   if (command === "login") return "Usage: potluck login [--wait|--no-wait] [--json]\nApprove the displayed code in a browser on any device. Interactive terminals wait by default; JSON and piped invocations return the pending code.\nRun again with --wait after approval to finish. Ctrl-C leaves the request resumable until expiry.\n";
   if (command === "logout") return "Usage: potluck logout [--local] [--json]\nRevoke this member session and remove local sign-in. --local removes it here without server revocation. Mesh enrollment is separate; use disconnect to unpair.\n";
   if (command === "whoami") return "Usage: potluck whoami [--json]\nShow the locally stored member profile without printing credentials.\n";
@@ -37,7 +37,7 @@ export async function runOperation(args: CliArgs, out: (value: string) => void):
   if (args.command === "setup") {
     const report = await runMachineSetup(args);
     out(args.json ? JSON.stringify(report) + "\n" : plainText(`Setup ${report.state}.\n${report.account && (report.account as Record<string, unknown>).state === "pending" ? formatMember(report.account as Record<string, unknown>) + "\n" : ""}${report.next}\n`));
-    return report.state === "configured" ? 0 : 1;
+    return ["configured", "model_ready"].includes(String(report.state)) ? 0 : 1;
   }
   if (["login", "logout", "whoami", "household", "connect", "disconnect"].includes(args.command!)) {
     const report = await (args.command === "login" ? login(args, text => process.stderr.write(plainText(text)))

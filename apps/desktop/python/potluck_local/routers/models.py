@@ -16,6 +16,7 @@ import asyncio
 import logging
 import os
 import shutil
+import time
 from pathlib import Path
 
 import psutil
@@ -87,6 +88,40 @@ async def list_models() -> list[dict]:
         if b:
             m["benchmark"] = b
     return models
+
+
+@router.get("/setup-options")
+async def get_setup_options() -> dict:
+    from potluck_local.services.model_setup import setup_options
+    return await asyncio.to_thread(setup_options)
+
+
+class ModelTestRequest(BaseModel):
+    sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+
+@router.post("/{slug}/test")
+async def test_local_model(slug: str, request: ModelTestRequest) -> dict:
+    """Fixed, synthetic local-only prompt; no gateway, account or project content."""
+    from potluck_local.services.model_identity import ModelIdentityError
+    _safe_model_dir(slug)
+    start = time.monotonic()
+    try:
+        result = await get_runtime().chat(
+            [{"role": "user", "content": "Reply briefly: what is 2 + 2? /no_think"}],
+            expected_model=slug, expected_sha256=request.sha256, temperature=0, max_tokens=64,
+        )
+    except ModelIdentityError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(503, "Local inference test failed. Check model and runtime settings.") from exc
+    content = (result.get("choices") or [{}])[0].get("message", {}).get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise HTTPException(503, "The local model returned no text. Check its chat template or context settings.")
+    usage = result.get("usage") or {}
+    return {"schemaVersion": 1, "status": "passed", "model": slug,
+            "durationMs": round((time.monotonic() - start) * 1000),
+            "outputTokens": usage.get("completion_tokens"), "scope": "local"}
 
 
 @router.post("/benchmark")
@@ -167,7 +202,7 @@ async def install_locked_model(slug: str, model: LockedModel, background_tasks: 
         raise HTTPException(400, "This lock has no download source. Copy its exact GGUF to the local model directory, then run sync again.")
     downloader = get_downloader()
     progress = downloader.get_progress(slug)
-    if progress and progress.status == "downloading":
+    if progress and progress.status in ("downloading", "verifying"):
         raise HTTPException(409, "A download is already running for this model. Wait for it, then run sync to verify the lock.")
     background_tasks.add_task(downloader.download_model, model_id=slug,
                              url=model.source.url, expected_sha256=model.sha256,
@@ -197,7 +232,7 @@ async def install_model(slug: str, background_tasks: BackgroundTasks) -> dict:
 
     downloader = get_downloader()
     existing_progress = downloader.get_progress(slug)
-    if existing_progress is not None and existing_progress.status == "downloading":
+    if existing_progress is not None and existing_progress.status in ("downloading", "verifying"):
         return {"status": "already_downloading"}
 
     background_tasks.add_task(

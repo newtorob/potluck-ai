@@ -29,6 +29,7 @@ export interface CliArgs {
   signIn?: boolean;
   connect?: boolean;
   preferences?: boolean;
+  withModel?: boolean;
 }
 
 const commands = new Set<Command>(["setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
@@ -60,6 +61,7 @@ export function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--sign-in") out.signIn = true;
     else if (arg === "--connect") out.connect = true;
     else if (arg === "--preferences") out.preferences = true;
+    else if (arg === "--with-model") out.withModel = true;
     else if (flag === "--name") out.name = value();
     else if (flag === "--output") out.output = value();
     else if (flag === "--invite-file") out.inviteFile = value();
@@ -111,7 +113,7 @@ export function parseArgs(argv: string[]): CliArgs {
     "--wait": ["login"], "--no-wait": ["login"], "--local": ["logout"],
     "--name": ["household", "connect", "setup"], "--output": ["household"],
     "--invite-file": ["connect"], "--no-input": ["setup"], "--enable-gateway": ["setup"],
-    "--sign-in": ["setup"], "--connect": ["setup"], "--preferences": ["setup"],
+    "--with-model": ["setup"], "--sign-in": ["setup"], "--connect": ["setup"], "--preferences": ["setup"],
   };
   for (const [flag, supported] of Object.entries(allowed)) {
     if (seen.has(flag) && !supported.includes(out.command || "")) throw new UsageError(`${flag} requires ${supported.join(" or ")}.`);
@@ -119,14 +121,14 @@ export function parseArgs(argv: string[]): CliArgs {
   if (seen.has("--wait") && seen.has("--no-wait")) throw new UsageError("Choose --wait or --no-wait.");
   if (out.name && (!out.name.trim() || out.name.length > 64 || /[\x00-\x1f\x7f]/.test(out.name))) throw new UsageError("--name must contain 1–64 printable characters.");
   if (out.command === "household" && ((out.name && out.action !== "create") || (out.output && out.action !== "invite"))) throw new UsageError("--name requires household create; --output requires household invite.");
-  if (out.preferences && (out.noInput || out.json || out.enableGateway || out.signIn || out.connect || out.name)) throw new UsageError("--preferences is an interactive preferences-only wizard.");
+  if (out.preferences && (out.noInput || out.json || out.enableGateway || out.signIn || out.connect || out.name || out.model || out.withModel)) throw new UsageError("--preferences is an interactive preferences-only wizard.");
   if (["up", "down"].includes(out.command || "") && !seen.has("--timeout")) out.timeout = 15000;
   if (out.command === "serve" && (out.json || seen.has("--timeout"))) throw new UsageError("serve runs in the foreground; use service status --json for reports.");
   if (out.command === "models" && !seen.has("--timeout")) out.timeout = 30000;
   if (["setup", "login", "logout", "household", "connect", "disconnect"].includes(out.command || "") && !seen.has("--timeout")) out.timeout = 30000;
   if (out.command && out.version) throw new UsageError("--version must be used without a command.");
   if (out.command === "logs" && seen.has("--timeout")) throw new UsageError("--timeout applies to status, doctor, up, and down.");
-  if (out.command && (out.print || out.model || out.verify || out.noVerify || out.yes)) {
+  if (out.command && (out.print || (out.model && out.command !== "setup") || out.verify || out.noVerify || out.yes)) {
     throw new UsageError("Agent options cannot be combined with a management command.");
   }
   if (!operation && (out.json || seen.has("--timeout"))) {

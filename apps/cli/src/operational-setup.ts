@@ -1,5 +1,7 @@
 import { createInterface } from "node:readline/promises";
 import type { CliArgs } from "./args.js";
+import { setupModel } from "./model-setup.js";
+import { plainText } from "./logs.js";
 import { UsageError } from "./args.js";
 import { loadCliPrefs, saveCliPrefs } from "./config.js";
 import { manageGateway } from "./manage.js";
@@ -7,6 +9,7 @@ import { connect, household, login, memberStatus } from "./member.js";
 import { RuntimeError, startRuntime } from "./runtime.js";
 
 export interface OnboardingIO {
+  signal?: AbortSignal;
   ask: (question: string) => Promise<string | null>;
   progress: (message: string) => void;
 }
@@ -26,6 +29,10 @@ export async function setupMachine(args: CliArgs, io?: OnboardingIO): Promise<Re
   if (args.enableGateway || await consent("Enable the authenticated local gateway for coding agents and other tools?")) {
     report.gateway = await manageGateway({ ...args, action: "enable" });
   }
+  if (args.withModel || args.model || io) {
+    report.model = await setupModel(args, io);
+    if ((report.model as Record<string, unknown>).status === "ready") report.state = "model_ready";
+  }
   let member = await memberStatus(args);
   if (!member.signedIn && (args.signIn || await consent("Sign in to your Potluck account using a browser on any device?"))) {
     member = await login({ ...args, wait: Boolean(io) }, io?.progress, Boolean(io));
@@ -41,7 +48,9 @@ export async function setupMachine(args: CliArgs, io?: OnboardingIO): Promise<Re
     report.household = current;
     report.connection = await connect(args);
   }
-  report.next = "Run potluck models list, install/load a model, then potluck doctor. Use potluck setup --preferences to customize coding-agent defaults.";
+  report.next = report.state === "model_ready"
+    ? 'Your model passed a local response check. Run potluck gateway enable if needed, then potluck --scope local -p "Explain this project".'
+    : "Run potluck setup --with-model to choose, install, load and test a fitting model. Use --model <id> to select one.";
   return report;
 }
 
@@ -49,12 +58,15 @@ export async function runMachineSetup(args: CliArgs): Promise<Record<string, unk
   if (args.json || args.noInput) return setupMachine(args);
   if (!process.stdin.isTTY) throw new UsageError("Use potluck setup --no-input with explicit --enable-gateway, --sign-in, or --connect options for unattended setup.");
   const rl = createInterface({ input: process.stdin, output: process.stderr });
+  const abort = new AbortController();
+  rl.on("SIGINT", () => { abort.abort(); rl.close(); });
   try {
     return await setupMachine(args, {
+      signal: abort.signal,
       ask: async question => {
         try { return await rl.question(question); } catch { return null; }
       },
-      progress: message => process.stderr.write(message),
+      progress: message => process.stderr.write(plainText(message)),
     });
   } finally { rl.close(); }
 }
