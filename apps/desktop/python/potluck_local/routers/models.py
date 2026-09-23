@@ -20,7 +20,7 @@ from pathlib import Path
 
 import psutil
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from potluck_local.services import model_registry
 from potluck_local.services.context_tuning import resolve_context_size
@@ -29,6 +29,7 @@ from potluck_local.services.model_lifecycle import get_model_lifecycle
 from potluck_local.services.runtime import get_runtime
 from potluck_local.services.settings_manager import get_settings
 from potluck_local.utils.crypto import sha256_file
+from potluck_local.services.model_identity import artifact_identity, valid_source_url
 from potluck_local.utils.paths import models_dir
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,71 @@ async def get_manifest(slug: str) -> dict:
     if manifest is None:
         raise HTTPException(status_code=404, detail=f"No manifest found for '{slug}'.")
     return manifest
+
+
+class LockedSource(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    url: str = Field(max_length=2048)
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, value: str) -> str:
+        if not valid_source_url(value):
+            raise ValueError("Locked downloads require a public Hugging Face GGUF URL without credentials or query parameters.")
+        return value
+
+
+class LockedModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}$")
+    format: str = Field(pattern=r"^gguf$")
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    sizeBytes: int = Field(strict=True, gt=0, le=9007199254740991)
+    source: LockedSource | None = None
+
+
+@router.get("/{slug}/identity")
+async def installed_model_identity(slug: str) -> dict:
+    path = _safe_model_dir(slug) / "model.gguf"
+    try:
+        digest, stamp = await asyncio.to_thread(artifact_identity, path)
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "Install this model before pinning it.") from exc
+    except OSError as exc:
+        raise HTTPException(409, "Model changed or could not be read during verification. Retry when installation finishes.") from exc
+    model = {"id": slug, "format": "gguf", "sha256": digest, "sizeBytes": stamp[2]}
+    manifest = model_registry.get_manifest(slug) or {}
+    source = manifest.get("download_url", "")
+    # An imported/older file can still be pinned offline, but never pair its
+    # digest with provenance for different catalog bytes.
+    if manifest.get("sha256") == digest and valid_source_url(source):
+        model["source"] = {"url": source}
+    return {"model_lock_version": 1, "model": model}
+
+
+@router.post("/{slug}/install-locked", status_code=202)
+async def install_locked_model(slug: str, model: LockedModel, background_tasks: BackgroundTasks) -> dict:
+    if model.id != slug:
+        raise HTTPException(400, "Model ID does not match the lock.")
+    path = _safe_model_dir(slug) / "model.gguf"
+    if path.exists():
+        try:
+            digest, stamp = await asyncio.to_thread(artifact_identity, path)
+        except OSError as exc:
+            raise HTTPException(409, "Existing model could not be verified; retry when installation finishes.") from exc
+        if digest != model.sha256 or stamp[2] != model.sizeBytes:
+            raise HTTPException(409, "A different file is already installed under this model ID. Move it aside deliberately before syncing this lock.")
+        return {"model_lock_version": 1, "status": "verified", "sha256": digest}
+    if model.source is None:
+        raise HTTPException(400, "This lock has no download source. Copy its exact GGUF to the local model directory, then run sync again.")
+    downloader = get_downloader()
+    progress = downloader.get_progress(slug)
+    if progress and progress.status == "downloading":
+        raise HTTPException(409, "A download is already running for this model. Wait for it, then run sync to verify the lock.")
+    background_tasks.add_task(downloader.download_model, model_id=slug,
+                             url=model.source.url, expected_sha256=model.sha256,
+                             expected_size=model.sizeBytes)
+    return {"model_lock_version": 1, "status": "downloading", "sha256": model.sha256}
 
 
 @router.post("/{slug}/install", status_code=202)

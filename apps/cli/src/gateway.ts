@@ -9,6 +9,7 @@
  * File contents only ever travel to this base URL (the local gateway).
  */
 
+import { pinnedModel } from "./model-lock.js";
 import type { GatewayConfig } from "./config.js";
 
 export interface ChatMessage {
@@ -77,6 +78,18 @@ export async function* streamChat(
   opts: StreamOptions,
 ): AsyncGenerator<string, void, void> {
   const headers = authHeaders(cfg);
+  const lock = cfg.modelLock;
+  if (lock) {
+    pinnedModel(lock, opts.model);
+    if (!["local", "mine"].includes(opts.scope || "")) throw new Error("Project model locks require local or mine scope.");
+    // Check before sending project content to an older runtime that might ignore the lock.
+    const caps = await fetch(`${cfg.baseURL}/potluck/capabilities`, {
+      headers, signal: AbortSignal.any([AbortSignal.timeout(5000), ...(opts.signal ? [opts.signal] : [])]),
+    });
+    if (!caps.ok || (await caps.json() as { model_lock_version?: number }).model_lock_version !== 1) {
+      throw new Error("Gateway does not support project model locks. Upgrade the Potluck runtime before using this project.");
+    }
+  }
   // A parallel gateway change adds local|mine routing; sending the header is
   // harmless (ignored) on a gateway that doesn't yet understand it.
   if (opts.scope) headers["x-potluck-scope"] = opts.scope;
@@ -86,6 +99,7 @@ export async function* streamChat(
     headers,
     body: JSON.stringify({
       model: opts.model,
+      ...(lock ? { potluck_model_sha256: lock.model.sha256 } : {}),
       messages,
       temperature: opts.temperature ?? 0.2,
       // 2048 truncated any non-trivial write/edit mid-JSON (the model's output
@@ -104,6 +118,11 @@ export async function* streamChat(
     );
   }
 
+  if (lock && (res.headers.get("x-potluck-model-lock") !== "1"
+      || res.headers.get("x-potluck-model-sha256") !== lock.model.sha256)) {
+    await res.body.cancel();
+    throw new Error("Gateway did not acknowledge the exact model lock. No output was accepted; upgrade the runtime.");
+  }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";

@@ -24,6 +24,8 @@ from contextlib import aclosing, asynccontextmanager
 from functools import partial
 from pathlib import Path
 
+from potluck_local.services.model_identity import ModelIdentityError, artifact_identity, file_stamp
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,6 +35,7 @@ class LLMRuntime:
     def __init__(self) -> None:
         self._model = None
         self._model_path: str | None = None
+        self._artifact: tuple[str, tuple] | None = None
         self._model_id: str | None = None
         self._loaded_n_ctx: int | None = None
         self._loaded_rpc_servers: tuple[str, ...] | None = None  # Big Model Mode
@@ -61,6 +64,23 @@ class LLMRuntime:
 
     def current_model_id(self) -> str | None:
         return self._model_id
+
+    def current_model_sha256(self) -> str | None:
+        if not self._artifact or not self._model_path or self._pipeline is not None or self._loaded_rpc_servers:
+            return None
+        try:
+            if file_stamp(Path(self._model_path)) == self._artifact[1]:
+                return self._artifact[0]
+        except OSError:
+            pass
+        return None
+
+    def assert_model_identity(self, model: str | None, sha256: str | None = None) -> None:
+        # Call again after inference admission: route selection can race a load.
+        if model is not None and (not self.is_loaded() or model != self._model_id):
+            raise ModelIdentityError("Requested model is no longer loaded. Load the requested model and retry.")
+        if sha256 is not None and self.current_model_sha256() != sha256:
+            raise ModelIdentityError("Loaded model does not match the project SHA-256, or this backend cannot enforce a GGUF lock. Load the exact locked GGUF locally and retry.")
 
     def loaded_n_ctx(self) -> int | None:
         """Return the n_ctx the currently loaded model was initialised with, or None."""
@@ -126,11 +146,23 @@ class LLMRuntime:
                 # llama-cpp-python wheels that don't accept the kwarg.
                 kwargs["rpc_servers"] = rpc_servers
 
+            # Bind the digest to the file actually loaded, never to a catalog or sidecar claim.
+            # An unreadable/changing file remains ineligible for locked inference.
+            try:
+                identity = artifact_identity(Path(model_path))
+            except OSError:
+                identity = None
             model = Llama(**kwargs)
+            try:
+                if identity and file_stamp(Path(model_path)) != identity[1]:
+                    identity = None
+            except OSError:
+                identity = None
             elapsed = round(time.monotonic() - start, 2)
 
             self._model = model
             self._model_path = model_path
+            self._artifact = identity
             self._model_id = Path(model_path).parent.name
             self._loaded_n_ctx = n_ctx
             self._loaded_rpc_servers = tuple(rpc_servers) if rpc_servers else None
@@ -421,6 +453,7 @@ class LLMRuntime:
 
     def _release_model(self) -> None:
         """Inner release — must be called while _load_lock is held."""
+        self._artifact = None
         if self._model is not None:
             import gc
 
@@ -456,6 +489,8 @@ class LLMRuntime:
         self,
         messages: list[dict],
         *,
+        expected_model: str | None = None,
+        expected_sha256: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
         stop: list[str] | None = None,
@@ -470,6 +505,7 @@ class LLMRuntime:
         llama.cpp path retains its existing temperature/stop defaults.
         """
         async with self._stream_session() as batched:
+            self.assert_model_identity(expected_model, expected_sha256)
             sampling = dict(max_new=max_tokens, temperature=temperature,
                             top_k=top_k, top_p=top_p, seed=seed)
             if self._batcher is not None:
@@ -554,6 +590,8 @@ class LLMRuntime:
         self,
         messages: list[dict],
         *,
+        expected_model: str | None = None,
+        expected_sha256: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
     ) -> dict:
@@ -567,6 +605,7 @@ class LLMRuntime:
             raise RuntimeError("No model loaded")
 
         async with self._inference_lock:
+            self.assert_model_identity(expected_model, expected_sha256)
             loop = asyncio.get_running_loop()
             model = self._model
             model_id = self._model_id
@@ -609,6 +648,8 @@ class LLMRuntime:
         self,
         messages: list[dict],
         *,
+        expected_model: str | None = None,
+        expected_sha256: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
         stop: list[str] | None = None,
@@ -630,6 +671,7 @@ class LLMRuntime:
             raise RuntimeError("No model loaded")
 
         async with self._inference_lock:
+            self.assert_model_identity(expected_model, expected_sha256)
             loop = asyncio.get_running_loop()
             queue: asyncio.Queue = asyncio.Queue()
             model = self._model

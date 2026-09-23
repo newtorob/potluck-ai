@@ -1,3 +1,4 @@
+import { manageModelLock } from "./model-lock.js";
 import type { CliArgs } from "./args.js";
 import { ControlError } from "./control.js";
 import { runtimeRequest } from "./runtime.js";
@@ -19,6 +20,7 @@ export async function manageGateway(args: CliArgs): Promise<Record<string, unkno
 }
 
 export async function manageModels(args: CliArgs): Promise<Record<string, unknown>> {
+  if (["pin", "lock", "sync", "unpin"].includes(args.action!)) return manageModelLock(args);
   if (args.action === "autoload") {
     const settings = await runtimeRequest("/settings", args.target
       ? { method: "PATCH", body: { ui: { "potluck.autoload_on_startup": String(args.target === "on") } }, timeout: args.timeout }

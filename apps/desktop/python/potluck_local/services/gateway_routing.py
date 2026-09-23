@@ -48,14 +48,17 @@ class PeerDispatchError(RemoteStreamError):
                          "peer_unavailable")
 
 
-async def _replacement_peer(model: str, excluded: set[str]) -> dict | None:
+async def _replacement_peer(model: str, excluded: set[str], sha256: str | None = None) -> dict | None:
     # Read current membership on every retry. Never route through the pool or
     # relax the requested model because an earlier household machine failed.
     peers = [p for p in await household_peers() if p["mesh_ip"] not in excluded]
     async with httpx.AsyncClient(timeout=_CAPS_TIMEOUT_S) as client:
         caps = await asyncio.gather(*(_peer_caps(client, peer) for peer in peers))
     for peer, cap in zip(peers, caps):
-        if cap and cap.get("available_for_inference") and cap.get("loaded_model") == model:
+        if cap and cap.get("available_for_inference") and cap.get("loaded_model") == model and (
+            sha256 is None or (cap.get("model_lock_version") == 1
+                               and (cap.get("loaded_model_detail") or {}).get("sha256") == sha256)
+        ):
             return {**peer, "_capabilities": cap}
     return None
 
@@ -124,10 +127,12 @@ async def household_model_map() -> dict[str, dict]:
     return out
 
 
-async def peer_for_model(model: str) -> dict | None:
+async def peer_for_model(model: str, sha256: str | None = None) -> dict | None:
     """The household peer serving `model`, or None."""
     if not model:
         return None
+    if sha256 is not None:
+        return await _replacement_peer(model, set(), sha256)
     return (await household_model_map()).get(model)
 
 
@@ -135,7 +140,7 @@ def _peer_url(peer: dict) -> str:
     return f"http://{peer['mesh_ip']}:{PEER_SIDECAR_PORT}/peer/chat/completions"
 
 
-def _payload(messages: list[dict], model: str, temperature: float, max_tokens: int) -> dict:
+def _payload(messages: list[dict], model: str, temperature: float, max_tokens: int, *, sha256: str | None = None) -> dict:
     return {
         "messages": messages,
         "model": model,
@@ -146,13 +151,15 @@ def _payload(messages: list[dict], model: str, temperature: float, max_tokens: i
 
 
 async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
-                             temperature: float, max_tokens: int):
+                             temperature: float, max_tokens: int, *, sha256: str | None = None):
     """Retry another household machine only while no output has been yielded.
 
     One absolute budget spans headers, prefill, every attempt and decoding.
     Cancelling the caller closes the HTTP stream and never triggers a retry.
     """
     body = copy.deepcopy(_payload(messages, model, temperature, max_tokens))
+    if sha256:
+        body["potluck_model_sha256"] = sha256
     loop = asyncio.get_running_loop()
     deadline = loop.time() + REQUEST_TIMEOUT_S
     excluded: set[str] = set()
@@ -162,7 +169,7 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
         try:
             if attempt:
                 async with asyncio.timeout_at(deadline):
-                    peer = await _replacement_peer(model, excluded)
+                    peer = await _replacement_peer(model, excluded, **({"sha256": sha256} if sha256 else {}))
                 if peer is None:
                     break
             excluded.add(peer["mesh_ip"])
@@ -181,6 +188,9 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
                     async with client.stream("POST", _peer_url(peer), json=body) as response:
                         if response.status_code != 200:
                             raise PeerDispatchError(response.status_code)
+                        if sha256 and (response.headers.get("x-potluck-model-lock") != "1"
+                                       or response.headers.get("x-potluck-model-sha256") != sha256):
+                            raise RemoteStreamError("Household runtime did not acknowledge the exact model lock; upgrade it.", "model_mismatch")
                         async for chunk in openai_chunks(response, model):
                             choice = chunk["choices"][0]
                             delta = choice["delta"]
@@ -206,9 +216,9 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
 
 
 async def complete_peer_openai(peer: dict, messages: list[dict], model: str,
-                               temperature: float, max_tokens: int) -> dict:
+                               temperature: float, max_tokens: int, *, sha256: str | None = None) -> dict:
     """Dispatch to a peer (streamed under the hood) and return one OpenAI
     chat.completion envelope."""
     return await collect_completion(
-        stream_peer_openai(peer, messages, model, temperature, max_tokens)
+        stream_peer_openai(peer, messages, model, temperature, max_tokens, **({"sha256": sha256} if sha256 else {}))
     )

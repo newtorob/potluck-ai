@@ -19,7 +19,7 @@ export function operationHelp(command: string): string {
   if (command === "connect") return "Usage: potluck connect [--invite-file <private-file>] [--name <machine-name>] [--json]\nConnect through the installed mesh daemon using your signed-in household or a private invitation file.\n";
   if (command === "disconnect") return "Usage: potluck disconnect [--json]\nRemove this machine's local mesh enrollment and keys. The old coordinator entry remains until cleanup.\n";
   if (command === "gateway") return "Usage: potluck gateway [status|enable|disable|rotate] [--json]\nEnable preserves an existing key; rotate invalidates the old key. Keys are never printed.\n";
-  if (command === "models") return "Usage: potluck models list [--json]\n       potluck models install|load|unload|progress|cancel <model-id> [--json] [--timeout 1-30000]\n       potluck models autoload [on|off] [--json]\nInstall starts a background download; use progress to check it. Successful local loads restore on engine restart; unload clears the choice.\n";
+  if (command === "models") return "Usage: potluck models list [--json]\n       potluck models install|load|unload|progress|cancel <model-id> [--json] [--timeout 1-30000]\n       potluck models autoload [on|off] [--json]\n       potluck models pin <model-id> [--json]\n       potluck models lock|sync|unpin [--json]\nPin records installed GGUF bytes in potluck.lock. sync installs/verifies those exact bytes. lock shows the project pin; unpin explicitly removes it.\nInstall starts a background download; use progress to check it. Successful local loads restore on engine restart; unload clears the choice.\n";
   if (command === "up" || command === "down") return `Usage: potluck ${command} [--timeout 1-30000] [--json]\n${command === "up" ? "Start or attach to the local runtime (macOS/Linux)." : "Gracefully stop a CLI-owned runtime (macOS/Linux)."}\n`;
   return command === "logs"
     ? "Usage: potluck logs [--source runtime|mesh|app] [--lines 1-1000] [--json]\nReads a bounded log tail and redacts common credentials. Does not follow logs.\n"
@@ -54,7 +54,7 @@ export async function runOperation(args: CliArgs, out: (value: string) => void):
         ? `Startup model restore ${report.enabled ? "enabled" : "disabled"}. Saved local model: ${report.model || "none"}. Applies on the next engine start.`
       : Array.isArray(report.models)
         ? report.models.map(m => `${m.id}\t${m.installed ? "installed" : "available"}${m.name ? `\t${m.name}` : ""}`).join("\n") || "No models available."
-        : `${report.model}: ${report.status || "request completed"}${typeof report.progress === "number" ? ` (${report.progress}%)` : ""}`;
+        : `${report.model}: ${report.status || "request completed"}${typeof report.progress === "number" ? ` (${report.progress}%)` : ""}${report.sha256 ? `\nSHA-256: ${report.sha256}` : ""}${report.path ? `\nLock: ${report.path}` : ""}${report.next ? `\n${report.next}` : ""}`;
     out(args.json ? JSON.stringify(report) + "\n" : plainText(human) + "\n");
     return report.status === "error" || report.status === "failed" ? 1 : 0;
   }

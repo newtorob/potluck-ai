@@ -34,6 +34,7 @@ export const AGENT_SCOPES: readonly Scope[] = ["local", "mine"] as const;
 export const DEFAULT_SCOPE: Scope = "mine";
 
 export interface GatewayConfig {
+  modelLock?: import("./model-lock.js").ProjectModelLock;
   baseURL: string;
   apiKey: string;
   enabled: boolean;

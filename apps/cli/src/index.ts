@@ -34,6 +34,7 @@ import {
   type VerifyResolution,
 } from "./config.js";
 import { listModels, type ChatMessage } from "./gateway.js";
+import { readProjectModelLock, pinnedModel } from "./model-lock.js";
 import { runTask, systemPrompt } from "./agent.js";
 import {
   briefSection,
@@ -91,7 +92,7 @@ function printHelp(): void {
       "  potluck logs [--source mesh]   read recent runtime, mesh or app logs",
       "",
       `${c.bold("Options")}`,
-      "  -m, --model <id>       Model to use (default: cli.json / app / first installed)",
+      "  -m, --model <id>       Model to use (project lock takes precedence)",
       "      --scope <s>        Routing scope: local | mine (default from cli.json)",
       "      --verify <cmd>     Build/test command run after each edit (default: auto-detect)",
       "      --no-verify        Disable the post-edit verify step",
@@ -313,6 +314,9 @@ async function main(): Promise<void> {
   let cli = await loadCliPrefs();
   const shared = await loadSharedPrefs();
   const cwd = process.cwd();
+  const projectLock = await readProjectModelLock(cwd);
+  pinnedModel(projectLock, args.model);
+  cfg.modelLock = projectLock;
 
   let verify = await resolveVerify({
     cwd,
@@ -344,7 +348,7 @@ async function main(): Promise<void> {
       throw err;
     }
 
-    const preferred = args.model ?? cli.model ?? shared.activeModelId;
+    const preferred = projectLock?.model.id ?? args.model ?? cli.model ?? shared.activeModelId;
     let model: string;
     try {
       model = await resolveModel(cfg, preferred);
@@ -392,6 +396,7 @@ async function main(): Promise<void> {
     await runSetup({ ask, out: (s) => stdout.write(`${s}\n`) });
     cli = await loadCliPrefs();
     cfg = await loadConfig();
+    cfg.modelLock = projectLock;
     verify = await resolveVerify({
       cwd,
       cliVerify: cli.verify,
@@ -415,7 +420,7 @@ async function main(): Promise<void> {
     throw err;
   }
 
-  const preferred = args.model ?? cli.model ?? shared.activeModelId;
+  const preferred = projectLock?.model.id ?? args.model ?? cli.model ?? shared.activeModelId;
   let model: string;
   try {
     model = await resolveModel(cfg, preferred);
@@ -484,6 +489,8 @@ async function main(): Promise<void> {
     if (line === "/model" || line.startsWith("/model ")) {
       const target = line.slice("/model".length).trim();
       if (target) {
+        try { pinnedModel(projectLock, target); }
+        catch (error) { stdout.write(`${c.red((error as Error).message)}\n`); continue; }
         model = target;
         stdout.write(`${c.dim("model set to")} ${c.cyan(model)}\n`);
       } else {
