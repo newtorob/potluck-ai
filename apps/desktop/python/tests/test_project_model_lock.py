@@ -117,6 +117,25 @@ def test_changed_file_invalidates_loaded_digest(runtime):
     assert runtime.current_model_sha256() is None
     with pytest.raises(ModelIdentityError): runtime.assert_model_identity('test', A)
 
+
+def test_readiness_uses_exact_route_without_inference_or_peer_disclosure(client, runtime, monkeypatch):
+    body = {'model': 'test', 'sha256': A, 'scope': 'local'}
+    state = client.post('/v1/potluck/readiness', json=body).json()
+    assert state['ready'] is True and state['route'] == 'local'
+    body['sha256'] = B
+    assert client.post('/v1/potluck/readiness', json=body).json()['ready'] is False
+    async def find(model, digest):
+        assert (model, digest) == ('test', B)
+        return {'mesh_ip': '100.64.0.2', 'node_id': 'never-expose'}
+    monkeypatch.setattr(routing, 'peer_for_model', find)
+    body['scope'] = 'mine'
+    response = client.post('/v1/potluck/readiness', json=body)
+    assert response.json()['route'] == 'household'
+    assert '100.64' not in response.text and 'never-expose' not in response.text
+    body['scope'] = 'pool'
+    assert client.post('/v1/potluck/readiness', json=body).status_code == 422
+    assert runtime._model.calls == 0
+
 def test_pin_hashes_actual_bytes_and_sync_checks_existing_file(client, monkeypatch, tmp_path):
     monkeypatch.setattr(models, 'models_dir', lambda: tmp_path)
     manifest = {'sha256': B, 'download_url': SOURCE}

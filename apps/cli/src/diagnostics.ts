@@ -1,5 +1,6 @@
 import { loadCliPrefs, loadConfig, resolveScope } from "./config.js";
 import { ControlError, meshSocketPath, requestJSON, runtimeURL, safeURL } from "./control.js";
+import { diagnoseProject } from "./project-diagnostics.js";
 
 export interface Check {
   id: string;
@@ -97,6 +98,7 @@ export async function diagnose(options: { timeout: number; scope?: string }): Pr
       action: "Use potluck models list, install, and load; or load a model on an eligible household machine." });
   if (scope === "local" && !report.runtime.model) checks.push({ id: "local_model", state: "error",
     message: "Local scope requires a model loaded on this computer.", action: "Load a local model." });
+  checks.push(...await diagnoseProject(cfg, scope, options.timeout));
   report.ready = checks.every(c => c.state !== "error");
   return report;
 }

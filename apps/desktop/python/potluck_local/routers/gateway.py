@@ -24,6 +24,7 @@ import json
 import logging
 import time
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -126,6 +127,30 @@ async def _locked_route(runtime, model: str | None, digest: str, scope: str):
             if peer:
                 return peer
         raise HTTPException(409, str(exc)) from exc
+
+
+class ReadinessRequest(BaseModel):
+    model: str = Field(min_length=1, max_length=200)
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    scope: Literal["local", "mine"] = "local"
+
+
+@router.post("/potluck/readiness")
+async def model_readiness(req: ReadinessRequest) -> dict:
+    """Read-only route check using the same exact-artifact gate as inference.
+
+    A snapshot, not a reservation: inference rechecks under admission. No prompt
+    is sent and no model is loaded. Household details stay inside the router.
+    """
+    route = None
+    try:
+        peer = await _locked_route(get_runtime(), req.model, req.sha256, req.scope)
+        route = "household" if peer else "local"
+    except HTTPException as exc:
+        if exc.status_code != 409:
+            raise
+    return {"schemaVersion": 1, "model_lock_version": 1, "ready": route is not None,
+            "model": req.model, "scope": req.scope, "route": route}
 
 
 @router.post("/chat/completions")
