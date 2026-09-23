@@ -20,7 +20,8 @@ const platforms = ['darwin', 'linux'].filter(p => artifacts.some(a => a.platform
 const sections = platforms.map(p => {
   const targets = artifacts.filter(a => a.platform === p);
   const requiredArch = targets.length === 1 ? `    depends_on arch: :${targets[0].arch === 'arm64' ? 'arm64' : 'x86_64'}\n` : '';
-  return `  on_${p === 'darwin' ? 'macos' : 'linux'} do\n${requiredArch}${targets.map(a => `    on_${a.arch === 'arm64' ? 'arm' : 'intel'} do\n      url "${a.url}"\n      sha256 "${a.sha256}"\n    end`).join('\n')}\n  end`;
+  const requiredOS = p === 'darwin' ? '    depends_on macos: :sequoia\n' : '';
+  return `  on_${p === 'darwin' ? 'macos' : 'linux'} do\n${requiredArch}${requiredOS}${targets.map(a => `    on_${a.arch === 'arm64' ? 'arm' : 'intel'} do\n      url "${a.url}"\n      sha256 "${a.sha256}"\n    end`).join('\n')}\n  end`;
 }).join('\n\n');
 const platformDependency = platforms.length === 1 ? `  depends_on :${platforms[0] === 'darwin' ? 'macos' : 'linux'}\n` : '';
 const archDependency = artifacts.every(a => a.arch === artifacts[0].arch) ? `  depends_on arch: :${artifacts[0].arch === 'arm64' ? 'arm64' : 'x86_64'}\n` : '';
