@@ -2,10 +2,8 @@
  * Config + auth resolution for the Potluck gateway, plus CLI-owned prefs.
  *
  * Two files live under ~/.potluck:
- *   - config.json  — owned by the desktop app. The CLI READS it for the gateway
- *     key/switch, the coordinator URL, and the default model. It may write back
- *     only safe SHARED fields (default model, coordinator URL) and NEVER the
- *     gateway api_key or enabled flag.
+ *   - config.json  — owned by the runtime. The CLI reads gateway/default fields
+ *     and sends shared changes through its authenticated settings API.
  *   - cli.json     — owned by the CLI. Holds CLI-only prefs (default model,
  *     default scope, gateway URL override).
  *
@@ -21,8 +19,9 @@
  */
 
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { dataDir } from "./paths.js";
+import { runtimeRequest } from "./runtime.js";
 
 import { listModels } from "./gateway.js";
 
@@ -60,11 +59,11 @@ export class GatewayDisabledError extends Error {
 }
 
 function configPath(): string {
-  return join(homedir(), ".potluck", "config.json");
+  return join(dataDir(), "config.json");
 }
 
 function cliPrefsPath(): string {
-  return join(homedir(), ".potluck", "cli.json");
+  return join(dataDir(), "cli.json");
 }
 
 async function readRawConfig(): Promise<RawConfig> {
@@ -292,16 +291,13 @@ export function mergeSharedSafeFields(
   return next;
 }
 
-/** Persist safe shared fields back to config.json (read-modify-write). */
+/** The runtime owns shared writes; never race its settings cache/file writer. */
 export async function saveSharedSafeFields(patch: {
   model?: string;
   coordinatorUrl?: string;
 }): Promise<void> {
-  const raw = await readRawSharedConfig();
-  const next = mergeSharedSafeFields(raw, patch);
-  const path = configPath();
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  const body = mergeSharedSafeFields({}, patch);
+  await runtimeRequest("/settings", { method: "PATCH", body, timeout: 3000 });
 }
 
 // ---------------------------------------------------------------------------

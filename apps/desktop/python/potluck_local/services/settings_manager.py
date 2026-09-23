@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from pathlib import Path
 from typing import Literal
 
@@ -15,6 +16,9 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class RuntimeSettings(BaseModel):
+    # Only a successfully loaded local GGUF is eligible for startup restore.
+    # Separate from active_model_id (the coding agent's model preference).
+    startup_model_id: str | None = None
     # 0 = auto-tune n_ctx per model + available RAM (default). A value > 0 pins
     # n_ctx, capped at the loaded model's maximum context window.
     context_size: int = 0
@@ -32,9 +36,13 @@ class PrivacySettings(BaseModel):
 
 
 class NetworkSettings(BaseModel):
-    contributor_mode: bool = False       # Disabled in v0; reserved for v1
+    contributor_mode: bool = False       # The Contribute compute toggle
     contributor_schedule: dict[str, object] | None = None
     max_gpu_percent: int = 80
+    # Coordinator jobs this machine serves at once. Sent in every heartbeat
+    # and enforced locally by the contributor loop. The runtime serialises
+    # inference on one model, so 1 is the honest default.
+    max_concurrent_jobs: int = Field(default=1, ge=0, le=64)
     # HTTP base of the coordinator this node talks to (e.g. "http://127.0.0.1:8400").
     # Synced from the frontend's connection setting so the sidecar can reach the
     # open pool for gateway routing. Empty = not configured (pool unavailable).
@@ -221,11 +229,17 @@ def save_settings(
         os.chmod(config_path.parent, 0o700)
     except OSError:
         pass
-    config_path.write_text(settings.model_dump_json(indent=2), encoding="utf-8")
+    # Publish an entire private file atomically. Readers in the CLI/app must
+    # never observe a truncated document or a briefly world-readable key.
+    fd, temporary = tempfile.mkstemp(prefix=".config-", dir=config_path.parent)
     try:
-        os.chmod(config_path, 0o600)
-    except OSError:
-        pass
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write(settings.model_dump_json(indent=2))
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, config_path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
     # Keep the mtime cache coherent so the next get_settings reflects this write.
     try:
         _settings_cache[str(config_path)] = (config_path.stat().st_mtime, settings)

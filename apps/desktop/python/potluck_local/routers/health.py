@@ -6,12 +6,22 @@ import asyncio
 import os
 import signal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Request
 
 from potluck_local import __version__
 from potluck_local.services.runtime import get_runtime
+from potluck_local.services.model_lifecycle import get_model_lifecycle
 
 router = APIRouter()
+
+
+@router.get("/control")
+async def control_info(request: Request) -> dict[str, object]:
+    """Authenticated identity check. Never returns the control credential."""
+    control = getattr(request.app.state, "runtime_control", None)
+    if control is None:
+        raise HTTPException(409, "Runtime was not started with shared control")
+    return control.info()
 
 
 @router.get("/health")
@@ -24,6 +34,7 @@ async def health() -> dict[str, object]:
         "version": __version__,
         "model_loaded": runtime.is_loaded(),
         "active_model_id": runtime.current_model_id(),
+        "model_restore": get_model_lifecycle().status(),
         "n_ctx_loaded": runtime.loaded_n_ctx(),
         # Big Model Mode status — list of llama.cpp RPC endpoints the
         # current model is loaded across. Null when the model is local-only
@@ -44,7 +55,7 @@ async def health() -> dict[str, object]:
 
 
 @router.post("/shutdown")
-async def shutdown() -> dict[str, str]:
+async def shutdown(request: Request) -> dict[str, str]:
     """Ask the sidecar to shut down cleanly.
 
     Electron posts here before sending SIGKILL so in-flight inference can finish.
@@ -53,6 +64,7 @@ async def shutdown() -> dict[str, str]:
     import gc
 
     try:
+        await get_model_lifecycle().stop()
         await get_runtime().unload_model_async()
         gc.collect()
     except Exception:  # noqa: BLE001
@@ -60,7 +72,14 @@ async def shutdown() -> dict[str, str]:
         pass
 
     def _terminate() -> None:
-        os.kill(os.getpid(), signal.SIGTERM)
+        server = getattr(request.app.state, "runtime_server", None)
+        if server is not None:
+            # Let main() leave its control context and remove the private record.
+            # Uvicorn re-raises captured SIGTERM after serving, which can otherwise
+            # terminate the process before that context gets a chance to exit.
+            server.should_exit = True
+        else:
+            os.kill(os.getpid(), signal.SIGTERM)
 
     loop = asyncio.get_running_loop()
     loop.call_later(0.1, _terminate)

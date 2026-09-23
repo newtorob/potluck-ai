@@ -46,6 +46,38 @@ def main() -> None:
     print(f"\nBuild complete: {binary}")
     print(f"Bundle directory: {binary.parent}")
 
+    # Stamp the build identity the contributor presents to the coordinator as
+    # binary_hash: SHA-256 over the unsigned PyInstaller output, written to
+    # contributor-release.json inside the bundle (see contributor/release.py).
+    # Computed here, before code signing and before electron-builder re-signs
+    # nested binaries, because signing rewrites Mach-O bytes and a file added
+    # after signing would break the app seal. So this identifies the build
+    # inputs, which is what the coordinator's release allowlist keys on; it
+    # is not a tamper check of the shipped bytes (that is the OS signature).
+    sys.path.insert(0, str(_ROOT))
+    from potluck_local.contributor.release import write_release_info
+
+    info = write_release_info(binary.parent, _release_version())
+    print(f"Release stamp: version={info['version']} binary_hash={info['binary_hash'][:16]}…")
+
+
+def _release_version() -> str:
+    """The desktop release number (apps/desktop/electron/package.json), which
+    is what a signed release row would carry; falls back to the sidecar's
+    own __version__ when the Electron manifest is not next to us."""
+    import json
+
+    manifest = _ROOT.parent / "electron" / "package.json"
+    try:
+        version = json.loads(manifest.read_text()).get("version")
+        if isinstance(version, str) and version:
+            return version
+    except (OSError, ValueError):
+        pass
+    from potluck_local import __version__
+
+    return __version__
+
 
 if __name__ == "__main__":
     main()

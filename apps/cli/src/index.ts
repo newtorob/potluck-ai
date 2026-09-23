@@ -14,6 +14,7 @@
 
 import { createInterface, type Interface } from "node:readline";
 import { basename } from "node:path";
+import { readFileSync } from "node:fs";
 import { stdin, stdout, stderr } from "node:process";
 
 import {
@@ -56,96 +57,38 @@ import {
   renderResultPreview,
 } from "./ui.js";
 
-const VERSION = "0.1.0";
+import { parseArgs, UsageError } from "./args.js";
+import { runOperation } from "./operations.js";
+import { plainText } from "./logs.js";
+import { RuntimeError } from "./runtime.js";
+import { ControlError } from "./control.js";
 
-interface CliArgs {
-  help: boolean;
-  version: boolean;
-  print: boolean;
-  yes: boolean;
-  model?: string;
-  scope?: string;
-  verify?: string;
-  noVerify: boolean;
-  task?: string;
-  command?: "setup";
-}
-
-function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = {
-    help: false,
-    version: false,
-    print: false,
-    yes: false,
-    noVerify: false,
-  };
-  const positionals: string[] = [];
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === "--help" || arg === "-h") args.help = true;
-    else if (arg === "--version" || arg === "-v") args.version = true;
-    else if (arg === "--yes" || arg === "-y") args.yes = true;
-    else if (arg === "--model" || arg === "-m") {
-      const next = argv[i + 1];
-      if (next !== undefined) {
-        args.model = next;
-        i++;
-      }
-    } else if (arg.startsWith("--model=")) {
-      args.model = arg.slice("--model=".length);
-    } else if (arg === "--scope") {
-      const next = argv[i + 1];
-      if (next !== undefined) {
-        args.scope = next;
-        i++;
-      }
-    } else if (arg.startsWith("--scope=")) {
-      args.scope = arg.slice("--scope=".length);
-    } else if (arg === "--no-verify") {
-      args.noVerify = true;
-    } else if (arg === "--verify") {
-      const next = argv[i + 1];
-      if (next !== undefined) {
-        args.verify = next;
-        i++;
-      }
-    } else if (arg.startsWith("--verify=")) {
-      args.verify = arg.slice("--verify=".length);
-    } else if (arg === "--print" || arg === "-p") {
-      args.print = true;
-      const next = argv[i + 1];
-      if (next !== undefined && !next.startsWith("-")) {
-        args.task = next;
-        i++;
-      }
-    } else if (arg.startsWith("--print=")) {
-      args.print = true;
-      args.task = arg.slice("--print=".length);
-    } else if (!arg.startsWith("-")) {
-      positionals.push(arg);
-    }
-    // Unknown flags are ignored rather than fatal.
-  }
-
-  if (positionals[0] === "setup") {
-    args.command = "setup";
-  } else if (args.print && args.task === undefined && positionals.length > 0) {
-    args.task = positionals.join(" ");
-  }
-  return args;
-}
+const VERSION = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
 
 function printHelp(): void {
   stdout.write(
     [
-      `${c.bold("potluck")} — a member-owned terminal coding agent`,
+      `${c.bold("potluck")} — local AI from your terminal`,
       "Inference runs on your own machines across the Potluck mesh.",
       "",
       `${c.bold("Usage")}`,
       "  potluck [options]              start the interactive REPL",
       '  potluck -p "task" [--yes]      run one task and exit (scripting/CI)',
-      "  potluck setup                  configure CLI defaults",
+      "  potluck setup                  set up the local engine, account, and connections",
+      "  potluck setup --preferences    configure coding-agent defaults",
+      "  potluck login / logout         sign in using a browser on any device, or sign out",
+      "  potluck whoami                 show the signed-in member",
+      "  potluck household              create/list your household; export private invitations",
+      "  potluck connect / disconnect   pair or unpair this machine",
+      "  potluck up / down              start/stop the local runtime",
+      "  potluck service install        start the runtime automatically at login",
+      "  potluck service status         inspect the background service",
+      "  potluck serve                  run the runtime in the foreground",
+      "  potluck models list            list/install/load/unload local models",
+      "  potluck gateway enable         enable the local gateway",
+      "  potluck status [--json]        inspect runtime, connection and models",
+      "  potluck doctor [--json]        diagnose setup/connection problems",
+      "  potluck logs [--source mesh]   read recent runtime, mesh or app logs",
       "",
       `${c.bold("Options")}`,
       "  -m, --model <id>       Model to use (default: cli.json / app / first installed)",
@@ -174,7 +117,7 @@ function printHelp(): void {
       "",
       "Config layers (low -> high): defaults < ~/.potluck/config.json (app) <",
       "~/.potluck/cli.json (CLI prefs) < env < flags.",
-      "The gateway must be enabled in the Potluck app (Settings -> Connect tools).",
+      "Enable the gateway with potluck gateway enable (or Settings -> Connect tools).",
       "",
     ].join("\n"),
   );
@@ -315,12 +258,36 @@ function reportGatewayError(cfg: GatewayConfig, err: unknown, sink: NodeJS.Writa
 }
 
 async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
+  let args;
+  try { args = parseArgs(process.argv.slice(2)); }
+  catch (err) {
+    if (!(err instanceof UsageError)) throw err;
+    stderr.write(plainText(`error: ${err.message}\nRun potluck --help.\n`));
+    process.exitCode = 2;
+    return;
+  }
+  if (args.command && !(args.command === "setup" && args.preferences)) {
+    try {
+      process.exitCode = await runOperation(args, (text) => stdout.write(text));
+    } catch (error) {
+      const message = error instanceof RuntimeError || error instanceof ControlError || error instanceof UsageError ? error.message
+        : "Could not complete the command. Check endpoint configuration and local file permissions.";
+      if (args.json) stdout.write(JSON.stringify({ schemaVersion: 1, error: { code: "operation_failed", message } }) + "\n");
+      else stderr.write(plainText(message) + "\n");
+      process.exitCode = error instanceof UsageError ? 2 : 1;
+    }
+    return;
+  }
 
   // `potluck setup` — interactive wizard (or its help).
   if (args.command === "setup") {
     if (args.help) {
       printSetupHelp((s) => stdout.write(s));
+      return;
+    }
+    if (!stdin.isTTY) {
+      stderr.write("potluck setup currently needs an interactive terminal. Run potluck status --json for non-interactive diagnostics.\n");
+      process.exitCode = 2;
       return;
     }
     const rl = createInterface({ input: stdin, output: stdout });
@@ -406,6 +373,12 @@ async function main(): Promise<void> {
       stderr.write(`${c.red("error:")} ${c.dim(message)}\n`);
       process.exitCode = 1;
     }
+    return;
+  }
+
+  if (!stdin.isTTY) {
+    stderr.write('Interactive mode requires a terminal. Use potluck -p "task" or potluck status --json.\n');
+    process.exitCode = 2;
     return;
   }
 

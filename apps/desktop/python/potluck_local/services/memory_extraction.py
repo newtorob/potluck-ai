@@ -20,6 +20,7 @@ from potluck_local.services.ai_contracts import (
     EXTRACTION_PROMPT_VERSION,
 )
 from potluck_local.utils.time import now_iso as _now_iso
+from potluck_local.services.memory_safety import redact_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,12 @@ class Memory(BaseModel):
     project: str | None = None  # null = global memory, applies across all projects
     extraction_prompt_version: str | None = None  # NULL for pre-2026-05-20 rows
     pinned: bool = False  # always-inject into retrieval regardless of query
+
+    @field_validator("content")
+    @classmethod
+    def _redact_credentials(cls, value: str) -> str:
+        # Browse, search, export, graph and MCP all serialize this model.
+        return redact_credentials(value)
 
     @field_validator("project", mode="before")
     @classmethod
@@ -195,11 +202,11 @@ class MemoryExtractor:
             logger.warning("memory_extraction_skipped reason=no_model_loaded")
             return []
 
-        conversation_text = "\n\n".join(
+        conversation_text = redact_credentials("\n\n".join(
             f"{m['role'].upper()}: {m.get('content', '')}"
             for m in messages
             if m.get("content")
-        )
+        ))
 
         # Apply the length cap: take the tail of the conversation text so
         # the extraction prompt fits inside the model's context window.
@@ -207,7 +214,9 @@ class MemoryExtractor:
         if len(conversation_text) > _EXTRACTION_MAX_CHARS:
             conversation_text = conversation_text[-_EXTRACTION_MAX_CHARS:]
 
-        prompt = _EXTRACTION_PROMPT.format(conversation=conversation_text)
+        # The examples contain literal JSON braces. str.format would interpret
+        # their keys as placeholders and fail before extraction reaches the LLM.
+        prompt = _EXTRACTION_PROMPT.replace("{conversation}", conversation_text)
         try:
             result = await runtime.chat(
                 messages=[{"role": "user", "content": prompt}],
@@ -231,7 +240,7 @@ class MemoryExtractor:
                 if not isinstance(item, dict) or not item.get("content"):
                     continue
 
-                content: str = str(item["content"]).strip()
+                content = redact_credentials(str(item["content"]).strip())
                 category: str = item.get("category", "fact")
                 if category not in ("preference", "fact", "decision", "project", "person", "instruction"):
                     category = "fact"
@@ -411,7 +420,7 @@ class MemoryExtractor:
         Raises ValueError if content is missing/empty — the caller counts
         that as a skipped row.
         """
-        content = str(raw.get("content", "")).strip()
+        content = redact_credentials(str(raw.get("content", "")).strip())
         if not content:
             raise ValueError("import row missing non-empty 'content'")
 

@@ -30,6 +30,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from potluck_local.services import gateway_routing, pool_routing
+from potluck_local.services.remote_stream import RemoteStreamError
 from potluck_local.services.model_registry import list_models
 from potluck_local.services.runtime import get_runtime
 
@@ -189,7 +190,7 @@ async def chat_completions_openai(
     if use_pool:
         served_by = coordinator_scope  # "pool" or "circle"
     elif peer:
-        served_by = f"peer:{peer['node_name']}"
+        served_by = "household"
     else:
         served_by = "local"
 
@@ -230,7 +231,7 @@ async def chat_completions_openai(
                 yield "data: [DONE]\n\n"
             except Exception as exc:  # noqa: BLE001
                 logger.exception("gateway_stream_failed")
-                yield f'data: {json.dumps({"error": {"message": str(exc), "type": "inference_error"}})}\n\n'
+                yield f'data: {json.dumps({"error": {"message": str(exc), "type": "inference_error", "code": getattr(exc, "category", "inference_error")}})}\n\n'
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(
@@ -257,6 +258,8 @@ async def chat_completions_openai(
             result = await runtime.chat(messages, temperature=req.temperature, max_tokens=max_tokens)
             if isinstance(result, dict):
                 result.setdefault("model", local)
+    except RemoteStreamError as exc:
+        raise HTTPException(status_code=502, detail={"code": exc.category, "message": str(exc)}) from exc
     except pool_routing.PoolDispatchError as exc:
         # Surface the coordinator's real status when it's meaningful (e.g. 503
         # "no peer serves this model" — same condition as a local 404); any other
@@ -366,7 +369,7 @@ async def text_completions(
     if use_pool:
         served_by = coordinator_scope
     elif peer:
-        served_by = f"peer:{peer['node_name']}"
+        served_by = "household"
     else:
         served_by = "local"
 
@@ -380,6 +383,8 @@ async def text_completions(
 
     if req.stream:
         async def event_stream():
+            finish_reason = "stop"
+            usage = None
             try:
                 if use_pool:
                     source = pool_routing.stream_pool_openai(
@@ -398,6 +403,10 @@ async def text_completions(
                     if isinstance(chunk, dict) and "__error__" in chunk:
                         yield f'data: {json.dumps({"error": {"message": chunk["__error__"], "type": "inference_error"}})}\n\n'
                         break
+                    if chunk.get("choices") and chunk["choices"][0].get("finish_reason"):
+                        finish_reason = chunk["choices"][0]["finish_reason"]
+                    if chunk.get("usage") is not None:
+                        usage = chunk["usage"]
                     # Extract text delta from OpenAI chat chunk shape
                     try:
                         delta_text = chunk["choices"][0].get("delta", {}).get("content") or ""
@@ -419,13 +428,14 @@ async def text_completions(
                 finish_chunk = {
                     "id": cid, "object": "text_completion", "created": created,
                     "model": served_model,
-                    "choices": [{"text": "", "index": 0, "finish_reason": "stop"}],
+                    "choices": [{"text": "", "index": 0, "finish_reason": finish_reason}],
+                    **({"usage": usage} if usage is not None else {}),
                 }
                 yield f"data: {json.dumps(finish_chunk)}\n\n"
                 yield "data: [DONE]\n\n"
             except Exception as exc:  # noqa: BLE001
                 logger.exception("gateway_completions_stream_failed")
-                yield f'data: {json.dumps({"error": {"message": str(exc), "type": "inference_error"}})}\n\n'
+                yield f'data: {json.dumps({"error": {"message": str(exc), "type": "inference_error", "code": getattr(exc, "category", "inference_error")}})}\n\n'
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(
@@ -452,6 +462,8 @@ async def text_completions(
             result = await runtime.chat(messages, temperature=req.temperature, max_tokens=max_tokens)
             if isinstance(result, dict):
                 result.setdefault("model", local)
+    except RemoteStreamError as exc:
+        raise HTTPException(status_code=502, detail={"code": exc.category, "message": str(exc)}) from exc
     except pool_routing.PoolDispatchError as exc:
         status = exc.status_code if exc.status_code in (404, 503) else 502
         raise HTTPException(status_code=status, detail=exc.detail)
@@ -480,7 +492,7 @@ async def text_completions(
         "choices": [{
             "text": text,
             "index": 0,
-            "finish_reason": "stop",
+            "finish_reason": result["choices"][0].get("finish_reason", "stop"),
         }],
         "usage": {
             "prompt_tokens": prompt_tokens,
@@ -561,7 +573,7 @@ async def embeddings_openai(req: EmbeddingRequest):
 def _canonical_scope(served_by: str) -> str:
     """Map the gateway's served_by string to a canonical dashboard scope."""
     s = (served_by or "").lower()
-    if s.startswith("peer:"):
+    if s == "household" or s.startswith("peer:"):
         return "my_machines"
     if s in ("pool", "circle"):
         return s

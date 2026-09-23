@@ -230,9 +230,12 @@ def test_receive_loop_cancels_in_flight_job_handlers_on_disconnect(monkeypatch) 
             handler_cancelled.set()
             raise
 
-    monkeypatch.setattr(client_mod, "_handle_stub_job", _hanging_stub_job)
-
-    settings = Settings(inference_enabled=False)
+    # The loop now takes its job handler through LoopHooks (M2.5) rather than
+    # dispatching on settings; the invariant under test is unchanged.
+    settings = Settings(_env_file=None, inference_enabled=False)
+    hooks = client_mod.standalone_hooks(settings)
+    hooks.job_handler = _hanging_stub_job
+    tracker = client_mod.JobTracker()
     ws = _FakeWS([_job_assigned_json()])
 
     async def scenario() -> None:
@@ -241,7 +244,8 @@ def test_receive_loop_cancels_in_flight_job_handlers_on_disconnect(monkeypatch) 
         # What must be true by the time that propagates is that the `finally`
         # has already cancelled + awaited the spawned handler.
         with pytest.raises(websockets.ConnectionClosed):
-            await client_mod._receive_loop(ws, settings)
+            await client_mod._receive_loop(ws, hooks, tracker)
+        assert tracker.count == 0, "a cancelled handler must not stay counted in flight"
 
     async def run_with_timeout() -> None:
         await asyncio.wait_for(scenario(), timeout=5.0)

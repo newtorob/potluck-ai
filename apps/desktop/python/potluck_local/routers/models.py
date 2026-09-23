@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 from potluck_local.services import model_registry
 from potluck_local.services.context_tuning import resolve_context_size
 from potluck_local.services.model_downloader import get_downloader
+from potluck_local.services.model_lifecycle import get_model_lifecycle
 from potluck_local.services.runtime import get_runtime
 from potluck_local.services.settings_manager import get_settings
 from potluck_local.utils.crypto import sha256_file
@@ -147,10 +148,16 @@ async def install_model(slug: str, background_tasks: BackgroundTasks) -> dict:
 
 @router.delete("/{slug}", status_code=200)
 async def delete_model(slug: str) -> dict:
+    async with get_model_lifecycle().command():
+        return await _delete_model(slug)
+
+
+async def _delete_model(slug: str) -> dict:
     model_dir = _safe_model_dir(slug)
     if not model_dir.exists():
         raise HTTPException(status_code=404, detail=f"Model '{slug}' is not installed.")
 
+    get_model_lifecycle().forget(slug)
     runtime = get_runtime()
     if runtime.is_loaded() and runtime.current_model_id() == slug:
         await runtime.unload_model_async()
@@ -254,6 +261,15 @@ def _load_verify_reference(slug: str, manifest: dict | None, model_dir) -> tuple
 
 @router.post("/{slug}/load", status_code=200)
 async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
+    lifecycle = get_model_lifecycle()
+    async with lifecycle.command():
+        # A distributed switch must not restore the previous local model or
+        # reconnect peers on the next launch. HF/pipeline restore is separate.
+        remote = body and (body.rpc_servers or body.pipeline or body.pipeline_auto)
+        return await lifecycle.load_and_remember(_load_model(slug, body), None if remote else slug)
+
+
+async def _load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
     # Pipeline-parallel: explicit chain (body.pipeline) or auto-orchestrated across the
     # household (body.pipeline_auto). Either path -> runtime.load_pipeline. Transformers
     # head-loop on an HF model id (no GGUF on disk), so it bypasses the slug/GGUF path.
@@ -430,10 +446,13 @@ async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
 
 @router.post("/{slug}/unload", status_code=200)
 async def unload_model(slug: str) -> dict:
-    runtime = get_runtime()
-    if runtime.is_loaded() and runtime.current_model_id() == slug:
-        await runtime.unload_model_async()
-        logger.info("model_unloaded slug=%s", slug)
+    lifecycle = get_model_lifecycle()
+    async with lifecycle.command():
+        lifecycle.forget(slug)
+        runtime = get_runtime()
+        if runtime.is_loaded() and runtime.current_model_id() == slug:
+            await runtime.unload_model_async()
+            logger.info("model_unloaded slug=%s", slug)
     return {"status": "unloaded"}
 
 

@@ -24,7 +24,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from potluck_local import __version__
-from potluck_local.routers import agents, chat, contributor, gateway, hardware, health, memory, models, ollama, peer, readiness, settings, tasks, usage, vault, verify
+from potluck_local.routers import account, agents, chat, contributor, gateway, hardware, health, memory, models, ollama, peer, readiness, settings, tasks, usage, vault, verify
 from potluck_local.utils.logging import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -164,7 +164,49 @@ async def _lifespan(app: FastAPI):  # noqa: ARG001
                 pass
     _track(asyncio.create_task(_stale_session_sweeper()))
 
+    # The Contribute compute toggle: if it was on when the app last ran, the
+    # in-process contributor comes back up with the sidecar. Never fatal.
+    try:
+        from potluck_local.services.contributor_service import get_contributor_service
+        from potluck_local.services.settings_manager import get_settings as _get_app_settings
+
+        if os.name != "nt":
+            from potluck_local.services.member_account import get_member_account
+            session = get_member_account().session()
+            if session:
+                get_contributor_service().set_member_session(session["token"])
+        await get_contributor_service().apply_settings(_get_app_settings())
+    except Exception:  # noqa: BLE001
+        logger.exception("contributor_startup_failed")
+
+    # Restore only the last successful local load, without delaying /control
+    # readiness for a multi-GB model. Explicit model commands share its gate.
+    from potluck_local.services.model_lifecycle import get_model_lifecycle
+    from potluck_local.routers.models import _load_model
+
+    _track(asyncio.create_task(get_model_lifecycle().restore(_load_model)))
+
     yield
+
+    # Stop the contributor first: closing its socket is what tells the
+    # coordinator to drain this peer, and it must happen before the model
+    # it serves with is unloaded below.
+    try:
+        from potluck_local.services.contributor_service import get_contributor_service
+
+        await get_contributor_service().stop()
+    except Exception:  # noqa: BLE001
+        logger.exception("contributor_shutdown_failed")
+
+    # Stop the supervised Codex process before the event loop and trace store
+    # begin shutting down. Managed sessions fail closed from the UI's point of
+    # view, while Codex remains responsible for terminating its own child work.
+    try:
+        from potluck_local.services.managed_agents import get_managed_agent_manager
+
+        await get_managed_agent_manager().shutdown()
+    except Exception:  # noqa: BLE001
+        logger.exception("managed_agents_shutdown_failed")
 
     # Cancel + drain every background task BEFORE touching the model or DB
     # below, so nothing still in flight (e.g. the sweeper mid-sleep, or the
@@ -174,6 +216,7 @@ async def _lifespan(app: FastAPI):  # noqa: ARG001
         task.cancel()
     if background_tasks:
         await asyncio.gather(*background_tasks, return_exceptions=True)
+    await get_model_lifecycle().stop()
 
     # Release Metal / llama.cpp before process exit. If the model is still
     # loaded, ggml-metal's atexit finalize can GGML_ASSERT on macOS
@@ -350,8 +393,7 @@ def create_app() -> FastAPI:
         # Shared-secret gate — applies to loopback callers too. When a token is
         # configured, every non-exempt path must present a matching bearer token.
         # This is what stops a malicious local process from reading the user's
-        # data over 127.0.0.1. Exempt: liveness (/health), /shutdown (Electron
-        # may call it from the main process during teardown), and /peer/* —
+        # data over 127.0.0.1. Exempt: liveness (/health) and /peer/* —
         # but ONLY for a non-loopback caller.
         #
         # NOTE on /peer/* exemption: peer routes are NOT per-request signature
@@ -373,10 +415,11 @@ def create_app() -> FastAPI:
         # credential to fall back on, so it must present the sidecar token like
         # every other loopback route; a mesh peer keeps its pre-existing
         # token-free path since mesh membership already gated it above.
+        if normalised.startswith("/account") and sidecar_token is None:
+            return JSONResponse(status_code=503, content={"detail": "Account control requires an authenticated runtime. Run potluck up."})
         if sidecar_token is not None:
             exempt = (
                 normalised == "/health"
-                or normalised == "/shutdown"
                 or (normalised.startswith("/peer/") and not is_loopback)
             )
             if not exempt:
@@ -392,6 +435,7 @@ def create_app() -> FastAPI:
 
     # Routers — prefixes must match localApi.ts in the frontend
     app.include_router(health.router, tags=["health"])
+    app.include_router(account.router, prefix="/account", tags=["account"])
     app.include_router(readiness.router, tags=["readiness"])
     app.include_router(chat.router, prefix="/chat", tags=["chat"])
     app.include_router(models.router, prefix="/models", tags=["models"])
@@ -412,7 +456,7 @@ def create_app() -> FastAPI:
 
 
 def main() -> None:
-    """Parse CLI args and start uvicorn bound to loopback only."""
+    """Start the local engine, optionally publishing private shared control."""
     parser = argparse.ArgumentParser(description="Potluck local sidecar")
     parser.add_argument(
         "--port",
@@ -433,6 +477,19 @@ def main() -> None:
     # POTLUCK_BIND_HOST=127.0.0.1 to opt out (e.g. on a machine that should
     # never serve peer inference).
     bind_host = os.environ.get("POTLUCK_BIND_HOST", "0.0.0.0")
+    if os.environ.get("POTLUCK_SHARED_RUNTIME") == "1":
+        from potluck_local.runtime_control import RuntimeControl, cleanup_on_sigterm
+
+        with cleanup_on_sigterm(), RuntimeControl(port=args.port, host=bind_host,
+                            token=os.environ.get("POTLUCK_SIDECAR_TOKEN", ""),
+                            owner=os.environ.get("POTLUCK_RUNTIME_OWNER", "standalone")) as control:
+            app.state.runtime_control = control
+            server = uvicorn.Server(uvicorn.Config(
+                app, host=bind_host, port=control.port,
+                log_level="debug" if dev_mode else "info"))
+            app.state.runtime_server = server
+            server.run(sockets=[control.socket])
+        return
     uvicorn.run(
         app,
         host=bind_host,

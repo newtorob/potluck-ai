@@ -35,11 +35,11 @@ from __future__ import annotations
 import json
 import logging
 import os
-import time
-import uuid
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
+
+from .remote_stream import collect_completion, openai_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -222,38 +222,6 @@ def _job_body(
     return body
 
 
-def _content_of(line: str) -> str | None:
-    """Pull a content delta from one coordinator SSE line.
-
-    The coordinator emits three shapes (services/coordinator/routers/jobs.py):
-      data: {"choices":[{"delta":{"content":"..."}}]}   token
-      data: {"meta":{...}}                               completion summary
-      data: {"error":{"category","message"}}            failure
-      data: [DONE]                                       terminator
-    Raises RuntimeError on an error chunk. Returns None for non-content lines.
-    """
-    if not line.startswith("data:"):
-        return None
-    data = line[5:].strip()
-    if not data or data == "[DONE]":
-        return None
-    try:
-        obj = json.loads(data)
-    except ValueError:
-        return None
-    if "error" in obj:
-        err = obj["error"]
-        if isinstance(err, dict):
-            raise RuntimeError(err.get("message") or err.get("category") or "pool job error")
-        raise RuntimeError(str(err))
-    if "meta" in obj:
-        return None
-    try:
-        return obj["choices"][0].get("delta", {}).get("content")
-    except (KeyError, IndexError, AttributeError):
-        return None
-
-
 async def stream_pool_openai(
     messages: list[dict],
     model: str,
@@ -272,15 +240,6 @@ async def stream_pool_openai(
     if not base:
         raise RuntimeError("open-pool routing is not configured (no coordinator URL)")
 
-    cid = "chatcmpl-" + uuid.uuid4().hex[:24]
-    created = int(time.time())
-
-    def chunk(delta: dict, finish: str | None) -> dict:
-        return {
-            "id": cid, "object": "chat.completion.chunk", "created": created, "model": model,
-            "choices": [{"index": 0, "delta": delta, "finish_reason": finish}],
-        }
-
     timeout = httpx.Timeout(None, connect=_CONNECT_TIMEOUT_S)
     async with httpx.AsyncClient(timeout=timeout) as c:
         async with c.stream(
@@ -291,12 +250,8 @@ async def stream_pool_openai(
             if resp.status_code != 200:
                 body = (await resp.aread()).decode("utf-8", "replace")[:300]
                 raise PoolDispatchError(resp.status_code, body)
-            yield chunk({"role": "assistant"}, None)
-            async for line in resp.aiter_lines():
-                content = _content_of(line)
-                if content:
-                    yield chunk({"content": content}, None)
-            yield chunk({}, "stop")
+            async for chunk in openai_chunks(resp, model, coordinator=True):
+                yield chunk
 
 
 async def complete_pool_openai(
@@ -308,37 +263,9 @@ async def complete_pool_openai(
 ) -> dict:
     """Dispatch to the coordinator (streamed under the hood) and return one OpenAI
     chat.completion envelope. Works for both pool and circle scopes."""
-    parts: list[str] = []
-    base = coordinator_http_base()
-    if not base:
-        raise RuntimeError("open-pool routing is not configured (no coordinator URL)")
-    timeout = httpx.Timeout(None, connect=_CONNECT_TIMEOUT_S)
-    async with httpx.AsyncClient(timeout=timeout) as c:
-        async with c.stream(
-            "POST", f"{base}/jobs/stream",
-            json=_job_body(messages, model, temperature, max_tokens, scope),
-            headers=_headers(),
-        ) as resp:
-            if resp.status_code != 200:
-                body = (await resp.aread()).decode("utf-8", "replace")[:300]
-                raise PoolDispatchError(resp.status_code, body)
-            async for line in resp.aiter_lines():
-                content = _content_of(line)
-                if content:
-                    parts.append(content)
-    text = "".join(parts)
-    return {
-        "id": "chatcmpl-" + uuid.uuid4().hex[:24],
-        "object": "chat.completion",
-        "created": int(time.time()),
-        "model": model,
-        "choices": [{
-            "index": 0,
-            "message": {"role": "assistant", "content": text},
-            "finish_reason": "stop",
-        }],
-        "usage": {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None},
-    }
+    return await collect_completion(
+        stream_pool_openai(messages, model, temperature, max_tokens, scope)
+    )
 
 
 async def pool_model_slugs() -> list[str]:

@@ -1,17 +1,28 @@
-"""Contributor sidecar — WebSocket client + lifecycle.
+"""Contributor loop: WebSocket client + lifecycle.
 
 Connects to the coordinator's /peers/connect endpoint, completes the
-Ed25519 attestation handshake, then sends periodic heartbeats. Reconnects
-on any failure with exponential backoff.
+Ed25519 attestation handshake, then sends periodic heartbeats and serves
+dispatched jobs. Reconnects on any failure with exponential backoff.
 
-Run as `python -m potluck_local.contributor`. Settings come from
-POTLUCK_* environment variables (see config.py).
+Two callers share this module:
 
-Architectural invariant (see manifesto §10.3): this process must never
-write prompt content or member-identifying data to disk, logs, or
-telemetry. The handshake + heartbeat loop here only handles routing
-metadata. When job dispatch lands in m3-m4, the same invariant applies
-to the inference path.
+  * ``python -m potluck_local.contributor`` (``main()`` below): the
+    standalone bench-fleet client. Settings come from POTLUCK_* environment
+    variables (see config.py); jobs are served by the standalone engines in
+    inference.py.
+  * ``potluck_local.services.contributor_service.ContributorService``: the
+    in-process contributor the desktop app runs when the Contribute compute
+    toggle is on. It supplies its own hooks (jobs served through the
+    sidecar runtime, capacity from the runtime, member session headers).
+
+``run_contributor_loop`` is the shared core. Everything a caller can vary
+travels in ``LoopHooks``; the loop itself owns the protocol, the backoff,
+the in-flight job cap and the stop semantics (set ``stop`` and the loop
+closes its socket and returns).
+
+Architectural invariant (see manifesto §10.3): this loop must never write
+prompt content or member-identifying data to disk, logs, or telemetry. Log
+lines carry counters and ids only.
 """
 from __future__ import annotations
 
@@ -23,10 +34,12 @@ import logging
 import platform as _platform
 import socket
 import sys
-import uuid
-from datetime import datetime, timezone
-
 import time
+import uuid
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
 
 import websockets
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -45,13 +58,18 @@ from potluck_local.contributor.schemas import (
     JobTokenMessage,
     RejectMessage,
 )
+from potluck_local.contributor.telemetry import (
+    Capacity,
+    full_hardware_summary,
+    probe_capacity,
+)
 
 logger = logging.getLogger("potluck.contributor")
 
 # Module version — embedded in attestation, persisted by coordinator into
 # peer_heartbeats.client_version. Bump when the wire protocol or
 # heartbeat shape changes.
-CLIENT_VERSION = "0.0.1-dev"
+CLIENT_VERSION = "0.0.2-dev"
 
 # How long to wait for an accept/reject after sending attestation.
 HANDSHAKE_RESPONSE_TIMEOUT_S = 10.0
@@ -66,6 +84,43 @@ class HandshakeFailed(Exception):
     transient based on context."""
 
 
+# Type aliases for the hook signatures. `ws` is the live websockets client
+# connection; handlers send JobToken/JobComplete/JobError frames on it.
+JobHandler = Callable[[Any, JobAssignedMessage], Awaitable[None]]
+CapacityProbe = Callable[[], Awaitable[Capacity]]
+CapabilitiesProvider = Callable[[], Awaitable[list[CapabilityEntry]]]
+HardwareSummaryProvider = Callable[[], dict[str, Any]]
+HeadersProvider = Callable[[], list[tuple[str, str]] | None]
+StateCallback = Callable[..., None]
+
+
+@dataclass
+class LoopHooks:
+    """Everything a caller of ``run_contributor_loop`` can vary."""
+
+    job_handler: JobHandler
+    capacity_probe: CapacityProbe
+    capabilities_provider: CapabilitiesProvider
+    hardware_summary_provider: HardwareSummaryProvider
+    headers_provider: HeadersProvider
+    max_concurrent_jobs: int | None = 1
+    # on_state(event, **fields). Events: connecting, connected, heartbeat,
+    # rejected, disconnected, job_started, job_finished, stopped. Never
+    # carries prompt content or member ids.
+    on_state: StateCallback | None = None
+
+
+@dataclass
+class JobTracker:
+    """Jobs currently being served on this connection."""
+
+    in_flight: set[uuid.UUID] = field(default_factory=set)
+
+    @property
+    def count(self) -> int:
+        return len(self.in_flight)
+
+
 def detect_platform() -> str:
     """Cross-platform identifier, e.g. 'darwin-arm64', 'linux-x86_64'.
 
@@ -78,16 +133,10 @@ def detect_platform() -> str:
 
 
 def detect_hardware_summary() -> dict[str, object]:
-    """Minimal hardware metadata. Real GPU detection lands in m3+ when the
-    coordinator actually routes by capability. For m1 we capture enough
-    to make the /transparency/fleet view useful (cpu count, OS release)."""
-    summary: dict[str, object] = {
-        "system": _platform.system(),
-        "release": _platform.release(),
-        "machine": _platform.machine(),
-        "cpu_count": _platform.os.cpu_count() if hasattr(_platform, "os") else None,
-    }
-    return summary
+    """Hardware facts for attestation: the legacy four keys plus whatever
+    the sidecar's detector finds (gpu_name, gpu_vram_gb, recommended_tier,
+    core counts, total RAM). See telemetry.full_hardware_summary."""
+    return full_hardware_summary()
 
 
 def _quantization_from_slug(slug: str) -> str:
@@ -105,8 +154,7 @@ def _quantization_from_slug(slug: str) -> str:
 
 
 async def _build_capabilities(settings: Settings) -> list[CapabilityEntry]:
-    """Enumerate the models this peer is willing to serve, for the
-    coordinator's peer_capabilities table.
+    """Enumerate the models this standalone peer is willing to serve.
 
     Per backend:
       - inference_enabled=False: empty list (peer is stub-echo only).
@@ -155,10 +203,22 @@ async def _build_capabilities(settings: Settings) -> list[CapabilityEntry]:
     return []
 
 
+def _emit(hooks: LoopHooks, event: str, **fields: Any) -> None:
+    """Deliver a state event to the caller. A callback that raises must
+    never take the connection down with it."""
+    if hooks.on_state is None:
+        return
+    try:
+        hooks.on_state(event, **fields)
+    except Exception:  # noqa: BLE001
+        logger.debug("on_state_callback_failed event=%s", event, exc_info=True)
+
+
 async def _do_handshake(
-    ws: websockets.WebSocketClientProtocol,
+    ws: Any,
     settings: Settings,
     priv: Ed25519PrivateKey,
+    hooks: LoopHooks,
 ) -> AcceptMessage:
     # 1) receive challenge
     raw = await ws.recv()
@@ -169,7 +229,7 @@ async def _do_handshake(
 
     # 2) sign + send attest
     sig = priv.sign(nonce_bytes)
-    capabilities = await _build_capabilities(settings)
+    capabilities = await hooks.capabilities_provider()
     attest = AttestationPayload(
         member_id=settings.member_id,
         peer_public_key=public_key_b64(priv.public_key()),
@@ -177,14 +237,13 @@ async def _do_handshake(
         client_version=CLIENT_VERSION,
         platform=detect_platform(),
         hostname=socket.gethostname(),
-        hardware_summary=detect_hardware_summary(),
+        hardware_summary=hooks.hardware_summary_provider(),
         nonce_signature=base64.urlsafe_b64encode(sig).rstrip(b"=").decode("ascii"),
         capabilities=capabilities,
     )
     if capabilities:
         logger.info(
-            "advertising_capabilities backend=%s slugs=%s",
-            settings.inference_backend,
+            "advertising_capabilities slugs=%s",
             [c.model_slug for c in capabilities],
         )
     await ws.send(attest.model_dump_json())
@@ -202,37 +261,51 @@ async def _do_handshake(
 
 
 async def _heartbeat_loop(
-    ws: websockets.WebSocketClientProtocol,
+    ws: Any,
     accept: AcceptMessage,
+    hooks: LoopHooks,
+    tracker: JobTracker,
 ) -> None:
     """Send a heartbeat every `heartbeat_interval_s`. Returns when the
-    connection closes; caller handles reconnect."""
+    connection closes; caller handles reconnect.
+
+    current_jobs is the loop's own in-flight count, never a caller-supplied
+    number: the coordinator takes max(live, reported) so a low report can
+    only understate load, and this loop is the authority on what it is
+    serving.
+    """
     while True:
         await asyncio.sleep(accept.heartbeat_interval_s)
+        try:
+            capacity = await hooks.capacity_probe()
+        except Exception:  # noqa: BLE001
+            logger.debug("capacity_probe_failed", exc_info=True)
+            capacity = Capacity()
         hb = HeartbeatMessage(
             peer_id=accept.peer_id,
             session_id=accept.session_id,
             timestamp=datetime.now(timezone.utc),
-            current_jobs=0,
-            gpu_utilization=None,
-            vram_available_gb=None,
+            current_jobs=tracker.count,
+            gpu_utilization=capacity.gpu_utilization,
+            vram_available_gb=capacity.vram_available_gb,
+            max_concurrent_jobs=hooks.max_concurrent_jobs,
         )
         await ws.send(hb.model_dump_json())
-        logger.debug("heartbeat_sent peer_id=%s", accept.peer_id)
+        logger.debug("heartbeat_sent peer_id=%s current_jobs=%d", accept.peer_id, tracker.count)
+        _emit(hooks, "heartbeat", current_jobs=tracker.count)
 
 
 # m3 stub: per-token "inference" delay so the streaming feels real on the
-# coordinator + desktop side. Replaced by llama-cpp-python's actual
-# generation rate when real inference lands.
+# coordinator + desktop side.
 _STUB_TOKEN_DELAY_S = 0.03
 
 
 async def _handle_real_job(
-    ws: websockets.WebSocketClientProtocol,
+    ws: Any,
     job: JobAssignedMessage,
     settings: Settings,
 ) -> None:
-    """Real-inference handler (Phase G m3 step 5).
+    """Standalone real-inference handler (Phase G m3 step 5).
 
     Lazy-loads the configured GGUF on first job, streams generated tokens
     back as JobTokenMessages, sends JobCompleteMessage when done. If the
@@ -253,8 +326,6 @@ async def _handle_real_job(
     #     demand; the engine's _ensure_loaded reports if it isn't installed.
     #   - llama-cpp: the peer has exactly one GGUF (settings.model_slug) and can
     #     only serve that slug.
-    # Using settings.model_slug for the dispatch check (the old behaviour) made a
-    # multi-model Ollama peer decline every model except its one configured slug.
     if settings.inference_backend == "ollama":
         serve_slug = job.model_slug
     elif settings.model_slug != job.model_slug:
@@ -315,11 +386,6 @@ async def _handle_real_job(
         return
 
     token_index = 0
-    # Choose the inference path based on what the coordinator sent:
-    #   job.messages populated -> stream_chat (applies the model's chat template,
-    #     multi-turn context).  Used when scope==circle or pool_multiturn is on.
-    #   job.messages absent/empty -> stream_completion (single-turn, prompt string).
-    #     Backward-compat default.
     sampling_kwargs: dict = dict(
         max_tokens=job.sampling.max_tokens,
         temperature=job.sampling.temperature,
@@ -345,10 +411,6 @@ async def _handle_real_job(
             token_index += 1
 
         duration_ms = int((time.monotonic() - started) * 1000)
-        # Heuristic: if we hit max_tokens we report "length"; otherwise the
-        # model decided to stop. llama-cpp-python's chunks carry a
-        # finish_reason but we don't surface it through the queue today;
-        # adding it is a minor follow-up.
         finish_reason = "length" if token_index >= job.sampling.max_tokens else "stop"
         cmp = JobCompleteMessage(
             job_id=job.job_id,
@@ -362,10 +424,8 @@ async def _handle_real_job(
             job.job_id, token_index, duration_ms, finish_reason,
         )
         # Usage dashboard: record that this machine SERVED a network request.
-        # The wire deliberately hides whether it was circle or pool (the
-        # coordinator strips scope + identity), so served rows are recorded as
-        # "pool" — "I served the open network" — with NO peer identity, matching
-        # the privacy invariant. Failure-tolerant; never breaks the serve.
+        # The wire deliberately hides whether it was circle or pool, so served
+        # rows are recorded as "pool" with NO peer identity. Failure-tolerant.
         try:
             from potluck_local.services.usage_store import record_usage_event
             await record_usage_event(
@@ -394,22 +454,15 @@ async def _handle_real_job(
 
 
 async def _handle_stub_job(
-    ws: websockets.WebSocketClientProtocol,
+    ws: Any,
     job: JobAssignedMessage,
 ) -> None:
     """m3 stub inference handler — echoes the prompt back as tokens.
 
     Privacy invariant: this function MUST NOT log job.prompt content,
-    write it to disk, or persist it anywhere. The whole point of the
-    in-memory-only rule is that the prompt lives in RAM only as long as
-    the inference takes, then evaporates. CI lint will eventually enforce
-    this; for now, code review.
+    write it to disk, or persist it anywhere.
     """
     started = time.monotonic()
-    # Stub "model" output: prefix the prompt + emit it character by
-    # character. Real inference (llama-cpp-python) replaces this body in
-    # step 5 of the m3 plan; the wire-protocol surrounding it doesn't
-    # change, which is the whole point of doing the stub first.
     output = f"echo: {job.prompt}"
     max_chars = min(len(output), job.sampling.max_tokens)
 
@@ -432,14 +485,11 @@ async def _handle_stub_job(
             finish_reason=finish_reason,
         )
         await ws.send(cmp.model_dump_json())
-        # Counter-only logging: count of tokens, never the content.
         logger.info(
             "stub_job_complete job_id=%s output_tokens=%d duration_ms=%d reason=%s",
             job.job_id, max_chars, duration_ms, finish_reason,
         )
     except websockets.ConnectionClosed:
-        # Connection died mid-stream — coordinator will time out the job
-        # on its side. Nothing useful to do here.
         logger.warning("stub_job_aborted_connection_closed job_id=%s", job.job_id)
     except Exception as exc:  # pragma: no cover — defensive
         logger.exception("stub_job_internal_error job_id=%s", job.job_id)
@@ -454,29 +504,46 @@ async def _handle_stub_job(
             pass
 
 
+async def _decline_at_capacity(ws: Any, job: JobAssignedMessage, cap: int, in_flight: int) -> None:
+    err = JobErrorMessage(
+        job_id=job.job_id,
+        error_category="declined",
+        error_message=f"at capacity: {in_flight} of {cap} jobs in flight",
+    )
+    try:
+        await ws.send(err.model_dump_json())
+    except websockets.ConnectionClosed:
+        pass
+    logger.info(
+        "job_declined_at_capacity job_id=%s in_flight=%d cap=%d", job.job_id, in_flight, cap,
+    )
+
+
 async def _receive_loop(
-    ws: websockets.WebSocketClientProtocol,
-    settings: Settings,
+    ws: Any,
+    hooks: LoopHooks,
+    tracker: JobTracker,
 ) -> None:
     """Read incoming server-sent messages and dispatch by type.
 
     Job handlers are spawned as separate tasks so token streaming for one
-    job doesn't block reading the next message (e.g. a future second job,
-    or a server-initiated cancellation). For m3 we only handle one job at
-    a time per peer in practice — the coordinator's pick_peer is round-
-    robin-ish and won't stack jobs — but the structure is here for when
-    concurrent jobs land in m4.
+    job doesn't block reading the next message. Every spawned handler task
+    is tracked and, in the `finally` below, cancelled + awaited before this
+    function returns, so a disconnect never leaves a handler driving a
+    model against a socket that is gone.
 
-    Every spawned handler task is tracked in `background_tasks` and, in the
-    `finally` below, cancelled + awaited before this function returns. This
-    closes a launch-blocking leak: WITHOUT tracking, a WS disconnect (or any
-    other reason ws.recv() raises out of the `while True`) left an in-flight
-    _handle_real_job task running detached in the background, still driving
-    LlamaCppInferenceEngine's producer thread against a socket that's gone.
-    Tracking + cancelling here is what lets that engine's own cancellation
-    (stop_event + drain, see inference.py) actually run.
+    The in-flight cap is enforced HERE, once, for every caller: a job that
+    arrives while ``max_concurrent_jobs`` are already running is declined on
+    the wire (category ``declined``) so the coordinator reroutes it.
     """
     background_tasks: set[asyncio.Task] = set()
+
+    def _finish(job_id: uuid.UUID, task: asyncio.Task) -> None:
+        tracker.in_flight.discard(job_id)
+        background_tasks.discard(task)
+        ok = not task.cancelled() and task.exception() is None
+        _emit(hooks, "job_finished", job_id=str(job_id), ok=ok)
+
     try:
         while True:
             raw = await ws.recv()
@@ -506,48 +573,47 @@ async def _receive_loop(
                         "job_assigned_received job_id=%s model_slug=%s prompt_chars=%d",
                         job.job_id, job.model_slug, len(job.prompt),
                     )
-                if settings.inference_enabled:
-                    task = asyncio.create_task(_handle_real_job(ws, job, settings))
-                else:
-                    task = asyncio.create_task(_handle_stub_job(ws, job))
+                cap = hooks.max_concurrent_jobs
+                if cap is not None and tracker.count >= cap:
+                    await _decline_at_capacity(ws, job, cap, tracker.count)
+                    continue
+                tracker.in_flight.add(job.job_id)
+                _emit(hooks, "job_started", job_id=str(job.job_id))
+                task = asyncio.create_task(hooks.job_handler(ws, job))
                 background_tasks.add(task)
-                task.add_done_callback(background_tasks.discard)
+                task.add_done_callback(lambda t, jid=job.job_id: _finish(jid, t))
             else:
                 logger.debug("server_message_unhandled type=%s", msg_type)
     finally:
-        # The WS is closing/closed (or this loop is being torn down for any
-        # other reason) — cancel and await every still-running job handler
-        # rather than leaving it stranded. Copy to a list first: cancel()
-        # doesn't mutate the set, but the done-callback (background_tasks
-        # .discard) fires as each task actually finishes, which would mutate
-        # the set while we're iterating it.
         for task in list(background_tasks):
             task.cancel()
         if background_tasks:
             await asyncio.gather(*background_tasks, return_exceptions=True)
 
 
-async def _session(settings: Settings, priv: Ed25519PrivateKey) -> None:
+async def _stop_watch(ws: Any, stop: asyncio.Event) -> None:
+    """Close the socket the moment the caller asks the loop to stop. The
+    receive loop then ends with ConnectionClosed and the session unwinds."""
+    await stop.wait()
+    await ws.close()
+
+
+async def _session(
+    settings: Settings,
+    priv: Ed25519PrivateKey,
+    hooks: LoopHooks,
+    stop: asyncio.Event,
+) -> None:
     logger.info("connecting url=%s", settings.coordinator_url)
-    # Present the coordinator token on the WS upgrade when configured. The
-    # coordinator's /peers/connect gate is a no-op unless POTLUCK_COORDINATOR_TOKEN
-    # is set, so leaving this unset keeps tokenless household setups working.
-    extra_headers = (
-        [("X-Potluck-Coordinator-Token", settings.coordinator_token)]
-        if settings.coordinator_token
-        else None
-    )
+    _emit(hooks, "connecting")
     async with websockets.connect(
-        settings.coordinator_url, extra_headers=extra_headers
+        settings.coordinator_url, extra_headers=hooks.headers_provider()
     ) as ws:
         try:
-            accept = await _do_handshake(ws, settings, priv)
+            accept = await _do_handshake(ws, settings, priv, hooks)
         except HandshakeFailed as e:
             logger.error("handshake_rejected reason=%s", e)
-            # Reject is "fatal for this attempt" — most likely an unknown
-            # binary_hash, bad sig, or member_id problem. Reconnecting
-            # without changing config will just fail the same way; surface
-            # the error and let the backoff slow us down.
+            _emit(hooks, "rejected", reason=str(e))
             raise
         logger.info(
             "session_opened peer_id=%s session_id=%s heartbeat_interval=%ds",
@@ -555,25 +621,69 @@ async def _session(settings: Settings, priv: Ed25519PrivateKey) -> None:
             accept.session_id,
             accept.heartbeat_interval_s,
         )
-        # Bidirectional: heartbeat outbound, receive incoming. First task
-        # to terminate ends the gather (typically the receive_loop on a
-        # ConnectionClosed); the outer reconnect loop handles backoff.
-        await asyncio.gather(
-            _heartbeat_loop(ws, accept),
-            _receive_loop(ws, settings),
+        _emit(
+            hooks,
+            "connected",
+            peer_id=str(accept.peer_id),
+            session_id=str(accept.session_id),
+            heartbeat_interval_s=accept.heartbeat_interval_s,
         )
-
-
-async def _run(settings: Settings, priv: Ed25519PrivateKey) -> None:
-    backoff = RECONNECT_BACKOFF_INITIAL_S
-    while True:
+        tracker = JobTracker()
+        # Bidirectional: heartbeat outbound, receive incoming, stop watch.
+        # First task to terminate ends the gather (typically the receive
+        # loop on a ConnectionClosed); the outer loop handles backoff.
+        tasks = [
+            asyncio.create_task(_heartbeat_loop(ws, accept, hooks, tracker)),
+            asyncio.create_task(_receive_loop(ws, hooks, tracker)),
+            asyncio.create_task(_stop_watch(ws, stop)),
+        ]
         try:
-            await _session(settings, priv)
+            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            for t in pending:
+                t.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+            for t in done:
+                exc = t.exception() if not t.cancelled() else None
+                if exc is not None:
+                    raise exc
+        finally:
+            for t in tasks:
+                if not t.done():
+                    t.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+
+async def run_contributor_loop(
+    settings: Settings,
+    priv: Ed25519PrivateKey,
+    hooks: LoopHooks,
+    stop: asyncio.Event | None = None,
+) -> None:
+    """Connect, serve, reconnect, until ``stop`` is set (or forever).
+
+    Returns normally once ``stop`` is set: an open session is closed first,
+    a backoff sleep is cut short, and a handshake in progress finishes or
+    fails before the return.
+    """
+    stop = stop or asyncio.Event()
+    backoff = RECONNECT_BACKOFF_INITIAL_S
+
+    async def _sleep_or_stop(seconds: float) -> None:
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=seconds)
+        except asyncio.TimeoutError:
+            pass
+
+    while not stop.is_set():
+        try:
+            await _session(settings, priv, hooks, stop)
             backoff = RECONNECT_BACKOFF_INITIAL_S
+            if stop.is_set():
+                break
+            logger.warning("session_ended retry_in_s=%.1f", backoff)
+            _emit(hooks, "disconnected", error="session_ended")
         except HandshakeFailed:
             logger.warning("retry_after_reject in_s=%.1f", backoff)
-            await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, RECONNECT_BACKOFF_MAX_S)
         except (
             ConnectionRefusedError,
             websockets.ConnectionClosed,
@@ -581,9 +691,52 @@ async def _run(settings: Settings, priv: Ed25519PrivateKey) -> None:
             asyncio.TimeoutError,
             OSError,
         ) as e:
+            if stop.is_set():
+                break
             logger.warning("disconnected error=%s retry_in_s=%.1f", e, backoff)
-            await asyncio.sleep(backoff)
-            backoff = min(backoff * 2, RECONNECT_BACKOFF_MAX_S)
+            _emit(hooks, "disconnected", error=type(e).__name__)
+        if stop.is_set():
+            break
+        await _sleep_or_stop(backoff)
+        backoff = min(backoff * 2, RECONNECT_BACKOFF_MAX_S)
+    _emit(hooks, "stopped")
+
+
+def standalone_hooks(settings: Settings) -> LoopHooks:
+    """The hooks the bench-fleet script uses: standalone engines from
+    inference.py, GPU capacity from telemetry, headers from the shared
+    coordinator token when configured."""
+
+    async def _job_handler(ws: Any, job: JobAssignedMessage) -> None:
+        if settings.inference_enabled:
+            await _handle_real_job(ws, job, settings)
+        else:
+            await _handle_stub_job(ws, job)
+
+    async def _capacity() -> Capacity:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, probe_capacity)
+
+    async def _capabilities() -> list[CapabilityEntry]:
+        return await _build_capabilities(settings)
+
+    def _headers() -> list[tuple[str, str]] | None:
+        if settings.coordinator_token:
+            return [("X-Potluck-Coordinator-Token", settings.coordinator_token)]
+        return None
+
+    return LoopHooks(
+        job_handler=_job_handler,
+        capacity_probe=_capacity,
+        capabilities_provider=_capabilities,
+        hardware_summary_provider=detect_hardware_summary,
+        headers_provider=_headers,
+        max_concurrent_jobs=settings.max_concurrent_jobs,
+    )
+
+
+async def _run(settings: Settings, priv: Ed25519PrivateKey) -> None:
+    await run_contributor_loop(settings, priv, standalone_hooks(settings))
 
 
 def _setup_logging(verbose: bool) -> None:
@@ -599,8 +752,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         prog="potluck-contributor",
         description=(
             "Potluck contributor sidecar. Connects to the coordinator, "
-            "attests with an Ed25519 keypair, and heartbeats. No inference "
-            "yet — that's m3+."
+            "attests with an Ed25519 keypair, heartbeats, and serves jobs."
         ),
     )
     p.add_argument(
@@ -615,18 +767,17 @@ def main(argv: list[str] | None = None) -> None:
     settings = get_settings()
 
     if not settings.binary_hash:
-        logger.error(
-            "missing POTLUCK_BINARY_HASH — set it to the SHA256 of the "
-            "current contributor binary, which must be present in the "
-            "coordinator's contributor_releases table"
-        )
-        sys.exit(2)
+        from potluck_local.contributor.release import frozen_bundle_dir, resolve_binary_hash
+
+        resolved, source = resolve_binary_hash(None, frozen_bundle_dir())
+        settings = settings.model_copy(update={"binary_hash": resolved})
+        logger.info("binary_hash_resolved source=%s", source)
 
     if "REPLACE_WITH" in settings.coordinator_url:
         logger.error(
             "POTLUCK_COORDINATOR_URL still contains the placeholder. "
-            "Edit your .env (or the env var) with the dev Mac's actual "
-            "LAN/Tailscale IP. Got: %s",
+            "Edit your .env (or the env var) with the coordinator's actual "
+            "address. Got: %s",
             settings.coordinator_url,
         )
         sys.exit(2)

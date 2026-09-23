@@ -2,7 +2,9 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runtimeRequest } from "../src/runtime.js";
+vi.mock("../src/runtime.js", () => ({ runtimeRequest: vi.fn(async () => ({})) }));
 
 import {
   assertGatewayReady,
@@ -22,19 +24,17 @@ import {
 } from "../src/config.js";
 
 let home = "";
-const savedEnv = { ...process.env };
 
 beforeEach(async () => {
+  vi.mocked(runtimeRequest).mockClear();
   home = await mkdtemp(join(tmpdir(), "potluck-cfg-"));
-  process.env.HOME = home;
+  vi.stubEnv("POTLUCK_DATA_DIR", join(home, ".potluck"));
   delete process.env.POTLUCK_GATEWAY_KEY;
   delete process.env.POTLUCK_GATEWAY_URL;
 });
 
 afterEach(async () => {
-  // Restore env vars in place. Reassigning process.env wholesale detaches it
-  // from the live proxy, after which HOME mutations no longer reach os.homedir().
-  process.env.HOME = savedEnv.HOME;
+  vi.unstubAllEnvs();
   delete process.env.POTLUCK_GATEWAY_KEY;
   delete process.env.POTLUCK_GATEWAY_URL;
   await rm(home, { recursive: true, force: true });
@@ -205,8 +205,11 @@ describe("mergeSharedSafeFields (wizard write-back safety)", () => {
     const raw = JSON.parse(
       await readFile(join(home, ".potluck", "config.json"), "utf8"),
     ) as Record<string, unknown>;
-    expect(raw.active_model_id).toBe("model-x");
-    expect((raw.network as Record<string, unknown>).coordinator_url).toBe("http://c:8400");
+    expect(runtimeRequest).toHaveBeenCalledWith("/settings", {
+      method: "PATCH", timeout: 3000,
+      body: { active_model_id: "model-x", network: { coordinator_url: "http://c:8400" } },
+    });
+    expect(raw.active_model_id).toBeUndefined(); // The CLI never writes shared config itself.
     expect(raw.gateway).toEqual({ enabled: true, api_key: "DO-NOT-TOUCH" });
   });
 });

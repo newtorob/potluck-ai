@@ -156,6 +156,9 @@ _ALLOWED_SCHEMA_ADDITIONS: frozenset[tuple[str, str, str]] = frozenset(
         ("memory_access_log", "retrieval_profile_version", "TEXT"),
         ("mcp_tool_calls", "tool_schema_version", "TEXT"),
         ("mcp_tool_calls", "memory_ids_touched", "TEXT"),
+        ("agent_runs", "control_mode", "TEXT NOT NULL DEFAULT 'observed'"),
+        ("agent_runs", "task_id", "TEXT"),
+        ("agent_runs", "cwd", "TEXT"),
         # updated_at enables incremental sync, agent delta queries, and
         # export diffing. ISO-8601 TEXT matches the rest of the schema.
         ("memories", "updated_at", "TEXT"),
@@ -270,6 +273,10 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         await db.execute(_CREATE_MEMORY_ACCESS_LOG)
         await db.execute(_CREATE_MCP_SESSIONS)
         await db.execute(_CREATE_MCP_TOOL_CALLS)
+        await db.execute(_CREATE_AGENT_RUNS)
+        await db.execute(_CREATE_AGENT_INSTANCES)
+        await db.execute(_CREATE_AGENT_EVENTS)
+        await db.execute(_CREATE_AGENT_RESOURCES)
         await db.execute(_CREATE_VAULT_FILES)
         await db.execute(_CREATE_CONVERSATIONS)
         await db.execute(_CREATE_MESSAGES)
@@ -316,6 +323,15 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         # show the previews of the memories it touched.
         await _add_column_if_missing(db, "mcp_tool_calls", "memory_ids_touched", "TEXT")
 
+        # Managed coding sessions share the provider-native trace tables with
+        # observe-only hooks. These columns preserve the control boundary and
+        # link each managed execution back to its durable Potluck task.
+        await _add_column_if_missing(
+            db, "agent_runs", "control_mode", "TEXT NOT NULL DEFAULT 'observed'"
+        )
+        await _add_column_if_missing(db, "agent_runs", "task_id", "TEXT")
+        await _add_column_if_missing(db, "agent_runs", "cwd", "TEXT")
+
         # pinned: 1 = always-inject this memory into retrieval regardless of
         # query (ambient/standing context). Defaults 0 for all existing rows.
         await _add_column_if_missing(db, "memories", "pinned", "INTEGER NOT NULL DEFAULT 0")
@@ -326,8 +342,16 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         for stmt in _OBSERVABILITY_INDICES:
             await db.execute(stmt)
 
+        for stmt in _AGENT_RUN_INDICES:
+            await db.execute(stmt)
+
         for stmt in _USAGE_INDICES:
             await db.execute(stmt)
+
+        from potluck_local.services.memory_safety import redact_stored_memories
+        redacted = await redact_stored_memories(db)
+        if redacted:
+            logger.info("memory_credentials_redacted count=%d", redacted)
 
         await db.commit()
 
@@ -340,9 +364,9 @@ async def reset_memory_db(db_path: Path | None = None) -> None:
 
     NOT used by the /memory/wipe route (see wipe_memory_tables): this drops
     the WHOLE database file, including task_states, vault_files,
-    conversations, messages, mcp_sessions, and mcp_tool_calls — every other
-    product surface that happens to share this SQLite file with memory, not
-    memory data. A prior version of /memory/wipe called this directly, which
+    conversations, messages, MCP observations, and provider-native agent runs,
+    every other product surface that happens to share this SQLite file with
+    memory, not memory data. A prior version of /memory/wipe called this directly, which
     silently deleted the user's chat history and tasks alongside their
     memories. Kept here only for tests that want a fully blank DB.
     """
@@ -359,7 +383,7 @@ async def wipe_memory_tables(db_path: Path | None = None) -> int:
     Scope, enumerated against the schema above: `memories`, `memory_embeddings`,
     and `memory_access_log` are memory data. Every other table in this file —
     task_states (tasks), vault_files (vault), conversations/messages (chat),
-    mcp_sessions/mcp_tool_calls (agent observability) — is a distinct product
+    MCP and provider-native agent observability tables — is a distinct product
     surface that merely shares this SQLite file with memory, and MUST be left
     untouched by a memory wipe. This is the fix for the launch-blocker where
     POST /memory/wipe called reset_memory_db() and dropped the whole file,
@@ -420,6 +444,87 @@ _OBSERVABILITY_INDICES = [
     "CREATE INDEX IF NOT EXISTS idx_mcp_tool_calls_tool_name ON mcp_tool_calls(tool_name)",
 ]
 
+# Provider-native execution traces. These live beside the MCP observer because
+# an MCP session is a connection lifetime, while a run contains turns,
+# subagents, approvals, compaction, and tool transitions.
+_CREATE_AGENT_RUNS = """
+CREATE TABLE IF NOT EXISTS agent_runs (
+  id TEXT PRIMARY KEY,
+  provider TEXT NOT NULL,
+  provider_session_id TEXT NOT NULL,
+  project TEXT,
+  model TEXT,
+  status TEXT NOT NULL DEFAULT 'active',
+  capture_profile TEXT NOT NULL DEFAULT 'metadata-only',
+  capture_note TEXT,
+  control_mode TEXT NOT NULL DEFAULT 'observed',
+  task_id TEXT,
+  cwd TEXT,
+  started_at TEXT NOT NULL,
+  ended_at TEXT,
+  last_event_at TEXT NOT NULL,
+  UNIQUE(provider, provider_session_id)
+)
+"""
+
+_CREATE_AGENT_INSTANCES = """
+CREATE TABLE IF NOT EXISTS agent_instances (
+  id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+  provider_agent_id TEXT NOT NULL,
+  parent_instance_id TEXT REFERENCES agent_instances(id),
+  kind TEXT NOT NULL,
+  label TEXT NOT NULL,
+  model TEXT,
+  status TEXT NOT NULL DEFAULT 'active',
+  started_at TEXT NOT NULL,
+  ended_at TEXT,
+  UNIQUE(run_id, provider_agent_id)
+)
+"""
+
+_CREATE_AGENT_EVENTS = """
+CREATE TABLE IF NOT EXISTS agent_events (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT,
+  id TEXT NOT NULL UNIQUE,
+  run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+  agent_instance_id TEXT REFERENCES agent_instances(id),
+  event_type TEXT NOT NULL,
+  provider_event_name TEXT NOT NULL,
+  correlation_id TEXT,
+  turn_id TEXT,
+  tool_name TEXT,
+  status TEXT NOT NULL,
+  occurred_at TEXT NOT NULL,
+  received_at TEXT NOT NULL,
+  duration_ms INTEGER,
+  attribution_confidence TEXT NOT NULL,
+  metadata TEXT NOT NULL DEFAULT '{}'
+)
+"""
+
+_CREATE_AGENT_RESOURCES = """
+CREATE TABLE IF NOT EXISTS agent_resources (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_id TEXT NOT NULL REFERENCES agent_events(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  resource_ref TEXT NOT NULL,
+  action TEXT NOT NULL,
+  UNIQUE(event_id, kind, resource_ref, action)
+)
+"""
+
+_AGENT_RUN_INDICES = [
+    "CREATE INDEX IF NOT EXISTS idx_agent_runs_recent ON agent_runs(last_event_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_agent_runs_status ON agent_runs(status, last_event_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_agent_runs_provider ON agent_runs(provider, last_event_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_agent_runs_task ON agent_runs(task_id, last_event_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_agent_instances_run ON agent_instances(run_id, started_at)",
+    "CREATE INDEX IF NOT EXISTS idx_agent_events_run_seq ON agent_events(run_id, seq)",
+    "CREATE INDEX IF NOT EXISTS idx_agent_events_type ON agent_events(event_type, occurred_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_agent_resources_event ON agent_resources(event_id)",
+]
+
 # usage_events powers the Usage dashboard (services/usage_store.py). One row per
 # completed inference request, written by each request path. METADATA ONLY:
 # model, token counts, latency, timestamp, scope, ok/fail. NEVER prompt or
@@ -449,6 +554,149 @@ _USAGE_INDICES = [
     "CREATE INDEX IF NOT EXISTS idx_usage_events_scope ON usage_events(scope)",
     "CREATE INDEX IF NOT EXISTS idx_usage_events_model ON usage_events(model_slug)",
 ]
+
+
+async def list_agent_runs(
+    *,
+    db_path: Path | None = None,
+    status: str | None = None,
+    provider: str | None = None,
+    project: str | None = None,
+    limit: int = 100,
+) -> list[dict]:
+    """Return provider-native runs, newest activity first."""
+    path = db_path or get_memory_db_path()
+    conditions: list[str] = []
+    params: list[object] = []
+    if status is not None:
+        conditions.append("r.status = ?")
+        params.append(status)
+    if provider is not None:
+        conditions.append("r.provider = ?")
+        params.append(provider)
+    if project is not None:
+        conditions.append("r.project = ?")
+        params.append(project)
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    params.append(limit)
+
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            f"""
+            SELECT
+                r.*,
+                (SELECT COUNT(*) FROM agent_instances i WHERE i.run_id = r.id) AS agent_count,
+                (SELECT COUNT(*) FROM agent_events e WHERE e.run_id = r.id) AS event_count,
+                (SELECT COUNT(*) FROM agent_events e
+                 WHERE e.run_id = r.id AND e.status = 'failed') AS error_count
+            FROM agent_runs r
+            {where}
+            ORDER BY r.last_event_at DESC
+            LIMIT ?
+            """,
+            params,
+        )
+        rows = await cursor.fetchall()
+    return [dict(row) for row in rows]
+
+
+async def get_agent_run(
+    run_id: str,
+    db_path: Path | None = None,
+) -> dict | None:
+    """Return one provider-native run with aggregate counts."""
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            SELECT
+                r.*,
+                (SELECT COUNT(*) FROM agent_instances i WHERE i.run_id = r.id) AS agent_count,
+                (SELECT COUNT(*) FROM agent_events e WHERE e.run_id = r.id) AS event_count,
+                (SELECT COUNT(*) FROM agent_events e
+                 WHERE e.run_id = r.id AND e.status = 'failed') AS error_count
+            FROM agent_runs r
+            WHERE r.id = ?
+            """,
+            (run_id,),
+        )
+        row = await cursor.fetchone()
+    return dict(row) if row else None
+
+
+async def list_agent_instances(
+    run_id: str,
+    db_path: Path | None = None,
+) -> list[dict]:
+    """Return root and subagent lanes for a run."""
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            SELECT * FROM agent_instances
+            WHERE run_id = ?
+            ORDER BY CASE kind WHEN 'root' THEN 0 ELSE 1 END, started_at, id
+            """,
+            (run_id,),
+        )
+        rows = await cursor.fetchall()
+    return [dict(row) for row in rows]
+
+
+async def list_agent_events(
+    run_id: str,
+    *,
+    after_seq: int = 0,
+    limit: int = 1000,
+    db_path: Path | None = None,
+) -> list[dict]:
+    """Return an ascending cursor page of normalized run events."""
+    path = db_path or get_memory_db_path()
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            SELECT * FROM agent_events
+            WHERE run_id = ? AND seq > ?
+            ORDER BY seq ASC
+            LIMIT ?
+            """,
+            (run_id, after_seq, limit),
+        )
+        rows = await cursor.fetchall()
+    return [dict(row) for row in rows]
+
+
+async def list_agent_resources(
+    run_id: str,
+    *,
+    after_seq: int = 0,
+    through_seq: int | None = None,
+    db_path: Path | None = None,
+) -> list[dict]:
+    """Return safe resource references for the same event cursor window."""
+    path = db_path or get_memory_db_path()
+    through_condition = "AND ae.seq <= ?" if through_seq is not None else ""
+    params: list[object] = [run_id, after_seq]
+    if through_seq is not None:
+        params.append(through_seq)
+    async with aiosqlite.connect(path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            f"""
+            SELECT ar.id, ar.event_id, ar.kind, ar.resource_ref, ar.action
+            FROM agent_resources ar
+            JOIN agent_events ae ON ae.id = ar.event_id
+            WHERE ae.run_id = ? AND ae.seq > ? {through_condition}
+            ORDER BY ae.seq ASC, ar.id ASC
+            """,
+            params,
+        )
+        rows = await cursor.fetchall()
+    return [dict(row) for row in rows]
 
 
 async def list_sessions(

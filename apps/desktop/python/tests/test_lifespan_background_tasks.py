@@ -39,6 +39,9 @@ import potluck_local.routers.peer as peer_module
 
 @pytest.fixture()
 def isolated_env(tmp_path, monkeypatch):
+    from potluck_local.services import model_lifecycle
+
+    monkeypatch.setattr(model_lifecycle, "_lifecycle", model_lifecycle.ModelLifecycle())
     db_path = tmp_path / "memory.db"
     monkeypatch.setenv("POTLUCK_MEMORY_DB_PATH", str(db_path))
     monkeypatch.setenv("POTLUCK_DATA_DIR", str(tmp_path / "data_dir"))

@@ -43,21 +43,21 @@ from __future__ import annotations
 # a stored "instruction" memory. See RETRIEVAL_PROFILE_VERSION v3 for the
 # paired retrieval-side mitigation (auto-extracted instructions no longer
 # get always-inject status).
-EXTRACTION_PROMPT_VERSION = "extraction-v3-2026-07-17"
+EXTRACTION_PROMPT_VERSION = "extraction-v4-redacted-2026-09-15"
 
 # Version stamped on memories saved via the explicit user-typed path
 # (memory_save MCP tool, /memory POST endpoint). No LLM is involved here,
 # so this is effectively "the contract for user-provided memories" — it
 # bumps if we change validation, normalisation, or storage semantics
 # (NOT if the user happens to type something different).
-EXPLICIT_MEMORY_VERSION = "explicit-v1"
+EXPLICIT_MEMORY_VERSION = "explicit-v2-redacted-2026-09-15"
 
 # Version stamped on memories produced by the vault-ingestion pipeline
 # (services/vault_ingestion.py). Files chunked by anchor, each chunk
 # becomes one 'reference' memory. No LLM extraction happens here. Bump
 # when the chunking algorithm, anchor strategy, or source_ref format
 # changes.
-VAULT_INGESTION_VERSION = "vault-ingest-v1"
+VAULT_INGESTION_VERSION = "vault-ingest-v2-redacted-2026-09-15"
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +101,11 @@ VAULT_INGESTION_VERSION = "vault-ingest-v1"
 #     drift for stored vectors is already captured separately on
 #     memory_embeddings.model_used)
 RETRIEVAL_PROFILE_VERSION = "retrieval-v3-2026-07-17"
+
+# Local chat opts into relevance-first retrieval: explicit pins, then all
+# categories ranked against the latest user turn, with a semantic relevance
+# floor. MCP keeps its existing ambient instruction contract.
+CHAT_CONTEXT_VERSION = "chat-context-v1-relevance-2026-09-15"
 
 
 # ---------------------------------------------------------------------------
