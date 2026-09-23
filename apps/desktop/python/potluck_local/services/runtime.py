@@ -36,6 +36,7 @@ class LLMRuntime:
         self._model = None
         self._model_path: str | None = None
         self._artifact: tuple[str, tuple] | None = None
+        self._verified_artifact: tuple[str, tuple] | None = None
         self._model_id: str | None = None
         self._loaded_n_ctx: int | None = None
         self._loaded_rpc_servers: tuple[str, ...] | None = None  # Big Model Mode
@@ -69,7 +70,19 @@ class LLMRuntime:
         if not self._artifact or not self._model_path or self._pipeline is not None or self._loaded_rpc_servers:
             return None
         try:
-            if file_stamp(Path(self._model_path)) == self._artifact[1]:
+            path = Path(self._model_path)
+            if file_stamp(path) == self._artifact[1]:
+                if self._verified_artifact != self._artifact:
+                    # A freshly written file can change within one filesystem
+                    # timestamp tick. Recheck bytes until that tick is safely
+                    # past, including the first observation after native load.
+                    # Established weights then use the cheap metadata check.
+                    checked = artifact_identity(path)
+                    if checked != self._artifact:
+                        self._artifact = None
+                        return None
+                    if time.time_ns() - max(checked[1][-2:]) > 2_000_000_000:
+                        self._verified_artifact = checked
                 return self._artifact[0]
         except OSError:
             pass
@@ -153,9 +166,16 @@ class LLMRuntime:
             except OSError:
                 identity = None
             model = Llama(**kwargs)
+            verified_identity = None
             try:
-                if identity and file_stamp(Path(model_path)) != identity[1]:
-                    identity = None
+                if identity:
+                    # Verify again in the loading worker, keeping a full-file
+                    # hash out of the first peer capability/inference request.
+                    checked = artifact_identity(Path(model_path))
+                    if checked != identity:
+                        identity = None
+                    elif time.time_ns() - max(checked[1][-2:]) > 2_000_000_000:
+                        verified_identity = checked
             except OSError:
                 identity = None
             elapsed = round(time.monotonic() - start, 2)
@@ -163,6 +183,7 @@ class LLMRuntime:
             self._model = model
             self._model_path = model_path
             self._artifact = identity
+            self._verified_artifact = verified_identity
             self._model_id = Path(model_path).parent.name
             self._loaded_n_ctx = n_ctx
             self._loaded_rpc_servers = tuple(rpc_servers) if rpc_servers else None
@@ -454,6 +475,7 @@ class LLMRuntime:
     def _release_model(self) -> None:
         """Inner release — must be called while _load_lock is held."""
         self._artifact = None
+        self._verified_artifact = None
         if self._model is not None:
             import gc
 

@@ -118,6 +118,34 @@ def test_changed_file_invalidates_loaded_digest(runtime):
     with pytest.raises(ModelIdentityError): runtime.assert_model_identity('test', A)
 
 
+@pytest.mark.parametrize('observe_before_change', [False, True])
+def test_timestamp_collision_cannot_reuse_an_unsettled_digest(runtime, monkeypatch, observe_before_change):
+    from potluck_local.services import runtime as runtime_module
+    stamp = runtime._artifact[1]
+    monkeypatch.setattr(runtime_module, 'file_stamp', lambda _: stamp)
+    monkeypatch.setattr(runtime_module.time, 'time_ns', lambda: max(stamp[-2:]) + 1_000_000)
+    if observe_before_change:
+        assert runtime.current_model_sha256() == A
+    Path(runtime._model_path).write_bytes(b'weights-b')
+    # Even a first observation much later must verify bytes after native load.
+    monkeypatch.setattr(runtime_module.time, 'time_ns', lambda: max(stamp[-2:]) + 10_000_000_000)
+    assert runtime.current_model_sha256() is None
+    with pytest.raises(ModelIdentityError): runtime.assert_model_identity('test', A)
+
+
+def test_established_weights_do_not_rehash_on_every_request(runtime, monkeypatch):
+    from potluck_local.services import runtime as runtime_module
+    original = runtime_module.artifact_identity
+    calls = []
+    def verify(path):
+        calls.append(path)
+        return original(path)
+    monkeypatch.setattr(runtime_module, 'artifact_identity', verify)
+    monkeypatch.setattr(runtime_module.time, 'time_ns', lambda: max(runtime._artifact[1][-2:]) + 10_000_000_000)
+    assert [runtime.current_model_sha256() for _ in range(3)] == [A, A, A]
+    assert len(calls) == 1
+
+
 def test_readiness_uses_exact_route_without_inference_or_peer_disclosure(client, runtime, monkeypatch):
     body = {'model': 'test', 'sha256': A, 'scope': 'local'}
     state = client.post('/v1/potluck/readiness', json=body).json()
