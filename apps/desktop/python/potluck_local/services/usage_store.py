@@ -194,6 +194,20 @@ async def summary(window_days: float = 30.0, db_path: Path | None = None) -> dic
     }
 
 
+async def performance_summary(db_path: Path | None = None) -> dict:
+    """Bounded aggregate over recorded consumed requests in the last 24 hours."""
+    async with aiosqlite.connect(db_path or get_memory_db_path()) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT COUNT(*) AS requests, SUM(output_tokens) AS output_tokens, "
+            "AVG(ttft_ms) AS avg_ttft_ms, AVG(duration_ms) AS avg_duration_ms, "
+            "AVG(ok) AS success_rate FROM usage_events WHERE direction = 'consumed' AND ts >= ?",
+            (_cutoff_iso(1),))
+        row = dict(await cursor.fetchone())
+    return {'windowHours': 24, 'requests': row['requests'], 'reportedOutputTokens': row['output_tokens'] or 0,
+            'avgTtftMs': row['avg_ttft_ms'], 'avgDurationMs': row['avg_duration_ms'], 'successRate': row['success_rate']}
+
+
 async def activity(range_days: int = 365, db_path: Path | None = None) -> list[dict]:
     """Per-day [{date, tokens, requests}] for the contribution heatmap (consumed)."""
     path = db_path or get_memory_db_path()

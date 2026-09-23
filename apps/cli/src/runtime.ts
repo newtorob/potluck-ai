@@ -50,8 +50,8 @@ export async function readRuntimeRecord(): Promise<RuntimeRecord | null> {
   }
 }
 
-export async function verifyRuntime(record: RuntimeRecord, timeout: number): Promise<void> {
-  const response = await requestJSON({ url: record.url + "/control", token: record.token, timeout });
+export async function verifyRuntime(record: RuntimeRecord, timeout: number, signal?: AbortSignal): Promise<void> {
+  const response = await requestJSON({ url: record.url + "/control", token: record.token, timeout, signal });
   if (response.schemaVersion !== 1 || response.instanceId !== record.instanceId || response.pid !== record.pid
       || response.owner !== record.owner || response.url !== record.url) {
     throw new RuntimeError("Runtime identity changed. Run potluck up again before retrying.");
@@ -60,11 +60,11 @@ export async function verifyRuntime(record: RuntimeRecord, timeout: number): Pro
 
 export async function runtimeRequest<T = Record<string, unknown>>(path: string, options: {
   timeout: number; method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown;
-  allowArray?: boolean;
+  allowArray?: boolean; signal?: AbortSignal;
 }): Promise<T> {
   const record = await readRuntimeRecord();
   if (!record) throw new RuntimeError("No shared runtime found. Start it with potluck up.");
-  await verifyRuntime(record, options.timeout);
+  await verifyRuntime(record, options.timeout, options.signal);
   return requestJSON<T>({ ...options, url: record.url + path, token: record.token });
 }
 

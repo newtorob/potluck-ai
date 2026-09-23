@@ -32,7 +32,7 @@ async function main() {
     await fs.symlink(weights, path.join(folder, 'model.gguf'));
   }
   await fs.writeFile(path.join(directory, 'config.json'), JSON.stringify({
-    runtime: { context_size: 512, gpu_layers: 0, threads: 2, max_tokens: 16 },
+    runtime: { context_size: process.env.POTLUCK_VALIDATION_AIDER_BIN ? 4096 : 512, gpu_layers: 0, threads: 2, max_tokens: 16 },
     network: { contributor_mode: false },
   }), { mode: 0o600 });
   await fs.writeFile(path.join(directory, 'cli.json'), JSON.stringify({ model: 'other-fixture', scope: 'local' }));
@@ -97,9 +97,33 @@ async function main() {
     const doctor = await cli(['doctor', '--scope', 'local']);
     assert.equal(doctor.ready, true);
     assert.equal(doctor.checks.find(c => c.id === 'installed_weights').state, 'ok');
+    const status = await cli(['status', '--scope', 'local']);
+    assert.equal(status.performance.local.model, slug);
+    assert.equal(status.performance.household, null);
+    const watch = run(process.execPath, [entry, 'status', '--scope', 'local', '--watch', '--interval', '1000', '--json', '--timeout', '30000'], { env, cwd: nested, timeout: 15000 });
+    watch.child.stdin.end();
+    let samples = '';
+    watch.child.stdout.on('data', chunk => {
+      samples += chunk; if (samples.trim().split('\n').length >= 2) watch.child.kill('SIGINT');
+    });
+    const watched = await watch;
+    assert(watched.stdout.trim().split('\n').map(JSON.parse).every(row => row.performance.local.model === slug));
+    checks.push('live status samples real runtime metrics and exits cleanly on SIGINT');
     const controls = await cli(['contribute', 'limits', '--jobs', '1', '--max-tokens', '512', '--min-free-memory', '1']);
     assert.equal(controls.enabled, false); assert.equal(controls.maxTokens, 512);
     checks.push('plain inference returns complete JSON; doctor verifies the project; contribution limits preserve disabled state');
+    if (process.env.POTLUCK_VALIDATION_AIDER_BIN) {
+      await run('git', ['init', '--quiet'], { cwd: project });
+      const profile = path.join(directory, 'aider-profile'); await fs.mkdir(profile);
+      const aider = await run(process.execPath, [entry, 'launch', 'aider', '--scope', 'local', '--message', 'Reply only POTLUCK_AIDER_OK. Do not read or edit any files.'], {
+        cwd: project, timeout: 180000, maxBuffer: 1048576,
+        env: { ...env, HOME: profile, POTLUCK_AIDER_BIN: process.env.POTLUCK_VALIDATION_AIDER_BIN },
+      });
+      await fs.writeFile(path.join(directory, 'aider-output.txt'), aider.stdout + aider.stderr, { mode: 0o600 });
+      assert.match(aider.stdout, /POTLUCK_AIDER_OK/);
+      assert(!/APIConnectionError|BadRequestError|ContextWindowExceededError/.test(aider.stdout + aider.stderr));
+      checks.push('installed Aider receives a real response from the pinned CPU model through the private bridge');
+    }
     checks.push('project lock survives runtime restart and serves real CPU inference through the CLI client');
     const post = async body => fetch(cfg.baseURL + '/chat/completions', { method: 'POST',
       headers: { Authorization: `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json', 'X-Potluck-Scope': 'local' },

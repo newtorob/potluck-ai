@@ -4,7 +4,7 @@ import { requestJSON, ControlError } from "./control.js";
 import { readProjectModelLock } from "./model-lock.js";
 import { runtimeRequest } from "./runtime.js";
 
-export async function diagnoseProject(cfg: GatewayConfig, scope: Scope, timeout: number, cwd = process.cwd()): Promise<Check[]> {
+export async function diagnoseProject(cfg: GatewayConfig, scope: Scope, timeout: number, cwd = process.cwd(), signal?: AbortSignal): Promise<Check[]> {
   let lock;
   try { lock = await readProjectModelLock(cwd); }
   catch { return [{ id: "project_lock", state: "error", message: "The project model lock is invalid or unreadable.", action: "Review potluck.lock; do not replace it with a global default." }]; }
@@ -12,10 +12,10 @@ export async function diagnoseProject(cfg: GatewayConfig, scope: Scope, timeout:
   const checks: Check[] = [{ id: "project_lock", state: "ok", message: `Project pins ${lock.model.id} (SHA-256 ${lock.model.sha256}).` }];
   let route: unknown;
   try {
-    const caps = await requestJSON({ url: `${cfg.baseURL}/potluck/capabilities`, token: cfg.apiKey, timeout });
+    const caps = await requestJSON({ url: `${cfg.baseURL}/potluck/capabilities`, token: cfg.apiKey, timeout, signal });
     if (caps.model_lock_version !== 1 || caps.artifact_format !== "gguf" || !Array.isArray(caps.scopes) || !caps.scopes.includes(scope)) throw new Error("incompatible");
     checks.push({ id: "lock_protocol", state: "ok", message: "Gateway supports exact GGUF model locks for this scope." });
-    const state = await requestJSON({ url: `${cfg.baseURL}/potluck/readiness`, token: cfg.apiKey, timeout, method: "POST",
+    const state = await requestJSON({ url: `${cfg.baseURL}/potluck/readiness`, token: cfg.apiKey, timeout, signal, method: "POST",
       body: { model: lock.model.id, sha256: lock.model.sha256, scope } });
     if (state.model_lock_version !== 1 || state.model !== lock.model.id || state.scope !== scope) throw new Error("incompatible");
     route = state.ready === true && ["local", "household"].includes(String(state.route)) ? state.route : null;
@@ -29,8 +29,8 @@ export async function diagnoseProject(cfg: GatewayConfig, scope: Scope, timeout:
   }
   // These inspect this machine only; absence is normal when an own machine serves the pin.
   const results = await Promise.allSettled([
-    runtimeRequest(`/models/${encodeURIComponent(lock.model.id)}/identity`, { timeout }),
-    runtimeRequest("/models/setup-options", { timeout }),
+    runtimeRequest(`/models/${encodeURIComponent(lock.model.id)}/identity`, { timeout, signal }),
+    runtimeRequest("/models/setup-options", { timeout, signal }),
   ]);
   const identity = results[0];
   if (identity.status === "fulfilled") {

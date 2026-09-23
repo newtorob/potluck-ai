@@ -38,6 +38,8 @@ export interface CliArgs {
   timezone?: string;
   saveSession?: boolean;
   resume?: string;
+  watch?: boolean;
+  interval?: number;
 }
 
 const commands = new Set<Command>(["sessions", "run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
@@ -69,6 +71,11 @@ export function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--sign-in") out.signIn = true;
     else if (arg === "--connect") out.connect = true;
     else if (arg === "--preferences") out.preferences = true;
+    else if (arg === "--watch") out.watch = true;
+    else if (flag === "--interval") {
+      const v = value(); if (!/^\d+$/.test(v) || Number(v) < 1000 || Number(v) > 60000) throw new UsageError("--interval must be 1000–60000 milliseconds.");
+      out.interval = Number(v);
+    }
     else if (arg === "--save-session") out.saveSession = true;
     else if (flag === "--resume") out.resume = value();
     else if (arg === "--with-model") out.withModel = true;
@@ -147,6 +154,8 @@ export function parseArgs(argv: string[]): CliArgs {
   }
   if (out.command && (out.saveSession || out.resume)) throw new UsageError("--save-session and --resume apply to the coding agent, not management commands.");
   if (out.saveSession && out.resume) throw new UsageError("--resume already saves the continued session.");
+  if ((out.watch || out.interval !== undefined) && out.command !== "status") throw new UsageError("--watch and --interval require status.");
+  if (out.interval !== undefined && !out.watch) throw new UsageError("--interval requires --watch.");
   const operation = out.command;
   const allowed: Record<string, string[]> = {
     "--jobs": ["contribute"], "--max-tokens": ["contribute", "run"], "--min-free-memory": ["contribute"], "--days": ["contribute"], "--timezone": ["contribute"],

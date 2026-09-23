@@ -16,6 +16,7 @@ export interface DiagnosticReport {
   runtime: { reachable: boolean; version: string | null; model: string | null };
   mesh: { reachable: boolean; paired: boolean | null; connected: boolean | null; peersOnline: number | null; peersKnown: number | null };
   gateway: { endpoint: string; configured: boolean; reachable: boolean; models: string[] };
+  performance?: import("./status.js").PerformanceReport | null;
 }
 
 const string = (v: unknown): string | null => typeof v === "string" ? v : null;
@@ -26,15 +27,15 @@ async function probe(options: Parameters<typeof requestJSON>[0]): Promise<Probe>
   catch (err) { return { code: err instanceof ControlError ? err.code : "unreachable" }; }
 }
 
-export async function diagnose(options: { timeout: number; scope?: string }): Promise<DiagnosticReport> {
+export async function diagnose(options: { timeout: number; scope?: string; signal?: AbortSignal }): Promise<DiagnosticReport> {
   const [cfg, prefs] = await Promise.all([loadConfig(), loadCliPrefs()]);
   const scope = resolveScope(options.scope, prefs.scope).scope;
   const configured = cfg.enabled && Boolean(cfg.apiKey);
   const [health, mesh, peers, gateway] = await Promise.all([
-    probe({ url: `${runtimeURL()}/health`, timeout: options.timeout }),
-    probe({ socketPath: meshSocketPath(), path: "/status", timeout: options.timeout }),
-    probe({ socketPath: meshSocketPath(), path: "/peers", timeout: options.timeout }),
-    configured ? probe({ url: `${cfg.baseURL}/models`, token: cfg.apiKey, timeout: options.timeout })
+    probe({ url: `${runtimeURL()}/health`, timeout: options.timeout, signal: options.signal }),
+    probe({ socketPath: meshSocketPath(), path: "/status", timeout: options.timeout, signal: options.signal }),
+    probe({ socketPath: meshSocketPath(), path: "/peers", timeout: options.timeout, signal: options.signal }),
+    configured ? probe({ url: `${cfg.baseURL}/models`, token: cfg.apiKey, timeout: options.timeout, signal: options.signal })
       : Promise.resolve({ code: "disabled" }),
   ]);
   const h = "body" in health ? health.body : null;
@@ -98,7 +99,7 @@ export async function diagnose(options: { timeout: number; scope?: string }): Pr
       action: "Use potluck models list, install, and load; or load a model on an eligible household machine." });
   if (scope === "local" && !report.runtime.model) checks.push({ id: "local_model", state: "error",
     message: "Local scope requires a model loaded on this computer.", action: "Load a local model." });
-  checks.push(...await diagnoseProject(cfg, scope, options.timeout));
+  checks.push(...await diagnoseProject(cfg, scope, options.timeout, undefined, options.signal));
   report.ready = checks.every(c => c.state !== "error");
   return report;
 }

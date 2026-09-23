@@ -38,7 +38,7 @@ export function safeURL(raw: string): string {
 export function requestJSON<T = Record<string, unknown>>(options: {
   url?: string; socketPath?: string; path?: string; token?: string; timeout: number;
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown;
-  allowArray?: boolean; allowEmpty?: boolean;
+  allowArray?: boolean; allowEmpty?: boolean; signal?: AbortSignal;
 }): Promise<T> {
   return new Promise((resolve, reject) => {
     let url: URL;
@@ -50,6 +50,7 @@ export function requestJSON<T = Record<string, unknown>>(options: {
     }
     const request = url.protocol === "https:" ? httpsRequest : httpRequest;
     const req = request({
+      signal: options.signal,
       protocol: url.protocol, hostname: url.hostname.replace(/^\[|\]$/g, ""), port: url.port,
       path: options.path ?? `${url.pathname}${url.search}`, socketPath: options.socketPath,
       method: options.method || "GET", headers: { Accept: "application/json",
