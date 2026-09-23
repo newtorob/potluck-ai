@@ -17,6 +17,8 @@ const run = promisify(execFile);
   const oldBundle = process.env.POTLUCK_VALIDATION_OLD_BUNDLE;
   const newBundle = process.env.POTLUCK_VALIDATION_NEW_BUNDLE;
   const weights = process.env.POTLUCK_VALIDATION_MODEL_FILE;
+  const brew = process.env.POTLUCK_VALIDATION_BREW;
+  const brewMetadata = [process.env.POTLUCK_VALIDATION_BREW_OLD_METADATA, process.env.POTLUCK_VALIDATION_BREW_NEW_METADATA];
   for (const value of [oldBundle, newBundle, weights]) assert(value && path.isAbsolute(value), 'Supply absolute OLD_BUNDLE, NEW_BUNDLE and MODEL_FILE validation paths.');
   const before = await fs.stat(weights);
   const hash = createHash('sha256');
@@ -43,19 +45,54 @@ const run = promisify(execFile);
     POTLUCK_CLOUD_API_URL: 'http://127.0.0.1:9', POTLUCK_CLOUD_API_BASE: 'http://127.0.0.1:9',
     POTLUCK_LOCAL_API_SOCKET: path.join(data, 'absent.sock'), HF_HUB_OFFLINE: '1', NO_COLOR: '1' };
   for (const key of ['POTLUCK_RUNTIME_BIN', 'POTLUCK_GATEWAY_KEY', 'POTLUCK_SIDECAR_TOKEN', 'POTLUCK_MEMORY_DB_PATH', 'POTLUCK_HOMEBREW']) delete env[key];
-  const executable = path.join(prefix, 'bin/potluck');
+  let executable = path.join(prefix, 'bin/potluck');
+  let tapDirectory;
+  let brewBefore;
+  const tap = `potluck-validation/upgrade-${process.pid}`;
+  const formulaName = tap + '/potluck';
+  Object.assign(env, { HOMEBREW_NO_AUTO_UPDATE: '1', HOMEBREW_NO_INSTALL_CLEANUP: '1', HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: '1', HOMEBREW_NO_ANALYTICS: '1' });
+  if (brew) {
+    assert(path.isAbsolute(brew) && brewMetadata.every(p => p && path.isAbsolute(p)), 'Brew mode requires absolute brew and old/new metadata paths.');
+    const brewPrefix = (await run(brew, ['--prefix'], { env })).stdout.trim();
+    executable = path.join(brewPrefix, 'bin/potluck');
+    await assert.rejects(fs.lstat(path.join(brewPrefix, 'Cellar/potluck')), { code: 'ENOENT' });
+    await assert.rejects(fs.lstat(executable), { code: 'ENOENT' });
+    brewBefore = (await run(brew, ['list', '--versions'], { env })).stdout;
+    const repository = (await run(brew, ['--repository'], { env })).stdout.trim();
+    tapDirectory = path.join(repository, 'Library/Taps/potluck-validation', `homebrew-upgrade-${process.pid}`);
+    await fs.mkdir(path.dirname(tapDirectory), { recursive: true });
+    await fs.mkdir(tapDirectory); // Exclusive: never reuse or remove an existing tap.
+    await fs.mkdir(path.join(tapDirectory, 'Formula'));
+  }
   const cli = async args => {
-    const pending = run(executable, [...args, '--json', '--timeout', '120000'], { env, cwd: project, timeout: 150000 });
+    // The baseline 0.1.0 parser caps operation timeouts at 30 seconds.
+    const pending = run(executable, [...args, '--json', '--timeout', '30000'], { env, cwd: project, timeout: 45000 });
     pending.child.stdin.end();
     return JSON.parse((await pending).stdout);
   };
-  const install = bundle => run(process.execPath, [path.join(bundle, 'install.mjs'), '--prefix', prefix], { env, cwd: directory, timeout: 120000 });
+  const install = async bundle => {
+    if (!brew) return run(process.execPath, [path.join(bundle, 'install.mjs'), '--prefix', prefix], { env, cwd: directory, timeout: 120000 });
+    const metadata = brewMetadata[bundle === oldBundle ? 0 : 1];
+    const artifact = JSON.parse(await fs.readFile(metadata, 'utf8'));
+    const archive = path.join(path.dirname(metadata), artifact.archive);
+    const digest = createHash('sha256');
+    for await (const chunk of createReadStream(archive)) digest.update(chunk);
+    assert.equal(digest.digest('hex'), artifact.sha256);
+    await run(process.execPath, [path.join(__dirname, 'generate-homebrew.mjs'), path.join(tapDirectory, 'Formula/potluck.rb'), metadata], { env });
+    const cache = (await run(brew, ['--cache', '--build-from-source', formulaName], { env })).stdout.trim();
+    await fs.copyFile(archive, cache);
+    // Homebrew's install command upgrades an outdated linked formula. Ignore
+    // dependencies explicitly to preserve this host's already-supported Node.
+    const result = await run(brew, ['install', '--build-from-source', '--ignore-dependencies', formulaName], { env, timeout: 180000 });
+    await fs.writeFile(path.join(directory, `brew-${artifact.version}.log`), result.stdout + result.stderr);
+  };
+  const currentTarget = async () => brew ? fs.realpath(path.dirname(executable) + '/../opt/potluck') : fs.readlink(path.join(prefix, 'lib/potluck/current'));
   const read = async file => JSON.parse(await fs.readFile(path.join(data, file), 'utf8'));
   const checks = [];
   let passed = false;
   try {
     await install(oldBundle);
-    const oldTarget = await fs.readlink(path.join(prefix, 'lib/potluck/current'));
+    const oldTarget = await currentTarget();
     await cli(['setup', '--no-input', '--enable-gateway']);
     await cli(['models', 'load', slug]);
     const first = await read('run/runtime.json');
@@ -67,8 +104,8 @@ const run = promisify(execFile);
     const preferencesText = JSON.stringify({ model: 'different-global-default', scope: 'local' });
     await fs.writeFile(path.join(data, 'cli.json'), preferencesText, { mode: 0o600 });
     await install(newBundle);
-    assert.notEqual(await fs.readlink(path.join(prefix, 'lib/potluck/current')), oldTarget);
-    await fs.access(path.join(oldTarget, 'manifest.json'));
+    assert.notEqual(await currentTarget(), oldTarget);
+    await fs.access(path.join(oldTarget, brew ? 'libexec/manifest.json' : 'manifest.json'));
     assert.equal(await fs.readFile(path.join(data, 'config.json'), 'utf8'), settingsText);
     assert.equal(await fs.readFile(path.join(data, 'cli.json'), 'utf8'), preferencesText);
     assert.equal(await fs.readFile(path.join(project, 'potluck.lock'), 'utf8'), lockText);
@@ -105,8 +142,14 @@ const run = promisify(execFile);
   } finally {
     let stopped = false;
     try { await cli(['down']); stopped = true; } catch { /* retain isolated logs */ }
+    if (brew) {
+      try { await run(brew, ['uninstall', '--force', formulaName], { env, timeout: 120000 }); }
+      finally { await fs.rm(tapDirectory, { recursive: true, force: true }); }
+      assert.equal((await run(brew, ['list', '--versions'], { env })).stdout, brewBefore, 'Homebrew dependency inventory changed.');
+      checks.push('Homebrew installed and upgraded the generated formula, then cleanup restored the original package inventory');
+    }
     const report = { passed: passed && stopped, stopped, directory, platform: process.platform, architecture: process.arch,
-      oldBundle, newBundle, sha256, checks, date: new Date().toISOString() };
+      oldBundle, newBundle, installer: brew ? 'Homebrew' : 'standalone', sha256, checks, date: new Date().toISOString() };
     await fs.writeFile(path.join(directory, 'report.json'), JSON.stringify(report, null, 2), { mode: 0o600 });
     console.log(JSON.stringify(report, null, 2));
     if (!report.passed) process.exitCode = 1;
