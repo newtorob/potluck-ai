@@ -68,8 +68,15 @@ def mesh_socket_path() -> str | None:
     meshSocketPath(). Returns None on Windows (named pipe, not yet supported here)."""
     if sys.platform == "win32" or platform.system() == "Windows":
         return None  # named pipe; household routing degrades to local-only for now
+    configured = os.environ.get("POTLUCK_LOCAL_API_SOCKET")
+    if configured:
+        return configured
     if sys.platform == "darwin":
         return "/tmp/potluck-mesh.sock"
+    # The packaged Linux daemon uses a fixed socket. Match CLI discovery so
+    # diagnostics and actual inference consult the same household roster.
+    if os.path.exists("/run/potluck-mesh.sock"):
+        return "/run/potluck-mesh.sock"
     xdg = os.environ.get("XDG_RUNTIME_DIR")
     if xdg:
         return os.path.join(xdg, "potluck-mesh.sock")
