@@ -30,6 +30,8 @@ export interface StreamOptions {
   signal?: AbortSignal;
   /** Routing scope sent as the X-Potluck-Scope header (e.g. "local" | "mine"). */
   scope?: string;
+  /** Plain inference must not treat a dropped stream as a successful answer. */
+  requireDone?: boolean;
 }
 
 interface ModelsResponse {
@@ -57,9 +59,11 @@ async function bodyText(res: Response): Promise<string> {
 }
 
 /** GET /v1/models — installed + reachable models, in the gateway's order. */
-export async function listModels(cfg: GatewayConfig): Promise<ModelInfo[]> {
+export async function listModels(cfg: GatewayConfig, signal?: AbortSignal): Promise<ModelInfo[]> {
   const res = await fetch(`${cfg.baseURL}/models`, {
     headers: authHeaders(cfg),
+    signal,
+    redirect: "error",
   });
   if (!res.ok) {
     throw new Error(`gateway GET /models failed: ${res.status} ${await bodyText(res)}`);
@@ -84,7 +88,7 @@ export async function* streamChat(
     if (!["local", "mine"].includes(opts.scope || "")) throw new Error("Project model locks require local or mine scope.");
     // Check before sending project content to an older runtime that might ignore the lock.
     const caps = await fetch(`${cfg.baseURL}/potluck/capabilities`, {
-      headers, signal: AbortSignal.any([AbortSignal.timeout(5000), ...(opts.signal ? [opts.signal] : [])]),
+      headers, redirect: "error", signal: AbortSignal.any([AbortSignal.timeout(5000), ...(opts.signal ? [opts.signal] : [])]),
     });
     if (!caps.ok || (await caps.json() as { model_lock_version?: number }).model_lock_version !== 1) {
       throw new Error("Gateway does not support project model locks. Upgrade the Potluck runtime before using this project.");
@@ -110,6 +114,7 @@ export async function* streamChat(
       stop: opts.stop,
     }),
     signal: opts.signal,
+    redirect: "error",
   });
 
   if (!res.ok || !res.body) {
@@ -132,6 +137,8 @@ export async function* streamChat(
       const { value, done } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
+      buffer = buffer.replace(/\r\n/g, "\n");
+      if (buffer.length > 8 * 1024 * 1024) throw new Error("Gateway stream frame is too large.");
 
       let sep: number;
       // SSE frames are separated by a blank line.
@@ -150,6 +157,7 @@ export async function* streamChat(
           try {
             chunk = JSON.parse(data) as ChatChunk;
           } catch {
+            if (opts.requireDone) throw new Error("Gateway returned an invalid stream frame.");
             continue; // skip a partial/garbled frame rather than crash
           }
           if (chunk.error) {
@@ -160,6 +168,7 @@ export async function* streamChat(
         }
       }
     }
+    if (opts.requireDone) throw new Error("Gateway stream ended before completion.");
   } finally {
     // Best-effort: release the stream if the consumer stops early.
     void reader.cancel().catch(() => {});

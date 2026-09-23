@@ -43,8 +43,11 @@ async function main() {
     POTLUCK_LOCAL_API_SOCKET: path.join(directory, 'absent.sock'), NO_COLOR: '1' };
   for (const key of ['POTLUCK_GATEWAY_KEY', 'POTLUCK_SIDECAR_TOKEN', 'POTLUCK_MEMORY_DB_PATH']) delete env[key];
   const entry = path.join(root, 'apps/cli/dist/index.js');
-  const cli = async args => JSON.parse((await run(process.execPath,
-    [entry, ...args, '--json', '--timeout', '30000'], { env, cwd: nested, timeout: 45000 })).stdout);
+  const cli = async args => {
+    const pending = run(process.execPath, [entry, ...args, '--json', '--timeout', '30000'], { env, cwd: nested, timeout: 45000 });
+    pending.child.stdin.end();
+    return JSON.parse((await pending).stdout);
+  };
   const read = async file => JSON.parse(await fs.readFile(path.join(directory, file), 'utf8'));
   const checks = [];
   let passed = false;
@@ -89,6 +92,14 @@ async function main() {
       model: slug, scope: 'local', maxTokens: 64, temperature: 0, signal: AbortSignal.timeout(120000),
     })) output += token;
     assert(output.trim().length > 0, 'Expected real model output');
+    const answer = await cli(['run', 'Reply with the digit 4. /no_think', '--scope', 'local', '--max-tokens', '16']);
+    assert.equal(answer.sha256, lock.model.sha256); assert(answer.text.trim());
+    const doctor = await cli(['doctor', '--scope', 'local']);
+    assert.equal(doctor.ready, true);
+    assert.equal(doctor.checks.find(c => c.id === 'installed_weights').state, 'ok');
+    const controls = await cli(['contribute', 'limits', '--jobs', '1', '--max-tokens', '512', '--min-free-memory', '1']);
+    assert.equal(controls.enabled, false); assert.equal(controls.maxTokens, 512);
+    checks.push('plain inference returns complete JSON; doctor verifies the project; contribution limits preserve disabled state');
     checks.push('project lock survives runtime restart and serves real CPU inference through the CLI client');
     const post = async body => fetch(cfg.baseURL + '/chat/completions', { method: 'POST',
       headers: { Authorization: `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json', 'X-Potluck-Scope': 'local' },

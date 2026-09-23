@@ -1,7 +1,7 @@
 /** Parse commands before touching config, starting a REPL, or making requests. */
 export class UsageError extends Error {}
 
-export type Command = "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
+export type Command = "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
 export interface CliArgs {
   help: boolean;
   version: boolean;
@@ -38,7 +38,7 @@ export interface CliArgs {
   timezone?: string;
 }
 
-const commands = new Set<Command>(["contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
+const commands = new Set<Command>(["run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
 
 export function parseArgs(argv: string[]): CliArgs {
   const out: CliArgs = { help: false, version: false, print: false, yes: false,
@@ -93,7 +93,7 @@ export function parseArgs(argv: string[]): CliArgs {
       out.source = v as CliArgs["source"];
     } else if (flag === "--lines" || flag === "--timeout") {
       const v = value();
-      const max = flag === "--lines" ? 1000 : 30000;
+      const max = flag === "--lines" ? 1000 : 300000;
       if (!/^\d+$/.test(v) || Number(v) < 1 || Number(v) > max) {
         throw new UsageError(`${flag} must be an integer from 1 to ${max}.`);
       }
@@ -106,7 +106,10 @@ export function parseArgs(argv: string[]): CliArgs {
       throw new UsageError("Unknown command. Run potluck --help, or use potluck -p \"task\".");
     }
     out.command = positional[0] as Command;
-    if (out.command === "contribute") {
+    if (out.command === "run") {
+      if (positional.length > 2) throw new UsageError('Quote your prompt: potluck run "Summarize this".');
+      out.task = positional[1];
+    } else if (out.command === "contribute") {
       out.action = positional[1] || "status"; out.target = positional[2];
       if (!["status", "on", "off", "schedule", "limits"].includes(out.action) || positional.length > 3 || (out.target && out.action !== "schedule")) throw new UsageError("Use contribute status|on|off|schedule|limits.");
       if (out.action === "schedule" && !out.target && !out.help) throw new UsageError("Use contribute schedule HH:MM-HH:MM or off.");
@@ -137,7 +140,7 @@ export function parseArgs(argv: string[]): CliArgs {
   }
   const operation = out.command;
   const allowed: Record<string, string[]> = {
-    "--jobs": ["contribute"], "--max-tokens": ["contribute"], "--min-free-memory": ["contribute"], "--days": ["contribute"], "--timezone": ["contribute"],
+    "--jobs": ["contribute"], "--max-tokens": ["contribute", "run"], "--min-free-memory": ["contribute"], "--days": ["contribute"], "--timezone": ["contribute"],
     "--wait": ["login"], "--no-wait": ["login"], "--local": ["logout"],
     "--name": ["household", "connect", "setup"], "--output": ["household"],
     "--invite-file": ["connect"], "--no-input": ["setup"], "--enable-gateway": ["setup"],
@@ -151,13 +154,15 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.command === "household" && ((out.name && out.action !== "create") || (out.output && out.action !== "invite"))) throw new UsageError("--name requires household create; --output requires household invite.");
   if (out.preferences && (out.noInput || out.json || out.enableGateway || out.signIn || out.connect || out.name || out.model || out.withModel)) throw new UsageError("--preferences is an interactive preferences-only wizard.");
   if (["up", "down"].includes(out.command || "") && !seen.has("--timeout")) out.timeout = 15000;
+  if (out.command === "run" && !seen.has("--timeout")) out.timeout = 120000;
+  if (out.command !== "run" && out.timeout > 30000) throw new UsageError("--timeout must be an integer from 1 to 30000 for this command.");
   if (out.command === "launch" && out.json) throw new UsageError("launch runs an external tool; JSON output is not supported.");
   if (out.command === "serve" && (out.json || seen.has("--timeout"))) throw new UsageError("serve runs in the foreground; use service status --json for reports.");
   if (out.command === "models" && !seen.has("--timeout")) out.timeout = 30000;
   if (["setup", "login", "logout", "household", "connect", "disconnect"].includes(out.command || "") && !seen.has("--timeout")) out.timeout = 30000;
   if (out.command && out.version) throw new UsageError("--version must be used without a command.");
   if (out.command === "logs" && seen.has("--timeout")) throw new UsageError("--timeout applies to status, doctor, up, and down.");
-  if (out.command && (out.print || (out.model && !["setup", "launch"].includes(out.command)) || out.verify || out.noVerify || out.yes)) {
+  if (out.command && (out.print || (out.model && !["setup", "launch", "run"].includes(out.command)) || out.verify || out.noVerify || out.yes)) {
     throw new UsageError("Agent options cannot be combined with a management command.");
   }
   if (!operation && (out.json || seen.has("--timeout"))) {
@@ -166,7 +171,7 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.command !== "logs" && (seen.has("--source") || seen.has("--lines"))) {
     throw new UsageError("--source and --lines require logs.");
   }
-  if (out.scope && out.command && !["status", "doctor", "launch"].includes(out.command)) {
+  if (out.scope && out.command && !["status", "doctor", "launch", "run"].includes(out.command)) {
     throw new UsageError("--scope is supported by status, doctor, and the coding agent.");
   }
   if (operation && out.scope && !["local", "mine"].includes(out.scope)) {
