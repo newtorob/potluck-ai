@@ -85,7 +85,7 @@ async function main() {
     const settings = await read('config.json');
     const completion = await api('/v1/chat/completions', { method: 'POST',
       headers: { Authorization: `Bearer ${settings.gateway.api_key}` },
-      body: JSON.stringify({ model: slug, messages: [{ role: 'user', content: 'Reply with just the digit: what is 2+2?' }], max_tokens: 12, temperature: 0 }),
+      body: JSON.stringify({ model: slug, messages: [{ role: 'user', content: 'Reply with just the digit: what is 2+2? /no_think' }], max_tokens: 64, temperature: 0 }),
     });
     assert(completion.choices[0].message.content.includes('4'));
     checks.push('local model persisted across process restart and served real CPU inference');
