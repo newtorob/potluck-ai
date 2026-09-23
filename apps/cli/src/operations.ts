@@ -1,4 +1,5 @@
 import { launchAider } from "./launch.js";
+import { manageContribution, formatContribution } from "./contribute.js";
 import type { CliArgs } from "./args.js";
 import { diagnose, formatDiagnostics } from "./diagnostics.js";
 import { plainText, readLogs } from "./logs.js";
@@ -10,6 +11,7 @@ import { serveRuntime } from "./serve.js";
 import { manageService } from "./service.js";
 
 export function operationHelp(command: string): string {
+  if (command === "contribute") return "Usage: potluck contribute status|on|off [--json]\n       potluck contribute limits [--jobs 0-64] [--max-tokens 1-32768] [--min-free-memory GiB]\n       potluck contribute schedule HH:MM-HH:MM [--days mon,tue,...] [--timezone Area/City]\n       potluck contribute schedule off\nControls coordinator jobs served by this runtime. Schedule boundaries stop new admissions; existing jobs finish. Overnight windows belong to the starting weekday. Free-memory checks are an admission threshold, not a process memory ceiling. No GPU-percentage throttle is claimed. Off stops the contributor connection.\n";
   if (command === "launch") return "Usage: potluck launch aider [--model <id>] [--scope local|mine] [--message <prompt>]\nLaunch installed Aider through a temporary authenticated local bridge that enforces the selected model, scope and project lock. Existing tool config files remain unchanged.\n";
   if (command === "serve") return "Usage: potluck serve\nRun the shared runtime in the foreground for launchd, systemd, or brew services. Waits while another launcher owns it. Ctrl-C stops only this launcher's child.\n";
   if (command === "service") return "Usage: potluck service [install|uninstall|start|stop|restart|status] [--json]\nManage the current user's runtime service on macOS/Linux. install enables startup at login and starts it. stop keeps login startup enabled; uninstall removes it and keeps your data.\nHomebrew installations use brew services. Linux startup without a login requires administrator-configured user lingering.\n";
@@ -30,6 +32,11 @@ export function operationHelp(command: string): string {
 
 export async function runOperation(args: CliArgs, out: (value: string) => void): Promise<number> {
   if (args.help) { out(operationHelp(args.command!)); return 0; }
+  if (args.command === "contribute") {
+    const report = await manageContribution(args);
+    out(args.json ? JSON.stringify(report) + "\n" : plainText(formatContribution(report)));
+    return ["error", "rejected"].includes(String(report.state)) ? 1 : 0;
+  }
   if (args.command === "launch") return launchAider(args);
   if (args.command === "serve") return serveRuntime();
   if (args.command === "service") {

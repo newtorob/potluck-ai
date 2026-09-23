@@ -51,6 +51,7 @@ from potluck_local.contributor.telemetry import (
     probe_capacity,
 )
 from potluck_local.services.settings_manager import PotluckSettings
+from potluck_local.services.contribution_policy import admission_reason
 
 logger = logging.getLogger(__name__)
 
@@ -133,12 +134,16 @@ class ContributorService:
         self._lock = asyncio.Lock()
         self._last_hooks: contributor_client.LoopHooks | None = None
         self._last_settings: ContributorSettings | None = None
+        self._network = None
 
     # ---- public surface ------------------------------------------------- #
 
     def status(self) -> dict[str, Any]:
         snapshot = asdict(self._status)
         snapshot["running"] = self.is_running
+        reason = admission_reason(self._network) if self._network is not None else 'disabled'
+        snapshot["accepting_jobs"] = reason is None and self._status.state == 'connected'
+        snapshot["pause_reason"] = reason
         return snapshot
 
     @property
@@ -162,6 +167,7 @@ class ContributorService:
         """Reconcile the running state with what settings ask for."""
         async with self._lock:
             network = settings.network
+            self._network = network
             self._status.enabled = bool(network.contributor_mode)
             if not network.contributor_mode:
                 if self.is_running:
@@ -309,6 +315,8 @@ class ContributorService:
         return await loop.run_in_executor(None, probe_capacity)
 
     async def _capabilities(self) -> list[CapabilityEntry]:
+        if self._network is not None and admission_reason(self._network):
+            return []
         runtime = self._runtime()
         try:
             loaded = runtime.current_model_id() if runtime.is_loaded() else None
@@ -377,6 +385,13 @@ class ContributorService:
         loaded model is not the one requested. Streams deltas as job_token
         frames and finishes with job_complete. Never logs content.
         """
+        network = self._network
+        reason = admission_reason(network) if network is not None else None
+        if reason or (network is not None and network.contributor_max_tokens is not None
+                      and job.sampling.max_tokens > network.contributor_max_tokens):
+            await self._send(ws, JobErrorMessage(job_id=job.job_id, error_category='declined',
+                error_message='Contributor admission policy does not allow this job.'))
+            return
         runtime = self._runtime()
         loaded = runtime.current_model_id() if runtime.is_loaded() else None
         if loaded is None:

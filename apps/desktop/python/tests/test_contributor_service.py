@@ -75,6 +75,24 @@ class FakeWS:
         self.sent.append(json.loads(raw))
 
 
+@run_async
+async def test_admission_rechecks_live_policy_before_serving():
+    rt = FakeRuntime()
+    svc = cs.ContributorService(runtime_getter=lambda: rt)
+    job = JobAssignedMessage(type='job_assigned', job_id=uuid.uuid4(), model_slug=rt.model_id,
+                             prompt='private', sampling={'max_tokens': 100})
+    for network in [NetworkSettings(contributor_mode=False),
+                    NetworkSettings(contributor_mode=True, max_concurrent_jobs=0),
+                    NetworkSettings(contributor_mode=True, contributor_max_tokens=50),
+                    NetworkSettings(contributor_mode=True, contributor_schedule={'invalid': True})]:
+        svc._network = network
+        ws = FakeWS()
+        await svc._serve_job(ws, job)
+        assert ws.sent[0]['type'] == 'job_error' and ws.sent[0]['error_category'] == 'declined'
+        if network.contributor_max_tokens is None: assert await svc._capabilities() == []
+    assert rt.calls == []
+
+
 def _settings(on=True, url="https://coord.example", cap=1) -> PotluckSettings:
     return PotluckSettings(network=NetworkSettings(
         contributor_mode=on, coordinator_url=url, max_concurrent_jobs=cap))

@@ -1,7 +1,7 @@
 /** Parse commands before touching config, starting a REPL, or making requests. */
 export class UsageError extends Error {}
 
-export type Command = "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
+export type Command = "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
 export interface CliArgs {
   help: boolean;
   version: boolean;
@@ -31,9 +31,14 @@ export interface CliArgs {
   preferences?: boolean;
   withModel?: boolean;
   message?: string;
+  jobs?: number;
+  maxTokens?: number;
+  minFreeMemory?: number;
+  days?: string;
+  timezone?: string;
 }
 
-const commands = new Set<Command>(["launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
+const commands = new Set<Command>(["contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
 
 export function parseArgs(argv: string[]): CliArgs {
   const out: CliArgs = { help: false, version: false, print: false, yes: false,
@@ -63,6 +68,17 @@ export function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--connect") out.connect = true;
     else if (arg === "--preferences") out.preferences = true;
     else if (arg === "--with-model") out.withModel = true;
+    else if (flag === "--jobs" || flag === "--max-tokens") {
+      const v = value(), min = flag === "--jobs" ? 0 : 1, max = flag === "--jobs" ? 64 : 32768;
+      if (!/^\d+$/.test(v) || Number(v) < min || Number(v) > max) throw new UsageError(`${flag} must be an integer from ${min} to ${max}.`);
+      if (flag === "--jobs") out.jobs = Number(v); else out.maxTokens = Number(v);
+    }
+    else if (flag === "--min-free-memory") {
+      const v = value(); if (!/^\d+(?:\.\d+)?$/.test(v) || Number(v) > 1024) throw new UsageError("--min-free-memory must be 0–1024 GiB.");
+      out.minFreeMemory = Number(v);
+    }
+    else if (flag === "--days") out.days = value();
+    else if (flag === "--timezone") out.timezone = value();
     else if (flag === "--message") out.message = value();
     else if (flag === "--name") out.name = value();
     else if (flag === "--output") out.output = value();
@@ -90,7 +106,13 @@ export function parseArgs(argv: string[]): CliArgs {
       throw new UsageError("Unknown command. Run potluck --help, or use potluck -p \"task\".");
     }
     out.command = positional[0] as Command;
-    if (out.command === "launch") {
+    if (out.command === "contribute") {
+      out.action = positional[1] || "status"; out.target = positional[2];
+      if (!["status", "on", "off", "schedule", "limits"].includes(out.action) || positional.length > 3 || (out.target && out.action !== "schedule")) throw new UsageError("Use contribute status|on|off|schedule|limits.");
+      if (out.action === "schedule" && !out.target && !out.help) throw new UsageError("Use contribute schedule HH:MM-HH:MM or off.");
+      if ((out.days || out.timezone) && out.action !== "schedule") throw new UsageError("--days and --timezone require contribute schedule.");
+      if ((out.jobs !== undefined || out.maxTokens !== undefined || out.minFreeMemory !== undefined) && out.action !== "limits") throw new UsageError("Limit options require contribute limits.");
+    } else if (out.command === "launch") {
       out.action = positional[1];
       if ((!out.help && out.action !== "aider") || positional.length > 2) throw new UsageError("Use potluck launch aider [--model <id>] [--scope local|mine] [--message <prompt>].");
     } else if (out.command === "service") {
@@ -115,6 +137,7 @@ export function parseArgs(argv: string[]): CliArgs {
   }
   const operation = out.command;
   const allowed: Record<string, string[]> = {
+    "--jobs": ["contribute"], "--max-tokens": ["contribute"], "--min-free-memory": ["contribute"], "--days": ["contribute"], "--timezone": ["contribute"],
     "--wait": ["login"], "--no-wait": ["login"], "--local": ["logout"],
     "--name": ["household", "connect", "setup"], "--output": ["household"],
     "--invite-file": ["connect"], "--no-input": ["setup"], "--enable-gateway": ["setup"],

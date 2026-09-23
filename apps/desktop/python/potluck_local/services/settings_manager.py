@@ -43,6 +43,8 @@ class NetworkSettings(BaseModel):
     # and enforced locally by the contributor loop. The runtime serialises
     # inference on one model, so 1 is the honest default.
     max_concurrent_jobs: int = Field(default=1, ge=0, le=64)
+    contributor_max_tokens: int | None = Field(default=None, ge=1, le=32768)
+    contributor_min_free_memory_gib: float = Field(default=0, ge=0, le=1024)
     # HTTP base of the coordinator this node talks to (e.g. "http://127.0.0.1:8400").
     # Synced from the frontend's connection setting so the sidecar can reach the
     # open pool for gateway routing. Empty = not configured (pool unavailable).

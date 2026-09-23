@@ -35,10 +35,49 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+from potluck_local.services.contribution_policy import ContributionSchedule, admission_reason
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+class ContributionControls(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    enabled: bool | None = None
+    schedule: ContributionSchedule | None = None
+    maxJobs: int | None = Field(default=None, ge=0, le=64)
+    maxTokens: int | None = Field(default=None, ge=1, le=32768)
+    minFreeMemoryGiB: float | None = Field(default=None, ge=0, le=1024)
+
+
+@router.get('/controls')
+async def contribution_controls() -> dict:
+    from potluck_local.services.settings_manager import get_settings
+    from potluck_local.services.contributor_service import get_contributor_service
+    network = get_settings().network
+    svc = get_contributor_service()
+    status = svc.status()
+    return {'schemaVersion': 1, 'enabled': network.contributor_mode,
+            'schedule': network.contributor_schedule, 'maxJobs': network.max_concurrent_jobs,
+            'maxTokens': network.contributor_max_tokens, 'minFreeMemoryGiB': network.contributor_min_free_memory_gib,
+            'state': status['state'], 'acceptingJobs': status['accepting_jobs'],
+            'pauseReason': admission_reason(network), 'signedIn': svc.has_member_session(),
+            'jobsInFlight': status['jobs_in_flight'], 'jobsServed': status['jobs_served'],
+            'lastError': status['last_error']}
+
+
+@router.patch('/controls')
+async def set_contribution_controls(body: ContributionControls) -> dict:
+    from potluck_local.routers.settings import update_settings
+    fields = {'enabled': 'contributor_mode', 'schedule': 'contributor_schedule',
+              'maxJobs': 'max_concurrent_jobs', 'maxTokens': 'contributor_max_tokens',
+              'minFreeMemoryGiB': 'contributor_min_free_memory_gib'}
+    patch = {fields[key]: value for key, value in body.model_dump(exclude_unset=True).items()}
+    if any(value is None and key not in ('contributor_schedule', 'contributor_max_tokens') for key, value in patch.items()):
+        raise HTTPException(422, 'Only schedule and maxTokens can be cleared.')
+    await update_settings({'network': patch})
+    return await contribution_controls()
 
 
 # ---------------------------------------------------------------------------
