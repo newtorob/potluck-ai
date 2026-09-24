@@ -52,6 +52,8 @@ def test_linux_packaged_daemon_takes_precedence_over_user_socket(monkeypatch):
     monkeypatch.setenv("XDG_RUNTIME_DIR", "/run/user/1234")
     monkeypatch.setattr(routing.os.path, "exists", lambda path: path == "/run/potluck-mesh.sock")
     assert routing.mesh_socket_path() == "/run/potluck-mesh.sock"
+    monkeypatch.setattr(routing.os.path, "exists", lambda path: path == "/run/potluck-mesh/potluck-mesh.sock")
+    assert routing.mesh_socket_path() == "/run/potluck-mesh/potluck-mesh.sock"
     monkeypatch.setenv("POTLUCK_LOCAL_API_SOCKET", "/custom/mesh.sock")
     assert routing.mesh_socket_path() == "/custom/mesh.sock"
 

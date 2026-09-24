@@ -82,6 +82,7 @@ function printHelp(): void {
       "  potluck whoami                 show the signed-in member",
       "  potluck household              create/list your household; export private invitations",
       "  potluck batch                  summarize files across your computers with saved progress",
+      "  potluck split                  run one pinned model across your owned computers",
       "  potluck connect / disconnect   pair or unpair this machine",
       "  potluck up / down              start/stop the local runtime",
       "  potluck service install        start the runtime automatically at login",

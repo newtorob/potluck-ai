@@ -34,6 +34,7 @@ class LLMRuntime:
 
     def __init__(self) -> None:
         self._model = None
+        self._split_worker_reserved = False
         self._model_path: str | None = None
         self._artifact: tuple[str, tuple] | None = None
         self._verified_artifact: tuple[str, tuple] | None = None
@@ -61,12 +62,16 @@ class LLMRuntime:
         self._atexit_registered = False
 
     def is_loaded(self) -> bool:
+        if getattr(self._model, "managed_split", False) and self._model.closed:
+            return False
         return self._model is not None or self._pipeline is not None
 
     def current_model_id(self) -> str | None:
         return self._model_id
 
     def current_model_sha256(self) -> str | None:
+        if getattr(self._model, "managed_split", False) and self._model.closed:
+            return None
         if not self._artifact or not self._model_path or self._pipeline is not None or self._loaded_rpc_servers:
             return None
         try:
@@ -414,6 +419,8 @@ class LLMRuntime:
         n_threads: int | None = None,
         rpc_servers: list[str] | None = None,
     ) -> dict:
+        if self._split_worker_reserved:
+            raise RuntimeError("This machine is reserved as a split worker. Run potluck split worker off first.")
         return await self._run_lifecycle(
             partial(self.load_model, model_path, n_ctx=n_ctx,
                     n_gpu_layers=n_gpu_layers, n_threads=n_threads,
@@ -421,13 +428,38 @@ class LLMRuntime:
         )
 
     async def load_pipeline_async(self, model_id: str, **kwargs) -> dict:
+        if self._split_worker_reserved:
+            raise RuntimeError("This machine is reserved as a split worker.")
         return await self._run_lifecycle(partial(self.load_pipeline, model_id, **kwargs))
 
     async def load_whole_model_async(self, model_id: str, **kwargs) -> dict:
+        if self._split_worker_reserved:
+            raise RuntimeError("This machine is reserved as a split worker.")
         return await self._run_lifecycle(partial(self.load_whole_model, model_id, **kwargs))
 
     async def unload_model_async(self) -> None:
         await self._run_lifecycle(self.unload_model)
+
+    async def install_split_async(self, model, path, slug, identity, context):
+        def install():
+            if self._split_worker_reserved:
+                raise RuntimeError("This machine is reserved as a split worker.")
+            with self._load_lock:
+                self._release_model()
+                self._model = model
+                self._model_path = str(path)
+                self._model_id = slug
+                self._artifact = self._verified_artifact = identity
+                self._loaded_n_ctx = context
+        return await self._run_lifecycle(install)
+
+    async def release_split_async(self, model):
+        # A normal load may have replaced the adapter while its asynchronous
+        # close callback was waiting. Never unload that newer model.
+        def release():
+            if self._model is model:
+                self.unload_model()
+        await self._run_lifecycle(release)
 
     async def _run_lifecycle(self, operation):
         async with self._admission_lock, self._inference_lock:
@@ -587,11 +619,13 @@ class LLMRuntime:
 
         fut = loop.run_in_executor(None, _generate)
         token_count = 0
+        completed = False
         start = time.monotonic()
         try:
             while True:
                 item = await queue.get()
                 if item is None:
+                    completed = True
                     break
                 if isinstance(item, str) and item.startswith("\x00ERROR\x00"):
                     err_msg = item[len("\x00ERROR\x00"):]
@@ -604,6 +638,8 @@ class LLMRuntime:
             logger.info("%s cancelled tokens_so_far=%d", label, token_count)
         finally:
             cancel_event.set()
+            if getattr(self._model, "managed_split", False) and not completed:
+                await asyncio.to_thread(self._model.cancel)
             await self._drain_worker(fut)
             logger.info("%s complete tokens=%d duration=%.3fs",
                         label, token_count, round(time.monotonic() - start, 3))
@@ -643,7 +679,11 @@ class LLMRuntime:
                 ),
             )
             try:
-                result = await fut
+                result = await (asyncio.shield(fut) if getattr(model, "managed_split", False) else fut)
+            except asyncio.CancelledError:
+                if getattr(model, "managed_split", False):
+                    await asyncio.to_thread(model.cancel)
+                raise
             finally:
                 # A cancelled request must not free the inference lock while the
                 # worker thread is still inside create_chat_completion (the model
@@ -722,11 +762,13 @@ class LLMRuntime:
             fut = loop.run_in_executor(None, _generate)
 
             chunk_count = 0
+            completed = False
             start = time.monotonic()
             try:
                 while True:
                     item = await queue.get()
                     if item is None:
+                        completed = True
                         break
                     chunk_count += 1
                     yield item
@@ -737,6 +779,8 @@ class LLMRuntime:
                 # stream_chat) so a disconnect can't leave inference running on the
                 # non-thread-safe model while the next request acquires the lock.
                 cancel_event.set()
+                if getattr(model, "managed_split", False) and not completed:
+                    await asyncio.to_thread(model.cancel)
                 try:
                     await asyncio.shield(fut)
                 except Exception:
@@ -783,6 +827,8 @@ class LLMRuntime:
             loop = asyncio.get_running_loop()
             model = self._model
             model_id = self._model_id
+            if getattr(model, "managed_split", False):
+                raise RuntimeError("Scoring verification is not supported for owned-machine split sessions.")
 
             def _score() -> dict:
                 import math

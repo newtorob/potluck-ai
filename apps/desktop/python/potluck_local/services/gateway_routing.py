@@ -79,6 +79,8 @@ def mesh_socket_path() -> str | None:
     # diagnostics and actual inference consult the same household roster.
     if os.path.exists("/run/potluck-mesh.sock"):
         return "/run/potluck-mesh.sock"
+    if os.path.exists("/run/potluck-mesh/potluck-mesh.sock"):
+        return "/run/potluck-mesh/potluck-mesh.sock"
     xdg = os.environ.get("XDG_RUNTIME_DIR")
     if xdg:
         return os.path.join(xdg, "potluck-mesh.sock")

@@ -14,6 +14,7 @@ export function meshSocketPath(platform = process.platform, env = process.env): 
   if (platform === "win32") return "\\\\.\\pipe\\potluck-mesh";
   if (platform === "darwin") return "/tmp/potluck-mesh.sock";
   if (existsSync("/run/potluck-mesh.sock")) return "/run/potluck-mesh.sock";
+  if (existsSync("/run/potluck-mesh/potluck-mesh.sock")) return "/run/potluck-mesh/potluck-mesh.sock";
   return join(env.XDG_RUNTIME_DIR || `/run/user/${process.getuid?.() ?? 1000}`, "potluck-mesh.sock");
 }
 
@@ -39,6 +40,7 @@ export function requestJSON<T = Record<string, unknown>>(options: {
   url?: string; socketPath?: string; path?: string; token?: string; timeout: number;
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown;
   allowArray?: boolean; allowEmpty?: boolean; signal?: AbortSignal;
+  errorHints?: Readonly<Record<string, string>>;
 }): Promise<T> {
   return new Promise((resolve, reject) => {
     let url: URL;
@@ -72,8 +74,13 @@ export function requestJSON<T = Record<string, unknown>>(options: {
       // No redirect following: a redirect must never forward a local credential.
       if (status < 200 || status >= 300) {
         clearTimeout(timer); res.resume();
+        // Display only caller-supplied hints for a recognized code. Never echo
+        // arbitrary response bodies/headers that could contain credentials.
+        const code = res.headers["x-potluck-error"];
+        const hint = typeof code === "string" && Object.hasOwn(options.errorHints ?? {}, code)
+          ? options.errorHints![code] : undefined;
         reject(new ControlError(status === 401 || status === 403 ? "unauthorized" : "http_error",
-          `Service returned HTTP ${status}.`, status));
+          hint ?? `Service returned HTTP ${status}.`, status));
         req.destroy(); return;
       }
       res.on("data", (part: Buffer) => {

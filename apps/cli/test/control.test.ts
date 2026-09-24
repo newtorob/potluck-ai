@@ -35,6 +35,18 @@ describe("control transports", () => {
     await expect(requestJSON({ url, token: "key", timeout: 500 }))
       .rejects.toMatchObject({ code: "http_error", message: "Service returned HTTP 302." });
   });
+  it("only displays allowlisted local hints for error codes", async () => {
+    let code = "split_busy";
+    const url = await server((_req, res) => {
+      res.writeHead(409, { "X-Potluck-Error": code }); res.end("private model path or token");
+    });
+    const options = { url, timeout: 500, errorHints: { split_busy: "Stop the current split." } };
+    await expect(requestJSON(options)).rejects.toMatchObject({ message: "Stop the current split." });
+    for (const value of ["unrecognized-private-token", "toString", "__proto__"]) {
+      code = value;
+      await expect(requestJSON(options)).rejects.toMatchObject({ message: "Service returned HTTP 409." });
+    }
+  });
   it("bounds stalled and oversized replies", async () => {
     const stalled = await server(() => {});
     await expect(requestJSON({ url: stalled, timeout: 30 })).rejects.toMatchObject({ code: "timeout" });

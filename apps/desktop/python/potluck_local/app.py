@@ -26,6 +26,8 @@ from fastapi.responses import JSONResponse
 from potluck_local import __version__
 from potluck_local.routers import account, agents, batches, chat, contributor, gateway, hardware, health, memory, models, ollama, peer, readiness, settings, tasks, usage, vault, verify
 from potluck_local.utils.logging import setup_logging
+from potluck_local.routers import split
+from potluck_local.services.split_native import SplitError
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +199,9 @@ async def _lifespan(app: FastAPI):  # noqa: ARG001
         logger.error("batch_storage_unavailable")
 
     yield
+
+    from potluck_local.services.split_manager import get_split_manager
+    await get_split_manager().close()
 
     if app.state.batch_manager is not None:
         try:
@@ -437,7 +442,7 @@ def create_app() -> FastAPI:
         # credential to fall back on, so it must present the sidecar token like
         # every other loopback route; a mesh peer keeps its pre-existing
         # token-free path since mesh membership already gated it above.
-        if (normalised.startswith("/account") or normalised.startswith("/batches")) and sidecar_token is None:
+        if normalised.startswith(("/account", "/batches", "/split")) and sidecar_token is None:
             return JSONResponse(status_code=503, content={"detail": "Private control requires an authenticated runtime. Run potluck up."})
         if sidecar_token is not None:
             exempt = (
@@ -456,6 +461,13 @@ def create_app() -> FastAPI:
         return await call_next(request)
 
     # Routers — prefixes must match localApi.ts in the frontend
+    @app.exception_handler(SplitError)
+    async def split_error_handler(request, exc):
+        return JSONResponse(status_code=exc.status, content={"detail": str(exc)},
+                            headers={"X-Potluck-Error": exc.code})
+
+    app.include_router(split.router, prefix="/split", tags=["split"])
+    app.include_router(split.peer_router, prefix="/peer/split", tags=["split"])
     app.include_router(health.router, tags=["health"])
     app.include_router(account.router, prefix="/account", tags=["account"])
     app.include_router(batches.router, prefix="/batches", tags=["batches"])
@@ -480,6 +492,10 @@ def create_app() -> FastAPI:
 
 def main() -> None:
     """Start the local engine, optionally publishing private shared control."""
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "--split-supervisor":
+        from potluck_local.services.native_supervisor import run
+        raise SystemExit(run(sys.argv[2:]))
     parser = argparse.ArgumentParser(description="Potluck local sidecar")
     parser.add_argument(
         "--port",

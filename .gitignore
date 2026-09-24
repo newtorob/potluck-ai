@@ -97,3 +97,6 @@ apps/desktop/electron/resources/python/
 # Archived to ~/Documents/potluck-archive (standalone learn page + unused landing video)
 /potluck-learn.html
 /web/landing/public/demo-c.mp4
+
+# Reproducible native split-engine build output (source pin and build script are tracked).
+/apps/desktop/python/native/

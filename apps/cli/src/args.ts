@@ -1,7 +1,7 @@
 /** Parse commands before touching config, starting a REPL, or making requests. */
 export class UsageError extends Error {}
 
-export type Command = "batch" | "sessions" | "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
+export type Command = "split" | "batch" | "sessions" | "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
 export interface CliArgs {
   help: boolean;
   version: boolean;
@@ -41,9 +41,11 @@ export interface CliArgs {
   watch?: boolean;
   interval?: number;
   files?: string[];
+  peers?: string[];
+  context?: number;
 }
 
-const commands = new Set<Command>(["batch", "sessions", "run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
+const commands = new Set<Command>(["split", "batch", "sessions", "run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
 
 export function parseArgs(argv: string[]): CliArgs {
   const out: CliArgs = { help: false, version: false, print: false, yes: false,
@@ -90,6 +92,16 @@ export function parseArgs(argv: string[]): CliArgs {
       out.minFreeMemory = Number(v);
     }
     else if (flag === "--days") out.days = value();
+    else if (flag === "--peer") {
+      const peer = value();
+      if (peer.length > 128 || /[\x00-\x1f\x7f/\\]/.test(peer)) throw new UsageError("--peer requires an owned machine name or mesh IP.");
+      (out.peers ??= []).push(peer);
+    }
+    else if (flag === "--context") {
+      const v = value();
+      if (!/^\d+$/.test(v) || Number(v) < 512 || Number(v) > 8192) throw new UsageError("--context must be 512–8192 tokens.");
+      out.context = Number(v);
+    }
     else if (flag === "--timezone") out.timezone = value();
     else if (flag === "--message") out.message = value();
     else if (flag === "--name") out.name = value();
@@ -118,7 +130,19 @@ export function parseArgs(argv: string[]): CliArgs {
       throw new UsageError("Unknown command. Run potluck --help, or use potluck -p \"task\".");
     }
     out.command = positional[0] as Command;
-    if (out.command === "batch") {
+    if (out.command === "split") {
+      out.action = positional[1] || "status";
+      out.target = positional[2];
+      if (!["status", "worker", "plan", "start", "stop"].includes(out.action) || positional.length > 3) throw new UsageError("Use potluck split status|worker|plan|start|stop.");
+      if (!out.help) {
+        if (out.action === "worker" && !["on", "off"].includes(out.target || "")) throw new UsageError("Use potluck split worker on|off.");
+        if (["plan", "start"].includes(out.action)) {
+          if (!out.target || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}$/.test(out.target)) throw new UsageError("Choose a pinned model ID.");
+          if (!out.peers?.length || out.peers.length > 3 || new Set(out.peers).size !== out.peers.length) throw new UsageError("Select 1–3 distinct workers with --peer.");
+        } else if (out.peers || out.context !== undefined) throw new UsageError("--peer and --context require split plan or start.");
+        if (["status", "stop"].includes(out.action) && out.target) throw new UsageError("Unexpected split argument.");
+      }
+    } else if (out.command === "batch") {
       out.action = positional[1] || "list";
       if (!["submit", "status", "list", "resume", "cancel", "results", "delete"].includes(out.action)) throw new UsageError("Use batch submit|status|list|resume|cancel|results|delete.");
       if (out.action === "submit") {
@@ -172,6 +196,8 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.saveSession && out.resume) throw new UsageError("--resume already saves the continued session.");
   if ((out.watch || out.interval !== undefined) && out.command !== "status" && !(out.command === "batch" && out.action === "status")) throw new UsageError("--watch and --interval require status or batch status.");
   if (out.interval !== undefined && !out.watch) throw new UsageError("--interval requires --watch.");
+  if ((out.peers || out.context !== undefined) && out.command !== "split") throw new UsageError("--peer and --context require split.");
+  if (out.command === "split" && !seen.has("--timeout")) out.timeout = 30000;
   const operation = out.command;
   const allowed: Record<string, string[]> = {
     "--jobs": ["contribute", "batch"], "--max-tokens": ["contribute", "run", "batch"], "--min-free-memory": ["contribute"], "--days": ["contribute"], "--timezone": ["contribute"],

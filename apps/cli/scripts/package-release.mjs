@@ -31,6 +31,25 @@ if (!/^[a-f0-9]{40,64}$/.test(provenance.source) || typeof provenance.dirty !== 
 const runtime = await realpath(options.runtime);
 const executable = join(runtime, 'potluck-local');
 if (!(await stat(executable)).isFile() || !(await stat(join(runtime, '_internal'))).isDirectory()) throw new Error('Expected a PyInstaller onedir runtime bundle.');
+const splitRoot = join(runtime, '_internal/split-engine');
+const splitPin = JSON.parse(await readFile(join(root, 'apps/desktop/python/potluck_local/data/split-engine.json'), 'utf8'));
+let splitEngine;
+try {
+  splitEngine = JSON.parse(await readFile(join(splitRoot, 'manifest.json'), 'utf8'));
+  if (['schemaVersion', 'protocol', 'commit'].some(key => splitEngine[key] !== splitPin[key])
+      || !(process.platform === 'darwin' ? ['metal'] : ['cpu', 'cuda']).includes(splitEngine.backend)) throw new Error();
+  for (const name of ['llama-server', 'rpc-server']) {
+    const binary = join(splitRoot, name);
+    const info = await stat(binary);
+    const native = execFileSync('file', ['-b', binary], { encoding: 'utf8' });
+    if (!info.isFile() || !(info.mode & 0o111)
+        || !(process.platform === 'darwin' ? /Mach-O/.test(native) : /ELF/.test(native))
+        || !(process.arch === 'arm64' ? /arm64|aarch64/.test(native) : /x86[_-]64/.test(native))) throw new Error();
+  }
+  await stat(join(splitRoot, 'LICENSE'));
+} catch {
+  throw new Error('Runtime is missing its pinned native split engine. Run scripts/build-split-engine.py, then rebuild the Python bundle before packaging.');
+}
 // Reject mislabelled native builds and runtime links that escape into the build machine.
 const nativeType = execFileSync('file', ['-b', executable], { encoding: 'utf8' });
 if (!(process.platform === 'darwin' ? /Mach-O/.test(nativeType) : /ELF/.test(nativeType))
@@ -61,7 +80,7 @@ try {
   await cp(join(cli, 'packaging/install.mjs'), join(bundle, 'install.mjs'));
   await writeFile(join(bundle, 'bin/potluck'), `#!/bin/sh\nset -eu\n# Resolve both ~/.local/bin and Homebrew symlinks before finding the bundle.\nself=$0\nwhile [ -L "$self" ]; do\n  dir=$(CDPATH= cd -P -- "$(dirname -- "$self")" && pwd)\n  target=$(readlink "$self")\n  case "$target" in /*) self=$target ;; *) self=$dir/$target ;; esac\ndone\nroot=$(CDPATH= cd -P -- "$(dirname -- "$self")/.." && pwd)\nexec "\${POTLUCK_NODE_BIN:-node}" "$root/libexec/cli/dist/index.js" "$@"\n`, { mode: 0o755 });
   const manifest = { schemaVersion: 1, version, platform: process.platform, arch: process.arch, node: '>=20', source: provenance.source, dirty: provenance.dirty,
-    runtimeSha256: await digest(executable), builtAt: new Date().toISOString() };
+    runtimeSha256: await digest(executable), splitEngine, builtAt: new Date().toISOString() };
   await writeFile(join(bundle, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
   const archive = join(out, name + '.tar.gz');
   // tar keeps relative PyInstaller links and signed Mach-O bytes intact.

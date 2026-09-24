@@ -1,8 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
+from pathlib import Path
 
 datas = [('potluck_local/data/models.json', 'potluck_local/data')]
+datas += [('potluck_local/data/split-engine.json', 'potluck_local/data')]
 binaries = []
+split_bundle = Path(SPECPATH) / 'native' / 'split'
+if split_bundle.is_dir():
+    datas += [(str(split_bundle / 'manifest.json'), 'split-engine'),
+              (str(split_bundle / 'LICENSE'), 'split-engine')]
+    binaries += [(str(split_bundle / name), 'split-engine') for name in ('llama-server', 'rpc-server')]
 hiddenimports = [
     'aiosqlite',
     'aiosqlite.core',
