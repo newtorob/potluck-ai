@@ -1,4 +1,5 @@
 import { launchAider } from "./launch.js";
+import { runBatch } from "./batch.js";
 import { manageContribution, formatContribution } from "./contribute.js";
 import { runInference } from "./inference.js";
 import { manageSessions } from "./sessions.js";
@@ -14,6 +15,7 @@ import { serveRuntime } from "./serve.js";
 import { manageService } from "./service.js";
 
 export function operationHelp(command: string): string {
+  if (command === "batch") return "Usage: potluck batch submit <file> [file...] --scope local|mine [--jobs 1-8] [--max-tokens 64-2048] [--json]\n       potluck batch status <id> [--watch] [--interval 1000-60000] [--json]\n       potluck batch list|resume|cancel|results|delete [id] [--json]\n       potluck batch results <id> --output <new-file> [--json]\nSummarizes 1–64 explicitly selected UTF-8 files (16 KiB each, 256 KiB total), with no tools or file edits. Requires potluck.lock and a running batch-capable runtime. Submit snapshots input privately on this computer; the runtime schedules work after the terminal exits. Mine scope sends content only to your own eligible computers. Completed results survive interruption; partial attempts retry at most three times per file. Runtime restart pauses work; resume requires the original pin and scope and reuses saved input. Ctrl-C stops watching, not the batch. Cancel stops new work and drains active requests. Delete removes the saved job, inputs and outputs.\n";
   if (command === "status") return "Usage: potluck status [--scope local|mine] [--json] [--timeout 1-30000]\n       potluck status --watch [--interval 1000-60000] [--json]\nLive runtime, own-machine availability, recorded latency and last benchmark metrics. Watch emits newline-delimited JSON or refreshes the terminal, without overlapping polls. Ctrl-C stops watching. Missing measurements are unavailable, not zero.\n";
   if (command === "sessions") return "Usage: potluck sessions list [--json]\n       potluck sessions delete <session-id> [--json]\nOpt in with potluck --save-session or potluck --resume <id>. History is stored privately on this machine and requires a project model pin. Resume from the original working directory. Each resume forks a new session; saved tool calls are never replayed.\n";
   if (command === "run") return 'Usage: potluck run ["prompt"] [--model <id>] [--scope local|mine] [--max-tokens 1-32768] [--timeout 1-300000] [--json]\nPlain inference with no file-editing tools. Piped stdin is appended to the prompt (combined limit 1 MiB). Project model locks apply. Default timeout: 120000 ms. Text streams to stdout; JSON is emitted only after a complete response. Exit 124: timeout; 130: cancelled; 1: inference failed; 2: invalid input.\n';
@@ -38,6 +40,7 @@ export function operationHelp(command: string): string {
 
 export async function runOperation(args: CliArgs, out: (value: string) => void): Promise<number> {
   if (args.help) { out(operationHelp(args.command!)); return 0; }
+  if (args.command === "batch") return runBatch(args, out);
   if (args.command === "status") return runStatus(args, out);
   if (args.command === "run") return runInference(args, out);
   if (args.command === "sessions") {

@@ -1,7 +1,7 @@
 /** Parse commands before touching config, starting a REPL, or making requests. */
 export class UsageError extends Error {}
 
-export type Command = "sessions" | "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
+export type Command = "batch" | "sessions" | "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
 export interface CliArgs {
   help: boolean;
   version: boolean;
@@ -40,9 +40,10 @@ export interface CliArgs {
   resume?: string;
   watch?: boolean;
   interval?: number;
+  files?: string[];
 }
 
-const commands = new Set<Command>(["sessions", "run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
+const commands = new Set<Command>(["batch", "sessions", "run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
 
 export function parseArgs(argv: string[]): CliArgs {
   const out: CliArgs = { help: false, version: false, print: false, yes: false,
@@ -117,7 +118,22 @@ export function parseArgs(argv: string[]): CliArgs {
       throw new UsageError("Unknown command. Run potluck --help, or use potluck -p \"task\".");
     }
     out.command = positional[0] as Command;
-    if (out.command === "sessions") {
+    if (out.command === "batch") {
+      out.action = positional[1] || "list";
+      if (!["submit", "status", "list", "resume", "cancel", "results", "delete"].includes(out.action)) throw new UsageError("Use batch submit|status|list|resume|cancel|results|delete.");
+      if (out.action === "submit") {
+        out.files = positional.slice(2);
+        if (!out.help && (!out.files.length || out.files.length > 64 || !out.scope)) throw new UsageError("Use batch submit <file> [file...] --scope local|mine. Select 1–64 text files explicitly.");
+      } else {
+        out.target = positional[2];
+        if (positional.length > 3 || (out.action === "list" && out.target) || (!out.help && out.action !== "list" && !out.target)) throw new UsageError("Use batch <action> <job-id>, or batch list.");
+        if (out.target && !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(out.target)) throw new UsageError("Use the batch job ID returned by submit.");
+      }
+      if (out.jobs !== undefined && (out.action !== "submit" || out.jobs < 1 || out.jobs > 8)) throw new UsageError("Batch --jobs must be 1–8 and requires submit.");
+      if (out.maxTokens !== undefined && (out.action !== "submit" || out.maxTokens < 64 || out.maxTokens > 2048)) throw new UsageError("Batch --max-tokens must be 64–2048 and requires submit.");
+      if (out.scope && !["submit", "resume"].includes(out.action)) throw new UsageError("Batch --scope requires submit or resume.");
+      if (out.output && out.action !== "results") throw new UsageError("Batch --output requires results.");
+    } else if (out.command === "sessions") {
       out.action = positional[1] || "list"; out.target = positional[2];
       if (!["list", "delete"].includes(out.action) || positional.length > 3 || (out.target && out.action !== "delete") || (!out.help && out.action === "delete" && !out.target)) throw new UsageError("Use sessions list or sessions delete <session-id>.");
     } else if (out.command === "run") {
@@ -154,13 +170,13 @@ export function parseArgs(argv: string[]): CliArgs {
   }
   if (out.command && (out.saveSession || out.resume)) throw new UsageError("--save-session and --resume apply to the coding agent, not management commands.");
   if (out.saveSession && out.resume) throw new UsageError("--resume already saves the continued session.");
-  if ((out.watch || out.interval !== undefined) && out.command !== "status") throw new UsageError("--watch and --interval require status.");
+  if ((out.watch || out.interval !== undefined) && out.command !== "status" && !(out.command === "batch" && out.action === "status")) throw new UsageError("--watch and --interval require status or batch status.");
   if (out.interval !== undefined && !out.watch) throw new UsageError("--interval requires --watch.");
   const operation = out.command;
   const allowed: Record<string, string[]> = {
-    "--jobs": ["contribute"], "--max-tokens": ["contribute", "run"], "--min-free-memory": ["contribute"], "--days": ["contribute"], "--timezone": ["contribute"],
+    "--jobs": ["contribute", "batch"], "--max-tokens": ["contribute", "run", "batch"], "--min-free-memory": ["contribute"], "--days": ["contribute"], "--timezone": ["contribute"],
     "--wait": ["login"], "--no-wait": ["login"], "--local": ["logout"],
-    "--name": ["household", "connect", "setup"], "--output": ["household"],
+    "--name": ["household", "connect", "setup"], "--output": ["household", "batch"],
     "--invite-file": ["connect"], "--no-input": ["setup"], "--enable-gateway": ["setup"],
     "--message": ["launch"], "--with-model": ["setup"], "--sign-in": ["setup"], "--connect": ["setup"], "--preferences": ["setup"],
   };
@@ -189,7 +205,7 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.command !== "logs" && (seen.has("--source") || seen.has("--lines"))) {
     throw new UsageError("--source and --lines require logs.");
   }
-  if (out.scope && out.command && !["status", "doctor", "launch", "run"].includes(out.command)) {
+  if (out.scope && out.command && !["status", "doctor", "launch", "run", "batch"].includes(out.command)) {
     throw new UsageError("--scope is supported by status, doctor, and the coding agent.");
   }
   if (operation && out.scope && !["local", "mine"].includes(out.scope)) {

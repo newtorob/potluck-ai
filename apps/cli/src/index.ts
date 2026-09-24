@@ -81,6 +81,7 @@ function printHelp(): void {
       "  potluck login / logout         sign in using a browser on any device, or sign out",
       "  potluck whoami                 show the signed-in member",
       "  potluck household              create/list your household; export private invitations",
+      "  potluck batch                  summarize files across your computers with saved progress",
       "  potluck connect / disconnect   pair or unpair this machine",
       "  potluck up / down              start/stop the local runtime",
       "  potluck service install        start the runtime automatically at login",

@@ -169,13 +169,16 @@ async def _peer_chunks(peer: dict, body: dict, model: str, sha256: str | None):
             if sha256 and (response.headers.get("x-potluck-model-lock") != "1"
                            or response.headers.get("x-potluck-model-sha256") != sha256):
                 raise RemoteStreamError("Household runtime did not acknowledge the exact model lock; upgrade it.", "model_mismatch")
-            async with aclosing(openai_chunks(response, model)) as chunks:
+            if body.get("potluck_batch") and response.headers.get("x-potluck-batch-protocol") != "1":
+                raise RemoteStreamError("Household runtime does not support complete batch results; upgrade it.", "model_mismatch")
+            async with aclosing(openai_chunks(response, model, require_finish=body.get("potluck_batch", False))) as chunks:
                 async for chunk in chunks:
                     yield chunk
 
 
 async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
-                             temperature: float, max_tokens: int, *, sha256: str | None = None):
+                             temperature: float, max_tokens: int, *, sha256: str | None = None,
+                             retry: bool = True, batch: bool = False):
     """Retry another household machine only while no output has been yielded.
 
     One absolute budget spans headers, prefill, every attempt and decoding.
@@ -184,12 +187,14 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
     body = copy.deepcopy(_payload(messages, model, temperature, max_tokens))
     if sha256:
         body["potluck_model_sha256"] = sha256
+    if batch:
+        body["potluck_batch"] = True
     loop = asyncio.get_running_loop()
     deadline = loop.time() + REQUEST_TIMEOUT_S
     excluded: set[str] = set()
     committed = False
     last_error: Exception = RemoteStreamError("No compatible household machine is available")
-    for attempt in range(MAX_DISPATCH_ATTEMPTS):
+    for attempt in range(MAX_DISPATCH_ATTEMPTS if retry else 1):
         try:
             if attempt:
                 async with asyncio.timeout_at(deadline):

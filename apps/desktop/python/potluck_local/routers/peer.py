@@ -54,6 +54,7 @@ import logging
 import os
 import socket
 import time
+from contextlib import aclosing
 from typing import AsyncGenerator, Literal
 
 from fastapi import APIRouter, HTTPException
@@ -153,6 +154,9 @@ class PeerCapabilities(BaseModel):
     available_for_inference: bool
     protocol_version: int = 4
     model_lock_version: int = 1
+    # Batch v1 preserves native finish reasons so token-limit truncation cannot
+    # be mistaken for a complete durable result. Older chat peers remain valid.
+    batch_protocol_version: int = 1
 
     # Additive fields (protocol_version >= 2)
     hardware: PeerHardware | None = None
@@ -399,6 +403,7 @@ class PeerChatRequest(BaseModel):
     messages: list[PeerChatMessage]
     model: str | None = Field(default=None)
     potluck_model_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    potluck_batch: bool = Field(default=False, strict=True)
     stream: bool = Field(default=True)
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(default=2048, ge=1, le=131072)
@@ -441,6 +446,8 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
         )
 
     digest = request.potluck_model_sha256
+    if request.potluck_batch and (not digest or not request.stream):
+        raise HTTPException(400, "Batch inference requires a model pin and streaming.")
     if digest:
         if not request.model:
             raise HTTPException(400, "A model ID is required with potluck_model_sha256.")
@@ -459,6 +466,25 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
     )
 
     served_model = runtime.current_model_id()
+
+    if request.potluck_batch:
+        async def batch_stream():
+            try:
+                source = runtime.stream_chat_raw(messages_for_runtime, temperature=request.temperature,
+                                                 max_tokens=request.max_tokens, stop=request.stop, **identity)
+                async with aclosing(source):
+                    async for chunk in source:
+                        if "__error__" in chunk:
+                            yield 'data: {"error":{"message":"Inference failed","category":"inference_error"}}\n\n'
+                            return
+                        yield f"data: {json.dumps(chunk)}\n\n"
+                yield "data: [DONE]\n\n"
+            except ModelIdentityError:
+                yield 'data: {"error":{"message":"Model identity changed","category":"model_mismatch"}}\n\n'
+
+        return StreamingResponse(_served_metering_stream(batch_stream(), served_model), media_type="text/event-stream",
+                                 headers={**lock_headers(digest), "X-Potluck-Batch-Protocol": "1",
+                                          "Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     if request.stream:
         upstream = runtime.stream_chat(
@@ -536,10 +562,11 @@ async def _served_metering_stream(
     started = time.monotonic()
     count = 0
     try:
-        async for chunk in upstream:
-            if chunk and "[DONE]" not in chunk:
-                count += 1
-            yield chunk
+        async with aclosing(upstream):
+            async for chunk in upstream:
+                if chunk and "[DONE]" not in chunk:
+                    count += 1
+                yield chunk
     except ModelIdentityError as exc:
         yield f'data: {json.dumps({"error": {"message": str(exc), "code": exc.category}})}\n\n'
         yield "data: [DONE]\n\n"

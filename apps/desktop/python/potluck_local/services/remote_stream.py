@@ -38,7 +38,7 @@ async def _events(response: httpx.Response) -> AsyncIterator[str]:
 
 
 async def openai_chunks(
-    response: httpx.Response, model: str, *, coordinator: bool = False,
+    response: httpx.Response, model: str, *, coordinator: bool = False, require_finish: bool = False,
 ) -> AsyncIterator[dict]:
     """Normalize direct-peer/coordinator streams, retaining their terminal state.
 
@@ -61,6 +61,8 @@ async def openai_chunks(
 
     async for data in _events(response):
         if data.strip() == "[DONE]":
+            if require_finish and finish is None:
+                raise RemoteStreamError("Batch result ended without a finish reason", "stream_protocol_error")
             if coordinator and (meta is None or finish is None):
                 raise RemoteStreamError("Remote job ended without a success summary")
             terminal = chunk({}, finish or "stop")

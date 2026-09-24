@@ -24,7 +24,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from potluck_local import __version__
-from potluck_local.routers import account, agents, chat, contributor, gateway, hardware, health, memory, models, ollama, peer, readiness, settings, tasks, usage, vault, verify
+from potluck_local.routers import account, agents, batches, chat, contributor, gateway, hardware, health, memory, models, ollama, peer, readiness, settings, tasks, usage, vault, verify
 from potluck_local.utils.logging import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -186,7 +186,23 @@ async def _lifespan(app: FastAPI):  # noqa: ARG001
 
     _track(asyncio.create_task(get_model_lifecycle().restore(_load_model)))
 
+    from potluck_local.services.batch_jobs import BatchManager
+    from potluck_local.utils.paths import data_dir
+    try:
+        app.state.batch_manager = BatchManager(data_dir() / "batches")
+    except Exception:
+        # A damaged/private-permission store disables batches, not local chat.
+        # Never log raw records or exceptions which could include user content.
+        app.state.batch_manager = None
+        logger.error("batch_storage_unavailable")
+
     yield
+
+    if app.state.batch_manager is not None:
+        try:
+            await app.state.batch_manager.close()
+        except Exception:
+            logger.error("batch_shutdown_failed")
 
     # Stop the contributor first: closing its socket is what tells the
     # coordinator to drain this peer, and it must happen before the model
@@ -276,6 +292,12 @@ def create_app() -> FastAPI:
     # Compress responses >= 1 KB when the client sends Accept-Encoding: gzip.
     # Keeps multi-row memory/export and trace payloads well under the wire.
     app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+    from potluck_local.services.batch_jobs import BatchError
+
+    @app.exception_handler(BatchError)
+    async def batch_error_handler(request: Request, error: BatchError):
+        return JSONResponse(status_code=error.status, content={"detail": str(error), "code": error.code})
 
     # Peer-access guard — when the sidecar is bound to 0.0.0.0 (required so
     # household peers can dial it over the mesh), the bare socket would
@@ -415,8 +437,8 @@ def create_app() -> FastAPI:
         # credential to fall back on, so it must present the sidecar token like
         # every other loopback route; a mesh peer keeps its pre-existing
         # token-free path since mesh membership already gated it above.
-        if normalised.startswith("/account") and sidecar_token is None:
-            return JSONResponse(status_code=503, content={"detail": "Account control requires an authenticated runtime. Run potluck up."})
+        if (normalised.startswith("/account") or normalised.startswith("/batches")) and sidecar_token is None:
+            return JSONResponse(status_code=503, content={"detail": "Private control requires an authenticated runtime. Run potluck up."})
         if sidecar_token is not None:
             exempt = (
                 normalised == "/health"
@@ -436,6 +458,7 @@ def create_app() -> FastAPI:
     # Routers — prefixes must match localApi.ts in the frontend
     app.include_router(health.router, tags=["health"])
     app.include_router(account.router, prefix="/account", tags=["account"])
+    app.include_router(batches.router, prefix="/batches", tags=["batches"])
     app.include_router(readiness.router, tags=["readiness"])
     app.include_router(chat.router, prefix="/chat", tags=["chat"])
     app.include_router(models.router, prefix="/models", tags=["models"])
