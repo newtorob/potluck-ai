@@ -24,10 +24,12 @@ import logging
 import os
 import platform
 import sys
+from contextlib import aclosing
 
 import httpx
 
 from .remote_stream import RemoteStreamError, collect_completion, openai_chunks
+from .peer_liveness import watch_peer_stream
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +159,21 @@ def _payload(messages: list[dict], model: str, temperature: float, max_tokens: i
     }
 
 
+async def _peer_chunks(peer: dict, body: dict, model: str, sha256: str | None):
+    timeout = httpx.Timeout(None, connect=_DISPATCH_CONNECT_TIMEOUT_S,
+                            write=_DISPATCH_CONNECT_TIMEOUT_S, pool=_DISPATCH_CONNECT_TIMEOUT_S)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        async with client.stream("POST", _peer_url(peer), json=body) as response:
+            if response.status_code != 200:
+                raise PeerDispatchError(response.status_code)
+            if sha256 and (response.headers.get("x-potluck-model-lock") != "1"
+                           or response.headers.get("x-potluck-model-sha256") != sha256):
+                raise RemoteStreamError("Household runtime did not acknowledge the exact model lock; upgrade it.", "model_mismatch")
+            async with aclosing(openai_chunks(response, model)) as chunks:
+                async for chunk in chunks:
+                    yield chunk
+
+
 async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
                              temperature: float, max_tokens: int, *, sha256: str | None = None):
     """Retry another household machine only while no output has been yielded.
@@ -186,29 +203,25 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
                 prompt_tokens = sum(len(m.get("content", "")) for m in body["messages"]) / 4
                 first_budget = min(first_budget, 10 + prompt_tokens / rate)
             first_deadline = min(deadline, loop.time() + first_budget)
-            timeout = httpx.Timeout(None, connect=_DISPATCH_CONNECT_TIMEOUT_S,
-                                    write=_DISPATCH_CONNECT_TIMEOUT_S, pool=_DISPATCH_CONNECT_TIMEOUT_S)
             # Reschedule from first-token to decode-idle only on useful output.
             # Role chunks, keepalives and malformed/no-op frames don't buy time.
             async with asyncio.timeout_at(first_deadline) as budget:
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    async with client.stream("POST", _peer_url(peer), json=body) as response:
-                        if response.status_code != 200:
-                            raise PeerDispatchError(response.status_code)
-                        if sha256 and (response.headers.get("x-potluck-model-lock") != "1"
-                                       or response.headers.get("x-potluck-model-sha256") != sha256):
-                            raise RemoteStreamError("Household runtime did not acknowledge the exact model lock; upgrade it.", "model_mismatch")
-                        async for chunk in openai_chunks(response, model):
-                            choice = chunk["choices"][0]
-                            delta = choice["delta"]
-                            useful = any(value for key, value in delta.items() if key != "role")
-                            finished = choice["finish_reason"] is not None
-                            if not useful and not finished:
-                                continue
-                            committed = True
-                            budget.reschedule(None if finished else min(deadline, loop.time() + IDLE_TIMEOUT_S))
-                            yield chunk
-                        return
+                guarded = watch_peer_stream(
+                    _peer_chunks(peer, body, model, sha256),
+                    f"http://{peer['mesh_ip']}:{PEER_SIDECAR_PORT}/health",
+                )
+                async with aclosing(guarded):
+                    async for chunk in guarded:
+                        choice = chunk["choices"][0]
+                        delta = choice["delta"]
+                        useful = any(value for key, value in delta.items() if key != "role")
+                        finished = choice["finish_reason"] is not None
+                        if not useful and not finished:
+                            continue
+                        committed = True
+                        budget.reschedule(None if finished else min(deadline, loop.time() + IDLE_TIMEOUT_S))
+                        yield chunk
+                    return
         except (httpx.TransportError, RemoteStreamError, TimeoutError) as exc:
             if isinstance(exc, TimeoutError):
                 exc = RemoteStreamError("Household inference stopped making progress", "stream_timeout")
