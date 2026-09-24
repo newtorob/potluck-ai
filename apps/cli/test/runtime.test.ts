@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { mkdtemp, mkdir, writeFile, chmod, rm, symlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -93,6 +94,28 @@ describe.skipIf(process.platform === "win32")("shared runtime", () => {
     await expect(startRuntime(500)).rejects.toThrow("identity changed");
     await expect(discoverRuntime({ dataDir: dir, port: Number(new URL(url).port) })).rejects.toThrow("identity changed");
   });
+  it.each(["removed", "replaced"])("waits for process exit after discovery is %s", async (change) => {
+    const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
+    spawned.add(child.pid!);
+    let saved: RuntimeRecord;
+    const url = await server(async (req, res) => {
+      if (req.url === "/shutdown") {
+        if (change === "removed") await rm(join(dir, "run/runtime.json"));
+        else await writeFile(join(dir, "run/runtime.json"), JSON.stringify({ ...saved, instanceId: "00000000-0000-0000-0000-000000000002" }), { mode: 0o600 });
+        res.end("{}");
+      } else res.end(JSON.stringify(saved));
+    });
+    saved = { ...await record(url), pid: child.pid! };
+    await writeFile(join(dir, "run/runtime.json"), JSON.stringify(saved), { mode: 0o600 });
+    await expect(stopRuntime(250)).rejects.toThrow("still shutting down");
+    child.kill();
+    await new Promise<void>(resolve => child.once("exit", () => resolve()));
+  });
+  it("does not report a live process stopped when its API is unreachable", async () => {
+    const saved = { ...await record("http://127.0.0.1:1"), pid: process.pid };
+    await writeFile(join(dir, "run/runtime.json"), JSON.stringify(saved), { mode: 0o600 });
+    await expect(stopRuntime(250)).rejects.toThrow("process still exists");
+  });
   it("refuses to start over an unmanaged listener", async () => {
     const url = await server((_req, res) => res.end('{"status":"ok"}'));
     vi.stubEnv("POTLUCK_SIDECAR_URL", url);
@@ -149,6 +172,7 @@ with RuntimeControl(port=args.port, host='127.0.0.1', token=os.environ['POTLUCK_
     expect(await startRuntime(500)).toMatchObject({ pid: current?.pid, started: false });
     expect(await stopRuntime(3000)).toEqual({ schemaVersion: 1, state: "stopped" });
     expect(await readRuntimeRecord()).toBeNull();
+    expect(() => process.kill(current!.pid, 0)).toThrow();
     spawned.clear();
   }, 20000);
 });

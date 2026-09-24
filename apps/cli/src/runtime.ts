@@ -163,32 +163,32 @@ export async function startRuntime(timeout: number): Promise<RuntimeReport> {
   throw new RuntimeError("Runtime is not ready within the timeout. It may still be starting; run potluck up again or potluck logs.");
 }
 
+function processHasExited(pid: number): boolean {
+  try { process.kill(pid, 0); }
+  catch (error) { return (error as NodeJS.ErrnoException).code === "ESRCH"; }
+  return false;
+}
+
 export async function stopRuntime(timeout: number): Promise<RuntimeReport> {
   supported();
   const record = await readRuntimeRecord();
   if (!record) return { schemaVersion: 1, state: "stopped" };
   try { await verifyRuntime(record, Math.min(timeout, 1000)); }
   catch (error) {
-    if (error instanceof ControlError && error.code === "unreachable") return { schemaVersion: 1, state: "stopped" };
+    if (error instanceof ControlError && error.code === "unreachable") {
+      if (processHasExited(record.pid)) return { schemaVersion: 1, state: "stopped" };
+      throw new RuntimeError("Runtime API is unavailable but its process still exists. Check potluck logs; no process was force-killed.");
+    }
     throw error;
   }
   if (record.owner !== "cli") throw new RuntimeError(`Runtime is owned by ${record.owner}. Stop it through that launcher.`);
   await requestJSON({ url: record.url + "/shutdown", token: record.token, method: "POST", timeout });
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
-    const latest = await readRuntimeRecord();
-    if (!latest || latest.instanceId !== record.instanceId) return { schemaVersion: 1, state: "stopped" };
-    try { await verifyRuntime(latest, Math.min(500, Math.max(1, deadline - Date.now()))); }
-    catch (error) {
-      if (error instanceof ControlError && error.code === "unreachable") {
-        // Closing the listener comes before model/background-task cleanup.
-        // A stale record is only enough once its process has actually exited.
-        try { process.kill(record.pid, 0); }
-        catch (probe) {
-          if ((probe as NodeJS.ErrnoException).code === "ESRCH") return { schemaVersion: 1, state: "stopped" };
-        }
-      }
-    }
+    // The listener and discovery record close before Python finalization.
+    // Keep observing the original PID even if a replacement runtime starts.
+    // Never send it a signal: PID reuse can only delay a successful report.
+    if (processHasExited(record.pid)) return { schemaVersion: 1, state: "stopped" };
     await delay(100);
   }
   throw new RuntimeError("Runtime is still shutting down. Check potluck logs; no process was force-killed.");

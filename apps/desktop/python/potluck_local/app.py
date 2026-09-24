@@ -496,6 +496,10 @@ def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "--split-supervisor":
         from potluck_local.services.native_supervisor import run
         raise SystemExit(run(sys.argv[2:]))
+    if len(sys.argv) == 3 and sys.argv[1] == "--gpu-probe":
+        from potluck_local.services.gpu_probe import main as probe
+        probe(sys.argv[2])
+        return
     parser = argparse.ArgumentParser(description="Potluck local sidecar")
     parser.add_argument(
         "--port",

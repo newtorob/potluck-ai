@@ -13,6 +13,9 @@ if split_bundle.is_dir():
 hiddenimports = [
     'aiosqlite',
     'aiosqlite.core',
+    # SciPy 1.17 Cython extensions import this from native code; static analysis
+    # misses it, breaking sentence-transformers in an otherwise healthy bundle.
+    'scipy._cyutility',
     'uvicorn.logging',
     'uvicorn.loops.auto',
     'uvicorn.protocols.http.auto',
