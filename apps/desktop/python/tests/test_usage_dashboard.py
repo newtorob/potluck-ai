@@ -1,4 +1,6 @@
 import asyncio
+import sys
+from types import SimpleNamespace
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock
 
@@ -80,7 +82,7 @@ def test_api_parses_query_params_without_bypassing_bounds(monkeypatch):
 
 
 def test_split_is_allowlisted_and_household_is_explicit(monkeypatch):
-    from potluck_local.services import performance_status, split_manager
+    from potluck_local.services import performance_status
     snapshot = AsyncMock(return_value={})
     monkeypatch.setattr(usage, 'usage_snapshot', snapshot)
     perf = AsyncMock(return_value=dict(schemaVersion=1, sampledAt='now', local={}, household=None, secret='never-expose'))
@@ -90,8 +92,18 @@ def test_split_is_allowlisted_and_household_is_explicit(monkeypatch):
             return dict(state='ready', workerEnabled=False, workerBusy=False, error='never-expose', session={
                 'id': 'never-expose', 'model': {'id': 'coder', 'path': 'never-expose'},
                 'workers': [{'name': 'never-expose', 'mesh_ip': 'never-expose'}]})
-    monkeypatch.setattr(split_manager, 'get_split_manager', Manager)
+    monkeypatch.setitem(sys.modules, 'potluck_local.services.split_manager', SimpleNamespace(get_split_manager=Manager))
     result = asyncio.run(usage.dashboard(7, 'consumed', False))
     perf.assert_awaited_once_with(include_household=False)
     assert result['split'] == dict(state='ready', workerEnabled=False, workerBusy=False, workers=1, model='coder')
     assert 'never-expose' not in str(result)
+
+
+def test_dashboard_keeps_usage_when_optional_split_module_is_absent(monkeypatch):
+    from potluck_local.services import performance_status
+    monkeypatch.setattr(usage, 'usage_snapshot', AsyncMock(return_value={'totals': {'requests': 3}}))
+    monkeypatch.setattr(performance_status, 'performance_status', AsyncMock(return_value=dict(schemaVersion=1, sampledAt='now', local={}, household=None)))
+    monkeypatch.setitem(sys.modules, 'potluck_local.services.split_manager', None)
+    result = asyncio.run(usage.dashboard(7, 'consumed', False))
+    assert result['totals']['requests'] == 3 and result['split'] is None
+    assert result['performance']['schemaVersion'] == 1

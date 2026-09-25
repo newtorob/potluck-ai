@@ -1,6 +1,6 @@
 {
   "name": "@potluck/cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Potluck CLI — a terminal coding agent whose inference runs on the Potluck mesh via the local OpenAI-compatible gateway.",
   "type": "module",
   "bin": {

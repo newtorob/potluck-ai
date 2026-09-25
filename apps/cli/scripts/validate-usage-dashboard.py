@@ -103,7 +103,8 @@ def main():
             data = run('usage', '--window', '1')
             assert data['totals']['requests'] == 3 and data['totals']['failures'] == 1
             assert data['totals']['outputTokens'] == 105 and data['totals']['endToEndTokensPerSecond'] == 20
-            assert data['performance']['local']['model'] is None and data['split']['state'] == 'idle'
+            assert data['performance']['local']['model'] is None
+            assert data['split'] is None or data['split']['state'] == 'idle'
             served = run('usage', '--direction', 'served')
             assert served['totals']['requests'] == 1 and served['totals']['endToEndTokensPerSecond'] is None
             assert 'validation-only' in run('usage', 'requests', '--once', json_output=False)

@@ -6,6 +6,8 @@ binaries = []
 hiddenimports = [
     'aiosqlite',
     'aiosqlite.core',
+    # Imported by SciPy's native extensions rather than Python source.
+    'scipy._cyutility',
     'uvicorn.logging',
     'uvicorn.loops.auto',
     'uvicorn.protocols.http.auto',
