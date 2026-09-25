@@ -110,7 +110,10 @@ def main():
                 original = termios.tcgetattr(slave)
                 fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 38, 130, 0, 0))
                 child = subprocess.Popen(command + ['usage'], env=env, cwd=directory,
-                    stdin=slave, stdout=slave, stderr=slave, start_new_session=True)
+                    # Keep the harness's session. A session-leading /bin/sh
+                    # launcher can acquire and revoke this PTY on exit on macOS,
+                    # making post-exit termios inspection fail with ENOTTY.
+                    stdin=slave, stdout=slave, stderr=slave)
                 collected = bytearray()
 
                 def drain(seconds):
