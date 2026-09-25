@@ -5,7 +5,7 @@ export interface UsageScreen {
   view: UsageView; window: number; direction: "consumed" | "served"; theme: "dark" | "light";
   paused: boolean; offset: number; report: UsageReport | null; error: boolean; refreshing: boolean;
 }
-export interface RenderOptions { width: number; height?: number; color?: boolean; unicode?: boolean; interactive?: boolean }
+export interface RenderOptions { width: number; height?: number; color?: boolean; colorDepth?: number; unicode?: boolean; interactive?: boolean }
 type Tone = "text" | "muted" | "ember" | "sage" | "red" | "border";
 const colors = {
   dark: { bg: "26;23;20", text: "243;237;225", muted: "180;169;153", ember: "220;143;115", sage: "157;183;160", red: "226;133;115", border: "73;63;54" },
@@ -29,9 +29,28 @@ export function fit(value: string, width: number): string {
   for (const g of gs) { if (!g.width) continue; if (used + g.width > width - 1) break; result += g.text; used += g.width; }
   return result + "~";
 }
+// Quantize Hearth colors for terminals without truecolor; never send unsupported
+// RGB parameters to a 16-color console. Precompute once per frame, not per cell.
+function terminalColor(rgb: string, background: boolean, depth: number): string {
+  const channels = rgb.split(";").map(Number), prefix = background ? 48 : 38;
+  if (depth >= 24) return `${prefix};2;${rgb}`;
+  const distance = (candidate: number[]) => candidate.reduce((sum, v, i) => sum + (v - channels[i]) ** 2, 0);
+  if (depth >= 8) {
+    const levels = [0, 95, 135, 175, 215, 255];
+    const cube = channels.map(v => levels.reduce((best, level, i) => Math.abs(level - v) < Math.abs(levels[best] - v) ? i : best, 0));
+    const gray = Math.min(23, Math.max(0, Math.round((channels.reduce((s, v) => s + v, 0) / 3 - 8) / 10)));
+    const index = distance(cube.map(i => levels[i])) <= distance([0, 0, 0].map(() => 8 + gray * 10))
+      ? 16 + cube[0] * 36 + cube[1] * 6 + cube[2] : 232 + gray;
+    return `${prefix};5;${index}`;
+  }
+  const ansi = [[0,0,0],[128,0,0],[0,128,0],[128,128,0],[0,0,128],[128,0,128],[0,128,128],[192,192,192],
+    [128,128,128],[255,0,0],[0,255,0],[255,255,0],[0,0,255],[255,0,255],[0,255,255],[255,255,255]];
+  const index = ansi.reduce((best, color, i) => distance(color) < distance(ansi[best]) ? i : best, 0);
+  return String((background ? 40 : 30) + index % 8 + (index >= 8 ? 60 : 0));
+}
 class Canvas {
   cells: Array<Array<{ text: string; tone: Tone; bold: boolean }>>;
-  constructor(readonly width: number, readonly height: number, readonly theme: UsageScreen["theme"], readonly color: boolean, readonly unicode: boolean) {
+  constructor(readonly width: number, readonly height: number, readonly theme: UsageScreen["theme"], readonly color: boolean, readonly unicode: boolean, readonly colorDepth: number) {
     this.cells = Array.from({ length: height }, () => Array.from({ length: width }, () => ({ text: " ", tone: "text" as Tone, bold: false })));
   }
   text(x: number, y: number, value: string, tone: Tone = "text", bold = false, max = this.width - x) {
@@ -55,11 +74,12 @@ class Canvas {
   }
   render(): string {
     const palette = colors[this.theme];
+    const encoded = Object.fromEntries(Object.entries(palette).map(([name, rgb]) => [name, terminalColor(rgb, name === "bg", this.colorDepth)]));
     return this.cells.map(row => {
       if (!this.color) return row.map(c => c.text).join("").trimEnd();
-      let line = `\x1b[48;2;${palette.bg}m`, style = "";
+      let line = `\x1b[${encoded.bg}m`, style = "";
       for (const cell of row) {
-        const next = `${cell.bold ? 1 : 22};38;2;${palette[cell.tone]}`;
+        const next = `${cell.bold ? 1 : 22};${encoded[cell.tone]}`;
         if (next !== style) { line += `\x1b[${next}m`; style = next; }
         line += cell.text;
       }
@@ -140,7 +160,7 @@ function runtime(c: Canvas, r: UsageReport, x: number, y: number, width: number)
 }
 export function renderUsage(state: UsageScreen, options: RenderOptions): string {
   const width = Math.min(200, Math.max(10, Math.floor(options.width))), height = Math.max(4, Math.min(100, Math.floor(options.height ?? 38)));
-  const c = new Canvas(width, height, state.theme, options.color ?? false, options.unicode ?? true);
+  const c = new Canvas(width, height, state.theme, options.color ?? false, options.unicode ?? true, options.colorDepth ?? 24);
   const r = state.report, status = state.error ? "OFFLINE / STALE" : state.paused ? "PAUSED" : state.refreshing ? "UPDATING" : options.interactive ? "LIVE" : "SNAPSHOT";
   c.text(1, 0, c.unicode ? "◈ POTLUCK" : "* POTLUCK", "ember", true);
   c.text(13, 0, "/ usage", "muted");

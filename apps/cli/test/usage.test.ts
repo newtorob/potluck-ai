@@ -95,3 +95,19 @@ it("shows stale data explicitly and repaints a resized terminal without overlapp
   expect(t.sample).toHaveBeenCalledTimes(3);
   t.input.emit("keypress", "q", { name: "q" }); await run;
 });
+
+it("uses only supported color sequences in truecolor, 256-color and 16-color terminals", () => {
+  for (const colorDepth of [4, 8, 24]) {
+    const frame = renderUsage(screen(), { width: 130, color: true, colorDepth });
+    expect(plainText(frame)).toContain("POTLUCK");
+    if (colorDepth === 24) expect(frame).toContain("48;2;26;23;20");
+    else expect(frame).not.toMatch(/(?:38|48);2;/);
+    if (colorDepth === 8) expect(frame).toMatch(/48;5;[0-9]+/);
+    if (colorDepth === 4) expect(frame).not.toMatch(/(?:38|48);5;/);
+  }
+});
+it("honors explicit multiplexer color support even when Node reports 16 colors", async () => {
+  const t = terminal(), out = vi.fn(); t.env.TERM = "screen-256color"; t.output.getColorDepth = () => 4;
+  await runUsage(parseArgs(["usage", "--once"]), out, t);
+  expect(out.mock.calls[0][0]).toContain("48;5;"); expect(out.mock.calls[0][0]).not.toContain("48;2;");
+});
