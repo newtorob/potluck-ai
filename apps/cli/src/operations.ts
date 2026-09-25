@@ -4,6 +4,7 @@ import { runSplit } from "./split.js";
 import { manageContribution, formatContribution } from "./contribute.js";
 import { runInference } from "./inference.js";
 import { manageSessions } from "./sessions.js";
+import { runUsage, usageHelp } from "./usage.js";
 import { runStatus } from "./status.js";
 import type { CliArgs } from "./args.js";
 import { diagnose, formatDiagnostics } from "./diagnostics.js";
@@ -16,6 +17,7 @@ import { serveRuntime } from "./serve.js";
 import { manageService } from "./service.js";
 
 export function operationHelp(command: string): string {
+  if (command === "usage") return usageHelp;
   if (command === "split") return "Usage: potluck split worker on|off [--json]\n       potluck split plan|start <pinned-model> --peer <owned-machine> [--peer <another>] [--context 512-8192] [--json]\n       potluck split status|stop [--json]\nRun one pinned GGUF across your own paired machines. Requires a split-capable runtime on each machine. Unload each worker's local model, then enable worker sharing explicitly. Run plan/start on the head computer holding the exact potluck.lock weights; peers are selected from your current mesh roster. Start loads in the background; status reports ready or failed. No cloud fallback or automatic model downloads. Stop releases the group. Runtime restart or interrupted inference requires an explicit start; turning a worker off interrupts its current split. This is a capacity feature, not a speed guarantee.\n";
   if (command === "batch") return "Usage: potluck batch submit <file> [file...] --scope local|mine [--jobs 1-8] [--max-tokens 64-2048] [--json]\n       potluck batch status <id> [--watch] [--interval 1000-60000] [--json]\n       potluck batch list|resume|cancel|results|delete [id] [--json]\n       potluck batch results <id> --output <new-file> [--json]\nSummarizes 1–64 explicitly selected UTF-8 files (16 KiB each, 256 KiB total), with no tools or file edits. Requires potluck.lock and a running batch-capable runtime. Submit snapshots input privately on this computer; the runtime schedules work after the terminal exits. Mine scope sends content only to your own eligible computers. Completed results survive interruption; partial attempts retry at most three times per file. Runtime restart pauses work; resume requires the original pin and scope and reuses saved input. Ctrl-C stops watching, not the batch. Cancel stops new work and drains active requests. Delete removes the saved job, inputs and outputs.\n";
   if (command === "status") return "Usage: potluck status [--scope local|mine] [--json] [--timeout 1-30000]\n       potluck status --watch [--interval 1000-60000] [--json]\nLive runtime, own-machine availability, recorded latency and last benchmark metrics. Watch emits newline-delimited JSON or refreshes the terminal, without overlapping polls. Ctrl-C stops watching. Missing measurements are unavailable, not zero.\n";
@@ -42,6 +44,7 @@ export function operationHelp(command: string): string {
 
 export async function runOperation(args: CliArgs, out: (value: string) => void): Promise<number> {
   if (args.help) { out(operationHelp(args.command!)); return 0; }
+  if (args.command === "usage") return runUsage(args, out);
   if (args.command === "split") return runSplit(args, out);
   if (args.command === "batch") return runBatch(args, out);
   if (args.command === "status") return runStatus(args, out);

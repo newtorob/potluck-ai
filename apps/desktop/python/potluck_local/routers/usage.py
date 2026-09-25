@@ -24,14 +24,25 @@ Endpoints:
 from __future__ import annotations
 
 import logging
+from typing import Literal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from potluck_local.services import usage_store
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@router.get('/dashboard')
+async def get_dashboard(window: int = Query(default=7, ge=1, le=90),
+                        direction: Literal['consumed', 'served'] = 'consumed',
+                        household: bool = False) -> dict:
+    if window not in (1, 7, 30, 90):
+        raise HTTPException(422, "window must be 1, 7, 30, or 90 days")
+    from potluck_local.services.usage_dashboard import dashboard
+    return await dashboard(window, direction, household)
 
 
 @router.get('/performance')

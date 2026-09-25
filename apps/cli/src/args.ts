@@ -1,7 +1,7 @@
 /** Parse commands before touching config, starting a REPL, or making requests. */
 export class UsageError extends Error {}
 
-export type Command = "split" | "batch" | "sessions" | "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
+export type Command = "usage" | "split" | "batch" | "sessions" | "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
 export interface CliArgs {
   help: boolean;
   version: boolean;
@@ -43,9 +43,13 @@ export interface CliArgs {
   files?: string[];
   peers?: string[];
   context?: number;
+  once?: boolean;
+  window?: 1 | 7 | 30 | 90;
+  direction?: "consumed" | "served";
+  theme?: "dark" | "light";
 }
 
-const commands = new Set<Command>(["split", "batch", "sessions", "run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
+const commands = new Set<Command>(["usage", "split", "batch", "sessions", "run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
 
 export function parseArgs(argv: string[]): CliArgs {
   const out: CliArgs = { help: false, version: false, print: false, yes: false,
@@ -74,6 +78,22 @@ export function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--sign-in") out.signIn = true;
     else if (arg === "--connect") out.connect = true;
     else if (arg === "--preferences") out.preferences = true;
+    else if (arg === "--once") out.once = true;
+    else if (flag === "--window") {
+      const v = value();
+      if (!["1", "7", "30", "90"].includes(v)) throw new UsageError("--window must be 1, 7, 30, or 90 days.");
+      out.window = Number(v) as CliArgs["window"];
+    }
+    else if (flag === "--direction") {
+      const v = value();
+      if (!["consumed", "served"].includes(v)) throw new UsageError("--direction must be consumed or served.");
+      out.direction = v as CliArgs["direction"];
+    }
+    else if (flag === "--theme") {
+      const v = value();
+      if (!["dark", "light"].includes(v)) throw new UsageError("--theme must be dark or light.");
+      out.theme = v as CliArgs["theme"];
+    }
     else if (arg === "--watch") out.watch = true;
     else if (flag === "--interval") {
       const v = value(); if (!/^\d+$/.test(v) || Number(v) < 1000 || Number(v) > 60000) throw new UsageError("--interval must be 1000–60000 milliseconds.");
@@ -130,7 +150,10 @@ export function parseArgs(argv: string[]): CliArgs {
       throw new UsageError("Unknown command. Run potluck --help, or use potluck -p \"task\".");
     }
     out.command = positional[0] as Command;
-    if (out.command === "split") {
+    if (out.command === "usage") {
+      out.action = positional[1] || "overview";
+      if (!["overview", "models", "requests", "machines"].includes(out.action) || positional.length > 2) throw new UsageError("Use potluck usage [overview|models|requests|machines].");
+    } else if (out.command === "split") {
       out.action = positional[1] || "status";
       out.target = positional[2];
       if (!["status", "worker", "plan", "start", "stop"].includes(out.action) || positional.length > 3) throw new UsageError("Use potluck split status|worker|plan|start|stop.");
@@ -194,12 +217,14 @@ export function parseArgs(argv: string[]): CliArgs {
   }
   if (out.command && (out.saveSession || out.resume)) throw new UsageError("--save-session and --resume apply to the coding agent, not management commands.");
   if (out.saveSession && out.resume) throw new UsageError("--resume already saves the continued session.");
-  if ((out.watch || out.interval !== undefined) && out.command !== "status" && !(out.command === "batch" && out.action === "status")) throw new UsageError("--watch and --interval require status or batch status.");
-  if (out.interval !== undefined && !out.watch) throw new UsageError("--interval requires --watch.");
+  if ((out.watch || out.interval !== undefined) && out.command !== "status" && out.command !== "usage" && !(out.command === "batch" && out.action === "status")) throw new UsageError("--watch and --interval require status, batch status, or usage.");
+  if (out.interval !== undefined && !out.watch && out.command !== "usage") throw new UsageError("--interval requires --watch.");
   if ((out.peers || out.context !== undefined) && out.command !== "split") throw new UsageError("--peer and --context require split.");
   if (out.command === "split" && !seen.has("--timeout")) out.timeout = 30000;
+  if (out.once && (out.watch || out.interval !== undefined)) throw new UsageError("Choose --once or live refresh options.");
   const operation = out.command;
   const allowed: Record<string, string[]> = {
+    "--once": ["usage"], "--window": ["usage"], "--direction": ["usage"], "--theme": ["usage"],
     "--jobs": ["contribute", "batch"], "--max-tokens": ["contribute", "run", "batch"], "--min-free-memory": ["contribute"], "--days": ["contribute"], "--timezone": ["contribute"],
     "--wait": ["login"], "--no-wait": ["login"], "--local": ["logout"],
     "--name": ["household", "connect", "setup"], "--output": ["household", "batch"],
