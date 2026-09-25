@@ -31,7 +31,7 @@ it("allowlists and bounds metadata and strips terminal injection", () => {
   expect(r.performance?.local.benchmarkTokensPerSecond).toBeNull(); expect(() => sanitizeUsage({ schemaVersion: 9 })).toThrow();
 });
 it.each(["overview", "models", "requests", "machines"] as const)("fits %s to 40–180 columns and 16–48 rows with CJK/emoji", view => {
-  for (const [width, height] of [[40, 16], [64, 20], [80, 24], [130, 38], [180, 48]]) {
+  for (const [width, height] of [[40, 16], [64, 20], [64, 24], [80, 24], [96, 34], [100, 36], [119, 34], [120, 34], [130, 38], [180, 48]]) {
     const s = screen(); s.view = view; s.report!.models[0].model = "模型🦙é🇯🇵".repeat(50); s.report!.recent[0].model = s.report!.models[0].model;
     for (const color of [true, false]) {
       const rendered = renderUsage(s, { width, height, color }), lines = plainText(rendered).split("\n");
@@ -110,4 +110,39 @@ it("honors explicit multiplexer color support even when Node reports 16 colors",
   const t = terminal(), out = vi.fn(); t.env.TERM = "screen-256color"; t.output.getColorDepth = () => 4;
   await runUsage(parseArgs(["usage", "--once"]), out, t);
   expect(out.mock.calls[0][0]).toContain("48;5;"); expect(out.mock.calls[0][0]).not.toContain("48;2;");
+});
+
+it("keeps all route counts and unknown records visible without exposing arbitrary scopes", () => {
+  const s = screen();
+  s.report = sanitizeUsage({ ...s.report, totals: { ...s.report!.totals, requests: 1000 }, routes: [
+    { scope: "private-host-one", requests: 7 }, { scope: "private-host-two", requests: 3 },
+    { scope: "local", requests: 100 }, { scope: "my_machines", requests: 300 },
+    { scope: "circle", requests: 200 }, { scope: "pool", requests: 390 },
+  ] });
+  expect(s.report.routes).toHaveLength(5);
+  expect(JSON.stringify(s.report.routes)).not.toContain("private-host");
+  for (const [width, height] of [[80, 24], [130, 38]]) {
+    const frame = renderUsage(s, { width, height });
+    expect(frame).toMatch(/This machine\s+100\s+10%/);
+    expect(frame).toMatch(/Your machines\s+300\s+30%/);
+    expect(frame).toMatch(/Trusted circle\s+200\s+20%/);
+    expect(frame).toMatch(/Open pool\s+390\s+39%/);
+    expect(frame).toMatch(/Unknown\s+10\s+1%/);
+  }
+});
+
+it("distinguishes latency statistics and explains the activity scale at both layout sizes", () => {
+  for (const [width, height] of [[80, 24], [130, 38]]) {
+    const frame = renderUsage(screen(), { width, height });
+    expect(frame).toContain("First token avg"); expect(frame).toContain("Total latency p95");
+    expect(frame).toContain("286ms"); expect(frame).toContain("14.5s");
+    expect(frame).toContain("320"); expect(frame).toContain("Requests / day");
+    expect(frame).toContain("Current day*"); expect(frame).toContain("* Partial bucket");
+  }
+  const empty = screen(); empty.report!.totals = { ...empty.report!.totals, requests: 0, avgTtftMs: null, p95DurationMs: null };
+  empty.report!.routes = []; empty.report!.activity = [];
+  const frame = renderUsage(empty, { width: 80, height: 24 });
+  expect(frame).toContain("First token avg --"); expect(frame).toContain("Total latency p95 --");
+  expect(frame).toContain("No requests yet"); expect(frame).not.toMatch(/NaN|Infinity/);
+  expect(frame).toMatch(/Open pool\s+0\s+--/);
 });

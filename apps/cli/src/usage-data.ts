@@ -47,11 +47,17 @@ export function sanitizeUsage(value: unknown): UsageReport {
     if (p.household) p.household.models = p.household.models.slice(0, 64).map(m => ({ ...m, model: cellText(m.model) }));
   }
   const s = object(v.split);
+  const routes = new Map<string, { scope: string; requests: number; outputTokens: number }>();
+  for (const row of rows(v.routes, 64)) {
+    const name = scope(row.scope), entry = routes.get(name) ?? { scope: name, requests: 0, outputTokens: 0 };
+    entry.requests += number(row.requests) ?? 0; entry.outputTokens += number(row.outputTokens) ?? 0;
+    routes.set(name, entry);
+  }
   return { schemaVersion: 1, sampledAt: cellText(v.sampledAt), since: cellText(v.since), windowDays: Number(v.windowDays), direction: v.direction as UsageDirection,
     totals: stats(v.totals), bucketUnit: v.bucketUnit === "hour" ? "hour" : "day",
     activity: rows(v.activity, 91).map(r => ({ bucket: cellText(r.bucket), requests: number(r.requests) ?? 0, outputTokens: number(r.outputTokens) ?? 0 })),
     models: rows(v.models, 20).map(r => ({ ...stats(r), model: cellText(r.model) || "Unreported model" })),
-    routes: rows(v.routes, 4).map(r => ({ scope: scope(r.scope), requests: number(r.requests) ?? 0, outputTokens: number(r.outputTokens) ?? 0 })),
+    routes: Array.from(routes.values()),
     recent: rows(v.recent, 100).map(r => ({ id: number(r.id) ?? 0, ts: cellText(r.ts), model: cellText(r.model) || "Unreported model", scope: scope(r.scope),
       inputTokens: number(r.inputTokens), outputTokens: number(r.outputTokens), ttftMs: number(r.ttftMs), durationMs: number(r.durationMs), ok: r.ok === 1 || r.ok === true })),
     performance: p, memoryTotalGiB: number(v.memoryTotalGiB),

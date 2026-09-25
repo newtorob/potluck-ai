@@ -92,6 +92,24 @@ const n = (v: number | null) => v === null ? "--" : Intl.NumberFormat("en", { ma
 const duration = (ms: number | null) => ms === null ? "--" : ms < 1000 ? `${n(Math.round(ms))}ms` : ms < 60000 ? `${n(ms / 1000)}s` : `${n(ms / 60000)}m`;
 const pct = (ratio: number | null) => ratio === null ? "--" : `${n(ratio * 100)}%`;
 const route = (scope: string) => ({ local: "This machine", my_machines: "Your machines", circle: "Trusted circle", pool: "Open pool" }[scope] ?? "Unknown");
+// Three terminal rows give headline numbers weight without terminal-specific
+// font/size escape sequences. Plain/ASCII output keeps ordinary, copyable text.
+const digits: Record<string, string[]> = {
+  "0": ["█▀█", "█ █", "█▄█"], "1": ["▄█ ", " █ ", "▄█▄"],
+  "2": ["▀▀█", "█▀▀", "█▄▄"], "3": ["▀▀█", " ▀█", "▄▄█"],
+  "4": ["█ █", "▀▀█", "  █"], "5": ["█▀▀", "▀▀█", "▄▄█"],
+  "6": ["█▀▀", "█▀█", "█▄█"], "7": ["▀▀█", "  █", "  █"],
+  "8": ["█▀█", "█▀█", "█▄█"], "9": ["█▀█", "▀▀█", "▄▄█"],
+  ".": [" ", " ", "▄"],
+};
+function headline(c: Canvas, x: number, y: number, width: number, value: string, tone: Tone, large: boolean) {
+  const match = /^(\d+(?:\.\d+)?)([A-Za-z]*)$/.exec(value);
+  const rows = match && [0, 1, 2].map(i => [...match[1]].map(d => digits[d][i]).join(" "));
+  if (large && c.color && c.unicode && rows && rows[0].length + (match[2] ? match[2].length + 1 : 0) <= width) {
+    rows.forEach((row, i) => c.text(x, y + i, row, tone, true, width));
+    if (match[2]) c.text(x + rows[0].length + 1, y + 2, match[2], tone, true);
+  } else c.text(x, y + (large ? 1 : 0), value, tone, true, width);
+}
 function bar(c: Canvas, x: number, y: number, width: number, ratio: number, tone: Tone) {
   const used = Math.round(Math.min(1, Math.max(0, ratio)) * width);
   c.text(x, y, (c.unicode ? "━" : "=").repeat(used), tone);
@@ -99,23 +117,52 @@ function bar(c: Canvas, x: number, y: number, width: number, ratio: number, tone
 }
 function chart(c: Canvas, x: number, y: number, width: number, height: number, r: UsageReport) {
   const values: number[] = [];
-  const bin = Math.max(1, Math.ceil(r.activity.length / width));
+  const axis = 6, plotWidth = Math.max(1, width - axis);
+  const bin = Math.max(1, Math.ceil(r.activity.length / plotWidth));
   for (let i = 0; i < r.activity.length; i += bin) values.push(r.activity.slice(i, i + bin).reduce((s, a) => s + a.requests, 0));
   const peak = Math.max(1, ...values), bars = "▁▂▃▄▅▆▇█";
-  for (let col = 0; col < width; col++) {
-    const index = Math.min(values.length - 1, Math.floor(col * values.length / width));
+  c.text(x, y, compact(peak).padStart(axis - 1), "muted", false, axis - 1);
+  c.text(x, y + height, "0".padStart(axis - 1), "muted");
+  for (let col = 0; col < plotWidth; col++) {
+    const index = Math.min(values.length - 1, Math.floor(col * values.length / plotWidth));
     const level = (values[index] ?? 0) / peak * height;
     for (let row = 0; row < height; row++) {
       const fill = level - (height - row - 1);
-      c.text(x + col, y + row, fill > 0 ? c.unicode ? bars[Math.min(7, Math.ceil(fill * 8) - 1)] : "#" : " ", index === values.length - 1 ? "ember" : "sage");
+      c.text(x + axis + col, y + row, fill > 0 ? c.unicode ? bars[Math.min(7, Math.ceil(fill * 8) - 1)] : "#" : " ", index === values.length - 1 ? "ember" : "sage");
     }
   }
-  c.line(x, y + height, width);
+  c.line(x + axis, y + height, plotWidth);
   const first = r.activity[0]?.bucket ?? "", last = r.activity.at(-1)?.bucket ?? "";
   const label = (s: string) => r.bucketUnit === "hour" ? `${s.slice(11)}:00` : s.slice(5, 10);
-  c.text(x, y + height + 1, `${label(first)} UTC`, "muted");
-  c.text(x + width - 12, y + height + 1, `${label(last)} UTC`, "muted");
-  c.text(x, y - 1, `${compact(r.totals.requests)} requests  /  ${bin > 1 ? `${bin} ` : ""}${r.bucketUnit} buckets`, "muted", false, width);
+  const firstLabel = `${label(first)} UTC`, lastLabel = `${label(last)} UTC`;
+  c.text(x, y + height + 1, firstLabel, "muted", false, Math.floor(width / 2));
+  c.text(x + width - lastLabel.length, y + height + 1, lastLabel, "muted", false, Math.ceil(width / 2));
+  c.text(x, y - 2, `Requests / ${bin > 1 ? `${bin} ${r.bucketUnit}s` : r.bucketUnit}`, "muted", false, width);
+  c.text(x, y - 1, `${c.unicode ? "■" : "#"} ${bin > 1 ? "Last bin" : `Current ${r.bucketUnit}`}*`, "ember", false, width);
+}
+function routing(c: Canvas, r: UsageReport, x: number, y: number, width: number, height: number) {
+  const total = r.totals.requests;
+  const counts = new Map<string, number>();
+  for (const row of r.routes) counts.set(row.scope, (counts.get(row.scope) ?? 0) + row.requests);
+  const known = ["local", "my_machines", "pool", "circle"].reduce((sum, scope) => sum + (counts.get(scope) ?? 0), 0);
+  // Keep unclassified records visible instead of inventing a route for them.
+  counts.set("unknown", Math.max(counts.get("unknown") ?? 0, (total ?? known) - known));
+  const scopes = ["local", "my_machines", "pool", ...((counts.get("circle") ?? 0) ? ["circle"] : []), ...((counts.get("unknown") ?? 0) ? ["unknown"] : [])];
+  const stride = height >= scopes.length * 2 ? 2 : 1;
+  scopes.forEach((scope, i) => {
+    const count = counts.get(scope) ?? 0, row = y + i * stride;
+    if (row >= y + height) return;
+    const share = total !== null && total > 0 && known + (counts.get("unknown") ?? 0) <= total ? count / total : null;
+    const value = `${n(count)}  ${pct(share)}`;
+    c.text(x, row, route(scope), "text", false, width - value.length - 1);
+    c.text(x + width - value.length, row, value, count ? "ember" : "muted");
+    if (stride === 2) bar(c, x, row + 1, width, share ?? 0, "ember");
+  });
+  if (height >= scopes.length * stride + 3) {
+    const row = y + height - 2, p = r.performance?.local;
+    c.text(x, row, p ? `${c.unicode ? "●" : "+"} This machine: ${p.busy ? "working" : "ready"}` : "Runtime status unavailable", p ? "sage" : "muted", false, width);
+    c.text(x, row + 1, p?.model || "No local model loaded", "muted", false, width);
+  }
 }
 function recent(c: Canvas, r: UsageReport, x: number, y: number, width: number, count: number, offset = 0) {
   const wide = width >= 94, modelWidth = Math.max(12, width - (wide ? 78 : 52));
@@ -136,7 +183,7 @@ function recent(c: Canvas, r: UsageReport, x: number, y: number, width: number, 
 function models(c: Canvas, r: UsageReport, x: number, y: number, width: number, count: number, offset: number) {
   const wide = width >= 94, name = width - (wide ? 78 : 47), at = x + name;
   c.text(x, y, "MODEL", "muted");
-  for (const [dx, label] of [[0, "REQUESTS"], [12, "OUTPUT"], [24, "E2E TOK/S"], [38, "TTFT"]] as const) c.text(at + dx, y, label, "muted");
+  for (const [dx, label] of [[0, "REQUESTS"], [12, "OUTPUT"], [24, "E2E TOK/S"], [38, "AVG TTFT"]] as const) c.text(at + dx, y, label, "muted");
   if (wide) { c.text(at + 49, y, "SUCCESS", "muted"); c.text(at + 61, y, "SAMPLES", "muted"); }
   for (const [i, row] of r.models.slice(offset, offset + count).entries()) {
     const dy = y + 2 + i * 2;
@@ -169,10 +216,10 @@ export function renderUsage(state: UsageScreen, options: RenderOptions): string 
   let tabX = 1;
   tabs.forEach((t, i) => { const label = `${i + 1} ${t[0].toUpperCase() + t.slice(1)}`; c.text(tabX, 2, label, state.view === t ? "ember" : "muted", state.view === t); tabX += label.length + 4; });
   c.line(1, 3, width - 2);
-  if (width < 64 || height < 20) {
+  if (width < 64 || height < 24) {
     c.text(1, 5, `${state.direction === "served" ? "Contribution" : "Your usage"} / ${state.window}d / ${status}`, "muted");
     c.text(1, 7, r ? `${n(r.totals.requests)} requests  |  ${compact(r.totals.outputTokens)} output tokens` : "Waiting for local runtime", "ember");
-    c.text(1, 9, "Enlarge to 64 x 20 for the full dashboard.", "muted");
+    c.text(1, 9, "Enlarge to 64 x 24 for the full dashboard.", "muted");
     c.text(1, height - 2, options.interactive ? "q quit  r refresh" : "potluck usage --json", "muted");
     return c.render();
   }
@@ -181,43 +228,53 @@ export function renderUsage(state: UsageScreen, options: RenderOptions): string 
     c.text(3, 8, "Run potluck up. This screen needs a dashboard-capable runtime.", "muted", false, width - 6);
     c.text(3, 10, "After an upgrade, restart the runtime to load the new version.", "muted", false, width - 6);
   } else {
-    const t = r.totals, cardWidth = Math.floor((width - 5) / 4);
+    const t = r.totals, large = state.view === "overview" && width >= 96 && height >= 34;
+    const fiveCards = large && width >= 120;
     const short = width < 100;
     const cards: Array<[string, string, string]> = [["Requests", compact(t.requests), `${compact(t.failures)} failed`],
       [short ? "Output" : "Output tokens", compact(t.outputTokens), `${compact(t.inputTokens)} ${short ? "in" : "input"}`],
-      [short ? "E2E tok/s" : "End-to-end tok/s", n(t.endToEndTokensPerSecond), `${compact(t.rateSamples)} ${short ? "samples" : "measured requests"}`],
-      ["First token", duration(t.avgTtftMs), `p95 ${short ? "" : "total "}${duration(t.p95DurationMs)}`]];
-    cards.forEach(([label, value, sub], i) => { const x = 1 + i * (cardWidth + 1); c.box(x, 5, cardWidth, 5, label); c.text(x + 2, 7, value, i === 2 ? "sage" : "ember", true, cardWidth - 4); c.text(x + 2, 8, sub, "muted", false, cardWidth - 4); });
-    const bottom = height - 4;
+      [short || large ? "E2E tok/s" : "End-to-end tok/s", n(t.endToEndTokensPerSecond), `${compact(t.rateSamples)} samples`]];
+    if (fiveCards) cards.push(["First token avg", duration(t.avgTtftMs), "Successful requests"], ["Total latency p95", duration(t.p95DurationMs), `Average ${duration(t.avgDurationMs)}`]);
+    cards.forEach(([label, value, sub], i) => {
+      const x = 1 + Math.floor(i * (width - 1) / cards.length);
+      const cardWidth = Math.floor((i + 1) * (width - 1) / cards.length) - x;
+      c.box(x, 5, cardWidth, large ? 7 : 5, label);
+      headline(c, x + 2, 7, cardWidth - 4, value, i === 2 ? "text" : "ember", large);
+      c.text(x + 2, large ? 10 : 8, sub, "muted", false, cardWidth - 4);
+    });
+    if (!fiveCards) c.text(2, large ? 12 : 10, `First token avg ${duration(t.avgTtftMs)}  |  Total latency p95 ${duration(t.p95DurationMs)}`, "muted", false, width - 4);
+    const bottom = height - 4, bodyY = large ? fiveCards ? 13 : 14 : 12;
     if (state.view === "overview") {
-      const middleHeight = Math.min(12, Math.max(5, bottom - 11 - (height >= 30 ? 8 : 0))), side = width >= 100 ? 38 : 0, chartWidth = width - side - 2;
-      c.box(1, 11, chartWidth, middleHeight, "Activity");
-      if (t.requests && middleHeight >= 7) chart(c, 3, 14, chartWidth - 4, middleHeight - 6, r);
-      else if (t.requests) c.text(3, 13, `${n(t.requests)} recorded requests / ${state.window} days`, "sage", false, chartWidth - 4);
-      else { c.text(3, 13, "A quiet start. Your next request begins the story.", "muted", false, chartWidth - 4); }
-      if (side) { c.box(chartWidth + 2, 11, side - 1, middleHeight, "This machine"); if (middleHeight >= 10) runtime(c, r, chartWidth + 4, 13, side - 5); else c.text(chartWidth + 4, 13, r.performance?.local.model || "No model loaded", "muted", false, side - 5); }
-      const y = 12 + middleHeight;
+      const middleHeight = Math.min(14, Math.max(5, bottom - bodyY - (height >= 34 ? 7 : 0)));
+      const side = Math.min(38, Math.ceil(width * .52)), chartWidth = width - side - 2;
+      c.box(1, bodyY, chartWidth, middleHeight, "Activity");
+      if (t.requests && r.activity.length && middleHeight >= 8) chart(c, 3, bodyY + 4, chartWidth - 4, middleHeight - 7, r);
+      else if (t.requests) c.text(3, bodyY + 2, `${compact(t.requests)} recorded requests`, "text", false, chartWidth - 4);
+      else c.text(3, bodyY + 2, t.requests === null ? "Activity unavailable" : "No requests yet", "muted", false, chartWidth - 4);
+      c.box(chartWidth + 2, bodyY, side - 1, middleHeight, "Request routing");
+      routing(c, r, chartWidth + 4, bodyY + 1, side - 5, middleHeight - 2);
+      const y = bodyY + middleHeight + 1;
       if (y + 4 < bottom) { c.text(2, y, "LATEST REQUESTS", "muted", true); recent(c, r, 2, y + 2, width - 4, bottom - y - 4); }
     } else if (state.view === "models") {
-      c.text(2, 11, "MODEL PERFORMANCE", "muted", true);
-      models(c, r, 2, 13, width - 4, Math.max(1, Math.floor((bottom - 15) / 2)), state.offset);
+      c.text(2, bodyY, "MODEL PERFORMANCE", "muted", true);
+      models(c, r, 2, bodyY + 2, width - 4, Math.max(1, Math.floor((bottom - bodyY - 4) / 2)), state.offset);
     } else if (state.view === "requests") {
-      c.text(2, 11, `REQUEST HISTORY  /  ${r.recent.length ? state.offset + 1 : 0}-${Math.min(r.recent.length, state.offset + Math.max(1, bottom - 15))} of ${r.recent.length} recent`, "muted", true);
-      recent(c, r, 2, 13, width - 4, Math.max(1, bottom - 15), state.offset);
+      c.text(2, bodyY, `REQUEST HISTORY  /  ${r.recent.length ? state.offset + 1 : 0}-${Math.min(r.recent.length, state.offset + Math.max(1, bottom - bodyY - 4))} of ${r.recent.length} recent`, "muted", true);
+      recent(c, r, 2, bodyY + 2, width - 4, Math.max(1, bottom - bodyY - 4), state.offset);
     } else {
       const half = Math.floor((width - 3) / 2), h = r.performance?.household;
-      c.box(1, 11, half, 11, "This machine"); runtime(c, r, 3, 13, half - 4);
-      c.box(half + 2, 11, width - half - 3, 11, "Your other machines");
+      c.box(1, bodyY, half, 11, "This machine"); runtime(c, r, 3, bodyY + 2, half - 4);
+      c.box(half + 2, bodyY, width - half - 3, 11, "Your other machines");
       const x = half + 4, w = width - x - 3;
-      c.text(x, 13, h ? `${n(h.available)} serving  /  ${n(h.busy)} busy` : "Availability unavailable", h ? "sage" : "muted", true, w);
-      c.text(x, 15, h ? `${n(h.checked)} / ${n(h.rosterCount)} checked${h.partial ? " (partial)" : ""}` : "Owned-machine probes only", "muted", false, w);
-      for (const [i, m] of (h?.models ?? []).slice(0, 3).entries()) c.text(x, 17 + i, `${m.machines}x  ${m.model}`, "text", false, w);
-      if (bottom > 27) {
-        c.text(2, 23, "ROUTING", "muted", true);
-        r.routes.forEach((row, i) => { c.text(2, 25 + i, route(row.scope), "text", false, 16); bar(c, 20, 25 + i, Math.max(4, half - 33), row.requests / Math.max(1, t.requests ?? 1), "ember"); c.text(half - 10, 25 + i, compact(row.requests), "muted"); });
-        c.text(x, 23, "SPLIT MODEL", "muted", true);
-        c.text(x, 25, r.split ? `${r.split.state}  /  ${n(r.split.workers)} workers` : "Unavailable", "sage", false, w);
-        c.text(x, 26, r.split?.model || (r.split?.workerEnabled ? r.split.workerBusy ? "Serving as a split worker" : "Worker sharing enabled" : "Worker sharing off"), "muted", false, w);
+      c.text(x, bodyY + 2, h ? `${n(h.available)} serving  /  ${n(h.busy)} busy` : "Availability unavailable", h ? "sage" : "muted", true, w);
+      c.text(x, bodyY + 4, h ? `${n(h.checked)} / ${n(h.rosterCount)} checked${h.partial ? " (partial)" : ""}` : "Owned-machine probes only", "muted", false, w);
+      for (const [i, m] of (h?.models ?? []).slice(0, 3).entries()) c.text(x, bodyY + 6 + i, `${m.machines}x  ${m.model}`, "text", false, w);
+      if (bottom > bodyY + 16) {
+        c.text(2, bodyY + 12, "ROUTING", "muted", true);
+        r.routes.forEach((row, i) => { c.text(2, bodyY + 14 + i, route(row.scope), "text", false, 16); bar(c, 20, bodyY + 14 + i, Math.max(4, half - 33), row.requests / Math.max(1, t.requests ?? 1), "ember"); c.text(half - 10, bodyY + 14 + i, compact(row.requests), "muted"); });
+        c.text(x, bodyY + 12, "SPLIT MODEL", "muted", true);
+        c.text(x, bodyY + 14, r.split ? `${r.split.state}  /  ${n(r.split.workers)} workers` : "Unavailable", "sage", false, w);
+        c.text(x, bodyY + 15, r.split?.model || (r.split?.workerEnabled ? r.split.workerBusy ? "Serving as a split worker" : "Worker sharing enabled" : "Worker sharing off"), "muted", false, w);
       }
     }
   }
@@ -225,7 +282,7 @@ export function renderUsage(state: UsageScreen, options: RenderOptions): string 
   // Footer is drawn last and clears its rows, so a short terminal never overlaps it.
   for (let y = footer; y < height; y++) c.cells[y] = Array.from({ length: width }, () => ({ text: " ", tone: "text", bold: false }));
   c.line(1, footer, width - 2);
-  c.text(1, footer + 1, state.error ? "Connection lost. Showing the last sample; r retries." : "E2E includes prefill. Reported tokens only. -- means unavailable.", state.error ? "red" : "muted", false, width - 2);
+  c.text(1, footer + 1, state.error ? "Connection lost. Showing the last sample; r retries." : "E2E includes prefill. * Partial bucket. -- means unavailable.", state.error ? "red" : "muted", false, width - 2);
   c.text(1, footer + 2, options.interactive ? "1-4 views  w window  d usage/served  space pause  r refresh  q quit" : `Recorded on this machine  /  ${r?.sampledAt.slice(0, 19).replace("T", " ") ?? "unavailable"} UTC`, "muted", false, width - 2);
   if (options.interactive && r) c.text(1, footer + 3, `Sample ${r.sampledAt.slice(11, 19)} UTC / local records`, "muted", false, width - 2);
   if (options.interactive && width >= 110) c.text(width - 38, footer + 3, "arrows scroll  t theme  ? help", "muted");
