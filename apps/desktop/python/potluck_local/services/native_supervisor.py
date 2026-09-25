@@ -28,8 +28,22 @@ def allocation_counter(line: str) -> dict | None:
         device = "Metal"
     if device is None:
         return None
-    return {"device": device, "modelMiB": float(match[2]),
+    size = float(match[2])
+    # Fit probes create zero-byte dummy buffers. They are not placement and
+    # must not consume the bounded collector before the actual model loads.
+    if size <= 0:
+        return None
+    return {"device": device, "modelMiB": size,
             **({"rpcPort": int(rpc[1])} if rpc else {})}
+
+
+def failure_code(line: str) -> dict | None:
+    # Recognize the pinned engine's allocation failure, without forwarding any
+    # native text (which can contain model paths, prompts or credentials).
+    if re.search(r"(?:^|\s)ggml_backend_cuda_buffer_type_alloc_buffer:.*"
+                 r"cudaMalloc failed: out of memory(?:\s|$)", line):
+        return {"error": "cuda_out_of_memory"}
+    return None
 
 
 def run(argv: list[str]) -> int:
@@ -37,14 +51,15 @@ def run(argv: list[str]) -> int:
                              stderr=subprocess.PIPE, start_new_session=True)
 
     def counters():
-        # Forward only allocation counters. Native prompts, tokens, paths and
-        # arbitrary diagnostics never enter sidecar logs or the result surface.
+        # Forward only allocation counters and allowlisted error codes. Native
+        # text never enters sidecar logs or the result surface.
         for raw in iter(child.stderr.readline, b""):
             line = raw.decode("utf-8", errors="replace")
-            counter = allocation_counter(line)
+            counter = allocation_counter(line) or failure_code(line)
             if counter:
                 print(json.dumps(counter), flush=True)
-    threading.Thread(target=counters, daemon=True).start()
+    reader = threading.Thread(target=counters, daemon=True)
+    reader.start()
 
     def stop(*_):
         raise SystemExit(0)
@@ -69,6 +84,7 @@ def run(argv: list[str]) -> int:
             except subprocess.TimeoutExpired:
                 os.killpg(child.pid, signal.SIGKILL)
                 child.wait(timeout=3)
+        reader.join(timeout=1)
     return child.returncode or 0
 
 

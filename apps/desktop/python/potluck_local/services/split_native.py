@@ -58,6 +58,7 @@ class NativeProcess:
         clean_env = {k: v for k, v in os.environ.items() if not k.startswith(("LLAMA_", "GGML_RPC_"))}
         clean_env.update(env or {})
         self.placement = []
+        self.failure = None
         self.process = subprocess.Popen(command + args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                         stderr=subprocess.DEVNULL, env=clean_env, start_new_session=True)
         self._lock = threading.Lock()
@@ -65,16 +66,22 @@ class NativeProcess:
             for line in iter(self.process.stdout.readline, b""):
                 try:
                     row = json.loads(line)
-                    if set(row) in ({"device", "modelMiB"}, {"device", "modelMiB", "rpcPort"}) and len(self.placement) < 32:
+                    if row == {"error": "cuda_out_of_memory"}:
+                        self.failure = "cuda_out_of_memory"
+                    elif set(row) in ({"device", "modelMiB"}, {"device", "modelMiB", "rpcPort"}) and len(self.placement) < 32:
                         self.placement.append(row)
                 except (ValueError, TypeError):
                     pass
-        threading.Thread(target=collect, daemon=True).start()
+        self._reader = threading.Thread(target=collect, daemon=True)
+        self._reader.start()
         self.heartbeat()
 
     def heartbeat(self):
         with self._lock:
             if self.process.poll() is not None:
+                self._reader.join(timeout=1)
+                if self.failure == "cuda_out_of_memory":
+                    raise SplitError("The head computer ran out of GPU memory. Unload other models or free GPU memory, then start the split again.", 503, code="split_gpu_memory")
                 raise SplitError("The native split engine stopped. Stop the split, check available memory and start again.", 503)
             try:
                 self.process.stdin.write(b".\n")

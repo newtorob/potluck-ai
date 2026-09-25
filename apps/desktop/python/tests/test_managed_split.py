@@ -20,7 +20,7 @@ from potluck_local.services import split_manager as sm, split_native as sn
 from potluck_local.services.runtime import LLMRuntime
 from potluck_local.services.settings_manager import PotluckSettings
 from potluck_local.services.model_lifecycle import ModelLifecycle
-from potluck_local.services.native_supervisor import allocation_counter
+from potluck_local.services.native_supervisor import allocation_counter, failure_code
 
 
 class Process:
@@ -65,7 +65,9 @@ def test_worker_lease_bound_to_opt_in_member_version_and_expiry(isolated):
             await manager.acquire("100.64.1.2", {**req, "commit": "a" * 40})
         lease = await manager.acquire("100.64.1.2", req)
         assert runtime._split_worker_reserved
-        assert await manager.acquire("100.64.1.2", req) == lease
+        repeated = await manager.acquire("100.64.1.2", req)
+        assert repeated["lease"] == lease["lease"] and repeated["ttl"] == lease["ttl"]
+        assert repeated["freeMemoryBytes"] > 0
         with pytest.raises(sn.SplitError):
             await manager.acquire("100.64.1.2", {**req, "request_id": str(uuid4())})
         for host, token in [("100.64.1.3", lease["lease"]), ("100.64.1.2", "wrong")]:
@@ -230,8 +232,28 @@ def test_native_allocation_counters_keep_only_device_numbers():
     assert allocation_counter("load_tensors: MTL0_Mapped model buffer size = 20.5 MiB") == {
         "device": "Metal", "modelMiB": 20.5}
     for line in ["prompt: a private document", "model path: /private/model.gguf",
-                 "load_tensors: RPC0[private-host:123] model buffer size = 20 MiB"]:
+                 "load_tensors: RPC0[private-host:123] model buffer size = 20 MiB",
+                 "load_tensors: RPC0[127.0.0.1:54321] model buffer size = 0.00 MiB"]:
         assert allocation_counter(line) is None
+
+
+def test_native_cuda_memory_failure_is_actionable_without_raw_logs():
+    diagnostic = "0.09 E ggml_backend_cuda_buffer_type_alloc_buffer: allocating 4379.45 MiB on device 0: cudaMalloc failed: out of memory"
+    assert failure_code(diagnostic) == {"error": "cuda_out_of_memory"}
+    for line in ["prompt: out of memory /private/model.gguf", "cudaMalloc failed: invalid argument",
+                 "error loading /private/model.gguf"]:
+        assert failure_code(line) is None
+    child = "import sys,time; time.sleep(.15); print(" + repr(diagnostic) + ",file=sys.stderr); print('private prompt and path',file=sys.stderr); sys.exit(1)"
+    process = sn.NativeProcess([sys.executable, "-c", child])
+    try:
+        process.process.wait(timeout=6)
+        with pytest.raises(sn.SplitError, match="head computer ran out of GPU memory") as error:
+            process.heartbeat()
+        assert error.value.code == "split_gpu_memory"
+        assert "private" not in str(error.value)
+        assert process.placement == []
+    finally:
+        process.close()
 
 
 def test_expired_lease_retry_gets_fresh_process_and_token(isolated):

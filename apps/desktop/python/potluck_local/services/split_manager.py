@@ -24,6 +24,7 @@ from .model_lifecycle import get_model_lifecycle
 from .runtime import get_runtime
 from .settings_manager import get_settings, save_settings
 from .split_native import PIN, NativeProcess, SplitError, SplitModel, engine_bundle, free_port
+from .split_memory import probe_fit_arguments
 
 WORKER_KEY = "potluck.split_worker_enabled"
 LEASE_SECONDS = 30
@@ -123,7 +124,7 @@ class SplitManager:
                 await self._stop_worker()
             if self.worker:
                 if self.worker["host"] == host and self.worker["request_id"] == request["request_id"]:
-                    return {"lease": self.worker["token"], "ttl": LEASE_SECONDS}
+                    return self._lease_response()
                 raise SplitError("This split worker is reserved by another session.")
             if not self.status()["available"]:
                 raise SplitError("Worker is disabled, busy or has no compatible engine.")
@@ -144,7 +145,11 @@ class SplitManager:
                            "expires": time.monotonic() + LEASE_SECONDS, "process": process,
                            "port": port, "connections": set()}
             self.start_monitor()
-            return {"lease": self.worker["token"], "ttl": LEASE_SECONDS}
+            return self._lease_response()
+
+    def _lease_response(self):
+        return {"lease": self.worker["token"], "ttl": LEASE_SECONDS,
+                "freeMemoryBytes": psutil.virtual_memory().available}
 
     def authenticate_lease(self, host: str, token: str):
         worker = self.worker
@@ -320,11 +325,15 @@ class SplitManager:
                             json={"commit": PIN["commit"], "request_id": head["id"]})
                         if response.status_code != 200:
                             raise SplitError("Could not reserve an owned worker.")
-                        worker["lease"] = response.json()["lease"]
+                        lease = response.json()
+                        worker["lease"] = lease["lease"]
+                        worker["freeMemoryBytes"] = lease.get("freeMemoryBytes")
                         worker["server"] = await asyncio.start_server(
                             lambda r, w, peer=worker: self._head_tunnel(peer, r, w), "127.0.0.1", 0)
                 endpoints = [f"127.0.0.1:{w['server'].sockets[0].getsockname()[1]}" for w in head["workers"]]
                 root, _ = engine_bundle()
+                memory_args = await probe_fit_arguments(root, endpoints,
+                    {str(w["server"].sockets[0].getsockname()[1]): w for w in head["workers"]})
                 from potluck_local.routers.models import _safe_model_dir
                 path = _safe_model_dir(head["model"]["id"]) / "model.gguf"
                 port, key = free_port(), secrets.token_hex(32)
@@ -337,7 +346,7 @@ class SplitManager:
                     process = NativeProcess([str(root / "llama-server"), "--model", str(path),
                         "--host", "127.0.0.1", "--port", str(port), "--ctx-size", str(head["context"]),
                         "--threads", str(get_settings().runtime.threads or 4),
-                        "--n-gpu-layers", "999", "--split-mode", "layer", "--rpc", ",".join(endpoints),
+                        "--rpc", ",".join(endpoints), *memory_args, "--split-mode", "layer",
                         "--parallel", "1", "--no-warmup", "--no-webui",
                         # The pinned engine emits allocation records at level
                         # four. The supervisor forwards only numeric counters.
