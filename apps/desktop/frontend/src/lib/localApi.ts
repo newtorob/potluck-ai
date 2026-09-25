@@ -11,6 +11,7 @@
  */
 
 import type { ChatMessage, ChatOptions } from '@/types/chat';
+import type { ModelAvailability, SplitModelPin, SplitSelection, SplitStatus } from '@/types/modelAvailability';
 import type { Model, DownloadProgress } from '@/types/models';
 import type {
   Memory,
@@ -576,6 +577,25 @@ export interface UsageRecordInput {
 // ---------------------------------------------------------------------------
 
 export const localApi = {
+  modelAvailability(signal?: AbortSignal): Promise<ModelAvailability> {
+    return timedFetch(`${LOCAL_BASE}/models/available`, signal ? { signal } : {}).then(handleResponse<ModelAvailability>);
+  },
+  splitStatus(signal?: AbortSignal): Promise<SplitStatus> {
+    return timedFetch(`${LOCAL_BASE}/split/status`, signal ? { signal } : {}).then(handleResponse<SplitStatus>);
+  },
+  modelIdentity(slug: string): Promise<SplitModelPin> {
+    return timedFetch(`${LOCAL_BASE}/models/${encodeURIComponent(slug)}/identity`, {}, LOAD_TIMEOUT_MS)
+      .then(handleResponse<{ model: SplitModelPin }>).then(result => result.model);
+  },
+  splitPlan(selection: SplitSelection): Promise<unknown> {
+    return timedFetch(`${LOCAL_BASE}/split/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(selection) }).then(handleResponse);
+  },
+  splitStart(selection: SplitSelection): Promise<SplitStatus> {
+    return timedFetch(`${LOCAL_BASE}/split/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(selection) }).then(handleResponse<SplitStatus>);
+  },
+  splitStop(): Promise<SplitStatus> {
+    return timedFetch(`${LOCAL_BASE}/split/stop`, { method: 'POST' }).then(handleResponse<SplitStatus>);
+  },
   /** GET /health — liveness check; also tells us if a model is loaded */
   health(): Promise<HealthResponse> {
     return timedFetch(`${LOCAL_BASE}/health`).then((r) => handleResponse<HealthResponse>(r));

@@ -177,10 +177,10 @@ export function parseArgs(argv: string[]): CliArgs {
       if (positional.length > 2 || !["install", "uninstall", "start", "stop", "restart", "status"].includes(out.action)) throw new UsageError("Use potluck service install|uninstall|start|stop|restart|status.");
     } else if (out.command === "models") {
       out.action = positional[1] || "list";
-      if (!["list", "install", "load", "unload", "progress", "cancel", "autoload", "pin", "lock", "sync", "unpin"].includes(out.action)) throw new UsageError("Unknown model action. Run potluck models --help.");
+      if (!["list", "available", "install", "load", "unload", "progress", "cancel", "autoload", "pin", "lock", "sync", "unpin"].includes(out.action)) throw new UsageError("Unknown model action. Run potluck models --help.");
       out.target = positional[2];
-      if (positional.length > 3 || (["list", "lock", "sync", "unpin"].includes(out.action) && out.target)
-          || (!["list", "autoload", "lock", "sync", "unpin"].includes(out.action) && !out.target && !out.help)) throw new UsageError("Use potluck models <action> <model-id>.");
+      if (positional.length > 3 || (["list", "available", "lock", "sync", "unpin"].includes(out.action) && out.target)
+          || (!["list", "available", "autoload", "lock", "sync", "unpin"].includes(out.action) && !out.target && !out.help)) throw new UsageError("Use potluck models <action> <model-id>.");
       if (out.action === "autoload" && out.target && !["on", "off"].includes(out.target)) throw new UsageError("Use potluck models autoload [on|off].");
       if (out.target && (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(out.target) || out.target.length > 200)) throw new UsageError("Use a model ID from potluck models list.");
     } else if (out.command === "gateway") {

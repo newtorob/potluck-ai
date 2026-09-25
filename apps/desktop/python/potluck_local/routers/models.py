@@ -96,6 +96,12 @@ async def get_setup_options() -> dict:
     return await asyncio.to_thread(setup_options)
 
 
+@router.get("/available")
+async def available_models() -> dict:
+    from potluck_local.services.model_availability import model_availability
+    return await model_availability()
+
+
 class ModelTestRequest(BaseModel):
     sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
 

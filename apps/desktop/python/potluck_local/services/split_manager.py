@@ -89,6 +89,9 @@ class SplitManager:
                 "session": None if not self.head else {
                     "id": self.head["id"], "model": self.head["model"],
                     "context": self.head["context"],
+                    "phase": self.head.get("phase", self.state),
+                    "elapsedSeconds": round(max(0, self.head.get("endedMono", time.monotonic()) - self.head.get("startedMono", time.monotonic())), 1),
+                    "loadSeconds": self.head.get("loadSeconds"),
                     "workers": [{"name": w["node_name"], "sentBytes": w["sent"], "receivedBytes": w["received"],
                                  "modelMiB": w.get("modelMiB", 0)}
                                 for w in self.head["workers"]],
@@ -272,7 +275,7 @@ class SplitManager:
                 raise SplitError("Stop the current split before starting another.", code="split_busy")
             plan = await self.plan(model, peer_names, context)
             self.head = {**plan, "id": str(uuid4()), "process": None, "adapter": None,
-                         "selection": sorted(peer_names),
+                         "selection": sorted(peer_names), "startedMono": time.monotonic(), "phase": "reserving",
                          "workers": [{**p, "sent": 0, "received": 0, "lease": None, "server": None,
                                       "connections": set()} for p in plan["workers"]]}
             self.state, self.error = "loading", None
@@ -340,6 +343,7 @@ class SplitManager:
                         # four. The supervisor forwards only numeric counters.
                         "--log-verbosity", "4"], env={"LLAMA_API_KEY": key})
                     head["process"] = process
+                    head["phase"] = "loading"
                     loop = asyncio.get_running_loop()
                     def closed():
                         with suppress(RuntimeError):
@@ -356,6 +360,7 @@ class SplitManager:
                             except httpx.HTTPError:
                                 pass
                             await asyncio.sleep(.25)
+                    head["phase"] = "verifying"
                     identity = await asyncio.to_thread(artifact_identity, path)
                     if identity[0] != head["model"]["sha256"] or identity[1][2] != head["model"]["sizeBytes"]:
                         raise SplitError("The pinned model changed while loading.")
@@ -370,6 +375,8 @@ class SplitManager:
                         raise SplitError("Engine did not place work on every selected worker.")
                     await runtime.install_split_async(adapter, path, head["model"]["id"], identity, head["context"])
                     get_model_lifecycle().remember(None)
+                    head["loadSeconds"] = round(time.monotonic() - head["startedMono"], 1)
+                    head["phase"] = "ready"
                     self.state = "ready"
         except asyncio.CancelledError:
             raise
@@ -399,6 +406,8 @@ class SplitManager:
         return self.status()
 
     async def _cleanup_head(self, head):
+        head.setdefault("endedMono", time.monotonic())
+        head["phase"] = self.state
         adapter = head.get("adapter")
         if adapter:
             await asyncio.to_thread(adapter.close)

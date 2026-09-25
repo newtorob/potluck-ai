@@ -1,4 +1,5 @@
 import { manageModelLock } from "./model-lock.js";
+import { availableModels } from "./availability.js";
 import type { CliArgs } from "./args.js";
 import { ControlError } from "./control.js";
 import { runtimeRequest } from "./runtime.js";
@@ -20,6 +21,7 @@ export async function manageGateway(args: CliArgs): Promise<Record<string, unkno
 }
 
 export async function manageModels(args: CliArgs): Promise<Record<string, unknown>> {
+  if (args.action === "available") return { ...await availableModels(args.timeout) };
   if (["pin", "lock", "sync", "unpin"].includes(args.action!)) return manageModelLock(args);
   if (args.action === "autoload") {
     const settings = await runtimeRequest("/settings", args.target
