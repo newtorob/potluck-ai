@@ -32,7 +32,7 @@ const views: UsageView[] = ["overview", "models", "requests", "machines"];
 const windows = [1, 7, 30, 90];
 export interface UsageDependencies {
   input: ReadStream;
-  output: { isTTY?: boolean; columns?: number; rows?: number; on: NodeJS.WriteStream["on"]; off: NodeJS.WriteStream["off"] };
+  output: { isTTY?: boolean; columns?: number; rows?: number; getColorDepth?: (env?: NodeJS.ProcessEnv) => number; on: NodeJS.WriteStream["on"]; off: NodeJS.WriteStream["off"] };
   env: NodeJS.ProcessEnv;
   sample: (window: number, direction: UsageDirection, household: boolean, signal: AbortSignal) => Promise<UsageReport>;
 }
@@ -55,6 +55,10 @@ export async function runUsage(args: CliArgs, out: (s: string) => void, deps?: U
   const input = deps?.input ?? process.stdin, output = deps?.output ?? process.stdout, env = deps?.env ?? process.env;
   const interactive = Boolean(input.isTTY && output.isTTY && env.TERM !== "dumb" && !args.json && !args.once);
   const watch = interactive || Boolean(args.watch);
+  // Node conservatively reports screen/tmux-256color as 16 colors on some
+  // versions. Honor the terminal's explicit declaration unless FORCE_COLOR wins.
+  const declaredDepth = /truecolor|24bit/i.test(env.COLORTERM ?? "") || /-direct$/.test(env.TERM ?? "") ? 24 : /256color/.test(env.TERM ?? "") ? 8 : undefined;
+  const colorDepth = (env.FORCE_COLOR === undefined ? declaredDepth : undefined) ?? output.getColorDepth?.(env) ?? 4;
   const state: UsageScreen = { view: (args.action ?? "overview") as UsageView, window: args.window ?? 7,
     direction: args.direction ?? "consumed", theme: args.theme ?? (env.COLORFGBG?.split(";").at(-1) === "15" ? "light" : "dark"),
     paused: false, offset: 0, report: null, error: false, refreshing: false };
@@ -71,7 +75,7 @@ export async function runUsage(args: CliArgs, out: (s: string) => void, deps?: U
       return;
     }
     out((interactive ? "\x1b[H" : "") + renderUsage(state, { width: Math.max(10, (output.columns ?? 110) - 1), height: interactive ? output.rows ?? 38 : 38,
-      color: Boolean(output.isTTY && env.NO_COLOR === undefined && env.TERM !== "dumb"), unicode: env.TERM !== "dumb", interactive }) + (interactive ? "\x1b[J" : "\n"));
+      color: Boolean(output.isTTY && colorDepth >= 4 && env.NO_COLOR === undefined && env.TERM !== "dumb"), colorDepth, unicode: env.TERM !== "dumb", interactive }) + (interactive ? "\x1b[J" : "\n"));
   };
   const keypress = (_text: string, key: Key = {}) => {
     if (key.name === "q" || (key.ctrl && key.name === "c") || (key.name === "escape" && !help)) { stop(); return; }
