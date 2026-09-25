@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import json
+from itertools import islice
 import re
 import time
 
@@ -17,6 +19,7 @@ from .gateway_routing import household_peers, PEER_SIDECAR_PORT
 from .runtime import get_runtime
 from .split_manager import get_split_manager, SPLIT_PEER_PORT
 from .split_native import PIN
+from potluck_local.utils.paths import models_dir
 
 MAX_PEERS = 32
 PROBE_TIMEOUT = 2.0
@@ -32,6 +35,24 @@ def _digest(value):
 
 def _positive(value):
     return value if type(value) is int and 0 < value < 2**53 else None
+
+
+def _installed_models():
+    """Include imported GGUFs even when absent from the curated catalog."""
+    base = models_dir().resolve()
+    rows = []
+    try:
+        for path in islice(base.iterdir(), 512):
+            try:
+                if _model_id(path.name) and path.resolve().parent == base and path.is_dir():
+                    size = (path / "model.gguf").stat().st_size
+                    if size > 0 and (path / "model.gguf").is_file():
+                        rows.append({"id": path.name, "sizeBytes": size})
+            except (OSError, RuntimeError):
+                continue
+    except OSError:
+        pass
+    return sorted(rows, key=lambda row: row["id"])
 
 
 async def model_availability():
@@ -70,7 +91,6 @@ async def model_availability():
                                 data.extend(chunk)
                                 if len(data) > 65536:
                                     return None
-                            import json
                             result = json.loads(data)
                             return result if isinstance(result, dict) else None
                 except (httpx.HTTPError, ValueError, TimeoutError):
@@ -112,6 +132,7 @@ async def model_availability():
         row["idleMachineCount"] += int(idle)
     rows = sorted(models.values(), key=lambda row: (row["id"], row["sha256"] or ""))
     return {"schemaVersion": 1, "scope": "mine", "checkedAt": time.time(), "local": local,
+            "installedModels": await asyncio.to_thread(_installed_models),
             "models": rows, "machines": machines,
             "additionalModels": len({row["id"] for row in rows if row["id"] != local_model}),
             "splitWorkerCount": sum(m["splitReady"] for m in machines),

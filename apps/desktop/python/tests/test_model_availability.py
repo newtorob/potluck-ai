@@ -8,7 +8,8 @@ from potluck_local.services import model_availability as ma
 
 
 @pytest.fixture
-def inventory(monkeypatch):
+def inventory(monkeypatch, tmp_path):
+    monkeypatch.setenv("POTLUCK_DATA_DIR", str(tmp_path))
     roster = [{"mesh_ip": "100.64.0.2", "node_name": "desktop"},
               {"mesh_ip": "100.64.0.3", "node_name": "laptop"}]
     responses = {}
@@ -117,3 +118,15 @@ def test_bounds_and_owned_addresses_only(inventory):
     assert result["truncated"] is True
     assert len(result["machines"]) == ma.MAX_PEERS
     assert all(request.url.host.startswith("100.64.") for request in calls)
+
+
+def test_imported_artifact_can_be_selected_without_catalog_entry(inventory, tmp_path):
+    model = tmp_path / "models" / "imported-32b"
+    model.mkdir(parents=True)
+    (model / "model.gguf").write_bytes(b"GGUF-test")
+    outside = tmp_path / "other-model"
+    outside.mkdir()
+    (outside / "model.gguf").write_bytes(b"GGUF-test")
+    (tmp_path / "models" / "escaping-dir").symlink_to(outside, target_is_directory=True)
+    result = asyncio.run(ma.model_availability())
+    assert result["installedModels"] == [{"id": "imported-32b", "sizeBytes": 9}]

@@ -12,6 +12,7 @@ vi.mock('@/lib/localApi', () => ({ localApi: {
 } }));
 const pin = { id: 'coder', format: 'gguf' as const, sha256: 'a'.repeat(64), sizeBytes: 100 };
 const inventory = (): ModelAvailability => ({ schemaVersion: 1, scope: 'mine', checkedAt: 1,
+  installedModels: [{ id: 'coder', sizeBytes: 100 }],
   models: [{ id: 'coder', sha256: pin.sha256, local: false, idleMachineCount: 1, machines: [{ name: 'Desktop', meshIp: '100.64.0.2', idle: true }] }],
   machines: [{ name: 'Desktop', meshIp: '100.64.0.2', responding: true, splitReady: true, splitCompatible: true, backend: 'cpu', freeMemoryBytes: 10000000 }],
   additionalModels: 1, splitWorkerCount: 1, splitEngineAvailable: true, truncated: false });

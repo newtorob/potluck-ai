@@ -5,6 +5,7 @@ export interface AvailableModel {
 export interface ModelAvailability {
   schemaVersion: 1; scope: 'mine'; checkedAt: number;
   models: AvailableModel[];
+  installedModels: { id: string; sizeBytes: number }[];
   machines: { name: string; meshIp: string; responding: boolean; splitReady: boolean; splitCompatible: boolean; backend: string | null; freeMemoryBytes: number | null }[];
   additionalModels: number; splitWorkerCount: number; splitEngineAvailable: boolean; truncated: boolean;
 }

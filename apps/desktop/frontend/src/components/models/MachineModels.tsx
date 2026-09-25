@@ -23,7 +23,7 @@ export function MachineModels({ models }: { models: CatalogModel[] }) {
   const [plan, setPlan] = useState<SplitSelection | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const previous = useRef<Set<string> | null>(null);
-  const installed = models.filter(m => m.installed);
+  const installed = data?.installedModels?.map(m => ({ slug: m.id, name: models.find(item => item.slug === m.id)?.name ?? m.id })) ?? [];
 
   useEffect(() => {
     const controller = new AbortController();
@@ -133,7 +133,7 @@ export function MachineModels({ models }: { models: CatalogModel[] }) {
       <p className="flex items-center gap-2 text-sm font-medium"><Layers className="h-4 w-4" aria-hidden="true" />{status.session.model.id} · {status.session.phase ?? status.state}{error ? ' (last known)' : ''}</p>
       <p className="mt-2 text-xs text-muted-foreground">{status.session.elapsedSeconds ?? 0}s elapsed · {(status.session.workers.reduce((sum, w) => sum + w.sentBytes, 0) / 1048576).toFixed(1)} MiB sent to workers{status.session.loadSeconds != null ? ` · loaded in ${status.session.loadSeconds}s` : ''}</p>
       {status.session.workers.map(w => <p key={w.name} className="mt-2 text-xs">{w.name} · {w.modelMiB > 0 ? `${w.modelMiB.toFixed(1)} MiB of model placed` : 'Placement not yet verified'}</p>)}
-      {status.state === 'ready' && <p className="mt-3 text-sm">Placement verified. The model is ready on this computer’s runtime.</p>}
+      {status.state === 'ready' && !error && <p className="mt-3 text-sm">Placement verified. The model is ready on this computer’s runtime.</p>}
       <button className={`${button} mt-3`} disabled={!!busy} onClick={() => void stop()}>{busy === 'Stopping…' ? busy : 'Stop split'}</button>
     </div>}
     {(actionError || status?.error) && <p className="mt-3 text-sm text-destructive" role="alert">{actionError || status?.error}</p>}
