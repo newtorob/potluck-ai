@@ -2,6 +2,7 @@ import { launchAider } from "./launch.js";
 import { manageContribution, formatContribution } from "./contribute.js";
 import { runInference } from "./inference.js";
 import { manageSessions } from "./sessions.js";
+import { runUsage, usageHelp } from "./usage.js";
 import { runStatus } from "./status.js";
 import type { CliArgs } from "./args.js";
 import { diagnose, formatDiagnostics } from "./diagnostics.js";
@@ -14,6 +15,7 @@ import { serveRuntime } from "./serve.js";
 import { manageService } from "./service.js";
 
 export function operationHelp(command: string): string {
+  if (command === "usage") return usageHelp;
   if (command === "status") return "Usage: potluck status [--scope local|mine] [--json] [--timeout 1-30000]\n       potluck status --watch [--interval 1000-60000] [--json]\nLive runtime, own-machine availability, recorded latency and last benchmark metrics. Watch emits newline-delimited JSON or refreshes the terminal, without overlapping polls. Ctrl-C stops watching. Missing measurements are unavailable, not zero.\n";
   if (command === "sessions") return "Usage: potluck sessions list [--json]\n       potluck sessions delete <session-id> [--json]\nOpt in with potluck --save-session or potluck --resume <id>. History is stored privately on this machine and requires a project model pin. Resume from the original working directory. Each resume forks a new session; saved tool calls are never replayed.\n";
   if (command === "run") return 'Usage: potluck run ["prompt"] [--model <id>] [--scope local|mine] [--max-tokens 1-32768] [--timeout 1-300000] [--json]\nPlain inference with no file-editing tools. Piped stdin is appended to the prompt (combined limit 1 MiB). Project model locks apply. Default timeout: 120000 ms. Text streams to stdout; JSON is emitted only after a complete response. Exit 124: timeout; 130: cancelled; 1: inference failed; 2: invalid input.\n';
@@ -38,6 +40,7 @@ export function operationHelp(command: string): string {
 
 export async function runOperation(args: CliArgs, out: (value: string) => void): Promise<number> {
   if (args.help) { out(operationHelp(args.command!)); return 0; }
+  if (args.command === "usage") return runUsage(args, out);
   if (args.command === "status") return runStatus(args, out);
   if (args.command === "run") return runInference(args, out);
   if (args.command === "sessions") {

@@ -1,7 +1,7 @@
 /** Parse commands before touching config, starting a REPL, or making requests. */
 export class UsageError extends Error {}
 
-export type Command = "sessions" | "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
+export type Command = "usage" | "sessions" | "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
 export interface CliArgs {
   help: boolean;
   version: boolean;
@@ -40,9 +40,13 @@ export interface CliArgs {
   resume?: string;
   watch?: boolean;
   interval?: number;
+  once?: boolean;
+  window?: 1 | 7 | 30 | 90;
+  direction?: "consumed" | "served";
+  theme?: "dark" | "light";
 }
 
-const commands = new Set<Command>(["sessions", "run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
+const commands = new Set<Command>(["usage", "sessions", "run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
 
 export function parseArgs(argv: string[]): CliArgs {
   const out: CliArgs = { help: false, version: false, print: false, yes: false,
@@ -71,6 +75,22 @@ export function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--sign-in") out.signIn = true;
     else if (arg === "--connect") out.connect = true;
     else if (arg === "--preferences") out.preferences = true;
+    else if (arg === "--once") out.once = true;
+    else if (flag === "--window") {
+      const v = value();
+      if (!["1", "7", "30", "90"].includes(v)) throw new UsageError("--window must be 1, 7, 30, or 90 days.");
+      out.window = Number(v) as CliArgs["window"];
+    }
+    else if (flag === "--direction") {
+      const v = value();
+      if (!["consumed", "served"].includes(v)) throw new UsageError("--direction must be consumed or served.");
+      out.direction = v as CliArgs["direction"];
+    }
+    else if (flag === "--theme") {
+      const v = value();
+      if (!["dark", "light"].includes(v)) throw new UsageError("--theme must be dark or light.");
+      out.theme = v as CliArgs["theme"];
+    }
     else if (arg === "--watch") out.watch = true;
     else if (flag === "--interval") {
       const v = value(); if (!/^\d+$/.test(v) || Number(v) < 1000 || Number(v) > 60000) throw new UsageError("--interval must be 1000–60000 milliseconds.");
@@ -117,7 +137,10 @@ export function parseArgs(argv: string[]): CliArgs {
       throw new UsageError("Unknown command. Run potluck --help, or use potluck -p \"task\".");
     }
     out.command = positional[0] as Command;
-    if (out.command === "sessions") {
+    if (out.command === "usage") {
+      out.action = positional[1] || "overview";
+      if (!["overview", "models", "requests", "machines"].includes(out.action) || positional.length > 2) throw new UsageError("Use potluck usage [overview|models|requests|machines].");
+    } else if (out.command === "sessions") {
       out.action = positional[1] || "list"; out.target = positional[2];
       if (!["list", "delete"].includes(out.action) || positional.length > 3 || (out.target && out.action !== "delete") || (!out.help && out.action === "delete" && !out.target)) throw new UsageError("Use sessions list or sessions delete <session-id>.");
     } else if (out.command === "run") {
@@ -154,10 +177,12 @@ export function parseArgs(argv: string[]): CliArgs {
   }
   if (out.command && (out.saveSession || out.resume)) throw new UsageError("--save-session and --resume apply to the coding agent, not management commands.");
   if (out.saveSession && out.resume) throw new UsageError("--resume already saves the continued session.");
-  if ((out.watch || out.interval !== undefined) && out.command !== "status") throw new UsageError("--watch and --interval require status.");
-  if (out.interval !== undefined && !out.watch) throw new UsageError("--interval requires --watch.");
+  if ((out.watch || out.interval !== undefined) && out.command !== "status" && out.command !== "usage") throw new UsageError("--watch and --interval require status or usage.");
+  if (out.interval !== undefined && !out.watch && out.command !== "usage") throw new UsageError("--interval requires --watch.");
+  if (out.once && (out.watch || out.interval !== undefined)) throw new UsageError("Choose --once or live refresh options.");
   const operation = out.command;
   const allowed: Record<string, string[]> = {
+    "--once": ["usage"], "--window": ["usage"], "--direction": ["usage"], "--theme": ["usage"],
     "--jobs": ["contribute"], "--max-tokens": ["contribute", "run"], "--min-free-memory": ["contribute"], "--days": ["contribute"], "--timezone": ["contribute"],
     "--wait": ["login"], "--no-wait": ["login"], "--local": ["logout"],
     "--name": ["household", "connect", "setup"], "--output": ["household"],
