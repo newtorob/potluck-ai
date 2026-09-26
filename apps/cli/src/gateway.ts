@@ -30,7 +30,7 @@ export interface StreamOptions {
   signal?: AbortSignal;
   /** Routing scope sent as the X-Potluck-Scope header (e.g. "local" | "mine"). */
   scope?: string;
-  /** Plain inference must not treat a dropped stream as a successful answer. */
+  /** Require the terminal SSE marker before accepting a response as complete. */
   requireDone?: boolean;
 }
 

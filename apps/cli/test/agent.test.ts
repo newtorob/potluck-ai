@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -299,6 +299,64 @@ describe("runTask verify loop", () => {
     streamChatMock.mockReset();
     if (cwd) await rm(cwd, { recursive: true, force: true });
     cwd = "";
+  });
+
+  it("drains a tool turn to completion without accepting post-action output", async () => {
+    const dir = await tmp();
+    await writeFile(join(dir, "f.ts"), "const a = 1;\n");
+    const edit = action("edit_file", {
+      path: "f.ts", old_string: "a = 1", new_string: "a = 2",
+    });
+    let completed = false;
+    streamChatMock.mockImplementationOnce(() => (async function* () {
+      yield edit.slice(0, -3);
+      yield edit.slice(-3) + "\nINVENTED TOOL OUTPUT";
+      yield action("write_file", { path: "unwanted.ts", content: "wrong" });
+      completed = true;
+    })());
+    streamChatMock.mockImplementationOnce(() => (async function* () { yield "Done."; })());
+    const tokens: string[] = [];
+    const history: ChatMessage[] = [];
+    const verify = vi.fn(async () => {
+      expect(completed).toBe(true);
+      expect(await readFile(join(dir, "f.ts"), "utf8")).toBe("const a = 2;\n");
+      return { code: 0, output: "passed" };
+    });
+    await runTask(history, "bump", {
+      cfg: CFG, model: "m", cwd: dir, verifyCommand: "fixed-check", runVerify: verify,
+      confirm: async () => { expect(completed).toBe(true); return true; },
+      callbacks: {
+        onToken: t => tokens.push(t), onTurnEnd: () => {},
+        onAction: () => { expect(completed).toBe(true); }, onToolResult: () => {},
+      },
+    });
+    expect(tokens.join("")).toBe(edit + "Done.");
+    expect(history.filter(m => m.role === "assistant").map(m => m.content)).toEqual([edit, "Done."]);
+    expect(verify).toHaveBeenCalledOnce();
+    expect(streamChatMock.mock.calls[0][2]).toMatchObject({ requireDone: true, stop: ["\nTOOL_RESULT:"] });
+    await expect(readFile(join(dir, "unwanted.ts"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("does not execute a complete-looking action from an interrupted response", async () => {
+    const dir = await tmp();
+    await writeFile(join(dir, "f.ts"), "const a = 1;\n");
+    streamChatMock.mockImplementationOnce(() => (async function* () {
+      yield action("edit_file", { path: "f.ts", old_string: "a = 1", new_string: "a = 2" });
+      throw new Error("Gateway stream ended before completion");
+    })());
+    const confirm = vi.fn(async () => true);
+    const onAction = vi.fn();
+    const onTurnEnd = vi.fn();
+    const history: ChatMessage[] = [];
+    await expect(runTask(history, "bump", {
+      cfg: CFG, model: "m", cwd: dir, confirm,
+      callbacks: { onToken: () => {}, onTurnEnd, onAction, onToolResult: () => {} },
+    })).rejects.toThrow("before completion");
+    expect(confirm).not.toHaveBeenCalled();
+    expect(onAction).not.toHaveBeenCalled();
+    expect(onTurnEnd).not.toHaveBeenCalled();
+    expect(history).toEqual([{ role: "user", content: "bump" }]);
+    expect(await readFile(join(dir, "f.ts"), "utf8")).toBe("const a = 1;\n");
   });
 
   it("runs verify after a successful edit and feeds a FAILURE back", async () => {

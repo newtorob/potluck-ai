@@ -412,6 +412,7 @@ export async function runTask(
 
   for (let step = 0; step < maxSteps; step++) {
     let assistant = "";
+    let actionComplete = false;
     // Send a trimmed view so long sessions stay under the context window; the
     // caller keeps the full history untouched for follow-ups and cancel-restore.
     const view = trimHistory(history, opts.charBudget);
@@ -419,14 +420,22 @@ export async function runTask(
       model,
       scope: opts.scope,
       signal: opts.signal,
+      requireDone: true,
+      stop: ["\nTOOL_RESULT:"],
     })) {
+      // Drain through [DONE] before acting. Closing the HTTP stream at the
+      // action fence cancels inference and can stop a managed split runtime.
+      // A later transport error must prevent even a complete-looking edit.
+      if (actionComplete) continue;
+      const previousLength = assistant.length;
       assistant += token;
-      callbacks.onToken(token);
-      // Stop the moment one complete action block is emitted. Weaker local models
-      // tend to keep generating after it -- hallucinating a TOOL_RESULT or drifting
-      // into invented output. Breaking closes the stream so they can't.
-      if (hasActionBlock(assistant)) break;
+      if (hasActionBlock(assistant)) {
+        assistant = assistant.slice(0, actionBlockEnd(assistant));
+        actionComplete = true;
+      }
+      callbacks.onToken(assistant.slice(previousLength));
     }
+    opts.signal?.throwIfAborted();
     callbacks.onTurnEnd();
 
     const parsed = parseAction(assistant);
