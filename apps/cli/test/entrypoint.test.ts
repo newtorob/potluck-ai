@@ -73,3 +73,38 @@ it("the installed agent selects the project pin ahead of global and shared model
     expect(calls).toHaveLength(1);
   } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
 });
+
+it.each(["repeated failure", "step limit", "failed verify", "repaired verify"])(
+  "reports the actual outcome of a one-shot agent run: %s", async scenario => {
+    await writeFile(join(dir, "f.txt"), "original");
+    let requests = 0;
+    const server = createServer(async (req, res) => {
+      for await (const _ of req) { /* consume */ }
+      requests++;
+      const action = (tool: string, args: Record<string, unknown>) =>
+        "```action\n" + JSON.stringify({ tool, args }) + "\n```";
+      let content: string;
+      if (scenario === "repeated failure") content = action("read_file", { path: "absent.txt" });
+      else if (scenario === "step limit") content = action("read_file", { path: "f.txt" });
+      else if (requests === 1) content = action("edit_file", { path: "f.txt", old_string: "original", new_string: "broken" });
+      else if (requests === 2 && scenario === "repaired verify") content = action("edit_file", { path: "f.txt", old_string: "broken", new_string: "fixed" });
+      else content = "All fixed.";
+      res.setHeader("Content-Type", "text/event-stream");
+      res.end(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`);
+    });
+    await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const port = (server.address() as import("node:net").AddressInfo).port;
+      const nodePath = "'" + process.execPath.replace(/'/g, "'\\''") + "'";
+      const verify = `${nodePath} -e "process.exit(require('fs').readFileSync('f.txt','utf8') === 'fixed' ? 0 : 1)"`;
+      const result = await run(["-p", "Repair f.txt", "-m", "test-model", "--scope", "local", "--yes",
+        ...(scenario.includes("verify") ? ["--verify", verify] : ["--no-verify"])], {
+        POTLUCK_GATEWAY_KEY: "test", POTLUCK_GATEWAY_URL: `http://127.0.0.1:${port}/v1`,
+      });
+      expect(result.code).toBe(scenario === "repaired verify" ? 0 : 1);
+      if (scenario === "failed verify") expect(result.stderr).toContain("Task incomplete: verification did not pass.");
+      if (scenario === "step limit") expect(result.stderr).toContain("step limit");
+      if (scenario === "repeated failure") expect(result.stderr).toContain("failed identically");
+    } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
+  },
+);

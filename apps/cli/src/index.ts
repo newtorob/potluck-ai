@@ -204,7 +204,7 @@ async function runOneShot(
       ),
     );
   }
-  await runTask(conversation, task, {
+  const result = await runTask(conversation, task, {
     cfg: opts.cfg,
     model: opts.model,
     cwd: opts.cwd,
@@ -226,6 +226,7 @@ async function runOneShot(
         ),
     },
   });
+  if (result.status === "incomplete") process.exitCode = 1;
   if (opts.session) {
     await saveSession(opts.session, conversation);
     stderr.write(`Session saved: ${opts.session.id}\n`);

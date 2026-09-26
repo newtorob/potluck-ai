@@ -388,6 +388,11 @@ export interface AgentOptions {
   runVerify?: VerifyRunner;
 }
 
+/** A final response is distinct from stopping with unfinished or unchecked work. */
+export type AgentResult =
+  | { status: "finished" }
+  | { status: "incomplete"; reason: "verification_failed" | "repeated_tool_failure" | "step_limit" };
+
 /**
  * Run one task to completion. Mutates `history` in place (the caller owns it so
  * follow-ups keep context, and can truncate it if the turn is cancelled).
@@ -396,7 +401,7 @@ export async function runTask(
   history: ChatMessage[],
   task: string,
   opts: AgentOptions,
-): Promise<void> {
+): Promise<AgentResult> {
   const { cfg, model, cwd, confirm, callbacks } = opts;
   const maxSteps = opts.maxSteps ?? 24;
   const verifyCommand = opts.verifyCommand ?? null;
@@ -404,6 +409,7 @@ export async function runTask(
   const verifyRunner = opts.runVerify ?? runVerify;
   let consecutiveVerifyFailures = 0;
   let verifyStopped = false; // tripped after too many failures in a row
+  let verificationFailed = false;
   let lastActionKey = ""; // repeat-detection: identical (tool,args) in a row
   let repeatCount = 0;
   const readPaths = new Set<string>(); // files read this task (write_file guard)
@@ -448,7 +454,11 @@ export async function runTask(
     });
 
     if (parsed.kind === "final") {
-      return;
+      if (verificationFailed) {
+        callbacks.onNotice?.("Task incomplete: verification did not pass.");
+        return { status: "incomplete", reason: "verification_failed" };
+      }
+      return { status: "finished" };
     }
 
     if (parsed.kind === "error") {
@@ -480,7 +490,7 @@ export async function runTask(
       );
       callbacks.onToolResult(result);
       history.push({ role: "user", content: `TOOL_RESULT: ${result}` });
-      return;
+      return { status: "incomplete", reason: "repeated_tool_failure" };
     }
     if (repeatCount === 1) {
       result +=
@@ -499,6 +509,7 @@ export async function runTask(
       callbacks.onVerifyStart?.(verifyCommand);
       const outcome = await verifyRunner(verifyCommand, cwd);
       const ok = outcome.code === 0;
+      verificationFailed = !ok;
       callbacks.onVerify?.(verifyCommand, ok, outcome.output);
       result += formatVerifyResult(verifyCommand, outcome);
 
@@ -522,4 +533,5 @@ export async function runTask(
   callbacks.onNotice?.(
     `Reached the ${maxSteps}-step limit for this task. Ask a follow-up to continue.`,
   );
+  return { status: "incomplete", reason: "step_limit" };
 }

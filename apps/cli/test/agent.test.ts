@@ -471,8 +471,8 @@ describe("runTask verify loop", () => {
     scriptTurns([write, write, write, write, write, "done"]);
 
     const spy = vi.fn(async () => ({ code: 1, output: "boom" }));
-    let notice = "";
-    await runTask([{ role: "system", content: "s" }], "spam writes", {
+    const notices: string[] = [];
+    const result = await runTask([{ role: "system", content: "s" }], "spam writes", {
       cfg: CFG,
       model: "m",
       cwd: dir,
@@ -486,14 +486,15 @@ describe("runTask verify loop", () => {
         onAction: () => {},
         onToolResult: () => {},
         onNotice: (m) => {
-          notice = m;
+          notices.push(m);
         },
       },
     });
 
     // 5 successful writes occur, but verify stops after 4 failures in a row.
     expect(spy).toHaveBeenCalledTimes(4);
-    expect(notice).toMatch(/stopping auto-verify/);
+    expect(notices.some(m => /stopping auto-verify/.test(m))).toBe(true);
+    expect(result).toEqual({ status: "incomplete", reason: "verification_failed" });
   });
 
   it("never runs verify when no verify command is configured", async () => {
