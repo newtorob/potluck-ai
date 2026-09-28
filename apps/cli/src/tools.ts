@@ -25,6 +25,7 @@ import { unifiedDiff } from "./diff.js";
 import {
   escapeRegExp,
   globToRegExp,
+  ignoredBy,
   loadIgnore,
   walkFiles,
 } from "./walk.js";
@@ -239,12 +240,27 @@ async function searchFilesTool(
   }
 
   const rules = await loadIgnore(deps.cwd);
+  const startInfo = await lstat(start);
+  if (!startInfo.isFile() && !startInfo.isDirectory()) {
+    throw new ToolError("search path must be a regular file or directory");
+  }
+  const startRel = relative(root, start).split(sep).join("/");
+  const segments = startRel.split("/").filter(Boolean);
+  // A scoped search bypasses the walk's ancestor pruning. Apply those same
+  // rules to its root so a file/directory path cannot bypass .gitignore.
+  for (let i = 1; i <= segments.length; i++) {
+    const isDir = i < segments.length || startInfo.isDirectory();
+    if (ignoredBy(rules, segments.slice(0, i).join("/"), isDir)) {
+      throw new ToolError("search path is ignored; choose a non-ignored file or directory");
+    }
+  }
   const hits: string[] = [];
   let truncated = false;
 
   // `start` is canonical, so the walk is rooted at the canonical root too and
   // every yielded path stays relative to it.
-  search: for await (const rel of walkFiles(start, root, rules)) {
+  const files = startInfo.isFile() ? [startRel] : walkFiles(start, root, rules);
+  search: for await (const rel of files) {
     const abs = join(root, rel);
     let content: string;
     try {
@@ -312,10 +328,16 @@ async function writeFileTool(
   const abs = await resolveInCwd(deps.cwd, path);
 
   let current = "";
+  let exists = false;
   try {
     current = await readFile(abs, "utf8");
+    exists = true;
   } catch {
     current = ""; // new file
+  }
+
+  if (exists && current === content) {
+    throw new ToolError(`file ${path} already has exactly this content; nothing changed. Make a different targeted correction.`);
   }
 
   // Guard against the classic weak-model mistake: overwriting an existing,
@@ -581,6 +603,9 @@ async function editFileTool(
   const replaceAll = args.replace_all === true;
   const result = resolveEdit(current, oldString, newString, replaceAll, path);
   if ("error" in result) throw new ToolError(result.error);
+  if (result.updated === current) {
+    throw new ToolError("replacement matches the existing content after whitespace matching; nothing changed");
+  }
 
   const summary = unifiedDiff(path, current, result.updated);
   const approved = await deps.confirm({ tool: "edit_file", summary, subject: path });

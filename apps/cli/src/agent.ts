@@ -9,9 +9,10 @@
  */
 
 import type { GatewayConfig } from "./config.js";
+import { createHash } from "node:crypto";
 import { streamChat, type ChatMessage } from "./gateway.js";
 import { parseRelaxedJson } from "./relaxedJson.js";
-import { runTool, runVerify, type Confirm, type VerifyOutcome } from "./tools.js";
+import { runTool, runVerify, TOOL_NAMES, type Confirm, type VerifyOutcome } from "./tools.js";
 
 /** A function that runs the verify command (injectable for tests). */
 export type VerifyRunner = (command: string, cwd: string) => Promise<VerifyOutcome>;
@@ -23,16 +24,26 @@ export interface ParsedAction {
 
 export type ParseResult =
   | { kind: "final"; text: string }
-  | { kind: "action"; action: ParsedAction }
+  | { kind: "action"; action: ParsedAction; recovery?: string }
   | { kind: "error"; message: string };
 
 // The canonical fence the prompt asks for. A malformed JSON body HERE is a
 // retryable error (the model tried to act), not a final answer.
-const CANONICAL_ACTION = /```[ \t]*action[^\n]*\r?\n([\s\S]*?)```/;
+const CANONICAL_ACTION = /```[ \t]*action[^\n]*\r?\n([\s\S]*?)^[ \t]*```/m;
 // Any fenced block — weak models routinely mislabel the fence (```json,
 // ```tool) or drop the label. We only treat such a block as an action if its
 // content actually parses to a tool object, so prose code fences are ignored.
-const ANY_FENCE = /```[^\n]*\r?\n([\s\S]*?)```/g;
+const ANY_FENCE = /```[^\n]*\r?\n([\s\S]*?)^[ \t]*```/gm;
+
+const ARGUMENTS: Record<string, { required: string[]; optional?: Record<string, string> }> = {
+  read_file: { required: ["path"] },
+  list_dir: { required: [], optional: { path: "string" } },
+  search_files: { required: ["query"], optional: { path: "string", regex: "boolean" } },
+  glob: { required: ["pattern"] },
+  edit_file: { required: ["path", "old_string", "new_string"], optional: { replace_all: "boolean" } },
+  write_file: { required: ["path", "content"] },
+  run_command: { required: ["command"] },
+};
 
 /** JSON first, then the relaxed parser; `undefined` when both fail. */
 function parseToolContent(raw: string): unknown {
@@ -57,21 +68,68 @@ function coerceAction(parsed: unknown): ParsedAction | { error: string } {
   if (typeof obj.tool !== "string") {
     return { error: 'action requires a string "tool" field' };
   }
+  if (!(TOOL_NAMES as readonly string[]).includes(obj.tool)) {
+    return { error: `unknown tool "${obj.tool}"; choose one of: ${TOOL_NAMES.join(", ")}` };
+  }
   // Prefer an explicit args/arguments object. Weaker local models often inline
   // the args at the top level (e.g. {"tool":"run_command","command":"..."}), so
   // fall back to treating any remaining top-level keys as the args.
-  const explicit = obj.args ?? obj.arguments;
+  const explicit = obj.args !== undefined ? obj.args : obj.arguments;
   let args: Record<string, unknown>;
   if (typeof explicit === "object" && explicit !== null && !Array.isArray(explicit)) {
+    if (obj.args !== undefined && obj.arguments !== undefined) return { error: 'use only "args", not both "args" and "arguments"' };
+    const extra = Object.keys(obj).find(key => !["tool", "args", "arguments"].includes(key));
+    if (extra) return { error: `put "${extra}" inside args; do not mix nested and top-level arguments` };
     args = explicit as Record<string, unknown>;
   } else {
+    if (explicit !== undefined) return { error: '"args" must be a JSON object, not a string, array, or null' };
     const { tool: _tool, args: _args, arguments: _arguments, ...rest } = obj;
     void _tool;
     void _args;
     void _arguments;
     args = rest;
   }
+  const schema = ARGUMENTS[obj.tool];
+  for (const key of schema.required) {
+    if (typeof args[key] !== "string") return { error: `${obj.tool} requires a string "${key}" argument` };
+  }
+  for (const [key, value] of Object.entries(args)) {
+    const type = schema.required.includes(key) ? "string" : schema.optional?.[key];
+    if (!type) return { error: `unknown ${obj.tool} argument "${key}"; use ${[...schema.required, ...Object.keys(schema.optional ?? {})].join(", ")}` };
+    if (typeof value !== type) return { error: `${obj.tool} argument "${key}" must be ${type}` };
+  }
   return { tool: obj.tool, args };
+}
+
+/** Only repair one missing OUTER brace, after the complete args object. Never
+ * synthesize a string, argument, inner delimiter, or an unfinished fence. */
+function parseFencedAction(raw: string): ParseResult {
+  let parsed = parseToolContent(raw);
+  let recovery: string | undefined;
+  if (parsed === undefined && raw.trimEnd().endsWith("}")) {
+    try {
+      const closed = JSON.parse(raw.trim() + "}") as Record<string, unknown>;
+      if (Object.keys(closed).length === 2 && typeof closed.tool === "string" &&
+          closed.args !== null && typeof closed.args === "object" && !Array.isArray(closed.args)) {
+        parsed = closed;
+        recovery = "Recovered one missing outer }. Close both the args object and action object with }} next time.";
+      }
+    } catch { /* Ambiguous or incomplete arguments must be regenerated. */ }
+  }
+  if (parsed === undefined) {
+    let detail = "";
+    try { parseRelaxedJson(raw.trim()); } catch (error) {
+      detail = error instanceof Error ? `: ${error.message}` : "";
+    }
+    return { kind: "error", message: `invalid JSON in action block${detail}. Re-emit one complete action; escape quotes and newlines inside strings, close args and the outer object with }}, then close the fence. Use a smaller targeted edit if needed. Nothing was executed.` };
+  }
+  const coerced = coerceAction(parsed);
+  if ("error" in coerced) return { kind: "error", message: coerced.error };
+  return { kind: "action", action: coerced, ...(recovery ? { recovery } : {}) };
+}
+
+function looksLikeAction(raw: string): boolean {
+  return /^\s*\{\s*["']?tool["']?\s*:/.test(raw);
 }
 
 /** End offset (exclusive) of the first balanced `{...}` at/after `start`, or -1. */
@@ -116,25 +174,18 @@ function locateAction(text: string): { result: ParseResult; end: number } | null
   const canonical = CANONICAL_ACTION.exec(text);
   if (canonical) {
     const end = canonical.index + canonical[0].length;
-    const parsed = parseToolContent(canonical[1]);
-    if (parsed === undefined) {
-      return { result: { kind: "error", message: "invalid JSON in action block" }, end };
-    }
-    const coerced = coerceAction(parsed);
-    return {
-      result:
-        "error" in coerced
-          ? { kind: "error", message: coerced.error }
-          : { kind: "action", action: coerced },
-      end,
-    };
+    return { result: parseFencedAction(canonical[1]), end };
   }
 
   ANY_FENCE.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = ANY_FENCE.exec(text)) !== null) {
+    if (looksLikeAction(m[1])) return { result: parseFencedAction(m[1]), end: m.index + m[0].length };
     const parsed = parseToolContent(m[1]);
     if (parsed === undefined) continue;
+    if (parsed && typeof parsed === "object" && Object.hasOwn(parsed, "tool")) {
+      return { result: parseFencedAction(m[1]), end: m.index + m[0].length };
+    }
     const coerced = coerceAction(parsed);
     if (!("error" in coerced)) {
       return { result: { kind: "action", action: coerced }, end: m.index + m[0].length };
@@ -147,6 +198,9 @@ function locateAction(text: string): { result: ParseResult; end: number } | null
     const parsed = parseToolContent(text.slice(start, end));
     if (parsed === undefined) continue;
     const coerced = coerceAction(parsed);
+    if (parsed && typeof parsed === "object" && Object.hasOwn(parsed, "tool") && "error" in coerced) {
+      return { result: { kind: "error", message: coerced.error }, end };
+    }
     if (!("error" in coerced)) {
       return { result: { kind: "action", action: coerced }, end };
     }
@@ -178,7 +232,27 @@ function actionBlockEnd(text: string): number {
  * becomes a retryable `error`.
  */
 export function parseAction(text: string): ParseResult {
-  return locateAction(text)?.result ?? { kind: "final", text: text.trim() };
+  // A missing Markdown closer is recoverable ONLY if the entire remaining
+  // body already parses as a complete action. Never extract a nested object
+  // from unfinished args, or combine this with a missing-JSON-brace repair.
+  const open = /^[ \t]*```[ \t]*(action|json|tool)?[ \t]*\r?\n([\s\S]*)/m.exec(text);
+  if (open && !/^[ \t]*```/m.test(open[2])) {
+    const parsed = parseToolContent(open[2]);
+    const intent = open[1] === "action" || looksLikeAction(open[2]) ||
+      (parsed !== null && typeof parsed === "object" && Object.hasOwn(parsed, "tool"));
+    if (intent) {
+      const coerced = coerceAction(parsed);
+      if (!("error" in coerced)) return { kind: "action", action: coerced,
+        recovery: "Recovered a missing closing fence from complete tool JSON. Close the action fence next time." };
+      return { kind: "error", message: "unfinished action fence or arguments; re-emit one complete, smaller action and its closing fence. Nothing was executed." };
+    }
+  }
+  const located = locateAction(text);
+  if (located) return located.result;
+  if (looksLikeAction(text) || /```(?:json|tool)?[ \t]*\r?\n\s*\{\s*["']?tool["']?\s*:/.test(text)) {
+    return { kind: "error", message: "incomplete or invalid tool action; send a complete JSON object inside an action fence. Nothing was executed." };
+  }
+  return { kind: "final", text: text.trim() };
 }
 
 /** Build the system prompt that defines the strict action protocol. */
@@ -234,6 +308,10 @@ export function systemPrompt(
     "",
     "Rules:",
     "- Emit at most ONE action per turn; put the JSON inside the fence.",
+    "- Close BOTH the args object and outer action object with }} before the fence.",
+    "- Use the exact argument names/types above; never put args in a quoted string.",
+    "- Do not repeat an unchanged read or an edit that changes nothing. Use the",
+    "  actual tool/verify feedback to make a different, targeted correction.",
     `- Paths are relative to the working directory: ${cwd}  (you cannot escape it).`,
     "- Read before you edit. Make minimal, correct changes.",
     "- Keep prose short. Never fabricate tool output; wait for TOOL_RESULT.",
@@ -382,11 +460,16 @@ export interface AgentOptions {
    * never choose it). null/undefined disables the verify loop.
    */
   verifyCommand?: string | null;
-  /** Consecutive verify failures before auto-verify stops for the task (default 4). */
+  /** Consecutive verify failures before the task stops incomplete (default 4). */
   maxVerifyFailures?: number;
   /** Overrides the verify runner (tests inject a fake exec). */
   runVerify?: VerifyRunner;
 }
+
+/** A final response is distinct from stopping with unfinished or unchecked work. */
+export type AgentResult =
+  | { status: "finished" }
+  | { status: "incomplete"; reason: "verification_failed" | "repeated_tool_failure" | "stalled" | "invalid_action" | "step_limit" };
 
 /**
  * Run one task to completion. Mutates `history` in place (the caller owns it so
@@ -396,22 +479,41 @@ export async function runTask(
   history: ChatMessage[],
   task: string,
   opts: AgentOptions,
-): Promise<void> {
+): Promise<AgentResult> {
   const { cfg, model, cwd, confirm, callbacks } = opts;
   const maxSteps = opts.maxSteps ?? 24;
   const verifyCommand = opts.verifyCommand ?? null;
   const maxVerifyFailures = opts.maxVerifyFailures ?? 4;
   const verifyRunner = opts.runVerify ?? runVerify;
   let consecutiveVerifyFailures = 0;
-  let verifyStopped = false; // tripped after too many failures in a row
-  let lastActionKey = ""; // repeat-detection: identical (tool,args) in a row
-  let repeatCount = 0;
+  let verificationFailed = false;
+  let verificationFeedback = "";
+  let protocolFailures = 0;
+  // Count identical action + actual result pairs between mutations. Intervening
+  // reads do not hide a failing-edit cycle; changed contents do not count as a
+  // repeated read. Hashes keep large file contents out of this bounded map.
+  const observations = new Map<string, number>();
   const readPaths = new Set<string>(); // files read this task (write_file guard)
+
+  async function verifyCurrent(): Promise<void> {
+    if (verifyCommand === null) return;
+    callbacks.onVerifyStart?.(verifyCommand);
+    const outcome = await verifyRunner(verifyCommand, cwd);
+    opts.signal?.throwIfAborted();
+    const ok = outcome.code === 0;
+    verificationFailed = !ok;
+    consecutiveVerifyFailures = ok ? 0 : consecutiveVerifyFailures + 1;
+    callbacks.onVerify?.(verifyCommand, ok, outcome.output);
+    verificationFeedback = formatVerifyResult(verifyCommand, {
+      ...outcome, output: outcome.output.length > 3000 ? "[earlier verification output trimmed]\n" + outcome.output.slice(-3000) : outcome.output,
+    });
+  }
 
   history.push({ role: "user", content: task });
 
   for (let step = 0; step < maxSteps; step++) {
     let assistant = "";
+    let actionComplete = false;
     // Send a trimmed view so long sessions stay under the context window; the
     // caller keeps the full history untouched for follow-ups and cancel-restore.
     const view = trimHistory(history, opts.charBudget);
@@ -419,14 +521,22 @@ export async function runTask(
       model,
       scope: opts.scope,
       signal: opts.signal,
+      requireDone: true,
+      stop: ["\nTOOL_RESULT:"],
     })) {
+      // Drain through [DONE] before acting. Closing the HTTP stream at the
+      // action fence cancels inference and can stop a managed split runtime.
+      // A later transport error must prevent even a complete-looking edit.
+      if (actionComplete) continue;
+      const previousLength = assistant.length;
       assistant += token;
-      callbacks.onToken(token);
-      // Stop the moment one complete action block is emitted. Weaker local models
-      // tend to keep generating after it -- hallucinating a TOOL_RESULT or drifting
-      // into invented output. Breaking closes the stream so they can't.
-      if (hasActionBlock(assistant)) break;
+      if (hasActionBlock(assistant)) {
+        assistant = assistant.slice(0, actionBlockEnd(assistant));
+        actionComplete = true;
+      }
+      callbacks.onToken(assistant.slice(previousLength));
     }
+    opts.signal?.throwIfAborted();
     callbacks.onTurnEnd();
 
     const parsed = parseAction(assistant);
@@ -435,19 +545,41 @@ export async function runTask(
     const end = actionBlockEnd(assistant);
     history.push({
       role: "assistant",
-      content: end === -1 ? assistant : assistant.slice(0, end),
+      content: parsed.kind !== "action" || end === -1 ? assistant : assistant.slice(0, end),
     });
 
     if (parsed.kind === "final") {
-      return;
+      // A model can describe a repair without ever editing. If the user has
+      // configured a check, run it before accepting an otherwise unchecked
+      // completion. The failed check consumes the same verification budget.
+      if (verifyCommand !== null && !verificationFeedback) await verifyCurrent();
+      if (verificationFailed) {
+        // One prose claim is not a reason to abandon a repair. Return the real
+        // failing check, within the SAME turn budget, and let it correct course.
+        const result = "error: task is not complete; the fixed verification still fails. Make a targeted correction or report the blocker." + verificationFeedback;
+        callbacks.onToolResult(result);
+        history.push({ role: "user", content: `TOOL_RESULT: ${result}` });
+        protocolFailures++;
+        if (protocolFailures >= 3 || consecutiveVerifyFailures >= maxVerifyFailures) {
+          callbacks.onNotice?.("Task incomplete: verification did not pass.");
+          return { status: "incomplete", reason: "verification_failed" };
+        }
+        continue;
+      }
+      return { status: "finished" };
     }
 
     if (parsed.kind === "error") {
-      const result = `error: ${parsed.message}`;
+      const result = `error: ${parsed.message}` + verificationFeedback;
       callbacks.onToolResult(result);
       history.push({ role: "user", content: `TOOL_RESULT: ${result}` });
+      if (++protocolFailures >= 3) {
+        callbacks.onNotice?.("Stopping: three consecutive invalid action responses; no further tools were executed.");
+        return { status: "incomplete", reason: "invalid_action" };
+      }
       continue;
     }
+    protocolFailures = 0;
 
     callbacks.onAction(parsed.action);
     let result = await runTool(parsed.action.tool, parsed.action.args, {
@@ -456,54 +588,59 @@ export async function runTask(
       readPaths,
     });
 
-    // Repeat-detection: a weak model stuck in a loop re-emits the identical
-    // action that keeps FAILING (e.g. an edit whose old_string never matches).
-    // Count only identical actions that error — a repeated successful write
-    // whose verify keeps failing is the verify cap's job, not this. Bail after
-    // three identical failures rather than burn the whole step budget.
-    const actionKey = `${parsed.action.tool}:${JSON.stringify(parsed.action.args)}`;
-    if (actionKey === lastActionKey && result.startsWith("error:")) repeatCount++;
-    else repeatCount = 0;
-    lastActionKey = actionKey;
-    if (repeatCount >= 2) {
+    const changed = shouldVerify(parsed.action.tool, result);
+    const commandSucceeded = parsed.action.tool === "run_command" && result.startsWith("exit 0");
+    if (changed || commandSucceeded) observations.clear();
+    const key = createHash("sha256").update(JSON.stringify([
+      parsed.action.tool,
+      JSON.stringify(parsed.action.args, Object.keys(parsed.action.args).sort()),
+      result,
+    ])).digest("hex");
+    const repeatCount = changed || commandSucceeded ? 0 : (observations.get(key) ?? 0) + 1;
+    if (repeatCount) observations.set(key, repeatCount);
+    if (repeatCount >= 3) {
+      const failed = result.startsWith("error:");
       callbacks.onNotice?.(
-        `Stopping: the same action failed identically ${repeatCount + 1} times.`,
+        failed ? `Stopping: the same action failed identically ${repeatCount} times without a successful change.`
+          : `Stopping: the same action returned unchanged results ${repeatCount} times without progress.`,
       );
-      callbacks.onToolResult(result);
-      history.push({ role: "user", content: `TOOL_RESULT: ${result}` });
-      return;
+      callbacks.onToolResult(result + verificationFeedback);
+      history.push({ role: "user", content: `TOOL_RESULT: ${result}${verificationFeedback}` });
+      return { status: "incomplete", reason: failed ? "repeated_tool_failure" : "stalled" };
     }
-    if (repeatCount === 1) {
+    if (repeatCount === 2) {
       result +=
-        "\n(NOTE: this identical action just failed twice. Change your approach:" +
-        " re-read the file, adjust old_string, or use a different tool.)";
+        "\nRECOVERY: this action returned the same result twice without a successful change." +
+        " Do not repeat it. Use the content already returned; correct the edit to match it," +
+        " inspect a different relevant file, or explain the blocker.";
     }
+    if (parsed.recovery) result += `\nPROTOCOL: ${parsed.recovery}`;
 
     // Verify-and-self-correct: after a file actually changed, run the FIXED
     // verify command (never one the model picked, no confirm) and fold the
     // outcome into the TOOL_RESULT so the model fixes any failure on the next turn.
     if (
       verifyCommand !== null &&
-      !verifyStopped &&
-      shouldVerify(parsed.action.tool, result)
+      changed
     ) {
-      callbacks.onVerifyStart?.(verifyCommand);
-      const outcome = await verifyRunner(verifyCommand, cwd);
-      const ok = outcome.code === 0;
-      callbacks.onVerify?.(verifyCommand, ok, outcome.output);
-      result += formatVerifyResult(verifyCommand, outcome);
+      // Keep the current failure with the latest tool result, so history
+      // trimming or intervening reads cannot erase the repair target. Bound it
+      // independently of injected runners (the default runner already caps).
+      await verifyCurrent();
+      result += verificationFeedback;
 
-      if (ok) {
-        consecutiveVerifyFailures = 0;
-      } else {
-        consecutiveVerifyFailures++;
+      if (verificationFailed) {
         if (consecutiveVerifyFailures >= maxVerifyFailures) {
-          verifyStopped = true;
+          callbacks.onToolResult(result);
+          history.push({ role: "user", content: `TOOL_RESULT: ${result}` });
           callbacks.onNotice?.(
-            `verify still failing after ${maxVerifyFailures} attempts; stopping auto-verify`,
+            `Task incomplete: verification did not pass after ${maxVerifyFailures} consecutive attempts; stopping before further unverified edits.`,
           );
+          return { status: "incomplete", reason: "verification_failed" };
         }
       }
+    } else if (verificationFeedback) {
+      result += verificationFeedback;
     }
 
     callbacks.onToolResult(result);
@@ -513,4 +650,5 @@ export async function runTask(
   callbacks.onNotice?.(
     `Reached the ${maxSteps}-step limit for this task. Ask a follow-up to continue.`,
   );
+  return { status: "incomplete", reason: verificationFailed ? "verification_failed" : "step_limit" };
 }
