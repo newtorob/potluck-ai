@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -48,5 +48,41 @@ describe("buildRepoMap", () => {
 
   it("returns empty string for an empty directory", async () => {
     expect(await buildRepoMap(cwd)).toBe("");
+  });
+
+  it("maps definitions to their owning file without including bodies or values", async () => {
+    await writeFile(join(cwd, "caller.py"), "from worker import transform\n\ndef run():\n    return transform()\n");
+    await writeFile(join(cwd, "worker.py"), "async def transform():\n    return 'private-value'\n");
+    const map = await buildRepoMap(cwd);
+    expect(map).toContain("caller.py\n  declarations (name:line): run:3");
+    expect(map).toContain("worker.py\n  declarations (name:line): transform:1");
+    expect(map).not.toContain("private-value");
+  });
+
+  it("supports exported JS/TS declarations but skips binary, ignored and symlinked files", async () => {
+    await writeFile(join(cwd, "module.ts"), "export async function run() {}\nexport const enabled = false;\n");
+    await writeFile(join(cwd, "binary.py"), "def fake():\n\0binary");
+    await writeFile(join(cwd, ".gitignore"), "hidden.py\n");
+    await writeFile(join(cwd, "hidden.py"), "def secret(): pass\n");
+    await symlink(join(cwd, "hidden.py"), join(cwd, "alias.py"));
+    const map = await buildRepoMap(cwd);
+    expect(map).toContain("run:1, enabled:2");
+    expect(map).not.toContain("false");
+    expect(map).not.toContain("fake:");
+    expect(map).not.toContain("secret:");
+    expect(map).not.toContain("alias.py");
+  });
+
+  it("caps large files and total declaration text while retaining the file list", async () => {
+    await writeFile(join(cwd, "large.py"), "# padding\n".repeat(4000) + "def beyond_cap(): pass\n");
+    for (let i = 0; i < 60; i++) {
+      await writeFile(join(cwd, `file${i}.py`), Array.from({ length: 9 }, (_, j) => `def name_${'x'.repeat(60)}_${j}(): pass`).join("\n"));
+    }
+    const map = await buildRepoMap(cwd);
+    expect(map).toContain("large.py");
+    expect(map).toContain("file59.py");
+    expect(map).not.toContain("beyond_cap:");
+    expect(map).not.toContain("_8:");
+    expect(map.split("\n").filter(l => l.startsWith("  declarations")).join("").length).toBeLessThanOrEqual(3000);
   });
 });

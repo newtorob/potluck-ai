@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -74,7 +74,7 @@ it("the installed agent selects the project pin ahead of global and shared model
   } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
 });
 
-it.each(["repeated failure", "repeated read", "step limit", "failed verify", "repaired verify", "malformed action"])(
+it.each(["repeated failure", "repeated read", "step limit", "failed verify", "repaired verify", "malformed action", "literal write verify", "truncated literal"])(
   "reports the actual outcome of a one-shot agent run: %s", async scenario => {
     await writeFile(join(dir, "f.txt"), "original");
     let requests = 0;
@@ -88,6 +88,9 @@ it.each(["repeated failure", "repeated read", "step limit", "failed verify", "re
       else if (scenario === "repeated read") content = action("read_file", { path: "f.txt" });
       else if (scenario === "step limit") content = action("read_file", { path: `absent-${requests}.txt` });
       else if (scenario === "malformed action") content = '```action\n{"tool": "edit_file", "args": {\n```';
+      else if (scenario === "truncated literal") content = '```write_file {"path":"f.txt"}\nwrong\n';
+      else if (scenario === "literal write verify") content = requests === 1 ? action("read_file", { path: "f.txt" }) :
+        requests === 2 ? '```write_file {"path":"f.txt"}\nfixed\n```\n' : "All fixed.";
       else if (requests === 1) content = action("edit_file", { path: "f.txt", old_string: "original", new_string: "broken" });
       else if (requests === 2 && scenario === "repaired verify") content = action("edit_file", { path: "f.txt", old_string: "broken", new_string: "fixed" });
       else content = "All fixed.";
@@ -98,12 +101,15 @@ it.each(["repeated failure", "repeated read", "step limit", "failed verify", "re
     try {
       const port = (server.address() as import("node:net").AddressInfo).port;
       const nodePath = "'" + process.execPath.replace(/'/g, "'\\''") + "'";
-      const verify = `${nodePath} -e "process.exit(require('fs').readFileSync('f.txt','utf8') === 'fixed' ? 0 : 1)"`;
+      const expected = scenario === "literal write verify" ? "'fixed' + String.fromCharCode(10)" : "'fixed'";
+      const verify = `${nodePath} -e "process.exit(require('fs').readFileSync('f.txt','utf8') === (${expected}) ? 0 : 1)"`;
       const result = await run(["-p", "Repair f.txt", "-m", "test-model", "--scope", "local", "--yes",
         ...(scenario.includes("verify") ? ["--verify", verify] : ["--no-verify"])], {
         POTLUCK_GATEWAY_KEY: "test", POTLUCK_GATEWAY_URL: `http://127.0.0.1:${port}/v1`,
       });
-      expect(result.code).toBe(scenario === "repaired verify" ? 0 : 1);
+      expect(result.code).toBe(["repaired verify", "literal write verify"].includes(scenario) ? 0 : 1);
+      if (scenario === "literal write verify") expect(await readFile(join(dir, "f.txt"), "utf8")).toBe("fixed\n");
+      if (scenario === "truncated literal") expect(await readFile(join(dir, "f.txt"), "utf8")).toBe("original");
       if (scenario === "failed verify") expect(result.stderr).toContain("Task incomplete: verification did not pass.");
       if (scenario === "step limit") expect(result.stderr).toContain("step limit");
       if (scenario === "repeated failure") expect(result.stderr).toContain("failed identically");
