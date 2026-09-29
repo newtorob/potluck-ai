@@ -17,6 +17,15 @@ DEVICE = re.compile(r"^\s*(CUDA\d+|MTL\d+|RPC\d+): (.+) "
                     r"\((\d+) MiB, (\d+) MiB free\)\s*$")
 
 
+def shared_memory_budget(available: object) -> dict | None:
+    """A startup estimate shared by planning and native fit, never a reservation."""
+    if type(available) is not int or available <= 0:
+        return None
+    available_mib = available // MIB
+    return {"availableMiB": available_mib, "reserveMiB": RESERVE_MIB,
+            "budgetMiB": max(0, available_mib - RESERVE_MIB)}
+
+
 def fit_arguments(output: str, workers: dict[str, dict], local_available: int) -> list[str]:
     """Explicit device ordering keeps fit margins attached to the right worker.
 
@@ -50,10 +59,11 @@ def fit_arguments(output: str, workers: dict[str, dict], local_available: int) -
         margin = 1024
         if backend in ("metal", "cpu"):
             available = worker.get("freeMemoryBytes") if worker else local_available
-            if type(available) is not int or available <= 0:
+            memory = shared_memory_budget(available)
+            if memory is None:
                 raise SplitError("Worker did not report available memory. Update its Potluck runtime.")
             count = sum(k == key for _, k, _ in devices)
-            budget = (available // MIB - RESERVE_MIB) // count
+            budget = memory["budgetMiB"] // count
             if budget < 256:
                 raise SplitError("A split computer has too little available memory. Close other models or apps and try again.")
             margin = max(margin, free - budget)

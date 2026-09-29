@@ -54,3 +54,13 @@ def test_cancelling_memory_probe_terminates_native_process(tmp_path):
         with pytest.raises(ProcessLookupError):
             os.kill(int(pidfile.read_text()), 0)
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("available,expected", [
+    (None, None), (True, None), ("4096", None), (-1, None),
+    (1024 * MIB, {"availableMiB": 1024, "reserveMiB": 2048, "budgetMiB": 0}),
+    (4096 * MIB + 17, {"availableMiB": 4096, "reserveMiB": 2048, "budgetMiB": 2048}),
+])
+def test_shared_memory_estimate_never_invents_capacity(available, expected):
+    from potluck_local.services.split_memory import shared_memory_budget
+    assert shared_memory_budget(available) == expected

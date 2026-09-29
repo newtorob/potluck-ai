@@ -335,3 +335,25 @@ def test_local_control_token_and_nonmember_rejection(isolated, monkeypatch):
                 response = await client.get(path, headers={"Authorization": auth} if auth else {})
                 assert response.status_code == status
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("backend,available,expected", [
+    ("metal", 4096 * 1024**2, {"availableMiB": 4096, "reserveMiB": 2048, "budgetMiB": 2048}),
+    ("cpu", 1024 * 1024**2, {"availableMiB": 1024, "reserveMiB": 2048, "budgetMiB": 0}),
+    ("metal", None, None), ("metal", True, None),
+    ("cuda", 64000 * 1024**2, "absent"),
+])
+def test_plan_reports_shared_budget_without_treating_cuda_ram_as_vram(isolated, monkeypatch, backend, available, expected):
+    manager, _, _ = isolated
+    monkeypatch.setattr(sm, "artifact_identity", lambda path: ("a" * 64, (0, 0, 12)))
+    async def response(request):
+        return httpx.Response(200, json={"available": True, "engine": {"commit": sn.PIN["commit"], "backend": backend}, "freeMemoryBytes": available})
+    client = httpx.AsyncClient
+    monkeypatch.setattr(sm.httpx, "AsyncClient", lambda **kwargs: client(**kwargs, transport=httpx.MockTransport(response)))
+    plan = asyncio.run(manager.plan({"id": "tiny", "sha256": "a" * 64, "sizeBytes": 12}, ["worker"], 8192))
+    worker = plan["workers"][0]
+    if expected == "absent":
+        assert "sharedMemory" not in worker
+    else:
+        assert worker["sharedMemory"] == expected
+    assert plan["context"] == 8192 and manager.head is None and manager.worker is None

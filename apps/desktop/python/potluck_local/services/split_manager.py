@@ -24,7 +24,7 @@ from .model_lifecycle import get_model_lifecycle
 from .runtime import get_runtime
 from .settings_manager import get_settings, save_settings
 from .split_native import PIN, NativeProcess, SplitError, SplitModel, engine_bundle, free_port
-from .split_memory import probe_fit_arguments
+from .split_memory import probe_fit_arguments, shared_memory_budget
 
 WORKER_KEY = "potluck.split_worker_enabled"
 LEASE_SECONDS = 30
@@ -259,6 +259,8 @@ class SplitManager:
                             or cap.get("engine", {}).get("commit") != PIN["commit"]:
                         raise ValueError()
                     peer["backend"] = cap["engine"].get("backend")
+                    if peer["backend"] in ("metal", "cpu"):
+                        peer["sharedMemory"] = shared_memory_budget(cap.get("freeMemoryBytes"))
                 except (httpx.HTTPError, ValueError, KeyError):
                     raise SplitError("A selected worker is unavailable. On it, unload any model and run potluck split worker on.", code="split_peer_unavailable") from None
         return {"model": model, "context": context, "workers": selected,
@@ -381,7 +383,7 @@ class SplitManager:
                                                  if p.get("rpcPort") == port and p["device"] == "RPC")
                     if not all(w["sent"] > min(65536, head["model"]["sizeBytes"] // 100)
                                and w["received"] > 0 and w["modelMiB"] > 0 for w in head["workers"]):
-                        raise SplitError("Engine did not place work on every selected worker.")
+                        raise SplitError("Engine did not place work on every selected worker. Free memory on the selected workers or select workers with more available memory, then start again.")
                     await runtime.install_split_async(adapter, path, head["model"]["id"], identity, head["context"])
                     get_model_lifecycle().remember(None)
                     head["loadSeconds"] = round(time.monotonic() - head["startedMono"], 1)
