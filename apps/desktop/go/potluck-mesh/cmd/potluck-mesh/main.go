@@ -531,6 +531,7 @@ func run() int {
 	// the always-on DERP floor. See landirect.go's Phase-3 doc comment.
 	if dBind != nil {
 		go runPunchTrialLoop(ctx, tun, ps, dBind, bus, modes, punchTrials)
+		go handler.runPunchRecoveryLoop(ctx)
 	}
 
 	// ---- roster reconcile goroutine ---- //
@@ -1388,7 +1389,7 @@ func runReachabilityLoop(
 // table analogue of the same-key-rejoin bug, not an endpoint-roaming one.
 // Calling this at every "a peer just became my active data path" moment
 // closes the gap regardless of which mechanism (re-)established the session.
-func ensurePeerRoute(tun *tunnel.Tunnel, p msignal.RosterPeer) {
+func ensurePeerRoute(tun rosterTunnel, p msignal.RosterPeer) {
 	if p.MeshIP == "" {
 		return
 	}
@@ -1429,7 +1430,7 @@ func ensurePeerRoute(tun *tunnel.Tunnel, p msignal.RosterPeer) {
 // the state a peer is in on normal DERP fallback, which is the proven-working
 // relay path. A peer therefore always ends up reachable over DERP again after a
 // failed trial.
-func restoreDERPFloor(tun *tunnel.Tunnel, dBind *derp.DerpBind, p msignal.RosterPeer, pubkeyBase64 string, pubkeyBytes [32]byte) {
+func restoreDERPFloor(tun rosterTunnel, dBind *derp.DerpBind, p msignal.RosterPeer, pubkeyBase64 string, pubkeyBytes [32]byte) {
 	// Re-add the peer with the standard mesh config (clears the trial's LAN pin
 	// and short keepalive). rosterPeerToTunnelPeer supplies mesh-IP/32 +
 	// 25s keepalive + the cached real endpoint; AddPeer's replace_allowed_ips
@@ -1449,7 +1450,7 @@ func restoreDERPFloor(tun *tunnel.Tunnel, dBind *derp.DerpBind, p msignal.Roster
 // flipToDERP marks the peer as DERP-routed in the bind and updates the WG
 // peer endpoint to the synthetic address so wg-go routes outbound packets via
 // DerpBind.Send (which dispatches to the relay).
-func flipToDERP(tun *tunnel.Tunnel, dBind *derp.DerpBind, pubkeyBase64 string, pubkeyBytes [32]byte) {
+func flipToDERP(tun rosterTunnel, dBind *derp.DerpBind, pubkeyBase64 string, pubkeyBytes [32]byte) {
 	syntheticEp := derp.SyntheticEndpointString(pubkeyBytes)
 	dBind.SetPeerRouting(pubkeyBytes, true)
 	if err := tun.UpdatePeerEndpoint(pubkeyBase64, syntheticEp); err != nil {
@@ -1648,12 +1649,28 @@ type punchEntry struct {
 	lastRequested time.Time
 }
 
-// rosterHandler receives welcome + roster update + punch coord events from the
-// signal client and applies them to the WireGuard tunnel.
+// rosterTunnel is the subset of tunnel operations used by roster routing.
+type rosterTunnel interface {
+	SetMeshIP(string) error
+	SetPeers([]tunnel.Peer) error
+	AddPeer(tunnel.Peer) error
+	RemovePeer(string) error
+	AddPeerRoute(string) error
+	RemovePeerRoute(string) error
+	UpdatePeerEndpoint(string, string) error
+	PeerReachability(string) (time.Time, uint64, uint64, error)
+}
+
+type rosterSignal interface {
+	SendEndpointUpdate(string, []string)
+	SendRequestPunch(string)
+}
+
+// rosterHandler applies signaling events to the tunnel and coordinates direct-path recovery.
 type rosterHandler struct {
-	tun      *tunnel.Tunnel
+	tun      rosterTunnel
 	ps       *peerstate.Store
-	client   *msignal.Client // set after construction via setClient
+	client   rosterSignal // set after construction via setClient
 	bus      *events.Bus
 	ipcState *localapi.State
 
@@ -1697,7 +1714,7 @@ type rosterHandler struct {
 	// isSymmetricNATFn reports whether THIS node's own NAT has been classified
 	// as symmetric (external port varies per destination) — see
 	// internal/stun's dual-server NAT classifier. When true, OnPunchCoord
-	// skips starting new punch trials entirely: a symmetric NAT on our own
+	// skips WAN punch trials (same-LAN endpoints do not traverse it): a symmetric NAT on our own
 	// side means our external mapping for a handshake-init to peer A differs
 	// from the mapping the coordinator/STUN observed, so any trial is a
 	// guaranteed failure. nil (never classified yet, or classification
@@ -1707,17 +1724,19 @@ type rosterHandler struct {
 	isSymmetricNATFn func() bool
 
 	// punchMu guards punchState.
-	punchMu    sync.Mutex
-	punchState map[string]*punchEntry // keyed by node_id
+	punchMu     sync.Mutex
+	punchState  map[string]*punchEntry // keyed by node_id
+	localIPNets func() []net.IPNet
 }
 
-func newRosterHandler(tun *tunnel.Tunnel, ps *peerstate.Store, bus *events.Bus, ipcState *localapi.State) *rosterHandler {
+func newRosterHandler(tun rosterTunnel, ps *peerstate.Store, bus *events.Bus, ipcState *localapi.State) *rosterHandler {
 	return &rosterHandler{
-		tun:        tun,
-		ps:         ps,
-		bus:        bus,
-		ipcState:   ipcState,
-		punchState: make(map[string]*punchEntry),
+		tun:         tun,
+		ps:          ps,
+		bus:         bus,
+		ipcState:    ipcState,
+		punchState:  make(map[string]*punchEntry),
+		localIPNets: localep.LocalIPNets,
 	}
 }
 
@@ -2102,8 +2121,9 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 	// isn't cached yet, targetEndpoint just stays the WAN endpoint, matching
 	// prior behaviour exactly.
 	targetEndpoint := *coord.PeerEndpoint
-	if pOK {
-		if lanEp := punchTargetEndpoint(localep.LocalIPNets(), p.LocalEndpoints, targetEndpoint); lanEp != targetEndpoint {
+	lanEndpoint, targetOnLAN := sameLANEndpoint(h.localIPNets(), p.LocalEndpoints)
+	if pOK && targetOnLAN {
+		if lanEp := lanEndpoint; lanEp != targetEndpoint {
 			slog.Info("punch_coord: same-LAN candidate found, preferring it over the WAN/hairpin endpoint",
 				"peer_node_id", coord.PeerNodeID,
 				"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
@@ -2184,7 +2204,8 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 	var pub [32]byte
 	copy(pub[:], kb)
 
-	symmetric := h.isSymmetricNATFn != nil && h.isSymmetricNATFn()
+	// A co-subnet endpoint does not traverse the symmetric WAN NAT.
+	symmetric := !targetOnLAN && h.isSymmetricNATFn != nil && h.isSymmetricNATFn()
 	st, _ := h.punchTrials.get(coord.PeerWGPublicKey)
 	now := time.Now()
 	if !shouldStartPunchTrial(h.modes.get(coord.PeerWGPublicKey), st.backoffUntil, symmetric, now) {
@@ -2245,8 +2266,8 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 		return
 	}
 
-	h.modes.set(coord.PeerWGPublicKey, modePunchTrial)
 	h.punchTrials.startTrial(coord.PeerWGPublicKey, targetEndpoint, preHS, now.Add(punchTrialDuration))
+	h.modes.set(coord.PeerWGPublicKey, modePunchTrial)
 
 	slog.Info("punch_coord: WAN direct trial started — DERP off, peer re-pinned to punched endpoint (force-rekey)",
 		"peer_node_id", coord.PeerNodeID,
@@ -2258,17 +2279,16 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 	)
 }
 
-// maybeSendRequestPunch sends request_punch for the given peer if the peer
-// doesn't have a fresh WG handshake and we haven't requested a punch for this
-// peer within the last punchThrottlePeriod. Concurrency-safe.
+// maybeSendRequestPunch requests a direct path for a disconnected or relayed
+// peer. A fresh relay handshake proves reachability, not direct connectivity.
+// Keep the existing trial backoff and request throttle. Concurrency-safe.
 func (h *rosterHandler) maybeSendRequestPunch(nodeID string) {
 	if h.client == nil {
 		return
 	}
 
-	// Check WG handshake freshness before doing anything.
-	// If we already have a live session with this peer, there's no need to
-	// re-punch. Look up the public key from the peer cache.
+	// Resolve the peer before checking its routing mode and handshake. A
+	// live relayed session can still benefit from a coordinated direct trial.
 	cached, ok := h.ps.Get(nodeID)
 	if !ok {
 		// Peer not in cache — shouldn't happen since callers upsert first,
@@ -2278,7 +2298,19 @@ func (h *rosterHandler) maybeSendRequestPunch(nodeID string) {
 	}
 
 	lastHS, _, _, err := h.tun.PeerReachability(cached.WGPublicKey)
-	if err == nil && !lastHS.IsZero() && time.Since(lastHS) < handshakeFreshWindow {
+	relayed := h.peerRelayed(cached.WGPublicKey)
+	if h.modes != nil && h.modes.isManaged(cached.WGPublicKey) {
+		return
+	}
+	if relayed && h.punchTrials != nil && h.modes != nil {
+		st, _ := h.punchTrials.get(cached.WGPublicKey)
+		_, sameLAN := sameLANEndpoint(h.localIPNets(), cached.LocalEndpoints)
+		symmetric := !sameLAN && h.isSymmetricNATFn != nil && h.isSymmetricNATFn()
+		if !shouldStartPunchTrial(h.modes.get(cached.WGPublicKey), st.backoffUntil, symmetric, time.Now()) {
+			return
+		}
+	}
+	if !relayed && err == nil && !lastHS.IsZero() && time.Since(lastHS) < handshakeFreshWindow {
 		slog.Debug("punch: peer has fresh handshake, skipping request_punch",
 			"node_id", nodeID,
 			"pubkey_prefix", util.TruncatePubkey(cached.WGPublicKey),
@@ -2310,6 +2342,54 @@ func (h *rosterHandler) maybeSendRequestPunch(nodeID string) {
 		"pubkey_prefix", util.TruncatePubkey(cached.WGPublicKey),
 	)
 	h.client.SendRequestPunch(nodeID)
+}
+
+// peerRelayed checks the actual bind, not isDERPRoutedFn (which also guards
+// managed direct endpoints against overwrites).
+func (h *rosterHandler) peerRelayed(key string) bool {
+	if h.dBind == nil {
+		return false
+	}
+	b, err := base64.StdEncoding.DecodeString(key)
+	if err != nil || len(b) != 32 {
+		return false
+	}
+	var pub [32]byte
+	copy(pub[:], b)
+	return h.dBind.IsPeerDERPRouted(pub)
+}
+
+// Recover a live same-LAN peer after failed trials/backoff, even if neither
+// endpoint changes. Ask the coordinator so both ends trial together; never
+// force a raw endpoint over an existing encrypted session. Offline peers and
+// WAN-only relay links are not periodically interrupted by this recovery.
+func (h *rosterHandler) retryRelayedLANPeers() {
+	for _, p := range h.ps.All() {
+		if p.LastEndpoint == nil || *p.LastEndpoint == "" || !h.peerRelayed(p.WGPublicKey) {
+			continue
+		}
+		if _, ok := sameLANEndpoint(h.localIPNets(), p.LocalEndpoints); !ok {
+			continue
+		}
+		lastHS, _, _, err := h.tun.PeerReachability(p.WGPublicKey)
+		if err != nil || lastHS.IsZero() || time.Since(lastHS) >= handshakeFreshWindow {
+			continue
+		}
+		h.maybeSendRequestPunch(p.NodeID)
+	}
+}
+
+func (h *rosterHandler) runPunchRecoveryLoop(ctx context.Context) {
+	ticker := time.NewTicker(punchThrottlePeriod)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			h.retryRelayedLANPeers()
+		}
+	}
 }
 
 // rosterPeerToSnapshot converts a RosterPeer to an events.PeerSnapshot for
