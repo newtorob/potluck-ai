@@ -15,6 +15,7 @@ Run inside the api container:  ``docker compose exec api pytest -q``
 from __future__ import annotations
 
 import os
+import re
 
 # Deterministic settings before the app imports get_settings() (lru_cached).
 os.environ.setdefault("ENV", "development")
@@ -47,7 +48,9 @@ from potluck_api.middleware.rate_limit import limiter
 limiter.enabled = False
 
 _SRC = make_url(get_settings().database_url)
-_TEST_DB = "potluck_test"
+_TEST_DB = os.environ.get("POTLUCK_API_TEST_DB", "potluck_test")
+if not re.fullmatch(r"potluck_test(?:_[a-z0-9_]+)?", _TEST_DB):
+    raise ValueError("POTLUCK_API_TEST_DB must be an isolated potluck_test database name")
 TEST_URL = _SRC.set(database=_TEST_DB).render_as_string(hide_password=False)
 
 

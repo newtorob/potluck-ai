@@ -71,6 +71,18 @@ class EmailService:
         html = f"<p>Hi {name}, welcome to Potluck.</p>"
         await self._send(to_email, subject, html)
 
+    async def send_device_approval(self, to_email: str, approval_url: str) -> None:
+        from html import escape
+        html = (
+            "<p>A terminal requested permission to sign in to your Potluck account.</p>"
+            f'<p><a href="{escape(approval_url, quote=True)}">Review terminal sign-in</a></p>'
+            "<p>Only approve a request you started with potluck login. You will need "
+            "the code from that terminal. Opening this link does not approve it.</p>"
+            "<p>This link expires with the terminal request. If you did not request "
+            "it, ignore this email.</p>"
+        )
+        await self._send(to_email, "Approve your Potluck terminal sign-in", html, magic_link_url=approval_url)
+
     async def send_membership_confirmation(self, to_email: str, plan: str) -> None:
         subject = "Your Potluck membership is active"
         html = (

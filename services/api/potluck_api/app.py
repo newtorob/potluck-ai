@@ -18,6 +18,7 @@ from potluck_api.middleware.rate_limit import limiter
 from potluck_api.routers import (
     admin,
     auth,
+    device_auth,
     billing,
     client,
     discourse_sso,
@@ -103,6 +104,7 @@ def create_app() -> FastAPI:
     # Auth endpoints live at /auth/...
     # discourse_sso also hangs off /auth (GET /auth/discourse-sso)
     app.include_router(auth.router, prefix="/auth")
+    app.include_router(device_auth.router, prefix="/auth/device")
     app.include_router(discourse_sso.router, prefix="/auth")
 
     # Member profile — routes are /me and /me/...

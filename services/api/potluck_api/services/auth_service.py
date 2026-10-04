@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from potluck_api.config import get_settings
@@ -107,24 +108,7 @@ class AuthService:
             raise MagicLinkError("Invalid magic link")
         email = email.strip().lower()
 
-        # Allowlist membership is re-evaluated on every sign-in below, so both a
-        # promotion (email added to ADMIN_EMAILS) and a demotion (email removed)
-        # take effect on the member's next sign-in rather than only at creation.
-        is_allowlisted_admin = email in self.settings.admin_email_list()
-
-        # Case-insensitive lookup: emails are normalized to lowercase at every
-        # write path going forward, but existing rows may predate that and
-        # carry mixed case — comparing on lower() means "Rob@x.com" and
-        # "rob@x.com" always resolve to the same member.
-        member = await self.db.scalar(
-            select(Member).where(func.lower(Member.email) == email)
-        )
-        if member is None:
-            member = Member(email=email, is_admin=is_allowlisted_admin)
-            self.db.add(member)
-            await self.db.flush()  # populate member.id for the FK below
-        elif member.is_admin != is_allowlisted_admin:
-            member.is_admin = is_allowlisted_admin
+        member = await self.member_for_email(email)
 
         self.db.add(
             ConsumedMagicLink(
@@ -133,20 +117,35 @@ class AuthService:
             )
         )
 
-        raw_token = secrets.token_urlsafe(64)
-        session = Session(
-            member_id=member.id,
-            token_hash=hashlib.sha256(raw_token.encode()).hexdigest(),
-            expires_at=datetime.now(timezone.utc)
-            + timedelta(days=self.settings.session_expiry_days),
-        )
-        self.db.add(session)
+        raw_token, session = self.issue_session(member)
         try:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
             raise MagicLinkError("Magic link already used") from exc
         return member, raw_token, session
+
+    async def member_for_email(self, email: str) -> Member:
+        """Resolve a verified email, sharing identity rules across sign-in flows."""
+        email = email.strip().lower()
+        member = await self.db.scalar(select(Member).where(func.lower(Member.email) == email))
+        if member is None:
+            # Independent device approvals may create the same account concurrently.
+            await self.db.execute(insert(Member).values(id=uuid.uuid4(), email=email)
+                                  .on_conflict_do_nothing())
+            member = await self.db.scalar(select(Member).where(func.lower(Member.email) == email))
+        assert member is not None
+        member.is_admin = email in self.settings.admin_email_list()
+        return member
+
+    def issue_session(self, member: Member) -> tuple[str, Session]:
+        """Stage a session in the caller's transaction; caller commits consumption."""
+        raw_token = secrets.token_urlsafe(64)
+        session = Session(member_id=member.id,
+                          token_hash=hashlib.sha256(raw_token.encode()).hexdigest(),
+                          expires_at=datetime.now(timezone.utc) + timedelta(days=self.settings.session_expiry_days))
+        self.db.add(session)
+        return raw_token, session
 
     async def validate_session(self, raw_token: str) -> Member | None:
         """Return the Member for a valid, unexpired session token, else None."""
