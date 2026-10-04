@@ -1,4 +1,5 @@
 /** Account and household operations. Member/device bearers stay in the engine. */
+import { spawn } from "node:child_process";
 import { constants } from "node:fs";
 import { open, unlink } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -27,14 +28,49 @@ function publicAccount(result: Report): Report {
   return { signedIn: result.signedIn === true, memberId: text(result.memberId), email: text(result.email), expiresAt: text(result.expiresAt) };
 }
 
-export async function login(args: CliArgs, progress: (message: string) => void = () => {}, interactive = Boolean(process.stdin.isTTY)): Promise<Report> {
+/** The approval page with the code filled in. Only for a secure page with no query of its own. */
+export function approvalLink(verificationUri: string | null, userCode: string | null): string | null {
+  if (!verificationUri || !userCode) return null;
+  let url: URL;
+  try { url = new URL(verificationUri); } catch { return null; }
+  const loopback = url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  if ((url.protocol !== "https:" && !loopback) || url.search || url.hash) return null;
+  url.searchParams.set("code", userCode);
+  return url.toString();
+}
+
+/** Open a browser only where one can appear on this person's screen: not over SSH, CI, or a headless Linux box. */
+export function canOpenBrowser(args: CliArgs, env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): boolean {
+  if (args.browser === false || args.json) return false;
+  if (env.SSH_CONNECTION || env.SSH_CLIENT || env.SSH_TTY || env.CI) return false;
+  if (platform === "darwin") return true;
+  if (platform === "linux") return Boolean(env.DISPLAY || env.WAYLAND_DISPLAY);
+  return false;
+}
+
+function openBrowser(url: string): boolean {
+  try {
+    const child = spawn(process.platform === "darwin" ? "open" : "xdg-open", [url], { detached: true, stdio: "ignore" });
+    child.on("error", () => {});
+    child.unref();
+    return true;
+  } catch { return false; }
+}
+
+export async function login(args: CliArgs, progress: (message: string) => void = () => {}, interactive = Boolean(process.stdin.isTTY),
+  openLink: ((url: string) => boolean) | null = canOpenBrowser(args) ? openBrowser : null): Promise<Report> {
   let result = await account("/login/start", args, "POST");
   if (result.state === "pending") {
-    const instruction = `Open ${text(result.verificationUri)} on any device. Enter code ${text(result.userCode)}, then approve the email link.\n`;
+    const code = text(result.userCode);
+    const link = approvalLink(text(result.verificationUri), code);
     const wait = args.wait ?? (interactive && !args.json);
-    if (!wait) return { schemaVersion: 1, state: "pending", userCode: text(result.userCode), verificationUri: text(result.verificationUri),
-      expiresAt: result.expiresAt, interval: result.interval, next: "After approval, run potluck login --wait to finish signing in." };
-    progress(instruction);
+    if (!wait) return { schemaVersion: 1, state: "pending", userCode: code, verificationUri: text(result.verificationUri),
+      verificationUriComplete: link, expiresAt: result.expiresAt, interval: result.interval,
+      next: "After approval, run potluck login --wait to finish signing in." };
+    const opened = Boolean(link && interactive && openLink?.(link));
+    progress(opened
+      ? `Opening your browser to approve this terminal. Check the code matches: ${code}\nIf it did not open, go to ${link}\n`
+      : `To approve this terminal, open ${link ?? text(result.verificationUri)} on any device.\nCode: ${code}\n`);
     // Each HTTP call is bounded; the overall wait is bounded by the grant's expiry.
     const deadline = Math.min(Number(result.expiresAt) * 1000, Date.now() + 1800000);
     if (!Number.isFinite(deadline)) throw new RuntimeError("Invalid sign-in expiry. Restart login.");

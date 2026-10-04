@@ -20,6 +20,8 @@ export interface CliArgs {
   lines: number;
   timeout: number;
   wait?: boolean;
+  /** false when --no-browser: print the approval link instead of opening it. */
+  browser?: boolean;
   local?: boolean;
   name?: string;
   output?: string;
@@ -69,6 +71,7 @@ export function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--no-verify") out.noVerify = true;
     else if (arg === "--wait") out.wait = true;
     else if (arg === "--no-wait") out.wait = false;
+    else if (arg === "--no-browser") out.browser = false;
     else if (arg === "--local") out.local = true;
     else if (arg === "--no-input") out.noInput = true;
     else if (arg === "--enable-gateway") out.enableGateway = true;
@@ -184,7 +187,7 @@ export function parseArgs(argv: string[]): CliArgs {
   const allowed: Record<string, string[]> = {
     "--once": ["usage"], "--window": ["usage"], "--direction": ["usage"], "--theme": ["usage"],
     "--jobs": ["contribute"], "--max-tokens": ["contribute", "run"], "--min-free-memory": ["contribute"], "--days": ["contribute"], "--timezone": ["contribute"],
-    "--wait": ["login"], "--no-wait": ["login"], "--local": ["logout"],
+    "--wait": ["login"], "--no-wait": ["login"], "--no-browser": ["login", "setup"], "--local": ["logout"],
     "--name": ["household", "connect", "setup"], "--output": ["household"],
     "--invite-file": ["connect"], "--no-input": ["setup"], "--enable-gateway": ["setup"],
     "--message": ["launch"], "--with-model": ["setup"], "--sign-in": ["setup"], "--connect": ["setup"], "--preferences": ["setup"],

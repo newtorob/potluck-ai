@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseArgs } from "../src/args.js";
-import { connect, disconnect, household, login, logout, memberStatus, readInvite } from "../src/member.js";
+import { approvalLink, canOpenBrowser, connect, disconnect, household, login, logout, memberStatus, readInvite } from "../src/member.js";
 import { ControlError, requestJSON } from "../src/control.js";
 import { runtimeRequest } from "../src/runtime.js";
 
@@ -31,6 +31,64 @@ describe("member commands", () => {
     const result = await login(parseArgs(["login", "--wait"]));
     expect(result).toMatchObject({ state: "signed_in", signedIn: true, email: "m@example.com" });
     expect(JSON.stringify(result)).not.toContain("private");
+  });
+  it("opens the browser with the code filled in, then waits", async () => {
+    vi.mocked(runtimeRequest).mockResolvedValueOnce({ state: "pending", userCode: "BCDF-GHJK", verificationUri: "https://trypotluck.ai/auth/device",
+      expiresAt: Date.now() / 1000 + 900, interval: 5 })
+      .mockResolvedValueOnce({ state: "signed_in", signedIn: true, email: "m@example.com" });
+    const opened: string[] = [];
+    const messages: string[] = [];
+    const result = await login(parseArgs(["login"]), m => messages.push(m), true, url => { opened.push(url); return true; });
+    expect(opened).toEqual(["https://trypotluck.ai/auth/device?code=BCDF-GHJK"]);
+    expect(messages.join("")).toContain("Opening your browser");
+    expect(messages.join("")).toContain("BCDF-GHJK");
+    expect(result).toMatchObject({ state: "signed_in", signedIn: true });
+  });
+  it("prints a link with the code when no browser can open", async () => {
+    vi.mocked(runtimeRequest).mockResolvedValueOnce({ state: "pending", userCode: "BCDF-GHJK", verificationUri: "https://trypotluck.ai/auth/device",
+      expiresAt: Date.now() / 1000 + 900, interval: 5 })
+      .mockResolvedValueOnce({ state: "signed_in", signedIn: true, email: "m@example.com" });
+    const messages: string[] = [];
+    await login(parseArgs(["login"]), m => messages.push(m), true, null);
+    expect(messages.join("")).toContain("open https://trypotluck.ai/auth/device?code=BCDF-GHJK on any device");
+    expect(messages.join("")).not.toContain("Opening your browser");
+  });
+  it("falls back to the printed link when the browser fails to launch", async () => {
+    vi.mocked(runtimeRequest).mockResolvedValueOnce({ state: "pending", userCode: "BCDF-GHJK", verificationUri: "https://trypotluck.ai/auth/device",
+      expiresAt: Date.now() / 1000 + 900, interval: 5 })
+      .mockResolvedValueOnce({ state: "signed_in", signedIn: true });
+    const messages: string[] = [];
+    await login(parseArgs(["login"]), m => messages.push(m), true, () => false);
+    expect(messages.join("")).toContain("open https://trypotluck.ai/auth/device?code=BCDF-GHJK on any device");
+  });
+  it("never opens a browser when returning the pending code", async () => {
+    vi.mocked(runtimeRequest).mockResolvedValue({ state: "pending", userCode: "BCDF-GHJK", verificationUri: "https://trypotluck.ai/auth/device",
+      expiresAt: Date.now() / 1000 + 900, interval: 5 });
+    const opener = vi.fn(() => true);
+    const result = await login(parseArgs(["login", "--no-wait"]), undefined, true, opener);
+    expect(opener).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ state: "pending", verificationUriComplete: "https://trypotluck.ai/auth/device?code=BCDF-GHJK" });
+  });
+  it("decides when a browser can open", () => {
+    const login_ = parseArgs(["login"]);
+    expect(canOpenBrowser(login_, {}, "darwin")).toBe(true);
+    expect(canOpenBrowser(login_, { DISPLAY: ":0" }, "linux")).toBe(true);
+    expect(canOpenBrowser(login_, { WAYLAND_DISPLAY: "wayland-0" }, "linux")).toBe(true);
+    expect(canOpenBrowser(login_, {}, "linux")).toBe(false);
+    expect(canOpenBrowser(login_, { SSH_CONNECTION: "1.2.3.4 5 6.7.8.9 22" }, "darwin")).toBe(false);
+    expect(canOpenBrowser(login_, { SSH_TTY: "/dev/ttys001", DISPLAY: ":0" }, "linux")).toBe(false);
+    expect(canOpenBrowser(login_, { CI: "true" }, "darwin")).toBe(false);
+    expect(canOpenBrowser(parseArgs(["login", "--no-browser"]), {}, "darwin")).toBe(false);
+    expect(canOpenBrowser(parseArgs(["login", "--json"]), {}, "darwin")).toBe(false);
+    expect(canOpenBrowser(login_, {}, "win32")).toBe(false);
+  });
+  it("only builds approval links for secure query-free pages", () => {
+    expect(approvalLink("https://trypotluck.ai/auth/device", "BCDF-GHJK")).toBe("https://trypotluck.ai/auth/device?code=BCDF-GHJK");
+    expect(approvalLink("http://127.0.0.1:5173/auth/device", "BCDF-GHJK")).toBe("http://127.0.0.1:5173/auth/device?code=BCDF-GHJK");
+    expect(approvalLink("http://evil.example/auth/device", "BCDF-GHJK")).toBeNull();
+    expect(approvalLink("https://trypotluck.ai/auth/device?x=1", "BCDF-GHJK")).toBeNull();
+    expect(approvalLink("not a url", "BCDF-GHJK")).toBeNull();
+    expect(approvalLink(null, "BCDF-GHJK")).toBeNull();
   });
   it("shows stored profile without secrets", async () => {
     vi.mocked(runtimeRequest).mockResolvedValue({ signedIn: true, token: "private", email: "m@example.com" });
