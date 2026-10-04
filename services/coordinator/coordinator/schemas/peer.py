@@ -48,6 +48,13 @@ class CapabilityEntry(BaseModel):
 
     model_slug: str  # canonical name, e.g. "qwen2.5:3b-instruct-q4_K_M"
     quantization: str = "unknown"  # e.g. "q4_K_M", "q5_K_M", "f16"
+    # Measured on the peer for this model: generation speed and prompt-
+    # processing speed. None until the peer has benchmarked the model. The
+    # scorer uses tokens_per_second; the first-token deadline prefers
+    # prompt_tokens_per_second. Both are peer self-reports (advisory, like
+    # every other capacity figure): they steer routing, never billing.
+    tokens_per_second: float | None = Field(default=None, ge=0)
+    prompt_tokens_per_second: float | None = Field(default=None, ge=0)
 
 
 class AttestationPayload(BaseModel):
@@ -96,6 +103,11 @@ class HeartbeatMessage(BaseModel):
     current_jobs: int = 0
     gpu_utilization: float | None = None
     vram_available_gb: float | None = None
+    # The peer's own concurrency cap (peers.max_concurrent_jobs). None keeps
+    # whatever the row holds; 0 takes the peer out of new-job candidacy
+    # without disconnecting it. Capped on the wire so a peer cannot claim an
+    # absurd number to game the load term.
+    max_concurrent_jobs: int | None = Field(default=None, ge=0, le=64)
 
 
 # ---- Job dispatch (m3) ----------------------------------------------- #

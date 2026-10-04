@@ -27,6 +27,7 @@ import { localApi } from '@/lib/localApi';
 import { useChatStore } from '@/stores/chatStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { registerContributorDeviceKey } from '@/lib/deviceKey';
+import { contributorStatusLine, type ContributorStatus } from '@/lib/contributorStatus';
 import type { FleetSummary, MyJobStats, CreditBalance, CreditHistory, CreditHistoryEntry, ContributionsResponse } from '@/lib/localApi';
 import { relativeTime } from '@/lib/timeFormat';
 import { formatModelName } from '@/lib/modelName';
@@ -379,7 +380,7 @@ function FirstPeerPanel() {
               </p>
             </div>
             <p className="max-w-xl text-sm text-muted-foreground">
-              To offer this machine's loaded model to your own machines, enable{' '}
+              To offer this machine's loaded model, enable{' '}
               <span className="font-medium text-foreground">Contribute compute</span> above.
               To ask the network for an answer, choose a network scope in Chat.
               Your own usage, contributions, and credits are below.
@@ -963,12 +964,40 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
  * and open-pool serving both gate on this flag). Enabling it also registers
  * this machine's contributor device key, mirroring ConnectStep.
  */
+const CONTRIBUTOR_STATUS_POLL_MS = 10_000;
+
 function ContributorToggleCard() {
   const settings = useSettingsStore((s) => s.settings);
   const isSaving = useSettingsStore((s) => s.isSaving);
   const updateSettings = useSettingsStore((s) => s.update);
+  const [status, setStatus] = useState<ContributorStatus | null>(null);
 
   const contributorMode = settings?.network.contributor_mode ?? false;
+
+  // While the toggle is on, the sidecar's in-process contributor is what does
+  // the work; show what it is doing. Polled, not pushed: the status is a few
+  // counters and a state word, and 10 s is well inside a heartbeat interval.
+  useEffect(() => {
+    if (!contributorMode) {
+      setStatus(null);
+      return;
+    }
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const next = await localApi.getContributorStatus();
+        if (!cancelled) setStatus(next);
+      } catch {
+        // Sidecar hiccup: keep the last line rather than flashing.
+      }
+    };
+    void tick();
+    const id = window.setInterval(() => void tick(), CONTRIBUTOR_STATUS_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [contributorMode]);
 
   async function handleToggle(next: boolean) {
     try {
@@ -985,8 +1014,16 @@ function ContributorToggleCard() {
       } catch (err) {
         console.warn('[NetworkView] device key registration failed:', err);
       }
+      // Refresh right away so the line moves from Starting within a second.
+      try {
+        setStatus(await localApi.getContributorStatus());
+      } catch {
+        /* the poll above catches up */
+      }
     }
   }
+
+  const line = contributorStatusLine(status);
 
   return (
     <div className="rounded-lg border border-border bg-card/60 p-4">
@@ -1002,11 +1039,25 @@ function ContributorToggleCard() {
               Share spare compute with your network
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              While enabled, this machine can answer requests from your own machines
-              using its loaded model. Turn it off when you need the resources for
-              other work. It does not automatically pause when you are active.
+              While enabled, this machine offers its loaded model to your own machines
+              and eligible network requests. Turn it off when you need the resources
+              for other work. It does not automatically pause when you are active.
               Choosing a network scope in Chat is separate: it requests compute from others.
             </p>
+            {line !== null ? (
+              <p
+                role="status"
+                aria-live="polite"
+                className={cn(
+                  'text-xs',
+                  line.tone === 'ok' && 'text-foreground',
+                  line.tone === 'pending' && 'text-muted-foreground',
+                  line.tone === 'warn' && 'text-destructive',
+                )}
+              >
+                {line.text}
+              </p>
+            ) : null}
           </div>
           <input
             type="checkbox"

@@ -59,6 +59,11 @@ async def apply_heartbeat(
     )
     await db.execute(hb_stmt)
 
+    peer_values: dict = {"last_seen_at": now}
+    if hb.max_concurrent_jobs is not None:
+        # The peer's own cap. pick_peer_for_model hard-excludes the peer once
+        # its live in-flight count reaches it (see migration 0010).
+        peer_values["max_concurrent_jobs"] = hb.max_concurrent_jobs
     await db.execute(
-        update(Peer).where(Peer.id == hb.peer_id).values(last_seen_at=now)
+        update(Peer).where(Peer.id == hb.peer_id).values(**peer_values)
     )

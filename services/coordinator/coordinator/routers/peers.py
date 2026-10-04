@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from coordinator.db.database import get_db
 from coordinator.middleware.auth import coordinator_token_matches
+from coordinator.middleware.session_auth import resolve_member_from_bearer
 from coordinator.schemas.peer import (
     AcceptMessage,
     AttestationPayload,
@@ -83,17 +84,27 @@ async def peer_connect(
 ) -> None:
     await ws.accept()
 
-    # ---- coordinator-token gate ----
-    # No-op when POTLUCK_COORDINATOR_TOKEN is unset, so tokenless household
-    # coordinators are unaffected. When a token IS configured, the contributor
-    # must present it on the WS upgrade (X-Potluck-Coordinator-Token header).
-    # Raises the bar for opening a contributor session from "anyone reachable"
-    # to "anyone holding the coordinator token" while full member<->key binding
-    # is built (v0.5). The Ed25519 signed-nonce challenge below still runs.
-    if not coordinator_token_matches(ws.headers.get("x-potluck-coordinator-token")):
+    # ---- credential gate ----
+    # Two ways in, checked in this order (mirrors middleware/node_auth.py):
+    #   1. `Authorization: Bearer <member session>` — the desktop app's
+    #      contributor. Resolves to a member through the shared sessions
+    #      table when POTLUCK_SESSION_AUTH_ENABLED=1; that member is then
+    #      BOUND to this connection and overrides whatever member_id the
+    #      attestation payload claims, so the key binding and the
+    #      member_keys allowlist apply to the real member.
+    #   2. `X-Potluck-Coordinator-Token` — the machine-wide shared token for
+    #      the dev fleet. No-op when POTLUCK_COORDINATOR_TOKEN is unset, so
+    #      tokenless household coordinators are unaffected.
+    # Neither: reject. The Ed25519 signed-nonce challenge below still runs
+    # either way; this gate only decides who may attempt it.
+    session_member_id = await resolve_member_from_bearer(db, ws.headers.get("authorization"))
+    if session_member_id is None and not coordinator_token_matches(
+        ws.headers.get("x-potluck-coordinator-token")
+    ):
         logger.info("peer_rejected_bad_coordinator_token")
         await _reject(ws, "unauthorized", code=1008)
         return
+    auth_mode = "session" if session_member_id is not None else "shared_token"
 
     nonce_raw, nonce_b64 = _new_nonce()
 
@@ -123,6 +134,10 @@ async def peer_connect(
         logger.info("peer_attestation_invalid_shape", errors=e.errors())
         await _reject(ws, f"invalid attestation payload: {e.error_count()} error(s)")
         return
+    if session_member_id is not None:
+        # The session is the identity; the payload's member_id is at best a
+        # stale stub. Replace it before attestation binds the key.
+        payload = payload.model_copy(update={"member_id": session_member_id})
 
     # ---- verify + register ----
     try:
@@ -167,6 +182,7 @@ async def peer_connect(
         member_id=str(peer.member_id),
         platform=payload.platform,
         client_version=payload.client_version,
+        auth=auth_mode,
     )
 
     # Register the connection so the job dispatch endpoint can find it.

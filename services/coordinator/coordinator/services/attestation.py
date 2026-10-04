@@ -92,9 +92,16 @@ async def verify_attestation(
         )
     )
     if release is None:
-        raise AttestationError(
-            f"binary_hash {payload.binary_hash[:16]}…: not in contributor_releases"
+        if get_settings().require_registered_release:
+            raise AttestationError(
+                f"binary_hash {payload.binary_hash[:16]}…: not in contributor_releases"
+            )
+        logger.info(
+            "peer_release_unregistered",
+            binary_hash_prefix=payload.binary_hash[:16],
+            client_version=payload.client_version,
         )
+    release_version = release.version if release is not None else "unregistered"
 
     peer = await db.scalar(
         select(Peer).where(Peer.public_key == payload.peer_public_key)
@@ -160,7 +167,7 @@ async def verify_attestation(
             "peer_registered",
             peer_id=str(peer.id),
             member_id=str(peer.member_id),
-            release_version=release.version,
+            release_version=release_version,
             platform=payload.platform,
         )
     else:
@@ -174,7 +181,7 @@ async def verify_attestation(
             "peer_reconnected",
             peer_id=str(peer.id),
             member_id=str(peer.member_id),
-            release_version=release.version,
+            release_version=release_version,
         )
 
     # Upsert peer_heartbeats — primary key is peer_id, so on_conflict_do_update.
@@ -210,6 +217,8 @@ async def verify_attestation(
             peer_id=peer.id,
             model_slug=cap.model_slug,
             quantization=cap.quantization,
+            tokens_per_second=cap.tokens_per_second,
+            prompt_tokens_per_second=cap.prompt_tokens_per_second,
         ))
     if payload.capabilities:
         logger.info(

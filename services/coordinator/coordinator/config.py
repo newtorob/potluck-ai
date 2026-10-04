@@ -43,6 +43,15 @@ class Settings(BaseSettings):
     # member and can't later claim a different one.
     require_registered_keys: bool = False
 
+    # Peer attestation: when true, a peer whose binary_hash is not in
+    # contributor_releases is rejected (the original behaviour). When false
+    # (default), an unknown hash is accepted, logged as
+    # peer_release_unregistered, and recorded on the peer's heartbeat row as
+    # before. Advisory until releases are actually signed: no shipped
+    # desktop build has a registered hash yet, so the strict gate would keep
+    # every real member out. Preflight warns in production while this is off.
+    require_registered_release: bool = False
+
     # DERP-token proof-of-possession (POST /mesh/derp-token). When a caller
     # presents the OPTIONAL `nonce` + `signature` fields, the coordinator
     # always verifies them (mismatch -> 401) regardless of this flag. This

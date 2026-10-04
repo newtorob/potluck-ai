@@ -67,6 +67,11 @@ class PeerCapability(Base):
     model_slug: Mapped[str] = mapped_column(String(128), primary_key=True)
     quantization: Mapped[str] = mapped_column(String(16), nullable=False)
     tokens_per_second: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Prompt-processing speed the peer measured for this model; the
+    # first-token deadline prefers it over tokens_per_second (generation),
+    # which is the wrong rate for "how long until the first token". See
+    # migration 0012.
+    prompt_tokens_per_second: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

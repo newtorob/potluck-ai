@@ -114,6 +114,26 @@ def run_preflight(settings: Settings) -> list[Check]:
         )
     )
 
+    # --- Release allowlist (advisory until releases are signed) --------------
+    checks.append(
+        Check(
+            name="require_registered_release",
+            status="ok" if settings.require_registered_release else "warn",
+            detail=(
+                "Unknown binary_hash values are rejected at attestation."
+                if settings.require_registered_release
+                else "require_registered_release is off — a peer with an "
+                "unregistered binary_hash is accepted and logged "
+                "(peer_release_unregistered). Expected until releases are signed."
+            ),
+            remedy=(
+                "Sign the shipped build (scripts/dev/sign-contributor-release.py) "
+                "and set REQUIRE_REGISTERED_RELEASE=true."
+            ),
+            blocking=False,
+        )
+    )
+
     # --- Database credentials (operator-fixable) -----------------------------
     using_default_db = _DEFAULT_DB_CREDENTIALS in settings.database_url
     checks.append(

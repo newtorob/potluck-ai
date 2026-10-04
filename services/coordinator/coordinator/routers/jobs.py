@@ -844,9 +844,10 @@ async def _first_token_deadline(
     Estimate:
         est_prompt_tokens = (len(prompt) + sum(len(m.content) for messages))
                             / 4 chars-per-token
-        expected_pp_rate  = measured PeerCapability.tokens_per_second for
-                            (peer, model) when present and > 0, else the
-                            coarse hardware-tier proxy * 25 tok/s
+        expected_pp_rate  = measured PeerCapability.prompt_tokens_per_second
+                            for (peer, model) when present and > 0, else its
+                            tokens_per_second, else the coarse hardware-tier
+                            proxy * 25 tok/s
         deadline          = clamp(FIRST_TOKEN_DEADLINE_S
                                   + est_prompt_tokens / expected_pp_rate,
                                   FIRST_TOKEN_DEADLINE_S, FIRST_TOKEN_MAX_S)
@@ -876,7 +877,11 @@ async def _first_token_deadline(
 
     row = (
         await db.execute(
-            sa_select(PeerCapability.tokens_per_second, Peer.hardware_summary)
+            sa_select(
+                PeerCapability.tokens_per_second,
+                Peer.hardware_summary,
+                PeerCapability.prompt_tokens_per_second,
+            )
             .select_from(Peer)
             .outerjoin(
                 PeerCapability,
@@ -889,8 +894,13 @@ async def _first_token_deadline(
 
     measured_tps = row[0] if row is not None else None
     hardware = (row[1] if row is not None else None) or {}
+    measured_pp_tps = row[2] if row is not None else None
 
-    if measured_tps is not None and measured_tps > 0:
+    # Prompt-processing rate is the right rate for a first-token budget;
+    # generation rate is the next best measured figure; the tier guess last.
+    if measured_pp_tps is not None and measured_pp_tps > 0:
+        expected_pp_rate = float(measured_pp_tps)
+    elif measured_tps is not None and measured_tps > 0:
         expected_pp_rate = float(measured_tps)
     else:
         expected_pp_rate = _hardware_tier_score(hardware) * _TIER_PP_TOKENS_PER_SECOND

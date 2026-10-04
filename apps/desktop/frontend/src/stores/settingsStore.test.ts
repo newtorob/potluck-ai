@@ -29,6 +29,7 @@ function makeSettings(chatHistoryEnabled: boolean): PotluckSettings {
       contributor_mode: false,
       contributor_schedule: null,
       max_gpu_percent: 50,
+    max_concurrent_jobs: 1,
       coordinator_url: '',
     },
     app: { theme: 'system', font_size: 14 },

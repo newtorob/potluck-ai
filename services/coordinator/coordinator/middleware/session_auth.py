@@ -122,3 +122,33 @@ async def resolve_session_member_id(
     # asyncpg returns a uuid.UUID for a uuid column; coerce defensively so the
     # return type is honest regardless of driver.
     return member_id if isinstance(member_id, uuid.UUID) else uuid.UUID(str(member_id))
+
+
+async def resolve_member_from_bearer(
+    db: AsyncSession, authorization: str | None
+) -> uuid.UUID | None:
+    """WebSocket-side twin of ``resolve_session_member_id``.
+
+    Returns the member behind a valid ``Authorization: Bearer`` session
+    token, or None when session auth is disabled, the header is absent or
+    malformed, or the session is unknown or expired. Never raises: the
+    caller decides what "no session" means (for ``/peers/connect`` it falls
+    back to the shared coordinator token, mirroring ``node_auth``).
+    """
+    if not session_auth_enabled():
+        return None
+    token = _extract_token(None, authorization)
+    if not token:
+        return None
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    member_id = await db.scalar(
+        text(
+            "SELECT member_id FROM sessions "
+            "WHERE token_hash = :token_hash AND expires_at > now() "
+            "LIMIT 1"
+        ),
+        {"token_hash": token_hash},
+    )
+    if member_id is None:
+        return None
+    return member_id if isinstance(member_id, uuid.UUID) else uuid.UUID(str(member_id))
