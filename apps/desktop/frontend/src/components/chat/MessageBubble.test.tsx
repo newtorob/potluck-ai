@@ -4,11 +4,14 @@
  * and a 'partial' reply must not read like a finished one.
  */
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MessageBubble } from './MessageBubble';
-import type { AppMessage } from '@/stores/chatStore';
+import { useChatStore, type AppMessage } from '@/stores/chatStore';
+
+const restartAction = useChatStore.getState().restartMessage;
+afterEach(() => useChatStore.setState({ isStreaming: false, restartMessage: restartAction }));
 
 function message(overrides: Partial<AppMessage> = {}): AppMessage {
   return {
@@ -68,5 +71,32 @@ describe('MessageBubble', () => {
     renderBubble(message({ status: 'complete', content: 'a whole answer' }));
 
     expect(screen.queryByText('Stopped early')).toBeNull();
+  });
+});
+
+
+describe('restart control', () => {
+  const recovery = { messages: [], modelSlug: 'same-model', excludedPeerIds: ['p1'],
+    routingMode: 'capability' as const, historyAllowed: false };
+
+  it('explains the scope and restarts the interrupted message', () => {
+    const restart = vi.fn().mockResolvedValue(undefined);
+    useChatStore.setState({ isStreaming: false, restartMessage: restart });
+    renderBubble(message({ status: 'error', content: 'partial answer', recovery }));
+    expect(screen.getByText(/This answer is incomplete/)).toBeTruthy();
+    expect(screen.getByText(/another of your machines/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Restart on another computer' }));
+    expect(restart).toHaveBeenCalledWith('m1');
+  });
+
+  it('disables restart while another request is running', () => {
+    useChatStore.setState({ isStreaming: true });
+    renderBubble(message({ status: 'error', recovery }));
+    expect(screen.getByRole('button', { name: 'Restart on another computer' })).toBeDisabled();
+  });
+
+  it('labels the replacement as a restarted answer', () => {
+    renderBubble(message({ content: 'replacement', restartOf: 'original' }));
+    expect(screen.getByText('Restarted answer · My Machines')).toBeTruthy();
   });
 });

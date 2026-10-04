@@ -73,7 +73,7 @@ interface ModelState {
   /** Full catalog from GET /models, merged with live download_progress */
   models: CatalogModel[];
 
-  /** Slug of the currently-loaded model (from settings.active_model_id) */
+  /** Slug of the currently-loaded model (from /health.active_model_id) */
   activeModelSlug: string | null;
 
   /** True while a POST /install request is pending (before polling starts) */
@@ -132,8 +132,8 @@ export const useModelStore = create<ModelState>()((set, get) => ({
     set({ isFetching: true, fetchError: null });
     try {
       // Fetch catalog and runtime state in parallel.
-      // /health is authoritative for "what's loaded right now" — settings may lag
-      // because the sidecar doesn't persist active_model_id across loads in v0.
+      // /health is authoritative for "what's loaded right now". The saved
+      // startup model and coding-agent preference do not imply a loaded model.
       const [rawModels, health] = await Promise.all([
         (localApi.listModels() as unknown) as Promise<CatalogModel[]>,
         localApi.health().catch(() => null),

@@ -9,6 +9,8 @@ const http = require('http');
 const { pathToFileURL } = require('url');
 const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
+const { discoverRuntime } = require('./runtime-control');
+const { readMemberSession } = require('./member-session');
 
 // ─── App identity ────────────────────────────────────────────────────────────
 // Must be set BEFORE app.whenReady() so menu bar / app data path use the right
@@ -30,11 +32,22 @@ const SIGKILL_TIMEOUT_MS = 3_000;
 // processes on the machine from reading the user's memory/chat/tasks/vault over
 // 127.0.0.1. Generated fresh each launch. Unused in dev: there the sidecar is
 // started by dev:python without a token, so the gate is off and we inject nothing.
-const SIDECAR_TOKEN = crypto.randomBytes(32).toString('hex');
+let SIDECAR_TOKEN = crypto.randomBytes(32).toString('hex');
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
 let pythonProcess = null;
+let attachedRuntime = false;
+// A CLI-owned runtime can restart while the app stays open. Re-authenticate the
+// new instance before adopting its per-launch credential; never spawn a rival.
+const sharedRuntimePoll = setInterval(async () => {
+  if (!attachedRuntime || app.isQuitting) return;
+  try {
+    const record = await discoverRuntime();
+    if (record) SIDECAR_TOKEN = record.token;
+  } catch (_) { /* The renderer's health checks report runtime unavailability. */ }
+}, 3000);
+sharedRuntimePoll.unref();
 let mainWindow = null;
 let restartAttempts = 0;
 
@@ -255,13 +268,28 @@ function getSidecarPath() {
 
 // ─── Sidecar lifecycle ───────────────────────────────────────────────────────
 
-function startPythonSidecar() {
+async function startPythonSidecar() {
   const sidecarPath = getSidecarPath();
 
   if (!sidecarPath) {
     log.info('[sidecar] Dev mode — expecting Python sidecar started via dev:python script.');
     return;
   }
+
+  try {
+    const existing = await discoverRuntime();
+    if (existing) {
+      SIDECAR_TOKEN = existing.token;
+      attachedRuntime = true;
+      log.info(`[sidecar] Attached to shared runtime PID ${existing.pid}.`);
+      return;
+    }
+  } catch (err) {
+    log.error(`[sidecar] ${err.message}`);
+    return; // Fail closed; never replace a live runtime's private credential.
+  }
+  attachedRuntime = false;
+  SIDECAR_TOKEN = crypto.randomBytes(32).toString('hex');
 
   log.info(`[sidecar] Spawning: ${sidecarPath} --port ${PYTHON_PORT}`);
 
@@ -271,6 +299,7 @@ function startPythonSidecar() {
       ...process.env,
       POTLUCK_PORT: String(PYTHON_PORT),
       POTLUCK_SIDECAR_TOKEN: SIDECAR_TOKEN,
+      ...(process.platform !== 'win32' ? { POTLUCK_SHARED_RUNTIME: '1', POTLUCK_RUNTIME_OWNER: 'desktop' } : {}),
     },
   });
 
@@ -279,6 +308,8 @@ function startPythonSidecar() {
     // This way only *consecutive* rapid failures count against the limit,
     // not the total lifetime crash count across a long session.
     restartAttempts = 0;
+    // A fresh sidecar holds no member session; give it ours once it answers.
+    void syncContributorSessionWhenReady();
   });
 
   pythonProcess.stdout.on('data', (data) => {
@@ -299,7 +330,7 @@ function startPythonSidecar() {
     log.warn(`[sidecar] Exited — code=${code} signal=${signal}`);
     pythonProcess = null;
 
-    if (app.isQuitting) {
+    if (app.isQuitting || attachedRuntime) {
       return; // Expected shutdown, do not restart.
     }
 
@@ -361,7 +392,13 @@ async function waitForSidecar() {
   while (Date.now() < deadline) {
     attempt += 1;
     try {
-      const res = await fetch(`http://127.0.0.1:${PYTHON_PORT}/health`);
+      if (app.isPackaged && process.platform !== 'win32') {
+        const record = await discoverRuntime();
+        if (!record) throw new Error('Shared runtime not ready');
+        SIDECAR_TOKEN = record.token;
+        attachedRuntime = record.pid !== pythonProcess?.pid;
+      }
+      const res = await fetch(`http://127.0.0.1:${PYTHON_PORT}/health`, { signal: AbortSignal.timeout(1000) });
       if (res.ok) {
         log.info(`[sidecar] Health check passed after ${attempt} attempt(s).`);
         return true;
@@ -1517,6 +1554,12 @@ function cloudTokenPath() {
 }
 
 function loadCloudToken() {
+  if (process.platform !== 'win32' && (app.isPackaged || attachedRuntime)) {
+    try {
+      const shared = readMemberSession(CLOUD_API_BASE);
+      if (shared !== undefined) return shared.token;
+    } catch (_) { return null; } // A private/foreign-origin record must never fall back.
+  }
   if (cloudSessionToken !== undefined) return cloudSessionToken;
   try {
     cloudSessionToken = fs.readFileSync(cloudTokenPath(), 'utf8').trim() || null;
@@ -1526,7 +1569,80 @@ function loadCloudToken() {
   return cloudSessionToken;
 }
 
-ipcMain.handle('cloud:set-token', (_evt, token) => {
+async function migrateMemberSession() {
+  if (process.platform === 'win32' || !app.isPackaged) return;
+  try {
+    const legacy = fs.existsSync(cloudTokenPath()) ? fs.readFileSync(cloudTokenPath(), 'utf8').trim() : null;
+    if (!legacy) return;
+    const response = await sidecarRequest('POST', '/account/session/import', { token: legacy });
+    if (response.ok) {
+      fs.rmSync(cloudTokenPath(), { force: true });
+      cloudSessionToken = undefined;
+    } else log.warn(`[account] Shared session migration returned HTTP ${response.status}; legacy state retained.`);
+  } catch (_) { log.warn('[account] Shared session migration unavailable; legacy state retained.'); }
+}
+
+// ─── Contributor session hand-off ────────────────────────────────────────────
+//
+// The in-process contributor inside the sidecar identifies this machine to the
+// coordinator with the member's session bearer. The sidecar never reads the
+// token file itself; main hands the token over loopback (sidecar bearer on the
+// request) whenever it changes and whenever the sidecar comes up. The renderer
+// never sees it.
+
+const CONTRIBUTOR_SESSION_SYNC_TIMEOUT_MS = 2_500;
+
+function sidecarRequest(method, reqPath, body) {
+  const headers = { Authorization: `Bearer ${SIDECAR_TOKEN}` };
+  const init = { method, headers };
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), reqPath.startsWith('/account')
+    ? CLOUD_REQUEST_TIMEOUT_MS + 2_000 : CONTRIBUTOR_SESSION_SYNC_TIMEOUT_MS);
+  init.signal = controller.signal;
+  return fetch(`http://127.0.0.1:${PYTHON_PORT}${reqPath}`, init).finally(() => clearTimeout(timer));
+}
+
+async function syncContributorSession({ allowClear = true } = {}) {
+  const token = loadCloudToken();
+  // Opening a signed-out app must not sign out a runtime started from the CLI.
+  if (!token && attachedRuntime && !allowClear) return;
+  try {
+    const res = token
+      ? await sidecarRequest('PUT', '/contributor/session', { token })
+      : await sidecarRequest('DELETE', '/contributor/session');
+    if (!res.ok) {
+      log.warn(`[contributor] session sync returned HTTP ${res.status}`);
+    }
+  } catch (err) {
+    log.warn(`[contributor] session sync failed: ${err.message}`);
+  }
+}
+
+/**
+ * After a (re)spawn the sidecar takes a few seconds to answer; wait for
+ * /health and then hand over the session. Fire-and-forget from the spawn
+ * path so a crash-restart re-arms the contributor without the renderer's
+ * involvement.
+ */
+async function syncContributorSessionWhenReady() {
+  const ready = await waitForSidecar();
+  if (ready) await syncContributorSession({ allowClear: false });
+}
+
+ipcMain.handle('cloud:set-token', async (_evt, token) => {
+  if (process.platform !== 'win32' && (app.isPackaged || attachedRuntime)) {
+    const response = token
+      ? await sidecarRequest('PUT', '/account/session', { token })
+      : await sidecarRequest('POST', '/account/logout', { local_only: true });
+    if (!response.ok) throw new Error('Could not save the shared member session. Check the local engine and retry.');
+    fs.rmSync(cloudTokenPath(), { force: true });
+    cloudSessionToken = undefined;
+    return;
+  }
   cloudSessionToken = typeof token === 'string' && token.length > 0 ? token : null;
   try {
     if (cloudSessionToken) {
@@ -1539,19 +1655,25 @@ ipcMain.handle('cloud:set-token', (_evt, token) => {
   } catch (err) {
     log.warn(`[cloud] failed to persist session token: ${err.message}`);
   }
+  void syncContributorSession();
 });
 
 ipcMain.handle('cloud:has-token', () => {
   return loadCloudToken() != null;
 });
 
-ipcMain.handle('cloud:clear-token', () => {
+ipcMain.handle('cloud:clear-token', async () => {
+  if (process.platform !== 'win32' && (app.isPackaged || attachedRuntime)) {
+    const response = await sidecarRequest('POST', '/account/logout', { local_only: true });
+    if (!response.ok) throw new Error('Could not clear the shared member session. Start the local engine and retry.');
+  }
   cloudSessionToken = null;
   try {
     fs.rmSync(cloudTokenPath(), { force: true });
   } catch (_) {
     /* already gone */
   }
+  void syncContributorSession();
 });
 
 ipcMain.handle('cloud:request', async (_evt, method, reqPath, body) => {
@@ -1844,7 +1966,7 @@ function setupAutoUpdater() {
  * forcibly kills it with SIGKILL (or taskkill on Windows).
  * Returns a Promise that resolves once the process is gone or the timeout elapses.
  */
-function killSidecar() {
+function killSidecar({ shutdownRequested = false } = {}) {
   return new Promise((resolve) => {
     if (!pythonProcess) {
       resolve();
@@ -1855,25 +1977,25 @@ function killSidecar() {
     pythonProcess = null;
 
     let settled = false;
+    let gracefulTimer;
+    let killTimer;
     const done = () => {
       if (!settled) {
         settled = true;
+        clearTimeout(gracefulTimer);
+        clearTimeout(killTimer);
         resolve();
       }
     };
 
     proc.once('exit', done);
 
-    // Attempt graceful SIGTERM first.
-    try {
-      proc.kill('SIGTERM');
-    } catch (err) {
-      log.warn(`[sidecar] SIGTERM failed: ${err.message}`);
-    }
-
-    // Escalate to SIGKILL after timeout.
-    const killTimer = setTimeout(() => {
-      if (!settled) {
+    const terminate = () => {
+      if (settled) return;
+      try { proc.kill('SIGTERM'); }
+      catch (err) { log.warn(`[sidecar] SIGTERM failed: ${err.message}`); }
+      killTimer = setTimeout(() => {
+        if (settled) return;
         log.warn('[sidecar] SIGTERM timeout — sending SIGKILL.');
         try {
           proc.kill('SIGKILL');
@@ -1882,10 +2004,13 @@ function killSidecar() {
         }
         // Give Windows an extra beat then resolve regardless.
         setTimeout(done, 500);
-      }
-    }, SIGKILL_TIMEOUT_MS);
+      }, SIGKILL_TIMEOUT_MS);
+    };
 
-    proc.once('exit', () => clearTimeout(killTimer));
+    // Let /shutdown finish and remove the shared runtime record before sending
+    // a signal. Uvicorn re-raises SIGTERM after serving, skipping that cleanup.
+    if (shutdownRequested) gracefulTimer = setTimeout(terminate, SIGKILL_TIMEOUT_MS);
+    else terminate();
   });
 }
 
@@ -1923,7 +2048,7 @@ app.whenReady().then(async () => {
     }
   }
 
-  startPythonSidecar();
+  await startPythonSidecar();
 
   const sidecarReady = await waitForSidecar();
   if (!sidecarReady) {
@@ -1949,6 +2074,10 @@ app.whenReady().then(async () => {
     app.exit(1);
     return;
   }
+  // Dev mode runs the sidecar outside this process (no spawn hook fires), so
+  // hand the member session over here as well. Idempotent in production.
+  await migrateMemberSession();
+  void syncContributorSession({ allowClear: false });
 
   await createWindow();
   setupAutoUpdater();
@@ -1961,7 +2090,7 @@ app.on('activate', async () => {
   // for every API call until the restart completes. Skip window creation in that case —
   // the restart handler will not re-open a window, but the next crash-free activate
   // (or the app.whenReady path after a future relaunch) will.
-  if (BrowserWindow.getAllWindows().length === 0 && (pythonProcess || !app.isPackaged)) {
+  if (BrowserWindow.getAllWindows().length === 0 && (pythonProcess || attachedRuntime || !app.isPackaged)) {
     await createWindow();
   }
 });
@@ -1978,19 +2107,31 @@ app.on('before-quit', async (event) => {
   if (!app.isQuitting) {
     event.preventDefault();
     app.isQuitting = true;
+    clearInterval(sharedRuntimePoll);
+    if (attachedRuntime) {
+      log.info('[app] Leaving the shared runtime running.');
+      // Electron ignores a synchronous re-entrant quit while the first
+      // before-quit event is still being cancelled. Finish that event first.
+      setImmediate(() => app.quit());
+      return;
+    }
     log.info('[app] Shutting down sidecar before quit…');
 
+    let shutdownRequested = false;
     try {
       // Best-effort HTTP shutdown signal; the sidecar can do cleanup on its end.
-      await Promise.race([
-        fetch(`http://127.0.0.1:${PYTHON_PORT}/shutdown`, { method: 'POST' }),
+      const response = await Promise.race([
+        fetch(`http://127.0.0.1:${PYTHON_PORT}/shutdown`, {
+          method: 'POST', headers: { Authorization: `Bearer ${SIDECAR_TOKEN}` },
+        }),
         new Promise((r) => setTimeout(r, 1000)),
       ]);
+      shutdownRequested = response?.ok === true;
     } catch (_) {
       // Ignore — the sidecar may already be down.
     }
 
-    await killSidecar();
+    await killSidecar({ shutdownRequested });
     log.info('[app] Sidecar terminated. Quitting.');
     app.quit();
   }

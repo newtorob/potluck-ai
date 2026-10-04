@@ -25,13 +25,28 @@ import type {
   ClusterResponse,
 } from '@/types/memory';
 import type { TaskState, TaskStatus, TaskCreateInput, TaskUpdateInput } from '@/types/tasks';
-import type { AgentSession, MemoryPreview, SessionDetail, ToolCall } from '@/types/agents';
+import type {
+  AgentRun,
+  AgentRunDetail,
+  AgentRunEventDelta,
+  AgentConnectorStatus,
+  AgentProvider,
+  AgentSession,
+  ManagedAgentCapabilities,
+  ManagedAgentSession,
+  ManagedApprovalDecision,
+  ManagedSandboxMode,
+  MemoryPreview,
+  SessionDetail,
+  ToolCall,
+} from '@/types/agents';
 import { coordinatorBase } from '@/stores/connectionStore';
 import {
   coordinatorSessionRequest,
   detailOf,
   type CoordinatorSessionResult,
 } from '@/lib/coordinatorAuth';
+import type { ContributorStatus } from './contributorStatus';
 
 const LOCAL_BASE =
   (import.meta.env['VITE_LOCAL_API_URL'] as string | undefined) ?? 'http://127.0.0.1:8321';
@@ -188,6 +203,8 @@ export interface HealthResponse {
   status: 'ok';
   model_loaded: boolean;
   active_model_id: string | null;
+  /** Present when the shared runtime owns startup restoration. */
+  model_restore?: { status: 'idle' | 'disabled' | 'loading' | 'restored' | 'failed' | 'cancelled'; model_id: string | null };
   /** Context window actually loaded into the runtime. Null when no model is loaded. */
   n_ctx_loaded?: number | null;
   /** Big Model Mode: list of llama.cpp RPC endpoints the current model
@@ -212,6 +229,7 @@ export interface HealthResponse {
 // ---------------------------------------------------------------------------
 
 export interface RuntimeSettings {
+  startup_model_id?: string | null;
   context_size: number;
   gpu_layers: number;
   threads: number;
@@ -228,6 +246,9 @@ export interface PrivacySettings {
 
 export interface NetworkSettings {
   contributor_mode: boolean;
+  /** Coordinator jobs this machine serves at once; the contributor loop
+   *  declines beyond it and heartbeats carry it. */
+  max_concurrent_jobs: number;
   contributor_schedule: Record<string, unknown> | null;
   max_gpu_percent: number;
   /** HTTP base of the coordinator this node talks to. Synced from the
@@ -784,6 +805,14 @@ export const localApi = {
     return timedFetch(`${LOCAL_BASE}/settings`).then((r) => handleResponse<PotluckSettings>(r));
   },
 
+  /** GET /contributor/status — what the Contribute compute toggle is doing
+   *  (state, this machine's own peer id, counters). Never lists other peers. */
+  getContributorStatus(): Promise<ContributorStatus> {
+    return timedFetch(`${LOCAL_BASE}/contributor/status`).then((r) =>
+      handleResponse<ContributorStatus>(r),
+    );
+  },
+
   updateSettings(patch: PotluckSettingsPatch): Promise<PotluckSettings> {
     return timedFetch(`${LOCAL_BASE}/settings`, {
       method: 'PATCH',
@@ -1012,6 +1041,126 @@ export const localApi = {
   // ---- Agents --------------------------------------------------------------
 
   agents: {
+    managedCapabilities(): Promise<ManagedAgentCapabilities> {
+      return timedFetch(`${LOCAL_BASE}/agents/managed/capabilities`).then((r) =>
+        handleResponse<ManagedAgentCapabilities>(r),
+      );
+    },
+
+    listManagedSessions(taskId?: string): Promise<ManagedAgentSession[]> {
+      const params = new URLSearchParams();
+      if (taskId) params.set('task_id', taskId);
+      const query = params.toString();
+      return timedFetch(`${LOCAL_BASE}/agents/managed/sessions${query ? `?${query}` : ''}`).then(
+        (r) => handleResponse<ManagedAgentSession[]>(r),
+      );
+    },
+
+    startManagedSession(input: {
+      task_id: string;
+      cwd: string;
+      model?: string;
+      sandbox: ManagedSandboxMode;
+      direction?: string;
+    }): Promise<ManagedAgentSession> {
+      return timedFetch(`${LOCAL_BASE}/agents/managed/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      }, 60_000).then((r) => handleResponse<ManagedAgentSession>(r));
+    },
+
+    getManagedSession(id: string): Promise<ManagedAgentSession> {
+      return timedFetch(`${LOCAL_BASE}/agents/managed/sessions/${encodeURIComponent(id)}`).then(
+        (r) => handleResponse<ManagedAgentSession>(r),
+      );
+    },
+
+    sendManagedMessage(id: string, text: string): Promise<ManagedAgentSession> {
+      return timedFetch(`${LOCAL_BASE}/agents/managed/sessions/${encodeURIComponent(id)}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      }, 60_000).then((r) => handleResponse<ManagedAgentSession>(r));
+    },
+
+    steerManagedSession(id: string, text: string): Promise<ManagedAgentSession> {
+      return timedFetch(`${LOCAL_BASE}/agents/managed/sessions/${encodeURIComponent(id)}/steer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      }).then((r) => handleResponse<ManagedAgentSession>(r));
+    },
+
+    interruptManagedSession(id: string): Promise<ManagedAgentSession> {
+      return timedFetch(`${LOCAL_BASE}/agents/managed/sessions/${encodeURIComponent(id)}/interrupt`, {
+        method: 'POST',
+      }).then((r) => handleResponse<ManagedAgentSession>(r));
+    },
+
+    resolveManagedApproval(
+      id: string,
+      approvalId: string,
+      decision: ManagedApprovalDecision,
+    ): Promise<ManagedAgentSession> {
+      return timedFetch(
+        `${LOCAL_BASE}/agents/managed/sessions/${encodeURIComponent(id)}/approvals/${encodeURIComponent(approvalId)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision }),
+        },
+      ).then((r) => handleResponse<ManagedAgentSession>(r));
+    },
+
+    connectorStatus(provider: AgentProvider, projectPath: string): Promise<AgentConnectorStatus> {
+      const params = new URLSearchParams({ project_path: projectPath });
+      return timedFetch(
+        `${LOCAL_BASE}/agents/connectors/${provider}?${params.toString()}`,
+      ).then((r) => handleResponse<AgentConnectorStatus>(r));
+    },
+
+    connectProvider(provider: AgentProvider, projectPath: string): Promise<AgentConnectorStatus> {
+      return timedFetch(`${LOCAL_BASE}/agents/connectors/${provider}/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_path: projectPath }),
+      }).then((r) => handleResponse<AgentConnectorStatus>(r));
+    },
+
+    disconnectProvider(provider: AgentProvider, projectPath: string): Promise<AgentConnectorStatus> {
+      return timedFetch(`${LOCAL_BASE}/agents/connectors/${provider}/disconnect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_path: projectPath }),
+      }).then((r) => handleResponse<AgentConnectorStatus>(r));
+    },
+
+    listRuns(opts: { status?: string; provider?: string; project?: string; limit?: number } = {}): Promise<AgentRun[]> {
+      const params = new URLSearchParams();
+      if (opts.status) params.set('status', opts.status);
+      if (opts.provider) params.set('provider', opts.provider);
+      if (opts.project) params.set('project', opts.project);
+      if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+      const qs = params.toString();
+      return timedFetch(`${LOCAL_BASE}/agents/runs${qs ? `?${qs}` : ''}`).then((r) =>
+        handleResponse<AgentRun[]>(r),
+      );
+    },
+
+    getRun(id: string): Promise<AgentRunDetail> {
+      return timedFetch(`${LOCAL_BASE}/agents/runs/${encodeURIComponent(id)}`).then((r) =>
+        handleResponse<AgentRunDetail>(r),
+      );
+    },
+
+    getRunEvents(id: string, afterSeq: number): Promise<AgentRunEventDelta> {
+      const params = new URLSearchParams({ after_seq: String(afterSeq) });
+      return timedFetch(
+        `${LOCAL_BASE}/agents/runs/${encodeURIComponent(id)}/events?${params.toString()}`,
+      ).then((r) => handleResponse<AgentRunEventDelta>(r));
+    },
+
     listSessions(opts: { include_disconnected?: boolean; limit?: number } = {}): Promise<AgentSession[]> {
       const params = new URLSearchParams();
       if (opts.include_disconnected !== undefined) {
@@ -1079,8 +1228,8 @@ export const localApi = {
       }).then((r) => handleResponse<MemoryPreview[]>(r));
     },
 
-    /** Download a portable JSON trace of one session — session metadata +
-     *  full tool-call history + memory previews for any ids touched.
+    /** Download a sanitized portable JSON trace of one session. The default
+     *  omits tool argument summaries and memory previews.
      *  Returns the response as a Blob (not decoded JSON) so the caller can
      *  trigger a file save while preserving the server's filename hint.
      *  See the /trace endpoint for the privacy guarantees. */

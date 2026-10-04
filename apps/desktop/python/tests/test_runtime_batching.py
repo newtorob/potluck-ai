@@ -283,6 +283,8 @@ def test_gguf_load_retires_the_previous_batcher(monkeypatch):
     rt._pipeline = object()
     model = object()
     monkeypatch.setitem(sys.modules, "llama_cpp", SimpleNamespace(Llama=lambda **kw: model))
+    # The fake engine has no log hooks to capture.
+    monkeypatch.setattr("potluck_local.services.runtime._install_log_capture", lambda: None)
 
     asyncio.run(rt.load_model_async("/models/new/model.gguf"))
 

@@ -35,6 +35,8 @@
 
 import type { MeshPeer } from '@/types/mesh';
 import type { ChatMessage } from '@/types/chat';
+import { streamTokens } from '@/lib/streaming';
+import type { StreamEvent } from '@/lib/streaming';
 
 const PEER_SIDECAR_PORT = 8321;
 
@@ -157,9 +159,14 @@ const CAPABILITIES_TIMEOUT_MS = 1_500;
 /** Probe a single household peer for its current capabilities. Returns
  *  null on any failure (unreachable, non-2xx, malformed body) — null
  *  is just "not available," never an exception. */
-export async function probePeer(peer: MeshPeer): Promise<PeerCapabilities | null> {
+export async function probePeer(
+  peer: MeshPeer, signal?: AbortSignal, timeoutMs = CAPABILITIES_TIMEOUT_MS,
+): Promise<PeerCapabilities | null> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CAPABILITIES_TIMEOUT_MS);
+  const onAbort = () => controller.abort(signal?.reason);
+  signal?.addEventListener('abort', onAbort, { once: true });
+  if (signal?.aborted) onAbort();
+  const timer = setTimeout(() => controller.abort(), Math.max(0, timeoutMs));
   try {
     const res = await fetch(`${peerBaseURL(peer)}/peer/capabilities`, {
       method: 'GET',
@@ -172,6 +179,7 @@ export async function probePeer(peer: MeshPeer): Promise<PeerCapabilities | null
     return null;
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
   }
 }
 
@@ -257,6 +265,9 @@ export interface PickPeerOptions {
    *  good enough signal for "is this a long prompt?" */
   promptCharLength: number;
   mode: RoutingMode;
+  modelSlug?: string;
+  abortSignal?: AbortSignal;
+  deadline?: number;
 }
 
 /** Pick the best household peer for this prompt, according to the
@@ -275,7 +286,8 @@ export async function pickPeerForPrompt(
   const reachable = peers.filter((p) => p.reachable);
   if (reachable.length === 0) return null;
 
-  const probes = await Promise.all(reachable.map((p) => probePeer(p)));
+  const probeBudget = Math.min(CAPABILITIES_TIMEOUT_MS, (options.deadline ?? Infinity) - performance.now());
+  const probes = await Promise.all(reachable.map((p) => probePeer(p, options.abortSignal, probeBudget)));
 
   // Pair peers with their probe results, dropping any that failed to
   // respond or aren't available_for_inference. After this point we
@@ -284,7 +296,8 @@ export async function pickPeerForPrompt(
   for (let i = 0; i < reachable.length; i++) {
     const caps = probes[i];
     const peer = reachable[i];
-    if (peer && caps && caps.available_for_inference) {
+    if (peer && caps && caps.available_for_inference && caps.loaded_model &&
+        (!options.modelSlug || caps.loaded_model === options.modelSlug)) {
       eligible.push({ peer, capabilities: caps });
     }
   }
@@ -324,6 +337,25 @@ export interface HouseholdStreamOptions {
   maxTokens?: number;
   abortSignal?: AbortSignal;
   routingMode?: RoutingMode;
+  modelSlug?: string;
+  excludedPeerIds?: readonly string[];
+  getPeers?: () => MeshPeer[];
+  onAttempt?: (peer: MeshPeer, model: string) => void;
+}
+
+export const HOUSEHOLD_RECOVERY = {
+  maxAttempts: 3,
+  firstTokenMs: 90_000,
+  idleMs: 30_000,
+  totalMs: 240_000,
+};
+
+function encodeEvent(event: StreamEvent): Uint8Array {
+  const body = event.type === 'done' ? '[DONE]'
+    : event.type === 'token' ? JSON.stringify({ choices: [{ delta: { content: event.content } }] })
+      : event.type === 'meta' ? JSON.stringify({ meta: event })
+        : JSON.stringify({ error: event });
+  return new TextEncoder().encode(`data: ${body}\n\n`);
 }
 
 export class HouseholdNoPeerError extends Error {
@@ -335,9 +367,9 @@ export class HouseholdNoPeerError extends Error {
 }
 
 /**
- * Dispatch chat messages to the first available household peer.
+ * Find a household peer that actually produces output before committing.
  *
- * Returns the raw fetch Response (SSE stream). Caller pipes it through
+ * Returns a validated, bounded Response (SSE stream). Caller pipes it through
  * `streamTokens()` from lib/streaming.ts exactly like the local-sidecar
  * response — the wire format is identical.
  *
@@ -350,36 +382,107 @@ export async function streamHouseholdInference(
   peers: MeshPeer[],
   options: HouseholdStreamOptions = {},
 ): Promise<{ response: Response; peer: MeshPeer; capabilities: PeerCapabilities }> {
-  const lastUserContent = messages
-    .filter((m) => m.role === 'user')
-    .pop()?.content ?? '';
-  const pick = await pickPeerForPrompt(peers, {
-    promptCharLength: lastUserContent.length,
-    mode: options.routingMode ?? 'capability',
-  });
-  if (pick === null) {
-    throw new HouseholdNoPeerError();
-  }
-
-  const { peer, capabilities } = pick;
-
+  // Copy before the first await: edits/settings changes cannot rewrite a retry.
   const apiMessages = messages.map((m) => ({
     role: m.role,
     content: m.content,
   }));
-
-  const init: RequestInit = {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messages: apiMessages,
-      stream: true,
-      temperature: options.temperature ?? 0.7,
-      max_tokens: options.maxTokens ?? 2048,
-    }),
-  };
-  if (options.abortSignal) init.signal = options.abortSignal;
-  const response = await fetch(`${peerBaseURL(peer)}/peer/chat/completions`, init);
-
-  return { response, peer, capabilities };
+  const deadline = performance.now() + HOUSEHOLD_RECOVERY.totalMs;
+  const excluded = new Set(options.excludedPeerIds);
+  let model = options.modelSlug;
+  let lastError: unknown = new HouseholdNoPeerError();
+  const promptChars = apiMessages.reduce((n, m) => n + m.content.length, 0);
+  for (let attempt = 0; attempt < HOUSEHOLD_RECOVERY.maxAttempts; attempt++) {
+    options.abortSignal?.throwIfAborted();
+    if (performance.now() >= deadline) break;
+    const pick = await pickPeerForPrompt(
+      (options.getPeers?.() ?? peers).filter((p) => !excluded.has(p.node_id)),
+      { promptCharLength: promptChars, mode: options.routingMode ?? 'capability',
+        deadline, ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
+        ...(model ? { modelSlug: model } : {}) },
+    );
+    options.abortSignal?.throwIfAborted();
+    if (performance.now() >= deadline) break;
+    if (!pick) break;
+    const { peer, capabilities } = pick;
+    model ??= capabilities.loaded_model ?? undefined;
+    if (!model) break;
+    excluded.add(peer.node_id);
+    options.onAttempt?.(peer, model);
+    const controller = new AbortController();
+    const onAbort = () => controller.abort(options.abortSignal?.reason);
+    options.abortSignal?.addEventListener('abort', onAbort, { once: true });
+    const rate = capabilities.loaded_model_detail?.tokens_per_sec;
+    const firstMs = Math.min(HOUSEHOLD_RECOVERY.firstTokenMs,
+      rate && rate > 0 ? 10_000 + (promptChars / 4 / rate) * 1000 : HOUSEHOLD_RECOVERY.firstTokenMs);
+    const firstDeadline = Math.min(deadline, performance.now() + firstMs);
+    const timer = setTimeout(() => controller.abort(new Error('The computer did not start the reply in time.')),
+      Math.max(0, firstDeadline - performance.now()));
+    let iterator: AsyncGenerator<StreamEvent> | undefined;
+    const cleanup = () => {
+      clearTimeout(timer);
+      options.abortSignal?.removeEventListener('abort', onAbort);
+      controller.abort();
+    };
+    try {
+      const upstream = await fetch(`${peerBaseURL(peer)}/peer/chat/completions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
+        body: JSON.stringify({ messages: apiMessages, model, stream: true,
+          temperature: options.temperature ?? 0.7, max_tokens: options.maxTokens ?? 2048 }),
+      });
+      if (!upstream.ok) {
+        await upstream.body?.cancel();
+        const error = new Error(`That computer could not serve the request (HTTP ${upstream.status}).`);
+        if (![408, 409, 429, 500, 502, 503, 504].includes(upstream.status)) {
+          cleanup();
+          throw Object.assign(error, { retryable: false });
+        }
+        throw error;
+      }
+      iterator = streamTokens(upstream, {
+        signal: controller.signal, deadline, idleTimeoutMs: HOUSEHOLD_RECOVERY.idleMs,
+        firstTokenTimeoutMs: Math.max(0, firstDeadline - performance.now()),
+      });
+      const first = await iterator.next();
+      if (first.done) throw new Error('The connection ended before the reply started.');
+      if (first.value.type === 'error') throw new Error(first.value.message);
+      clearTimeout(timer);
+      const events = iterator;
+      let pending: StreamEvent | undefined = first.value;
+      let finished = false;
+      const response = new Response(new ReadableStream<Uint8Array>({
+        async pull(out) {
+          try {
+            if (finished) { out.close(); return; }
+            const next = pending ? { value: pending, done: false } : await events.next();
+            pending = undefined;
+            if (next.done) throw new Error('The connection ended before the reply finished.');
+            out.enqueue(encodeEvent(next.value));
+            if (next.value.type === 'done' || next.value.type === 'error') {
+              finished = true;
+              out.close();
+              cleanup();
+              await events.return(undefined);
+            }
+          } catch (error) {
+            out.error(error);
+            cleanup();
+            await events.return(undefined);
+          }
+        },
+        async cancel() {
+          cleanup();
+          await events.return(undefined);
+        },
+      }), { headers: { 'Content-Type': 'text/event-stream' } });
+      return { response, peer, capabilities };
+    } catch (error) {
+      cleanup();
+      await iterator?.return(undefined);
+      options.abortSignal?.throwIfAborted();
+      if (error instanceof Error && 'retryable' in error && error.retryable === false) throw error;
+      lastError = error;
+    }
+  }
+  throw lastError;
 }

@@ -136,7 +136,17 @@ function parseEventBlock(block: string): ParsedBlock {
  * @yields {StreamEvent} discriminated union of token, meta, error and done
  * @throws if the response body is null
  */
-export async function* streamTokens(response: Response): AsyncGenerator<StreamEvent> {
+export interface StreamReadOptions {
+  signal?: AbortSignal;
+  firstTokenTimeoutMs?: number;
+  idleTimeoutMs?: number;
+  /** Absolute performance.now() deadline shared by all attempts. */
+  deadline?: number;
+}
+
+export async function* streamTokens(
+  response: Response, options: StreamReadOptions = {},
+): AsyncGenerator<StreamEvent> {
   if (!response.body) {
     throw new Error('[streaming] Response body is null');
   }
@@ -144,10 +154,36 @@ export async function* streamTokens(response: Response): AsyncGenerator<StreamEv
   const reader = response.body.getReader();
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
+  let progressDeadline = performance.now() + (options.firstTokenTimeoutMs ?? Infinity);
+
+  async function read(): Promise<ReadableStreamReadResult<Uint8Array>> {
+    const deadline = Math.min(progressDeadline, options.deadline ?? Infinity);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let onAbort: (() => void) | undefined;
+    try {
+      return await new Promise((resolve, reject) => {
+        const fail = (reason: unknown) => {
+          reject(reason);
+          void reader.cancel().catch(() => undefined);
+        };
+        onAbort = () => fail(options.signal?.reason ?? new DOMException('Stopped', 'AbortError'));
+        if (options.signal?.aborted) { onAbort(); return; }
+        options.signal?.addEventListener('abort', onAbort, { once: true });
+        if (Number.isFinite(deadline)) {
+          timer = setTimeout(() => fail(new Error('The computer stopped responding before the reply finished.')),
+            Math.max(0, deadline - performance.now()));
+        }
+        void reader.read().then(resolve, reject);
+      });
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
+      if (onAbort) options.signal?.removeEventListener('abort', onAbort);
+    }
+  }
 
   try {
     while (true) {
-      const { done, value } = await reader.read();
+      const { done, value } = await read();
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
@@ -165,7 +201,12 @@ export async function* streamTokens(response: Response): AsyncGenerator<StreamEv
 
       for (const block of blocks) {
         const { events, done: sawDone } = parseEventBlock(block);
-        for (const event of events) yield event;
+        for (const event of events) {
+          if (event.type === 'token') {
+            progressDeadline = performance.now() + (options.idleTimeoutMs ?? Infinity);
+          }
+          yield event;
+        }
         if (sawDone) return;
       }
     }

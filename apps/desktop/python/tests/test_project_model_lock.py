@@ -247,6 +247,8 @@ def test_native_load_captures_bytes_and_invalidates_changes_during_load(tmp_path
         if mutation == 'remove': path.unlink()
         return Model()
     monkeypatch.setitem(sys.modules, 'llama_cpp', SimpleNamespace(Llama=native))
+    # The fake engine has no log hooks to capture.
+    monkeypatch.setattr('potluck_local.services.runtime._install_log_capture', lambda: None)
     rt = LLMRuntime()
     rt._atexit_registered = True
     rt.load_model(str(path))

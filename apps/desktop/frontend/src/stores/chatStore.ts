@@ -113,6 +113,17 @@ export interface AppMessage extends ChatMessage {
   meta?: MessageMeta;
   /** Only set on error messages */
   errorText?: string;
+  /** Session-only request snapshot. Never written to chat history. */
+  recovery?: HouseholdRecovery;
+  restartOf?: string;
+}
+
+interface HouseholdRecovery {
+  messages: ChatMessage[];
+  modelSlug: string;
+  excludedPeerIds: string[];
+  routingMode: RoutingMode;
+  historyAllowed: boolean;
 }
 
 export interface AppConversation extends Omit<Conversation, 'messages'> {
@@ -179,7 +190,8 @@ interface ChatState {
   deleteConversation: (id: string) => Promise<void>;
   switchConversation: (id: string) => Promise<void>;
   renameConversation: (id: string, title: string) => Promise<void>;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, restartMessageId?: string) => Promise<void>;
+  restartMessage: (messageId: string) => Promise<void>;
   abort: () => void;
   clearConversations: () => void;
   /** Primary setter — persists scope and keeps networkMode/householdMode in sync. */
@@ -600,17 +612,33 @@ export const useChatStore = create<ChatState>()((set, get) => {
     persistContent(true, () => localApi.history.update(id, { title: trimmed }), 'rename');
   },
 
-  async sendMessage(content) {
+  async restartMessage(messageId) {
+    await get().sendMessage('', messageId);
+  },
+
+  async sendMessage(content, restartMessageId) {
     if (get().isStreaming) return;
 
     const state = get();
+    const previous = restartMessageId && state.activeConversationId
+      ? state.conversations[state.activeConversationId]?.messages.find((m) => m.id === restartMessageId)
+      : undefined;
+    const recovery = previous?.status === 'error' ? previous.recovery : undefined;
+    if (restartMessageId && !recovery) return;
     // Keep the user's routing choice for this request across persistence awaits.
-    const { routingScope, networkModelSlug, activeCircleId } = state;
+    const { networkModelSlug, activeCircleId } = state;
+    const routingScope = recovery ? 'household' : state.routingScope;
+    const routingMode = recovery?.routingMode ?? state.routingMode;
+    let servedModelSlug: string | null = recovery?.modelSlug ?? (routingScope === 'household' ? null : networkModelSlug);
     // Same idea for the chat-history privacy setting: snapshot it for this
     // turn so a flag flipped on mid-stream never retroactively saves a
     // conversation the user started while history was off. Every write also
     // re-reads the live value, so flipping it off mid-stream stops writes.
-    const historyAllowed = historyEnabled();
+    const historyAllowed = historyEnabled() && (recovery?.historyAllowed ?? true);
+    // Claim this turn before persistence awaits so double-clicking Restart
+    // cannot dispatch two replacements for the same interrupted answer.
+    const controller = new AbortController();
+    set({ isStreaming: true, streamingMessageId: null, abortController: controller });
     currentTurnHistoryAllowed = historyAllowed;
     const maybeId = state.activeConversationId;
 
@@ -619,6 +647,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       maybeId && maybeId in state.conversations
         ? maybeId
         : await get().createConversation();
+    if (controller.signal.aborted || get().abortController !== controller) return;
 
     const userMessage: AppMessage = {
       id: makeId(),
@@ -639,7 +668,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       const updated: AppConversation = {
         ...target,
         title: newTitle ?? target.title,
-        messages: [...target.messages, userMessage],
+        messages: recovery ? target.messages : [...target.messages, userMessage],
         updatedAt: Date.now(),
       };
       return { conversations: { ...s.conversations, [conversationId]: updated } };
@@ -655,6 +684,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       get().networkModelSlug,
       historyAllowed,
     );
+    if (controller.signal.aborted || get().abortController !== controller) return;
 
     // The row may have been created just now (history was already on) — keep
     // the sidebar's "Not saved" marker honest either way.
@@ -675,7 +705,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     // Persist user message immediately. The first-message title rename
     // piggybacks here as a separate update — small extra round-trip but
     // keeps the API surface minimal (no compound endpoint).
-    persistContent(
+    if (!recovery) persistContent(
       historyAllowed,
       () =>
         localApi.history.appendMessage(conversationId, {
@@ -701,9 +731,9 @@ export const useChatStore = create<ChatState>()((set, get) => {
       content: '',
       createdAt: Date.now(),
       status: 'streaming',
+      ...(restartMessageId ? { restartOf: restartMessageId } : {}),
+      ...(recovery ? { recovery } : {}),
     };
-
-    const controller = new AbortController();
 
     set((s) => {
       const target = s.conversations[conversationId];
@@ -716,7 +746,14 @@ export const useChatStore = create<ChatState>()((set, get) => {
           ...s.conversations,
           [conversationId]: {
             ...target,
-            messages: [...target.messages, assistantPlaceholder],
+            messages: [
+              ...target.messages.map((m) => {
+                if (m.id !== restartMessageId) return m;
+                const { recovery: _used, ...rest } = m;
+                return rest;
+              }),
+              assistantPlaceholder,
+            ],
             updatedAt: Date.now(),
           },
         },
@@ -726,8 +763,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
     // Build the message history to send (all messages including the new user msg,
     // excluding the empty assistant placeholder)
     const currentConvo = get().conversations[conversationId];
-    const apiMessages: ChatMessage[] = (currentConvo?.messages ?? [])
-      .filter((m) => m.id !== assistantId)
+    const apiMessages: ChatMessage[] = recovery?.messages.map((m) => ({ ...m })) ?? (currentConvo?.messages ?? [])
+      .filter((m) => m.id !== assistantId && (m.role !== 'assistant' || m.status === 'complete'))
       .map((m): ChatMessage => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt }));
 
     // Usage dashboard (metadata only, never content): the NETWORK scopes stream
@@ -759,9 +796,29 @@ export const useChatStore = create<ChatState>()((set, get) => {
       let householdPeerName: string | null = null;
       if (routingScope === 'household') {
         const peers = getConnectedPeers(useMeshStore.getState());
+        let excludedPeerIds = [...(recovery?.excludedPeerIds ?? [])];
         const { response: r, peer } = await streamHouseholdInference(apiMessages, peers, {
           abortSignal: controller.signal,
-          routingMode: get().routingMode,
+          routingMode,
+          ...(recovery ? { modelSlug: recovery.modelSlug } : {}),
+          excludedPeerIds,
+          getPeers: () => getConnectedPeers(useMeshStore.getState()),
+          onAttempt: (candidate, modelSlug) => {
+            servedModelSlug = modelSlug;
+            excludedPeerIds = [...excludedPeerIds, candidate.node_id];
+            const snapshot: HouseholdRecovery = {
+              messages: apiMessages.map((m) => ({ ...m })), modelSlug,
+              excludedPeerIds, routingMode, historyAllowed,
+            };
+            set((s) => {
+              const target = s.conversations[conversationId];
+              if (!target || s.abortController !== controller) return s;
+              return { conversations: { ...s.conversations, [conversationId]: {
+                ...target, messages: target.messages.map((m) => m.id === assistantId
+                  ? { ...m, recovery: snapshot } : m),
+              } } };
+            });
+          },
         });
         response = r;
         householdPeerName = peer.node_name;
@@ -785,6 +842,10 @@ export const useChatStore = create<ChatState>()((set, get) => {
         response = await localApi.streamChat(apiMessages, {
           abortSignal: controller.signal,
         });
+      }
+      if (controller.signal.aborted || get().abortController !== controller) {
+        await response.body?.cancel();
+        return;
       }
 
       if (!response.ok) {
@@ -839,7 +900,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
 
       for await (const event of streamTokens(response)) {
         // Check abort between events
-        if (controller.signal.aborted) break;
+        if (controller.signal.aborted || get().abortController !== controller) break;
 
         if (event.type === 'done') {
           sawDone = true;
@@ -935,7 +996,10 @@ export const useChatStore = create<ChatState>()((set, get) => {
                   if (m.id !== assistantId) return m;
                   // Content is never rewritten: whatever streamed in stays on
                   // screen, and the error line sits alongside it.
-                  if (terminalErrorText === null) return { ...m, status: terminalStatus };
+                  if (terminalErrorText === null) {
+                    const { recovery: _finished, ...rest } = m;
+                    return { ...rest, status: terminalStatus };
+                  }
                   return { ...m, status: terminalStatus, errorText: terminalErrorText };
                 }),
               },
@@ -988,7 +1052,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
               .record({
                 direction: 'consumed',
                 scope: usageScope,
-                model_slug: networkModelSlug ?? null,
+                model_slug: servedModelSlug,
                 ...(finalMsg.meta?.output_tokens === undefined
                   ? {}
                   : { output_tokens: finalMsg.meta.output_tokens }),
@@ -1007,7 +1071,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
         }
       }
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
+      if (controller.signal.aborted || get().abortController !== controller ||
+          (err instanceof Error && err.name === 'AbortError')) {
         // abort() handled state + persistence — nothing to do here.
         return;
       }
@@ -1069,7 +1134,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           .record({
             direction: 'consumed',
             scope: usageScope,
-            model_slug: networkModelSlug ?? null,
+            model_slug: servedModelSlug,
             ok: false,
             error_class: 'dispatch_error',
           })
@@ -1078,12 +1143,15 @@ export const useChatStore = create<ChatState>()((set, get) => {
           });
       }
     } finally {
-      currentTurnHistoryAllowed = false;
+      if (!get().abortController || get().abortController === controller) currentTurnHistoryAllowed = false;
     }
   },
 
   abort() {
-    const { abortController, streamingMessageId, activeConversationId } = get();
+    const { abortController, streamingMessageId, conversations } = get();
+    // The user may have switched conversations while the request was running.
+    const activeConversationId = Object.values(conversations)
+      .find((c) => c.messages.some((m) => m.id === streamingMessageId))?.id ?? null;
     abortController?.abort();
 
     set((s) => {
@@ -1137,6 +1205,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
   },
 
   clearConversations() {
+    get().abort();
     // State-only reset — does NOT delete persisted conversations from disk.
     // Use deleteConversation() per-id for that. This action exists for
     // tests and future "panic clear" UI; not currently bound to any view.

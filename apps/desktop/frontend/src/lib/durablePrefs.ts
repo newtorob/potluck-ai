@@ -28,7 +28,7 @@ import { useConnectionStore } from '@/stores/connectionStore';
 import { useUiPrefsStore } from '@/stores/uiPrefsStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { setAutoLoadOnStartup, setContributionReceiptsEnabled } from '@/lib/appPrefs';
+import { setContributionReceiptsEnabled } from '@/lib/appPrefs';
 
 /**
  * Fetch durable settings from the sidecar and apply them to the live stores.
@@ -64,11 +64,11 @@ export async function hydrateDurablePrefs(): Promise<void> {
     useUiPrefsStore.getState().setTheme(theme);
   }
 
-  // autoload_on_startup — localStorage-only live state; corrects the value for
-  // the current session even though the auto-load effect already ran earlier.
+  // Keep the legacy frontend fallback in sync. Current sidecars read this
+  // durable preference themselves before restoring a local model.
   const autoload = ui[PREF.autoload];
   if (autoload !== undefined) {
-    setAutoLoadOnStartup(autoload !== 'false');
+    localStorage.setItem(PREF.autoload, autoload);
   }
 
   // contribution_receipts_enabled

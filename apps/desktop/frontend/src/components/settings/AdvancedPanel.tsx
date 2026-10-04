@@ -13,7 +13,6 @@ import { cn } from '@/components/ui/cn';
 import { ModelPathPanel } from '@/components/settings/ModelPathPanel';
 import { McpIntegrationPanel } from '@/components/settings/McpIntegrationPanel';
 import { CooperativeConnectionPanel } from '@/components/settings/CooperativeConnectionPanel';
-import { autoLoadOnStartup, setAutoLoadOnStartup } from '@/lib/appPrefs';
 import { useProject } from '@/hooks/useProject';
 import { normaliseProjectName } from '@/lib/projectUtils';
 import type { PotluckSettingsPatch, PotluckSettings, MemorySettings } from '@/lib/localApi';
@@ -102,11 +101,10 @@ function ToggleRow({ id, label, description, checked, disabled, onChange }: Togg
 }
 
 // ---------------------------------------------------------------------------
-// Startup section — localStorage-backed app preference (not a backend setting)
+// Startup section — same durable preference used by the runtime and CLI
 // ---------------------------------------------------------------------------
 
-function StartupSection() {
-  const [autoLoad, setAutoLoad] = useState<boolean>(() => autoLoadOnStartup());
+function StartupSection({ settings, isSaving, onUpdate }: Pick<AdvancedPanelProps, 'settings' | 'isSaving' | 'onUpdate'>) {
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-3">
       <h2 className="font-serif text-[11px] italic text-muted-foreground tracking-hearth-label">
@@ -115,12 +113,13 @@ function StartupSection() {
       <ToggleRow
         id="autoload-on-startup"
         label="Load my last model on startup"
-        description="When Potluck launches, reload the model you last used so chat is ready immediately. Turn off to start with no model loaded."
-        checked={autoLoad}
-        disabled={false}
+        description="When the Potluck engine starts, restore the last local model you loaded. Unloading or deleting it clears this choice. Turn off to start with no model loaded."
+        checked={settings.ui['potluck.autoload_on_startup'] !== 'false'}
+        disabled={isSaving}
         onChange={(v) => {
-          setAutoLoadOnStartup(v);
-          setAutoLoad(v);
+          void onUpdate({ ui: { 'potluck.autoload_on_startup': String(v) } }).catch(() => {
+            // Parent displays saveError and rolls back the optimistic setting.
+          });
         }}
       />
     </div>
@@ -425,7 +424,7 @@ export function AdvancedPanel({ settings, isSaving, saveError, onUpdate }: Advan
       <ModelPathPanel settings={settings} />
 
       {/* Startup behavior (auto-load last model) */}
-      <StartupSection />
+      <StartupSection settings={settings} isSaving={isSaving} onUpdate={onUpdate} />
 
       {/* Memory tuning */}
       <MemoryTuningSection

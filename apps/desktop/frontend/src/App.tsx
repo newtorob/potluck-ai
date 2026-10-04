@@ -141,6 +141,8 @@ export default function App() {
     void useUpdateStore.getState().checkVersionHandshake();
   }, []);
 
+  // Legacy sidecars only. Current runtimes own startup restoration, including
+  // the choice to stay unloaded; opening another UI must never override it.
   // Make the default launch state "alive": once the model list has settled,
   // auto-load the last-active model (fallback: smallest installed) so the user
   // lands ready-to-chat instead of on "No model loaded". Runs once, only when
@@ -155,6 +157,7 @@ export default function App() {
     void (async () => {
       try {
         const health = await localApi.health();
+        if (health.model_restore) return;
         if (health.model_loaded) return; // already live — leave it
         const installed = useModelStore.getState().models.filter((m) => m.installed);
         if (installed.length === 0) return; // nothing to load — FirstRun handles this

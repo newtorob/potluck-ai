@@ -16,7 +16,7 @@
  */
 
 import { useState } from 'react';
-import { Check, Copy, AlertCircle } from 'lucide-react';
+import { Check, Copy, AlertCircle, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -24,7 +24,7 @@ import rehypeHighlight from 'rehype-highlight';
 import { Network, Cpu, Home } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { SafeExternalLink } from '@/components/ui/SafeExternalLink';
-import type { AppMessage } from '@/stores/chatStore';
+import { useChatStore, type AppMessage } from '@/stores/chatStore';
 import { classifyChatError } from '@/lib/chatErrorRecovery';
 
 interface MessageBubbleProps {
@@ -58,6 +58,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             'bg-destructive/8 text-destructive border border-destructive/30 rounded-bl-sm px-5 py-3.5',
         )}
       >
+        {message.restartOf && (
+          <p className="mb-2 text-xs text-muted-foreground">Restarted answer · My Machines</p>
+        )}
         {isError ? (
           <ErrorContent message={message} />
         ) : isUser ? (
@@ -354,6 +357,8 @@ function MarkdownContent({ content, isStreaming }: { content: string; isStreamin
 
 function ErrorContent({ message }: { message: AppMessage }) {
   const navigate = useNavigate();
+  const isStreaming = useChatStore((s) => s.isStreaming);
+  const restartMessage = useChatStore((s) => s.restartMessage);
   // errorText can arrive from persisted history or from a lookup that missed,
   // so it is only trusted once it is actually a string. Anything else is
   // treated as absent rather than allowed to throw on .toLowerCase().
@@ -379,10 +384,32 @@ function ErrorContent({ message }: { message: AppMessage }) {
         )}
       >
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-        <p className="leading-snug">
+        <p className="leading-snug" role="alert">
           {errorText ?? 'This reply did not finish.'}
         </p>
       </div>
+      {message.recovery && (
+        <div className="flex flex-col items-start gap-1.5">
+          <p className="text-xs text-muted-foreground">
+            {hasPartialAnswer ? 'This answer is incomplete. ' : ''}
+            Restart the same request using {message.recovery.modelSlug} on another of your machines.
+          </p>
+          <button
+            type="button"
+            disabled={isStreaming}
+            onClick={() => void restartMessage(message.id)}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground',
+              'hover:bg-accent active:bg-accent transition-colors duration-fast',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'disabled:cursor-not-allowed disabled:opacity-40',
+            )}
+          >
+            <RotateCcw className="h-3 w-3" aria-hidden="true" />
+            Restart on another computer
+          </button>
+        </div>
+      )}
       {recovery.action && (
         <button
           type="button"
