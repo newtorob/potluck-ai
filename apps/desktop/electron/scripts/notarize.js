@@ -109,7 +109,10 @@ module.exports = async function notarize(context) {
       );
     }
 
-    throw new Error(`Notarization failed: ${err.message}`);
+    // err.message repeats the whole notarytool command line, password
+    // included. Never let it reach the build log.
+    const safeMessage = String(err.message || '').split(applePassword).join('<app-specific-password>');
+    throw new Error(`Notarization failed: ${safeMessage}`);
   }
 
   // Clean up the temp zip now that submission is complete.
