@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncGenerator
 
 import structlog
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -56,6 +58,15 @@ async def close_db() -> None:
         _engine = None
         _session_factory = None
         logger.info("db_engine_disposed")
+
+
+async def check_database(timeout: float = 2.0) -> None:
+    """Probe the real pool with a deadline, including connection acquisition."""
+    if _engine is None:
+        raise RuntimeError("Database not initialised")
+    async with asyncio.timeout(timeout):
+        async with _engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
