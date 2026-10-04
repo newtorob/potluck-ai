@@ -10,7 +10,7 @@ import { runStatus } from "./status.js";
 import type { CliArgs } from "./args.js";
 import { diagnose, formatDiagnostics } from "./diagnostics.js";
 import { plainText, readLogs } from "./logs.js";
-import { startRuntime, stopRuntime } from "./runtime.js";
+import { ensureRuntime, startRuntime, stopRuntime } from "./runtime.js";
 import { manageGateway, manageModels } from "./manage.js";
 import { connect, disconnect, formatMember, household, login, logout, memberStatus } from "./member.js";
 import { runMachineSetup } from "./operational-setup.js";
@@ -29,7 +29,7 @@ export function operationHelp(command: string): string {
   if (command === "serve") return "Usage: potluck serve\nRun the shared runtime in the foreground for launchd, systemd, or brew services. Waits while another launcher owns it. Ctrl-C stops only this launcher's child.\n";
   if (command === "service") return "Usage: potluck service [install|uninstall|start|stop|restart|status] [--json]\nManage the current user's runtime service on macOS/Linux. install enables startup at login and starts it. stop keeps login startup enabled; uninstall removes it and keeps your data.\nHomebrew installations use brew services. Linux startup without a login requires administrator-configured user lingering.\n";
   if (command === "setup") return "Usage: potluck setup [--no-input] [--with-model|--model <id>] [--enable-gateway] [--sign-in] [--no-browser] [--connect] [--name <machine-name>] [--json]\nStart the local engine and resume setup. Interactive setup recommends, downloads, loads and tests a fitting model; unattended model setup requires --with-model or --model. Gateway access, account login, and household connection require opt-in.\nWith --json/--no-input only explicitly requested steps run. Browser approval can happen on another device.\nUse potluck setup --preferences for coding-agent defaults.\n";
-  if (command === "login") return "Usage: potluck login [--wait|--no-wait] [--no-browser] [--json]\nOpens your browser to approve this terminal, with the code filled in. Over SSH, without a display, or with --no-browser, it prints a link to open on any device instead.\nInteractive terminals wait by default; JSON and piped invocations return the pending code. Run again with --wait after approval to finish. Ctrl-C leaves the request resumable until expiry.\n";
+  if (command === "login") return "Usage: potluck login [--wait|--no-wait] [--no-browser] [--json]\nStarts the Potluck engine in the background if it is not running, then opens your browser to approve this terminal with the code filled in. Over SSH, without a display, or with --no-browser, it prints a link to open on any device instead.\nInteractive terminals wait by default; JSON and piped invocations return the pending code. Run again with --wait after approval to finish. Ctrl-C leaves the request resumable until expiry.\n";
   if (command === "logout") return "Usage: potluck logout [--local] [--json]\nRevoke this member session and remove local sign-in. --local removes it here without server revocation. Mesh enrollment is separate; use disconnect to unpair.\n";
   if (command === "whoami") return "Usage: potluck whoami [--json]\nShow the locally stored member profile without printing credentials.\n";
   if (command === "household") return "Usage: potluck household list [--json]\n       potluck household create [--name <household-name>] [--json]\n       potluck household invite --output <new-private-file> [--json]\nInvitations are one-use credentials, saved with permissions 0600 and never printed.\n";
@@ -74,6 +74,8 @@ export async function runOperation(args: CliArgs, out: (value: string) => void):
     return ["configured", "model_ready"].includes(String(report.state)) ? 0 : 1;
   }
   if (["login", "logout", "whoami", "household", "connect", "disconnect"].includes(args.command!)) {
+    // disconnect talks to the mesh daemon directly; the rest need the engine.
+    if (args.command !== "disconnect") await ensureRuntime(text => process.stderr.write(plainText(text)));
     const report = await (args.command === "login" ? login(args, text => process.stderr.write(plainText(text)))
       : args.command === "logout" ? logout(args) : args.command === "whoami" ? memberStatus(args)
       : args.command === "household" ? household(args) : args.command === "connect" ? connect(args) : disconnect(args));

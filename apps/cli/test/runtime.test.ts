@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readRuntimeRecord, runtimeRequest, startRuntime, stopRuntime, type RuntimeRecord } from "../src/runtime.js";
+import { ensureRuntime, readRuntimeRecord, runtimeRequest, startRuntime, stopRuntime, type RuntimeRecord } from "../src/runtime.js";
 
 const require = createRequire(import.meta.url);
 const { discoverRuntime } = require("../../desktop/electron/runtime-control.js");
@@ -28,6 +28,41 @@ async function record(url: string, owner: RuntimeRecord["owner"] = "cli"): Promi
   await mkdir(join(dir, "run"), { recursive: true, mode: 0o700 });
   await writeFile(join(dir, "run/runtime.json"), JSON.stringify(value), { mode: 0o600 });
   return value;
+}
+/** A real Python runtime that speaks the shared-runtime control protocol. */
+async function writeRuntimeFixture(path: string): Promise<void> {
+  await writeFile(path, `#!${python}\n` + `
+import argparse, asyncio, os, signal
+from contextlib import asynccontextmanager
+import uvicorn
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from potluck_local.runtime_control import RuntimeControl
+parser = argparse.ArgumentParser()
+parser.add_argument('--port', type=int)
+args = parser.parse_args()
+@asynccontextmanager
+async def lifespan(app):
+    await asyncio.sleep(1.2)  # The losing launcher exits before the winner is ready.
+    yield
+app = FastAPI(lifespan=lifespan)
+@app.middleware('http')
+async def auth(request: Request, call_next):
+    if request.url.path != '/health' and request.headers.get('authorization') != 'Bearer ' + os.environ['POTLUCK_SIDECAR_TOKEN']:
+        return JSONResponse(status_code=401, content={})
+    return await call_next(request)
+@app.get('/health')
+async def health(): return {'status': 'ok'}
+@app.get('/control')
+async def info(): return control.info()
+@app.post('/shutdown')
+async def shutdown():
+    asyncio.get_running_loop().call_later(0.05, lambda: setattr(server, 'should_exit', True))
+    return {'status': 'shutting_down'}
+with RuntimeControl(port=args.port, host='127.0.0.1', token=os.environ['POTLUCK_SIDECAR_TOKEN'], owner='cli') as control:
+    server = uvicorn.Server(uvicorn.Config(app, log_level='error'))
+    server.run(sockets=[control.socket])
+`, { mode: 0o700 });
 }
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), "potluck-runtime-"));
@@ -121,45 +156,48 @@ describe.skipIf(process.platform === "win32")("shared runtime", () => {
     await writeFile(join(dir, "run/runtime.json"), JSON.stringify(saved), { mode: 0o600 });
     await expect(stopRuntime(250)).rejects.toThrow("process still exists");
   });
+  it("account commands reuse a live engine without saying anything", async () => {
+    let saved!: RuntimeRecord;
+    const url = await server((_req, res) => res.end(JSON.stringify({ schemaVersion: 1, instanceId, pid: saved.pid, owner: saved.owner, url: saved.url })));
+    saved = await record(url, "desktop");
+    vi.stubEnv("POTLUCK_SIDECAR_URL", url);
+    const messages: string[] = [];
+    expect(await ensureRuntime(m => messages.push(m))).toMatchObject({ state: "running", started: false, owner: "desktop" });
+    expect(messages).toEqual([]);
+  });
+  it("account commands name the old desktop app instead of failing cryptically", async () => {
+    const url = await server((_req, res) => res.end('{"status":"ok"}'));
+    vi.stubEnv("POTLUCK_SIDECAR_URL", url);
+    await expect(ensureRuntime()).rejects.toThrow("desktop app");
+  });
+  it.skipIf(!existsSync(python))("account commands start the engine in the background when none is running", async () => {
+    const fixture = join(dir, "runtime");
+    await writeRuntimeFixture(fixture);
+    const reservation = createServer();
+    await new Promise<void>(r => reservation.listen(0, "127.0.0.1", r));
+    const port = (reservation.address() as { port: number }).port;
+    await new Promise<void>(r => reservation.close(() => r()));
+    vi.stubEnv("POTLUCK_SIDECAR_URL", `http://127.0.0.1:${port}`);
+    vi.stubEnv("POTLUCK_RUNTIME_BIN", fixture);
+    vi.stubEnv("PYTHONPATH", pythonRoot);
+    const messages: string[] = [];
+    const report = await ensureRuntime(m => messages.push(m));
+    spawned.add(report.pid!);
+    expect(report).toMatchObject({ state: "running", started: true });
+    expect(messages.join("")).toContain("Starting the Potluck engine in the background");
+    expect(messages.join("")).toContain("potluck down");
+    expect(await ensureRuntime(m => messages.push(m))).toMatchObject({ pid: report.pid, started: false });
+    expect(await stopRuntime(3000)).toEqual({ schemaVersion: 1, state: "stopped" });
+  }, 20000);
   it("refuses to start over an unmanaged listener", async () => {
     const url = await server((_req, res) => res.end('{"status":"ok"}'));
     vi.stubEnv("POTLUCK_SIDECAR_URL", url);
-    await expect(startRuntime(500)).rejects.toThrow("unmanaged runtime");
+    // Most likely a desktop app older than 0.1.7, which cannot share its engine.
+    await expect(startRuntime(500)).rejects.toThrow("desktop app");
   });
   it.skipIf(!existsSync(python))("starts once under racing launchers, reattaches, and shuts down via real Python control", async () => {
     const fixture = join(dir, "runtime");
-    await writeFile(fixture, `#!${python}\n` + `
-import argparse, asyncio, os, signal
-from contextlib import asynccontextmanager
-import uvicorn
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from potluck_local.runtime_control import RuntimeControl
-parser = argparse.ArgumentParser()
-parser.add_argument('--port', type=int)
-args = parser.parse_args()
-@asynccontextmanager
-async def lifespan(app):
-    await asyncio.sleep(1.2)  # The losing launcher exits before the winner is ready.
-    yield
-app = FastAPI(lifespan=lifespan)
-@app.middleware('http')
-async def auth(request: Request, call_next):
-    if request.url.path != '/health' and request.headers.get('authorization') != 'Bearer ' + os.environ['POTLUCK_SIDECAR_TOKEN']:
-        return JSONResponse(status_code=401, content={})
-    return await call_next(request)
-@app.get('/health')
-async def health(): return {'status': 'ok'}
-@app.get('/control')
-async def info(): return control.info()
-@app.post('/shutdown')
-async def shutdown():
-    asyncio.get_running_loop().call_later(0.05, lambda: setattr(server, 'should_exit', True))
-    return {'status': 'shutting_down'}
-with RuntimeControl(port=args.port, host='127.0.0.1', token=os.environ['POTLUCK_SIDECAR_TOKEN'], owner='cli') as control:
-    server = uvicorn.Server(uvicorn.Config(app, log_level='error'))
-    server.run(sockets=[control.socket])
-`, { mode: 0o700 });
+    await writeRuntimeFixture(fixture);
     // Reserve an isolated port, then release it immediately before launching.
     const reservation = createServer();
     await new Promise<void>(r => reservation.listen(0, "127.0.0.1", r));

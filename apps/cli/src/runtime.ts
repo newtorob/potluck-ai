@@ -130,7 +130,7 @@ export async function startRuntime(timeout: number): Promise<RuntimeReport> {
     await requestJSON({ url: endpoint.origin + "/health", timeout: Math.min(timeout, 1000) });
     const appeared = await readRuntimeRecord();
     if (appeared) { await verifyRuntime(appeared, Math.min(timeout, 1000)); return running(appeared, false); }
-    throw new RuntimeError("An unmanaged runtime is already listening. Stop its launcher before using potluck up.");
+    throw new RuntimeError("Another Potluck engine is already running on this computer and cannot be shared, most likely the desktop app before 0.1.7. Update the app (0.1.7 shares its engine with the CLI) or quit it, then try again.");
   } catch (error) {
     if (!(error instanceof ControlError && error.code === "unreachable")) throw error;
   }
@@ -173,6 +173,20 @@ function processHasExited(pid: number): boolean {
   try { process.kill(pid, 0); }
   catch (error) { return (error as NodeJS.ErrnoException).code === "ESRCH"; }
   return false;
+}
+
+/**
+ * Account commands need an engine, the way tailscale needs tailscaled. Use the
+ * running one (the desktop app's or the CLI's), or start one in the background.
+ */
+export async function ensureRuntime(progress: (message: string) => void = () => {}): Promise<RuntimeReport> {
+  const current = await readRuntimeRecord();
+  if (current) {
+    try { await verifyRuntime(current, 1000); return running(current, false); }
+    catch (error) { if (!(error instanceof ControlError && error.code === "unreachable")) throw error; }
+  }
+  progress("Starting the Potluck engine in the background. Stop it any time with potluck down.\n");
+  return startRuntime(30000);
 }
 
 export async function stopRuntime(timeout: number): Promise<RuntimeReport> {
