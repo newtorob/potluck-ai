@@ -24,8 +24,14 @@ export async function readRuntimeRecord(): Promise<RuntimeRecord | null> {
   const dir = join(dataDir(), "run");
   try {
     const directory = await lstat(dir);
-    if (!directory.isDirectory() || directory.uid !== process.getuid?.() || (directory.mode & 0o077)) {
-      throw new RuntimeError("Runtime directory must be owned by you with permissions 0700.");
+    if (!directory.isDirectory() || directory.uid !== process.getuid?.()) {
+      throw new RuntimeError("Runtime directory must be a directory owned by you.");
+    }
+    if (directory.mode & 0o077) {
+      // Left by an older Potluck. A runtime makes this directory private before
+      // it writes a record, so a loose one holds nothing to trust: tighten it.
+      await chmod(dir, 0o700);
+      return null;
     }
     const file = await open(join(dir, "runtime.json"), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     try {

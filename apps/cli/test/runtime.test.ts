@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createServer, type Server } from "node:http";
-import { mkdtemp, mkdir, writeFile, chmod, rm, symlink } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, chmod, rm, stat, symlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -51,9 +51,14 @@ describe.skipIf(process.platform === "win32")("shared runtime", () => {
     await expect(readRuntimeRecord()).rejects.toThrow("private regular file");
     await expect(discoverRuntime({ dataDir: dir })).rejects.toThrow("Cannot read private");
     await chmod(join(dir, "run/runtime.json"), 0o600);
+    // A loose directory comes from an older Potluck: both clients tighten it
+    // and treat any record inside as untrusted.
     await chmod(join(dir, "run"), 0o755);
-    await expect(readRuntimeRecord()).rejects.toThrow("0700");
-    await expect(discoverRuntime({ dataDir: dir })).rejects.toThrow("Cannot read private");
+    expect(await readRuntimeRecord()).toBeNull();
+    expect((await stat(join(dir, "run"))).mode & 0o777).toBe(0o700);
+    await chmod(join(dir, "run"), 0o755);
+    expect(await discoverRuntime({ dataDir: dir })).toBeNull();
+    expect((await stat(join(dir, "run"))).mode & 0o777).toBe(0o700);
   });
   it("rejects symlinked records and non-loopback endpoints without making requests", async () => {
     await record("https://remote.invalid");

@@ -13,8 +13,15 @@ async function discoverRuntime({ dataDir = process.env.POTLUCK_DATA_DIR || path.
   let record;
   try {
     const dir = await fs.lstat(directory);
-    if (!dir.isDirectory() || dir.uid !== process.getuid() || (dir.mode & 0o077)) {
-      throw new Error('Runtime directory must be private and owned by the current user.');
+    if (!dir.isDirectory() || dir.uid !== process.getuid()) {
+      throw new Error('Runtime directory must be a directory owned by the current user.');
+    }
+    if (dir.mode & 0o077) {
+      // Left by an older Potluck. A runtime makes this directory private
+      // before it writes a record, so nothing in a loose one is trustworthy:
+      // tighten it the way the runtime does and start a fresh runtime.
+      await fs.chmod(directory, 0o700);
+      return null;
     }
     const file = await fs.open(path.join(directory, 'runtime.json'), constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     try {
