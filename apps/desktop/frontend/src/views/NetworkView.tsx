@@ -28,6 +28,7 @@ import { useChatStore } from '@/stores/chatStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { registerContributorDeviceKey } from '@/lib/deviceKey';
 import { contributorStatusLine, type ContributorStatus } from '@/lib/contributorStatus';
+import { FEATURES } from '@/lib/features';
 import type { FleetSummary, MyJobStats, CreditBalance, CreditHistory, CreditHistoryEntry, ContributionsResponse } from '@/lib/localApi';
 import { relativeTime } from '@/lib/timeFormat';
 import { formatModelName } from '@/lib/modelName';
@@ -380,7 +381,7 @@ function FirstPeerPanel() {
               </p>
             </div>
             <p className="max-w-xl text-sm text-muted-foreground">
-              To offer this machine's loaded model, enable{' '}
+              To offer this machine's loaded model{FEATURES.openPoolContributor ? '' : ' to your own machines'}, enable{' '}
               <span className="font-medium text-foreground">Contribute compute</span> above.
               To ask the network for an answer, choose a network scope in Chat.
               Your own usage, contributions, and credits are below.
@@ -1023,7 +1024,7 @@ function ContributorToggleCard() {
     }
   }
 
-  const line = contributorStatusLine(status);
+  const line = FEATURES.openPoolContributor ? contributorStatusLine(status) : null;
 
   return (
     <div className="rounded-lg border border-border bg-card/60 p-4">
@@ -1039,9 +1040,11 @@ function ContributorToggleCard() {
               Share spare compute with your network
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
-              While enabled, this machine offers its loaded model to your own machines
-              and eligible network requests. Turn it off when you need the resources
-              for other work. It does not automatically pause when you are active.
+              {FEATURES.openPoolContributor
+                ? 'While enabled, this machine offers its loaded model to your own machines and eligible network requests.'
+                : 'While enabled, this machine can answer requests from your own machines using its loaded model.'}{' '}
+              Turn it off when you need the resources for other work. It does not
+              automatically pause when you are active.
               Choosing a network scope in Chat is separate: it requests compute from others.
             </p>
             {line !== null ? (

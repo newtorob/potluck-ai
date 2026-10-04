@@ -69,6 +69,16 @@ _REJECT_CATEGORIES: tuple[tuple[str, str], ...] = (
 )
 
 
+def open_pool_enabled() -> bool:
+    """Whether this build may join the coordinator as an open-pool contributor.
+
+    Off unless POTLUCK_OPEN_POOL_CONTRIBUTOR=1. Releases leave it off until
+    the open pool is ready, so the Contribute toggle only serves the member's
+    own machines (the household path reads contributor_mode directly).
+    """
+    return os.environ.get("POTLUCK_OPEN_POOL_CONTRIBUTOR") == "1"
+
+
 def reject_category(reason: str) -> str:
     lowered = reason.lower()
     for needle, category in _REJECT_CATEGORIES:
@@ -200,6 +210,11 @@ class ContributorService:
             network = settings.network
             self._network = network
             self._status.enabled = bool(network.contributor_mode)
+            if not open_pool_enabled():
+                if self.is_running:
+                    await self._stop_locked()
+                self._status.state = "disabled"
+                return
             if not network.contributor_mode:
                 if self.is_running:
                     await self._stop_locked()

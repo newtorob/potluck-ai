@@ -24,6 +24,7 @@ import { AgentSessionCard } from '@/components/agents/AgentSessionCard';
 import { ActivityFeed } from '@/components/agents/ActivityFeed';
 import { SessionDetailDrawer } from '@/components/agents/SessionDetailDrawer';
 import { AgentRunsPanel } from '@/components/agents/AgentRunsPanel';
+import { FEATURES } from '@/lib/features';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
 import type { AgentSession, ToolCall, SessionDetail } from '@/types/agents';
@@ -133,7 +134,7 @@ export function AgentsView() {
     fetchSessions,
   } = useAgents();
 
-  const [activeMode, setActiveMode] = useState<AgentsMode>('runs');
+  const [activeMode, setActiveMode] = useState<AgentsMode>(FEATURES.agentWorkroom ? 'runs' : 'connections');
   const [showDisconnected, setShowDisconnected] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
@@ -256,7 +257,7 @@ export function AgentsView() {
 
   const hasEverHadSessions = sessions.length > 0;
 
-  if (activeMode === 'runs') {
+  if (FEATURES.agentWorkroom && activeMode === 'runs') {
     return (
       <div
         id="agents-panel-runs"
@@ -265,7 +266,7 @@ export function AgentsView() {
         className="flex h-full flex-col overflow-hidden"
       >
         <AgentsHeader isFetching={false}>
-          <AgentsModeTabs mode={activeMode} onChange={setActiveMode} />
+          {FEATURES.agentWorkroom && <AgentsModeTabs mode={activeMode} onChange={setActiveMode} />}
         </AgentsHeader>
         <AgentRunsPanel />
       </div>
@@ -280,7 +281,7 @@ export function AgentsView() {
     return (
       <div className="flex h-full flex-col">
         <AgentsHeader isFetching={isFetching}>
-          <AgentsModeTabs mode={activeMode} onChange={setActiveMode} />
+          {FEATURES.agentWorkroom && <AgentsModeTabs mode={activeMode} onChange={setActiveMode} />}
         </AgentsHeader>
         <EmptyState
           icon={Activity}
@@ -313,7 +314,7 @@ export function AgentsView() {
         {/* Header */}
         <AgentsHeader isFetching={isFetching}>
           <div className="flex items-center gap-4">
-            <AgentsModeTabs mode={activeMode} onChange={setActiveMode} />
+            {FEATURES.agentWorkroom && <AgentsModeTabs mode={activeMode} onChange={setActiveMode} />}
             {/* Honest count by liveness tier. The old single "X active"
                 conflated four states and lied about reality (sessions that
                 had not heartbeated in days still counted as "active"). Now

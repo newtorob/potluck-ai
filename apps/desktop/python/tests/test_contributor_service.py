@@ -7,6 +7,8 @@ import functools
 import json
 import uuid
 
+import pytest
+
 from fastapi.testclient import TestClient
 
 from potluck_local.contributor.schemas import JobAssignedMessage
@@ -14,6 +16,12 @@ from potluck_local.services import contributor_service as cs
 from potluck_local.services.settings_manager import NetworkSettings, PotluckSettings
 
 _LOOPBACK = ("127.0.0.1", 54321)
+
+
+@pytest.fixture(autouse=True)
+def _open_pool_on(monkeypatch):
+    """These tests exercise the open-pool contributor itself."""
+    monkeypatch.setenv("POTLUCK_OPEN_POOL_CONTRIBUTOR", "1")
 
 
 def run_async(fn):
@@ -221,6 +229,18 @@ async def test_missing_coordinator_url_is_an_error_state_not_a_start(monkeypatch
     assert not svc.is_running and runner.starts == []
     st = svc.status()
     assert st["state"] == "error" and st["last_error"] == "coordinator_not_configured"
+
+
+@run_async
+async def test_releases_without_the_open_pool_never_start_the_contributor(monkeypatch, tmp_path):
+    monkeypatch.delenv("POTLUCK_OPEN_POOL_CONTRIBUTOR", raising=False)
+    runner = FakeLoopRunner()
+    svc = _service(runner, monkeypatch=monkeypatch, tmp_path=tmp_path)
+    _patch_base(monkeypatch, "https://coord.example")
+    await svc.apply_settings(_settings(on=True))
+    assert not svc.is_running and runner.starts == []
+    st = svc.status()
+    assert st["state"] == "disabled" and st["enabled"] is True
 
 
 @run_async

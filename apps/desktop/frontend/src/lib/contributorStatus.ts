@@ -5,7 +5,8 @@
  * testable without rendering; the Network view calls `contributorStatusLine`.
  */
 
-export type ContributorState = 'stopped' | 'connecting' | 'connected' | 'rejected' | 'error';
+// 'disabled': this build does not join the open pool (see lib/features.ts).
+export type ContributorState = 'stopped' | 'connecting' | 'connected' | 'rejected' | 'error' | 'disabled';
 
 export interface ContributorStatus {
   enabled: boolean;
@@ -43,7 +44,7 @@ function jobsPhrase(n: number): string {
  *  is off, so the card shows nothing extra. */
 export function contributorStatusLine(status: ContributorStatus | null): ContributorStatusLine | null {
   if (status === null) return null;
-  if (!status.enabled) return null;
+  if (!status.enabled || status.state === 'disabled') return null;
 
   switch (status.state) {
     case 'connected': {

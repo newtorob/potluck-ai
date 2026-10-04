@@ -13,6 +13,7 @@ import { useTasks } from '@/hooks/useTasks';
 import { useProject } from '@/hooks/useProject';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { TaskWorkroom } from '@/components/tasks/TaskWorkroom';
+import { FEATURES } from '@/lib/features';
 import { normaliseProjectName, resolveProjectFilter } from '@/lib/projectUtils';
 import type { ProjectFilter } from '@/lib/projectUtils';
 import { ViewHeader } from '@/components/layout/ViewHeader';
@@ -498,7 +499,7 @@ export function TaskStateView() {
               }}
             />
           </aside>
-          <TaskWorkroom task={selectedTask} onTaskRefresh={refetch} />
+          {FEATURES.agentWorkroom && <TaskWorkroom task={selectedTask} onTaskRefresh={refetch} />}
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto px-6 py-4">
