@@ -21,6 +21,17 @@ afterEach(() => {
 });
 
 describe("streamChat", () => {
+  it("rejects a disconnected response even when its text contains a complete action", async () => {
+    const text = '```action\n{"tool":"write_file","args":{"path":"x","content":"y"}}\n```';
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([
+      `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`,
+    ])));
+    const consume = async () => {
+      for await (const _ of streamChat(cfg, messages, { model: "m", requireDone: true })) { /* drain */ }
+    };
+    await expect(consume()).rejects.toThrow(/ended before completion/);
+  });
+
   it("sends the X-Potluck-Scope header and yields content deltas", async () => {
     const seen: { url: string; headers: Record<string, string> }[] = [];
     vi.stubGlobal(

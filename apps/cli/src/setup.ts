@@ -1,13 +1,12 @@
 /**
- * The setup wizard: `potluck setup`, also auto-run on first use when
+ * The preferences wizard: `potluck setup --preferences`, also auto-run on first use when
  * ~/.potluck/cli.json is missing.
  *
  * It can IMPORT settings from the desktop app's ~/.potluck/config.json (default
  * model + coordinator URL), prompts for the CLI defaults, and PERSISTS:
  *   - CLI prefs  -> ~/.potluck/cli.json   (model, scope, gatewayUrl)
- *   - shared     -> ~/.potluck/config.json (ONLY active_model_id + coordinator_url,
- *                   opt-in) — it NEVER writes gateway.api_key and NEVER flips
- *                   gateway.enabled (the app owns those).
+ *   - shared     -> authenticated runtime settings API (opt-in default model
+ *                   and coordinator URL). It never rewrites config.json.
  */
 
 import {
@@ -122,17 +121,12 @@ export async function runSetup(io: SetupIO): Promise<CliPrefs> {
       false,
     );
     if (doShare) {
-      await saveSharedSafeFields({
-        model: model ?? undefined,
-        coordinatorUrl: coordToShare ?? undefined,
-      });
-      out(
-        `${c.green("✓ updated shared fields")} ${c.dim(
-          "~/.potluck/config.json (active_model_id" +
-            (coordToShare ? " + network.coordinator_url" : "") +
-            "; gateway untouched)",
-        )}`,
-      );
+      try {
+        await saveSharedSafeFields({ model, coordinatorUrl: coordToShare });
+        out(c.green("✓ updated shared fields through the runtime"));
+      } catch {
+        out(c.yellow("Shared settings were not saved. Run potluck up, then repeat setup. CLI preferences will still be saved."));
+      }
     }
   }
 
@@ -171,11 +165,11 @@ export async function runSetup(io: SetupIO): Promise<CliPrefs> {
   await saveCliPrefs(prefs);
   out(`\n${c.green("✓ saved CLI prefs")} ${c.dim("~/.potluck/cli.json")}`);
 
-  // 8) If the gateway is off, the CLI cannot turn it on — explain how.
+  // 8) Preferences do not implicitly enable gateway access.
   if (!cfg.enabled || !cfg.apiKey) {
     out(
-      `\n${c.yellow("Note:")} the gateway is off (or has no key). The CLI cannot enable it.\n` +
-        `Open the Potluck app and turn it on: ${c.bold("Settings -> Connect tools")}.`,
+      `\n${c.yellow("Note:")} the gateway is off (or has no key).\n` +
+        `Run ${c.bold("potluck up")} then ${c.bold("potluck gateway enable")}, or use Settings -> Connect tools.`,
     );
   }
 
@@ -185,14 +179,14 @@ export async function runSetup(io: SetupIO): Promise<CliPrefs> {
 export function printSetupHelp(out: (s: string) => void): void {
   out(
     [
-      `${c.bold("potluck setup")} — configure CLI defaults`,
+      `${c.bold("potluck setup --preferences")} — configure CLI defaults`,
       "",
       "Walks you through the default model, the default network scope, the",
       "gateway URL, and the verify command (a build/test command the agent runs",
       "after each edit), then writes ~/.potluck/cli.json. Optionally imports settings",
       "from the Potluck app and writes safe shared fields (default model,",
-      "coordinator URL) back to ~/.potluck/config.json. It never touches the",
-      "gateway api_key or the enabled flag — the app owns those.",
+      "coordinator URL) through the running engine's settings API. It never",
+      "rewrites shared config or changes the gateway key during preference setup.",
       "",
       "Runs automatically the first time you use `potluck` in a terminal.",
       "",

@@ -25,6 +25,7 @@ from pydantic import BaseModel
 
 from potluck_local import __version__
 from potluck_local.services import gateway_routing, pool_routing
+from potluck_local.services.remote_stream import RemoteStreamError
 from potluck_local.services.model_registry import list_models
 from potluck_local.services.runtime import get_runtime
 
@@ -165,10 +166,11 @@ async def chat(req: OllamaChatRequest):
     messages = [m.model_dump() for m in req.messages]
     temperature, max_tokens = _opts(req)
     model_name = req.model if (peer or use_pool) else local
-    served_by = "pool" if use_pool else (f"peer:{peer['node_name']}" if peer else "local")
+    served_by = "pool" if use_pool else ("household" if peer else "local")
 
     if req.stream:
         async def ndjson_stream():
+            finish_reason = "stop"
             try:
                 if use_pool:
                     # pool_routing applies the multi-turn privacy policy.
@@ -183,6 +185,8 @@ async def chat(req: OllamaChatRequest):
                     if isinstance(chunk, dict) and "__error__" in chunk:
                         yield json.dumps({"model": model_name, "created_at": _now_iso(), "error": chunk["__error__"]}) + "\n"
                         return
+                    if chunk.get("choices") and chunk["choices"][0].get("finish_reason"):
+                        finish_reason = chunk["choices"][0]["finish_reason"]
                     delta = ""
                     try:
                         delta = chunk["choices"][0].get("delta", {}).get("content") or ""
@@ -201,7 +205,7 @@ async def chat(req: OllamaChatRequest):
             yield json.dumps({
                 "model": model_name, "created_at": _now_iso(),
                 "message": {"role": "assistant", "content": ""},
-                "done": True, "done_reason": "stop",
+                "done": True, "done_reason": finish_reason,
             }) + "\n"
 
         return StreamingResponse(
@@ -218,6 +222,8 @@ async def chat(req: OllamaChatRequest):
         else:
             result = await runtime.chat(messages, temperature=temperature, max_tokens=max_tokens)
         content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+    except RemoteStreamError as exc:
+        raise HTTPException(status_code=502, detail={"code": exc.category, "message": str(exc)}) from exc
     except pool_routing.PoolDispatchError as exc:
         status = exc.status_code if exc.status_code in (404, 503) else 502
         raise HTTPException(status_code=status, detail=exc.detail)
@@ -229,7 +235,7 @@ async def chat(req: OllamaChatRequest):
         "created_at": _now_iso(),
         "message": {"role": "assistant", "content": content},
         "done": True,
-        "done_reason": "stop",
+        "done_reason": result["choices"][0].get("finish_reason", "stop"),
     }, headers={"X-Potluck-Served-By": served_by})
 
 
@@ -275,10 +281,11 @@ async def generate(req: OllamaGenerateRequest):
 
     messages = [{"role": "user", "content": req.prompt}]
     model_name = req.model if (peer or use_pool) else local
-    served_by = "pool" if use_pool else (f"peer:{peer['node_name']}" if peer else "local")
+    served_by = "pool" if use_pool else ("household" if peer else "local")
 
     if req.stream:
         async def ndjson_stream():
+            finish_reason = "stop"
             try:
                 if use_pool:
                     source = pool_routing.stream_pool_openai(
@@ -292,6 +299,8 @@ async def generate(req: OllamaGenerateRequest):
                     if isinstance(chunk, dict) and "__error__" in chunk:
                         yield json.dumps({"model": model_name, "created_at": _now_iso(), "error": chunk["__error__"]}) + "\n"
                         return
+                    if chunk.get("choices") and chunk["choices"][0].get("finish_reason"):
+                        finish_reason = chunk["choices"][0]["finish_reason"]
                     try:
                         token = chunk["choices"][0].get("delta", {}).get("content") or ""
                     except (KeyError, IndexError, AttributeError):
@@ -312,7 +321,7 @@ async def generate(req: OllamaGenerateRequest):
                 "created_at": _now_iso(),
                 "response": "",
                 "done": True,
-                "done_reason": "stop",
+                "done_reason": finish_reason,
             }) + "\n"
 
         return StreamingResponse(
@@ -329,6 +338,8 @@ async def generate(req: OllamaGenerateRequest):
         else:
             result = await runtime.chat(messages, temperature=temperature, max_tokens=max_tokens)
         content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+    except RemoteStreamError as exc:
+        raise HTTPException(status_code=502, detail={"code": exc.category, "message": str(exc)}) from exc
     except pool_routing.PoolDispatchError as exc:
         status = exc.status_code if exc.status_code in (404, 503) else 502
         raise HTTPException(status_code=status, detail=exc.detail)
@@ -340,7 +351,7 @@ async def generate(req: OllamaGenerateRequest):
         "created_at": _now_iso(),
         "response": content,
         "done": True,
-        "done_reason": "stop",
+        "done_reason": result["choices"][0].get("finish_reason", "stop"),
     }, headers={"X-Potluck-Served-By": served_by})
 
 

@@ -269,6 +269,11 @@ def test_distributed_fewer_round_trips_than_serial() -> None:
 
     We use identical short prompts (max_new=15) so the oracle is cheap and all
     requests run at nearly the same speed (making batching likely)."""
+    import asyncio
+    import json
+
+    from potluck_local.services.runtime import LLMRuntime
+
     N = 3
     max_new = 15
     prompt = [{"role": "user", "content": "Say: hello"}]
@@ -277,19 +282,26 @@ def test_distributed_fewer_round_trips_than_serial() -> None:
     with _LoopbackTail(MODEL_ID, SPLIT) as tail:
         engine = _make_engine(tail.port)
         batcher = DistributedContinuousBatcher(engine)
-        results = [None] * N
+        rt = LLMRuntime()
+        rt._pipeline = engine
+        rt._batcher = batcher
 
-        def run(i):
-            gen = batcher.submit(prompt, max_new=max_new)
-            results[i] = _collect(gen)
+        async def run():
+            chunks = [chunk async for chunk in rt.stream_chat(
+                prompt, max_tokens=max_new, temperature=0.0)]
+            assert not any('"error"' in chunk for chunk in chunks)
+            assert chunks[-1] == "data: [DONE]\n\n"
+            return "".join(json.loads(chunk[6:])["choices"][0]["delta"]["content"]
+                           for chunk in chunks[:-1])
 
-        threads = [threading.Thread(target=run, args=(i,)) for i in range(N)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join(timeout=180)
-        batcher.stop()
-        st = batcher.stats()
+        async def scenario():
+            return await asyncio.gather(*(run() for _ in range(N)))
+
+        try:
+            results = asyncio.run(scenario())
+            st = batcher.stats()
+        finally:
+            rt.unload_model()
 
     assert st["max_batch_size"] > 1, (
         f"max_batch_size={st['max_batch_size']} — batch never grew beyond 1; "

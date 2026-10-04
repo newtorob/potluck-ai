@@ -10,6 +10,7 @@ import uuid
 from pathlib import Path
 
 import platformdirs
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -46,12 +47,18 @@ class Settings(BaseSettings):
     # membership integration lands in v0.5 (see roadmap memory 6d50b79d).
     member_id: uuid.UUID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
-    # SHA256 of the contributor binary, hex-encoded. The coordinator
-    # rejects connections whose hash isn't in `contributor_releases`. In
-    # dev: produced by `scripts/dev/sign-contributor-release.py emit-sql ...`
-    # and seeded via psql. In prod: computed at install-time from the
-    # signed release artifact.
+    # SHA256 of the contributor build, hex-encoded. Empty means "resolve it":
+    # see contributor/release.py (release file next to the frozen executable,
+    # else the dev placeholder). The coordinator records whatever is sent and
+    # only rejects unknown hashes when its require_registered_release flag is
+    # on. In dev: `scripts/dev/sign-contributor-release.py emit-sql ...`
+    # seeds a matching contributor_releases row.
     binary_hash: str = ""
+
+    # Jobs this peer runs at once. Sent in every heartbeat; the loop also
+    # declines a job locally once this many are in flight. 1 matches the
+    # sidecar runtime, which serialises inference on one model anyway.
+    max_concurrent_jobs: int = Field(default=1, ge=0, le=64)
 
     # Where to load + persist the per-peer Ed25519 key.
     key_dir: Path = _default_key_dir()

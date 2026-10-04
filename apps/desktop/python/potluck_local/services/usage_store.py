@@ -16,11 +16,13 @@ chokepoint); this module only reads and writes it.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import aiosqlite
+import anyio
 
 from potluck_local.services.memory_db import get_memory_db_path
 from potluck_local.utils.time import now_iso
@@ -88,34 +90,52 @@ async def record_usage_event(
     if direction not in VALID_DIRECTIONS:
         direction = "consumed"
     path = db_path or get_memory_db_path()
-    try:
-        async with aiosqlite.connect(path) as db:
-            await db.execute("PRAGMA busy_timeout=5000")
-            await db.execute(
-                """
-                INSERT INTO usage_events (
-                  ts, direction, scope, model_slug,
-                  input_tokens, cache_read_tokens, output_tokens,
-                  ttft_ms, duration_ms, ok, error_class
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    now_iso(),
-                    direction,
-                    _normalize_scope(scope),
-                    model_slug,
-                    max(0, int(input_tokens or 0)),
-                    max(0, int(cache_read_tokens or 0)),
-                    max(0, int(output_tokens or 0)),
-                    int(ttft_ms) if ttft_ms is not None else None,
-                    int(duration_ms) if duration_ms is not None else None,
-                    1 if ok else 0,
-                    error_class,
-                ),
-            )
-            await db.commit()
-    except Exception:
-        logger.exception("usage_event_write_failed direction=%s scope=%s", direction, scope)
+    # Stream finalizers run inside Starlette's cancelled AnyIO scope. Older
+    # aiosqlite versions leak their non-daemon worker if connect is cancelled
+    # before __aenter__ returns. Finish this small transaction, including close,
+    # before propagating cancellation; never leave a fire-and-forget DB writer.
+    async def write():
+        try:
+            async with aiosqlite.connect(path) as db:
+                await db.execute("PRAGMA busy_timeout=5000")
+                await db.execute(
+                    """
+                    INSERT INTO usage_events (
+                      ts, direction, scope, model_slug,
+                      input_tokens, cache_read_tokens, output_tokens,
+                      ttft_ms, duration_ms, ok, error_class
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        now_iso(),
+                        direction,
+                        _normalize_scope(scope),
+                        model_slug,
+                        max(0, int(input_tokens or 0)),
+                        max(0, int(cache_read_tokens or 0)),
+                        max(0, int(output_tokens or 0)),
+                        int(ttft_ms) if ttft_ms is not None else None,
+                        int(duration_ms) if duration_ms is not None else None,
+                        1 if ok else 0,
+                        error_class,
+                    ),
+                )
+                await db.commit()
+        except Exception:
+            logger.exception("usage_event_write_failed direction=%s scope=%s", direction, scope)
+
+    with anyio.CancelScope(shield=True):
+        worker = asyncio.create_task(write())
+        try:
+            await asyncio.shield(worker)
+        except asyncio.CancelledError:
+            while not worker.done():
+                try:
+                    await asyncio.shield(worker)
+                except asyncio.CancelledError:
+                    continue
+            worker.result()
+            raise
 
 
 async def summary(window_days: float = 30.0, db_path: Path | None = None) -> dict:
@@ -192,6 +212,20 @@ async def summary(window_days: float = 30.0, db_path: Path | None = None) -> dic
         "p95_latency_ms": p95,
         "avg_ttft_ms": int(agg["avg_ttft_ms"] or 0),
     }
+
+
+async def performance_summary(db_path: Path | None = None) -> dict:
+    """Bounded aggregate over recorded consumed requests in the last 24 hours."""
+    async with aiosqlite.connect(db_path or get_memory_db_path()) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT COUNT(*) AS requests, SUM(output_tokens) AS output_tokens, "
+            "AVG(ttft_ms) AS avg_ttft_ms, AVG(duration_ms) AS avg_duration_ms, "
+            "AVG(ok) AS success_rate FROM usage_events WHERE direction = 'consumed' AND ts >= ?",
+            (_cutoff_iso(1),))
+        row = dict(await cursor.fetchone())
+    return {'windowHours': 24, 'requests': row['requests'], 'reportedOutputTokens': row['output_tokens'] or 0,
+            'avgTtftMs': row['avg_ttft_ms'], 'avgDurationMs': row['avg_duration_ms'], 'successRate': row['success_rate']}
 
 
 async def activity(range_days: int = 365, db_path: Path | None = None) -> list[dict]:

@@ -1,6 +1,6 @@
 {
   "name": "@potluck/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Potluck CLI — a terminal coding agent whose inference runs on the Potluck mesh via the local OpenAI-compatible gateway.",
   "type": "module",
   "bin": {
@@ -17,7 +17,9 @@
     "build": "tsc",
     "dev": "tsc && node dist/index.js",
     "start": "node dist/index.js",
-    "test": "vitest run",
+    "package:release": "node scripts/package-release.mjs",
+    "package:homebrew": "node scripts/generate-homebrew.mjs",
+    "test": "tsc && vitest run",
     "test:watch": "vitest"
   },
   "devDependencies": {

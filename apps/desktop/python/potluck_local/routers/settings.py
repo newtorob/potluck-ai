@@ -100,6 +100,17 @@ async def update_settings(patch: dict[str, Any]) -> dict[str, Any]:
 
     save_settings(updated)
     logger.info("settings_updated")
+
+    # The Contribute compute toggle (and the coordinator URL / job cap next to
+    # it) drive the in-process contributor. Reconcile after every save; the
+    # service is idempotent and a failure here must never fail the PATCH.
+    try:
+        from potluck_local.services.contributor_service import get_contributor_service
+
+        await get_contributor_service().apply_settings(updated)
+    except Exception:  # noqa: BLE001
+        logger.exception("contributor_apply_settings_failed")
+
     return updated.model_dump()
 
 
@@ -125,3 +136,15 @@ async def rotate_gateway_key() -> dict[str, Any]:
     save_settings(updated)
     logger.info("gateway_key_rotated")
     return {"enabled": True, "api_key": new_key}
+
+
+@router.post("/gateway/enable")
+async def enable_gateway() -> dict[str, Any]:
+    """Idempotent enable: keep existing clients' key and routing preferences."""
+    current = get_settings()
+    if not current.gateway.api_key:
+        await rotate_gateway_key()
+    elif not current.gateway.enabled:
+        save_settings(current.model_copy(update={
+            "gateway": current.gateway.model_copy(update={"enabled": True})}))
+    return {"enabled": True, "key_configured": True}

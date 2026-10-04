@@ -16,18 +16,21 @@ import asyncio
 import logging
 import os
 import shutil
+import time
 from pathlib import Path
 
 import psutil
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from potluck_local.services import model_registry
 from potluck_local.services.context_tuning import resolve_context_size
 from potluck_local.services.model_downloader import get_downloader
+from potluck_local.services.model_lifecycle import get_model_lifecycle
 from potluck_local.services.runtime import get_runtime
 from potluck_local.services.settings_manager import get_settings
 from potluck_local.utils.crypto import sha256_file
+from potluck_local.services.model_identity import artifact_identity, valid_source_url
 from potluck_local.utils.paths import models_dir
 
 logger = logging.getLogger(__name__)
@@ -87,6 +90,46 @@ async def list_models() -> list[dict]:
     return models
 
 
+@router.get("/setup-options")
+async def get_setup_options() -> dict:
+    from potluck_local.services.model_setup import setup_options
+    return await asyncio.to_thread(setup_options)
+
+
+@router.get("/available")
+async def available_models() -> dict:
+    from potluck_local.services.model_availability import model_availability
+    return await model_availability()
+
+
+class ModelTestRequest(BaseModel):
+    sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+
+@router.post("/{slug}/test")
+async def test_local_model(slug: str, request: ModelTestRequest) -> dict:
+    """Fixed, synthetic local-only prompt; no gateway, account or project content."""
+    from potluck_local.services.model_identity import ModelIdentityError
+    _safe_model_dir(slug)
+    start = time.monotonic()
+    try:
+        result = await get_runtime().chat(
+            [{"role": "user", "content": "Reply briefly: what is 2 + 2? /no_think"}],
+            expected_model=slug, expected_sha256=request.sha256, temperature=0, max_tokens=64,
+        )
+    except ModelIdentityError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(503, "Local inference test failed. Check model and runtime settings.") from exc
+    content = (result.get("choices") or [{}])[0].get("message", {}).get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise HTTPException(503, "The local model returned no text. Check its chat template or context settings.")
+    usage = result.get("usage") or {}
+    return {"schemaVersion": 1, "status": "passed", "model": slug,
+            "durationMs": round((time.monotonic() - start) * 1000),
+            "outputTokens": usage.get("completion_tokens"), "scope": "local"}
+
+
 @router.post("/benchmark")
 async def benchmark_loaded_model() -> dict:
     """Benchmark the currently loaded model: tokens/sec + time-to-first-token."""
@@ -106,6 +149,71 @@ async def get_manifest(slug: str) -> dict:
     if manifest is None:
         raise HTTPException(status_code=404, detail=f"No manifest found for '{slug}'.")
     return manifest
+
+
+class LockedSource(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    url: str = Field(max_length=2048)
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, value: str) -> str:
+        if not valid_source_url(value):
+            raise ValueError("Locked downloads require a public Hugging Face GGUF URL without credentials or query parameters.")
+        return value
+
+
+class LockedModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}$")
+    format: str = Field(pattern=r"^gguf$")
+    sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    sizeBytes: int = Field(strict=True, gt=0, le=9007199254740991)
+    source: LockedSource | None = None
+
+
+@router.get("/{slug}/identity")
+async def installed_model_identity(slug: str) -> dict:
+    path = _safe_model_dir(slug) / "model.gguf"
+    try:
+        digest, stamp = await asyncio.to_thread(artifact_identity, path)
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "Install this model before pinning it.") from exc
+    except OSError as exc:
+        raise HTTPException(409, "Model changed or could not be read during verification. Retry when installation finishes.") from exc
+    model = {"id": slug, "format": "gguf", "sha256": digest, "sizeBytes": stamp[2]}
+    manifest = model_registry.get_manifest(slug) or {}
+    source = manifest.get("download_url", "")
+    # An imported/older file can still be pinned offline, but never pair its
+    # digest with provenance for different catalog bytes.
+    if manifest.get("sha256") == digest and valid_source_url(source):
+        model["source"] = {"url": source}
+    return {"model_lock_version": 1, "model": model}
+
+
+@router.post("/{slug}/install-locked", status_code=202)
+async def install_locked_model(slug: str, model: LockedModel, background_tasks: BackgroundTasks) -> dict:
+    if model.id != slug:
+        raise HTTPException(400, "Model ID does not match the lock.")
+    path = _safe_model_dir(slug) / "model.gguf"
+    if path.exists():
+        try:
+            digest, stamp = await asyncio.to_thread(artifact_identity, path)
+        except OSError as exc:
+            raise HTTPException(409, "Existing model could not be verified; retry when installation finishes.") from exc
+        if digest != model.sha256 or stamp[2] != model.sizeBytes:
+            raise HTTPException(409, "A different file is already installed under this model ID. Move it aside deliberately before syncing this lock.")
+        return {"model_lock_version": 1, "status": "verified", "sha256": digest}
+    if model.source is None:
+        raise HTTPException(400, "This lock has no download source. Copy its exact GGUF to the local model directory, then run sync again.")
+    downloader = get_downloader()
+    progress = downloader.get_progress(slug)
+    if progress and progress.status in ("downloading", "verifying"):
+        raise HTTPException(409, "A download is already running for this model. Wait for it, then run sync to verify the lock.")
+    background_tasks.add_task(downloader.download_model, model_id=slug,
+                             url=model.source.url, expected_sha256=model.sha256,
+                             expected_size=model.sizeBytes)
+    return {"model_lock_version": 1, "status": "downloading", "sha256": model.sha256}
 
 
 @router.post("/{slug}/install", status_code=202)
@@ -130,7 +238,7 @@ async def install_model(slug: str, background_tasks: BackgroundTasks) -> dict:
 
     downloader = get_downloader()
     existing_progress = downloader.get_progress(slug)
-    if existing_progress is not None and existing_progress.status == "downloading":
+    if existing_progress is not None and existing_progress.status in ("downloading", "verifying"):
         return {"status": "already_downloading"}
 
     background_tasks.add_task(
@@ -147,10 +255,16 @@ async def install_model(slug: str, background_tasks: BackgroundTasks) -> dict:
 
 @router.delete("/{slug}", status_code=200)
 async def delete_model(slug: str) -> dict:
+    async with get_model_lifecycle().command():
+        return await _delete_model(slug)
+
+
+async def _delete_model(slug: str) -> dict:
     model_dir = _safe_model_dir(slug)
     if not model_dir.exists():
         raise HTTPException(status_code=404, detail=f"Model '{slug}' is not installed.")
 
+    get_model_lifecycle().forget(slug)
     runtime = get_runtime()
     if runtime.is_loaded() and runtime.current_model_id() == slug:
         await runtime.unload_model_async()
@@ -254,6 +368,15 @@ def _load_verify_reference(slug: str, manifest: dict | None, model_dir) -> tuple
 
 @router.post("/{slug}/load", status_code=200)
 async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
+    lifecycle = get_model_lifecycle()
+    async with lifecycle.command():
+        # A distributed switch must not restore the previous local model or
+        # reconnect peers on the next launch. HF/pipeline restore is separate.
+        remote = body and (body.rpc_servers or body.pipeline or body.pipeline_auto)
+        return await lifecycle.load_and_remember(_load_model(slug, body), None if remote else slug)
+
+
+async def _load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
     # Pipeline-parallel: explicit chain (body.pipeline) or auto-orchestrated across the
     # household (body.pipeline_auto). Either path -> runtime.load_pipeline. Transformers
     # head-loop on an HF model id (no GGUF on disk), so it bypasses the slug/GGUF path.
@@ -430,10 +553,13 @@ async def load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
 
 @router.post("/{slug}/unload", status_code=200)
 async def unload_model(slug: str) -> dict:
-    runtime = get_runtime()
-    if runtime.is_loaded() and runtime.current_model_id() == slug:
-        await runtime.unload_model_async()
-        logger.info("model_unloaded slug=%s", slug)
+    lifecycle = get_model_lifecycle()
+    async with lifecycle.command():
+        lifecycle.forget(slug)
+        runtime = get_runtime()
+        if runtime.is_loaded() and runtime.current_model_id() == slug:
+            await runtime.unload_model_async()
+            logger.info("model_unloaded slug=%s", slug)
     return {"status": "unloaded"}
 
 

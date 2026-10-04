@@ -142,6 +142,65 @@ def _collect(gen) -> str:
     return "".join(gen)
 
 
+def test_concurrent_runtime_streams_share_real_batch_and_match_greedy(engine, monkeypatch):
+    """Exercise runtime admission through real model decode, not direct submit()."""
+    import asyncio
+    import json
+
+    from potluck_local.services.runtime import LLMRuntime
+
+    prompts = [[{"role": "user", "content": f"Count from 1 to 30 in {language}."}]
+               for language in ("English", "French")]
+    expected = [_single_stream_text(engine, prompt, max_new=24) for prompt in prompts]
+    rt = LLMRuntime()
+    rt._pipeline = engine
+    batcher = rt._batcher = ContinuousBatcher(engine)
+
+    # Hold the first decode step until both prefills have been admitted. This
+    # makes overlap deterministic even on a fast CPU. Runtime serialization
+    # causes this gate to time out, rather than accidentally passing in serial.
+    both_admitted = threading.Event()
+    admission_lock = threading.Lock()
+    count = 0
+    submit, step = batcher.submit, batcher._step
+
+    def gated_submit(*args, **kwargs):
+        nonlocal count
+        result = submit(*args, **kwargs)
+        with admission_lock:
+            count += 1
+            if count == 2:
+                both_admitted.set()
+        return result
+
+    def gated_step():
+        assert both_admitted.wait(10), "runtime did not admit both requests"
+        return step()
+
+    monkeypatch.setattr(batcher, "submit", gated_submit)
+    monkeypatch.setattr(batcher, "_step", gated_step)
+
+    async def collect(prompt):
+        chunks = [chunk async for chunk in rt.stream_chat(
+            prompt, temperature=0.0, max_tokens=24)]
+        assert not any('"error"' in chunk for chunk in chunks)
+        assert chunks[-1] == "data: [DONE]\n\n"
+        return "".join(json.loads(chunk[6:])["choices"][0]["delta"]["content"]
+                       for chunk in chunks[:-1])
+
+    async def scenario():
+        return await asyncio.gather(*(collect(prompt) for prompt in prompts))
+
+    try:
+        assert asyncio.run(scenario()) == expected
+        stats = batcher.stats()
+        assert stats["max_batch_size"] == 2
+        assert stats["n_forward"] < 2 * 24
+    finally:
+        both_admitted.set()
+        rt.unload_model()
+
+
 # ---------------------------------------------------------------------------
 # Test 1: CORRECTNESS GATE
 # ---------------------------------------------------------------------------

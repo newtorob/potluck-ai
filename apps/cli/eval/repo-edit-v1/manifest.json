@@ -1,0 +1,12 @@
+{
+  "version": "repo-edit-v1",
+  "maxSteps": 16,
+  "timeoutMs": 900000,
+  "charBudget": 16000,
+  "context": 8192,
+  "cases": [
+    { "id": "booking", "editable": ["intervals.py", "booking.py"] },
+    { "id": "retry", "editable": ["backoff.py", "queueing.py"] },
+    { "id": "contacts", "editable": ["csv_rows.py", "contacts.py"] }
+  ]
+}

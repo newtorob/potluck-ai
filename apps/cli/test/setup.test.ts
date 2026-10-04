@@ -2,25 +2,25 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { runtimeRequest } from "../src/runtime.js";
+vi.mock("../src/runtime.js", () => ({ runtimeRequest: vi.fn(async () => ({})) }));
 
 import { loadCliPrefs } from "../src/config.js";
 import { runSetup, type SetupIO } from "../src/setup.js";
 
 let home = "";
-const savedEnv = { ...process.env };
 
 beforeEach(async () => {
+  vi.mocked(runtimeRequest).mockClear();
   home = await mkdtemp(join(tmpdir(), "potluck-setup-"));
-  process.env.HOME = home;
+  vi.stubEnv("POTLUCK_DATA_DIR", join(home, ".potluck"));
   delete process.env.POTLUCK_GATEWAY_KEY;
   delete process.env.POTLUCK_GATEWAY_URL;
 });
 
 afterEach(async () => {
-  // Restore env vars in place (see config.test.ts): reassigning process.env
-  // wholesale detaches it from the proxy os.homedir() reads.
-  process.env.HOME = savedEnv.HOME;
+  vi.unstubAllEnvs();
   delete process.env.POTLUCK_GATEWAY_KEY;
   delete process.env.POTLUCK_GATEWAY_URL;
   await rm(home, { recursive: true, force: true });
@@ -70,6 +70,10 @@ describe("runSetup", () => {
     expect((raw.network as Record<string, unknown>).max_gpu_percent).toBe(80);
     // The app owns the key + the enabled flag — never written by the CLI.
     expect(raw.gateway).toEqual({ enabled: false, api_key: "" });
+    expect(runtimeRequest).toHaveBeenCalledWith("/settings", {
+      method: "PATCH", timeout: 3000,
+      body: { active_model_id: "app-model", network: { coordinator_url: "http://coord:8400" } },
+    });
   });
 
   it("does not modify config.json when the share step is declined", async () => {

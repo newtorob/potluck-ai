@@ -23,6 +23,12 @@ from potluck_local.app import create_app
 
 @pytest.fixture()
 def isolated_data_dir(tmp_path, monkeypatch):
+    from potluck_local.services import model_lifecycle
+
+    # Earlier lifespan tests shut down their runtime. Each isolated model store
+    # needs its own lifecycle so that process-wide shutdown state cannot turn
+    # path-validation responses into unrelated 503 errors.
+    monkeypatch.setattr(model_lifecycle, "_lifecycle", model_lifecycle.ModelLifecycle())
     data_dir = tmp_path / "potluck_data"
     models = data_dir / "models"
     models.mkdir(parents=True)

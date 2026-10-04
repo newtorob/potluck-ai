@@ -636,6 +636,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help=f"Use SSE transport on 127.0.0.1:PORT (default port {_DEFAULT_TCP_PORT}).",
     )
+    transport_group.add_argument(
+        "--agent-bridge",
+        choices=("codex", "claude"),
+        default=None,
+        help="Read one provider hook event from stdin and store safe trace metadata.",
+    )
     return parser.parse_args(argv)
 
 
@@ -650,6 +656,14 @@ def main(argv: list[str] | None = None) -> None:
 
     # Ensure DB schema exists before accepting any tool calls
     asyncio.run(init_memory_db())
+
+    if args.agent_bridge is not None:
+        # Keep one packaged executable for both MCP and hook ingestion. The
+        # bridge owns its fail-open contract and always returns success.
+        from potluck_local.agent_bridge import main as bridge_main
+
+        bridge_main([args.agent_bridge])
+        return
 
     if args.tcp is not None:
         port = args.tcp

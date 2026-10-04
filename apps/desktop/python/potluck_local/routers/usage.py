@@ -34,6 +34,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.get('/performance')
+async def get_performance(household: bool = False) -> dict:
+    from potluck_local.services.performance_status import performance_status
+    return await performance_status(include_household=household)
+
+
 class UsageRecord(BaseModel):
     """One completed request reported by the frontend for the paths that do not
     pass through the sidecar (in-app circle / pool / my_machines chat). Metadata

@@ -39,6 +39,9 @@ import potluck_local.routers.peer as peer_module
 
 @pytest.fixture()
 def isolated_env(tmp_path, monkeypatch):
+    from potluck_local.services import model_lifecycle
+
+    monkeypatch.setattr(model_lifecycle, "_lifecycle", model_lifecycle.ModelLifecycle())
     db_path = tmp_path / "memory.db"
     monkeypatch.setenv("POTLUCK_MEMORY_DB_PATH", str(db_path))
     monkeypatch.setenv("POTLUCK_DATA_DIR", str(tmp_path / "data_dir"))
@@ -47,6 +50,18 @@ def isolated_env(tmp_path, monkeypatch):
 
 async def _hang_forever() -> None:
     await asyncio.sleep(3600)
+
+
+def test_invalid_batch_storage_keeps_runtime_available(isolated_env, monkeypatch):
+    from potluck_local.services import batch_jobs
+    def unavailable(*_):
+        raise batch_jobs.BatchError("unsafe_storage", "Private content must not be logged", 503)
+    monkeypatch.setattr(batch_jobs, "BatchManager", unavailable)
+    async def scenario():
+        app = FastAPI()
+        async with app_module._lifespan(app):
+            assert app.state.batch_manager is None
+    asyncio.run(scenario())
 
 
 def test_lifespan_cancels_and_drains_background_tasks_on_shutdown(isolated_env, monkeypatch):

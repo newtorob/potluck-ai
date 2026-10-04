@@ -1,6 +1,7 @@
 """LLM inference runtime — wraps llama-cpp-python.
 
-One process, one model, one user. Serialises inference with an asyncio lock.
+One process, one loaded model. Batched streams share model access; other
+inference and model lifecycle operations retain exclusive access.
 
 Big Model Mode (Potluck Phase G, project=potluck-parallel):
   When `load_model(rpc_servers=...)` is called, the model loads with one or
@@ -21,7 +22,11 @@ import re
 import threading
 import time
 from collections import deque
+from contextlib import aclosing, asynccontextmanager
+from functools import partial
 from pathlib import Path
+
+from potluck_local.services.model_identity import ModelIdentityError, artifact_identity, file_stamp
 
 logger = logging.getLogger(__name__)
 
@@ -112,11 +117,14 @@ def _parse_load_log(lines: list[str]) -> dict:
 
 
 class LLMRuntime:
-    """Manages a single loaded GGUF model via llama-cpp-python."""
+    """Manages one loaded llama.cpp or transformers inference backend."""
 
     def __init__(self) -> None:
         self._model = None
+        self._split_worker_reserved = False
         self._model_path: str | None = None
+        self._artifact: tuple[str, tuple] | None = None
+        self._verified_artifact: tuple[str, tuple] | None = None
         self._model_id: str | None = None
         self._loaded_n_ctx: int | None = None
         self._loaded_rpc_servers: tuple[str, ...] | None = None  # Big Model Mode
@@ -128,6 +136,11 @@ class LLMRuntime:
         self._batcher = None
         self._load_lock = threading.Lock()
         self._inference_lock = asyncio.Lock()
+        # A batch of streams collectively owns _inference_lock. The admission
+        # gate lets lifecycle operations stop new admissions before draining
+        # the current batch, so an ongoing stream of requests cannot starve a swap.
+        self._admission_lock = asyncio.Lock()
+        self._batched_streams = 0
         # Last benchmark result per model_id (tokens/sec + TTFT). Persists across
         # loads so the Models page + peer rows can show "last bench" without
         # re-running. Populated by benchmark().
@@ -140,10 +153,43 @@ class LLMRuntime:
         self._atexit_registered = False
 
     def is_loaded(self) -> bool:
+        if getattr(self._model, "managed_split", False) and self._model.closed:
+            return False
         return self._model is not None or self._pipeline is not None
 
     def current_model_id(self) -> str | None:
         return self._model_id
+
+    def current_model_sha256(self) -> str | None:
+        if getattr(self._model, "managed_split", False) and self._model.closed:
+            return None
+        if not self._artifact or not self._model_path or self._pipeline is not None or self._loaded_rpc_servers:
+            return None
+        try:
+            path = Path(self._model_path)
+            if file_stamp(path) == self._artifact[1]:
+                if self._verified_artifact != self._artifact:
+                    # A freshly written file can change within one filesystem
+                    # timestamp tick. Recheck bytes until that tick is safely
+                    # past, including the first observation after native load.
+                    # Established weights then use the cheap metadata check.
+                    checked = artifact_identity(path)
+                    if checked != self._artifact:
+                        self._artifact = None
+                        return None
+                    if time.time_ns() - max(checked[1][-2:]) > 2_000_000_000:
+                        self._verified_artifact = checked
+                return self._artifact[0]
+        except OSError:
+            pass
+        return None
+
+    def assert_model_identity(self, model: str | None, sha256: str | None = None) -> None:
+        # Call again after inference admission: route selection can race a load.
+        if model is not None and (not self.is_loaded() or model != self._model_id):
+            raise ModelIdentityError("Requested model is no longer loaded. Load the requested model and retry.")
+        if sha256 is not None and self.current_model_sha256() != sha256:
+            raise ModelIdentityError("Loaded model does not match the project SHA-256, or this backend cannot enforce a GGUF lock. Load the exact locked GGUF locally and retry.")
 
     def loaded_n_ctx(self) -> int | None:
         """Return the n_ctx the currently loaded model was initialised with, or None."""
@@ -264,7 +310,7 @@ class LLMRuntime:
         _install_log_capture()
 
         with self._load_lock:
-            if self._model is not None:
+            if self._model is not None or self._pipeline is not None:
                 self._release_model()
 
             requested_gpu_layers = n_gpu_layers
@@ -309,13 +355,33 @@ class LLMRuntime:
                 # llama-cpp-python wheels that don't accept the kwarg.
                 kwargs["rpc_servers"] = rpc_servers
 
+            # Bind the digest to the file actually loaded, never to a catalog or sidecar claim.
+            # An unreadable/changing file remains ineligible for locked inference.
+            try:
+                identity = artifact_identity(Path(model_path))
+            except OSError:
+                identity = None
             _LOG_LINES.clear()
             model = Llama(**kwargs)
+            verified_identity = None
+            try:
+                if identity:
+                    # Verify again in the loading worker, keeping a full-file
+                    # hash out of the first peer capability/inference request.
+                    checked = artifact_identity(Path(model_path))
+                    if checked != identity:
+                        identity = None
+                    elif time.time_ns() - max(checked[1][-2:]) > 2_000_000_000:
+                        verified_identity = checked
+            except OSError:
+                identity = None
             elapsed = round(time.monotonic() - start, 2)
             load_log = _parse_load_log(list(_LOG_LINES))
 
             self._model = model
             self._model_path = model_path
+            self._artifact = identity
+            self._verified_artifact = verified_identity
             self._model_id = Path(model_path).parent.name
             self._loaded_n_ctx = n_ctx
             self._loaded_rpc_servers = tuple(rpc_servers) if rpc_servers else None
@@ -559,40 +625,95 @@ class LLMRuntime:
         n_threads: int | None = None,
         rpc_servers: list[str] | None = None,
     ) -> dict:
-        loop = asyncio.get_running_loop()
-        async with self._inference_lock:
-            return await loop.run_in_executor(
-                None,
-                lambda: self.load_model(
-                    model_path,
-                    n_ctx=n_ctx,
-                    n_gpu_layers=n_gpu_layers,
-                    n_threads=n_threads,
-                    rpc_servers=rpc_servers,
-                ),
-            )
+        if self._split_worker_reserved:
+            raise RuntimeError("This machine is reserved as a split worker. Run potluck split worker off first.")
+        return await self._run_lifecycle(
+            partial(self.load_model, model_path, n_ctx=n_ctx,
+                    n_gpu_layers=n_gpu_layers, n_threads=n_threads,
+                    rpc_servers=rpc_servers)
+        )
 
     async def load_pipeline_async(self, model_id: str, **kwargs) -> dict:
-        loop = asyncio.get_running_loop()
-        async with self._inference_lock:
-            return await loop.run_in_executor(
-                None, lambda: self.load_pipeline(model_id, **kwargs)
-            )
+        if self._split_worker_reserved:
+            raise RuntimeError("This machine is reserved as a split worker.")
+        return await self._run_lifecycle(partial(self.load_pipeline, model_id, **kwargs))
 
     async def load_whole_model_async(self, model_id: str, **kwargs) -> dict:
-        loop = asyncio.get_running_loop()
-        async with self._inference_lock:
-            return await loop.run_in_executor(
-                None, lambda: self.load_whole_model(model_id, **kwargs)
-            )
+        if self._split_worker_reserved:
+            raise RuntimeError("This machine is reserved as a split worker.")
+        return await self._run_lifecycle(partial(self.load_whole_model, model_id, **kwargs))
 
     async def unload_model_async(self) -> None:
-        loop = asyncio.get_running_loop()
-        async with self._inference_lock:
-            await loop.run_in_executor(None, self.unload_model)
+        await self._run_lifecycle(self.unload_model)
+
+    async def install_split_async(self, model, path, slug, identity, context):
+        def install():
+            if self._split_worker_reserved:
+                raise RuntimeError("This machine is reserved as a split worker.")
+            with self._load_lock:
+                self._release_model()
+                self._model = model
+                self._model_path = str(path)
+                self._model_id = slug
+                self._artifact = self._verified_artifact = identity
+                self._loaded_n_ctx = context
+        return await self._run_lifecycle(install)
+
+    async def release_split_async(self, model):
+        # A normal load may have replaced the adapter while its asynchronous
+        # close callback was waiting. Never unload that newer model.
+        def release():
+            if self._model is model:
+                self.unload_model()
+        await self._run_lifecycle(release)
+
+    async def _run_lifecycle(self, operation):
+        async with self._admission_lock, self._inference_lock:
+            worker = asyncio.get_running_loop().run_in_executor(None, operation)
+            try:
+                return await asyncio.shield(worker)
+            except asyncio.CancelledError:
+                # Cancelling the HTTP request cannot stop a native load/close.
+                # Keep both gates until it has actually finished touching the model.
+                await self._drain_worker(worker)
+                raise
+
+    @staticmethod
+    async def _drain_worker(worker):
+        while not worker.done():
+            try:
+                await asyncio.shield(worker)
+            except asyncio.CancelledError:
+                continue  # repeated cancellation must not release model access early
+            except Exception:
+                break
+        # Retrieve any worker exception even when cancellation won the race.
+        if not worker.cancelled():
+            worker.exception()
+
+    @asynccontextmanager
+    async def _stream_session(self):
+        """First batched stream acquires exclusive access; the last releases it."""
+        async with self._admission_lock:
+            if self._batched_streams == 0:
+                await self._inference_lock.acquire()
+            batched = self._batcher is not None
+            if batched:
+                self._batched_streams += 1
+        try:
+            yield batched
+        finally:
+            # Event-loop-only bookkeeping, deliberately without an await: an
+            # unload may already hold the admission gate while waiting for us.
+            if batched:
+                self._batched_streams -= 1
+            if self._batched_streams == 0:
+                self._inference_lock.release()
 
     def _release_model(self) -> None:
         """Inner release — must be called while _load_lock is held."""
+        self._artifact = None
+        self._verified_artifact = None
         if self._model is not None:
             import gc
 
@@ -629,6 +750,8 @@ class LLMRuntime:
         self,
         messages: list[dict],
         *,
+        expected_model: str | None = None,
+        expected_sha256: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
         stop: list[str] | None = None,
@@ -636,155 +759,104 @@ class LLMRuntime:
         top_k: int = 0,
         seed: int | None = None,
     ):
-        """Async generator yielding OpenAI-style SSE strings.
+        """Yield OpenAI SSE with shared admission only for continuous batchers.
 
-        Serialised by _inference_lock — llama-cpp-python is not thread-safe
-        for concurrent inference on the same model instance.
-
-        Sampling parameters (temperature / top_p / top_k / seed) are forwarded
-        to WholeModelEngine and ContinuousBatcher when those backends are active.
-        For the distributed pipeline (PipelineParallelEngine) and the llama.cpp
-        backend, temperature is forwarded as-is; top_k/top_p/seed are noted below.
-
-        Backend routing:
-          - ContinuousBatcher (whole-model, continuous_batch=True): full per-request
-            sampling (temperature/top_k/top_p/seed) — each request keeps its own RNG.
-          - WholeModelEngine (whole-model, single-stream): same, via stream_tokens.
-          - PipelineParallelEngine (distributed): stays greedy — the tail samples
-            remotely via argmax; temperature/sampling params are silently ignored here.
-            This is documented as a follow-on (sampling requires logits at the head,
-            which aren't available in the distributed pipeline path).
-          - llama.cpp (_model): temperature is forwarded to create_chat_completion;
-            top_k/top_p are not in this path yet (llama.cpp has its own defaults).
+        Select the backend after admission, so a request queued behind a model
+        swap uses the newly loaded backend. Sampling stays per request; the
+        llama.cpp path retains its existing temperature/stop defaults.
         """
-        if self._batcher is not None:
-            # Continuous-batching opt-in: multiple concurrent stream_chat callers share
-            # batched forward passes through the ContinuousBatcher. Each submit() call
-            # returns a blocking generator that _stream_sse_from_blocking pumps into the
-            # standard async SSE queue — no inference lock (batcher serialises internally).
-            batcher = self._batcher
-            is_cb = hasattr(batcher, "temperature") or hasattr(batcher, "submit")
-            # DistributedContinuousBatcher doesn't support per-request sampling yet
-            # (logits are on the tail); run greedy and log a note.
-            from .continuous_batch import ContinuousBatcher
-            if isinstance(batcher, ContinuousBatcher):
-                async for chunk in self._stream_sse_from_blocking(
-                    lambda: batcher.submit(messages, max_new=max_tokens,
-                                           temperature=temperature, top_k=top_k,
-                                           top_p=top_p, seed=seed),
-                    label=f"cb_stream model_id={self._model_id}",
-                ):
-                    yield chunk
+        async with self._stream_session() as batched:
+            self.assert_model_identity(expected_model, expected_sha256)
+            sampling = dict(max_new=max_tokens, temperature=temperature,
+                            top_k=top_k, top_p=top_p, seed=seed)
+            if self._batcher is not None:
+                produce = partial(self._batcher.submit, messages, **sampling)
+                label = f"cb_stream model_id={self._model_id}"
+            elif self._pipeline is not None:
+                produce = partial(self._pipeline.stream_tokens, messages, **sampling)
+                label = f"pipeline_stream model_id={self._model_id}"
+            elif self._model is not None:
+                model = self._model
+                label = f"stream model_id={self._model_id}"
+
+                def produce():
+                    for chunk in model.create_chat_completion(
+                        messages=messages, temperature=temperature, max_tokens=max_tokens,
+                        stop=stop or [], stream=True,
+                    ):
+                        yield chunk["choices"][0].get("delta", {}).get("content")
             else:
-                # DistributedContinuousBatcher: sampling now wired via top-K return.
-                async for chunk in self._stream_sse_from_blocking(
-                    lambda: batcher.submit(messages, max_new=max_tokens,
-                                           temperature=temperature, top_k=top_k,
-                                           top_p=top_p, seed=seed),
-                    label=f"cb_stream model_id={self._model_id}",
-                ):
-                    yield chunk
-            return
-
-        if self._pipeline is not None:
-            # Pipeline-parallel strategy: check if it is a WholeModelEngine (local) or
-            # a PipelineParallelEngine (distributed). Only the whole-model path supports
-            # sampling -- the distributed engine's tail does the argmax remotely.
-            from .pipeline_parallel import WholeModelEngine
-            engine = self._pipeline
-            if isinstance(engine, WholeModelEngine):
-                async for chunk in self._stream_sse_from_blocking(
-                    lambda: engine.stream_tokens(messages, max_new=max_tokens,
-                                                 temperature=temperature, top_k=top_k,
-                                                 top_p=top_p, seed=seed),
-                    label=f"pipeline_stream model_id={self._model_id}",
-                ):
-                    yield chunk
-            else:
-                # Distributed PipelineParallelEngine: sampling now wired via top-K return.
-                async for chunk in self._stream_sse_from_blocking(
-                    lambda: engine.stream_tokens(messages, max_new=max_tokens,
-                                                 temperature=temperature, top_k=top_k,
-                                                 top_p=top_p, seed=seed),
-                    label=f"pipeline_stream model_id={self._model_id}",
-                ):
-                    yield chunk
-            return
-
-        if self._model is None:
-            yield 'data: {"error":"No model loaded"}\n\n'
-            yield "data: [DONE]\n\n"
-            return
-
-        # llama.cpp path: stream native chunks' delta content through the shared machinery.
-        model = self._model
-        model_id = self._model_id
-
-        def produce():
-            for chunk in model.create_chat_completion(
-                messages=messages, temperature=temperature, max_tokens=max_tokens,
-                stop=stop or [], stream=True,
-            ):
-                yield chunk["choices"][0].get("delta", {}).get("content")
-
-        async for chunk in self._stream_sse_from_blocking(produce, label=f"stream model_id={model_id}"):
-            yield chunk
-
-    async def _stream_sse_from_blocking(self, produce, *, label):
-        """Shared SSE machinery for both backends (llama.cpp and the pipeline engine):
-        run the blocking content iterator produce() in a worker thread, pump pieces onto
-        an async queue, and yield the simplified OpenAI SSE shape. Serialised by
-        _inference_lock. Never yields from finally -- a client disconnect aclose()s the
-        generator (GeneratorExit) and yielding there would leave the lock held, so we drain
-        the worker there instead."""
-        async with self._inference_lock:
-            loop = asyncio.get_running_loop()
-            queue: asyncio.Queue = asyncio.Queue()
-            cancel_event = threading.Event()
-
-            def _generate() -> None:
-                try:
-                    for piece in produce():
-                        if cancel_event.is_set():
-                            break
-                        if piece:  # skip empty / None deltas
-                            loop.call_soon_threadsafe(queue.put_nowait, piece)
-                    loop.call_soon_threadsafe(queue.put_nowait, None)
-                except Exception as exc:
-                    logger.error("%s error=%s", label, type(exc).__name__)
-                    loop.call_soon_threadsafe(queue.put_nowait, f"\x00ERROR\x00{exc}")
-                    loop.call_soon_threadsafe(queue.put_nowait, None)
-
-            fut = loop.run_in_executor(None, _generate)
-            token_count = 0
-            start = time.monotonic()
-            try:
-                while True:
-                    item = await queue.get()
-                    if item is None:
-                        break
-                    if isinstance(item, str) and item.startswith("\x00ERROR\x00"):
-                        err_msg = item[len("\x00ERROR\x00"):]
-                        yield f'data: {json.dumps({"error": str(err_msg)})}\n\n'
-                        break
-                    token_count += 1
-                    yield f'data: {json.dumps({"choices": [{"delta": {"content": item}}]})}\n\n'
+                yield 'data: {"error":"No model loaded"}\n\n'
                 yield "data: [DONE]\n\n"
-            except asyncio.CancelledError:
-                logger.info("%s cancelled tokens_so_far=%d", label, token_count)
-            finally:
-                cancel_event.set()
-                try:
-                    await asyncio.shield(fut)
-                except Exception:
-                    pass
-                logger.info("%s complete tokens=%d duration=%.3fs",
-                            label, token_count, round(time.monotonic() - start, 3))
+                return
+
+            # Explicitly close the nested generator before releasing model access
+            # on disconnect. An async-for alone leaves cleanup to finalization.
+            async with aclosing(self._stream_sse_from_blocking(
+                produce, label=label, drain_on_cancel=batched,
+            )) as stream:
+                async for chunk in stream:
+                    yield chunk
+
+    async def _stream_sse_from_blocking(self, produce, *, label, drain_on_cancel=False):
+        """Pump a blocking iterator into SSE; caller must hold _stream_session.
+
+        Batchers own their decode loop and currently have no per-row cancel API.
+        On disconnect, discard that row's output and drain to its terminal event
+        before releasing model access. Other rows can continue independently.
+        """
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue = asyncio.Queue()
+        cancel_event = threading.Event()
+
+        def _generate() -> None:
+            try:
+                for piece in produce():
+                    if cancel_event.is_set():
+                        if drain_on_cancel:
+                            continue
+                        break
+                    if piece:  # skip empty / None deltas
+                        loop.call_soon_threadsafe(queue.put_nowait, piece)
+                loop.call_soon_threadsafe(queue.put_nowait, None)
+            except Exception as exc:
+                logger.error("%s error=%s", label, type(exc).__name__)
+                loop.call_soon_threadsafe(queue.put_nowait, f"\x00ERROR\x00{exc}")
+                loop.call_soon_threadsafe(queue.put_nowait, None)
+
+        fut = loop.run_in_executor(None, _generate)
+        token_count = 0
+        completed = False
+        start = time.monotonic()
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    completed = True
+                    break
+                if isinstance(item, str) and item.startswith("\x00ERROR\x00"):
+                    err_msg = item[len("\x00ERROR\x00"):]
+                    yield f'data: {json.dumps({"error": str(err_msg)})}\n\n'
+                    break
+                token_count += 1
+                yield f'data: {json.dumps({"choices": [{"delta": {"content": item}}]})}\n\n'
+            yield "data: [DONE]\n\n"
+        except asyncio.CancelledError:
+            logger.info("%s cancelled tokens_so_far=%d", label, token_count)
+        finally:
+            cancel_event.set()
+            if getattr(self._model, "managed_split", False) and not completed:
+                await asyncio.to_thread(self._model.cancel)
+            await self._drain_worker(fut)
+            logger.info("%s complete tokens=%d duration=%.3fs",
+                        label, token_count, round(time.monotonic() - start, 3))
 
     async def chat(
         self,
         messages: list[dict],
         *,
+        expected_model: str | None = None,
+        expected_sha256: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
     ) -> dict:
@@ -798,6 +870,7 @@ class LLMRuntime:
             raise RuntimeError("No model loaded")
 
         async with self._inference_lock:
+            self.assert_model_identity(expected_model, expected_sha256)
             loop = asyncio.get_running_loop()
             model = self._model
             model_id = self._model_id
@@ -813,7 +886,11 @@ class LLMRuntime:
                 ),
             )
             try:
-                result = await fut
+                result = await (asyncio.shield(fut) if getattr(model, "managed_split", False) else fut)
+            except asyncio.CancelledError:
+                if getattr(model, "managed_split", False):
+                    await asyncio.to_thread(model.cancel)
+                raise
             finally:
                 # A cancelled request must not free the inference lock while the
                 # worker thread is still inside create_chat_completion (the model
@@ -840,6 +917,8 @@ class LLMRuntime:
         self,
         messages: list[dict],
         *,
+        expected_model: str | None = None,
+        expected_sha256: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
         stop: list[str] | None = None,
@@ -861,6 +940,7 @@ class LLMRuntime:
             raise RuntimeError("No model loaded")
 
         async with self._inference_lock:
+            self.assert_model_identity(expected_model, expected_sha256)
             loop = asyncio.get_running_loop()
             queue: asyncio.Queue = asyncio.Queue()
             model = self._model
@@ -889,11 +969,13 @@ class LLMRuntime:
             fut = loop.run_in_executor(None, _generate)
 
             chunk_count = 0
+            completed = False
             start = time.monotonic()
             try:
                 while True:
                     item = await queue.get()
                     if item is None:
+                        completed = True
                         break
                     chunk_count += 1
                     yield item
@@ -904,6 +986,8 @@ class LLMRuntime:
                 # stream_chat) so a disconnect can't leave inference running on the
                 # non-thread-safe model while the next request acquires the lock.
                 cancel_event.set()
+                if getattr(model, "managed_split", False) and not completed:
+                    await asyncio.to_thread(model.cancel)
                 try:
                     await asyncio.shield(fut)
                 except Exception:
@@ -950,6 +1034,8 @@ class LLMRuntime:
             loop = asyncio.get_running_loop()
             model = self._model
             model_id = self._model_id
+            if getattr(model, "managed_split", False):
+                raise RuntimeError("Scoring verification is not supported for owned-machine split sessions.")
 
             def _score() -> dict:
                 import math
@@ -1081,12 +1167,40 @@ class LLMRuntime:
 
             total = time.monotonic() - start
             tps = (n / total) if (total > 0 and n) else 0.0
+
+            # Prompt-processing rate: time to first token on a fixed ~700-token
+            # prompt, one output token. The coordinator uses this for its
+            # first-token deadline, where the short-prompt TTFT above would
+            # badly overstate the rate. Best effort; None when it cannot run.
+            def _measure_prompt_rate() -> float | None:
+                try:
+                    prompt = _PROMPT_RATE_TEXT
+                    n_prompt = len(model.tokenize(prompt.encode("utf-8"), add_bos=True))
+                    t0 = time.monotonic()
+                    for _ in model.create_chat_completion(
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.0,
+                        max_tokens=1,
+                        stream=True,
+                    ):
+                        break
+                    dt = time.monotonic() - t0
+                    if dt <= 0 or n_prompt <= 0:
+                        return None
+                    return round(n_prompt / dt, 1)
+                except Exception:  # noqa: BLE001
+                    logger.debug("benchmark_prompt_rate_failed", exc_info=True)
+                    return None
+
+            prompt_tps = await loop.run_in_executor(None, _measure_prompt_rate)
+
             result = {
                 "model_id": model_id,
                 "output_tokens": n,
                 "ttft_ms": round((ttft or 0.0) * 1000, 1),
                 "duration_ms": round(total * 1000, 1),
                 "tokens_per_sec": round(tps, 1),
+                "prompt_tokens_per_sec": prompt_tps,
             }
             logger.info(
                 "benchmark model_id=%s tokens=%d tok_s=%.1f ttft_ms=%.1f",
@@ -1095,6 +1209,15 @@ class LLMRuntime:
             if model_id:
                 self._benchmarks[model_id] = result
             return result
+
+
+# Fixed prompt for the prompt-processing benchmark: about 700 tokens of
+# ordinary English, so the measured rate reflects batch prompt evaluation
+# rather than per-call overhead.
+_PROMPT_RATE_TEXT = (
+    "The quick brown fox jumps over the lazy dog near the old river bank while "
+    "the evening light fades behind the hills and the town settles in. "
+) * 40
 
 
 _runtime: LLMRuntime | None = None

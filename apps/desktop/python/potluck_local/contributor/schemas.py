@@ -38,10 +38,19 @@ class RejectMessage(BaseModel):
 
 
 class CapabilityEntry(BaseModel):
-    """One model this peer can serve. Mirrors coordinator/schemas/peer.py."""
+    """One model this peer can serve. Mirrors coordinator/schemas/peer.py.
+
+    ``tokens_per_second`` is measured generation speed for this model on this
+    machine; ``prompt_tokens_per_second`` is measured prompt-processing speed.
+    Both are None until the sidecar has benchmarked the model. The
+    coordinator uses them for scoring and for the first-token deadline
+    instead of guessing from the hardware tier.
+    """
 
     model_slug: str
     quantization: str = "unknown"
+    tokens_per_second: float | None = None
+    prompt_tokens_per_second: float | None = None
 
 
 class AttestationPayload(BaseModel):
@@ -75,6 +84,9 @@ class HeartbeatMessage(BaseModel):
     current_jobs: int = 0
     gpu_utilization: float | None = None
     vram_available_gb: float | None = None
+    # How many jobs this peer is willing to run at once. None keeps the
+    # coordinator's current value (uncapped for a peer that never said).
+    max_concurrent_jobs: int | None = None
 
 
 # ---- Job dispatch (m3) ----------------------------------------------- #

@@ -32,11 +32,93 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Response
+from pydantic import BaseModel, Field, ConfigDict
+from potluck_local.services.contribution_policy import ContributionSchedule, admission_reason
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+class ContributionControls(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    enabled: bool | None = None
+    schedule: ContributionSchedule | None = None
+    maxJobs: int | None = Field(default=None, ge=0, le=64)
+    maxTokens: int | None = Field(default=None, ge=1, le=32768)
+    minFreeMemoryGiB: float | None = Field(default=None, ge=0, le=1024)
+
+
+@router.get('/controls')
+async def contribution_controls() -> dict:
+    from potluck_local.services.settings_manager import get_settings
+    from potluck_local.services.contributor_service import get_contributor_service
+    network = get_settings().network
+    svc = get_contributor_service()
+    status = svc.status()
+    return {'schemaVersion': 1, 'enabled': network.contributor_mode,
+            'schedule': network.contributor_schedule, 'maxJobs': network.max_concurrent_jobs,
+            'maxTokens': network.contributor_max_tokens, 'minFreeMemoryGiB': network.contributor_min_free_memory_gib,
+            'state': status['state'], 'acceptingJobs': status['accepting_jobs'],
+            'pauseReason': admission_reason(network), 'signedIn': svc.has_member_session(),
+            'jobsInFlight': status['jobs_in_flight'], 'jobsServed': status['jobs_served'],
+            'lastError': status['last_error']}
+
+
+@router.patch('/controls')
+async def set_contribution_controls(body: ContributionControls) -> dict:
+    from potluck_local.routers.settings import update_settings
+    fields = {'enabled': 'contributor_mode', 'schedule': 'contributor_schedule',
+              'maxJobs': 'max_concurrent_jobs', 'maxTokens': 'contributor_max_tokens',
+              'minFreeMemoryGiB': 'contributor_min_free_memory_gib'}
+    patch = {fields[key]: value for key, value in body.model_dump(exclude_unset=True).items()}
+    if any(value is None and key not in ('contributor_schedule', 'contributor_max_tokens') for key, value in patch.items()):
+        raise HTTPException(422, 'Only schedule and maxTokens can be cleared.')
+    await update_settings({'network': patch})
+    return await contribution_controls()
+
+
+# ---------------------------------------------------------------------------
+# In-process contributor: status + member session
+# ---------------------------------------------------------------------------
+
+
+@router.get("/status")
+async def contributor_status() -> dict[str, Any]:
+    """What the Contribute compute toggle is doing right now: state, this
+    peer's own id, heartbeat and job counters, the last error category.
+    Counts and our own ids only; nothing about requesters or other peers."""
+    from potluck_local.services.contributor_service import get_contributor_service
+
+    svc = get_contributor_service()
+    body = svc.status()
+    body["has_member_session"] = svc.has_member_session()
+    return body
+
+
+class MemberSessionBody(BaseModel):
+    token: str = Field(min_length=1, max_length=4096)
+
+
+@router.put("/session", status_code=204)
+async def put_member_session(body: MemberSessionBody) -> Response:
+    """Hand the sidecar the member's session bearer so the contributor can
+    identify itself to the coordinator. Held in memory only; never logged,
+    never persisted, never echoed back."""
+    from potluck_local.services.contributor_service import get_contributor_service
+
+    get_contributor_service().set_member_session(body.token)
+    return Response(status_code=204)
+
+
+@router.delete("/session", status_code=204)
+async def delete_member_session() -> Response:
+    from potluck_local.services.contributor_service import get_contributor_service
+
+    get_contributor_service().set_member_session(None)
+    return Response(status_code=204)
 
 
 class DeviceKeyResponse(BaseModel):

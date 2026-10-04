@@ -18,15 +18,18 @@ slice.
 
 from __future__ import annotations
 
-import json
+import asyncio
+import copy
 import logging
 import os
 import platform
 import sys
-import time
-import uuid
+from contextlib import aclosing
 
 import httpx
+
+from .remote_stream import RemoteStreamError, collect_completion, openai_chunks
+from .peer_liveness import watch_peer_stream
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +37,32 @@ PEER_SIDECAR_PORT = 8321
 _ROSTER_TIMEOUT_S = 2.0
 _CAPS_TIMEOUT_S = 2.0
 _DISPATCH_CONNECT_TIMEOUT_S = 5.0
+MAX_DISPATCH_ATTEMPTS = 3
+FIRST_TOKEN_TIMEOUT_S = 90.0
+IDLE_TIMEOUT_S = 30.0
+REQUEST_TIMEOUT_S = 240.0
+
+
+class PeerDispatchError(RemoteStreamError):
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
+        super().__init__(f"Household machine could not serve the request (HTTP {status_code})",
+                         "peer_unavailable")
+
+
+async def _replacement_peer(model: str, excluded: set[str], sha256: str | None = None) -> dict | None:
+    # Read current membership on every retry. Never route through the pool or
+    # relax the requested model because an earlier household machine failed.
+    peers = [p for p in await household_peers() if p["mesh_ip"] not in excluded]
+    async with httpx.AsyncClient(timeout=_CAPS_TIMEOUT_S) as client:
+        caps = await asyncio.gather(*(_peer_caps(client, peer) for peer in peers))
+    for peer, cap in zip(peers, caps):
+        if cap and cap.get("available_for_inference") and cap.get("loaded_model") == model and (
+            sha256 is None or (cap.get("model_lock_version") == 1
+                               and (cap.get("loaded_model_detail") or {}).get("sha256") == sha256)
+        ):
+            return {**peer, "_capabilities": cap}
+    return None
 
 
 def mesh_socket_path() -> str | None:
@@ -41,8 +70,17 @@ def mesh_socket_path() -> str | None:
     meshSocketPath(). Returns None on Windows (named pipe, not yet supported here)."""
     if sys.platform == "win32" or platform.system() == "Windows":
         return None  # named pipe; household routing degrades to local-only for now
+    configured = os.environ.get("POTLUCK_LOCAL_API_SOCKET")
+    if configured:
+        return configured
     if sys.platform == "darwin":
         return "/tmp/potluck-mesh.sock"
+    # The packaged Linux daemon uses a fixed socket. Match CLI discovery so
+    # diagnostics and actual inference consult the same household roster.
+    if os.path.exists("/run/potluck-mesh.sock"):
+        return "/run/potluck-mesh.sock"
+    if os.path.exists("/run/potluck-mesh/potluck-mesh.sock"):
+        return "/run/potluck-mesh/potluck-mesh.sock"
     xdg = os.environ.get("XDG_RUNTIME_DIR")
     if xdg:
         return os.path.join(xdg, "potluck-mesh.sock")
@@ -96,14 +134,16 @@ async def household_model_map() -> dict[str, dict]:
             slug = caps.get("loaded_model")
             if slug and caps.get("available_for_inference"):
                 # First peer wins for a given slug (stable).
-                out.setdefault(slug, {"node_name": peer["node_name"], "mesh_ip": peer["mesh_ip"]})
+                out.setdefault(slug, {"node_name": peer["node_name"], "mesh_ip": peer["mesh_ip"], "_capabilities": caps})
     return out
 
 
-async def peer_for_model(model: str) -> dict | None:
+async def peer_for_model(model: str, sha256: str | None = None) -> dict | None:
     """The household peer serving `model`, or None."""
     if not model:
         return None
+    if sha256 is not None:
+        return await _replacement_peer(model, set(), sha256)
     return (await household_model_map()).get(model)
 
 
@@ -111,7 +151,7 @@ def _peer_url(peer: dict) -> str:
     return f"http://{peer['mesh_ip']}:{PEER_SIDECAR_PORT}/peer/chat/completions"
 
 
-def _payload(messages: list[dict], model: str, temperature: float, max_tokens: int) -> dict:
+def _payload(messages: list[dict], model: str, temperature: float, max_tokens: int, *, sha256: str | None = None) -> dict:
     return {
         "messages": messages,
         "model": model,
@@ -121,78 +161,91 @@ def _payload(messages: list[dict], model: str, temperature: float, max_tokens: i
     }
 
 
-def _delta_of(line: str) -> str | None:
-    """Pull delta content out of one peer SSE line, or None for non-content lines."""
-    if not line.startswith("data:"):
-        return None
-    data = line[5:].strip()
-    if not data or data == "[DONE]":
-        return None
-    try:
-        obj = json.loads(data)
-    except ValueError:
-        return None
-    if "error" in obj:
-        raise RuntimeError(str(obj.get("error")))
-    try:
-        return obj["choices"][0].get("delta", {}).get("content")
-    except (KeyError, IndexError, AttributeError):
-        return None
+async def _peer_chunks(peer: dict, body: dict, model: str, sha256: str | None):
+    timeout = httpx.Timeout(None, connect=_DISPATCH_CONNECT_TIMEOUT_S,
+                            write=_DISPATCH_CONNECT_TIMEOUT_S, pool=_DISPATCH_CONNECT_TIMEOUT_S)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        async with client.stream("POST", _peer_url(peer), json=body) as response:
+            if response.status_code != 200:
+                raise PeerDispatchError(response.status_code)
+            if sha256 and (response.headers.get("x-potluck-model-lock") != "1"
+                           or response.headers.get("x-potluck-model-sha256") != sha256):
+                raise RemoteStreamError("Household runtime did not acknowledge the exact model lock; upgrade it.", "model_mismatch")
+            if body.get("potluck_batch") and response.headers.get("x-potluck-batch-protocol") != "1":
+                raise RemoteStreamError("Household runtime does not support complete batch results; upgrade it.", "model_mismatch")
+            async with aclosing(openai_chunks(response, model, require_finish=body.get("potluck_batch", False))) as chunks:
+                async for chunk in chunks:
+                    yield chunk
 
 
 async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
-                             temperature: float, max_tokens: int):
-    """Dispatch to a peer and yield OpenAI chat.completion.chunk dicts."""
-    cid = "chatcmpl-" + uuid.uuid4().hex[:24]
-    created = int(time.time())
+                             temperature: float, max_tokens: int, *, sha256: str | None = None,
+                             retry: bool = True, batch: bool = False):
+    """Retry another household machine only while no output has been yielded.
 
-    def chunk(delta: dict, finish: str | None) -> dict:
-        return {
-            "id": cid, "object": "chat.completion.chunk", "created": created, "model": model,
-            "choices": [{"index": 0, "delta": delta, "finish_reason": finish}],
-        }
-
-    timeout = httpx.Timeout(None, connect=_DISPATCH_CONNECT_TIMEOUT_S)
-    async with httpx.AsyncClient(timeout=timeout) as c:
-        async with c.stream("POST", _peer_url(peer),
-                            json=_payload(messages, model, temperature, max_tokens)) as resp:
-            if resp.status_code != 200:
-                body = (await resp.aread()).decode("utf-8", "replace")[:300]
-                raise RuntimeError(f"peer returned {resp.status_code}: {body}")
-            yield chunk({"role": "assistant"}, None)
-            async for line in resp.aiter_lines():
-                content = _delta_of(line)
-                if content:
-                    yield chunk({"content": content}, None)
-            yield chunk({}, "stop")
+    One absolute budget spans headers, prefill, every attempt and decoding.
+    Cancelling the caller closes the HTTP stream and never triggers a retry.
+    """
+    body = copy.deepcopy(_payload(messages, model, temperature, max_tokens))
+    if sha256:
+        body["potluck_model_sha256"] = sha256
+    if batch:
+        body["potluck_batch"] = True
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + REQUEST_TIMEOUT_S
+    excluded: set[str] = set()
+    committed = False
+    last_error: Exception = RemoteStreamError("No compatible household machine is available")
+    for attempt in range(MAX_DISPATCH_ATTEMPTS if retry else 1):
+        try:
+            if attempt:
+                async with asyncio.timeout_at(deadline):
+                    peer = await _replacement_peer(model, excluded, **({"sha256": sha256} if sha256 else {}))
+                if peer is None:
+                    break
+            excluded.add(peer["mesh_ip"])
+            rate = (peer.get("_capabilities", {}).get("loaded_model_detail") or {}).get("tokens_per_sec")
+            first_budget = FIRST_TOKEN_TIMEOUT_S
+            if isinstance(rate, (int, float)) and rate > 0:
+                prompt_tokens = sum(len(m.get("content", "")) for m in body["messages"]) / 4
+                first_budget = min(first_budget, 10 + prompt_tokens / rate)
+            first_deadline = min(deadline, loop.time() + first_budget)
+            # Reschedule from first-token to decode-idle only on useful output.
+            # Role chunks, keepalives and malformed/no-op frames don't buy time.
+            async with asyncio.timeout_at(first_deadline) as budget:
+                guarded = watch_peer_stream(
+                    _peer_chunks(peer, body, model, sha256),
+                    f"http://{peer['mesh_ip']}:{PEER_SIDECAR_PORT}/health",
+                )
+                async with aclosing(guarded):
+                    async for chunk in guarded:
+                        choice = chunk["choices"][0]
+                        delta = choice["delta"]
+                        useful = any(value for key, value in delta.items() if key != "role")
+                        finished = choice["finish_reason"] is not None
+                        if not useful and not finished:
+                            continue
+                        committed = True
+                        budget.reschedule(None if finished else min(deadline, loop.time() + IDLE_TIMEOUT_S))
+                        yield chunk
+                    return
+        except (httpx.TransportError, RemoteStreamError, TimeoutError) as exc:
+            if isinstance(exc, TimeoutError):
+                exc = RemoteStreamError("Household inference stopped making progress", "stream_timeout")
+            if committed:
+                raise exc
+            if isinstance(exc, PeerDispatchError) and exc.status_code not in (408, 409, 429, 500, 502, 503, 504):
+                raise exc
+            last_error = exc
+            if loop.time() >= deadline:
+                break
+    raise last_error
 
 
 async def complete_peer_openai(peer: dict, messages: list[dict], model: str,
-                               temperature: float, max_tokens: int) -> dict:
+                               temperature: float, max_tokens: int, *, sha256: str | None = None) -> dict:
     """Dispatch to a peer (streamed under the hood) and return one OpenAI
     chat.completion envelope."""
-    parts: list[str] = []
-    timeout = httpx.Timeout(None, connect=_DISPATCH_CONNECT_TIMEOUT_S)
-    async with httpx.AsyncClient(timeout=timeout) as c:
-        async with c.stream("POST", _peer_url(peer),
-                            json=_payload(messages, model, temperature, max_tokens)) as resp:
-            if resp.status_code != 200:
-                body = (await resp.aread()).decode("utf-8", "replace")[:300]
-                raise RuntimeError(f"peer returned {resp.status_code}: {body}")
-            async for line in resp.aiter_lines():
-                content = _delta_of(line)
-                if content:
-                    parts.append(content)
-    text = "".join(parts)
-    return {
-        "id": "chatcmpl-" + uuid.uuid4().hex[:24],
-        "object": "chat.completion",
-        "created": int(time.time()),
-        "model": model,
-        "choices": [{
-            "index": 0,
-            "message": {"role": "assistant", "content": text},
-            "finish_reason": "stop",
-        }],
-        "usage": {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None},
-    }
+    return await collect_completion(
+        stream_peer_openai(peer, messages, model, temperature, max_tokens, **({"sha256": sha256} if sha256 else {}))
+    )

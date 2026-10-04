@@ -7,6 +7,9 @@ real-time feed of tool calls.
 Mount at /agents in app.py.
 
 Endpoints:
+  GET /agents/runs?status=&provider=&project=&limit=100
+  GET /agents/runs/{id}
+  GET /agents/runs/{id}/events?after_seq=0
   GET /agents/sessions?include_disconnected=false&limit=100
   GET /agents/sessions/{id}
   GET /agents/activity?limit=100&client=&project=&tool=
@@ -16,19 +19,38 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from potluck_local.services.agent_connectors import (
+    AgentConnectorError,
+    connect_provider,
+    connector_status,
+    disconnect_provider,
+)
 from potluck_local.services.memory_db import (
     delete_disconnected_sessions,
     delete_session,
     get_session,
+    get_agent_run,
+    list_agent_events,
+    list_agent_instances,
+    list_agent_resources,
+    list_agent_runs,
     list_recent_tool_calls,
     list_sessions,
     session_tool_calls,
 )
+from potluck_local.services.managed_agents import (
+    ApprovalDecision,
+    ManagedAgentError,
+    SandboxMode,
+    get_managed_agent_manager,
+)
+from potluck_local.services.task_state import TaskState, get_task_manager
+from potluck_local.services.memory_safety import redact_credentials
 
 from potluck_local.services.memory_safety import redact_credentials
 
@@ -40,6 +62,275 @@ def _memory_preview(content: str) -> str:
     # Redact before truncating, including credentials spanning the cutoff.
     safe = redact_credentials(content)
     return safe[:200] + ("…" if len(safe) > 200 else "")
+
+
+class AgentConnectorRequest(BaseModel):
+    project_path: str = Field(min_length=1, max_length=4096)
+
+
+class ManagedAgentStartRequest(BaseModel):
+    task_id: str = Field(min_length=1, max_length=500)
+    cwd: str = Field(min_length=1, max_length=4096)
+    model: str | None = Field(default=None, max_length=200)
+    sandbox: SandboxMode = "workspace-write"
+    direction: str | None = Field(default=None, max_length=50_000)
+
+
+class ManagedAgentMessageRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=50_000)
+
+    @field_validator("text")
+    @classmethod
+    def _require_content(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Message cannot be blank.")
+        return value
+
+
+class ManagedAgentApprovalRequest(BaseModel):
+    decision: ApprovalDecision
+
+
+@router.get("/connectors/{provider}")
+async def get_connector_status(
+    provider: Literal["codex", "claude"],
+    project_path: str = Query(min_length=1, max_length=4096),
+) -> dict[str, Any]:
+    """Preview Potluck's project-local hook installation without writing."""
+    try:
+        return connector_status(project_path, provider)
+    except AgentConnectorError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/connectors/{provider}/connect")
+async def connect_agent_provider(
+    provider: Literal["codex", "claude"], request: AgentConnectorRequest
+) -> dict[str, Any]:
+    """Merge Potluck-owned lifecycle hooks into an existing provider config."""
+    try:
+        return connect_provider(request.project_path, provider)
+    except AgentConnectorError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/connectors/{provider}/disconnect")
+async def disconnect_agent_provider(
+    provider: Literal["codex", "claude"], request: AgentConnectorRequest
+) -> dict[str, Any]:
+    """Remove Potluck-owned hooks while preserving all unrelated config."""
+    try:
+        return disconnect_provider(request.project_path, provider)
+    except AgentConnectorError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+def _task_prompt(task: TaskState, direction: str | None) -> str:
+    """Build the first turn from durable task state without logging it."""
+    lines = [
+        f"Work on this Potluck task: {task.task_name}",
+        f"Objective: {task.objective}",
+    ]
+    if task.known_constraints:
+        lines.append("Constraints:")
+        lines.extend(f"- {value}" for value in task.known_constraints)
+    if task.completed_steps:
+        lines.append("Completed steps:")
+        lines.extend(f"- {value}" for value in task.completed_steps[-10:])
+    if task.pending_steps:
+        lines.append("Pending steps:")
+        lines.extend(f"- {value}" for value in task.pending_steps)
+    if task.context_summary:
+        lines.append(f"Context: {task.context_summary}")
+    if task.files_touched:
+        lines.append(f"Files already involved: {', '.join(task.files_touched[-20:])}")
+    if direction and direction.strip():
+        lines.extend(("Current direction:", direction.strip()))
+    lines.append(
+        "Keep the Potluck task state current as you work. Complete task steps immediately "
+        "and record new blockers or errors when they occur."
+    )
+    return "\n".join(lines)
+
+
+def _managed_error(exc: ManagedAgentError) -> HTTPException:
+    return HTTPException(status_code=409, detail=str(exc))
+
+
+@router.get("/managed/capabilities")
+async def get_managed_capabilities() -> dict[str, Any]:
+    """Report whether the local Codex CLI can host managed sessions."""
+    return await get_managed_agent_manager().capabilities()
+
+
+@router.get("/managed/sessions")
+async def get_managed_sessions(
+    task_id: str | None = Query(default=None, max_length=500),
+) -> list[dict[str, Any]]:
+    """Return workroom sessions retained by this Potluck process."""
+    return get_managed_agent_manager().list_sessions(task_id=task_id)
+
+
+@router.post("/managed/sessions", status_code=201)
+async def start_managed_session(request: ManagedAgentStartRequest) -> dict[str, Any]:
+    """Launch Codex against one durable task and repository folder."""
+    task = await get_task_manager().get_task(request.task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    if task.status in {"completed", "abandoned"}:
+        raise HTTPException(status_code=409, detail="Reopen this task before starting Codex.")
+    try:
+        return await get_managed_agent_manager().start_session(
+            task_id=task.id,
+            task_name=task.task_name,
+            cwd=request.cwd,
+            project=task.project,
+            prompt=_task_prompt(task, request.direction),
+            model=request.model.strip() if request.model and request.model.strip() else None,
+            sandbox=request.sandbox,
+        )
+    except ManagedAgentError as exc:
+        raise _managed_error(exc) from exc
+
+
+@router.get("/managed/sessions/{session_id}")
+async def get_managed_session(session_id: str) -> dict[str, Any]:
+    try:
+        return get_managed_agent_manager().get_session(session_id).public()
+    except ManagedAgentError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/managed/sessions/{session_id}/messages")
+async def send_managed_message(
+    session_id: str, request: ManagedAgentMessageRequest
+) -> dict[str, Any]:
+    try:
+        return await get_managed_agent_manager().send_message(session_id, request.text)
+    except ManagedAgentError as exc:
+        raise _managed_error(exc) from exc
+
+
+@router.post("/managed/sessions/{session_id}/steer")
+async def steer_managed_session(
+    session_id: str, request: ManagedAgentMessageRequest
+) -> dict[str, Any]:
+    try:
+        return await get_managed_agent_manager().steer(session_id, request.text)
+    except ManagedAgentError as exc:
+        raise _managed_error(exc) from exc
+
+
+@router.post("/managed/sessions/{session_id}/interrupt")
+async def interrupt_managed_session(session_id: str) -> dict[str, Any]:
+    try:
+        return await get_managed_agent_manager().interrupt(session_id)
+    except ManagedAgentError as exc:
+        raise _managed_error(exc) from exc
+
+
+@router.post("/managed/sessions/{session_id}/approvals/{approval_id}")
+async def resolve_managed_approval(
+    session_id: str,
+    approval_id: str,
+    request: ManagedAgentApprovalRequest,
+) -> dict[str, Any]:
+    try:
+        return await get_managed_agent_manager().resolve_approval(
+            session_id, approval_id, request.decision
+        )
+    except ManagedAgentError as exc:
+        raise _managed_error(exc) from exc
+
+
+def _deserialize_agent_event(row: dict[str, Any]) -> dict[str, Any]:
+    if isinstance(row.get("metadata"), str):
+        try:
+            row["metadata"] = json.loads(row["metadata"])
+        except Exception:
+            row["metadata"] = {}
+    return row
+
+
+@router.get("/runs")
+async def get_runs(
+    status: str | None = Query(default=None, max_length=50),
+    provider: str | None = Query(default=None, max_length=50),
+    project: str | None = Query(default=None, max_length=200),
+    limit: int = Query(default=100, ge=1, le=1000),
+) -> list[dict]:
+    """Return provider-native Codex and Claude execution runs."""
+    try:
+        return await list_agent_runs(
+            status=status,
+            provider=provider,
+            project=project,
+            limit=limit,
+        )
+    except Exception as exc:
+        logger.error("agent_runs_error type=%s", type(exc).__name__)
+        return []
+
+
+@router.get("/runs/{run_id}/events")
+async def get_run_events(
+    run_id: str,
+    after_seq: int = Query(default=0, ge=0),
+    limit: int = Query(default=1000, ge=1, le=5000),
+) -> dict:
+    """Return an ascending event delta suitable for cursor polling."""
+    try:
+        run = await get_agent_run(run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found")
+        instances = await list_agent_instances(run_id)
+        rows = await list_agent_events(run_id, after_seq=after_seq, limit=limit)
+        next_cursor = rows[-1]["seq"] if rows else after_seq
+        resources = await list_agent_resources(
+            run_id,
+            after_seq=after_seq,
+            through_seq=next_cursor,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("agent_run_events_error id=%s type=%s", run_id, type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Database error") from exc
+    events = [_deserialize_agent_event(row) for row in rows]
+    return {
+        "instances": instances,
+        "events": events,
+        "resources": resources,
+        "next_cursor": next_cursor,
+    }
+
+
+@router.get("/runs/{run_id}")
+async def get_run_detail(run_id: str) -> dict:
+    """Return one run, its lanes, and the first event cursor page."""
+    try:
+        run = await get_agent_run(run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail=f"Run {run_id!r} not found")
+        instances = await list_agent_instances(run_id)
+        rows = await list_agent_events(run_id, limit=1000)
+        next_cursor = rows[-1]["seq"] if rows else 0
+        resources = await list_agent_resources(run_id, through_seq=next_cursor)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("agent_run_detail_error id=%s type=%s", run_id, type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Database error") from exc
+
+    events = [_deserialize_agent_event(row) for row in rows]
+    return {
+        "run": run,
+        "instances": instances,
+        "events": events,
+        "resources": resources,
+        "next_cursor": next_cursor,
+    }
 
 
 def _deserialize_session(row: dict[str, Any]) -> dict[str, Any]:
@@ -121,18 +412,19 @@ async def get_sessions(
     return [_deserialize_session(r) for r in rows]
 
 
-TRACE_FORMAT_VERSION = "potluck-trace-v1"
+TRACE_FORMAT_VERSION = "potluck-trace-v2"
 
 
 @router.get("/sessions/{session_id}/trace")
-async def export_session_trace(session_id: str) -> Response:
+async def export_session_trace(
+    session_id: str,
+    mode: Literal["sanitized", "local-diagnostic"] = Query(default="sanitized"),
+) -> Response:
     """Download a portable trace of one session for bug reports.
 
-    The blob is JSON: session metadata + ALL tool calls (not capped at 200)
-    + memory previews for any memory ids touched. Same privacy guarantees
-    as the rest of the agent observability surface — no prompt content, no
-    raw memory content beyond the first 200 chars per memory. Safe to
-    attach to a public bug tracker.
+    Sanitized is the default and contains metadata only. Local diagnostic is
+    explicit and additionally includes argument summaries and 200-character
+    memory previews; it should stay on the user's machine unless reviewed.
 
     Opt-in: the user clicks Export in the debugger drawer. We never
     auto-upload anywhere.
@@ -157,19 +449,39 @@ async def export_session_trace(session_id: str) -> Response:
     except Exception as exc:
         logger.error("agents_trace_calls_error id=%s type=%s", session_id, type(exc).__name__)
         calls = []
-    tool_calls = [_deserialize_tool_call(c) for c in calls]
+    full_tool_calls = [_deserialize_tool_call(c) for c in calls]
+    if mode == "sanitized":
+        safe_keys = {
+            "id",
+            "session_id",
+            "tool_name",
+            "result_count",
+            "duration_ms",
+            "called_at",
+            "tool_schema_version",
+            "memory_ids_touched",
+        }
+        tool_calls = [
+            {
+                **{key: value for key, value in call.items() if key in safe_keys},
+                "failed": bool(call.get("error")),
+            }
+            for call in full_tool_calls
+        ]
+    else:
+        tool_calls = full_tool_calls
 
     # Collect all unique memory ids touched across the calls and resolve
     # them to previews in one batch. Deleted memories are silently dropped
     # (the consumer can spot them by id mismatch).
     touched: set[str] = set()
-    for c in tool_calls:
+    for c in full_tool_calls:
         ids = c.get("memory_ids_touched")
         if isinstance(ids, list):
             touched.update(i for i in ids if isinstance(i, str) and i)
 
     memories: list[dict[str, Any]] = []
-    if touched:
+    if touched and mode == "local-diagnostic":
         import aiosqlite
         from potluck_local.services.memory_db import get_memory_db_path
 
@@ -204,7 +516,19 @@ async def export_session_trace(session_id: str) -> Response:
 
     blob = {
         "format": TRACE_FORMAT_VERSION,
+        "mode": mode,
         "exported_at": datetime.now(timezone.utc).isoformat(),
+        "privacy": {
+            "prompts_included": False,
+            "responses_included": False,
+            "tool_argument_summaries_included": mode == "local-diagnostic",
+            "memory_previews_included": mode == "local-diagnostic",
+            "sharing_guidance": (
+                "Metadata-only export; still review project names and identifiers before sharing."
+                if mode == "sanitized"
+                else "Local diagnostic export; review all fields before sharing."
+            ),
+        },
         "session": session,
         "tool_calls": tool_calls,
         "memories": memories,
@@ -212,7 +536,7 @@ async def export_session_trace(session_id: str) -> Response:
 
     short_id = session_id.split("-", 1)[0]
     ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    filename = f"potluck-trace-{short_id}-{ts}.json"
+    filename = f"potluck-trace-{mode}-{short_id}-{ts}.json"
 
     return Response(
         content=json.dumps(blob, indent=2),

@@ -4,8 +4,7 @@ GET /readiness/gpu-test
 
 Two modes, chosen by what is available at call time:
   - inference  A model is loaded in the runtime: run a 1-token generation and time it.
-  - compute    No model loaded: lazily import torch, allocate a small tensor on the
-               detected device, run a tiny matmul, sync, and confirm the result is finite.
+  - compute    No model loaded: run a bounded tensor probe in a disposable process.
   - none       torch is absent AND no model is loaded: nothing can be verified.
 
 Response shape (never 500s on device error — a failed probe is a valid result):
@@ -53,111 +52,27 @@ def _detect_device_name() -> str:
     return "cpu"
 
 
-def _run_compute_probe(device_str: str) -> tuple[bool, float, str]:
-    """Allocate a small tensor on *device_str*, do a matmul, sync, check finite.
-
-    Returns (ok, latency_ms, detail).  Never raises — caller receives a bool.
-    """
-    try:
-        import torch  # lazy — only imported here, never at module load
-    except ImportError:
-        return False, 0.0, "torch is not installed; install the inference backend to verify the GPU"
+async def _run_inference_probe(runtime) -> tuple[bool, float, str]:
+    """Use normal admission and cancellation, never a raw model handle."""
+    import json
+    from contextlib import aclosing
 
     t0 = time.monotonic()
+    completed = False
     try:
-        if device_str == "dml":
-            try:
-                import torch_directml
-                device = torch_directml.device()
-            except ImportError:
-                return False, 0.0, "torch_directml not installed; cannot verify DirectML device"
-        else:
-            device = torch.device(device_str)
-
-        # Small matmul: float32 on cpu/mps/dml, float16 on cuda
-        dtype = torch.float16 if device_str == "cuda" else torch.float32
-        a = torch.randn(64, 64, dtype=dtype, device=device)
-        b = torch.randn(64, 64, dtype=dtype, device=device)
-        c = torch.matmul(a, b)
-
-        # Synchronise device so latency is real wall-clock
-        if device_str == "cuda":
-            torch.cuda.synchronize(device)
-        elif device_str == "mps":
-            torch.mps.synchronize()
-
-        latency_ms = round((time.monotonic() - t0) * 1000, 2)
-
-        if not torch.isfinite(c).all():
-            return False, latency_ms, f"matmul result contained non-finite values on {device_str}"
-
-        if device_str == "cpu":
-            detail = f"matmul ok on cpu (no GPU acceleration); consider installing a model or GPU backend"
-        else:
-            detail = f"matmul ok on {device_str}"
-        return True, latency_ms, detail
-
-    except Exception as exc:
-        latency_ms = round((time.monotonic() - t0) * 1000, 2)
-        return False, latency_ms, f"{type(exc).__name__}: {exc}"
-
-
-def _run_inference_probe(runtime) -> tuple[bool, float, str]:
-    """Generate exactly 1 token from the loaded model and time it.
-
-    Returns (ok, latency_ms, detail).  Never raises.
-    """
-    t0 = time.monotonic()
-    try:
-        # llama.cpp path
-        if runtime._model is not None:
-            model = runtime._model
-            result = model.create_chat_completion(
-                messages=[{"role": "user", "content": "1"}],
-                max_tokens=1,
-                temperature=0.0,
-                stream=False,
-            )
-            latency_ms = round((time.monotonic() - t0) * 1000, 2)
-            tok = (
-                result.get("choices", [{}])[0]
-                .get("message", {})
-                .get("content", "")
-            )
-            return True, latency_ms, f"1-token inference ok (model={runtime._model_id!r}, token={tok!r})"
-
-        # pipeline / whole-model path: run a tiny synchronous forward using the
-        # engine's own tokenizer + model head, avoid the async stream machinery.
-        if runtime._pipeline is not None:
-            engine = runtime._pipeline
-            from potluck_local.services.pipeline_parallel import WholeModelEngine
-
-            if isinstance(engine, WholeModelEngine):
-                import torch
-
-                # Tokenise a single byte
-                tok_ids = engine.tokenizer.encode("1", return_tensors="pt")
-                tok_ids = tok_ids.to(engine.device)
-                with torch.no_grad():
-                    out = engine.model(tok_ids)
-                # Just confirm the logits tensor has finite values
-                logits = out.logits if hasattr(out, "logits") else out[0]
-                latency_ms = round((time.monotonic() - t0) * 1000, 2)
-                if torch.isfinite(logits).all():
-                    return True, latency_ms, f"1-forward ok on whole-model engine (model={runtime._model_id!r})"
-                return False, latency_ms, "forward pass produced non-finite logits"
-            else:
-                # Distributed PipelineParallelEngine: avoid the WAN round-trip.
-                # The head block is local — just confirm it is alive.
-                latency_ms = round((time.monotonic() - t0) * 1000, 2)
-                return True, latency_ms, f"pipeline engine loaded (model={runtime._model_id!r}); head layers resident"
-
-        latency_ms = round((time.monotonic() - t0) * 1000, 2)
-        return False, latency_ms, "no model in runtime slot"
-
-    except Exception as exc:
-        latency_ms = round((time.monotonic() - t0) * 1000, 2)
-        return False, latency_ms, f"{type(exc).__name__}: {exc}"
+        async with aclosing(runtime.stream_chat(
+            [{"role": "user", "content": "1"}], max_tokens=1, temperature=0.0,
+        )) as stream:
+            async for event in stream:
+                for line in event.splitlines():
+                    if line == "data: [DONE]":
+                        completed = True
+                    if line.startswith("data: {") and "error" in json.loads(line[6:]):
+                        return False, 0.0, "Loaded-model self-test failed"
+        return completed, round((time.monotonic() - t0) * 1000, 2), (
+            "1-token inference completed" if completed else "Loaded-model self-test was interrupted")
+    except Exception:
+        return False, round((time.monotonic() - t0) * 1000, 2), "Loaded-model self-test failed"
 
 
 @router.get("/readiness/gpu-test")
@@ -165,7 +80,7 @@ async def gpu_test() -> dict:
     """Self-test: prove the GPU/runtime device actually computes.
 
     - If a model is loaded: runs a 1-token generation and times it.
-    - Else: lazily imports torch, runs a tiny matmul on the detected device.
+    - Else: runs a tiny matmul in a bounded, isolated device-probe process.
     - If torch is absent and no model is loaded: returns ok=false with guidance.
 
     Never 500s on a device failure — a failed probe is a valid, useful result.
@@ -177,11 +92,7 @@ async def gpu_test() -> dict:
     loop = asyncio.get_running_loop()
 
     if runtime.is_loaded():
-        # Model already loaded — real inference probe (must run in executor;
-        # llama.cpp / torch calls are blocking).
-        ok, latency_ms, detail = await loop.run_in_executor(
-            None, lambda: _run_inference_probe(runtime)
-        )
+        ok, latency_ms, detail = await _run_inference_probe(runtime)
         # Try to name the device from the loaded backend.
         device = _infer_loaded_device(runtime)
         return {
@@ -194,10 +105,6 @@ async def gpu_test() -> dict:
 
     # No model loaded — try a raw compute probe.
     device_str = await loop.run_in_executor(None, _detect_device_name)
-
-    # Check torch availability without importing it in the async frame.
-    def _probe():
-        return _run_compute_probe(device_str)
 
     try:
         import importlib.util
@@ -214,7 +121,8 @@ async def gpu_test() -> dict:
             "detail": "install the inference backend or load a model to verify the GPU",
         }
 
-    ok, latency_ms, detail = await loop.run_in_executor(None, _probe)
+    from potluck_local.services.gpu_probe import compute_probe
+    ok, latency_ms, detail = await compute_probe(device_str)
     return {
         "ok": ok,
         "device": device_str,

@@ -388,6 +388,11 @@ export interface AgentOptions {
   runVerify?: VerifyRunner;
 }
 
+/** A final response is distinct from stopping with unfinished or unchecked work. */
+export type AgentResult =
+  | { status: "finished" }
+  | { status: "incomplete"; reason: "verification_failed" | "repeated_tool_failure" | "step_limit" };
+
 /**
  * Run one task to completion. Mutates `history` in place (the caller owns it so
  * follow-ups keep context, and can truncate it if the turn is cancelled).
@@ -396,7 +401,7 @@ export async function runTask(
   history: ChatMessage[],
   task: string,
   opts: AgentOptions,
-): Promise<void> {
+): Promise<AgentResult> {
   const { cfg, model, cwd, confirm, callbacks } = opts;
   const maxSteps = opts.maxSteps ?? 24;
   const verifyCommand = opts.verifyCommand ?? null;
@@ -404,6 +409,7 @@ export async function runTask(
   const verifyRunner = opts.runVerify ?? runVerify;
   let consecutiveVerifyFailures = 0;
   let verifyStopped = false; // tripped after too many failures in a row
+  let verificationFailed = false;
   let lastActionKey = ""; // repeat-detection: identical (tool,args) in a row
   let repeatCount = 0;
   const readPaths = new Set<string>(); // files read this task (write_file guard)
@@ -412,6 +418,7 @@ export async function runTask(
 
   for (let step = 0; step < maxSteps; step++) {
     let assistant = "";
+    let actionComplete = false;
     // Send a trimmed view so long sessions stay under the context window; the
     // caller keeps the full history untouched for follow-ups and cancel-restore.
     const view = trimHistory(history, opts.charBudget);
@@ -419,14 +426,22 @@ export async function runTask(
       model,
       scope: opts.scope,
       signal: opts.signal,
+      requireDone: true,
+      stop: ["\nTOOL_RESULT:"],
     })) {
+      // Drain through [DONE] before acting. Closing the HTTP stream at the
+      // action fence cancels inference and can stop a managed split runtime.
+      // A later transport error must prevent even a complete-looking edit.
+      if (actionComplete) continue;
+      const previousLength = assistant.length;
       assistant += token;
-      callbacks.onToken(token);
-      // Stop the moment one complete action block is emitted. Weaker local models
-      // tend to keep generating after it -- hallucinating a TOOL_RESULT or drifting
-      // into invented output. Breaking closes the stream so they can't.
-      if (hasActionBlock(assistant)) break;
+      if (hasActionBlock(assistant)) {
+        assistant = assistant.slice(0, actionBlockEnd(assistant));
+        actionComplete = true;
+      }
+      callbacks.onToken(assistant.slice(previousLength));
     }
+    opts.signal?.throwIfAborted();
     callbacks.onTurnEnd();
 
     const parsed = parseAction(assistant);
@@ -439,7 +454,11 @@ export async function runTask(
     });
 
     if (parsed.kind === "final") {
-      return;
+      if (verificationFailed) {
+        callbacks.onNotice?.("Task incomplete: verification did not pass.");
+        return { status: "incomplete", reason: "verification_failed" };
+      }
+      return { status: "finished" };
     }
 
     if (parsed.kind === "error") {
@@ -471,7 +490,7 @@ export async function runTask(
       );
       callbacks.onToolResult(result);
       history.push({ role: "user", content: `TOOL_RESULT: ${result}` });
-      return;
+      return { status: "incomplete", reason: "repeated_tool_failure" };
     }
     if (repeatCount === 1) {
       result +=
@@ -490,6 +509,7 @@ export async function runTask(
       callbacks.onVerifyStart?.(verifyCommand);
       const outcome = await verifyRunner(verifyCommand, cwd);
       const ok = outcome.code === 0;
+      verificationFailed = !ok;
       callbacks.onVerify?.(verifyCommand, ok, outcome.output);
       result += formatVerifyResult(verifyCommand, outcome);
 
@@ -513,4 +533,5 @@ export async function runTask(
   callbacks.onNotice?.(
     `Reached the ${maxSteps}-step limit for this task. Ask a follow-up to continue.`,
   );
+  return { status: "incomplete", reason: "step_limit" };
 }

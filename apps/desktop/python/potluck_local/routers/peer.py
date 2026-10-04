@@ -49,18 +49,21 @@ outside the WireGuard mesh CIDR.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import socket
 import time
+from contextlib import aclosing
 from typing import AsyncGenerator, Literal
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from potluck_local.services.hardware_detect import detect_hardware
 from potluck_local.services.runtime import get_runtime
+from potluck_local.services.model_identity import ModelIdentityError, lock_headers
 from potluck_local.services.settings_manager import get_settings
 
 logger = logging.getLogger(__name__)
@@ -101,6 +104,7 @@ class PeerLoadedModel(BaseModel):
     is the extended detail."""
 
     slug: str
+    sha256: str | None = None
     context_size: int | None = None
     tokens_per_sec: float | None = None  # last measured benchmark speed, if run
 
@@ -149,6 +153,10 @@ class PeerCapabilities(BaseModel):
     contributor_mode: bool
     available_for_inference: bool
     protocol_version: int = 4
+    model_lock_version: int = 1
+    # Batch v1 preserves native finish reasons so token-limit truncation cannot
+    # be mistaken for a complete durable result. Older chat peers remain valid.
+    batch_protocol_version: int = 1
 
     # Additive fields (protocol_version >= 2)
     hardware: PeerHardware | None = None
@@ -229,6 +237,7 @@ async def peer_capabilities() -> PeerCapabilities:
         bench = runtime.benchmarks().get(loaded)
         loaded_detail = PeerLoadedModel(
             slug=loaded,
+            sha256=runtime.current_model_sha256(),
             context_size=runtime.loaded_n_ctx(),
             tokens_per_sec=(bench or {}).get("tokens_per_sec"),
         )
@@ -393,6 +402,8 @@ class PeerChatRequest(BaseModel):
 
     messages: list[PeerChatMessage]
     model: str | None = Field(default=None)
+    potluck_model_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    potluck_batch: bool = Field(default=False, strict=True)
     stream: bool = Field(default=True)
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(default=2048, ge=1, le=131072)
@@ -434,6 +445,17 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
             detail="Peer is not in contributor mode (opted out of serving inbound jobs).",
         )
 
+    digest = request.potluck_model_sha256
+    if request.potluck_batch and (not digest or not request.stream):
+        raise HTTPException(400, "Batch inference requires a model pin and streaming.")
+    if digest:
+        if not request.model:
+            raise HTTPException(400, "A model ID is required with potluck_model_sha256.")
+        try:
+            runtime.assert_model_identity(request.model, digest)
+        except ModelIdentityError as exc:
+            raise HTTPException(409, str(exc)) from exc
+    identity = {"expected_model": request.model or runtime.current_model_id(), "expected_sha256": digest}
     messages_for_runtime = [m.model_dump() for m in request.messages]
 
     logger.info(
@@ -445,12 +467,32 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
 
     served_model = runtime.current_model_id()
 
+    if request.potluck_batch:
+        async def batch_stream():
+            try:
+                source = runtime.stream_chat_raw(messages_for_runtime, temperature=request.temperature,
+                                                 max_tokens=request.max_tokens, stop=request.stop, **identity)
+                async with aclosing(source):
+                    async for chunk in source:
+                        if "__error__" in chunk:
+                            yield 'data: {"error":{"message":"Inference failed","category":"inference_error"}}\n\n'
+                            return
+                        yield f"data: {json.dumps(chunk)}\n\n"
+                yield "data: [DONE]\n\n"
+            except ModelIdentityError:
+                yield 'data: {"error":{"message":"Model identity changed","category":"model_mismatch"}}\n\n'
+
+        return StreamingResponse(_served_metering_stream(batch_stream(), served_model), media_type="text/event-stream",
+                                 headers={**lock_headers(digest), "X-Potluck-Batch-Protocol": "1",
+                                          "Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
     if request.stream:
         upstream = runtime.stream_chat(
             messages=messages_for_runtime,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
             stop=request.stop,
+            **identity,
         )
         # Pass through unmodified — no memory accumulation, no extraction. The
         # only thing recorded is a metadata-only usage COUNT (tokens + duration,
@@ -462,25 +504,30 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
             headers={
                 "Cache-Control": "no-cache",
                 "X-Accel-Buffering": "no",
+                **lock_headers(digest),
             },
         )
 
     # Non-streaming path — collect the full response.
     started = time.monotonic()
     chunks: list[str] = []
-    async for chunk in runtime.stream_chat(
-        messages=messages_for_runtime,
-        temperature=request.temperature,
-        max_tokens=request.max_tokens,
-        stop=request.stop,
-    ):
-        chunks.append(chunk)
+    try:
+        async for chunk in runtime.stream_chat(
+            messages=messages_for_runtime,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+            stop=request.stop,
+            **identity,
+        ):
+            chunks.append(chunk)
+    except ModelIdentityError as exc:
+        raise HTTPException(409, str(exc)) from exc
     await _record_served(served_model, _count_content_chunks(chunks),
                          int((time.monotonic() - started) * 1000))
     # Same OpenAI-compatible non-streaming envelope the local chat
     # endpoint would emit. The runtime's chat() helper would do this
     # for us in a future refactor; for now we just stitch the stream.
-    return {"raw_chunks": chunks}
+    return JSONResponse({"raw_chunks": chunks}, headers=lock_headers(digest))
 
 
 def _count_content_chunks(chunks: list[str]) -> int:
@@ -515,10 +562,14 @@ async def _served_metering_stream(
     started = time.monotonic()
     count = 0
     try:
-        async for chunk in upstream:
-            if chunk and "[DONE]" not in chunk:
-                count += 1
-            yield chunk
+        async with aclosing(upstream):
+            async for chunk in upstream:
+                if chunk and "[DONE]" not in chunk:
+                    count += 1
+                yield chunk
+    except ModelIdentityError as exc:
+        yield f'data: {json.dumps({"error": {"message": str(exc), "code": exc.category}})}\n\n'
+        yield "data: [DONE]\n\n"
     finally:
         await _record_served(model_slug, count, int((time.monotonic() - started) * 1000))
 

@@ -11,8 +11,10 @@ readme = "README.md"
 license = { text = "AGPL-3.0" }
 
 [project.scripts]
+potluck-local = "potluck_local.app:main"
 potluck-mcp = "potluck_local.mcp.server:main"
 potluck-contributor = "potluck_local.contributor.client:main"
+potluck-agent-bridge = "potluck_local.agent_bridge:main"
 
 # Base runtime deps live in requirements.txt (pinned for the PyInstaller bundle),
 # NOT here — these groups only ADD optional extras on top.
