@@ -14,6 +14,7 @@ import { useState } from 'react';
 import { Cable, Copy, Check, Eye, EyeOff, RefreshCw, KeyRound, ShieldCheck } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { localApi, type PotluckSettings, type PotluckSettingsPatch } from '@/lib/localApi';
+import { AgentHooksPanel } from '@/components/settings/AgentHooksPanel';
 
 // External tools connect to the sidecar's fixed loopback address.
 const GATEWAY_BASE_URL = 'http://127.0.0.1:8321/v1';
@@ -97,6 +98,8 @@ export function GatewayPanel({ settings, isSaving, saveError, onUpdate }: Gatewa
 
   return (
     <div className="space-y-6">
+      <AgentHooksPanel />
+
       {/* Intro banner */}
       <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
         <Cable className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />

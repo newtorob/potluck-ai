@@ -7,11 +7,12 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { ListTodo, Plus, X } from 'lucide-react';
+import { ArrowLeft, ListTodo, Plus, X } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { useTasks } from '@/hooks/useTasks';
 import { useProject } from '@/hooks/useProject';
 import { TaskCard } from '@/components/tasks/TaskCard';
+import { TaskWorkroom } from '@/components/tasks/TaskWorkroom';
 import { normaliseProjectName, resolveProjectFilter } from '@/lib/projectUtils';
 import type { ProjectFilter } from '@/lib/projectUtils';
 import { ViewHeader } from '@/components/layout/ViewHeader';
@@ -262,6 +263,7 @@ export function TaskStateView() {
   const [activeFilter, setActiveFilter] = useState<FilterValue>('active');
   const [showNewForm, setShowNewForm] = useState(false);
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>({ kind: 'active' });
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   const { projects, activeProject } = useProject();
 
@@ -278,6 +280,7 @@ export function TaskStateView() {
     addError,
     deleteTask,
     setStatus,
+    refetch,
   } = useTasks({
     ...(resolvedProject !== undefined ? { project: resolvedProject } : {}),
     ...(includeAll !== undefined ? { include_all: includeAll } : {}),
@@ -287,6 +290,9 @@ export function TaskStateView() {
   const filtered = tasks
     .filter((t) => activeFilter === 'all' || t.status === activeFilter)
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  const selectedTask = selectedTaskId === null
+    ? null
+    : tasks.find((task) => task.id === selectedTaskId) ?? null;
 
   const isTemporaryProjectFilter = (() => {
     if (projectFilter.kind === 'active') return false;
@@ -317,7 +323,7 @@ export function TaskStateView() {
       <ViewHeader
         title={
           <span className="flex items-center gap-3">
-            Tasks
+            {selectedTask === null ? 'Tasks' : selectedTask.task_name}
             {isFetching && (
               <span
                 className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary/30 border-t-primary"
@@ -327,59 +333,77 @@ export function TaskStateView() {
             )}
           </span>
         }
-        count={tasks.length}
+        count={selectedTask === null ? tasks.length : null}
+        eyebrow={selectedTask === null ? undefined : 'Task workroom'}
         actions={
-          <button
-            type="button"
-            onClick={() => setShowNewForm(true)}
-            disabled={showNewForm}
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-hearth-sm',
-              'hover:bg-primary/90 active:scale-[0.98]',
-              'transition-all duration-fast',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-              'disabled:opacity-50 disabled:active:scale-100',
-            )}
-            aria-label="Create new task"
-          >
-            <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-            New task
-          </button>
+          selectedTask === null ? (
+            <button
+              type="button"
+              onClick={() => setShowNewForm(true)}
+              disabled={showNewForm}
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-hearth-sm',
+                'hover:bg-primary/90 active:scale-[0.98]',
+                'transition-all duration-fast',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                'disabled:opacity-50 disabled:active:scale-100',
+              )}
+              aria-label="Create new task"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              New task
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSelectedTaskId(null)}
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground',
+                'transition-colors hover:bg-accent hover:text-foreground',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              )}
+            >
+              <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+              Back to tasks
+            </button>
+          )
         }
       />
 
-      {/* Status filter chips */}
-      <div
-        role="group"
-        aria-label="Filter tasks by status"
-        className="flex gap-1.5 overflow-x-auto border-b border-border px-6 py-2.5"
-      >
-        {FILTERS.map(({ value, label }) => (
-          <button
-            key={value}
-            type="button"
-            aria-pressed={activeFilter === value}
-            onClick={() => setActiveFilter(value)}
-            className={cn(
-              'shrink-0 rounded-full px-3 py-1 text-xs font-medium tabular-nums',
-              'transition-all duration-fast',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-              activeFilter === value
-                ? 'bg-primary text-primary-foreground shadow-hearth-sm'
-                : 'bg-muted/70 text-muted-foreground hover:bg-accent hover:text-foreground',
-            )}
+      {selectedTask === null && (
+        <>
+          {/* Status filter chips */}
+          <div
+            role="group"
+            aria-label="Filter tasks by status"
+            className="flex gap-1.5 overflow-x-auto border-b border-border px-6 py-2.5"
           >
-            {label}
-          </button>
-        ))}
-      </div>
+            {FILTERS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={activeFilter === value}
+                onClick={() => setActiveFilter(value)}
+                className={cn(
+                  'shrink-0 rounded-full px-3 py-1 text-xs font-medium tabular-nums',
+                  'transition-all duration-fast',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  activeFilter === value
+                    ? 'bg-primary text-primary-foreground shadow-hearth-sm'
+                    : 'bg-muted/70 text-muted-foreground hover:bg-accent hover:text-foreground',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
-      {/* Project filter chips */}
-      <div
-        role="group"
-        aria-label="Filter tasks by project"
-        className="flex flex-wrap items-center gap-1.5 border-b border-border px-6 py-2.5"
-      >
+          {/* Project filter chips */}
+          <div
+            role="group"
+            aria-label="Filter tasks by project"
+            className="flex flex-wrap items-center gap-1.5 border-b border-border px-6 py-2.5"
+          >
         {/* Active-project default — distinguished as the resting filter */}
         <button
           type="button"
@@ -454,11 +478,31 @@ export function TaskStateView() {
         {isTemporaryProjectFilter && (
           <span className="text-[10px] italic text-muted-foreground/60">(temporary)</span>
         )}
-      </div>
+          </div>
+        </>
+      )}
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        <div className="mx-auto max-w-2xl space-y-3">
+      {selectedTask !== null ? (
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <aside className="w-[23rem] shrink-0 overflow-y-auto border-r border-border bg-surface-1 p-4" aria-label="Task state controls">
+            <p className="mb-3 font-serif text-[11px] italic tracking-hearth-label text-muted-foreground">Task state</p>
+            <TaskCard
+              task={selectedTask}
+              onCompleteStep={(id, step) => { void completeStep(id, step); }}
+              onAddStep={handleAddStep}
+              onAddError={(id, error, resolution) => { void addError(id, error, resolution); }}
+              onSetStatus={(id, status) => { void setStatus(id, status); }}
+              onDelete={(id) => {
+                void deleteTask(id).then(() => setSelectedTaskId(null));
+              }}
+            />
+          </aside>
+          <TaskWorkroom task={selectedTask} onTaskRefresh={refetch} />
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="mx-auto max-w-2xl space-y-3">
           {/* Inline new task form */}
           {showNewForm && (
             <NewTaskForm
@@ -489,6 +533,7 @@ export function TaskStateView() {
               onAddError={(id, error, resolution) => { void addError(id, error, resolution); }}
               onSetStatus={(id, status) => { void setStatus(id, status); }}
               onDelete={(id) => { void deleteTask(id); }}
+              onOpenWorkroom={setSelectedTaskId}
             />
           ))}
 
@@ -503,8 +548,9 @@ export function TaskStateView() {
               align="top"
             />
           )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

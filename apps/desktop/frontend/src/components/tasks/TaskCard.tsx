@@ -24,6 +24,7 @@ import {
   CheckCheck,
   Plus,
   AlertTriangle,
+  TerminalSquare,
 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { ProjectPill } from '@/components/memory/ProjectPill';
@@ -436,6 +437,7 @@ interface TaskCardProps {
   onAddError: (id: string, error: string, resolution?: string) => void;
   onSetStatus: (id: string, status: TaskStatus) => void;
   onDelete: (id: string) => void;
+  onOpenWorkroom?: (id: string) => void;
 }
 
 export function TaskCard({
@@ -445,6 +447,7 @@ export function TaskCard({
   onAddError,
   onSetStatus,
   onDelete,
+  onOpenWorkroom,
 }: TaskCardProps) {
   const [showConstraints, setShowConstraints] = useState(false);
 
@@ -468,6 +471,21 @@ export function TaskCard({
           <ProjectPill project={task.project} />
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {onOpenWorkroom !== undefined && task.status !== 'completed' && task.status !== 'abandoned' && (
+            <button
+              type="button"
+              onClick={() => onOpenWorkroom(task.id)}
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5 text-xs font-medium text-primary',
+                'transition-colors hover:bg-primary/10',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              )}
+              aria-label={`Open workroom for ${task.task_name}`}
+            >
+              <TerminalSquare className="h-3.5 w-3.5" aria-hidden="true" />
+              Workroom
+            </button>
+          )}
           <span className="text-[11px] text-muted-foreground whitespace-nowrap">
             {relativeTime(task.updated_at)}
           </span>

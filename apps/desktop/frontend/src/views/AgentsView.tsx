@@ -16,13 +16,14 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Activity, Trash2 } from 'lucide-react';
+import { Activity, Cable, GitBranch, Trash2 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { localApi } from '@/lib/localApi';
 import { useAgents } from '@/hooks/useAgents';
 import { AgentSessionCard } from '@/components/agents/AgentSessionCard';
 import { ActivityFeed } from '@/components/agents/ActivityFeed';
 import { SessionDetailDrawer } from '@/components/agents/SessionDetailDrawer';
+import { AgentRunsPanel } from '@/components/agents/AgentRunsPanel';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
 import type { AgentSession, ToolCall, SessionDetail } from '@/types/agents';
@@ -73,6 +74,47 @@ function CountChip({
   );
 }
 
+type AgentsMode = 'runs' | 'connections';
+
+function AgentsModeTabs({ mode, onChange }: { mode: AgentsMode; onChange: (mode: AgentsMode) => void }) {
+  return (
+    <div role="tablist" aria-label="Agent observability mode" className="flex rounded-lg border border-border bg-muted p-0.5">
+      <button
+        type="button"
+        role="tab"
+        id="agents-tab-runs"
+        aria-selected={mode === 'runs'}
+        aria-controls="agents-panel-runs"
+        onClick={() => onChange('runs')}
+        className={cn(
+          'flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors duration-fast',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          mode === 'runs' ? 'bg-background text-foreground shadow-hearth-sm' : 'text-muted-foreground hover:text-foreground',
+        )}
+      >
+        <GitBranch className="h-3 w-3" aria-hidden="true" />
+        Runs
+      </button>
+      <button
+        type="button"
+        role="tab"
+        id="agents-tab-connections"
+        aria-selected={mode === 'connections'}
+        aria-controls="agents-panel-connections"
+        onClick={() => onChange('connections')}
+        className={cn(
+          'flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors duration-fast',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          mode === 'connections' ? 'bg-background text-foreground shadow-hearth-sm' : 'text-muted-foreground hover:text-foreground',
+        )}
+      >
+        <Cable className="h-3 w-3" aria-hidden="true" />
+        Connections
+      </button>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // AgentsView
 // ---------------------------------------------------------------------------
@@ -91,6 +133,7 @@ export function AgentsView() {
     fetchSessions,
   } = useAgents();
 
+  const [activeMode, setActiveMode] = useState<AgentsMode>('runs');
   const [showDisconnected, setShowDisconnected] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
@@ -213,6 +256,22 @@ export function AgentsView() {
 
   const hasEverHadSessions = sessions.length > 0;
 
+  if (activeMode === 'runs') {
+    return (
+      <div
+        id="agents-panel-runs"
+        role="tabpanel"
+        aria-labelledby="agents-tab-runs"
+        className="flex h-full flex-col overflow-hidden"
+      >
+        <AgentsHeader isFetching={false}>
+          <AgentsModeTabs mode={activeMode} onChange={setActiveMode} />
+        </AgentsHeader>
+        <AgentRunsPanel />
+      </div>
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Empty state (no sessions ever)
   // ---------------------------------------------------------------------------
@@ -220,7 +279,9 @@ export function AgentsView() {
   if (!isFetching && !hasEverHadSessions) {
     return (
       <div className="flex h-full flex-col">
-        <AgentsHeader isFetching={isFetching} />
+        <AgentsHeader isFetching={isFetching}>
+          <AgentsModeTabs mode={activeMode} onChange={setActiveMode} />
+        </AgentsHeader>
         <EmptyState
           icon={Activity}
           title="No agent sessions yet"
@@ -240,12 +301,19 @@ export function AgentsView() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="flex h-full overflow-hidden" data-testid="agents-view">
+    <div
+      id="agents-panel-connections"
+      role="tabpanel"
+      aria-labelledby="agents-tab-connections"
+      className="flex h-full overflow-hidden"
+      data-testid="agents-view"
+    >
       {/* Main content */}
       <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
         {/* Header */}
         <AgentsHeader isFetching={isFetching}>
           <div className="flex items-center gap-4">
+            <AgentsModeTabs mode={activeMode} onChange={setActiveMode} />
             {/* Honest count by liveness tier. The old single "X active"
                 conflated four states and lied about reality (sessions that
                 had not heartbeated in days still counted as "active"). Now
