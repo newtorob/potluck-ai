@@ -182,7 +182,7 @@ export async function disconnect(args: CliArgs): Promise<Report> {
 }
 
 export function formatMember(report: Report): string {
-  if (report.state === "pending") return `Open ${report.verificationUri} on any device.\nCode: ${report.userCode}\n${report.next}`;
+  if (report.state === "pending") return `Open ${report.verificationUriComplete ?? report.verificationUri} on any device.\nCode: ${report.userCode}\n${report.next}`;
   if (report.state === "denied" || report.state === "expired") return `Sign-in ${report.state}. Run potluck login to start again.`;
   if (report.signedIn === true) return `Signed in as ${report.email}.`;
   if (report.signedIn === false) return `Signed out.${report.revoked === false ? " No server session was revoked." : ""}`;

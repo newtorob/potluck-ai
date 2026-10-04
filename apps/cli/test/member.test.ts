@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseArgs } from "../src/args.js";
-import { approvalLink, canOpenBrowser, connect, disconnect, household, login, logout, memberStatus, readInvite } from "../src/member.js";
+import { approvalLink, canOpenBrowser, connect, disconnect, formatMember, household, login, logout, memberStatus, readInvite } from "../src/member.js";
 import { ControlError, requestJSON } from "../src/control.js";
 import { runtimeRequest } from "../src/runtime.js";
 
@@ -68,6 +68,13 @@ describe("member commands", () => {
     const result = await login(parseArgs(["login", "--no-wait"]), undefined, true, opener);
     expect(opener).not.toHaveBeenCalled();
     expect(result).toMatchObject({ state: "pending", verificationUriComplete: "https://trypotluck.ai/auth/device?code=BCDF-GHJK" });
+  });
+  it("shows the link with the code for a pending login", () => {
+    const text = formatMember({ state: "pending", userCode: "BCDF-GHJK", verificationUri: "https://trypotluck.ai/auth/device",
+      verificationUriComplete: "https://trypotluck.ai/auth/device?code=BCDF-GHJK", next: "Then wait." });
+    expect(text).toContain("Open https://trypotluck.ai/auth/device?code=BCDF-GHJK on any device.");
+    expect(formatMember({ state: "pending", userCode: "BCDF-GHJK", verificationUri: "https://trypotluck.ai/auth/device", next: "x" }))
+      .toContain("Open https://trypotluck.ai/auth/device on any device.");
   });
   it("decides when a browser can open", () => {
     const login_ = parseArgs(["login"]);
