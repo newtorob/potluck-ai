@@ -46,8 +46,12 @@ class DeviceAuthService:
                                 expires_at=now + timedelta(seconds=TTL), status="pending", interval=5))
         await self.db.commit()
         uri = get_settings().app_url.rstrip("/") + "/auth/device"
-        return {"device_code": raw, "user_code": code[:4] + "-" + code[4:],
-                "verification_uri": uri, "expires_in": TTL, "interval": 5}
+        user_code = code[:4] + "-" + code[4:]
+        # Released runtimes reject a query on verification_uri, so the prefilled
+        # link travels in its own RFC 8628 field.
+        return {"device_code": raw, "user_code": user_code,
+                "verification_uri": uri, "verification_uri_complete": uri + "?code=" + user_code,
+                "expires_in": TTL, "interval": 5}
 
     async def email_link(self, code: str, email: str) -> str:
         grant = await self.db.scalar(select(DeviceGrant).where(
@@ -71,20 +75,50 @@ class DeviceAuthService:
         except (jwt.InvalidTokenError, ValueError, TypeError, KeyError) as exc:
             raise DeviceAuthError("invalid_proof") from exc
 
-    async def approve(self, token: str, code: str, approved: bool) -> dict:
+    async def approve(self, token: str, code: str, approved: bool,
+                      remember: bool = False) -> tuple[dict, str | None]:
+        """Decide a grant from an emailed proof.
+
+        With remember, an approval also stages a session for the approving
+        browser and returns its raw token, so the next terminal can be
+        approved with one click instead of another email.
+        """
         proof = self.proof(token)
         grant = await self.db.scalar(select(DeviceGrant).where(
             DeviceGrant.id == uuid.UUID(proof["grant"])).with_for_update())
+        self._require_pending(grant)
+        if not secrets.compare_digest(grant.user_code_hash, digest(normalize_code(code))):
+            raise DeviceAuthError("invalid_user_code")
+        member = await AuthService(self.db).member_for_email(proof["email"]) if approved else None
+        browser_token = None
+        if member is not None and remember:
+            browser_token, _ = AuthService(self.db).issue_session(member)
+        return await self._decide(grant, member), browser_token
+
+    async def approve_as(self, member: Member, code: str, approved: bool) -> dict:
+        """Decide a grant from a browser that already has a web session.
+
+        The user code is the only link to the terminal, so it has to match a
+        pending grant exactly; the page shows it for comparison first.
+        """
+        grant = await self.db.scalar(select(DeviceGrant).where(
+            DeviceGrant.user_code_hash == digest(normalize_code(code))).with_for_update())
+        if grant is None:
+            raise DeviceAuthError("invalid_user_code")
+        self._require_pending(grant)
+        return await self._decide(grant, member if approved else None)
+
+    @staticmethod
+    def _require_pending(grant: DeviceGrant | None) -> None:
         if not grant or grant.expires_at <= datetime.now(timezone.utc):
             raise DeviceAuthError("expired_token")
         if grant.status != "pending":
             raise DeviceAuthError("already_used")
-        if not secrets.compare_digest(grant.user_code_hash, digest(normalize_code(code))):
-            raise DeviceAuthError("invalid_user_code")
-        if approved:
-            member = await AuthService(self.db).member_for_email(proof["email"])
+
+    async def _decide(self, grant: DeviceGrant, member: Member | None) -> dict:
+        if member is not None:
             grant.member_id = member.id
-        grant.status = "approved" if approved else "denied"
+        grant.status = "approved" if member is not None else "denied"
         await self.db.commit()
         return {"status": grant.status}
 
