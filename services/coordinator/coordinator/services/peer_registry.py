@@ -243,6 +243,15 @@ _HW_TIER_LOW    = 1.5   # Small dedicated GPU (VRAM < 8 GB); future path
 _HW_TIER_CPU    = 1.0   # CPU-only or unrecognised hardware
 
 
+# A measured speed is still the peer's claim. Cap what it can buy in routing
+# until claims are checked against observed job throughput.
+TPS_SCORE_CAP = 200.0
+
+
+def measured_compute_score(tps: float) -> float:
+    return min(tps, TPS_SCORE_CAP)
+
+
 def _hardware_tier_score(hw: dict[str, Any]) -> float:
     """Derive a coarse compute-tier score from a Peer.hardware_summary dict.
 
@@ -362,7 +371,7 @@ async def _score_peers(
 
         # Compute signal: measured TPS when available; hardware tier proxy otherwise.
         if tps is not None and tps > 0.0:
-            compute_score = tps
+            compute_score = measured_compute_score(tps)
         else:
             compute_score = _hardware_tier_score(hw_summary or {})
 

@@ -76,9 +76,13 @@ export function contributorStatusLine(status: ContributorStatus | null): Contrib
           };
       }
     case 'error':
-      return status.last_error === 'coordinator_not_configured'
-        ? { text: 'No coordinator address is configured. Set one in Settings.', tone: 'warn' }
-        : { text: 'The contributor stopped unexpectedly. Check the local engine log.', tone: 'warn' };
+      if (status.last_error === 'coordinator_not_configured') {
+        return { text: 'No coordinator address is configured. Set one in Settings.', tone: 'warn' };
+      }
+      if (status.last_error === 'coordinator_insecure') {
+        return { text: 'The coordinator address must use https unless it is on your own network.', tone: 'warn' };
+      }
+      return { text: 'The contributor stopped unexpectedly. Check the local engine log.', tone: 'warn' };
     case 'stopped':
     default:
       return { text: 'Starting', tone: 'pending' };

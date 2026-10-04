@@ -47,9 +47,10 @@ class Settings(BaseSettings):
     # contributor_releases is rejected (the original behaviour). When false
     # (default), an unknown hash is accepted, logged as
     # peer_release_unregistered, and recorded on the peer's heartbeat row as
-    # before. Advisory until releases are actually signed: no shipped
-    # desktop build has a registered hash yet, so the strict gate would keep
-    # every real member out. Preflight warns in production while this is off.
+    # before. Advisory by default for dev and tests. Production sets
+    # REQUIRE_REGISTERED_RELEASE=true in fly.toml, keeping the original
+    # strict gate until a signed desktop build is registered; preflight warns
+    # in production if it is ever off.
     require_registered_release: bool = False
 
     # DERP-token proof-of-possession (POST /mesh/derp-token). When a caller

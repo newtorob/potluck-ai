@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---- Server → Peer ---------------------------------------------------- #
@@ -40,6 +40,13 @@ class RejectMessage(BaseModel):
 # ---- Peer → Server ---------------------------------------------------- #
 
 
+# Measured speeds are a peer's own claim and they steer routing, so they must be
+# finite. Values above these ceilings are clamped rather than refused, so a
+# fast honest peer still attests.
+MAX_TOKENS_PER_SECOND = 1000.0
+MAX_PROMPT_TOKENS_PER_SECOND = 100_000.0
+
+
 class CapabilityEntry(BaseModel):
     """One model the peer is willing to serve. Coordinator uses these to
     route jobs only to peers that actually have the requested model
@@ -53,8 +60,18 @@ class CapabilityEntry(BaseModel):
     # scorer uses tokens_per_second; the first-token deadline prefers
     # prompt_tokens_per_second. Both are peer self-reports (advisory, like
     # every other capacity figure): they steer routing, never billing.
-    tokens_per_second: float | None = Field(default=None, ge=0)
-    prompt_tokens_per_second: float | None = Field(default=None, ge=0)
+    tokens_per_second: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    prompt_tokens_per_second: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+
+    @field_validator("tokens_per_second")
+    @classmethod
+    def _cap_generation_rate(cls, value: float | None) -> float | None:
+        return None if value is None else min(value, MAX_TOKENS_PER_SECOND)
+
+    @field_validator("prompt_tokens_per_second")
+    @classmethod
+    def _cap_prompt_rate(cls, value: float | None) -> float | None:
+        return None if value is None else min(value, MAX_PROMPT_TOKENS_PER_SECOND)
 
 
 class AttestationPayload(BaseModel):

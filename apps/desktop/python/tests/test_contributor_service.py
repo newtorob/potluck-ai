@@ -138,7 +138,19 @@ def test_ws_url_from_http_base():
         "wss://coordinator.trypotluck.ai/peers/connect"
     assert cs.ws_url_from_http_base("http://192.168.4.78:8400/") == \
         "ws://192.168.4.78:8400/peers/connect"
-    assert cs.ws_url_from_http_base("ws://h:1/peers/connect") == "ws://h:1/peers/connect"
+    assert cs.ws_url_from_http_base("ws://127.0.0.1:1/peers/connect") == "ws://127.0.0.1:1/peers/connect"
+
+
+def test_session_token_never_travels_unencrypted_to_a_public_host():
+    import pytest
+
+    for safe in ("http://localhost:8400", "http://127.0.0.1:8400", "http://[::1]:8400",
+                 "http://10.0.0.5:8400", "http://172.16.1.2:8400", "http://100.101.102.103:8400"):
+        assert cs.ws_url_from_http_base(safe).startswith("ws://"), safe
+    for unsafe in ("http://coordinator.example.com", "ws://203.0.113.5:8400",
+                   "http://coordinator.trypotluck.ai", "ftp://coordinator.trypotluck.ai"):
+        with pytest.raises(ValueError):
+            cs.ws_url_from_http_base(unsafe)
 
 
 def test_reject_category_mapping():
@@ -186,17 +198,17 @@ async def test_toggle_on_starts_loop_with_ws_url_cap_and_hardware(monkeypatch, t
 async def test_same_settings_do_not_restart_but_url_change_does(monkeypatch, tmp_path):
     runner = FakeLoopRunner()
     svc = _service(runner, monkeypatch=monkeypatch, tmp_path=tmp_path)
-    _patch_base(monkeypatch, "http://a:8400")
+    _patch_base(monkeypatch, "http://10.0.0.1:8400")
     await svc.apply_settings(_settings(on=True))
     await asyncio.sleep(0)
     await svc.apply_settings(_settings(on=True))
     await asyncio.sleep(0)
     assert len(runner.starts) == 1
-    _patch_base(monkeypatch, "http://b:8400")
+    _patch_base(monkeypatch, "http://10.0.0.2:8400")
     await svc.apply_settings(_settings(on=True))
     await asyncio.sleep(0)
     assert len(runner.starts) == 2 and runner.stops == 1
-    assert runner.starts[1]["settings"].coordinator_url == "ws://b:8400/peers/connect"
+    assert runner.starts[1]["settings"].coordinator_url == "ws://10.0.0.2:8400/peers/connect"
     await svc.stop()
 
 
@@ -209,6 +221,17 @@ async def test_missing_coordinator_url_is_an_error_state_not_a_start(monkeypatch
     assert not svc.is_running and runner.starts == []
     st = svc.status()
     assert st["state"] == "error" and st["last_error"] == "coordinator_not_configured"
+
+
+@run_async
+async def test_insecure_public_coordinator_is_an_error_state_not_a_start(monkeypatch, tmp_path):
+    runner = FakeLoopRunner()
+    svc = _service(runner, monkeypatch=monkeypatch, tmp_path=tmp_path)
+    _patch_base(monkeypatch, "http://coordinator.example.com")
+    await svc.apply_settings(_settings(on=True, url="http://coordinator.example.com"))
+    assert not svc.is_running and runner.starts == []
+    st = svc.status()
+    assert st["state"] == "error" and st["last_error"] == "coordinator_insecure"
 
 
 @run_async

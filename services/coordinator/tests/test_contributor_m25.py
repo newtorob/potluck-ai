@@ -160,7 +160,8 @@ def test_bogus_bearer_without_shared_token_is_unauthorized(monkeypatch, no_share
             "/peers/connect", headers={"Authorization": "Bearer nope"}
         ) as ws:
             first = ws.receive_json()
-            assert first == {"type": "reject", "reason": "unauthorized"}
+            # A bearer that does not resolve is refused as such, never downgraded.
+            assert first == {"type": "reject", "reason": "unauthorized: invalid session"}
 
 
 def test_shared_token_still_works_when_session_auth_is_on(monkeypatch):

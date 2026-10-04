@@ -68,6 +68,12 @@ describe('contributorStatusLine', () => {
     ).toMatch(/No coordinator address/);
   });
 
+  it('explains an insecure coordinator address', () => {
+    expect(
+      contributorStatusLine(status({ state: 'error', last_error: 'coordinator_insecure' }))?.text,
+    ).toMatch(/must use https/);
+  });
+
   it('never uses an em dash', () => {
     const states: Array<Partial<ContributorStatus>> = [
       {},

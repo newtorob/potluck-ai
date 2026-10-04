@@ -42,6 +42,10 @@ primary_region = "ord"
   #     6PN (.internal) WireGuard mesh, which asyncpg's ssl= arg can't express.
   REQUIRE_REGISTERED_KEYS = "true"
   POTLUCK_DB_LINK_ENCRYPTED = "1"
+  # Refuse contributor builds whose binary_hash is not in contributor_releases.
+  # The code default is advisory for dev and tests; production stays strict
+  # until a signed desktop build is registered and the open pool is enabled.
+  REQUIRE_REGISTERED_RELEASE = "true"
 
 [[vm]]
   cpu_kind = "shared"

@@ -22,6 +22,7 @@ coordinator host, nothing else. Heartbeats carry capacity only.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
 import os
 import time
@@ -76,11 +77,41 @@ def reject_category(reason: str) -> str:
     return "rejected"
 
 
+# Plain ws:// is only for coordinators that the session token cannot leave
+# the machine or the local network to reach: loopback, private LAN, and the
+# 100.64/10 range the mesh and Tailscale use (encrypted by WireGuard).
+_LOCAL_NETWORKS = tuple(ipaddress.ip_network(n) for n in (
+    "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",  # private LAN (RFC 1918)
+    "100.64.0.0/10",                                   # mesh and Tailscale
+    "fc00::/7",                                        # IPv6 unique local
+))
+
+
+def _plaintext_ok(host: str | None) -> bool:
+    if not host:
+        return False
+    if host == "localhost":
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return ip.is_loopback or any(ip in net for net in _LOCAL_NETWORKS if ip.version == net.version)
+
+
 def ws_url_from_http_base(base: str) -> str:
     """``https://host`` becomes ``wss://host/peers/connect``; ``ws(s)://``
-    inputs are accepted as-is (path added if missing)."""
+    inputs are accepted as-is (path added if missing).
+
+    The member session bearer rides on this socket, so plain ``ws://`` is
+    refused (ValueError) unless the host is loopback, private or mesh.
+    """
     parts = urlsplit(base.strip())
-    scheme = {"http": "ws", "https": "wss", "ws": "ws", "wss": "wss"}.get(parts.scheme, "ws")
+    scheme = {"http": "ws", "https": "wss", "ws": "ws", "wss": "wss"}.get(parts.scheme)
+    if scheme is None:
+        raise ValueError("coordinator URL must use http(s) or ws(s)")
+    if scheme == "ws" and not _plaintext_ok(parts.hostname):
+        raise ValueError("coordinator URL must use https or wss for a public host")
     path = parts.path.rstrip("/")
     if not path.endswith("/peers/connect"):
         path = f"{path}/peers/connect"
@@ -189,7 +220,18 @@ class ContributorService:
                 logger.warning("contributor_not_started reason=coordinator_not_configured")
                 return
 
-            key = (ws_url_from_http_base(base), int(network.max_concurrent_jobs))
+            try:
+                ws_url = ws_url_from_http_base(base)
+            except ValueError:
+                if self.is_running:
+                    await self._stop_locked()
+                self._status.state = "error"
+                self._status.last_error = "coordinator_insecure"
+                self._status.last_error_detail = None
+                self._status.coordinator_host = None
+                logger.warning("contributor_not_started reason=coordinator_insecure")
+                return
+            key = (ws_url, int(network.max_concurrent_jobs))
             if self.is_running and self._running_key == key:
                 return
             if self.is_running:

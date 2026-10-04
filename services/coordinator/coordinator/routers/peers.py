@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from coordinator.db.database import get_db
 from coordinator.middleware.auth import coordinator_token_matches
-from coordinator.middleware.session_auth import resolve_member_from_bearer
+from coordinator.middleware.session_auth import resolve_member_from_bearer, session_auth_enabled
 from coordinator.schemas.peer import (
     AcceptMessage,
     AttestationPayload,
@@ -97,7 +97,14 @@ async def peer_connect(
     #      tokenless household coordinators are unaffected.
     # Neither: reject. The Ed25519 signed-nonce challenge below still runs
     # either way; this gate only decides who may attempt it.
-    session_member_id = await resolve_member_from_bearer(db, ws.headers.get("authorization"))
+    authorization = ws.headers.get("authorization")
+    session_member_id = await resolve_member_from_bearer(db, authorization)
+    if session_member_id is None and authorization and session_auth_enabled():
+        # A bearer that does not resolve is a failed sign-in, not a missing
+        # one. Never let it fall through to the shared token.
+        logger.info("peer_rejected_bad_session")
+        await _reject(ws, "unauthorized: invalid session", code=1008)
+        return
     if session_member_id is None and not coordinator_token_matches(
         ws.headers.get("x-potluck-coordinator-token")
     ):
