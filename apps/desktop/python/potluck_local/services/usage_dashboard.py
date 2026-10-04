@@ -84,6 +84,7 @@ async def usage_snapshot(window: int = 7, direction: str = "consumed", *,
 
 async def dashboard(window: int, direction: str, household: bool) -> dict:
     from potluck_local.services.performance_status import performance_status
+    from potluck_local.services.split_manager import get_split_manager
 
     result = await usage_snapshot(window, direction)
     # Runtime or optional household failures do not erase recorded usage.
@@ -95,9 +96,6 @@ async def dashboard(window: int, direction: str, household: bool) -> dict:
         result["performance"] = None
         result["memoryTotalGiB"] = None
     try:
-        # Some released runtimes intentionally omit managed split inference.
-        # Optional telemetry must not make the usage endpoint unavailable.
-        from potluck_local.services.split_manager import get_split_manager
         split = get_split_manager().status()
         session = split.get("session") or {}
         # Never include session IDs, worker names/addresses, errors or paths.
