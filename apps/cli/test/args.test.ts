@@ -29,11 +29,13 @@ describe("command dispatch", () => {
     expect(parseArgs(["setup", "--no-input", "--enable-gateway", "--connect", "--name", "Server"]))
       .toMatchObject({ noInput: true, enableGateway: true, connect: true, name: "Server" });
     expect(parseArgs(["login", "--no-wait", "--json"]).wait).toBe(false);
+    expect(parseArgs(["login", "--no-browser"]).browser).toBe(false);
+    expect(parseArgs(["setup", "--sign-in", "--no-browser"]).browser).toBe(false);
     expect(parseArgs(["setup", "--json"]).json).toBe(true);
   });
   it.each([["login", "--wait", "--no-wait"], ["household", "invite"], ["login", "secret"],
     ["status", "--sign-in"], ["connect", "--output", "secret"], ["household", "list", "--name", "x"],
-    ["connect", "--name", "\u001bsecret"], ["--no-input"]])("rejects misplaced account options %j", (...args) => {
+    ["connect", "--name", "\u001bsecret"], ["--no-input"], ["status", "--no-browser"]])("rejects misplaced account options %j", (...args) => {
     expect(() => parseArgs(args)).toThrow();
   });
 });

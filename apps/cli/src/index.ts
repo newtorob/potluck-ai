@@ -94,6 +94,7 @@ function printHelp(): void {
       "  potluck contribute status      control contribution, schedules and limits",
       "  potluck sessions list          list private saved agent sessions",
       "  potluck gateway enable         enable the local gateway",
+      "  potluck usage                  live usage, model performance and machine dashboard",
       "  potluck status [--json]        inspect runtime, connection and models",
       "  potluck doctor [--json]        diagnose setup/connection problems",
       "  potluck logs [--source mesh]   read recent runtime, mesh or app logs",

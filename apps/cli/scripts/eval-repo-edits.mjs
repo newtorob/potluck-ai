@@ -12,12 +12,13 @@ import { readProjectModelLock, validateLock } from '../dist/model-lock.js';
 import { buildRepoMap } from '../dist/repomap.js';
 
 const exec = promisify(execFile);
-const suite = resolve(dirname(fileURLToPath(import.meta.url)), '../eval/repo-edit-v1');
-const manifest = JSON.parse(await readFile(join(suite, 'manifest.json'), 'utf8'));
 const { values } = parseArgs({ options: {
   'self-test': { type: 'boolean' }, out: { type: 'string' }, lock: { type: 'string' },
-  case: { type: 'string' },
+  case: { type: 'string' }, suite: { type: 'string', default: 'repo-edit-v1' },
 } });
+if (!['repo-edit-v1', 'repo-edit-transfer-v1'].includes(values.suite)) throw new Error('Unknown evaluation suite.');
+const suite = resolve(dirname(fileURLToPath(import.meta.url)), '../eval', values.suite);
+const manifest = JSON.parse(await readFile(join(suite, 'manifest.json'), 'utf8'));
 if (process.platform !== 'linux') throw new Error('This evaluation requires Linux bubblewrap; there is no unsandboxed fallback.');
 if (!values.out) throw new Error('Specify --out with a directory for synthetic traces and edited fixture copies.');
 const output = resolve(values.out);

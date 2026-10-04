@@ -25,6 +25,7 @@ import { unifiedDiff } from "./diff.js";
 import {
   escapeRegExp,
   globToRegExp,
+  ignoredBy,
   loadIgnore,
   walkFiles,
 } from "./walk.js";
@@ -43,7 +44,7 @@ export interface ToolDeps {
   cwd: string;
   confirm: Confirm;
   /**
-   * Absolute paths the agent has read this task. read_file adds to it; write_file
+   * Absolute paths the agent has fully read this task. read_file adds to it; write_file
    * refuses to blind-overwrite an existing file that isn't in it. Optional so
    * direct tool tests can omit it (the guard is then inert).
    */
@@ -194,10 +195,11 @@ async function readFileTool(
   const path = requireString(args, "path");
   const abs = await resolveInCwd(deps.cwd, path);
   const content = await readFile(abs, "utf8");
-  deps.readPaths?.add(abs);
   if (content.length > MAX_FILE_BYTES) {
+    deps.readPaths?.delete(abs);
     return `${content.slice(0, MAX_FILE_BYTES)}\n…[truncated at ${MAX_FILE_BYTES} chars]`;
   }
+  deps.readPaths?.add(abs);
   return content;
 }
 
@@ -239,12 +241,27 @@ async function searchFilesTool(
   }
 
   const rules = await loadIgnore(deps.cwd);
+  const startInfo = await lstat(start);
+  if (!startInfo.isFile() && !startInfo.isDirectory()) {
+    throw new ToolError("search path must be a regular file or directory");
+  }
+  const startRel = relative(root, start).split(sep).join("/");
+  const segments = startRel.split("/").filter(Boolean);
+  // A scoped search bypasses the walk's ancestor pruning. Apply those same
+  // rules to its root so a file/directory path cannot bypass .gitignore.
+  for (let i = 1; i <= segments.length; i++) {
+    const isDir = i < segments.length || startInfo.isDirectory();
+    if (ignoredBy(rules, segments.slice(0, i).join("/"), isDir)) {
+      throw new ToolError("search path is ignored; choose a non-ignored file or directory");
+    }
+  }
   const hits: string[] = [];
   let truncated = false;
 
   // `start` is canonical, so the walk is rooted at the canonical root too and
   // every yielded path stays relative to it.
-  search: for await (const rel of walkFiles(start, root, rules)) {
+  const files = startInfo.isFile() ? [startRel] : walkFiles(start, root, rules);
+  search: for await (const rel of files) {
     const abs = join(root, rel);
     let content: string;
     try {
@@ -312,10 +329,19 @@ async function writeFileTool(
   const abs = await resolveInCwd(deps.cwd, path);
 
   let current = "";
+  let exists = false;
   try {
     current = await readFile(abs, "utf8");
-  } catch {
-    current = ""; // new file
+    exists = true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw new ToolError(`cannot read existing file ${path}; refusing to overwrite it`);
+    }
+    current = ""; // genuinely new file
+  }
+
+  if (exists && current === content) {
+    throw new ToolError(`file ${path} already has exactly this content; nothing changed. Make a different targeted correction.`);
   }
 
   // Guard against the classic weak-model mistake: overwriting an existing,
@@ -546,6 +572,18 @@ function resolveEdit(
   return { error: editNotFound(path) };
 }
 
+/** Bounded, literal file context. Never guess a different edit or target file. */
+function editContext(path: string, content: string, anchor = ""): string {
+  const budget = 3000;
+  const offset = anchor ? Math.max(0, content.indexOf(anchor)) : 0;
+  const start = content.length <= budget ? 0 : Math.max(0, content.lastIndexOf("\n", Math.max(0, offset - 500)) + 1);
+  const end = Math.min(content.length, start + budget);
+  const partial = start > 0 || end < content.length;
+  return `\nCURRENT FILE ${JSON.stringify(path)}${partial ? " (excerpt; use read_file for more)" : ""}:\n` +
+    (start ? "[earlier content omitted]\n" : "") + content.slice(start, end) +
+    (end < content.length ? "\n[later content omitted]" : "") + "\nEND CURRENT FILE";
+}
+
 /**
  * edit_file — replace `old_string` with `new_string` in an existing file. The
  * preferred way to change existing files; write_file is for creating new ones.
@@ -565,10 +603,6 @@ async function editFileTool(
   if (oldString.length === 0) {
     throw new ToolError("old_string must not be empty (use write_file for new files)");
   }
-  if (oldString === newString) {
-    throw new ToolError("old_string and new_string are identical — nothing to change");
-  }
-
   let current: string;
   try {
     current = await readFile(abs, "utf8");
@@ -578,9 +612,18 @@ async function editFileTool(
     );
   }
 
+  if (oldString === newString) {
+    throw new ToolError("old_string and new_string are identical — nothing to change. Inspect the actual file and make a different correction." + editContext(path, current, oldString));
+  }
+
   const replaceAll = args.replace_all === true;
   const result = resolveEdit(current, oldString, newString, replaceAll, path);
-  if ("error" in result) throw new ToolError(result.error);
+  if ("error" in result) throw new ToolError(result.error +
+    " Check the path and current contents; search_files can locate the definition in another file. Nothing was changed." +
+    editContext(path, current, oldString));
+  if (result.updated === current) {
+    throw new ToolError("replacement matches the existing content after whitespace matching; nothing changed" + editContext(path, current, oldString));
+  }
 
   const summary = unifiedDiff(path, current, result.updated);
   const approved = await deps.confirm({ tool: "edit_file", summary, subject: path });
@@ -590,7 +633,7 @@ async function editFileTool(
   const parts = [`edited ${path}`];
   if (result.count > 1) parts.push(`(${result.count} occurrences)`);
   if (result.fuzzy) parts.push("(matched with whitespace flexibility)");
-  return parts.join(" ");
+  return parts.join(" ") + editContext(path, result.updated, newString);
 }
 
 function execCommand(

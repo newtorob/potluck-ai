@@ -1,0 +1,11 @@
+{
+  "version": "repo-edit-transfer-v1",
+  "maxSteps": 16,
+  "timeoutMs": 900000,
+  "charBudget": 16000,
+  "context": 8192,
+  "cases": [
+    { "id": "settings", "editable": ["layers.py", "options.py"] },
+    { "id": "routing", "editable": ["paths.py", "routing.py"] }
+  ]
+}

@@ -166,6 +166,41 @@ describe("run_command", () => {
 });
 
 describe("search_files", () => {
+  it("searches an explicit file instead of falsely reporting no matches", async () => {
+    await mkdir(join(cwd, "src"));
+    await writeFile(join(cwd, "src", "booking.py"), "# booking\ndef is_available():\n    pass\n");
+    await writeFile(join(cwd, "other.py"), "def is_available(): pass\n");
+    const out = await runTool("search_files", { query: "is_available", path: "src/booking.py" }, { cwd, confirm: allow });
+    expect(out).toBe("src/booking.py:2: def is_available():");
+  });
+
+  it("reports a missing search path as an error", async () => {
+    const out = await runTool("search_files", { query: "needle", path: "missing.py" }, { cwd, confirm: allow });
+    expect(out).toMatch(/^error:/);
+  });
+
+  it.each(["secret.txt", "build", "build/nested", "build/nested/out.txt", "node_modules/pkg/index.js"])(
+    "respects ignore rules for an explicit search path: %s", async (path) => {
+      await writeFile(join(cwd, ".gitignore"), "secret.txt\nbuild/\n");
+      await mkdir(join(cwd, "build", "nested"), { recursive: true });
+      await mkdir(join(cwd, "node_modules", "pkg"), { recursive: true });
+      for (const file of ["secret.txt", "build/nested/out.txt", "node_modules/pkg/index.js"]) {
+        await writeFile(join(cwd, file), "needle\n");
+      }
+      const out = await runTool("search_files", { query: "needle", path }, { cwd, confirm: allow });
+      expect(out).toMatch(/^error:.*ignored/);
+      expect(out).not.toContain(":1:");
+    },
+  );
+
+  it.each([Buffer.from("needle\0"), Buffer.alloc(2_000_001, "x")])(
+    "still skips binary and oversized explicit files", async (content) => {
+      await writeFile(join(cwd, "data.bin"), content);
+      const out = await runTool("search_files", { query: ".", path: "data.bin" }, { cwd, confirm: allow });
+      expect(out).toMatch(/no matches/);
+    },
+  );
+
   it("returns file:line: text for matches", async () => {
     await writeFile(join(cwd, "a.ts"), "const x = 1;\nconst hello = 2;\n", "utf8");
     await writeFile(join(cwd, "b.ts"), "no match here\n", "utf8");

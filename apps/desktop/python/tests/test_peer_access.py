@@ -32,7 +32,7 @@ LOCAL = ("127.0.0.1", 50000)  # the local user (Electron / dev tools)
 
 # A representative sample of the private, loopback-only surface. The middleware
 # runs before routing, so 403 is returned whether or not the route exists.
-PRIVATE_PATHS = ["/memory/projects", "/tasks", "/agents", "/settings", "/vault"]
+PRIVATE_PATHS = ["/memory/projects", "/tasks", "/agents", "/settings", "/vault", "/usage/dashboard"]
 
 # The peer-facing surface that must be mesh-CIDR gated (not merely non-loopback
 # gated) -- capabilities probe, stateless inference dispatch, and (opt-in)

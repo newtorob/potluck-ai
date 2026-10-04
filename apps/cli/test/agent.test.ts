@@ -441,7 +441,7 @@ describe("runTask verify loop", () => {
     );
   });
 
-  it("does not run verify after a read-only tool", async () => {
+  it("does not verify the read itself, but checks an otherwise unverified final response", async () => {
     const dir = await tmp();
     await writeFile(join(dir, "r.txt"), "hello", "utf8");
     scriptTurns([action("read_file", { path: "r.txt" }), "done"]);
@@ -462,13 +462,12 @@ describe("runTask verify loop", () => {
       },
     });
 
-    expect(spy).not.toHaveBeenCalled();
+    expect(spy).toHaveBeenCalledOnce();
   });
 
-  it("stops auto-verify after the consecutive-failure cap", async () => {
+  it("stops the task at the unchanged verify failure cap instead of editing blindly", async () => {
     const dir = await tmp();
-    const write = action("write_file", { path: "out.txt", content: "x" });
-    scriptTurns([write, write, write, write, write, "done"]);
+    scriptTurns(Array.from({ length: 5 }, (_, i) => action("write_file", { path: "out.txt", content: `attempt ${i}` })));
 
     const spy = vi.fn(async () => ({ code: 1, output: "boom" }));
     const notices: string[] = [];
@@ -491,9 +490,10 @@ describe("runTask verify loop", () => {
       },
     });
 
-    // 5 successful writes occur, but verify stops after 4 failures in a row.
+    // The fifth write is never executed; the same four-failure cap still holds.
     expect(spy).toHaveBeenCalledTimes(4);
-    expect(notices.some(m => /stopping auto-verify/.test(m))).toBe(true);
+    expect(await readFile(join(dir, "out.txt"), "utf8")).toBe("attempt 3");
+    expect(notices.some(m => /stopping before further unverified edits/.test(m))).toBe(true);
     expect(result).toEqual({ status: "incomplete", reason: "verification_failed" });
   });
 
