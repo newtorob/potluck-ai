@@ -4,7 +4,8 @@ import type { CatalogModel } from '@/stores/modelStore';
 import type { HardwareInfo } from '@/hooks/useHardware';
 
 const hardware: HardwareInfo = { os: 'linux', arch: 'x64', cpu_name: 'CPU', cpu_cores_physical: 8,
-  cpu_cores_logical: 16, ram_total_gb: 16, ram_available_gb: 5, gpu_name: 'GPU', gpu_vram_gb: 8, recommended_tier: 'medium' };
+  cpu_cores_logical: 16, ram_total_gb: 16, ram_available_gb: 5, gpu_name: 'GPU', gpu_vram_gb: 8,
+  inference_gpu_available: true, inference_gpu_vram_gb: 8, recommended_tier: 'medium' };
 const model: CatalogModel = { slug: 'small', name: 'Small', tier: 'small', description: '', size_bytes: 2e9,
   min_ram_gb: 8, min_vram_gb: 4, context_window: 8192, recommended_tier: 'small', is_featured: false, installed: false };
 
@@ -21,6 +22,18 @@ describe('model choice', () => {
   it('does not claim compatibility before hardware detection; supports CPU-only capacity', () => {
     expect(checkModelFit(model, null)).toBe('unknown');
     expect(suggestedDownload([model], null)).toBeNull();
-    expect(checkModelFit(model, { ...hardware, gpu_name: null, gpu_vram_gb: null })).toBe('ok');
+    expect(checkModelFit(model, { ...hardware, gpu_name: null, gpu_vram_gb: null, inference_gpu_available: false })).toBe('ok');
+  });
+
+  it('uses RAM when Linux has a graphics card but no usable inference driver', () => {
+    const cpu = { ...hardware, gpu_vram_gb: 2, inference_gpu_available: false };
+    expect(checkModelFit(model, cpu)).toBe('ok');
+    expect(checkModelFit({ ...model, min_ram_gb: 32 }, cpu)).toBe('insufficient');
+    expect(checkModelFit(model, { ...cpu, inference_gpu_available: undefined })).toBe('ok');
+  });
+
+  it('uses the backend device capacity instead of an unrelated detected card', () => {
+    expect(checkModelFit(model, { ...hardware, gpu_vram_gb: 24, inference_gpu_vram_gb: 2 })).toBe('insufficient');
+    expect(checkModelFit(model, { ...hardware, gpu_vram_gb: 2, inference_gpu_vram_gb: 8 })).toBe('ok');
   });
 });

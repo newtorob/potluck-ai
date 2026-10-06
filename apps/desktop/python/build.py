@@ -23,8 +23,8 @@ _ROOT = Path(__file__).parent
 def _vendor_gpu_backends() -> None:
     """Put the GPU backend set beside the CPU one before PyInstaller collects it.
 
-    On Windows the wheel from requirements.txt is CPU only, so without this the
-    bundle ships a build that cannot offload to any GPU. No-op elsewhere.
+    Windows and Linux x86-64 use a CPU fallback wheel and a matching Vulkan
+    set. No-op on platforms without additional packaged backends.
     """
     script = _ROOT / "scripts" / "vendor_gpu_backend.py"
     result = subprocess.run([sys.executable, str(script)], cwd=_ROOT)
@@ -70,15 +70,16 @@ def main() -> None:
     # playtester's five-minute timeout.
     lib_root = binary.parent / "_internal" / "llama_cpp"
     for backend_dir in sorted(lib_root.glob("lib-*")):
-        count = len(list(backend_dir.glob("*.dll"))) + len(list(backend_dir.glob("*.so*")))
+        count = len(list(backend_dir.rglob("*.dll"))) + len(list(backend_dir.rglob("*.so*")))
         print(f"  backend set bundled: {backend_dir.name} ({count} libraries)")
-    if sys.platform == "win32" and not list(lib_root.glob("lib-*")):
-        print(
-            "error: no GPU backend set landed in the bundle; this build would be "
-            "CPU only",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    # Validate every recorded library, including Linux's hashed auditwheel
+    # dependencies. An empty directory or a surviving marker is not enough.
+    result = subprocess.run([
+        sys.executable, str(_ROOT / "scripts" / "vendor_gpu_backend.py"),
+        "--check", "--root", str(lib_root),
+    ], cwd=_ROOT)
+    if result.returncode:
+        sys.exit(result.returncode)
 
     # Stamp the build identity the contributor presents to the coordinator as
     # binary_hash: SHA-256 over the unsigned PyInstaller output, written to

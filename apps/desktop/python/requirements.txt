@@ -21,9 +21,12 @@ uvicorn[standard]==0.34.*
 #   sha256 31590ea000d5aff6f05f1e428048e72318a83709288159a5bd4dabec530080bb
 #   7,086,788 bytes, CPU only, llama.cpp b10454
 #
-# macOS (Metal) and Linux keep the existing range; they are not affected.
+# Linux x86-64 uses the matching CPU wheel plus the separately vendored
+# Vulkan set. Pin both to the same wrapper/native ABI. Other architectures
+# retain their source build; no x86 GPU libraries are installed there.
 llama-cpp-python @ https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.35/llama_cpp_python-0.3.35-py3-none-win_amd64.whl ; sys_platform == "win32"
-llama-cpp-python==0.3.* ; sys_platform != "win32"
+llama-cpp-python @ https://github.com/abetlen/llama-cpp-python/releases/download/v0.3.36/llama_cpp_python-0.3.36-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl#sha256=c8a3e98093e950d7a770f794842e36f2db82b2933e8762ed7b5ffd435011e8e4 ; sys_platform == "linux" and platform_machine == "x86_64"
+llama-cpp-python==0.3.* ; sys_platform != "win32" and (sys_platform != "linux" or platform_machine != "x86_64")
 httpx==0.28.*
 psutil==6.1.*
 GPUtil==1.4.*

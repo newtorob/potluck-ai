@@ -3,13 +3,22 @@ import type { HardwareInfo } from '@/hooks/useHardware';
 
 export type ModelFit = 'ok' | 'borderline' | 'insufficient' | 'unknown';
 
+export function inferenceVram(hardware: HardwareInfo): number | null {
+  if (hardware.os.toLowerCase() === 'linux') {
+    return hardware.inference_gpu_available === true
+      ? hardware.inference_gpu_vram_gb ?? null : null;
+  }
+  return hardware.gpu_vram_gb;
+}
+
 /** Catalog requirements are a capacity estimate, not a guarantee about free
  * memory or inference speed. CPU-only machines may run without GPU memory. */
 export function checkModelFit(model: CatalogModel, hardware: HardwareInfo | null): ModelFit {
   if (!hardware) return 'unknown';
   const ram = hardware.ram_total_gb / Math.max(model.min_ram_gb, 1);
-  const vram = hardware.gpu_vram_gb === null || model.min_vram_gb === 0
-    ? 1 : hardware.gpu_vram_gb / model.min_vram_gb;
+  const usableVram = inferenceVram(hardware);
+  const vram = usableVram === null || model.min_vram_gb === 0
+    ? 1 : usableVram / model.min_vram_gb;
   if (ram >= 1 && vram >= 1) return 'ok';
   if (ram >= 0.8 && vram >= 0.8) return 'borderline';
   return 'insufficient';

@@ -408,6 +408,7 @@ def test_a_backend_that_loads_but_has_no_gpu_is_not_used(monkeypatch, tmp_path):
 
 
 def test_the_probe_result_is_cached_and_reused(monkeypatch, tmp_path):
+    monkeypatch.setattr(llama_backend.sys, "platform", "win32")
     pkg = _fake_backend_dir(tmp_path)
     monkeypatch.setattr(llama_backend, "available_backends", lambda: {"vulkan": pkg / "lib-vulkan"})
     calls = []
@@ -426,6 +427,38 @@ def test_the_probe_result_is_cached_and_reused(monkeypatch, tmp_path):
     llama_backend.reset_for_tests()
     assert llama_backend.select_backend().backend == "vulkan"
     assert len(calls) == 1, "the second start should read the cache, not re-probe"
+
+
+def test_linux_reprobes_after_driver_disappears(monkeypatch, tmp_path):
+    monkeypatch.setattr(llama_backend.sys, "platform", "linux")
+    pkg = _fake_backend_dir(tmp_path)
+    monkeypatch.setattr(llama_backend, "available_backends", lambda: {"vulkan": pkg / "lib-vulkan"})
+    monkeypatch.setattr(llama_backend, "run_probe", lambda *a, **k: {
+        "loaded": True, "supports_gpu_offload": True, "devices": [_gpu(7)], "error": None,
+    })
+    assert llama_backend.select_backend().backend == "vulkan"
+    llama_backend.reset_for_tests()
+    monkeypatch.setattr(llama_backend, "run_probe", lambda *a, **k: None)
+    assert llama_backend.select_backend().backend == "cpu"
+    assert llama_backend.LIB_PATH_ENV not in __import__("os").environ
+
+
+def test_linux_finds_the_isolated_wheel_layout(monkeypatch, tmp_path):
+    pkg = tmp_path / "llama_cpp"
+    nested = pkg / "lib-vulkan" / "llama_cpp" / "lib"
+    nested.mkdir(parents=True)
+    (nested / "libllama.so").write_bytes(b"native")
+    monkeypatch.setattr(llama_backend, "llama_cpp_package_dir", lambda: pkg)
+    assert llama_backend.available_backends() == {"vulkan": nested}
+
+
+def test_probe_crashing_after_json_is_not_accepted(monkeypatch, tmp_path):
+    import subprocess
+
+    monkeypatch.setattr(llama_backend.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(
+        a, -11, b'{"loaded": true, "supports_gpu_offload": true}', b"driver crash",
+    ))
+    assert llama_backend.run_probe(tmp_path) is None
 
 
 def test_rebuilding_the_bundle_invalidates_the_cache(monkeypatch, tmp_path):

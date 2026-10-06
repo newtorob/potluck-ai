@@ -31,6 +31,12 @@ if (!/^[a-f0-9]{40,64}$/.test(provenance.source) || typeof provenance.dirty !== 
 const runtime = await realpath(options.runtime);
 const executable = join(runtime, 'potluck-local');
 if (!(await stat(executable)).isFile() || !(await stat(join(runtime, '_internal'))).isDirectory()) throw new Error('Expected a PyInstaller onedir runtime bundle.');
+if (process.platform === 'linux' && process.arch === 'x64') {
+  execFileSync(process.env.PYTHON_BIN || 'python3', [
+    join(root, 'apps/desktop/python/scripts/vendor_gpu_backend.py'),
+    '--check', '--root', join(runtime, '_internal/llama_cpp'),
+  ], { stdio: 'inherit' });
+}
 const splitRoot = join(runtime, '_internal/split-engine');
 const splitPin = JSON.parse(await readFile(join(root, 'apps/desktop/python/potluck_local/data/split-engine.json'), 'utf8'));
 let splitEngine;

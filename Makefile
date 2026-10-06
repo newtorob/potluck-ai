@@ -54,6 +54,7 @@ sidecar-setup: check-python ## Create Python venv for the sidecar and install re
 	@cd apps/desktop/python && $(PYTHON_BIN) -m venv .venv
 	@cd apps/desktop/python && ./.venv/bin/pip install --upgrade pip
 	@cd apps/desktop/python && ./.venv/bin/pip install -r requirements.txt
+	@cd apps/desktop/python && ./.venv/bin/python scripts/vendor_gpu_backend.py
 
 frontend-setup: ## Install frontend node deps
 	@echo "==> Installing frontend deps (apps/desktop/frontend)"
@@ -394,7 +395,7 @@ installer-linux-docker: ## Build .deb + .AppImage for linux/amd64 inside Docker 
 	@rm -rf dist-linux/_src dist-linux/out
 	@mkdir -p dist-linux
 	git clone --local --quiet . dist-linux/_src
-	@echo "==> Running the containerized build (compiles llama-cpp-python from source — slow, especially under emulation)"
+	@echo "==> Running the containerized build with pinned CPU and Vulkan inference libraries"
 	docker run --rm --platform linux/amd64 \
 		-v "$(CURDIR)/dist-linux/_src:/build" \
 		-w /build \

@@ -20,6 +20,9 @@ export interface HardwareInfo {
   ram_available_gb: number;
   gpu_name: string | null;
   gpu_vram_gb: number | null;
+  /** Engine-probed capacity, separate from a detected physical adapter. */
+  inference_gpu_available?: boolean | null;
+  inference_gpu_vram_gb?: number | null;
   recommended_tier: HardwareTier;
 }
 

@@ -86,8 +86,31 @@ def detect_hardware() -> dict[str, object]:
             info["gpu_name"] = "Apple Silicon (detection failed)"
             info["gpu_vram_gb"] = info["ram_total_gb"]
 
-    # Tier recommendation
-    vram = float(info["gpu_vram_gb"]) if info["gpu_vram_gb"] is not None else 0.0
+    # Installed hardware and an inference-capable backend are separate facts.
+    # Vulkan also supplies AMD/Intel device details when nvidia-smi cannot.
+    if platform.system() == "Linux":
+        from potluck_local.services.llama_backend import current_selection, offload_device
+
+        selection = current_selection()
+        verified = selection.probed or selection.backend == "cpu"
+        devices = selection.gpu_devices if selection.backend != "cpu" else []
+        selected = offload_device(devices)
+        info["inference_gpu_available"] = bool(devices) if verified else None
+        info["inference_gpu_vram_gb"] = (
+            round(int(selected[1].get("total_bytes") or 0) / (1024 ** 3), 1)
+            if selected else None
+        )
+        if selected and info["gpu_name"] is None:
+            primary = selected[1]
+            info["gpu_name"] = primary.get("description") or primary.get("name")
+            info["gpu_vram_gb"] = info["inference_gpu_vram_gb"]
+
+    # Linux recommendations use verified inference capacity; the physical
+    # adapter stays visible even when missing drivers force CPU execution.
+    capacity = info["gpu_vram_gb"]
+    if platform.system() == "Linux":
+        capacity = info.get("inference_gpu_vram_gb") if info.get("inference_gpu_available") else None
+    vram = float(capacity) if capacity is not None else 0.0
     ram = float(info["ram_total_gb"])  # type: ignore[arg-type]
 
     if vram >= 24 or (platform.machine() == "arm64" and ram >= 64):

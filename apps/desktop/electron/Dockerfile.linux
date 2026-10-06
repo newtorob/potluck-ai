@@ -54,6 +54,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         dpkg \
         squashfs-tools \
         libarchive-tools \
+        libvulkan1 \
         desktop-file-utils \
         file \
         xz-utils \
@@ -86,5 +87,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && corepack prepare pnpm@10.33.0 --activate
 
 WORKDIR /build
+
+# Vulkan's loader is needed for build-time smoke checks. The application
+# ships its pinned inference libraries, while the target machine supplies
+# its own GPU driver/ICD. Do not package build-host graphics drivers.
 
 CMD ["bash"]

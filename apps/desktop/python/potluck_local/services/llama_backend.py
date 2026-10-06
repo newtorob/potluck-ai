@@ -65,8 +65,9 @@ _GPU_PREFERENCE: tuple[str, ...] = ("vulkan",)
 _PROBE_TIMEOUT_SECONDS = 60.0
 _CACHE_TTL_SECONDS = 7 * 24 * 3600
 
-# ggml_backend_dev_type, from ggml/include/ggml-backend.h.
-_DEV_TYPE = {0: "cpu", 1: "gpu", 2: "accel", 3: "igpu"}
+# ggml_backend_dev_type from the pinned ggml/include/ggml-backend.h.
+# IGPU precedes ACCEL; reversing them hides Intel/AMD integrated graphics.
+_DEV_TYPE = {0: "cpu", 1: "gpu", 2: "igpu", 3: "accel", 4: "meta"}
 
 # Bytes held back for the KV cache and compute buffers. Deliberately generous:
 # a model that spills past the end of VRAM streams its weights over PCIe on
@@ -136,6 +137,11 @@ def available_backends() -> dict[str, Path]:
     found: dict[str, Path] = {}
     for name, dirname in _BACKEND_DIRS.items():
         candidate = pkg / dirname
+        # Linux wheels keep auditwheel's relative dependency layout inside
+        # the backend set, isolated from the CPU wheel's hashed libraries.
+        nested = candidate / "llama_cpp" / "lib"
+        if nested.is_dir():
+            candidate = nested
         if candidate.is_dir() and any(candidate.iterdir()):
             found[name] = candidate
     return found
@@ -294,11 +300,15 @@ def run_probe(lib_dir: Path, *, timeout: float = _PROBE_TIMEOUT_SECONDS) -> dict
         return None
 
     stdout = proc.stdout.decode("utf-8", "replace") if proc.stdout else ""
+    if proc.returncode != 0:
+        logger.warning("llama_backend: probe of %s failed with exit %s", lib_dir, proc.returncode)
+        return None
     for line in reversed(stdout.splitlines()):
         line = line.strip()
         if line.startswith("{"):
             try:
-                return json.loads(line)
+                result = json.loads(line)
+                return result if isinstance(result, dict) else None
             except json.JSONDecodeError:
                 continue
     logger.warning(
@@ -394,8 +404,7 @@ def select_backend(*, force_reprobe: bool = False) -> Selection:
     extras = available_backends()
 
     if not extras:
-        # Every platform except the Windows bundle: one backend set, shipped by
-        # the wheel (Metal on macOS, whatever the Linux build produced).
+        # Metal and custom/developer installs may have only the wheel's set.
         _selection = Selection(
             backend="bundled",
             lib_dir=None,
@@ -404,6 +413,7 @@ def select_backend(*, force_reprobe: bool = False) -> Selection:
         return _selection
 
     if override == "cpu":
+        os.environ.pop(LIB_PATH_ENV, None)
         _selection = Selection(
             backend="cpu",
             lib_dir=None,
@@ -430,7 +440,11 @@ def select_backend(*, force_reprobe: bool = False) -> Selection:
         )
 
     signature = _signature(extras)
-    if not force_reprobe:
+    # Linux drivers and render-device access can change between starts (or
+    # a machine can move between a desktop and a headless session). A stale
+    # successful cache must not let a broken driver crash the main process;
+    # a stale CPU cache must not hide a newly installed driver for a week.
+    if not force_reprobe and sys.platform != "linux":
         cached = _read_cache(signature)
         if cached is not None:
             backend = str(cached.get("backend", "cpu"))
@@ -444,6 +458,7 @@ def select_backend(*, force_reprobe: bool = False) -> Selection:
                     probed=True,
                 )
             else:
+                os.environ.pop(LIB_PATH_ENV, None)
                 _selection = Selection(
                     backend="cpu",
                     lib_dir=None,
@@ -466,7 +481,7 @@ def select_backend(*, force_reprobe: bool = False) -> Selection:
             continue
         devices = list(probe.get("devices") or [])
         gpus = [d for d in devices if d.get("type") in ("gpu", "igpu")]
-        if not probe.get("supports_gpu_offload") or not gpus:
+        if not probe.get("loaded") or not probe.get("supports_gpu_offload") or not gpus:
             logger.info(
                 "llama_backend: %s loaded but reported no GPU device; staying on CPU", name
             )
@@ -486,6 +501,7 @@ def select_backend(*, force_reprobe: bool = False) -> Selection:
         return _selection
 
     _write_cache(signature, "cpu", [])
+    os.environ.pop(LIB_PATH_ENV, None)
     _selection = Selection(
         backend="cpu",
         lib_dir=None,
@@ -649,6 +665,18 @@ def _round_down_ctx(n: int) -> int:
     return (n // 4096) * 4096
 
 
+def offload_device(devices: list[dict]) -> tuple[int, dict] | None:
+    """Prefer a dedicated GPU; integrated graphics is the fallback.
+
+    The index is among ggml's GPU devices, matching llama.cpp's main_gpu.
+    Do not size an NVIDIA load against an Intel iGPU's shared system RAM.
+    """
+    gpus = [d for d in devices if d.get("type") in ("gpu", "igpu")]
+    candidates = [(i, d) for i, d in enumerate(gpus) if d.get("total_bytes")]
+    dedicated = [(i, d) for i, d in candidates if d.get("type") == "gpu"]
+    return max(dedicated or candidates, key=lambda item: int(item[1].get("free_bytes") or 0), default=None)
+
+
 def plan_gpu_layers(
     model_path: str | Path,
     *,
@@ -683,8 +711,8 @@ def plan_gpu_layers(
 
     if devices is None:
         devices = describe_devices()
-    gpus = [d for d in devices if d.get("type") in ("gpu", "igpu") and d.get("total_bytes")]
-    if not gpus:
+    selected = offload_device(devices)
+    if selected is None:
         return OffloadPlan(
             0,
             "no GPU device is available to this build",
@@ -692,7 +720,7 @@ def plan_gpu_layers(
             requested_n_ctx=n_ctx,
         )
 
-    free = max(int(d.get("free_bytes") or 0) for d in gpus)
+    free = int(selected[1].get("free_bytes") or 0)
     try:
         model_bytes = Path(model_path).stat().st_size
     except OSError:

@@ -11,6 +11,7 @@ import { cn } from '@/components/ui/cn';
 import { DownloadProgress } from '@/components/models/DownloadProgress';
 import type { CatalogModel, ModelTier } from '@/stores/modelStore';
 import type { HardwareInfo } from '@/hooks/useHardware';
+import { inferenceVram } from '@/lib/modelFit';
 import type { DownloadProgressRecord } from '@/stores/modelStore';
 
 // ---------------------------------------------------------------------------
@@ -45,12 +46,13 @@ type Sufficiency = 'ok' | 'borderline' | 'insufficient';
 function getSufficiency(model: CatalogModel, hardware: HardwareInfo | null): Sufficiency {
   if (!hardware) return 'ok'; // assume ok when hardware unknown
   const ramOk = hardware.ram_total_gb >= model.min_ram_gb;
+  const usableVram = inferenceVram(hardware);
   const vramOk =
-    hardware.gpu_vram_gb === null || hardware.gpu_vram_gb >= model.min_vram_gb;
+    usableVram === null || usableVram >= model.min_vram_gb;
   if (ramOk && vramOk) return 'ok';
   const ramBorder = hardware.ram_total_gb >= model.min_ram_gb * 0.8;
   const vramBorder =
-    hardware.gpu_vram_gb === null || hardware.gpu_vram_gb >= model.min_vram_gb * 0.8;
+    usableVram === null || usableVram >= model.min_vram_gb * 0.8;
   if (ramBorder && vramBorder) return 'borderline';
   return 'insufficient';
 }

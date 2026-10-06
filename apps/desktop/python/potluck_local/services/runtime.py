@@ -41,8 +41,9 @@ _BUFFER_RE = re.compile(r"load_tensors:\s+(\S+) model buffer size =\s+([\d.]+) M
 _KV_RE = re.compile(r"(\S+) KV buffer size =\s+([\d.]+) MiB")
 _COMPUTE_RE = re.compile(r"(\S+) compute buffer size =\s+([\d.]+) MiB")
 
-# Ring buffer of llama.cpp log lines, so a load report can be built after the
-# fact without leaving a callback that swallows the library's own logging.
+# Keep placement evidence separately from verbose tensor/scheduler messages.
+# Native 0.3.36 emits thousands of those after allocating the weights, which
+# would evict the evidence from a ring containing every log line.
 _LOG_LINES: deque[str] = deque(maxlen=400)
 _LOG_CALLBACK = None  # keeps the ctypes trampoline alive for the process
 
@@ -75,7 +76,8 @@ def _install_log_capture() -> None:
             decoded = text.decode("utf-8", "replace") if text else ""
         except Exception:  # noqa: BLE001
             return
-        _LOG_LINES.append(decoded)
+        if any(pattern.search(decoded) for pattern in (_OFFLOAD_RE, _BUFFER_RE, _KV_RE, _COMPUTE_RE)):
+            _LOG_LINES.append(decoded)
         if _lib_logger is not None:
             mapped = _LEVELS.get(level)
             if mapped is not None and _lib_logger.level <= mapped:
@@ -316,15 +318,24 @@ class LLMRuntime:
             requested_gpu_layers = n_gpu_layers
             requested_n_ctx = n_ctx
             plan = None
-            if selection.probed and selection.backend != "cpu":
+            selected_device = None
+            if selection.backend == "cpu":
+                plan = llama_backend.OffloadPlan(
+                    0, selection.reason, n_ctx=n_ctx, requested_n_ctx=n_ctx,
+                )
+                n_gpu_layers = 0
+            elif selection.probed:
                 # A backend this module selected after a probe: size the offload
                 # against VRAM that is free right now. Everywhere else (macOS
-                # Metal, the Linux build) keeps the caller's value untouched.
+                # Metal, custom builds) keeps the caller's value untouched.
+                devices = llama_backend.describe_devices()
+                if not rpc_servers:
+                    selected_device = llama_backend.offload_device(devices)
                 plan = llama_backend.plan_gpu_layers(
                     model_path,
                     requested=n_gpu_layers,
                     n_ctx=n_ctx,
-                    devices=llama_backend.describe_devices(),
+                    devices=devices,
                 )
                 n_gpu_layers = plan.n_gpu_layers
                 if plan.n_ctx and plan.n_ctx != n_ctx:
@@ -349,6 +360,14 @@ class LLMRuntime:
                 "n_threads": effective_threads,
                 "verbose": False,
             }
+            if selected_device is not None:
+                from llama_cpp import LLAMA_SPLIT_MODE_NONE
+
+                # Size and execute on the same device. llama.cpp's default
+                # layer split could otherwise place weights on an iGPU based
+                # on its much larger shared-memory figure.
+                kwargs["split_mode"] = LLAMA_SPLIT_MODE_NONE
+                kwargs["main_gpu"] = selected_device[0]
             if rpc_servers:
                 # Only thread the param through when set — keeps the call
                 # backwards-compatible with stock (non-Potluck-patched)
@@ -392,6 +411,7 @@ class LLMRuntime:
                 "requested_n_ctx": requested_n_ctx,
                 "used_n_ctx": n_ctx,
                 "offload_plan": plan.as_dict() if plan else None,
+                "offload_device": selected_device[1] if selected_device else None,
                 **load_log,
             }
             # Register after Llama() so our atexit runs before ggml-metal's

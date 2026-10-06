@@ -8,6 +8,11 @@ things 0.1.3 had while running entirely on the CPU.
 
 from __future__ import annotations
 
+from collections import deque
+import sys
+from types import SimpleNamespace
+
+from potluck_local.services import runtime as runtime_module
 from potluck_local.services.runtime import LLMRuntime, _parse_load_log
 
 VULKAN_LOG = [
@@ -53,6 +58,32 @@ def _report(lines: list[str], devices: list[dict] | None = None) -> dict:
 # ---------------------------------------------------------------------------
 # Log parsing
 # ---------------------------------------------------------------------------
+
+
+def test_native_verbose_logs_do_not_evict_execution_evidence(monkeypatch):
+    callbacks = []
+    monkeypatch.setattr(runtime_module, "_LOG_CALLBACK", None)
+    monkeypatch.setattr(runtime_module, "_LOG_LINES", deque(maxlen=400))
+    monkeypatch.setitem(sys.modules, "llama_cpp", SimpleNamespace(
+        llama_log_callback=lambda callback: callback,
+        llama_log_set=lambda callback, _: callbacks.append(callback),
+    ))
+    runtime_module._install_log_capture()
+    callback = callbacks[0]
+    for line in VULKAN_LOG[:5]:
+        callback(0, line.encode(), None)
+    # Reproduces the native 0.3.36 scheduler chatter between weight allocation
+    # and final compute-buffer allocation on Linux.
+    for _ in range(3000):
+        callback(0, b"sched_reserve: reserving graph for token batch\n", None)
+    for line in VULKAN_LOG[5:]:
+        callback(0, line.encode(), None)
+    report = _report(list(runtime_module._LOG_LINES))
+    summary = _runtime(report).inference_summary()
+    assert summary["execution_verified"] is True
+    assert summary["backend"] == "vulkan"
+    assert report["offloaded_layers"] == 33
+    assert report["kv_buffer_mib"] == {"Vulkan0": 256.0}
 
 
 def test_parses_offloaded_layers_and_buffers():
