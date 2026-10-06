@@ -51,6 +51,18 @@ describe("standalone installer", () => {
 });
 
 describe("Homebrew release metadata", () => {
+  it("keeps independent platform versions next to their verified archives", async () => {
+    const mac = join(directory, 'mac.json');
+    const linux = join(directory, 'linux.json');
+    const output = join(directory, 'potluck.rb');
+    for (const [path, platform, arch, version] of [[mac, 'darwin', 'arm64', '0.1.6'], [linux, 'linux', 'x64', '0.1.7']]) {
+      await writeFile(path!, JSON.stringify({ schemaVersion: 1, version, platform, arch,
+        url: `https://releases.trypotluck.ai/cli/${version}/potluck-${platform}.tar.gz`, sha256: 'a'.repeat(64) }));
+    }
+    await exec(process.execPath, ['scripts/generate-homebrew.mjs', output, mac, linux]);
+    const formula = await readFile(output, 'utf8');
+    expect(formula).toMatch(/on_macos do[\s\S]*?version "0.1.6"[\s\S]*?on_linux do[\s\S]*?version "0.1.7"/);
+  });
   it("refuses fake checksums and inconsistent architecture metadata", async () => {
     const artifact = join(directory, 'artifact.json');
     await writeFile(artifact, JSON.stringify({ schemaVersion: 1, version: '1.0.0', platform: 'darwin', arch: 'arm64', url: 'https://releases.trypotluck.ai/cli/test.tar.gz', sha256: 'TODO' }));
