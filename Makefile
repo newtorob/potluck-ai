@@ -401,6 +401,7 @@ installer-linux-docker: ## Build .deb + .AppImage for linux/amd64 inside Docker 
 		-w /build \
 		$(DOCKER_LINUX_IMAGE) \
 		bash -c 'set -euo pipefail; \
+			git config --global --add safe.directory /build; \
 			make sidecar-setup PYTHON_BIN=python3.11; \
 			make frontend-setup; \
 			make electron-setup; \
