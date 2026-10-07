@@ -249,6 +249,52 @@ async def remove_circle_member(
 
 
 # ---------------------------------------------------------------------------
+# What a circle can run right now
+# ---------------------------------------------------------------------------
+
+
+class CircleModelOut(BaseModel):
+    slug: str
+    machines: int
+
+
+class CircleAvailabilityOut(BaseModel):
+    circle_id: uuid.UUID
+    models: list[CircleModelOut]
+
+
+@router.get(
+    "/me/circles/{circle_id}/availability",
+    response_model=CircleAvailabilityOut,
+)
+async def circle_availability(
+    circle_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    member_id: uuid.UUID = Depends(resolve_session_member_id),
+) -> CircleAvailabilityOut:
+    """The models the caller's circle can answer with at this moment, and how
+    many of its machines offer each. An empty list means no machine in the
+    circle is online and sharing. 404 if the circle is not the caller's.
+
+    Privacy: counts per model only. No machine, member or key is named.
+    """
+    from coordinator.services.peer_registry import circle_model_availability
+
+    await _get_own_circle(db, circle_id, member_id)
+    pubkeys = {
+        row[0] for row in (await db.execute(
+            select(CircleMember.member_pubkey).where(CircleMember.circle_id == circle_id)
+        )).all()
+    }
+    counts = await circle_model_availability(db, pubkeys)
+    models = [
+        CircleModelOut(slug=slug, machines=n)
+        for slug, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
+    return CircleAvailabilityOut(circle_id=circle_id, models=models)
+
+
+# ---------------------------------------------------------------------------
 # Own-identity disclosure — "your key to share"
 # ---------------------------------------------------------------------------
 

@@ -25,7 +25,8 @@ import { reconcileCircleSelection, useChatStore } from '@/stores/chatStore';
 import type { RoutingScope } from '@/stores/chatStore';
 import { useMeshStore } from '@/stores/meshStore';
 import { localApi } from '@/lib/localApi';
-import type { Circle } from '@/lib/localApi';
+import type { Circle, CircleModel } from '@/lib/localApi';
+import { circleModelLabel, pickCircleModel } from '@/lib/circleModels';
 import { PotluckLogo } from '@/components/brand/PotluckLogo';
 
 // ---------------------------------------------------------------------------
@@ -161,6 +162,10 @@ export function ChatView() {
               activeCircleId={activeCircleId}
               onCircleChange={setActiveCircleId}
             />
+
+            {routingScope === 'circle' && activeCircleId !== null && (
+              <CircleModelPicker circleId={activeCircleId} disabled={isStreaming} />
+            )}
 
             <details
               className="relative"
@@ -519,6 +524,87 @@ function ScopeSelector({
       />
     )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CircleModelPicker — the models the chosen circle can run right now
+// ---------------------------------------------------------------------------
+
+const CIRCLE_MODELS_REFRESH_MS = 20_000;
+
+/** A circle request names a model, and only a machine offering exactly that
+ *  model can answer. This asks the coordinator what the circle offers now,
+ *  moves the request onto one of those, and lets the user choose between
+ *  them. Counts only: it never says whose machine it is. */
+function CircleModelPicker({ circleId, disabled }: { circleId: string; disabled: boolean }) {
+  const networkModelSlug = useChatStore((s) => s.networkModelSlug);
+  const setNetworkModelSlug = useChatStore((s) => s.setNetworkModelSlug);
+  const [models, setModels] = useState<CircleModel[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setModels(null);
+    setFailed(false);
+    const load = () => {
+      localApi.circles
+        .availability(circleId)
+        .then((res) => {
+          if (cancelled) return;
+          setModels(res.models);
+          setFailed(false);
+        })
+        .catch(() => {
+          if (!cancelled) setFailed(true);
+        });
+    };
+    load();
+    const timer = window.setInterval(load, CIRCLE_MODELS_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [circleId]);
+
+  // Keep the request on a model the circle has.
+  useEffect(() => {
+    if (!models) return;
+    const next = pickCircleModel(networkModelSlug, models);
+    if (next !== null && next !== networkModelSlug) setNetworkModelSlug(next);
+  }, [models, networkModelSlug, setNetworkModelSlug]);
+
+  if (models === null) {
+    return (
+      <span className="text-xs text-muted-foreground">
+        {failed ? 'Could not check what this circle can run.' : 'Checking the circle…'}
+      </span>
+    );
+  }
+  if (models.length === 0) {
+    return (
+      <span className="text-xs text-muted-foreground">
+        No machine in this circle is sharing a model right now.
+      </span>
+    );
+  }
+  return (
+    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <span>Circle model</span>
+      <select
+        aria-label="Model this circle will answer with"
+        className="h-8 max-w-[16rem] rounded-md border border-border bg-background px-2 text-xs text-foreground disabled:opacity-60"
+        value={pickCircleModel(networkModelSlug, models) ?? ''}
+        disabled={disabled}
+        onChange={(e) => setNetworkModelSlug(e.target.value)}
+      >
+        {models.map((m) => (
+          <option key={m.slug} value={m.slug}>
+            {circleModelLabel(m)}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

@@ -397,6 +397,18 @@ export interface Circle {
   members: CircleMember[];
 }
 
+/** One model a circle can answer with now, and how many of its machines offer it. */
+export interface CircleModel {
+  slug: string;
+  machines: number;
+}
+
+/** Response from GET /me/circles/{id}/availability. Counts only; no machine or member is named. */
+export interface CircleAvailability {
+  circle_id: string;
+  models: CircleModel[];
+}
+
 /** Response from GET /me/circles. */
 export interface ListCirclesResponse {
   circles: Circle[];
@@ -1521,6 +1533,14 @@ export const localApi = {
         `/me/circles/${encodeURIComponent(circleId)}/members`,
         { member_pubkey: memberPubkey },
       ).then((r) => fromSessionResult<CircleMember>(r));
+    },
+
+    /** GET /me/circles/{circle_id}/availability — models the circle can run right now. */
+    availability(circleId: string): Promise<CircleAvailability> {
+      return coordinatorSessionRequest(
+        'GET',
+        `/me/circles/${encodeURIComponent(circleId)}/availability`,
+      ).then((r) => fromSessionResult<CircleAvailability>(r));
     },
 
     /** DELETE /me/circles/{circle_id}/members/{member_pubkey} — remove a member. */

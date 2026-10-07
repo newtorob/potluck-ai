@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 
 from coordinator.services.peer_registry import (
     PeerConnection,
+    circle_model_availability,
     honoured_audiences,
     register_peer,
     select_peer_for_request,
@@ -132,3 +133,60 @@ def test_attestation_audiences_are_echoed_and_bound_to_the_connection(
                 assert (conn.serves_circle, conn.serves_pool) == (circle, pool)
         finally:
             client.portal.call(lambda: _cleanup(pubkeys=[_pubkey(priv)]))
+
+
+# ---- what a circle can run right now ----------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_circle_availability_counts_machines_that_would_be_dispatched_to(session_factory) -> None:
+    friend, friend_key, friend_peer, model = await _online(session_factory, serves_pool=False)
+    _, pool_only_key, pool_only_peer, pool_model = await _online(session_factory, serves_circle=False)
+    _, outsider_key, outsider_peer, outsider_model = await _online(session_factory)
+    try:
+        async with session_factory.factory() as db:
+            got = await circle_model_availability(db, {friend_key, pool_only_key, "typo-key"})
+            assert got == {model: 1}, "only members who are online and sharing with circles"
+            assert await circle_model_availability(db, set()) == {}
+            assert await circle_model_availability(db, {"nobody"}) == {}
+        await unregister_peer(friend_peer)
+        async with session_factory.factory() as db:
+            assert await circle_model_availability(db, {friend_key}) == {}, "offline is not available"
+    finally:
+        for pid in (friend_peer, pool_only_peer, outsider_peer):
+            await unregister_peer(pid)
+
+
+@pytest.mark.asyncio
+async def test_circle_availability_endpoint_is_owner_only_and_names_no_one(session_factory) -> None:
+    from fastapi import HTTPException
+
+    from coordinator.models.circle import CircleMember, TrustedCircle
+    from coordinator.routers.circles import circle_availability
+
+    owner, stranger = uuid.uuid4(), uuid.uuid4()
+    _, friend_key, friend_peer, model = await _online(session_factory)
+    try:
+        async with session_factory.factory() as db:
+            circle = TrustedCircle(owner_member_id=owner, name=f"avail-{uuid.uuid4().hex[:6]}")
+            db.add(circle)
+            await db.flush()
+            db.add(CircleMember(circle_id=circle.id, member_pubkey=friend_key))
+            await db.commit()
+            circle_id = circle.id
+        try:
+            async with session_factory.factory() as db:
+                out = await circle_availability(circle_id, db=db, member_id=owner)
+                assert out.model_dump(mode="json") == {
+                    "circle_id": str(circle_id), "models": [{"slug": model, "machines": 1}],
+                }
+            async with session_factory.factory() as db:
+                with pytest.raises(HTTPException) as exc:
+                    await circle_availability(circle_id, db=db, member_id=stranger)
+                assert exc.value.status_code == 404
+        finally:
+            async with session_factory.factory() as db:
+                await db.delete(await db.get(TrustedCircle, circle_id))
+                await db.commit()
+    finally:
+        await unregister_peer(friend_peer)

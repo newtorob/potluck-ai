@@ -720,6 +720,41 @@ async def online_peer_ids() -> list[uuid.UUID]:
         return list(_peers.keys())
 
 
+async def circle_model_availability(db, circle_member_pubkeys: set[str]) -> dict[str, int]:
+    """model_slug -> how many machines in a circle are online and offering it.
+
+    Counts only: the machines are those of the circle's members that are
+    connected and agreed to serve circles, the same set a circle job can be
+    dispatched to. Nothing here says whose machine it is.
+    """
+    from sqlalchemy import func, select
+    from coordinator.models import PeerCapability
+    from coordinator.models.member_key import MemberKey
+
+    if not circle_member_pubkeys:
+        return {}
+    member_ids = {
+        row[0] for row in (await db.execute(
+            select(MemberKey.member_id).where(MemberKey.public_key.in_(circle_member_pubkeys))
+        )).all()
+    }
+    if not member_ids:
+        return {}
+    async with _lock:
+        peer_ids = [
+            pid for pid, conn in _peers.items()
+            if conn.member_id in member_ids and conn.serves_circle
+        ]
+    if not peer_ids:
+        return {}
+    rows = (await db.execute(
+        select(PeerCapability.model_slug, func.count(func.distinct(PeerCapability.peer_id)))
+        .where(PeerCapability.peer_id.in_(peer_ids))
+        .group_by(PeerCapability.model_slug)
+    )).all()
+    return {slug: int(count) for slug, count in rows}
+
+
 async def online_peer_sessions() -> dict[uuid.UUID, uuid.UUID]:
     """Snapshot of peer_id -> session_id for every currently-connected peer.
 

@@ -1782,6 +1782,7 @@ const COORDINATOR_CIRCLE_ID_RE = /^[0-9a-f-]{36}$/i;
 const COORDINATOR_PUBKEY_RE = /^[A-Za-z0-9_-]{1,512}$/;
 const COORDINATOR_SESSION_DYNAMIC_ROUTES = [
   { method: 'DELETE', pattern: /^\/me\/circles\/([^/]+)$/ },
+  { method: 'GET', pattern: /^\/me\/circles\/([^/]+)\/availability$/ },
   { method: 'POST', pattern: /^\/me\/circles\/([^/]+)\/members$/ },
   { method: 'DELETE', pattern: /^\/me\/circles\/([^/]+)\/members\/([^/]+)$/ },
   // Member removes a (stale/ghost) machine from their own household.
