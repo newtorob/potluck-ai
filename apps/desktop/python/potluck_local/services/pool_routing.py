@@ -176,6 +176,20 @@ def _pool_multiturn_enabled() -> bool:
         return False
 
 
+def refusal_message(exc: "PoolDispatchError", scope: str, model: str) -> str:
+    """What to tell the caller when the coordinator turned a request away
+    before any answer started. The coordinator's own detail is written for
+    API clients ("...or use scope=pool"); a circle request gets plain words."""
+    if exc.status_code == 401:
+        return "Your sign-in has expired. Sign in again to use the network."
+    if scope == _CIRCLE_SCOPE:
+        if exc.status_code == 503:
+            return f"No machine in this circle is offering {model} right now."
+        if exc.status_code == 404:
+            return "That trusted circle no longer exists."
+    return exc.detail
+
+
 def last_user_prompt(messages: list[dict]) -> str:
     """The latest user message content — the only thing we send to the pool.
 

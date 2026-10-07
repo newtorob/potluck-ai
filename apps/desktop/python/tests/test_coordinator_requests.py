@@ -176,3 +176,61 @@ def test_signed_out_and_expired_are_401(monkeypatch) -> None:
     monkeypatch.setattr(pr, "_member_session_token", lambda: None)
     err = _fail(CIRCLE_A)
     assert err.status_code == 401 and "Sign in" in err.detail
+
+
+# ---- a request the coordinator turns away -----------------------------------
+
+
+@pytest.mark.parametrize("status,scope,expected", [
+    (503, "circle", "No machine in this circle is offering test-model right now."),
+    (404, "circle", "That trusted circle no longer exists."),
+    (401, "circle", "Your sign-in has expired. Sign in again to use the network."),
+    (401, "pool", "Your sign-in has expired. Sign in again to use the network."),
+    (503, "pool", "No online peer serves model 'test-model'."),
+    (500, "circle", "boom"),
+])
+def test_refusals_get_plain_words_for_a_circle(status, scope, expected) -> None:
+    detail = {503: "No online peer serves model 'test-model'.", 404: "circle not found",
+              401: "Session expired or invalid", 500: "boom"}[status]
+    exc = pr.PoolDispatchError(status, json.dumps({"detail": detail}))
+    assert pr.refusal_message(exc, scope, "test-model") == expected
+
+
+def test_stream_reports_a_refusal_as_a_refusal(monkeypatch) -> None:
+    """The response has already started when the coordinator says no, so the
+    reason has to travel inside the stream, marked as a refusal."""
+    from fastapi.testclient import TestClient
+
+    import potluck_local.services.settings_manager as sm
+    from unittest.mock import MagicMock
+
+    settings = MagicMock()
+    settings.gateway.enabled = False
+    settings.gateway.api_key = None
+    settings.network.coordinator_url = None
+    monkeypatch.setattr(sm, "get_settings", lambda: settings)
+
+    class NoModel:
+        def is_loaded(self): return False
+        def current_model_id(self): return None
+
+    async def resolve(selector):
+        return CIRCLE_A
+
+    async def refuse(*a, **kw):
+        raise pr.PoolDispatchError(503, json.dumps({"detail": "No machine in this circle is online. Use scope=pool."}))
+        yield  # pragma: no cover
+
+    monkeypatch.setattr("potluck_local.routers.gateway.get_runtime", lambda: NoModel())
+    monkeypatch.setattr(pr, "resolve_circle_id", resolve)
+    monkeypatch.setattr(pr, "stream_pool_openai", refuse)
+    from potluck_local.app import create_app
+
+    client = TestClient(create_app(), client=("127.0.0.1", 50000), raise_server_exceptions=False)
+    resp = client.post("/v1/chat/completions", headers={"X-Potluck-Scope": "circle"},
+                       json={"model": "test-model", "stream": True, "messages": [{"role": "user", "content": "hi"}]})
+    assert resp.status_code == 200
+    frames = [json.loads(line[5:]) for line in resp.text.splitlines() if line.startswith("data:") and "[DONE]" not in line]
+    assert frames == [{"error": {"message": "No machine in this circle is offering test-model right now.",
+                                 "type": "routing_refused", "code": "refused", "status": 503}}]
+    assert "scope=pool" not in resp.text

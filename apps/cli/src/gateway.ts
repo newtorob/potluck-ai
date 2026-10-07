@@ -42,7 +42,7 @@ interface ModelsResponse {
 
 interface ChatChunk {
   choices?: Array<{ delta?: { content?: string } }>;
-  error?: { message?: string };
+  error?: { message?: string; code?: string; status?: number };
 }
 
 function authHeaders(cfg: GatewayConfig): Record<string, string> {
@@ -175,6 +175,12 @@ export async function* streamChat(
             continue; // skip a partial/garbled frame rather than crash
           }
           if (chunk.error) {
+            // The gateway turned the request away before any answer started
+            // (no machine offering the model, an expired sign-in). That is a
+            // refusal with a reason to show, not a failed generation.
+            if (chunk.error.code === "refused" && typeof chunk.error.message === "string") {
+              throw new GatewayRefusedError(Number(chunk.error.status) || 503, JSON.stringify({ detail: chunk.error.message }));
+            }
             throw new Error(chunk.error.message ?? "gateway inference error");
           }
           const delta = chunk.choices?.[0]?.delta?.content;

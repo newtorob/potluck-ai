@@ -37,7 +37,7 @@ import websockets
 from potluck_local.contributor import client as contributor_client
 from potluck_local.contributor.config import Settings as ContributorSettings
 from potluck_local.contributor.config import get_settings as get_contributor_settings
-from potluck_local.contributor.keys import ensure_keypair
+from potluck_local.contributor.keys import ensure_keypair, public_key_b64
 from potluck_local.contributor.release import frozen_bundle_dir, resolve_binary_hash
 from potluck_local.contributor.schemas import (
     CapabilityEntry,
@@ -193,6 +193,7 @@ class ContributorService:
         self._task: asyncio.Task | None = None
         self._stop: asyncio.Event | None = None
         self._session_token: str | None = None
+        self._key_registration_tried = False
         self._running_key: tuple[str, int, tuple[str, ...]] | None = None
         self._status = ContributorStatus()
         self._lock = asyncio.Lock()
@@ -219,6 +220,8 @@ class ContributorService:
         connect, so a token that arrives while the loop is backing off after
         an unauthorized reject is used on the next attempt."""
         self._session_token = token.strip() if token else None
+        # A different sign-in is a different member to register the key for.
+        self._key_registration_tried = False
         if self._session_token is None:
             logger.info("contributor_member_session_cleared")
         else:
@@ -449,6 +452,8 @@ class ContributorService:
             st.last_error_detail = reason[:200]
             st.peer_id = None
             st.connected_since = None
+            if st.last_error == "device_key_not_registered":
+                self._schedule_key_registration()
         elif event == "disconnected":
             if st.state == "connected":
                 st.reconnects += 1
@@ -466,6 +471,48 @@ class ContributorService:
         elif event == "stopped":
             st.state = "stopped"
             st.jobs_in_flight = 0
+
+    def _schedule_key_registration(self) -> None:
+        """The coordinator does not know this machine yet. The desktop app
+        registers the key when sharing is switched on, but a machine run from
+        the CLI has nothing to do that, so the engine does it once per
+        sign-in. The loop's next retry then attests normally."""
+        if self._key_registration_tried or not self._session_token:
+            return
+        self._key_registration_tried = True
+        try:
+            asyncio.get_running_loop().create_task(
+                self._register_device_key(), name="potluck-contributor-register-key"
+            )
+        except RuntimeError:  # no running loop (called from sync code in tests)
+            self._key_registration_tried = False
+
+    async def _register_device_key(self) -> None:
+        import socket
+
+        import httpx
+
+        from potluck_local.services import pool_routing
+
+        try:
+            base = pool_routing.coordinator_http_base()
+            token = self._session_token
+            if not token or not pool_routing._session_may_travel(base):
+                return
+            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
+            settings = self._last_settings or get_contributor_settings()
+            key = public_key_b64(ensure_keypair(settings.key_dir).public_key())
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    f"{base}/me/device-keys",
+                    json={"public_key": key, "label": socket.gethostname()[:64] or None},
+                    headers={**headers, "Accept": "application/json"},
+                )
+            # 201: registered. 409: already registered, to this member or
+            # another; the next attestation says which. Never log the key.
+            logger.info("contributor_device_key_registration status=%d", resp.status_code)
+        except Exception:  # noqa: BLE001
+            logger.warning("contributor_device_key_registration_failed", exc_info=True)
 
     def _served_scope(self) -> str:
         """What a job served for someone else counts as. The wire does not

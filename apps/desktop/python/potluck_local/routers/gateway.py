@@ -291,6 +291,13 @@ async def chat_completions_openai(
                 # disconnect aclose()s this generator (GeneratorExit), and
                 # yielding during that raises and can wedge the stream.
                 yield "data: [DONE]\n\n"
+            except pool_routing.PoolDispatchError as exc:
+                # Turned away before any answer started: say why, as a
+                # refusal the caller can show, not an inference failure.
+                refusal = {"message": pool_routing.refusal_message(exc, coordinator_scope, served_model),
+                           "type": "routing_refused", "code": "refused", "status": exc.status_code}
+                yield f'data: {json.dumps({"error": refusal})}\n\n'
+                yield "data: [DONE]\n\n"
             except Exception as exc:  # noqa: BLE001
                 logger.exception("gateway_stream_failed")
                 yield f'data: {json.dumps({"error": {"message": str(exc), "type": "inference_error", "code": getattr(exc, "category", "inference_error")}})}\n\n'
@@ -329,7 +336,7 @@ async def chat_completions_openai(
         # "no peer serves this model" — same condition as a local 404); any other
         # upstream failure is a bad-gateway (502).
         status = exc.status_code if exc.status_code in (401, 404, 503) else 502
-        raise HTTPException(status_code=status, detail=exc.detail)
+        raise HTTPException(status_code=status, detail=pool_routing.refusal_message(exc, coordinator_scope, served_model))
     except Exception as exc:  # noqa: BLE001
         logger.exception("gateway_chat_failed")
         raise HTTPException(status_code=500, detail=f"inference failed: {type(exc).__name__}")
@@ -503,6 +510,13 @@ async def text_completions(
                 }
                 yield f"data: {json.dumps(finish_chunk)}\n\n"
                 yield "data: [DONE]\n\n"
+            except pool_routing.PoolDispatchError as exc:
+                # Turned away before any answer started: say why, as a
+                # refusal the caller can show, not an inference failure.
+                refusal = {"message": pool_routing.refusal_message(exc, coordinator_scope, served_model),
+                           "type": "routing_refused", "code": "refused", "status": exc.status_code}
+                yield f'data: {json.dumps({"error": refusal})}\n\n'
+                yield "data: [DONE]\n\n"
             except Exception as exc:  # noqa: BLE001
                 logger.exception("gateway_completions_stream_failed")
                 yield f'data: {json.dumps({"error": {"message": str(exc), "type": "inference_error", "code": getattr(exc, "category", "inference_error")}})}\n\n'
@@ -538,7 +552,7 @@ async def text_completions(
         raise HTTPException(status_code=502, detail={"code": exc.category, "message": str(exc)}) from exc
     except pool_routing.PoolDispatchError as exc:
         status = exc.status_code if exc.status_code in (401, 404, 503) else 502
-        raise HTTPException(status_code=status, detail=exc.detail)
+        raise HTTPException(status_code=status, detail=pool_routing.refusal_message(exc, coordinator_scope, served_model))
     except Exception as exc:  # noqa: BLE001
         logger.exception("gateway_completions_failed")
         raise HTTPException(status_code=500, detail=f"inference failed: {type(exc).__name__}")

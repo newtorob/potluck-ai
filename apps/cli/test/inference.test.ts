@@ -8,7 +8,7 @@ import { afterEach, beforeEach, expect, it } from "vitest";
 import { readPrompt } from "../src/inference.js";
 import { parseArgs } from "../src/args.js";
 let directory: string, server: Server, url: string;
-let mode: "ok" | "truncated" | "slow" | "old" | "refused";
+let mode: "ok" | "truncated" | "slow" | "old" | "refused" | "refused-in-stream";
 let requests: Array<any>;
 const hash = "a".repeat(64);
 const entry = resolve("dist/index.js");
@@ -22,6 +22,7 @@ beforeEach(async () => {
     if (mode === "slow") return;
     if (mode === "refused") { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ detail: "Choose a trusted circle with X-Potluck-Circle. Yours: 'Friends', 'Work'." })); return; }
     res.writeHead(200, { "Content-Type": "text/event-stream", "X-Potluck-Model-Lock": "1", "X-Potluck-Model-SHA256": hash });
+    if (mode === "refused-in-stream") { res.end('data: {"error":{"message":"No machine in this circle is offering circle-model right now.","type":"routing_refused","code":"refused","status":503}}\n\ndata: [DONE]\n\n'); return; }
     res.write('data: {"choices":[{"delta":{"content":"hello"}}]}\r');
     res.write('\n\r\n');
     res.end(mode === "truncated" ? "" : "data: [DONE]\r\n\r\n");
@@ -82,6 +83,12 @@ it("sends a single prompt to a named trusted circle and reports the gateway's re
   expect(refused.code).toBe(1);
   expect(refused.stderr).toContain("Choose a trusted circle");
   expect(refused.stderr).not.toContain("never-echo");
+  // A stream has already started (HTTP 200) when the coordinator turns the
+  // request away, so the reason arrives as a refusal frame.
+  mode = "refused-in-stream";
+  const none = await run(["hi", "--scope", "circle", "--model", "circle-model"]);
+  expect(none.code).toBe(1);
+  expect(none.stderr).toContain("No machine in this circle is offering circle-model right now.");
 });
 it("keeps a locked project and other commands off circles", async () => {
   const locked = await run(["hi", "--scope", "circle", "--json"]);

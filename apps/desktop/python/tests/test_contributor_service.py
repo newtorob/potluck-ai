@@ -293,6 +293,56 @@ async def test_changing_who_the_machine_serves_reconnects(monkeypatch, tmp_path)
     assert not svc.is_running and svc.status()["state"] == "disabled"
 
 
+@run_async
+async def test_engine_registers_its_machine_key_once_when_the_coordinator_does_not_know_it(monkeypatch, tmp_path):
+    """A machine run from the CLI has no app to register its key, so the
+    engine does it when it is turned away for that reason."""
+    import httpx
+
+    from potluck_local.services import pool_routing
+
+    posts: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        posts.append(request)
+        return httpx.Response(201, json={})
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(handler), **kw))
+    monkeypatch.setattr(pool_routing, "coordinator_http_base", lambda: "https://coord.example")
+    svc = _service(monkeypatch=monkeypatch, tmp_path=tmp_path)
+    reason = "peer_public_key is not registered for any member"
+
+    svc._on_state("rejected", reason=reason)          # not signed in: nothing to register for
+    await asyncio.sleep(0.05)
+    assert posts == []
+
+    svc.set_member_session("sess-abc")
+    svc._on_state("rejected", reason=reason)
+    svc._on_state("rejected", reason=reason)          # the retry must not register again
+    await asyncio.sleep(0.1)
+    assert len(posts) == 1
+    assert posts[0].url.path == "/me/device-keys"
+    assert posts[0].headers["authorization"] == "Bearer sess-abc"
+    body = json.loads(posts[0].content)
+    assert body["public_key"] == svc_public_key(tmp_path)
+
+    svc._on_state("rejected", reason="unauthorized")  # other refusals never register a key
+    await asyncio.sleep(0.05)
+    assert len(posts) == 1
+
+    svc.set_member_session("sess-other")              # a new sign-in may need it again
+    svc._on_state("rejected", reason=reason)
+    await asyncio.sleep(0.1)
+    assert len(posts) == 2
+
+
+def svc_public_key(tmp_path) -> str:
+    from potluck_local.contributor.keys import ensure_keypair, public_key_b64
+
+    return public_key_b64(ensure_keypair(tmp_path / "keys").public_key())
+
+
 def test_work_served_by_a_circle_only_machine_is_counted_as_circle_work():
     svc = cs.ContributorService()
     assert svc._served_scope() == "pool", "unknown audience keeps the old label"
