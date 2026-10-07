@@ -246,6 +246,9 @@ export interface PrivacySettings {
 
 export interface NetworkSettings {
   contributor_mode: boolean;
+  /** Who else the machine answers while the toggle is on. Absent or null:
+   *  not chosen, which keeps what the build did before the choice existed. */
+  contributor_audience?: 'mine' | 'circles' | 'everyone' | null;
   /** Coordinator jobs this machine serves at once; the contributor loop
    *  declines beyond it and heartbeats carry it. */
   max_concurrent_jobs: number;

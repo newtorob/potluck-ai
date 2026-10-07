@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contributorStatusLine, type ContributorStatus } from './contributorStatus';
+import { contributorStatusLine, effectiveAudience, type ContributorStatus } from './contributorStatus';
 
 function status(over: Partial<ContributorStatus>): ContributorStatus {
   return {
@@ -91,5 +91,26 @@ describe('contributorStatusLine', () => {
     for (const s of states) {
       expect(contributorStatusLine(status(s))?.text ?? '').not.toContain('—');
     }
+  });
+
+  it('says who is being served when the machine is shared with circles only', () => {
+    expect(contributorStatusLine(status({ audiences: ['circle'], jobs_served: 2 }))?.text)
+      .toBe('Sharing with your trusted circles · 2 jobs served');
+    expect(contributorStatusLine(status({ audiences: ['circle', 'pool'] }))?.text)
+      .toContain('Connected to the network');
+  });
+
+  it('explains a coordinator that cannot limit sharing, and that nothing is shared', () => {
+    const line = contributorStatusLine(status({ state: 'rejected', last_error: 'coordinator_outdated' }));
+    expect(line?.tone).toBe('warn');
+    expect(line?.text).toContain('nothing is being shared');
+  });
+});
+
+describe('effectiveAudience', () => {
+  it('keeps what the build did when nothing was chosen', () => {
+    expect(effectiveAudience(null, false)).toBe('mine');
+    expect(effectiveAudience(undefined, true)).toBe('everyone');
+    expect(effectiveAudience('circles', true)).toBe('circles');
   });
 });

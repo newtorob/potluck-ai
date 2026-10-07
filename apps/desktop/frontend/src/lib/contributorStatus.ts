@@ -25,6 +25,20 @@ export interface ContributorStatus {
   binary_hash_source: string | null;
   max_concurrent_jobs: number | null;
   has_member_session: boolean;
+  /** Who this machine serves beyond its owner while connected. */
+  audiences?: string[] | null;
+}
+
+/** Who the Contribute toggle lets use this machine. */
+export type ContributorAudience = 'mine' | 'circles' | 'everyone';
+
+/** The audience in effect when the member has not chosen one: what the
+ *  build did before the choice existed. */
+export function effectiveAudience(
+  chosen: ContributorAudience | null | undefined,
+  openPoolBuild: boolean,
+): ContributorAudience {
+  return chosen ?? (openPoolBuild ? 'everyone' : 'mine');
 }
 
 export type ContributorTone = 'ok' | 'pending' | 'warn';
@@ -49,7 +63,9 @@ export function contributorStatusLine(status: ContributorStatus | null): Contrib
   switch (status.state) {
     case 'connected': {
       const busy = status.jobs_in_flight > 0 ? ', serving now' : '';
-      return { text: `Connected to the network · ${jobsPhrase(status.jobs_served)}${busy}`, tone: 'ok' };
+      const circlesOnly = Array.isArray(status.audiences) && !status.audiences.includes('pool');
+      const lead = circlesOnly ? 'Sharing with your trusted circles' : 'Connected to the network';
+      return { text: `${lead} · ${jobsPhrase(status.jobs_served)}${busy}`, tone: 'ok' };
     }
     case 'connecting':
       return status.last_error === 'unreachable'
@@ -66,6 +82,11 @@ export function contributorStatusLine(status: ContributorStatus | null): Contrib
           return { text: 'Sign in to contribute. The coordinator did not accept this machine.', tone: 'warn' };
         case 'key_bound_to_other_member':
           return { text: 'This machine is registered to a different member.', tone: 'warn' };
+        case 'coordinator_outdated':
+          return {
+            text: 'The network cannot yet keep this machine to your circles only, so nothing is being shared. It will start once the network is updated.',
+            tone: 'warn',
+          };
         case 'release_not_registered':
           return { text: 'This build is not on the coordinator’s release list yet.', tone: 'warn' };
         default:

@@ -27,7 +27,12 @@ import { localApi } from '@/lib/localApi';
 import { useChatStore } from '@/stores/chatStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { registerContributorDeviceKey } from '@/lib/deviceKey';
-import { contributorStatusLine, type ContributorStatus } from '@/lib/contributorStatus';
+import {
+  contributorStatusLine,
+  effectiveAudience,
+  type ContributorAudience,
+  type ContributorStatus,
+} from '@/lib/contributorStatus';
 import { FEATURES } from '@/lib/features';
 import type { FleetSummary, MyJobStats, CreditBalance, CreditHistory, CreditHistoryEntry, ContributionsResponse } from '@/lib/localApi';
 import { relativeTime } from '@/lib/timeFormat';
@@ -967,6 +972,25 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
  */
 const CONTRIBUTOR_STATUS_POLL_MS = 10_000;
 
+const AUDIENCE_CHOICES: { value: ContributorAudience; label: string; detail: string }[] = [
+  {
+    value: 'mine',
+    label: 'Only my own machines',
+    detail: 'Nobody else can send requests here.',
+  },
+  {
+    value: 'circles',
+    label: 'My trusted circles too',
+    detail:
+      'People in a trusted circle with you can send requests here. This machine sees their conversation in order to answer. It is never offered open pool work.',
+  },
+  {
+    value: 'everyone',
+    label: 'Everyone on the network',
+    detail: 'Your trusted circles and the open pool.',
+  },
+];
+
 function ContributorToggleCard() {
   const settings = useSettingsStore((s) => s.settings);
   const isSaving = useSettingsStore((s) => s.isSaving);
@@ -974,6 +998,7 @@ function ContributorToggleCard() {
   const [status, setStatus] = useState<ContributorStatus | null>(null);
 
   const contributorMode = settings?.network.contributor_mode ?? false;
+  const audience = effectiveAudience(settings?.network.contributor_audience, FEATURES.openPoolContributor);
 
   // While the toggle is on, the sidecar's in-process contributor is what does
   // the work; show what it is doing. Polled, not pushed: the status is a few
@@ -1024,7 +1049,31 @@ function ContributorToggleCard() {
     }
   }
 
-  const line = FEATURES.openPoolContributor ? contributorStatusLine(status) : null;
+  async function handleAudience(next: ContributorAudience) {
+    try {
+      await updateSettings({ network: { contributor_audience: next } });
+    } catch {
+      // Rollback is handled by the store.
+      return;
+    }
+    if (next !== 'mine') {
+      // The coordinator has to know this machine before it can share it.
+      try {
+        await registerContributorDeviceKey();
+      } catch (err) {
+        console.warn('[NetworkView] device key registration failed:', err);
+      }
+    }
+    try {
+      setStatus(await localApi.getContributorStatus());
+    } catch {
+      /* the poll above catches up */
+    }
+  }
+
+  // The engine joins the coordinator only when the machine is shared beyond
+  // its owner, so that is when there is a connection to report on.
+  const line = audience !== 'mine' ? contributorStatusLine(status) : null;
 
   return (
     <div className="rounded-lg border border-border bg-card/60 p-4">
@@ -1073,6 +1122,29 @@ function ContributorToggleCard() {
           />
         </label>
       )}
+      {settings !== null && contributorMode ? (
+        <fieldset disabled={isSaving} className="mt-3 space-y-2 border-t border-border/60 pt-3 pl-7">
+          <legend className="sr-only">Who can use this machine</legend>
+          <p className="text-xs font-medium text-foreground" aria-hidden="true">
+            Who can use this machine
+          </p>
+          {AUDIENCE_CHOICES.filter((c) => c.value !== 'everyone' || FEATURES.openPoolContributor).map((choice) => (
+            <label key={choice.value} className="flex cursor-pointer items-start gap-2 text-xs">
+              <input
+                type="radio"
+                name="contributor-audience"
+                checked={audience === choice.value}
+                onChange={() => void handleAudience(choice.value)}
+                className="mt-0.5 shrink-0 accent-primary disabled:cursor-not-allowed"
+              />
+              <span>
+                <span className="text-foreground">{choice.label}</span>
+                <span className="block leading-relaxed text-muted-foreground">{choice.detail}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+      ) : null}
     </div>
   );
 }
