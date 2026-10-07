@@ -385,6 +385,15 @@ installer-linux: installer-bundle ## Build Linux installers (.AppImage + .deb + 
 # container-only checkout and is copied to dist-linux/out/ from the host
 # *after* the container exits, as a plain `cp`, never as a mount.
 DOCKER_LINUX_IMAGE ?= potluck-linux-builder
+# A directory holding the pinned Linux x86-64 native split engine
+# (llama-server, rpc-server, manifest.json, LICENSE), as produced by
+# scripts/build-split-engine.py --backend cpu or taken from a published Linux
+# runtime. It is build output, never committed, so the clean clone below has
+# none. Set this to include it; the CLI packager requires it.
+LINUX_SPLIT_ENGINE ?=
+# Set to a version (e.g. 0.1.8) to also package the Linux CLI archive from
+# the runtime this build produces. Output: dist-linux/cli/.
+LINUX_CLI_VERSION ?=
 
 installer-linux-docker: ## Build .deb + .AppImage for linux/amd64 inside Docker (no Linux box required). Output: dist-linux/out/
 	@command -v docker >/dev/null 2>&1 || { echo "error: docker not found. install Docker Desktop."; exit 1; }
@@ -395,6 +404,16 @@ installer-linux-docker: ## Build .deb + .AppImage for linux/amd64 inside Docker 
 	@rm -rf dist-linux/_src dist-linux/out
 	@mkdir -p dist-linux
 	git clone --local --quiet . dist-linux/_src
+	@if [ -n "$(LINUX_SPLIT_ENGINE)" ]; then \
+		for f in llama-server rpc-server manifest.json LICENSE; do \
+			test -f "$(LINUX_SPLIT_ENGINE)/$$f" || { echo "error: $(LINUX_SPLIT_ENGINE)/$$f is missing"; exit 1; }; \
+		done; \
+		grep -q '"backend": *"cpu"' "$(LINUX_SPLIT_ENGINE)/manifest.json" || { echo "error: LINUX_SPLIT_ENGINE is not a Linux CPU build"; exit 1; }; \
+		echo "==> Including the pinned Linux split engine from $(LINUX_SPLIT_ENGINE)"; \
+		mkdir -p dist-linux/_src/apps/desktop/python/native/split; \
+		cp "$(LINUX_SPLIT_ENGINE)/llama-server" "$(LINUX_SPLIT_ENGINE)/rpc-server" "$(LINUX_SPLIT_ENGINE)/manifest.json" "$(LINUX_SPLIT_ENGINE)/LICENSE" dist-linux/_src/apps/desktop/python/native/split/; \
+		chmod 755 dist-linux/_src/apps/desktop/python/native/split/llama-server dist-linux/_src/apps/desktop/python/native/split/rpc-server; \
+	fi
 	@echo "==> Running the containerized build with pinned CPU and Vulkan inference libraries"
 	docker run --rm --platform linux/amd64 \
 		-v "$(CURDIR)/dist-linux/_src:/build" \
@@ -406,10 +425,17 @@ installer-linux-docker: ## Build .deb + .AppImage for linux/amd64 inside Docker 
 			make frontend-setup; \
 			make electron-setup; \
 			make installer-bundle PYTHON_BIN=python3.11; \
-			cd apps/desktop/electron && pnpm exec electron-builder --linux deb AppImage --x64 && node scripts/hash-release.js'
+			cd apps/desktop/electron && pnpm exec electron-builder --linux deb AppImage --x64 && node scripts/hash-release.js; \
+			if [ -n "$(LINUX_CLI_VERSION)" ]; then \
+				cd /build && pnpm --dir apps/cli install --frozen-lockfile && pnpm --dir apps/cli build && \
+				pnpm --dir apps/cli package:release --runtime /build/apps/desktop/python/dist/potluck-local --out /build/release/cli --version $(LINUX_CLI_VERSION); \
+			fi'
 	@echo "==> Copying installers out of the container checkout to dist-linux/out/"
 	@mkdir -p dist-linux/out
-	@cp -v dist-linux/_src/apps/desktop/electron/out/*.deb dist-linux/_src/apps/desktop/electron/out/*.AppImage dist-linux/_src/apps/desktop/electron/out/SHA256SUMS dist-linux/out/ 2>/dev/null || true
+	@cp -v dist-linux/_src/apps/desktop/electron/out/*.deb dist-linux/_src/apps/desktop/electron/out/*.AppImage dist-linux/_src/apps/desktop/electron/out/SHA256SUMS dist-linux/_src/apps/desktop/electron/out/latest-linux.yml dist-linux/out/ 2>/dev/null || true
+	@cp dist-linux/_src/apps/desktop/electron/build-info.json dist-linux/out/build-info.json 2>/dev/null || true
+	@cp dist-linux/_src/apps/desktop/python/dist/potluck-local/contributor-release.json dist-linux/out/contributor-release.json 2>/dev/null || true
+	@if [ -n "$(LINUX_CLI_VERSION)" ]; then rm -rf dist-linux/cli && mkdir -p dist-linux/cli && cp -v dist-linux/_src/release/cli/* dist-linux/cli/; fi
 	@echo "==> Linux installers:"
 	@ls -lh dist-linux/out/*.deb dist-linux/out/*.AppImage 2>/dev/null || echo "    (none found — check the build log above)"
 
