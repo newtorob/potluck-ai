@@ -50,7 +50,7 @@ def _make_app() -> FastAPI:
 
 
 def _attest(ws, priv: Ed25519PrivateKey, binary_hash: str, *, member_id=None,
-            capabilities=None, hardware=None) -> dict:
+            capabilities=None, hardware=None, audiences=None) -> dict:
     """Drive challenge -> attest and return the accept or reject envelope."""
     challenge = ws.receive_json()
     assert challenge["type"] == "challenge"
@@ -67,6 +67,8 @@ def _attest(ws, priv: Ed25519PrivateKey, binary_hash: str, *, member_id=None,
     }
     if capabilities is not None:
         payload["capabilities"] = capabilities
+    if audiences is not None:
+        payload["audiences"] = audiences
     ws.send_json(payload)
     return ws.receive_json()
 

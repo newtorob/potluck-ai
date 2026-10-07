@@ -101,9 +101,10 @@ async def test_admission_rechecks_live_policy_before_serving():
     assert rt.calls == []
 
 
-def _settings(on=True, url="https://coord.example", cap=1) -> PotluckSettings:
+def _settings(on=True, url="https://coord.example", cap=1, audience=None) -> PotluckSettings:
     return PotluckSettings(network=NetworkSettings(
-        contributor_mode=on, coordinator_url=url, max_concurrent_jobs=cap))
+        contributor_mode=on, coordinator_url=url, max_concurrent_jobs=cap,
+        contributor_audience=audience))
 
 
 def _service(runner=None, runtime=None, monkeypatch=None, tmp_path=None):
@@ -241,6 +242,59 @@ async def test_releases_without_the_open_pool_never_start_the_contributor(monkey
     assert not svc.is_running and runner.starts == []
     st = svc.status()
     assert st["state"] == "disabled" and st["enabled"] is True
+
+
+# ---- who the machine is shared with -----------------------------------------
+
+
+@pytest.mark.parametrize("open_pool,audience,expected", [
+    (False, None, None),                      # a release, nothing chosen: own machines only
+    (False, "mine", None),
+    (False, "circles", ["circle"]),           # circles need no open pool
+    (False, "everyone", ["circle"]),          # the pool is not this build's to offer
+    (True, None, ["circle", "pool"]),         # what open-pool builds did before the choice
+    (True, "circles", ["circle"]),
+    (True, "everyone", ["circle", "pool"]),
+    (True, "mine", None),
+])
+def test_sharing_audiences(monkeypatch, open_pool, audience, expected):
+    if open_pool:
+        monkeypatch.setenv("POTLUCK_OPEN_POOL_CONTRIBUTOR", "1")
+    else:
+        monkeypatch.delenv("POTLUCK_OPEN_POOL_CONTRIBUTOR", raising=False)
+    assert cs.sharing_audiences(NetworkSettings(contributor_audience=audience)) == expected
+
+
+@run_async
+async def test_a_release_can_share_with_circles_and_never_names_the_pool(monkeypatch, tmp_path):
+    monkeypatch.delenv("POTLUCK_OPEN_POOL_CONTRIBUTOR", raising=False)
+    runner = FakeLoopRunner()
+    svc = _service(runner, monkeypatch=monkeypatch, tmp_path=tmp_path)
+    _patch_base(monkeypatch, "https://coord.example")
+    await svc.apply_settings(_settings(on=True, audience="circles"))
+    await asyncio.sleep(0)
+    assert svc.is_running and len(runner.starts) == 1
+    assert runner.starts[0]["hooks"].audiences == ["circle"]
+    assert svc.status()["audiences"] == ["circle"]
+    await svc.stop()
+
+
+@run_async
+async def test_changing_who_the_machine_serves_reconnects(monkeypatch, tmp_path):
+    runner = FakeLoopRunner()
+    svc = _service(runner, monkeypatch=monkeypatch, tmp_path=tmp_path)
+    _patch_base(monkeypatch, "https://coord.example")
+    await svc.apply_settings(_settings(on=True, audience="everyone"))
+    await asyncio.sleep(0)
+    await svc.apply_settings(_settings(on=True, audience="circles"))
+    await asyncio.sleep(0)
+    assert [st["hooks"].audiences for st in runner.starts] == [["circle", "pool"], ["circle"]]
+    await svc.apply_settings(_settings(on=True, audience="mine"))
+    assert not svc.is_running and svc.status()["state"] == "disabled"
+
+
+def test_an_outdated_coordinator_has_its_own_reject_category():
+    assert cs.reject_category("this coordinator cannot limit who the machine serves") == "coordinator_outdated"
 
 
 @run_async

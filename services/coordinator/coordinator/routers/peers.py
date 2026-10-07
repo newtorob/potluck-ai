@@ -35,6 +35,7 @@ from coordinator.services.peer_registry import (
     complete_job,
     drain_peer_jobs,
     get_job,
+    honoured_audiences,
     register_peer,
     unregister_peer,
 )
@@ -169,11 +170,13 @@ async def peer_connect(
     await db.commit()
 
     session_id = uuid.uuid4()
+    audiences = honoured_audiences(payload.audiences)
     accept = AcceptMessage(
         peer_id=peer.id,
         session_id=session_id,
         server_time=datetime.now(timezone.utc),
         heartbeat_interval_s=HEARTBEAT_INTERVAL_S,
+        audiences=audiences,
     )
 
     try:
@@ -190,6 +193,7 @@ async def peer_connect(
         platform=payload.platform,
         client_version=payload.client_version,
         auth=auth_mode,
+        audiences=audiences,
     )
 
     # Register the connection so the job dispatch endpoint can find it.
@@ -199,6 +203,8 @@ async def peer_connect(
             session_id=session_id,
             ws=ws,
             member_id=peer.member_id,
+            serves_circle=audiences is None or "circle" in audiences,
+            serves_pool=audiences is None or "pool" in audiences,
         )
     )
 

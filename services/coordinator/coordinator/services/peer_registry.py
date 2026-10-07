@@ -89,6 +89,21 @@ class PeerConnection:
     session_id: uuid.UUID
     ws: WebSocket
     member_id: uuid.UUID  # used for OUR-side job creation only — never forwarded
+    # Who this peer agreed to serve beyond its owner's own requests (see
+    # AttestationPayload.audiences). Both true for a peer that named none.
+    serves_circle: bool = True
+    serves_pool: bool = True
+
+
+AUDIENCES = ("circle", "pool")
+
+
+def honoured_audiences(requested: list[str] | None) -> list[str] | None:
+    """The audiences a peer asked for that this coordinator enforces, in a
+    fixed order. None for a peer that named none (it serves both)."""
+    if requested is None:
+        return None
+    return [a for a in AUDIENCES if a in requested]
 
 
 @dataclass
@@ -408,8 +423,13 @@ async def pick_peer_for_model(
     enforce_pool_trust: bool = False,
     circle_member_pubkeys: set[str] | None = None,
     exclude_peer_ids: set[uuid.UUID] | None = None,
+    audience: str | None = None,
 ) -> PeerConnection | None:
     """Pick a connected peer that advertises the requested model_slug.
+
+    `audience` ("circle" or "pool") names who the job is for when it is not
+    the peer owner's own request; a peer that did not agree to serve that
+    audience is never a candidate. None (My Machines) applies no such filter.
 
     Joins the in-memory peer registry (only currently-connected WS
     sessions) against peer_capabilities (which the coordinator populated
@@ -593,6 +613,10 @@ async def pick_peer_for_model(
                 continue
             if owner_member_id is not None and _peers[peer_id].member_id != owner_member_id:
                 continue
+            if audience == "circle" and not _peers[peer_id].serves_circle:
+                continue
+            if audience == "pool" and not _peers[peer_id].serves_pool:
+                continue
             candidates.append(peer_id)
         if not candidates:
             return None
@@ -647,6 +671,7 @@ async def select_peer_for_request(
             model_slug,
             circle_member_pubkeys=circle_pubkeys,
             exclude_peer_ids=exclude_peer_ids,
+            audience="circle",
         )
         if peer is not None:
             return peer, "circle"
@@ -667,7 +692,8 @@ async def select_peer_for_request(
     # (fabrication, or sustained failures) must earn its way back before it can
     # serve strangers again.
     peer = await pick_peer_for_model(
-        db, model_slug, enforce_pool_trust=True, exclude_peer_ids=exclude_peer_ids
+        db, model_slug, enforce_pool_trust=True, exclude_peer_ids=exclude_peer_ids,
+        audience="pool",
     )
     if peer is not None:
         return peer, "pool"

@@ -191,7 +191,8 @@ export function parseArgs(argv: string[]): CliArgs {
       out.task = positional[1];
     } else if (out.command === "contribute") {
       out.action = positional[1] || "status"; out.target = positional[2];
-      if (!["status", "on", "off", "schedule", "limits"].includes(out.action) || positional.length > 3 || (out.target && out.action !== "schedule")) throw new UsageError("Use contribute status|on|off|schedule|limits.");
+      if (!["status", "on", "off", "share", "schedule", "limits"].includes(out.action) || positional.length > 3 || (out.target && !["schedule", "share"].includes(out.action))) throw new UsageError("Use contribute status|on|off|share|schedule|limits.");
+      if (out.action === "share" && !["mine", "circles", "everyone"].includes(out.target || "") && !out.help) throw new UsageError("Use contribute share mine|circles|everyone.");
       if (out.action === "schedule" && !out.target && !out.help) throw new UsageError("Use contribute schedule HH:MM-HH:MM or off.");
       if ((out.days || out.timezone) && out.action !== "schedule") throw new UsageError("--days and --timezone require contribute schedule.");
       if ((out.jobs !== undefined || out.maxTokens !== undefined || out.minFreeMemory !== undefined) && out.action !== "limits") throw new UsageError("Limit options require contribute limits.");

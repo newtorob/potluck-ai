@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { parseArgs } from "../src/args.js";
-import { manageContribution } from "../src/contribute.js";
+import { formatContribution, manageContribution, sharedWith } from "../src/contribute.js";
 import { runtimeRequest } from "../src/runtime.js";
 vi.mock("../src/runtime.js", () => ({ runtimeRequest: vi.fn(async () => ({ schemaVersion: 1, enabled: false, api_key: "never-echo" })) }));
 afterEach(() => vi.clearAllMocks());
@@ -19,4 +19,16 @@ it("rejects invalid schedule and limit options before calling the service", asyn
   for (const argv of [["contribute", "limits", "--jobs", "65"], ["contribute", "on", "--max-tokens", "3"], ["status", "--jobs", "1"]]) expect(() => parseArgs(argv)).toThrow();
   for (const argv of [["contribute", "schedule", "25:00-06:00"], ["contribute", "schedule", "22:00-06:00", "--days", "sat,sat"]]) await expect(manageContribution(parseArgs(argv))).rejects.toThrow();
   expect(runtimeRequest).not.toHaveBeenCalled();
+});
+it("chooses who the machine is shared with and changes nothing else", async () => {
+  await manageContribution(parseArgs(["contribute", "share", "circles"]));
+  expect(vi.mocked(runtimeRequest).mock.calls[0][1].body).toEqual({ audience: "circles" });
+  for (const argv of [["contribute", "share"], ["contribute", "share", "friends"], ["contribute", "on", "circles"]]) expect(() => parseArgs(argv)).toThrow();
+});
+it("says plainly who the machine is shared with", () => {
+  expect(sharedWith({ servingAudiences: null })).toBe("your own machines only");
+  expect(sharedWith({ audience: "circles", servingAudiences: ["circle"] })).toBe("your trusted circles");
+  expect(sharedWith({ audience: "everyone", servingAudiences: ["circle"] })).toContain("not available in this build");
+  expect(sharedWith({ audience: "everyone", servingAudiences: ["circle", "pool"] })).toBe("your trusted circles and the open pool");
+  expect(formatContribution({ enabled: true, state: "connected", audience: "circles", servingAudiences: ["circle"], schedule: null })).toContain("Shared with: your trusted circles.");
 });

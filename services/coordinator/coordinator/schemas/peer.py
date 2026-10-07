@@ -30,6 +30,12 @@ class AcceptMessage(BaseModel):
     # coordinator owns this so we can tune fleet load without shipping a
     # client update.
     heartbeat_interval_s: int = 30
+    # The audiences from the attestation that this coordinator enforces,
+    # echoed so the peer can tell its choice is honoured. A peer that asked
+    # to serve circles only and does not see that here is talking to a
+    # coordinator from before audiences existed and must not serve. None for
+    # a peer that named no audiences.
+    audiences: list[str] | None = None
 
 
 class RejectMessage(BaseModel):
@@ -103,6 +109,11 @@ class AttestationPayload(BaseModel):
     hardware_summary: dict[str, Any] = Field(default_factory=dict)
     nonce_signature: str  # base64url, no padding
     capabilities: list[CapabilityEntry] = Field(default_factory=list)
+    # Who this peer agrees to serve beyond its owner's own requests: "circle"
+    # (trusted circles) and/or "pool" (the open pool). None is a peer from
+    # before audiences existed, which serves both. Unknown names are ignored,
+    # so naming only audiences this coordinator does not know serves no one.
+    audiences: list[str] | None = Field(default=None, max_length=8)
 
 
 class HeartbeatMessage(BaseModel):

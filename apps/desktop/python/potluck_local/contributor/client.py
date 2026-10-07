@@ -109,6 +109,9 @@ class LoopHooks:
     hardware_summary_provider: HardwareSummaryProvider
     headers_provider: HeadersProvider
     max_concurrent_jobs: int | None = 1
+    # Who this peer serves beyond its owner: "circle" and/or "pool". None
+    # names no audience and serves both, as peers did before the choice.
+    audiences: list[str] | None = None
     # on_state(event, **fields). Events: connecting, connected, heartbeat,
     # rejected, disconnected, job_started, job_finished, stopped. Never
     # carries prompt content or member ids.
@@ -255,6 +258,7 @@ async def _do_handshake(
         hardware_summary=hooks.hardware_summary_provider(),
         nonce_signature=base64.urlsafe_b64encode(sig).rstrip(b"=").decode("ascii"),
         capabilities=capabilities,
+        audiences=hooks.audiences,
     )
     if capabilities:
         logger.info(
@@ -268,7 +272,12 @@ async def _do_handshake(
     msg = json.loads(raw)
     msg_type = msg.get("type")
     if msg_type == "accept":
-        return AcceptMessage.model_validate(msg), capabilities
+        accept = AcceptMessage.model_validate(msg)
+        if not _audiences_honoured(hooks.audiences, accept.audiences):
+            # A coordinator that does not enforce the limit would hand this
+            # machine jobs its owner never agreed to. Leave, serving nothing.
+            raise HandshakeFailed("this coordinator cannot limit who the machine serves")
+        return accept, capabilities
     if msg_type == "reject":
         reject = RejectMessage.model_validate(msg)
         raise HandshakeFailed(reject.reason)
@@ -611,6 +620,18 @@ async def _stop_watch(ws: Any, stop: asyncio.Event) -> None:
     receive loop then ends with ConnectionClosed and the session unwinds."""
     await stop.wait()
     await ws.close()
+
+
+_ALL_AUDIENCES = frozenset({"circle", "pool"})
+
+
+def _audiences_honoured(asked: list[str] | None, enforced: list[str] | None) -> bool:
+    """Whether the coordinator will serve this peer to no one beyond those
+    it asked for. Asking for everyone needs no confirmation; any narrower
+    choice has to be echoed back, with nothing added."""
+    if asked is None or frozenset(asked) >= _ALL_AUDIENCES:
+        return True
+    return enforced is not None and frozenset(enforced) <= frozenset(asked)
 
 
 def _slugs(capabilities: list[CapabilityEntry]) -> frozenset[str]:

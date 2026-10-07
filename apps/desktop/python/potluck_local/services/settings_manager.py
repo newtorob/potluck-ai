@@ -37,6 +37,13 @@ class PrivacySettings(BaseModel):
 
 class NetworkSettings(BaseModel):
     contributor_mode: bool = False       # The Contribute compute toggle
+    # Who else this machine answers while the toggle is on. Its owner's own
+    # machines are always answered. "mine": nobody else. "circles": members
+    # of the owner's trusted circles, through the coordinator. "everyone":
+    # circles and the open pool, in builds where the open pool is switched
+    # on (circles only otherwise). None: not chosen, which keeps what the
+    # build did before this setting existed.
+    contributor_audience: Literal["mine", "circles", "everyone"] | None = None
     contributor_schedule: dict[str, object] | None = None
     max_gpu_percent: int = 80
     # Coordinator jobs this machine serves at once. Sent in every heartbeat

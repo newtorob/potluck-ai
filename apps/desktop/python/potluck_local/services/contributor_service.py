@@ -65,18 +65,39 @@ _REJECT_CATEGORIES: tuple[tuple[str, str], ...] = (
     ("not registered for any member", "device_key_not_registered"),
     ("registered to a different member", "key_bound_to_other_member"),
     ("not in contributor_releases", "release_not_registered"),
+    ("cannot limit who the machine serves", "coordinator_outdated"),
     ("unauthorized", "unauthorized"),
 )
 
 
 def open_pool_enabled() -> bool:
-    """Whether this build may join the coordinator as an open-pool contributor.
+    """Whether this build may serve the open pool.
 
     Off unless POTLUCK_OPEN_POOL_CONTRIBUTOR=1. Releases leave it off until
-    the open pool is ready, so the Contribute toggle only serves the member's
-    own machines (the household path reads contributor_mode directly).
+    the open pool is ready. Sharing with trusted circles does not need it
+    (see sharing_audiences); serving the member's own machines never did
+    (the household path reads contributor_mode directly).
     """
     return os.environ.get("POTLUCK_OPEN_POOL_CONTRIBUTOR") == "1"
+
+
+def sharing_audiences(network: Any) -> list[str] | None:
+    """Who this machine serves through the coordinator, as it will attest.
+    None: it does not join the coordinator (its owner's own machines only).
+
+    A build without the open pool can still share with trusted circles; it
+    just never names the pool. With no choice made, a build keeps what it
+    did before the choice existed: everyone where the open pool is switched
+    on, own machines only where it is not.
+    """
+    choice = getattr(network, "contributor_audience", None)
+    if choice is None:
+        choice = "everyone" if open_pool_enabled() else "mine"
+    if choice == "everyone":
+        return ["circle", "pool"] if open_pool_enabled() else ["circle"]
+    if choice == "circles":
+        return ["circle"]
+    return None
 
 
 def reject_category(reason: str) -> str:
@@ -145,6 +166,8 @@ class ContributorStatus:
     coordinator_host: str | None = None
     binary_hash_source: str | None = None
     max_concurrent_jobs: int | None = None
+    # Who this machine serves beyond its owner while connected.
+    audiences: list[str] | None = None
 
 
 def _now_iso() -> str:
@@ -170,7 +193,7 @@ class ContributorService:
         self._task: asyncio.Task | None = None
         self._stop: asyncio.Event | None = None
         self._session_token: str | None = None
-        self._running_key: tuple[str, int] | None = None
+        self._running_key: tuple[str, int, tuple[str, ...]] | None = None
         self._status = ContributorStatus()
         self._lock = asyncio.Lock()
         self._last_hooks: contributor_client.LoopHooks | None = None
@@ -214,7 +237,8 @@ class ContributorService:
             network = settings.network
             self._network = network
             self._status.enabled = bool(network.contributor_mode)
-            if not open_pool_enabled():
+            audiences = sharing_audiences(network)
+            if audiences is None:
                 if self.is_running:
                     await self._stop_locked()
                 self._status.state = "disabled"
@@ -250,12 +274,12 @@ class ContributorService:
                 self._status.coordinator_host = None
                 logger.warning("contributor_not_started reason=coordinator_insecure")
                 return
-            key = (ws_url, int(network.max_concurrent_jobs))
+            key = (ws_url, int(network.max_concurrent_jobs), tuple(audiences))
             if self.is_running and self._running_key == key:
                 return
             if self.is_running:
                 await self._stop_locked()
-            await self._start_locked(key[0], key[1])
+            await self._start_locked(key[0], key[1], audiences)
 
     async def stop(self) -> None:
         async with self._lock:
@@ -266,7 +290,9 @@ class ContributorService:
 
     # ---- lifecycle ------------------------------------------------------ #
 
-    async def _start_locked(self, ws_url: str, max_concurrent_jobs: int) -> None:
+    async def _start_locked(
+        self, ws_url: str, max_concurrent_jobs: int, audiences: list[str]
+    ) -> None:
         base_settings = get_contributor_settings()
         binary_hash, source = resolve_binary_hash(
             base_settings.binary_hash or None, frozen_bundle_dir()
@@ -288,6 +314,7 @@ class ContributorService:
             hardware_summary_provider=lambda: dict(summary),
             headers_provider=self._headers,
             max_concurrent_jobs=max_concurrent_jobs,
+            audiences=list(audiences),
             on_state=self._on_state,
         )
         self._stop = asyncio.Event()
@@ -297,8 +324,9 @@ class ContributorService:
             coordinator_host=urlsplit(ws_url).netloc,
             binary_hash_source=source,
             max_concurrent_jobs=max_concurrent_jobs,
+            audiences=list(audiences),
         )
-        self._running_key = (ws_url, max_concurrent_jobs)
+        self._running_key = (ws_url, max_concurrent_jobs, tuple(audiences))
         self._last_hooks = hooks
         self._last_settings = settings
         self._task = asyncio.create_task(

@@ -44,6 +44,10 @@ class FakeCoordinator:
     # reject frame in place of the challenge, then close.
     pre_challenge_reject: str | None = None
     first_frame: str | None = None
+    # A coordinator that enforces audiences echoes them in the accept; one
+    # from before audiences existed says nothing.
+    enforces_audiences: bool = True
+    echo_override: list | None = None
     heartbeat_interval_s: int = 1
     attestations: list[dict] = field(default_factory=list)
     heartbeats: list[dict] = field(default_factory=list)
@@ -84,13 +88,17 @@ class FakeCoordinator:
             await ws.send(json.dumps({"type": "reject", "reason": self.reject_reason}))
             await ws.close(code=1008)
             return
-        await ws.send(json.dumps({
+        accept = {
             "type": "accept",
             "peer_id": str(uuid.uuid4()),
             "session_id": str(uuid.uuid4()),
             "server_time": "2026-09-10T00:00:00Z",
             "heartbeat_interval_s": self.heartbeat_interval_s,
-        }))
+        }
+        if self.enforces_audiences and attest.get("audiences") is not None:
+            accept["audiences"] = (self.echo_override if self.echo_override is not None
+                                   else [a for a in ("circle", "pool") if a in attest["audiences"]])
+        await ws.send(json.dumps(accept))
         self._conn = ws
         self._connected.set()
         try:
@@ -401,6 +409,61 @@ async def test_capability_change_waits_for_the_job_in_flight(monkeypatch):
         stop.set()
         await asyncio.wait_for(task, 5)
     assert [c["model_slug"] for c in coord.attestations[-1]["capabilities"]] == ["other-model"]
+
+
+@run_async
+async def test_circle_only_sharing_is_attested_and_confirmed():
+    async with FakeCoordinator() as coord:
+        hooks = _hooks(audiences=["circle"])
+        stop = asyncio.Event()
+        task = asyncio.create_task(contributor.run_contributor_loop(
+            _settings(coord.url), Ed25519PrivateKey.generate(), hooks, stop))
+        await coord.wait_connected()
+        stop.set()
+        await asyncio.wait_for(task, 5)
+    assert coord.attestations[0]["audiences"] == ["circle"]
+    assert "connected" in [e for e, _ in hooks.events]
+
+
+@pytest.mark.parametrize("coordinator", [
+    {"enforces_audiences": False},                    # predates audiences: would serve everyone
+    {"echo_override": ["circle", "pool"]},            # claims more than was asked
+])
+@run_async
+async def test_circle_only_peer_refuses_a_coordinator_that_would_serve_it_wider(monkeypatch, coordinator):
+    monkeypatch.setattr(contributor, "RECONNECT_BACKOFF_INITIAL_S", 0.05)
+    served: list = []
+
+    async def never_serve(ws, job):
+        served.append(job)
+
+    async with FakeCoordinator(**coordinator) as coord:
+        hooks = _hooks(audiences=["circle"], job_handler=never_serve)
+        stop = asyncio.Event()
+        task = asyncio.create_task(contributor.run_contributor_loop(
+            _settings(coord.url), Ed25519PrivateKey.generate(), hooks, stop))
+        deadline = asyncio.get_event_loop().time() + 3
+        while coord.connections < 2 and asyncio.get_event_loop().time() < deadline:
+            await asyncio.sleep(0.02)
+        stop.set()
+        await asyncio.wait_for(task, 5)
+    kinds = [e for e, _ in hooks.events]
+    assert "connected" not in kinds and served == []
+    rejected = [f for e, f in hooks.events if e == "rejected"]
+    assert rejected and "cannot limit who the machine serves" in rejected[0]["reason"]
+
+
+@run_async
+async def test_sharing_with_everyone_needs_no_confirmation():
+    async with FakeCoordinator(enforces_audiences=False) as coord:
+        hooks = _hooks(audiences=["circle", "pool"])
+        stop = asyncio.Event()
+        task = asyncio.create_task(contributor.run_contributor_loop(
+            _settings(coord.url), Ed25519PrivateKey.generate(), hooks, stop))
+        await coord.wait_connected()
+        stop.set()
+        await asyncio.wait_for(task, 5)
+    assert "connected" in [e for e, _ in hooks.events]
 
 
 @run_async

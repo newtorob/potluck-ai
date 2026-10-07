@@ -4,6 +4,7 @@ const weekdays = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 export async function manageContribution(args: CliArgs): Promise<Record<string, unknown>> {
   const patch: Record<string, unknown> = {};
   if (args.action === "on" || args.action === "off") patch.enabled = args.action === "on";
+  if (args.action === "share") patch.audience = args.target;
   if (args.action === "limits") {
     if (args.jobs !== undefined) patch.maxJobs = args.jobs;
     if (args.maxTokens !== undefined) patch.maxTokens = args.maxTokens;
@@ -25,12 +26,21 @@ export async function manageContribution(args: CliArgs): Promise<Record<string, 
   const result = await runtimeRequest("/contributor/controls", { timeout: args.timeout,
     ...(Object.keys(patch).length ? { method: "PATCH" as const, body: patch } : {}) });
   // Never print credentials or arbitrary additions to the shared API response.
-  return Object.fromEntries(["schemaVersion", "enabled", "schedule", "maxJobs", "maxTokens", "minFreeMemoryGiB",
+  return Object.fromEntries(["schemaVersion", "enabled", "audience", "servingAudiences", "schedule", "maxJobs", "maxTokens", "minFreeMemoryGiB",
     "state", "acceptingJobs", "pauseReason", "signedIn", "jobsInFlight", "jobsServed", "lastError"].map(key => [key, result[key]]));
+}
+/** Who the machine answers besides its owner, from what the engine will tell the coordinator. */
+export function sharedWith(report: Record<string, unknown>): string {
+  const serving = Array.isArray(report.servingAudiences) ? report.servingAudiences as string[] : null;
+  if (!serving) return "your own machines only";
+  if (serving.includes("pool")) return "your trusted circles and the open pool";
+  if (!serving.includes("circle")) return "your own machines only";
+  return report.audience === "everyone" ? "your trusted circles (the open pool is not available in this build)" : "your trusted circles";
 }
 export function formatContribution(report: Record<string, unknown>): string {
   const schedule = report.schedule as { start: string; end: string; days: number[]; timezone: string | null } | null;
   return `Coordinator contribution ${report.enabled ? "enabled" : "disabled"}: ${report.state}.\n` +
+    `Shared with: ${sharedWith(report)}.\n` +
     `Accepting new jobs: ${report.acceptingJobs ? "yes" : "no"}${report.pauseReason ? ` (${report.pauseReason})` : ""}. In flight: ${report.jobsInFlight}. Served: ${report.jobsServed}.\n` +
     `Limits: ${report.maxJobs} concurrent jobs; ${report.maxTokens ?? "no configured cap on"} output tokens per job; ${report.minFreeMemoryGiB} GiB free memory required at admission.\n` +
     `Schedule: ${schedule ? `${schedule.start}-${schedule.end} on ${schedule.days.map(day => weekdays[day]).join(",")} (${schedule.timezone ?? "machine local time"})` : "all day"}.\n` +

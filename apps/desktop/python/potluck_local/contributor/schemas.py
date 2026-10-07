@@ -27,6 +27,9 @@ class AcceptMessage(BaseModel):
     session_id: uuid.UUID
     server_time: datetime
     heartbeat_interval_s: int
+    # The audiences from our attestation that the coordinator enforces.
+    # Absent from a coordinator that predates audiences.
+    audiences: list[str] | None = None
 
 
 class RejectMessage(BaseModel):
@@ -67,6 +70,9 @@ class AttestationPayload(BaseModel):
     # serve real inference; non-empty = list of models the coordinator can
     # route here.
     capabilities: list[CapabilityEntry] = Field(default_factory=list)
+    # Who this peer agrees to serve beyond its owner's own requests: "circle"
+    # and/or "pool". None serves both (a peer from before audiences existed).
+    audiences: list[str] | None = None
 
 
 class HeartbeatMessage(BaseModel):
