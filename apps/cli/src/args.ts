@@ -11,6 +11,8 @@ export interface CliArgs {
   json: boolean;
   model?: string;
   scope?: string;
+  /** Which trusted circle a circle-scoped run goes to: a name or an ID. */
+  circle?: string;
   verify?: string;
   task?: string;
   command?: Command;
@@ -132,6 +134,7 @@ export function parseArgs(argv: string[]): CliArgs {
     else if (flag === "--invite-file") out.inviteFile = value();
     else if (flag === "--model" || flag === "-m") out.model = value();
     else if (flag === "--scope") out.scope = value();
+    else if (flag === "--circle") out.circle = value();
     else if (flag === "--verify") out.verify = value();
     else if (flag === "--print" || flag === "-p") { out.print = true; out.task = value(); }
     else if (flag === "--source") {
@@ -229,6 +232,7 @@ export function parseArgs(argv: string[]): CliArgs {
   const operation = out.command;
   const allowed: Record<string, string[]> = {
     "--once": ["usage"], "--window": ["usage"], "--direction": ["usage"], "--theme": ["usage"],
+    "--circle": ["run"],
     "--jobs": ["contribute", "batch"], "--max-tokens": ["contribute", "run", "batch"], "--min-free-memory": ["contribute"], "--days": ["contribute"], "--timezone": ["contribute"],
     "--wait": ["login"], "--no-wait": ["login"], "--no-browser": ["login", "setup"], "--local": ["logout"],
     "--name": ["household", "connect", "setup"], "--output": ["household", "batch"],
@@ -263,9 +267,14 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.scope && out.command && !["status", "doctor", "launch", "run", "batch"].includes(out.command)) {
     throw new UsageError("--scope is supported by status, doctor, and the coding agent.");
   }
-  if (operation && out.scope && !["local", "mine"].includes(out.scope)) {
-    throw new UsageError("Diagnostic --scope must be local or mine.");
+  // A single prompt can go to a trusted circle. Everything else that takes a
+  // scope stays on the member's own machines.
+  if (operation === "run" && out.scope === "circle") {
+    /* allowed */
+  } else if (operation && out.scope && !["local", "mine"].includes(out.scope)) {
+    throw new UsageError(operation === "run" ? "Run --scope must be local, mine or circle." : "Diagnostic --scope must be local or mine.");
   }
+  if (out.circle !== undefined && out.scope !== "circle") throw new UsageError("--circle requires --scope circle.");
   if (out.verify !== undefined && out.noVerify) throw new UsageError("Choose --verify or --no-verify.");
   return out;
 }

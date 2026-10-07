@@ -8,7 +8,7 @@ import { afterEach, beforeEach, expect, it } from "vitest";
 import { readPrompt } from "../src/inference.js";
 import { parseArgs } from "../src/args.js";
 let directory: string, server: Server, url: string;
-let mode: "ok" | "truncated" | "slow" | "old";
+let mode: "ok" | "truncated" | "slow" | "old" | "refused";
 let requests: Array<any>;
 const hash = "a".repeat(64);
 const entry = resolve("dist/index.js");
@@ -20,6 +20,7 @@ beforeEach(async () => {
     let raw = ""; for await (const chunk of req) raw += chunk;
     requests.push({ body: JSON.parse(raw), headers: req.headers });
     if (mode === "slow") return;
+    if (mode === "refused") { res.writeHead(400, { "Content-Type": "application/json" }); res.end(JSON.stringify({ detail: "Choose a trusted circle with X-Potluck-Circle. Yours: 'Friends', 'Work'." })); return; }
     res.writeHead(200, { "Content-Type": "text/event-stream", "X-Potluck-Model-Lock": "1", "X-Potluck-Model-SHA256": hash });
     res.write('data: {"choices":[{"delta":{"content":"hello"}}]}\r');
     res.write('\n\r\n');
@@ -68,4 +69,26 @@ it("bounds piped input and validates command-specific options", async () => {
   expect(parseArgs(["run", "hi"]).timeout).toBe(120000);
   expect(() => parseArgs(["status", "--timeout", "30001"])).toThrow();
   expect(() => parseArgs(["run", "hi", "--scope", "pool"])).toThrow();
+});
+it("sends a single prompt to a named trusted circle and reports the gateway's reason when refused", async () => {
+  await rm(join(directory, "potluck.lock"));
+  const ok = await run(["hi", "--scope", "circle", "--circle", "Friends", "--model", "circle-model", "--json"]);
+  expect(ok.code).toBe(0);
+  expect(JSON.parse(ok.stdout)).toMatchObject({ scope: "circle", model: "circle-model", text: "hello" });
+  expect(requests[0].headers["x-potluck-scope"]).toBe("circle");
+  expect(requests[0].headers["x-potluck-circle"]).toBe("Friends");
+  mode = "refused";
+  const refused = await run(["hi", "--scope", "circle", "--model", "circle-model"]);
+  expect(refused.code).toBe(1);
+  expect(refused.stderr).toContain("Choose a trusted circle");
+  expect(refused.stderr).not.toContain("never-echo");
+});
+it("keeps a locked project and other commands off circles", async () => {
+  const locked = await run(["hi", "--scope", "circle", "--json"]);
+  expect(locked.code).toBe(2); expect(JSON.parse(locked.stdout).error.message).toContain("potluck.lock");
+  expect(requests).toHaveLength(0);
+  expect(() => parseArgs(["run", "hi", "--circle", "Friends"])).toThrow("--circle requires --scope circle");
+  expect(() => parseArgs(["status", "--scope", "circle"])).toThrow();
+  expect(() => parseArgs(["batch", "submit", "a.txt", "--scope", "circle"])).toThrow();
+  expect(parseArgs(["run", "hi", "--scope", "circle"]).scope).toBe("circle");
 });

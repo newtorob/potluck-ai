@@ -221,14 +221,14 @@ describe("scope resolution", () => {
     expect(resolveScope("local", "mine").scope).toBe("local");
   });
 
-  it("treats circle/cooperative as single-turn only and falls back to mine", () => {
+  it("keeps agent sessions on the member's machines and points circle users at run", () => {
     const circle = normalizeScope("circle", "local");
     expect(circle.scope).toBe("mine");
-    expect(circle.notice).toMatch(/single-turn only/);
+    expect(circle.notice).toMatch(/potluck run --scope circle/);
 
     const coop = resolveScope("cooperative", "local");
     expect(coop.scope).toBe("mine");
-    expect(coop.notice).toMatch(/single-turn only/);
+    expect(coop.notice).toMatch(/not available for agent sessions/);
   });
 
   it("falls back with a notice for an unknown scope", () => {

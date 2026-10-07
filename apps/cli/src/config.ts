@@ -334,7 +334,9 @@ export function normalizeScope(
   if (v === "circle" || v === "trusted" || v === "cooperative" || v === "pool") {
     return {
       scope: "mine",
-      notice: `scope "${v}" is single-turn only; not available for agent sessions yet — using "mine".`,
+      notice: v === "circle" || v === "trusted"
+        ? `trusted circles take single prompts for now (potluck run --scope circle); agent sessions use local or mine. Using "mine".`
+        : `scope "${v}" is not available for agent sessions; using "mine".`,
     };
   }
   return {

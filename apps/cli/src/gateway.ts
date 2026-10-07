@@ -30,6 +30,8 @@ export interface StreamOptions {
   signal?: AbortSignal;
   /** Routing scope sent as the X-Potluck-Scope header (e.g. "local" | "mine"). */
   scope?: string;
+  /** Trusted circle (name or ID) sent as X-Potluck-Circle with scope "circle". */
+  circle?: string;
   /** Require the terminal SSE marker before accepting a response as complete. */
   requireDone?: boolean;
 }
@@ -48,6 +50,18 @@ function authHeaders(cfg: GatewayConfig): Record<string, string> {
     "content-type": "application/json",
     authorization: `Bearer ${cfg.apiKey}`,
   };
+}
+
+/** The gateway answered a chat request with an error instead of a stream. */
+export class GatewayRefusedError extends Error {
+  /** The gateway's own one-line reason, when it gave one as plain text. */
+  readonly detail: string | null;
+  constructor(readonly status: number, body: string) {
+    super(`gateway POST /chat/completions failed: ${status} ${body}`);
+    let detail: unknown = null;
+    try { detail = (JSON.parse(body) as { detail?: unknown }).detail; } catch { /* not JSON */ }
+    this.detail = typeof detail === "string" && detail.length <= 400 ? detail : null;
+  }
 }
 
 async function bodyText(res: Response): Promise<string> {
@@ -97,6 +111,7 @@ export async function* streamChat(
   // A parallel gateway change adds local|mine routing; sending the header is
   // harmless (ignored) on a gateway that doesn't yet understand it.
   if (opts.scope) headers["x-potluck-scope"] = opts.scope;
+  if (opts.scope === "circle" && opts.circle) headers["x-potluck-circle"] = opts.circle;
 
   const res = await fetch(`${cfg.baseURL}/chat/completions`, {
     method: "POST",
@@ -118,9 +133,8 @@ export async function* streamChat(
   });
 
   if (!res.ok || !res.body) {
-    throw new Error(
-      `gateway POST /chat/completions failed: ${res.status} ${await bodyText(res)}`,
-    );
+    const body = await bodyText(res);
+    throw new GatewayRefusedError(res.status, body);
   }
 
   if (lock && (res.headers.get("x-potluck-model-lock") !== "1"
