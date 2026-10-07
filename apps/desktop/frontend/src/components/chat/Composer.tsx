@@ -228,7 +228,7 @@ function ComposerHint({ isStreaming, modelLoaded, routingScope }: ComposerHintPr
   } else if (routingScope === 'circle') {
     body = (
       <>
-        Runs on a machine in a group you chose and allowed. That machine sees your prompt, but it is one you picked.
+        Runs on a machine in a circle you chose. That machine sees this conversation, including earlier messages, so it can answer.
       </>
     );
   } else if (routingScope === 'cooperative') {

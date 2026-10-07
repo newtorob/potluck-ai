@@ -21,7 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { Network, Cpu, Home } from 'lucide-react';
+import { Network, Cpu, Home, Users } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { SafeExternalLink } from '@/components/ui/SafeExternalLink';
 import { useChatStore, type AppMessage } from '@/stores/chatStore';
@@ -96,13 +96,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   );
 }
 
-/** Three honest privacy states for where a response was produced:
- *   local — nothing left this machine (the local sidecar; no meta emitted).
- *   mine  — left this box but only to your own hardware over the private mesh
- *           (a household peer, or the coordinator routing to one of your peers).
- *   pool  — left this machine to another member's machine in the open pool;
- *           identity-blind, so never a peer name. */
-type RoutePrivacy = 'local' | 'mine' | 'pool';
+/** Honest privacy states for where a response was produced:
+ *   local   — nothing left this machine (the local sidecar; no meta emitted).
+ *   mine    — left this box but only to your own hardware over the private mesh
+ *             (a household peer, or the coordinator routing to one of your peers).
+ *   circle  — left this machine to a machine in a trusted circle you chose.
+ *   pool    — left this machine to another member's machine in the open pool;
+ *             identity-blind, so never a peer name.
+ *   network — answered by another machine, but which tier was not recorded
+ *             (history keeps served_by, not the scope). Claims nothing more. */
+type RoutePrivacy = 'local' | 'mine' | 'circle' | 'pool' | 'network';
 
 function classifyRoute(meta: AppMessage['meta']): RoutePrivacy {
   if (!meta || meta.served_by === 'local') return 'local';
@@ -112,7 +115,9 @@ function classifyRoute(meta: AppMessage['meta']): RoutePrivacy {
   ) {
     return 'mine';
   }
-  return 'pool';
+  if (meta.served_scope === 'circle') return 'circle';
+  if (meta.served_scope === 'pool') return 'pool';
+  return 'network';
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +152,20 @@ function buildReceiptContent(meta: AppMessage['meta']): ReceiptContent {
     };
   }
 
-  // contributor + pool (or contributor with no scope)
+  if (meta.served_scope === 'circle') {
+    return {
+      title: 'Answered by your trusted circle',
+      body: 'A machine owned by a member of your circle answered this. It processed your prompt to generate the reply, so that machine saw your request text. The Potluck coordinator relayed it over encrypted connections, only to machines in the circle you chose.',
+    };
+  }
+
+  if (meta.served_scope !== 'pool') {
+    return {
+      title: 'Answered by another machine',
+      body: 'Another machine on the Potluck network answered this. It processed your prompt to generate the reply, so that machine saw your request text. Which part of the network it ran on was not saved with this conversation.',
+    };
+  }
+
   return {
     title: 'Answered by the open pool',
     body: 'A verified contributor\'s machine answered this. It processed your prompt to generate the reply, so that machine saw your request text. The request carried no account or identity, so they do not know it came from you, and it traveled over the encrypted mesh.',
@@ -176,17 +194,26 @@ function RouteReceipt({ meta }: { meta: AppMessage['meta'] }) {
     Icon = Home;
     badgeTone = 'text-primary/70';
     badgeLabel = meta?.served_peer ? `Your machine · ${meta.served_peer}` : 'Your hardware';
+  } else if (route === 'circle') {
+    Icon = Users;
+    badgeTone = 'text-muted-foreground/70';
+    badgeLabel = 'Trusted circle';
   } else if (route === 'pool') {
     Icon = Network;
     badgeTone = 'text-muted-foreground/70';
     badgeLabel = 'Open pool';
+  } else if (route === 'network') {
+    Icon = Network;
+    badgeTone = 'text-muted-foreground/70';
+    badgeLabel = 'Another machine';
   }
 
-  // Expanded panel tone: sage for local/mine (reassuring), muted for pool (honest, not alarming).
+  // Expanded panel tone: sage when the prompt stayed on your own hardware
+  // (reassuring), muted when another member's machine saw it (honest, not alarming).
   const panelTone =
-    route === 'pool'
-      ? 'border-border/50 bg-muted/30'
-      : 'border-sage/25 bg-sage/5';
+    route === 'local' || route === 'mine'
+      ? 'border-sage/25 bg-sage/5'
+      : 'border-border/50 bg-muted/30';
 
   const receiptId = `receipt-body-${Math.random().toString(36).slice(2, 9)}`;
 

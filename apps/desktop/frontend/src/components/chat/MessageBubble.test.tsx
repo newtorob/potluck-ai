@@ -75,6 +75,41 @@ describe('MessageBubble', () => {
 });
 
 
+describe('route receipt', () => {
+  function openReceipt(label: RegExp): string {
+    fireEvent.click(screen.getByRole('button', { name: label }));
+    return screen.getByRole('region', { name: 'Privacy receipt detail' }).textContent ?? '';
+  }
+
+  it('names a trusted circle answer as the circle, never the open pool', () => {
+    renderBubble(message({ content: 'hi', meta: { served_by: 'contributor', served_scope: 'circle' } }));
+
+    expect(screen.getByText('Trusted circle')).toBeTruthy();
+    expect(screen.queryByText('Open pool')).toBeNull();
+    const detail = openReceipt(/Trusted circle/);
+    expect(detail).toContain('Answered by your trusted circle');
+    expect(detail).toContain('only to machines in the circle you chose');
+    expect(detail).toContain('saw your request text');
+    expect(detail).not.toContain('do not know it came from you');
+  });
+
+  it('keeps the open pool receipt for an open pool answer', () => {
+    renderBubble(message({ content: 'hi', meta: { served_by: 'contributor', served_scope: 'pool' } }));
+
+    expect(openReceipt(/Open pool/)).toContain('Answered by the open pool');
+  });
+
+  it('claims nothing about anonymity when the tier was not saved', () => {
+    // Reloaded history keeps served_by but not the scope.
+    renderBubble(message({ content: 'hi', meta: { served_by: 'contributor' } }));
+
+    expect(screen.queryByText('Open pool')).toBeNull();
+    const detail = openReceipt(/Another machine/);
+    expect(detail).toContain('saw your request text');
+    expect(detail).not.toContain('do not know it came from you');
+  });
+});
+
 describe('restart control', () => {
   const recovery = { messages: [], modelSlug: 'same-model', excludedPeerIds: ['p1'],
     routingMode: 'capability' as const, historyAllowed: false };

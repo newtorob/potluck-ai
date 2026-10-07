@@ -651,9 +651,11 @@ export const localApi = {
    * — same shape /chat/completions emits, so streamTokens() consumes
    *   it without any modification.
    *
-   * This desktop path sends only the latest prompt. Routing scope is always
-   * explicit: a selected circle must never inherit the coordinator's pool
-   * default. Conversation-history sharing is configured separately.
+   * Routing scope is always explicit: a selected circle must never inherit
+   * the coordinator's pool default. The open pool gets only the latest
+   * prompt. A trusted circle also gets the conversation so far, so a
+   * follow-up makes sense to the machine that answers; history never rides
+   * on a request without a circle.
    */
   streamNetworkJob(
     prompt: string,
@@ -664,6 +666,8 @@ export const localApi = {
       abortSignal?: AbortSignal;
       /** When set, the coordinator only routes to members of this circle. */
       circleId?: string;
+      /** Conversation so far (role + content only). Sent to a circle only. */
+      messages?: { role: string; content: string }[];
     },
   ): Promise<Response> {
     const body: Record<string, unknown> = {
@@ -677,6 +681,9 @@ export const localApi = {
     };
     if (options.circleId !== undefined) {
       body['circle_id'] = options.circleId;
+      if (options.messages !== undefined && options.messages.length > 0) {
+        body['messages'] = options.messages.map((m) => ({ role: m.role, content: m.content }));
+      }
     }
     const init: RequestInit = {
       method: 'POST',

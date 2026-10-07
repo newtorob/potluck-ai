@@ -21,7 +21,7 @@ import { useSettings } from '@/hooks/useSettings';
 import { useHealth } from '@/hooks/useHealth';
 import { useCoordinatorHealth } from '@/hooks/useCoordinatorHealth';
 import { ViewHeader } from '@/components/layout/ViewHeader';
-import { useChatStore } from '@/stores/chatStore';
+import { reconcileCircleSelection, useChatStore } from '@/stores/chatStore';
 import type { RoutingScope } from '@/stores/chatStore';
 import { useMeshStore } from '@/stores/meshStore';
 import { localApi } from '@/lib/localApi';
@@ -73,7 +73,13 @@ export function ChatView() {
     localApi.circles
       .list()
       .then((res) => {
-        if (!cancelled) setCircles(res.circles);
+        if (cancelled) return;
+        setCircles(res.circles);
+        // A remembered circle may have been deleted since; a lone circle
+        // needs no picking.
+        const current = useChatStore.getState().activeCircleId;
+        const next = reconcileCircleSelection(current, res.circles);
+        if (next !== current) setActiveCircleId(next);
       })
       .catch(() => {
         // Coordinator unreachable — circles stays empty; tier stays disabled.
@@ -81,7 +87,7 @@ export function ChatView() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setActiveCircleId]);
 
   // Household-peer availability — mesh store polls the sidecar; we gate
   // the household tier on having at least one reachable peer.
@@ -342,7 +348,7 @@ function ScopeSelector({
       icon: Users,
       hint:
         circles.length > 0
-          ? 'Runs on a machine in a circle you trust. The machine that answers sees your prompt.'
+          ? 'Runs on a machine in a circle you trust. The machine that answers sees this conversation.'
           : 'Runs on a machine in a circle you trust. Set up a circle in Circles first.',
       ...(circles.length === 0 && {
         unavailableReason: 'No circles yet. Go to Circles to create one.',

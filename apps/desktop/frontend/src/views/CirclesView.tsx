@@ -205,9 +205,9 @@ export function CirclesView() {
 
         {/* Privacy footer */}
         <p className="pt-2 text-[11px] text-muted-foreground/70 max-w-2xl">
-          When you route a chat through a trusted circle, the coordinator picks
-          from that circle's members only. The member whose machine answers sees
-          your prompt. No one outside the circle is involved.
+          When you route a chat through a trusted circle, the Potluck
+          coordinator passes that conversation to one machine in the circle and
+          to no other machine. The member whose machine answers can see it.
         </p>
       </div>
     </div>

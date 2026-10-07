@@ -41,6 +41,35 @@ describe('network request routing contract', () => {
     });
   });
 
+  it('sends the conversation to a circle as role and content only', async () => {
+    await localApi.streamNetworkJob('and Italy?', {
+      modelSlug: 'test-model',
+      circleId: '11111111-1111-4111-8111-111111111111',
+      messages: [
+        { role: 'user', content: 'capital of France?', id: 'm1', createdAt: 5 } as never,
+        { role: 'assistant', content: 'Paris.' },
+        { role: 'user', content: 'and Italy?' },
+      ],
+    });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    expect(body.prompt).toBe('and Italy?');
+    expect(body.messages).toEqual([
+      { role: 'user', content: 'capital of France?' },
+      { role: 'assistant', content: 'Paris.' },
+      { role: 'user', content: 'and Italy?' },
+    ]);
+  });
+
+  it('never sends history to the open pool, even when handed some', async () => {
+    await localApi.streamNetworkJob('pool prompt', {
+      modelSlug: 'test-model',
+      messages: [{ role: 'user', content: 'earlier' }, { role: 'user', content: 'pool prompt' }],
+    });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).not.toHaveProperty('messages');
+  });
+
   it('sends an explicit pool scope without a circle ID for open-pool chat', async () => {
     await localApi.streamNetworkJob('pool prompt', { modelSlug: 'test-model' });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];

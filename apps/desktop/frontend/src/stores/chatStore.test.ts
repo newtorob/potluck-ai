@@ -55,7 +55,7 @@ function setChatHistoryEnabled(enabled: boolean): void {
   settingsMock.settings = { privacy: { chat_history_enabled: enabled } };
 }
 
-import { useChatStore } from './chatStore';
+import { reconcileCircleSelection, useChatStore } from './chatStore';
 
 function doneSse(): Response {
   return new Response('data: [DONE]\n\n', {
@@ -246,6 +246,37 @@ describe('chatStore persistence and routing', () => {
       expect.objectContaining({ circleId: 'selected-circle' }),
     );
     expect(streamChat).not.toHaveBeenCalled();
+  });
+
+  it('sends a circle the conversation so far and the open pool only the prompt', async () => {
+    history.create.mockResolvedValue({});
+    useChatStore.setState({ routingScope: 'circle', activeCircleId: 'selected-circle' });
+    await useChatStore.getState().sendMessage('first question');
+    expect(streamNetworkJob.mock.calls[0]?.[1]).toMatchObject({
+      messages: [{ role: 'user', content: 'first question' }],
+    });
+
+    streamNetworkJob.mockClear();
+    useChatStore.setState({ routingScope: 'cooperative', activeCircleId: null });
+    await useChatStore.getState().sendMessage('second question');
+    expect(streamNetworkJob.mock.calls[0]?.[1]).not.toHaveProperty('messages');
+  });
+
+  it('remembers the chosen circle and forgets it when cleared', () => {
+    useChatStore.getState().setActiveCircleId('circle-a');
+    expect(window.localStorage.getItem('potluck.active_circle_id')).toBe('circle-a');
+    useChatStore.getState().setActiveCircleId(null);
+    expect(window.localStorage.getItem('potluck.active_circle_id')).toBeNull();
+  });
+
+  it('resolves a remembered circle against the circles that still exist', () => {
+    const a = { id: 'a' };
+    const b = { id: 'b' };
+    expect(reconcileCircleSelection('a', [a, b])).toBe('a');
+    expect(reconcileCircleSelection('gone', [a, b])).toBeNull();
+    expect(reconcileCircleSelection('gone', [b])).toBe('b');
+    expect(reconcileCircleSelection(null, [a])).toBe('a');
+    expect(reconcileCircleSelection(null, [])).toBeNull();
   });
 
   it('fails without dispatch when circle scope has no selected circle', async () => {

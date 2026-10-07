@@ -57,6 +57,24 @@ const ROUTING_MODE_KEY = 'potluck.household_routing_mode';
 export type RoutingScope = 'local' | 'household' | 'circle' | 'cooperative';
 
 const ROUTING_SCOPE_KEY = 'potluck.routing_scope';
+const ACTIVE_CIRCLE_KEY = 'potluck.active_circle_id';
+
+function readBootstrapActiveCircle(): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(ACTIVE_CIRCLE_KEY) || null;
+}
+
+/** The circle a remembered choice resolves to once the member's circles are
+ *  known: the remembered one if it still exists, else the only circle, else
+ *  none (the picker asks). */
+export function reconcileCircleSelection(
+  activeId: string | null,
+  circles: readonly { id: string }[],
+): string | null {
+  if (activeId !== null && circles.some((c) => c.id === activeId)) return activeId;
+  const only = circles.length === 1 ? circles[0] : undefined;
+  return only ? only.id : null;
+}
 
 function readBootstrapRoutingScope(): RoutingScope {
   if (typeof window === 'undefined') return 'local';
@@ -416,7 +434,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
   streamingMessageId: null,
   abortController: null,
   routingScope: _initScope,
-  activeCircleId: null,
+  activeCircleId: readBootstrapActiveCircle(),
   networkMode: _initNetworkMode,
   // Default slug until the user picks from the models the network advertises
   // (the selectable chip rack in /network). qwen2.5:3b-instruct-q4_K_M is what
@@ -831,6 +849,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           modelSlug: networkModelSlug,
           abortSignal: controller.signal,
           circleId: activeCircleId,
+          messages: apiMessages.map((m) => ({ role: m.role, content: m.content })),
         });
       } else if (routingScope === 'cooperative') {
         response = await localApi.streamNetworkJob(content, {
@@ -1242,6 +1261,12 @@ export const useChatStore = create<ChatState>()((set, get) => {
   },
 
   setActiveCircleId(id) {
+    // Remembered like the scope, so a restart with the circle scope still
+    // selected has a circle to send to.
+    if (typeof window !== 'undefined') {
+      if (id === null) window.localStorage.removeItem(ACTIVE_CIRCLE_KEY);
+      else window.localStorage.setItem(ACTIVE_CIRCLE_KEY, id);
+    }
     set({ activeCircleId: id });
   },
 
