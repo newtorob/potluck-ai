@@ -37,6 +37,7 @@ import type { RoutingMode } from '@/lib/householdInference';
 import { useMeshStore } from '@/stores/meshStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { persistUiPref } from '@/lib/sidecarPersist';
+import { networkRefusalCopy } from '@/lib/networkRefusal';
 
 const ROUTING_MODE_KEY = 'potluck.household_routing_mode';
 
@@ -868,6 +869,13 @@ export const useChatStore = create<ChatState>()((set, get) => {
       }
 
       if (!response.ok) {
+        if (routingScope === 'circle' || routingScope === 'cooperative') {
+          const copy = networkRefusalCopy(routingScope, response.status, networkModelSlug);
+          if (copy !== null) {
+            await response.body?.cancel();
+            throw new Error(copy);
+          }
+        }
         // Surface the response body's `detail` / `error` when present so the
         // user sees the actionable reason (e.g. coordinator's "No online peer
         // serves model 'X'") instead of a generic "Service Unavailable."

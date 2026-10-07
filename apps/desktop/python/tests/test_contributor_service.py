@@ -293,6 +293,15 @@ async def test_changing_who_the_machine_serves_reconnects(monkeypatch, tmp_path)
     assert not svc.is_running and svc.status()["state"] == "disabled"
 
 
+def test_work_served_by_a_circle_only_machine_is_counted_as_circle_work():
+    svc = cs.ContributorService()
+    assert svc._served_scope() == "pool", "unknown audience keeps the old label"
+    svc._status.audiences = ["circle", "pool"]
+    assert svc._served_scope() == "pool"
+    svc._status.audiences = ["circle"]
+    assert svc._served_scope() == "circle"
+
+
 def test_an_outdated_coordinator_has_its_own_reject_category():
     assert cs.reject_category("this coordinator cannot limit who the machine serves") == "coordinator_outdated"
 

@@ -215,8 +215,9 @@ export function ConnectStep() {
                 Share spare compute with the network
               </p>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                When idle, this machine serves inference requests from the open
-                pool. You earn compute credits others can use. Off by default.
+                While on, this machine can answer requests from your other
+                machines using its loaded model. Sharing it with a trusted
+                circle is a separate choice under Network. Off by default.
               </p>
             </div>
             <input

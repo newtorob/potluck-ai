@@ -173,11 +173,21 @@ async def test_delete_circle_404_for_other_member(db_session: AsyncSession) -> N
 # ─── CRUD: add member ────────────────────────────────────────────────────────
 
 
+def _machine_key() -> str:
+    """A real machine key, encoded the way the app shows it."""
+    import base64
+
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    raw = Ed25519PrivateKey.generate().public_key().public_bytes_raw()
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
 @pytest.mark.asyncio
 async def test_add_circle_member_success(db_session: AsyncSession) -> None:
     tag = uuid.uuid4().hex[:8]
     c = await _seed_circle(db_session, owner=STUB_MEMBER_ID, name=f"adder-{tag}")
-    pubkey = f"edpk-{tag}"
+    pubkey = _machine_key()
 
     resp = await add_circle_member(
         c.id, AddCircleMemberRequest(member_pubkey=pubkey), db=db_session,
@@ -193,7 +203,7 @@ async def test_add_circle_member_409_on_duplicate(db_session: AsyncSession) -> N
 
     tag = uuid.uuid4().hex[:8]
     c = await _seed_circle(db_session, owner=STUB_MEMBER_ID, name=f"dup-{tag}")
-    pubkey = f"edpk-dup-{tag}"
+    pubkey = _machine_key()
     await _seed_member(db_session, c, pubkey)
 
     with pytest.raises(HTTPException) as exc:
@@ -217,6 +227,25 @@ async def test_add_circle_member_404_for_other_member_circle(db_session: AsyncSe
             member_id=STUB_MEMBER_ID,
         )
     assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("not_a_key", ["some-key", "typo", "A" * 42, "!!!!"])
+async def test_add_circle_member_400_when_not_a_machine_key(db_session: AsyncSession, not_a_key) -> None:
+    from fastapi import HTTPException
+
+    c = await _seed_circle(db_session, owner=STUB_MEMBER_ID, name=f"typo-{uuid.uuid4().hex[:8]}")
+    with pytest.raises(HTTPException) as exc:
+        await add_circle_member(
+            c.id, AddCircleMemberRequest(member_pubkey=not_a_key), db=db_session,
+            member_id=STUB_MEMBER_ID,
+        )
+    assert exc.value.status_code == 400
+    assert "not a Potluck machine key" in exc.value.detail
+    stored = (await db_session.execute(
+        select(CircleMember).where(CircleMember.circle_id == c.id)
+    )).scalars().all()
+    assert stored == []
 
 
 # ─── CRUD: remove member ─────────────────────────────────────────────────────

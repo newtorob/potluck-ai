@@ -198,10 +198,19 @@ async def add_circle_member(
 ) -> CircleMemberOut:
     """Add a member pubkey to the caller's circle.
 
-    Returns 404 if the circle doesn't belong to the caller, 409 if the
-    pubkey is already in the circle.
+    Returns 404 if the circle doesn't belong to the caller, 400 if the value
+    is not a machine key at all, 409 if the pubkey is already in the circle.
     """
     await _get_own_circle(db, circle_id, member_id)
+    # A mistyped or truncated key used to be stored and then never routed to,
+    # with nothing to tell the owner why their friend's machine never answered.
+    try:
+        decode_ed25519_public_key(req.member_pubkey, field_name="member_pubkey")
+    except KeyDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="That is not a Potluck machine key. Ask them to copy it again from Trusted circles.",
+        )
     entry = CircleMember(circle_id=circle_id, member_pubkey=req.member_pubkey)
     db.add(entry)
     try:

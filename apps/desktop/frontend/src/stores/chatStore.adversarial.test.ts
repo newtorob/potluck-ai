@@ -235,11 +235,28 @@ describe('contributor text containment', () => {
     expect(lastMessage()?.errorText).toBe('The contributor could not finish this reply.');
   });
 
-  it('documents that a non-ok coordinator response body is rendered verbatim', async () => {
+  it('uses its own words for a refusal it understands, never the response body', async () => {
     useChatStore.setState({ routingScope: 'cooperative', networkMode: true });
     streamNetworkJob.mockResolvedValue(
       new Response(JSON.stringify({ detail: HOSTILE }), {
         status: 503,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    await useChatStore.getState().createConversation();
+    await useChatStore.getState().sendMessage('hello');
+    await flush();
+
+    expect(lastMessage()?.errorText).not.toContain('potluck-support.example');
+    expect(lastMessage()?.errorText).toContain('No machine on the open pool is offering');
+  });
+
+  it('documents that any other non-ok coordinator response body is rendered verbatim', async () => {
+    useChatStore.setState({ routingScope: 'cooperative', networkMode: true });
+    streamNetworkJob.mockResolvedValue(
+      new Response(JSON.stringify({ detail: HOSTILE }), {
+        status: 500,
         headers: { 'Content-Type': 'application/json' },
       }),
     );

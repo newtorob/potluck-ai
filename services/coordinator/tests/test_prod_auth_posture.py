@@ -293,7 +293,14 @@ def test_frontend_direct_routes_succeed_session_only(prod_posture_env: None) -> 
             resp = client.get("/me/circles")
             results[("GET", "/me/circles")] = resp.status_code
 
-            member_pubkey = "prod-posture-member-pubkey"
+            # A real machine key: the endpoint refuses anything else.
+            import base64
+
+            from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+            member_pubkey = base64.urlsafe_b64encode(
+                Ed25519PrivateKey.generate().public_key().public_bytes_raw()
+            ).rstrip(b"=").decode("ascii")
             resp = client.post(
                 f"/me/circles/{circle_id}/members",
                 json={"member_pubkey": member_pubkey},

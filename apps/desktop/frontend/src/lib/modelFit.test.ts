@@ -29,7 +29,10 @@ describe('model choice', () => {
     const cpu = { ...hardware, gpu_vram_gb: 2, inference_gpu_available: false };
     expect(checkModelFit(model, cpu)).toBe('ok');
     expect(checkModelFit({ ...model, min_ram_gb: 32 }, cpu)).toBe('insufficient');
-    expect(checkModelFit(model, { ...cpu, inference_gpu_available: undefined })).toBe('ok');
+    // An engine from before the field existed sends no value at all.
+    const older: HardwareInfo = { ...cpu };
+    delete older.inference_gpu_available;
+    expect(checkModelFit(model, older)).toBe('ok');
   });
 
   it('uses the backend device capacity instead of an unrelated detected card', () => {

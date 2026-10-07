@@ -467,6 +467,13 @@ class ContributorService:
             st.state = "stopped"
             st.jobs_in_flight = 0
 
+    def _served_scope(self) -> str:
+        """What a job served for someone else counts as. The wire does not
+        say whether a job came from a circle or the pool, but a machine that
+        never offered itself to the pool can only have served a circle."""
+        audiences = self._status.audiences
+        return "circle" if audiences is not None and "pool" not in audiences else "pool"
+
     async def _serve_job(self, ws: Any, job: JobAssignedMessage) -> None:
         """Serve one coordinator job through the sidecar runtime.
 
@@ -538,7 +545,7 @@ class ContributorService:
                 from potluck_local.services.usage_store import record_usage_event
 
                 await record_usage_event(
-                    direction="served", scope="pool", model_slug=loaded,
+                    direction="served", scope=self._served_scope(), model_slug=loaded,
                     output_tokens=token_index, duration_ms=duration_ms, ok=True,
                 )
             except Exception:  # noqa: BLE001
