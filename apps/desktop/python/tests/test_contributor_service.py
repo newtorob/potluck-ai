@@ -394,6 +394,9 @@ def test_status_tracks_loop_events():
 def test_status_and_session_endpoints(monkeypatch, tmp_path, caplog):
     from potluck_local.app import create_app
 
+    # App boot hands a stored sign-in to the contributor; keep the
+    # developer's real one out of the test.
+    monkeypatch.setenv("POTLUCK_DATA_DIR", str(tmp_path))
     fake = cs.ContributorService(runtime_getter=FakeRuntime, loop_runner=FakeLoopRunner())
     cs.set_contributor_service_for_tests(fake)
     try:

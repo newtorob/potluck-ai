@@ -43,6 +43,7 @@ from typing import Any
 
 import websockets
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from pydantic import ValidationError
 
 from potluck_local.contributor.config import Settings, get_settings
 from potluck_local.contributor.keys import ensure_keypair, public_key_b64
@@ -73,6 +74,10 @@ CLIENT_VERSION = "0.0.2-dev"
 
 # How long to wait for an accept/reject after sending attestation.
 HANDSHAKE_RESPONSE_TIMEOUT_S = 10.0
+
+# How often a connected peer compares what it can serve now with what it
+# told the coordinator at the handshake.
+CAPABILITY_CHECK_INTERVAL_S = 5.0
 
 # Reconnect backoff bounds.
 RECONNECT_BACKOFF_INITIAL_S = 1.0
@@ -219,10 +224,20 @@ async def _do_handshake(
     settings: Settings,
     priv: Ed25519PrivateKey,
     hooks: LoopHooks,
-) -> AcceptMessage:
-    # 1) receive challenge
-    raw = await ws.recv()
-    challenge = ChallengeMessage.model_validate_json(raw)
+) -> tuple[AcceptMessage, list[CapabilityEntry]]:
+    # 1) receive challenge. A peer with no valid sign-in gets a reject here
+    # in place of the challenge, so that case is a reject too.
+    raw = await asyncio.wait_for(ws.recv(), timeout=HANDSHAKE_RESPONSE_TIMEOUT_S)
+    try:
+        first = json.loads(raw)
+    except json.JSONDecodeError:
+        raise HandshakeFailed("unreadable first message from coordinator") from None
+    if isinstance(first, dict) and first.get("type") == "reject":
+        raise HandshakeFailed(str(first.get("reason") or "rejected"))
+    try:
+        challenge = ChallengeMessage.model_validate(first)
+    except ValidationError:
+        raise HandshakeFailed("unexpected first message from coordinator") from None
     nonce_bytes = base64.urlsafe_b64decode(
         challenge.nonce + "=" * (-len(challenge.nonce) % 4)
     )
@@ -253,7 +268,7 @@ async def _do_handshake(
     msg = json.loads(raw)
     msg_type = msg.get("type")
     if msg_type == "accept":
-        return AcceptMessage.model_validate(msg)
+        return AcceptMessage.model_validate(msg), capabilities
     if msg_type == "reject":
         reject = RejectMessage.model_validate(msg)
         raise HandshakeFailed(reject.reason)
@@ -598,6 +613,40 @@ async def _stop_watch(ws: Any, stop: asyncio.Event) -> None:
     await ws.close()
 
 
+def _slugs(capabilities: list[CapabilityEntry]) -> frozenset[str]:
+    return frozenset(c.model_slug for c in capabilities)
+
+
+async def _capability_watch(
+    ws: Any, hooks: LoopHooks, tracker: JobTracker, advertised: frozenset[str]
+) -> None:
+    """End the session once what this machine can serve has changed.
+
+    Capabilities travel only in the attestation, so a model loaded, swapped
+    or unloaded after connecting (or a sharing window opening) reaches the
+    coordinator only through a new handshake. Acts on two matching checks
+    and an idle connection, so a brief flap or a job in flight never costs
+    a reconnect."""
+    pending: frozenset[str] | None = None
+    while True:
+        await asyncio.sleep(CAPABILITY_CHECK_INTERVAL_S)
+        try:
+            current = _slugs(await hooks.capabilities_provider())
+        except Exception:  # noqa: BLE001
+            continue
+        if current == advertised:
+            pending = None
+            continue
+        if current != pending:
+            pending = current
+            continue
+        if tracker.count:
+            continue
+        logger.info("capabilities_changed reconnecting")
+        await ws.close()
+        return
+
+
 async def _session(
     settings: Settings,
     priv: Ed25519PrivateKey,
@@ -610,7 +659,7 @@ async def _session(
         settings.coordinator_url, extra_headers=hooks.headers_provider()
     ) as ws:
         try:
-            accept = await _do_handshake(ws, settings, priv, hooks)
+            accept, advertised = await _do_handshake(ws, settings, priv, hooks)
         except HandshakeFailed as e:
             logger.error("handshake_rejected reason=%s", e)
             _emit(hooks, "rejected", reason=str(e))
@@ -636,6 +685,7 @@ async def _session(
             asyncio.create_task(_heartbeat_loop(ws, accept, hooks, tracker)),
             asyncio.create_task(_receive_loop(ws, hooks, tracker)),
             asyncio.create_task(_stop_watch(ws, stop)),
+            asyncio.create_task(_capability_watch(ws, hooks, tracker, _slugs(advertised))),
         ]
         try:
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -694,6 +744,14 @@ async def run_contributor_loop(
             if stop.is_set():
                 break
             logger.warning("disconnected error=%s retry_in_s=%.1f", e, backoff)
+            _emit(hooks, "disconnected", error=type(e).__name__)
+        except Exception as e:  # noqa: BLE001
+            # Anything unforeseen is one failed session, never the end of
+            # the loop: the toggle is still on and the member expects it to
+            # come back.
+            if stop.is_set():
+                break
+            logger.error("session_failed error=%s retry_in_s=%.1f", type(e).__name__, backoff)
             _emit(hooks, "disconnected", error=type(e).__name__)
         if stop.is_set():
             break

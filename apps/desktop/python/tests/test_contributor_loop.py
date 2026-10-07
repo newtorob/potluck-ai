@@ -40,6 +40,10 @@ class FakeCoordinator:
     """Accepts one peer at a time, records everything it sends."""
 
     reject_reason: str | None = None
+    # What the real coordinator does to a peer with no valid credential: a
+    # reject frame in place of the challenge, then close.
+    pre_challenge_reject: str | None = None
+    first_frame: str | None = None
     heartbeat_interval_s: int = 1
     attestations: list[dict] = field(default_factory=list)
     heartbeats: list[dict] = field(default_factory=list)
@@ -64,6 +68,14 @@ class FakeCoordinator:
     async def _handler(self, ws):
         self.connections += 1
         self.headers.append(dict(ws.request_headers))
+        if self.pre_challenge_reject:
+            await ws.send(json.dumps({"type": "reject", "reason": self.pre_challenge_reject}))
+            await ws.close(code=1008)
+            return
+        if self.first_frame is not None:
+            await ws.send(self.first_frame)
+            await ws.close(code=1008)
+            return
         nonce = base64.urlsafe_b64encode(b"n" * 32).rstrip(b"=").decode()
         await ws.send(json.dumps({"type": "challenge", "nonce": nonce}))
         attest = json.loads(await ws.recv())
@@ -277,6 +289,118 @@ async def test_reject_surfaces_reason_and_backs_off(monkeypatch):
     assert coord.connections >= 2, "should retry after a reject"
     rejected = [f for e, f in hooks.events if e == "rejected"]
     assert rejected and "not registered" in rejected[0]["reason"]
+
+
+@run_async
+async def test_reject_before_challenge_is_reported_and_retried(monkeypatch):
+    """The coordinator refuses a peer with no valid sign-in before it ever
+    sends a challenge. That is a reject like any other: reported, retried,
+    and recovered from once the member signs in."""
+    monkeypatch.setattr(contributor, "RECONNECT_BACKOFF_INITIAL_S", 0.05)
+    async with FakeCoordinator(pre_challenge_reject="unauthorized") as coord:
+        hooks = _hooks()
+        stop = asyncio.Event()
+        task = asyncio.create_task(contributor.run_contributor_loop(
+            _settings(coord.url), Ed25519PrivateKey.generate(), hooks, stop))
+        deadline = asyncio.get_event_loop().time() + 3
+        while coord.connections < 2 and asyncio.get_event_loop().time() < deadline:
+            await asyncio.sleep(0.02)
+        assert not task.done(), "the loop must survive a reject before the challenge"
+        coord.pre_challenge_reject = None
+        await coord.wait_connected()
+        stop.set()
+        await asyncio.wait_for(task, 5)
+    rejected = [f for e, f in hooks.events if e == "rejected"]
+    assert rejected and rejected[0]["reason"] == "unauthorized"
+    assert "connected" in [e for e, _ in hooks.events]
+
+
+@run_async
+async def test_unreadable_first_frame_does_not_end_the_loop(monkeypatch):
+    monkeypatch.setattr(contributor, "RECONNECT_BACKOFF_INITIAL_S", 0.05)
+    async with FakeCoordinator(first_frame="not json") as coord:
+        hooks = _hooks()
+        stop = asyncio.Event()
+        task = asyncio.create_task(contributor.run_contributor_loop(
+            _settings(coord.url), Ed25519PrivateKey.generate(), hooks, stop))
+        deadline = asyncio.get_event_loop().time() + 3
+        while coord.connections < 2 and asyncio.get_event_loop().time() < deadline:
+            await asyncio.sleep(0.02)
+        assert not task.done()
+        coord.first_frame = None
+        await coord.wait_connected()
+        stop.set()
+        await asyncio.wait_for(task, 5)
+    assert coord.connections >= 3
+
+
+@run_async
+async def test_model_loaded_after_connect_is_advertised(monkeypatch):
+    """Capabilities travel only in the attestation, so a model loaded after
+    connecting has to reach the coordinator through a new handshake."""
+    monkeypatch.setattr(contributor, "CAPABILITY_CHECK_INTERVAL_S", 0.05)
+    monkeypatch.setattr(contributor, "RECONNECT_BACKOFF_INITIAL_S", 0.05)
+    loaded: list[str] = []
+
+    async def capabilities():
+        return [CapabilityEntry(model_slug=s, quantization="q4") for s in loaded]
+
+    async with FakeCoordinator() as coord:
+        hooks = _hooks(capabilities_provider=capabilities)
+        stop = asyncio.Event()
+        task = asyncio.create_task(contributor.run_contributor_loop(
+            _settings(coord.url), Ed25519PrivateKey.generate(), hooks, stop))
+        await coord.wait_connected()
+        assert coord.attestations[0]["capabilities"] == []
+        loaded.append("late-model")
+        deadline = asyncio.get_event_loop().time() + 3
+        while len(coord.attestations) < 2 and asyncio.get_event_loop().time() < deadline:
+            await asyncio.sleep(0.02)
+        await coord.wait_connected()
+        await asyncio.sleep(0.3)
+        stop.set()
+        await asyncio.wait_for(task, 5)
+    assert [c["model_slug"] for c in coord.attestations[-1]["capabilities"]] == ["late-model"]
+    assert len(coord.attestations) == 2, "one reconnect, then steady"
+
+
+@run_async
+async def test_capability_change_waits_for_the_job_in_flight(monkeypatch):
+    monkeypatch.setattr(contributor, "CAPABILITY_CHECK_INTERVAL_S", 0.05)
+    monkeypatch.setattr(contributor, "RECONNECT_BACKOFF_INITIAL_S", 0.05)
+    loaded = ["fake-slug"]
+    started, release = asyncio.Event(), asyncio.Event()
+
+    async def capabilities():
+        return [CapabilityEntry(model_slug=s, quantization="q4") for s in loaded]
+
+    async def slow_job(ws, job: JobAssignedMessage):
+        started.set()
+        await release.wait()
+        await ws.send(json.dumps({"type": "job_complete", "job_id": str(job.job_id),
+                                  "output_tokens": 0, "duration_ms": 1,
+                                  "finish_reason": "stop"}))
+
+    async with FakeCoordinator() as coord:
+        hooks = _hooks(capabilities_provider=capabilities, job_handler=slow_job)
+        stop = asyncio.Event()
+        task = asyncio.create_task(contributor.run_contributor_loop(
+            _settings(coord.url), Ed25519PrivateKey.generate(), hooks, stop))
+        await coord.wait_connected()
+        job_id = await coord.assign()
+        await asyncio.wait_for(started.wait(), 3)
+        loaded[:] = ["other-model"]
+        await asyncio.sleep(0.5)
+        assert coord.connections == 1, "never drop a connection with a job in flight"
+        release.set()
+        await coord.wait_for_frame(lambda f: f.get("type") == "job_complete"
+                                   and f.get("job_id") == str(job_id))
+        deadline = asyncio.get_event_loop().time() + 3
+        while len(coord.attestations) < 2 and asyncio.get_event_loop().time() < deadline:
+            await asyncio.sleep(0.02)
+        stop.set()
+        await asyncio.wait_for(task, 5)
+    assert [c["model_slug"] for c in coord.attestations[-1]["capabilities"]] == ["other-model"]
 
 
 @run_async
