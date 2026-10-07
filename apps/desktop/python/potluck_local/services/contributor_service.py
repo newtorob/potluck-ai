@@ -204,6 +204,10 @@ class ContributorService:
     def has_member_session(self) -> bool:
         return self._session_token is not None
 
+    def member_session_token(self) -> str | None:
+        """The held session, for the engine's own coordinator calls."""
+        return self._session_token
+
     async def apply_settings(self, settings: PotluckSettings) -> None:
         """Reconcile the running state with what settings ask for."""
         async with self._lock:

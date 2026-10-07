@@ -26,7 +26,7 @@ def transport(monkeypatch):
         monkeypatch.setattr(httpx, 'AsyncClient', lambda **kw: real_client(
             transport=httpx.MockTransport(lambda req: httpx.Response(200, text=body)), **kw))
         monkeypatch.setattr(pool, 'coordinator_http_base', lambda: 'https://coordinator.example')
-        monkeypatch.setattr(pool, '_headers', lambda: {})
+        monkeypatch.setattr(pool, '_headers', lambda base=None: {})
         monkeypatch.setattr(pool, '_pool_multiturn_enabled', lambda: False)
     return install
 

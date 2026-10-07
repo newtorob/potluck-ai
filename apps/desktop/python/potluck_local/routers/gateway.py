@@ -113,6 +113,15 @@ async def model_lock_capabilities() -> dict:
     return {"model_lock_version": 1, "scopes": ["local", "mine"], "artifact_format": "gguf"}
 
 
+async def _circle_id(selector: str | None) -> str:
+    """The one circle a circle-scoped request goes to, or the HTTP error that
+    tells the caller how to choose."""
+    try:
+        return await pool_routing.resolve_circle_id(selector)
+    except pool_routing.CircleSelectionError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
 async def _locked_route(runtime, model: str | None, digest: str, scope: str):
     if not model:
         raise HTTPException(400, "A model ID is required with potluck_model_sha256.")
@@ -157,6 +166,7 @@ async def model_readiness(req: ReadinessRequest) -> dict:
 async def chat_completions_openai(
     req: ChatCompletionRequest,
     x_potluck_scope: str | None = Header(default=None),
+    x_potluck_circle: str | None = Header(default=None),
 ):
     """OpenAI /v1/chat/completions. Serves the local model, or routes to a
     household peer (your own machine over the mesh) that has the requested model
@@ -180,6 +190,7 @@ async def chat_completions_openai(
     # True. "pool" = open pool (strangers, single-turn by default); "circle" =
     # trusted members (always multi-turn).
     coordinator_scope = pool_routing._POOL_SCOPE
+    circle_id: str | None = None
 
     digest = req.potluck_model_sha256
     identity = {"expected_model": req.model or local, "expected_sha256": digest}
@@ -211,12 +222,8 @@ async def chat_completions_openai(
             )
     elif scope == "circle":
         # Trusted-circle routing: go directly to the coordinator with circle scope
-        # (full messages always sent — trusted members). Requires coordinator URL.
-        if not pool_routing.pool_available():
-            raise HTTPException(
-                status_code=503,
-                detail="circle routing requires a configured coordinator URL",
-            )
+        # (full messages always sent — trusted members), naming one circle.
+        circle_id = await _circle_id(x_potluck_circle)
         use_pool = True
         coordinator_scope = pool_routing._CIRCLE_SCOPE
     else:
@@ -264,7 +271,7 @@ async def chat_completions_openai(
                     # only the last user message (prompt) crosses the wire.
                     async for chunk in pool_routing.stream_pool_openai(
                         messages, served_model, req.temperature, max_tokens,
-                        scope=coordinator_scope,
+                        scope=coordinator_scope, circle_id=circle_id,
                     ):
                         yield f"data: {json.dumps(chunk)}\n\n"
                 elif peer:
@@ -303,7 +310,7 @@ async def chat_completions_openai(
         if use_pool:
             result = await pool_routing.complete_pool_openai(
                 messages, served_model, req.temperature, max_tokens,
-                scope=coordinator_scope,
+                scope=coordinator_scope, circle_id=circle_id,
             )
         elif peer:
             result = await gateway_routing.complete_peer_openai(
@@ -321,7 +328,7 @@ async def chat_completions_openai(
         # Surface the coordinator's real status when it's meaningful (e.g. 503
         # "no peer serves this model" — same condition as a local 404); any other
         # upstream failure is a bad-gateway (502).
-        status = exc.status_code if exc.status_code in (404, 503) else 502
+        status = exc.status_code if exc.status_code in (401, 404, 503) else 502
         raise HTTPException(status_code=status, detail=exc.detail)
     except Exception as exc:  # noqa: BLE001
         logger.exception("gateway_chat_failed")
@@ -360,6 +367,7 @@ def _prompt_to_message(prompt: str | list[str]) -> str:
 async def text_completions(
     req: CompletionRequest,
     x_potluck_scope: str | None = Header(default=None),
+    x_potluck_circle: str | None = Header(default=None),
 ):
     """OpenAI legacy /v1/completions. Converts prompt → user message and reuses
     the same local→household→pool routing path as /v1/chat/completions. Returns
@@ -374,6 +382,7 @@ async def text_completions(
     peer = None
     use_pool = False
     coordinator_scope = pool_routing._POOL_SCOPE
+    circle_id: str | None = None
 
     digest = req.potluck_model_sha256
     identity = {"expected_model": req.model or local, "expected_sha256": digest}
@@ -402,11 +411,7 @@ async def text_completions(
                 detail="No model loaded on this node, and no household peer matched.",
             )
     elif scope == "circle":
-        if not pool_routing.pool_available():
-            raise HTTPException(
-                status_code=503,
-                detail="circle routing requires a configured coordinator URL",
-            )
+        circle_id = await _circle_id(x_potluck_circle)
         use_pool = True
         coordinator_scope = pool_routing._CIRCLE_SCOPE
     else:
@@ -454,7 +459,7 @@ async def text_completions(
                 if use_pool:
                     source = pool_routing.stream_pool_openai(
                         messages, served_model, req.temperature, max_tokens,
-                        scope=coordinator_scope,
+                        scope=coordinator_scope, circle_id=circle_id,
                     )
                 elif peer:
                     source = gateway_routing.stream_peer_openai(
@@ -517,7 +522,7 @@ async def text_completions(
         if use_pool:
             result = await pool_routing.complete_pool_openai(
                 messages, served_model, req.temperature, max_tokens,
-                scope=coordinator_scope,
+                scope=coordinator_scope, circle_id=circle_id,
             )
         elif peer:
             result = await gateway_routing.complete_peer_openai(
@@ -532,7 +537,7 @@ async def text_completions(
     except RemoteStreamError as exc:
         raise HTTPException(status_code=502, detail={"code": exc.category, "message": str(exc)}) from exc
     except pool_routing.PoolDispatchError as exc:
-        status = exc.status_code if exc.status_code in (404, 503) else 502
+        status = exc.status_code if exc.status_code in (401, 404, 503) else 502
         raise HTTPException(status_code=status, detail=exc.detail)
     except Exception as exc:  # noqa: BLE001
         logger.exception("gateway_completions_failed")

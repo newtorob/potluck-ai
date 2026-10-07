@@ -65,14 +65,18 @@ MSGS = [
 ]
 
 
+CIRCLE_ID = "7f0c5a2e-58a1-4b0c-9a51-0f5e3a6f1d11"
+
+
 class TestJobBodyPolicy:
     """_job_body constructs the coordinator job envelope with the correct privacy policy."""
 
     def _call(self, scope: str, multiturn: bool) -> dict:
         from potluck_local.services import pool_routing as pr
 
+        circle_id = CIRCLE_ID if scope == "circle" else None
         with patch.object(pr, "_pool_multiturn_enabled", return_value=multiturn):
-            return pr._job_body(MSGS, "test-model", 0.7, 512, scope)
+            return pr._job_body(MSGS, "test-model", 0.7, 512, scope, circle_id)
 
     def test_prompt_always_populated_pool_default(self) -> None:
         body = self._call("pool", False)
@@ -116,6 +120,16 @@ class TestJobBodyPolicy:
 
         circle_body = self._call("circle", False)
         assert circle_body["scope"] == "circle"
+        assert circle_body["circle_id"] == CIRCLE_ID
+
+    def test_circle_without_a_circle_is_refused_locally(self) -> None:
+        from potluck_local.services import pool_routing as pr
+
+        with pytest.raises(ValueError):
+            pr._job_body(MSGS, "test-model", 0.7, 512, "circle")
+
+    def test_only_circle_requests_carry_a_circle(self) -> None:
+        assert "circle_id" not in self._call("pool", False)
 
     def test_model_slug_in_body(self) -> None:
         body = self._call("pool", False)
@@ -420,16 +434,21 @@ class TestGatewayCircleScope:
         with scope='circle' and the full messages array."""
         captured: dict[str, Any] = {}
 
-        async def _fake_complete(messages, model, temperature, max_tokens, scope="pool"):
+        async def _fake_complete(messages, model, temperature, max_tokens, scope="pool", circle_id=None):
             captured["messages"] = messages
             captured["scope"] = scope
+            captured["circle_id"] = circle_id
             return {
                 "choices": [{"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}],
                 "usage": {},
             }
 
+        async def _fake_resolve(selector):
+            captured["selector"] = selector
+            return CIRCLE_ID
+
         monkeypatch.setattr("potluck_local.routers.gateway.get_runtime", lambda: _NoModelRuntime())
-        monkeypatch.setattr("potluck_local.services.pool_routing.pool_available", lambda: True)
+        monkeypatch.setattr("potluck_local.services.pool_routing.resolve_circle_id", _fake_resolve)
         monkeypatch.setattr(
             "potluck_local.services.pool_routing.complete_pool_openai", _fake_complete
         )
@@ -444,24 +463,35 @@ class TestGatewayCircleScope:
                     {"role": "user", "content": "follow"},
                 ]
             },
-            headers={"X-Potluck-Scope": "circle"},
+            headers={"X-Potluck-Scope": "circle", "X-Potluck-Circle": "Friends"},
         )
         assert resp.status_code == 200, resp.text
         assert captured.get("scope") == "circle", f"expected circle scope, got {captured.get('scope')}"
+        assert captured.get("selector") == "Friends"
+        assert captured.get("circle_id") == CIRCLE_ID
         assert captured.get("messages") is not None
         assert len(captured["messages"]) == 4, "full messages array should be passed"
 
-    def test_circle_scope_no_coordinator_returns_503(self, client, monkeypatch) -> None:
-        """circle scope with no coordinator configured returns 503."""
+    def test_circle_scope_signed_out_is_401_and_sends_nothing(self, client, monkeypatch) -> None:
+        """No sign-in: the caller is told to sign in and no job is built."""
+        sent: list[Any] = []
+
+        async def _never(*a, **kw):
+            sent.append(a)
+            return {}
+
         monkeypatch.setattr("potluck_local.routers.gateway.get_runtime", lambda: _NoModelRuntime())
-        monkeypatch.setattr("potluck_local.services.pool_routing.pool_available", lambda: False)
+        monkeypatch.setattr("potluck_local.services.pool_routing._member_session_token", lambda: None)
+        monkeypatch.setattr("potluck_local.services.pool_routing.complete_pool_openai", _never)
 
         resp = client.post(
             "/v1/chat/completions",
             json={"messages": [{"role": "user", "content": "hi"}]},
             headers={"X-Potluck-Scope": "circle"},
         )
-        assert resp.status_code == 503
+        assert resp.status_code == 401
+        assert "Sign in" in resp.json()["detail"]
+        assert sent == []
 
 
 class TestGatewayPoolScope:
@@ -477,8 +507,8 @@ class TestGatewayPoolScope:
         body_built: list[dict] = []
         original_job_body = pr._job_body
 
-        def _spy_job_body(messages, model, temperature, max_tokens, scope="pool"):
-            result = original_job_body(messages, model, temperature, max_tokens, scope)
+        def _spy_job_body(messages, model, temperature, max_tokens, scope="pool", circle_id=None):
+            result = original_job_body(messages, model, temperature, max_tokens, scope, circle_id)
             body_built.append(result)
             return result
 

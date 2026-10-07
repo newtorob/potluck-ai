@@ -1,0 +1,48 @@
+{
+  "_comment": "Job bodies exactly as the desktop engine builds them (apps/desktop/python/potluck_local/services/pool_routing.py::_job_body). The engine suite asserts it still produces these; the coordinator suite asserts JobRequest still accepts them. Change both together.",
+  "inputs": {
+    "messages": [
+      {"role": "system", "content": "be brief"},
+      {"role": "user", "content": "first"},
+      {"role": "assistant", "content": "ok"},
+      {"role": "user", "content": "follow-up"}
+    ],
+    "model": "test-model",
+    "temperature": 0.7,
+    "max_tokens": 512,
+    "circle_id": "7f0c5a2e-58a1-4b0c-9a51-0f5e3a6f1d11"
+  },
+  "bodies": {
+    "circle": {
+      "prompt": "follow-up",
+      "model_slug": "test-model",
+      "sampling": {"temperature": 0.7, "max_tokens": 512},
+      "scope": "circle",
+      "circle_id": "7f0c5a2e-58a1-4b0c-9a51-0f5e3a6f1d11",
+      "messages": [
+        {"role": "system", "content": "be brief"},
+        {"role": "user", "content": "first"},
+        {"role": "assistant", "content": "ok"},
+        {"role": "user", "content": "follow-up"}
+      ]
+    },
+    "pool": {
+      "prompt": "follow-up",
+      "model_slug": "test-model",
+      "sampling": {"temperature": 0.7, "max_tokens": 512},
+      "scope": "pool"
+    },
+    "pool_multiturn": {
+      "prompt": "follow-up",
+      "model_slug": "test-model",
+      "sampling": {"temperature": 0.7, "max_tokens": 512},
+      "scope": "pool",
+      "messages": [
+        {"role": "system", "content": "be brief"},
+        {"role": "user", "content": "first"},
+        {"role": "assistant", "content": "ok"},
+        {"role": "user", "content": "follow-up"}
+      ]
+    }
+  }
+}
