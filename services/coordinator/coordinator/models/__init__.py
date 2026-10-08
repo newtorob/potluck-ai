@@ -13,5 +13,10 @@ from coordinator.models.release import ContributorRelease  # noqa: F401
 from coordinator.models.household import Household, HouseholdMember  # noqa: F401
 from coordinator.models.mesh_node import MeshNode  # noqa: F401
 from coordinator.models.pairing import PairingToken  # noqa: F401
-from coordinator.models.circle import TrustedCircle, CircleMember  # noqa: F401
+from coordinator.models.circle import (  # noqa: F401
+    CircleInvite,
+    CircleMember,
+    CircleMembership,
+    TrustedCircle,
+)
 from coordinator.models.peer_quality import PeerQualityScore  # noqa: F401

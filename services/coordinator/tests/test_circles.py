@@ -24,7 +24,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from coordinator.constants import STUB_MEMBER_ID
-from coordinator.models.circle import CircleMember, TrustedCircle
+from coordinator.models.circle import CircleMember, CircleMembership, TrustedCircle
 from coordinator.models.member_key import MemberKey
 from coordinator.models.peer import Peer, PeerCapability
 from coordinator.routers.circles import (
@@ -56,6 +56,10 @@ class _WS:  # stub WebSocket — routing functions store but never call it
 async def _seed_circle(db: AsyncSession, *, owner: uuid.UUID, name: str) -> TrustedCircle:
     c = TrustedCircle(owner_member_id=owner, name=name)
     db.add(c)
+    await db.flush()
+    # Every circle's owner holds a membership (create_circle and the 0013
+    # backfill both guarantee it).
+    db.add(CircleMembership(circle_id=c.id, member_id=owner, role="owner"))
     await db.flush()
     return c
 

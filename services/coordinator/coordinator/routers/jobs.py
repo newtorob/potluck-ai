@@ -305,38 +305,32 @@ async def _dispatch_to_peer(
     blinded-routing violation (the schema has no member_id field, so it's also
     a type error, but the rule deserves the comment).
     """
-    # Circle scope: validate ownership then restrict candidates to circle members.
-    circle_pubkeys: set[str] | None = None
+    # Circle scope: the caller must be in the circle; candidates are the
+    # machines of its other members.
+    circle_lenders: set[uuid.UUID] | None = None
     if req.scope == "circle":
         if req.circle_id is None:
             raise HTTPException(
                 status_code=422,
                 detail="circle_id is required when scope='circle'.",
             )
-        # Verify the circle belongs to the caller before doing anything else.
-        from coordinator.models.circle import TrustedCircle, CircleMember
-        from sqlalchemy import select as sa_select
+        from coordinator.services.circles import lender_member_ids, membership_of
 
-        circle_row = await db.get(TrustedCircle, req.circle_id)
-        if circle_row is None or circle_row.owner_member_id != member_id:
+        # Not being in the circle and the circle not existing look the same
+        # to the caller, so a circle ID cannot be probed.
+        if await membership_of(db, req.circle_id, member_id) is None:
             raise HTTPException(
                 status_code=404,
                 detail="circle not found",
             )
-        # Collect the pubkeys in this circle.
-        cm_result = await db.execute(
-            sa_select(CircleMember.member_pubkey).where(
-                CircleMember.circle_id == req.circle_id
-            )
-        )
-        circle_pubkeys = {row[0] for row in cm_result.all()}
+        circle_lenders = await lender_member_ids(db, req.circle_id, member_id)
 
     peer_conn, served_scope = await select_peer_for_request(
         db,
         model_slug=req.model_slug,
         requester_member_id=member_id,
         scope=req.scope,
-        circle_pubkeys=circle_pubkeys,
+        circle_member_ids=circle_lenders,
         exclude_peer_ids=exclude_peer_ids,
     )
     if peer_conn is None:

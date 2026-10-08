@@ -20,6 +20,7 @@ Two session fixtures are provided:
 """
 from __future__ import annotations
 
+import os
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
@@ -32,7 +33,12 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-_TEST_DB_URL = "postgresql+asyncpg://potluck:potluck@localhost:5432/potluck"
+# The dev stack's database by default. DATABASE_URL overrides it, so the suite
+# can run against a throwaway database (which is also what the app-level tests
+# use, through the service's own settings).
+_TEST_DB_URL = os.environ.get(
+    "DATABASE_URL", "postgresql+asyncpg://potluck:potluck@localhost:5432/potluck"
+)
 
 
 @pytest_asyncio.fixture()

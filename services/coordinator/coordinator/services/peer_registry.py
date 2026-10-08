@@ -422,6 +422,7 @@ async def pick_peer_for_model(
     owner_member_id: uuid.UUID | None = None,
     enforce_pool_trust: bool = False,
     circle_member_pubkeys: set[str] | None = None,
+    circle_member_ids: set[uuid.UUID] | None = None,
     exclude_peer_ids: set[uuid.UUID] | None = None,
     audience: str | None = None,
 ) -> PeerConnection | None:
@@ -573,17 +574,19 @@ async def pick_peer_for_model(
     # Trusted-circle filter: restrict to peers whose member's key is in the circle.
     # Joins peer_id -> peers.member_id -> member_keys.public_key. Uses the Peer
     # model (not the in-memory registry) to get the canonical member_id per peer.
-    if circle_member_pubkeys is not None:
+    if circle_member_pubkeys is not None or circle_member_ids is not None:
         from coordinator.models.peer import Peer
         from coordinator.models.member_key import MemberKey
 
-        # Find member_ids that own at least one of the circle's pubkeys.
-        mk_rows = (await db.execute(
-            select(MemberKey.member_id).where(
-                MemberKey.public_key.in_(circle_member_pubkeys)
-            )
-        )).all()
-        circle_member_ids: set[uuid.UUID] = {row[0] for row in mk_rows}
+        circle_member_ids = set(circle_member_ids or ())
+        if circle_member_pubkeys:
+            # Find member_ids that own at least one of the given pubkeys.
+            mk_rows = (await db.execute(
+                select(MemberKey.member_id).where(
+                    MemberKey.public_key.in_(circle_member_pubkeys)
+                )
+            )).all()
+            circle_member_ids |= {row[0] for row in mk_rows}
 
         if not circle_member_ids:
             # No enrolled members match any of the pubkeys — no eligible peer.
@@ -641,6 +644,7 @@ async def select_peer_for_request(
     requester_member_id: uuid.UUID,
     scope: str = "pool",
     circle_pubkeys: "set[str] | None" = None,
+    circle_member_ids: "set[uuid.UUID] | None" = None,
     exclude_peer_ids: "set[uuid.UUID] | None" = None,
 ) -> "tuple[PeerConnection | None, str | None]":
     """Pick a peer honoring the routing scope. `scope` is the WIDEST tier the
@@ -664,12 +668,16 @@ async def select_peer_for_request(
     if scope == "circle":
         # Circle scope: dispatch strictly to peers in the circle. No fallback
         # to My Machines or Pool — the caller explicitly chose circle isolation.
-        if not circle_pubkeys:
+        # The caller resolves the circle to the members who may lend
+        # (circle_member_ids). circle_pubkeys is the older form, a set of
+        # machine keys, resolved to their members here.
+        if not circle_pubkeys and not circle_member_ids:
             return None, None
         peer = await pick_peer_for_model(
             db,
             model_slug,
-            circle_member_pubkeys=circle_pubkeys,
+            circle_member_pubkeys=circle_pubkeys or None,
+            circle_member_ids=circle_member_ids or None,
             exclude_peer_ids=exclude_peer_ids,
             audience="circle",
         )
@@ -720,24 +728,18 @@ async def online_peer_ids() -> list[uuid.UUID]:
         return list(_peers.keys())
 
 
-async def circle_model_availability(db, circle_member_pubkeys: set[str]) -> dict[str, int]:
-    """model_slug -> how many machines in a circle are online and offering it.
+async def circle_model_availability(db, member_ids: set[uuid.UUID]) -> dict[str, int]:
+    """model_slug -> how many machines of these members are online and
+    offering it to circles.
 
-    Counts only: the machines are those of the circle's members that are
-    connected and agreed to serve circles, the same set a circle job can be
-    dispatched to. Nothing here says whose machine it is.
+    Counts only: the machines are those of the given members (a circle's
+    lenders for one requester) that are connected and agreed to serve
+    circles, the same set a circle job can be dispatched to. Nothing here
+    says whose machine it is.
     """
     from sqlalchemy import func, select
     from coordinator.models import PeerCapability
-    from coordinator.models.member_key import MemberKey
 
-    if not circle_member_pubkeys:
-        return {}
-    member_ids = {
-        row[0] for row in (await db.execute(
-            select(MemberKey.member_id).where(MemberKey.public_key.in_(circle_member_pubkeys))
-        )).all()
-    }
     if not member_ids:
         return {}
     async with _lock:

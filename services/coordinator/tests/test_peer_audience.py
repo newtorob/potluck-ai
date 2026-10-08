@@ -141,27 +141,27 @@ def test_attestation_audiences_are_echoed_and_bound_to_the_connection(
 @pytest.mark.asyncio
 async def test_circle_availability_counts_machines_that_would_be_dispatched_to(session_factory) -> None:
     friend, friend_key, friend_peer, model = await _online(session_factory, serves_pool=False)
-    _, pool_only_key, pool_only_peer, pool_model = await _online(session_factory, serves_circle=False)
+    pool_only, pool_only_key, pool_only_peer, pool_model = await _online(session_factory, serves_circle=False)
     _, outsider_key, outsider_peer, outsider_model = await _online(session_factory)
     try:
         async with session_factory.factory() as db:
-            got = await circle_model_availability(db, {friend_key, pool_only_key, "typo-key"})
+            got = await circle_model_availability(db, {friend, pool_only, uuid.uuid4()})
             assert got == {model: 1}, "only members who are online and sharing with circles"
             assert await circle_model_availability(db, set()) == {}
-            assert await circle_model_availability(db, {"nobody"}) == {}
+            assert await circle_model_availability(db, {uuid.uuid4()}) == {}
         await unregister_peer(friend_peer)
         async with session_factory.factory() as db:
-            assert await circle_model_availability(db, {friend_key}) == {}, "offline is not available"
+            assert await circle_model_availability(db, {friend}) == {}, "offline is not available"
     finally:
         for pid in (friend_peer, pool_only_peer, outsider_peer):
             await unregister_peer(pid)
 
 
 @pytest.mark.asyncio
-async def test_circle_availability_endpoint_is_owner_only_and_names_no_one(session_factory) -> None:
+async def test_circle_availability_endpoint_is_for_people_in_the_circle_and_names_no_one(session_factory) -> None:
     from fastapi import HTTPException
 
-    from coordinator.models.circle import CircleMember, TrustedCircle
+    from coordinator.models.circle import CircleMember, CircleMembership, TrustedCircle
     from coordinator.routers.circles import circle_availability
 
     owner, stranger = uuid.uuid4(), uuid.uuid4()
@@ -171,6 +171,7 @@ async def test_circle_availability_endpoint_is_owner_only_and_names_no_one(sessi
             circle = TrustedCircle(owner_member_id=owner, name=f"avail-{uuid.uuid4().hex[:6]}")
             db.add(circle)
             await db.flush()
+            db.add(CircleMembership(circle_id=circle.id, member_id=owner, role="owner"))
             db.add(CircleMember(circle_id=circle.id, member_pubkey=friend_key))
             await db.commit()
             circle_id = circle.id

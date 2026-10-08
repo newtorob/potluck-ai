@@ -43,7 +43,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from coordinator.db.database import close_db, get_db, get_session_factory, init_db
 from coordinator.middleware.session_auth import resolve_session_member_id
-from coordinator.models.circle import CircleMember, TrustedCircle
+from coordinator.models.circle import CircleMember, CircleMembership, TrustedCircle
 from coordinator.models.member_key import MemberKey
 from coordinator.models.credit import CreditLedger
 from coordinator.models.job import Job
@@ -197,6 +197,8 @@ async def test_circle_http_stream_never_fails_over_to_outsiders(fast_deadline, r
     try:
         async with factory() as db:
             db.add(TrustedCircle(id=circle_id, owner_member_id=requester, name='private circle'))
+            await db.flush()
+            db.add(CircleMembership(circle_id=circle_id, member_id=requester, role='owner'))
             # Even the caller's own online machine is outside this circle.
             outside_id, outside_ws = await _mk_peer(db, requester, behavior=finish)
             peer_ids.append(outside_id)
