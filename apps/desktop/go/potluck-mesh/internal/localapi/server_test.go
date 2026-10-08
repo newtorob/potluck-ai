@@ -2,6 +2,7 @@ package localapi_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -85,6 +87,24 @@ func testServer(t *testing.T, cfg localapi.Config) (*http.Client, context.Cancel
 	}
 	return client, cancel
 }
+
+// testKey returns a canonical base64 WireGuard public key (32 bytes of seed).
+// The peer store refuses roster entries whose key is not one, so the roster
+// fixtures below use these rather than free-form strings.
+func testKey(seed byte) string {
+	b := make([]byte, 32)
+	for i := range b {
+		b[i] = seed
+	}
+	return base64.StdEncoding.EncodeToString(b)
+}
+
+var (
+	keyABC        = testKey(0xA1)
+	keyXYZ        = testKey(0xA2)
+	keyConnecting = testKey(0xA3)
+	keyDirect     = testKey(0xA4)
+)
 
 // defaultCfg returns a minimal Config with non-nil bus/store/state.
 func defaultCfg(t *testing.T) localapi.Config {
@@ -282,14 +302,14 @@ func TestHandlePeers_DERPFlippedNotYetReachable_ReportsConnecting(t *testing.T) 
 		NodeID:      "peer-1",
 		NodeName:    "linux-box",
 		MeshIP:      "100.64.0.7",
-		WGPublicKey: "peerPubKeyABC",
+		WGPublicKey: keyABC,
 	})
 	// PeerReachFn returns a zero time (no handshake yet).
 	cfg.PeerReachFn = func(pubkeyBase64 string) (time.Time, uint64, uint64, error) {
 		return time.Time{}, 0, 0, nil
 	}
 	cfg.IsDERPRoutedFn = func(pubkeyBase64 string) bool {
-		return pubkeyBase64 == "peerPubKeyABC"
+		return pubkeyBase64 == keyABC
 	}
 
 	client, _ := testServer(t, cfg)
@@ -330,7 +350,7 @@ func TestHandlePeers_NotFlippedNotReachable_ReportsNullMode(t *testing.T) {
 		NodeID:      "peer-1",
 		NodeName:    "windows-box",
 		MeshIP:      "100.64.0.8",
-		WGPublicKey: "peerPubKeyXYZ",
+		WGPublicKey: keyXYZ,
 	})
 	cfg.PeerReachFn = func(pubkeyBase64 string) (time.Time, uint64, uint64, error) {
 		return time.Time{}, 0, 0, nil
@@ -361,6 +381,92 @@ func TestHandlePeers_NotFlippedNotReachable_ReportsNullMode(t *testing.T) {
 	}
 }
 
+// TestHandlePeers_NeverListsRejectedEntries feeds the peer store entries the
+// gate must refuse (a gateway address, this node's own address, two nodes on one
+// address, a malformed key, a hostile mesh_ip) beside good ones, and checks that
+// GET /peers and the /status peer count only ever reflect the good ones, including
+// after a listed peer's entry turns invalid or is claimed by another node.
+func TestHandlePeers_NeverListsRejectedEntries(t *testing.T) {
+	cfg := defaultCfg(t)
+	mk := func(id, ip string, seed byte) signal.RosterPeer {
+		return signal.RosterPeer{NodeID: id, NodeName: id, MeshIP: ip, WGPublicKey: testKey(seed)}
+	}
+	badKey := mk("bad-key", "100.64.0.10", 7)
+	badKey.WGPublicKey = "peerPubKeyABC"
+	cfg.PeerStore.Reset("100.64.0.6", []signal.RosterPeer{
+		mk("linux", "100.64.0.7", 1),
+		mk("gateway", "192.168.1.1", 2),
+		mk("windows", "100.64.0.8", 3),
+		mk("self-twin", "100.64.0.6", 4),
+		mk("dup-a", "100.64.0.9", 5),
+		mk("dup-b", "100.64.0.9", 6),
+		badKey,
+		mk("hostile", "100.64.0.11\nallowed_ip=0.0.0.0/0", 8),
+		mk("prefixed", "100.64.0.12/32", 9),
+		mk("port", "100.64.0.13:51820", 10),
+	})
+
+	client, _ := testServer(t, cfg)
+	listed := func() []string {
+		t.Helper()
+		resp := get(t, client, "/peers")
+		defer resp.Body.Close()
+		var body struct {
+			Peers []struct {
+				NodeID string `json:"node_id"`
+				MeshIP string `json:"mesh_ip"`
+			} `json:"peers"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		var out []string
+		for _, p := range body.Peers {
+			out = append(out, p.NodeID+"@"+p.MeshIP)
+		}
+		sort.Strings(out)
+		return out
+	}
+	statusCount := func() float64 {
+		t.Helper()
+		resp := get(t, client, "/status")
+		defer resp.Body.Close()
+		var body map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return body["peers_online_count"].(float64)
+	}
+	want := func(what string, got []string, want ...string) {
+		t.Helper()
+		if strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Errorf("%s: /peers = %v, want %v", what, got, want)
+		}
+	}
+
+	want("mixed roster", listed(), "linux@100.64.0.7", "windows@100.64.0.8")
+	if n := statusCount(); n != 2 {
+		t.Errorf("peers_online_count = %v, want 2", n)
+	}
+
+	// A listed peer's entry turns invalid.
+	_, _, evict, _ := cfg.PeerStore.Merge(nil, []signal.RosterPeer{mk("linux", "8.8.8.8", 1)})
+	for _, id := range evict {
+		cfg.PeerStore.Remove(id)
+	}
+	want("after linux turns invalid", listed(), "windows@100.64.0.8")
+
+	// Another node claims a listed peer's address: neither is listed.
+	_, _, evict, _ = cfg.PeerStore.Merge([]signal.RosterPeer{mk("thief", "100.64.0.8", 11)}, nil)
+	for _, id := range evict {
+		cfg.PeerStore.Remove(id)
+	}
+	want("after a claim on windows", listed())
+	if n := statusCount(); n != 0 {
+		t.Errorf("peers_online_count = %v, want 0", n)
+	}
+}
+
 // TestHandleStatus_PeersConnectingCount verifies the node-level aggregate:
 // GET /status surfaces peers_connecting_count so a systray/global indicator
 // can observe the same "flipped to DERP, handshake pending" state without
@@ -371,22 +477,22 @@ func TestHandleStatus_PeersConnectingCount(t *testing.T) {
 		NodeID:      "peer-1",
 		NodeName:    "linux-box",
 		MeshIP:      "100.64.0.7",
-		WGPublicKey: "connectingPeer",
+		WGPublicKey: keyConnecting,
 	})
 	cfg.PeerStore.Upsert(signal.RosterPeer{
 		NodeID:      "peer-2",
 		NodeName:    "windows-box",
 		MeshIP:      "100.64.0.8",
-		WGPublicKey: "directPeer",
+		WGPublicKey: keyDirect,
 	})
 	cfg.PeerReachFn = func(pubkeyBase64 string) (time.Time, uint64, uint64, error) {
-		if pubkeyBase64 == "directPeer" {
+		if pubkeyBase64 == keyDirect {
 			return time.Now(), 0, 0, nil
 		}
 		return time.Time{}, 0, 0, nil
 	}
 	cfg.IsDERPRoutedFn = func(pubkeyBase64 string) bool {
-		return pubkeyBase64 == "connectingPeer"
+		return pubkeyBase64 == keyConnecting
 	}
 
 	client, _ := testServer(t, cfg)

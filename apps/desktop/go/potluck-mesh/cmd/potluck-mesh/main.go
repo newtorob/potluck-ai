@@ -78,6 +78,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -1839,8 +1840,15 @@ func (h *rosterHandler) OnWelcome(w msignal.Welcome) {
 		}
 	}
 
-	// 3. Populate peer cache from the roster (excluding ourselves).
-	h.ps.Reset(w.Roster)
+	// 3. Populate peer cache from the roster (excluding ourselves). Reset is the
+	// gate for roster entries: it stores only entries that pass validation and
+	// logs each one it drops. w.Roster is narrowed to what was stored so the
+	// WG peer list, host routes, DERP flips and events below never see a
+	// rejected entry.
+	previous := h.ps.All()
+	kept, rejected := h.ps.Reset(w.MeshIP, w.Roster)
+	w.Roster = kept
+	h.removeRoutesOfRejected(previous, rejected)
 
 	// 4. Build WG Peer list and apply.
 	peers := rosterToPeers(w.Roster)
@@ -1907,9 +1915,56 @@ func (h *rosterHandler) OnWelcome(w msignal.Welcome) {
 	}
 }
 
+// removeRoutesOfRejected removes the host route of each peer that was cached
+// before a welcome and is rejected by the new roster. Such a peer is already
+// gone from the WG device (SetPeers replaces the peer set) and from the cache;
+// this drops the route it left behind. It runs before the routes for the kept
+// peers are installed, so an address a kept peer still uses ends up routed.
+func (h *rosterHandler) removeRoutesOfRejected(previous []msignal.RosterPeer, rejected []peerstate.Rejection) {
+	if len(rejected) == 0 {
+		return
+	}
+	bad := make(map[string]bool, len(rejected))
+	for _, r := range rejected {
+		bad[r.NodeID] = true
+	}
+	for _, p := range previous {
+		if !bad[p.NodeID] || p.MeshIP == "" {
+			continue
+		}
+		if err := h.tun.RemovePeerRoute(p.MeshIP); err != nil {
+			slog.Warn("tunnel: RemovePeerRoute failed for rejected peer",
+				"node_id", p.NodeID,
+				"mesh_ip", p.MeshIP,
+				"err", err,
+			)
+		}
+	}
+}
+
 // OnRosterUpdate applies incremental peer changes to the WireGuard tunnel and
 // the in-memory peer cache. Also sends request_punch for peers with endpoints.
 func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
+	// Gate the added and updated entries through the peer store before the
+	// tunnel sees any of them: Merge stores only entries that pass validation
+	// and logs each one it drops. Which Added entries were already cached is
+	// read first, since Merge stores them. A cached peer whose new entry was
+	// dropped (or whose address is now claimed twice) comes back in evict and
+	// is torn down by the removal loop below, like an explicit removal.
+	known := make(map[string]bool, len(u.Added))
+	for _, p := range u.Added {
+		_, known[p.NodeID] = h.ps.Get(p.NodeID)
+	}
+	added, updated, evict, _ := h.ps.Merge(u.Added, u.Updated)
+	u.Added, u.Updated = added, updated
+	removed := append([]string(nil), u.Removed...)
+	for _, nodeID := range evict {
+		if !slices.Contains(removed, nodeID) {
+			removed = append(removed, nodeID)
+		}
+	}
+	u.Removed = removed
+
 	// Added peers: insert into cache + configure WG peer.
 	for _, p := range u.Added {
 		// A coordinator "added" event is NOT always a brand-new peer: when a
@@ -1920,8 +1975,8 @@ func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
 		// appendPeerConfig emits replace_allowed_ips, so the re-add cleanly
 		// replaces the stale allowed-ips instead of merging) so the data path
 		// re-establishes. A plain re-add over stale state black-holes traffic.
-		_, alreadyKnown := h.ps.Get(p.NodeID)
-		h.ps.Upsert(p)
+		alreadyKnown := known[p.NodeID]
+		known[p.NodeID] = true
 		peer := rosterPeerToTunnelPeer(p)
 
 		if alreadyKnown {
@@ -1976,7 +2031,6 @@ func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
 
 	// Updated peers: update the endpoint (and cache) if endpoint changed.
 	for _, p := range u.Updated {
-		h.ps.Upsert(p)
 		if p.LastEndpoint != nil && *p.LastEndpoint != "" {
 			// If the peer is currently DERP-routed, do NOT push the raw
 			// IP:port back onto the WG device — that would silently break
