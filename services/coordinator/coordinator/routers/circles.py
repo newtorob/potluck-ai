@@ -416,6 +416,8 @@ class AcceptInviteRequest(BaseModel):
     code: str = Field(..., min_length=1, max_length=512)
 
 
+# The code rides in the fragment, which a browser never sends to the server,
+# so opening the link does not put the code in a web server's logs.
 INVITE_URL = "https://trypotluck.ai/circles/join"
 
 
@@ -475,7 +477,7 @@ async def create_invite(
     await db.commit()
     logger.info("circle_invite_created", circle_id=str(circle_id), invite_id=str(invite.id))
     return InviteCreatedOut(
-        id=invite.id, code=code, url=f"{INVITE_URL}?code={code}",
+        id=invite.id, code=code, url=f"{INVITE_URL}#code={code}",
         expires_at=invite.expires_at, max_uses=invite.max_uses,
     )
 

@@ -26,7 +26,7 @@ INVITE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ"
 INVITE_CODE_LENGTH = 12
 MAX_CIRCLE_PEOPLE = 50
 
-_CODE_IN_LINK = re.compile(r"[?&]code=([^&#\s]+)")
+_CODE_IN_LINK = re.compile(r"[?&#]code=([^&#\s]+)")
 
 
 def new_invite_code() -> str:

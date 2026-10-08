@@ -117,6 +117,7 @@ def test_a_code_is_readable_and_whatever_is_pasted_resolves_to_it() -> None:
 
     for pasted in (code, canonical, code.lower(), f"  {code[:4]} {code[5:9]} {code[10:]} ",
                    f"https://trypotluck.ai/circles/join?code={code}",
+                   f"https://trypotluck.ai/circles/join#code={code}",
                    f"https://trypotluck.ai/circles/join?utm=x&code={code}#top"):
         assert normalise_invite_code(pasted) == canonical, pasted
 
@@ -141,7 +142,7 @@ async def test_an_invite_is_owner_only_and_only_its_hash_is_stored(sessions) -> 
     owner, friend, stranger = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
     circle = await sessions.circle(owner)
     created = await sessions.call(create_invite, circle.id, CreateInviteRequest(), member=owner)
-    assert created.url.endswith(f"?code={created.code}") and created.max_uses == 1
+    assert created.url == f"https://trypotluck.ai/circles/join#code={created.code}" and created.max_uses == 1
     async with sessions.factory() as db:
         mine = (await db.execute(
             select(CircleInvite).where(CircleInvite.circle_id == circle.id)
