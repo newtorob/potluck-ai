@@ -516,6 +516,218 @@ func TestOnRosterUpdate_ValidUpdatesBehaviourUnchanged(t *testing.T) {
 	}
 }
 
+// An Updated entry for a node the store did not hold has never been configured
+// on the tunnel, so it has to be set up like a new peer, not just given an
+// endpoint. wantNewPeerSetup checks that: one AddPeer with the node's /32, its
+// host route, a DERP flip, a peer_added event (and no peer_updated), a punch
+// request, no teardown and no endpoint-only call. The recorders must have been
+// reset (resetRecorders) just before the update under test.
+func wantNewPeerSetup(t *testing.T, f *rosterFixture, id, ip string, seed byte) {
+	t.Helper()
+	wantStrings(t, "ops", f.tun.ops, []string{
+		"AddPeer:" + testKey(seed) + ":" + ip + "/32",
+		"AddPeerRoute:" + ip,
+	})
+	if len(f.tun.endpointCalls) != 0 || len(f.tun.removedKeys) != 0 {
+		t.Errorf("endpoint-only or teardown call for a new peer: endpoints=%v removed=%v", f.tun.endpointCalls, f.tun.removedKeys)
+	}
+	wantStrings(t, "DERP flips", *f.flipped, []string{testKey(seed)})
+	evs := f.drain()
+	wantStrings(t, "peer_added events", eventNodeIDs(evs, events.TypePeerAdded), []string{id})
+	wantStrings(t, "peer_updated events", eventNodeIDs(evs, events.TypePeerUpdated), nil)
+	wantStrings(t, "punch requests", f.sig.requests, []string{id})
+	if _, ok := f.h.ps.Get(id); !ok {
+		t.Errorf("%s is not in the store", id)
+	}
+}
+
+func (f *rosterFixture) resetRecorders() {
+	f.tun.ops = nil
+	f.tun.endpointCalls = nil
+	f.tun.removedKeys = nil
+	*f.flipped = nil
+	f.sig.requests = nil
+	f.drain()
+}
+
+// 1. A held peer is evicted by an invalid update, then a valid Updated entry
+// for it arrives while the coordinator connection stays up. The store no longer
+// holds it, so it must be added again, not given an endpoint on a tunnel that
+// no longer has the peer.
+func TestOnRosterUpdate_UpdatedEntryAfterEvictionIsAddedBack(t *testing.T) {
+	logs := captureSlog(t)
+	f := newRosterFixture(t)
+	f.h.OnWelcome(welcome(rp("linux", "100.64.0.7", 1), rp("windows", "100.64.0.8", 3)))
+
+	f.h.OnRosterUpdate(msignal.RosterUpdate{Updated: []msignal.RosterPeer{rp("linux", "192.168.1.1", 1)}})
+	wantStrings(t, "store after eviction", storeIDs(f.h), []string{"windows"})
+	f.resetRecorders()
+
+	f.h.OnRosterUpdate(msignal.RosterUpdate{Updated: []msignal.RosterPeer{rp("linux", "100.64.0.7", 1)}})
+
+	wantNewPeerSetup(t, f, "linux", "100.64.0.7", 1)
+	if got, ok := f.h.ps.Get("linux"); !ok || got.MeshIP != "100.64.0.7" {
+		t.Errorf("store entry = %+v, %v", got, ok)
+	}
+	if strings.Contains(logs.String(), "same-key rejoin") {
+		t.Errorf("a new peer was handled as a rejoin:\n%s", logs.String())
+	}
+	wantStrings(t, "store", storeIDs(f.h), []string{"linux", "windows"})
+	if len(f.tun.added) != 1 {
+		t.Errorf("AddPeer calls = %d, want 1", len(f.tun.added))
+	}
+}
+
+// 2. An Updated entry for a node the store never held (its "added" was
+// missed): same result as a new peer.
+func TestOnRosterUpdate_UpdatedEntryForNeverHeldNodeIsAdded(t *testing.T) {
+	captureSlog(t)
+	f := newRosterFixture(t)
+	f.h.OnWelcome(welcome(rp("windows", "100.64.0.8", 3)))
+	f.resetRecorders()
+
+	f.h.OnRosterUpdate(msignal.RosterUpdate{Updated: []msignal.RosterPeer{rp("linux", "100.64.0.7", 1)}})
+
+	wantStrings(t, "ops", f.tun.ops, []string{
+		"AddPeer:" + testKey(1) + ":100.64.0.7/32",
+		"AddPeerRoute:100.64.0.7",
+	})
+	if len(f.tun.endpointCalls) != 0 || len(f.tun.removedKeys) != 0 {
+		t.Errorf("endpoint-only or teardown call: endpoints=%v removed=%v", f.tun.endpointCalls, f.tun.removedKeys)
+	}
+	wantStrings(t, "DERP flips", *f.flipped, []string{testKey(1)})
+	evs := f.drain()
+	wantStrings(t, "peer_added events", eventNodeIDs(evs, events.TypePeerAdded), []string{"linux"})
+	wantStrings(t, "peer_updated events", eventNodeIDs(evs, events.TypePeerUpdated), nil)
+	wantStrings(t, "punch requests", f.sig.requests, []string{"linux"})
+	wantStrings(t, "store", storeIDs(f.h), []string{"linux", "windows"})
+	if len(f.tun.added) != 1 || !reflect.DeepEqual(f.tun.added[0].AllowedIPs, []string{"100.64.0.7/32"}) {
+		t.Errorf("AddPeer calls = %+v", f.tun.added)
+	}
+}
+
+// 3. An Updated entry for a held node with a new endpoint is exactly what it
+// was before: one endpoint update, nothing else, with the full call sequence
+// pinned.
+func TestOnRosterUpdate_UpdatedEntryForHeldNodeIsEndpointOnly(t *testing.T) {
+	captureSlog(t)
+	f := newRosterFixture(t)
+	f.h.OnWelcome(welcome(rp("linux", "100.64.0.7", 1), rp("windows", "100.64.0.8", 3)))
+	f.resetRecorders()
+
+	moved := rp("linux", "100.64.0.7", 1)
+	ep := "198.51.100.4:40000"
+	moved.LastEndpoint = &ep
+	f.h.OnRosterUpdate(msignal.RosterUpdate{Updated: []msignal.RosterPeer{moved}})
+
+	wantStrings(t, "ops", f.tun.ops, []string{"UpdatePeerEndpoint:" + testKey(1)})
+	wantStrings(t, "endpoint calls", f.tun.endpointCalls, []string{testKey(1) + "=" + ep})
+	if len(f.tun.added) != 0 {
+		t.Errorf("AddPeer called for a held node: %+v", f.tun.added)
+	}
+	if len(*f.flipped) != 0 {
+		t.Errorf("held node was flipped again: %v", *f.flipped)
+	}
+	evs := f.drain()
+	wantStrings(t, "peer_updated events", eventNodeIDs(evs, events.TypePeerUpdated), []string{"linux"})
+	wantStrings(t, "peer_added events", eventNodeIDs(evs, events.TypePeerAdded), nil)
+	wantStrings(t, "store", storeIDs(f.h), []string{"linux", "windows"})
+	if got, _ := f.h.ps.Get("linux"); got.LastEndpoint == nil || *got.LastEndpoint != ep {
+		t.Error("updated endpoint not cached")
+	}
+}
+
+// 4. The same new node in Added and in Updated of one message is added once,
+// from the later entry (the one the store keeps). Twice in Updated: once too.
+// Held node in both lists: exactly the old behaviour (rejoin re-sync, then the
+// endpoint update).
+func TestOnRosterUpdate_SameNodeInAddedAndUpdatedIsAddedOnce(t *testing.T) {
+	later := rp("linux", "100.64.0.7", 1)
+	laterEp := "198.51.100.9:41000"
+	later.LastEndpoint = &laterEp
+	first := rp("linux", "100.64.0.7", 1)
+
+	t.Run("added and updated, not held", func(t *testing.T) {
+		logs := captureSlog(t)
+		f := newRosterFixture(t)
+		f.h.OnWelcome(welcome())
+		f.resetRecorders()
+
+		f.h.OnRosterUpdate(msignal.RosterUpdate{
+			Added:   []msignal.RosterPeer{first},
+			Updated: []msignal.RosterPeer{later},
+		})
+
+		wantNewPeerSetup(t, f, "linux", "100.64.0.7", 1)
+		if len(f.tun.added) != 1 || f.tun.added[0].Endpoint != laterEp {
+			t.Errorf("AddPeer = %+v, want one call with endpoint %s", f.tun.added, laterEp)
+		}
+		if got, _ := f.h.ps.Get("linux"); got.LastEndpoint == nil || *got.LastEndpoint != laterEp {
+			t.Errorf("store endpoint = %v, want %s", got.LastEndpoint, laterEp)
+		}
+		if strings.Contains(logs.String(), "same-key rejoin") {
+			t.Errorf("handled as a rejoin:\n%s", logs.String())
+		}
+	})
+
+	t.Run("updated twice, not held", func(t *testing.T) {
+		captureSlog(t)
+		f := newRosterFixture(t)
+		f.h.OnWelcome(welcome())
+		f.resetRecorders()
+
+		f.h.OnRosterUpdate(msignal.RosterUpdate{Updated: []msignal.RosterPeer{first, later}})
+
+		wantNewPeerSetup(t, f, "linux", "100.64.0.7", 1)
+		if len(f.tun.added) != 1 || f.tun.added[0].Endpoint != laterEp {
+			t.Errorf("AddPeer = %+v, want one call with endpoint %s", f.tun.added, laterEp)
+		}
+	})
+
+	t.Run("added and updated, held (unchanged behaviour)", func(t *testing.T) {
+		captureSlog(t)
+		f := newRosterFixture(t)
+		f.h.OnWelcome(welcome(rp("linux", "100.64.0.7", 1)))
+		f.resetRecorders()
+
+		f.h.OnRosterUpdate(msignal.RosterUpdate{
+			Added:   []msignal.RosterPeer{first},
+			Updated: []msignal.RosterPeer{later},
+		})
+
+		wantStrings(t, "ops", f.tun.ops, []string{
+			"RemovePeer:" + testKey(1),
+			"AddPeer:" + testKey(1) + ":100.64.0.7/32",
+			"AddPeerRoute:100.64.0.7",
+			"UpdatePeerEndpoint:" + testKey(1),
+		})
+	})
+}
+
+// 5. An Updated entry that is refused for a node that was not held: nothing is
+// configured, nothing is stored, nothing is published, and the drop is logged
+// once.
+func TestOnRosterUpdate_RefusedUpdatedEntryForNeverHeldNodeDoesNothing(t *testing.T) {
+	logs := captureSlog(t)
+	f := newRosterFixture(t)
+	f.h.OnWelcome(welcome(rp("windows", "100.64.0.8", 3)))
+	f.resetRecorders()
+
+	f.h.OnRosterUpdate(msignal.RosterUpdate{Updated: []msignal.RosterPeer{rp("linux", "192.168.1.1", 1)}})
+
+	wantStrings(t, "ops", f.tun.ops, nil)
+	wantStrings(t, "store", storeIDs(f.h), []string{"windows"})
+	if evs := f.drain(); len(evs) != 0 {
+		t.Errorf("events published for a refused entry: %+v", evs)
+	}
+	if len(*f.flipped) != 0 || len(f.sig.requests) != 0 || len(f.tun.endpointCalls) != 0 {
+		t.Errorf("refused entry was acted on: flips=%v punches=%v endpoints=%v", *f.flipped, f.sig.requests, f.tun.endpointCalls)
+	}
+	if strings.Count(logs.String(), "roster: dropping peer") != 1 {
+		t.Errorf("want exactly one drop line:\n%s", logs.String())
+	}
+}
+
 // The reconcile loop is the other way roster entries arrive: a GET /mesh/peers
 // response is diffed against the cache and fed to OnRosterUpdate.
 func TestReconcileRosterOnce_DropsInvalidEntriesFromCoordinatorResponse(t *testing.T) {

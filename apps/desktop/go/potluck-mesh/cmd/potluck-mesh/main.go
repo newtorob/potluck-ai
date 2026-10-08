@@ -1947,16 +1947,42 @@ func (h *rosterHandler) removeRoutesOfRejected(previous []msignal.RosterPeer, re
 func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
 	// Gate the added and updated entries through the peer store before the
 	// tunnel sees any of them: Merge stores only entries that pass validation
-	// and logs each one it drops. Which Added entries were already cached is
-	// read first, since Merge stores them. A cached peer whose new entry was
-	// dropped (or whose address is now claimed twice) comes back in evict and
-	// is torn down by the removal loop below, like an explicit removal.
-	known := make(map[string]bool, len(u.Added))
+	// and logs each one it drops. Which Added and Updated entries were already
+	// cached is read first, since Merge stores them. A cached peer whose new
+	// entry was dropped (or whose address is now claimed twice) comes back in
+	// evict and is torn down by the removal loop below, like an explicit
+	// removal.
+	//
+	// An Updated entry is only an endpoint change for a node the store already
+	// held, because only a held node was ever configured on the tunnel. An
+	// Updated entry for a node the store did not hold (its earlier entry was
+	// refused, or its "added" was missed) has no tunnel peer, allowed IP or
+	// host route yet, so it is moved to the Added list and set up like any new
+	// peer.
+	known := make(map[string]bool, len(u.Added)+len(u.Updated))
 	for _, p := range u.Added {
 		_, known[p.NodeID] = h.ps.Get(p.NodeID)
 	}
+	heldBefore := make(map[string]bool, len(u.Updated))
+	for _, p := range u.Updated {
+		_, heldBefore[p.NodeID] = h.ps.Get(p.NodeID)
+	}
 	added, updated, evict, _ := h.ps.Merge(u.Added, u.Updated)
-	u.Added, u.Updated = added, updated
+	u.Added, u.Updated = added, nil
+	for _, p := range updated {
+		if heldBefore[p.NodeID] {
+			u.Updated = append(u.Updated, p)
+			continue
+		}
+		known[p.NodeID] = false
+		// The same new node can also be in Added in this message. Add it once,
+		// from the later entry, which is the one Merge stored.
+		if i := slices.IndexFunc(u.Added, func(a msignal.RosterPeer) bool { return a.NodeID == p.NodeID }); i >= 0 {
+			u.Added[i] = p
+			continue
+		}
+		u.Added = append(u.Added, p)
+	}
 	removed := append([]string(nil), u.Removed...)
 	for _, nodeID := range evict {
 		if !slices.Contains(removed, nodeID) {
@@ -2029,7 +2055,9 @@ func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
 		}
 	}
 
-	// Updated peers: update the endpoint (and cache) if endpoint changed.
+	// Updated peers: update the endpoint (and cache) if endpoint changed. Only
+	// nodes the store already held are left in this list (see the top of this
+	// function), so each one already has its tunnel peer and route.
 	for _, p := range u.Updated {
 		if p.LastEndpoint != nil && *p.LastEndpoint != "" {
 			// If the peer is currently DERP-routed, do NOT push the raw
