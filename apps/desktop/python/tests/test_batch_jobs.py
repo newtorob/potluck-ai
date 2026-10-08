@@ -311,7 +311,7 @@ def test_batch_routes_require_local_control_auth(monkeypatch):
 
 
 @pytest.mark.parametrize("reason", ["stop", "length", None])
-def test_real_peer_batch_protocol_preserves_finish_reason(monkeypatch, reason):
+def test_real_peer_batch_protocol_preserves_finish_reason(monkeypatch, fake_mesh, reason):
     from types import SimpleNamespace
     from potluck_local.routers import peer
     class Runtime:
@@ -327,7 +327,10 @@ def test_real_peer_batch_protocol_preserves_finish_reason(monkeypatch, reason):
     monkeypatch.setattr(peer, "get_settings", lambda: SimpleNamespace(network=SimpleNamespace(contributor_mode=True)))
     monkeypatch.setattr(peer, "_record_served", no_meter)
     monkeypatch.setenv("POTLUCK_SIDECAR_TOKEN", "token")
-    client = TestClient(create_app(), client=("100.64.0.2", 1))
+    # A household peer: listed as reachable by this machine's mesh sidecar and
+    # dialing this machine's own mesh address.
+    fake_mesh.add_peer("100.64.0.2")
+    client = TestClient(create_app(), client=("100.64.0.2", 1), base_url=fake_mesh.base_url)
     response = client.post("/peer/chat/completions", json={"model": "tiny", "potluck_model_sha256": PIN["sha256"],
                           "potluck_batch": True, "messages": [{"role": "user", "content": "text"}]})
     assert response.status_code == 200 and response.headers["x-potluck-batch-protocol"] == "1"

@@ -77,7 +77,10 @@ def test_create_app_does_not_import_torch() -> None:
 def test_health_shape() -> None:
     """/health includes the loaded_pipeline + loaded_rpc_servers status keys."""
     app = create_app()
-    with TestClient(app) as client:
+    # The frontend polls /health from loopback. A caller that is not a household
+    # member (TestClient's default "testclient" host is one) gets only the
+    # liveness stub; see tests/test_peer_trust.py.
+    with TestClient(app, client=("127.0.0.1", 50000)) as client:
         resp = client.get("/health")
         assert resp.status_code == 200
         body = resp.json()

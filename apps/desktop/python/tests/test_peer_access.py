@@ -13,9 +13,11 @@ future refactor of the middleware can't silently open the private surface.
 "Non-loopback" is not the same claim as "on the WireGuard mesh": 0.0.0.0 binds
 the bare socket to every interface, so a bystander on the same LAN/Wi-Fi is also
 "non-loopback" without ever having joined the household's mesh. /peer/* requires
-BOTH: non-loopback AND the source IP inside the mesh CIDR (default
-100.64.0.0/10, see app.py's _resolve_mesh_network / _DEFAULT_MESH_CIDR). These
-tests cover both the mesh-CIDR allow case and the LAN-but-not-mesh deny case.
+a source IP inside the mesh CIDR (default 100.64.0.0/10, see app.py's
+_resolve_mesh_network / _DEFAULT_MESH_CIDR) AND household membership as this
+machine's mesh sidecar reports it (services/peer_trust.py). These tests cover
+the member allow case and the LAN deny case; tests/test_peer_trust.py covers
+the membership rules in depth. The `fake_mesh` fixture stands in for the sidecar.
 """
 from __future__ import annotations
 
@@ -47,12 +49,17 @@ def app():
 
 
 @pytest.fixture()
-def mesh_peer_client(app):
-    return TestClient(app, client=MESH_PEER, raise_server_exceptions=False)
+def mesh_peer_client(app, fake_mesh):
+    # A household peer: listed as reachable by this machine's sidecar and
+    # dialing this machine's own mesh address.
+    fake_mesh.add_peer(MESH_PEER[0])
+    return TestClient(app, client=MESH_PEER, base_url=fake_mesh.base_url, raise_server_exceptions=False)
 
 
 @pytest.fixture()
-def lan_peer_client(app):
+def lan_peer_client(app, fake_mesh):
+    # The sidecar is up and knows the household; the LAN device is not in it.
+    fake_mesh.add_peer(MESH_PEER[0])
     return TestClient(app, client=LAN_PEER, raise_server_exceptions=False)
 
 
@@ -72,14 +79,19 @@ def test_lan_peer_cannot_reach_private_paths(lan_peer_client, path):
 
 
 def test_mesh_peer_can_reach_health(mesh_peer_client):
-    assert mesh_peer_client.get("/health").status_code == 200
+    resp = mesh_peer_client.get("/health")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ok" and "version" in resp.json()
 
 
-def test_lan_peer_can_reach_health(lan_peer_client):
-    # /health is a liveness probe with no memory/inference surface, so it keeps
-    # the pre-existing "any non-loopback caller" exemption -- only /peer/* gets
-    # the mesh-CIDR requirement. See app.py peer_access_middleware comments.
-    assert lan_peer_client.get("/health").status_code == 200
+def test_lan_peer_gets_only_liveness_from_health(lan_peer_client):
+    # /health stays open to any caller as a liveness probe, but a caller that
+    # is not a household member gets nothing else: no version, no loaded model,
+    # no other machines' mesh addresses (loaded_rpc_servers). This replaces the
+    # old "any LAN device gets the full /health body" behaviour.
+    resp = lan_peer_client.get("/health")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
 
 
 def test_mesh_peer_can_reach_peer_surface(mesh_peer_client):
@@ -113,7 +125,7 @@ def test_mesh_peer_memory_search_not_blocked_by_mesh_gate(mesh_peer_client, monk
     # 503 opted out) depending on other settings, but never the mesh-boundary 403.
     monkeypatch.setenv("POTLUCK_PEER_MEMORY_ENABLED", "1")
     resp = mesh_peer_client.post("/peer/memory/search", json={"query": "test"})
-    assert resp.status_code != 403 or "mesh" not in resp.json().get("detail", "")
+    assert resp.status_code != 403 or "household's mesh" not in resp.json().get("detail", "")
 
 
 def test_peer_cannot_escape_via_path_traversal(mesh_peer_client):
@@ -140,15 +152,50 @@ def test_local_caller_reaches_peer_surface_regardless_of_mesh_cidr(local_client)
     assert local_client.get("/peer/capabilities").status_code != 403
 
 
-def test_mesh_cidr_env_override(monkeypatch):
+def test_mesh_cidr_env_override(monkeypatch, fake_mesh):
     # POTLUCK_MESH_CIDR lets an operator point the gate at a non-default mesh
-    # allocation. A caller inside the overridden CIDR passes; the same address
-    # would have been rejected under the default 100.64.0.0/10 pool.
+    # allocation. A member inside the overridden CIDR passes; the same kind of
+    # address would have been rejected under the default 100.64.0.0/10 pool,
+    # and a default-range address is no longer eligible even if it is listed.
     monkeypatch.setenv("POTLUCK_MESH_CIDR", "10.42.0.0/16")
+    fake_mesh.own_ip = "10.42.0.1"
+    fake_mesh.add_peer("10.42.0.9")
+    fake_mesh.add_peer("100.64.0.9")
     app = create_app()
-    custom_mesh_client = TestClient(app, client=("10.42.0.9", 40000), raise_server_exceptions=False)
-    default_mesh_client = TestClient(app, client=("100.64.0.9", 40000), raise_server_exceptions=False)
+    custom_mesh_client = TestClient(
+        app, client=("10.42.0.9", 40000), base_url="http://10.42.0.1:8321", raise_server_exceptions=False
+    )
+    default_mesh_client = TestClient(
+        app, client=("100.64.0.9", 40000), base_url="http://10.42.0.1:8321", raise_server_exceptions=False
+    )
 
     assert custom_mesh_client.get("/peer/capabilities").status_code != 403
     # Under the override, the DEFAULT mesh CIDR is no longer trusted.
     assert default_mesh_client.get("/peer/capabilities").status_code == 403
+
+
+def test_every_engine_server_ignores_forwarded_headers():
+    # uvicorn's default takes the caller's address from X-Forwarded-For when the
+    # connection comes from 127.0.0.1. With that on, a local process sending
+    # "X-Forwarded-For: 100.64.0.9" over loopback looked like a mesh peer and
+    # skipped the token that loopback /peer/* requires. Every server the engine
+    # starts must turn it off.
+    import ast
+    import inspect
+
+    import potluck_local.app as app_module
+
+    servers = [
+        node
+        for node in ast.walk(ast.parse(inspect.getsource(app_module)))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "uvicorn"
+        and node.func.attr in ("run", "Config")
+    ]
+    assert len(servers) == 2
+    for call in servers:
+        options = {keyword.arg: keyword.value for keyword in call.keywords}
+        setting = options.get("proxy_headers")
+        assert isinstance(setting, ast.Constant) and setting.value is False

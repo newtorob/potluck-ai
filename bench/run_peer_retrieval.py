@@ -19,7 +19,7 @@ through the tunnel. Cleanup deletes the test memories from the peer.
 Usage:
     python bench/run_peer_retrieval.py \\
         --peer-ssh-user rob \\
-        --peer-mesh-ip 100.101.102.103 \\
+        --peer-mesh-ip 100.64.0.1 \\
         --peer-name linux
 """
 from __future__ import annotations
@@ -349,7 +349,7 @@ def probe_latency_at_scale(
 
 def parse_args():
     p = argparse.ArgumentParser(description="Cross-machine peer retrieval bench")
-    p.add_argument("--peer-mesh-ip", required=True, help="Peer's Tailscale (or other mesh) IP")
+    p.add_argument("--peer-mesh-ip", required=True, help="Peer's Potluck mesh IP, from this machine's mesh roster. The peer refuses any other address (Tailscale, LAN).")
     p.add_argument("--peer-ssh-user", required=True, help="SSH username for the peer (used to tunnel for populate)")
     p.add_argument("--peer-name", default="peer", help="Friendly name for output (e.g. 'linux', 'windows')")
     p.add_argument("--skip-latency-scale", action="store_true",

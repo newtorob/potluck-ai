@@ -27,6 +27,7 @@ from potluck_local import __version__
 from potluck_local.routers import account, agents, batches, chat, circles, contributor, gateway, hardware, health, memory, models, ollama, peer, readiness, settings, tasks, usage, vault, verify
 from potluck_local.utils.logging import setup_logging
 from potluck_local.routers import split
+from potluck_local.services import peer_trust
 from potluck_local.services.split_native import SplitError
 
 logger = logging.getLogger(__name__)
@@ -307,13 +308,15 @@ def create_app() -> FastAPI:
     # Peer-access guard — when the sidecar is bound to 0.0.0.0 (required so
     # household peers can dial it over the mesh), the bare socket would
     # expose every endpoint. This middleware restricts non-loopback callers
-    # to the explicit peer-facing surface (/peer/* + /health), and further
-    # requires /peer/* callers' source IP to be inside the WireGuard mesh
-    # CIDR (mesh_network above) — "non-loopback" is not the mesh boundary,
-    # since 0.0.0.0 is reachable from any device on the same LAN/Wi-Fi, not
-    # just mesh peers. The local user's memory, tasks, conversation history,
-    # and agent observability are never reachable from another machine —
-    # even one in the same household, let alone the same coffee shop.
+    # to the explicit peer-facing surface (/peer/* + /health). /peer/* and the
+    # full /health body need a household member: a source address inside the
+    # mesh CIDR (mesh_network above) that this machine's own mesh sidecar lists
+    # as a reachable peer, on a connection accepted at this machine's own mesh
+    # address (services/peer_trust.py). The CIDR alone proves nothing, because
+    # Tailscale and some carrier and campus networks use the same range. The
+    # local user's memory, tasks, conversation history, and agent
+    # observability are never reachable from another machine, even one in
+    # the same household, let alone the same coffee shop.
     #
     # Localhost source IPs (Electron, dev tools) get the full surface.
     @app.middleware("http")
@@ -354,28 +357,37 @@ def create_app() -> FastAPI:
                     },
                 )
 
-            # /peer/* additionally requires the caller's source IP to be on the
-            # WireGuard mesh (see mesh_network above) -- "non-loopback" alone is
-            # NOT the mesh boundary: uvicorn binds 0.0.0.0 (see main()), so a
-            # device on the same Wi-Fi/LAN is also "non-loopback" without ever
-            # having joined the household's mesh. /peer/capabilities,
-            # /peer/chat/completions, and (when opted in) /peer/memory/search --
-            # which returns full memory content -- must never be reachable by a
-            # bystander on the coffee-shop/dorm/apartment network. /health stays
-            # on the pre-existing loopback-or-any-caller liveness exemption (no
-            # memory or inference surface there).
-            if normalised.startswith("/peer/") and not _client_ip_in_network(
-                client_host, mesh_network
-            ):
+            # /peer/* and the full /health body are for household members only
+            # (see the guard comment above). Both addresses come from the TCP
+            # socket: scope["client"] is the source and scope["server"] is the
+            # local address the connection was accepted on. Neither is read
+            # from a header. Anything the check cannot establish is a refusal.
+            member = False
+            if _client_ip_in_network(client_host, mesh_network):
+                server = request.scope.get("server")
+                server_host = server[0] if isinstance(server, (tuple, list)) and len(server) == 2 else None
+                reason = await peer_trust.household_roster().refusal_reason(client_host, server_host)
+                member = reason is None
+            else:
+                reason = "outside_mesh_range"
+            if not member and (normalised.startswith("/peer/") or normalised == "/health"):
+                # Reason code and source only, at debug level, so a stranger
+                # cannot fill the log.
+                logger.debug("peer_refused reason=%s source=%s", reason, client_host)
+            if normalised.startswith("/peer/") and not member:
                 return JSONResponse(
                     status_code=403,
                     content={
                         "detail": (
-                            "peer routes require the caller to be on the "
-                            "household WireGuard mesh"
+                            "peer routes are only available to machines in "
+                            "this household's mesh"
                         ),
                     },
                 )
+            # Liveness stays open to any caller, but only a member or the local
+            # user gets the version, loaded model and other machines' addresses.
+            if normalised == "/health" and not member and request.method == "GET":
+                return JSONResponse(status_code=200, content={"status": "ok"})
 
         # OpenAI/Ollama-compatible gateway (/v1/*) is for external tools that do
         # not carry the internal sidecar token. It has its own opt-in key and
@@ -424,24 +436,25 @@ def create_app() -> FastAPI:
         # but ONLY for a non-loopback caller.
         #
         # NOTE on /peer/* exemption: peer routes are NOT per-request signature
-        # authenticated in v0. Their credential is mesh membership — a caller can
-        # only reach them from a source IP inside the WireGuard mesh CIDR (Gate 1
-        # above already 403s any non-loopback path outside /peer/* + /health, and
-        # the mesh-CIDR check just above that 403s a /peer/* caller whose source
-        # IP is outside the mesh subnet), and mesh enrollment is gated by the
-        # coordinator. Per-request signed-nonce attestation is a v0.5+ item. See
-        # routers/peer.py "Trust model".
+        # authenticated in v0. Their credential is household membership: a
+        # caller reaches them only from a source address that this machine's
+        # mesh sidecar lists as a reachable peer, on a connection accepted at
+        # this machine's own mesh address (Gate 1 above 403s any non-loopback
+        # path outside /peer/* + /health, and the membership check just above
+        # that 403s every other /peer/* caller), and mesh enrollment is gated by
+        # the coordinator. Per-request signed-nonce attestation is a v0.5+
+        # item. See routers/peer.py "Trust model".
         #
-        # That mesh-membership credential ONLY exists for a non-loopback caller
-        # — the mesh-CIDR check above runs exclusively inside `if not
-        # is_loopback:` (Gate 1), so a loopback caller hitting /peer/* never
-        # proves mesh membership at all. Exempting /peer/* from the token gate
+        # That membership credential ONLY exists for a non-loopback caller:
+        # the check above runs exclusively inside `if not is_loopback:`
+        # (Gate 1), so a loopback caller hitting /peer/* never proves
+        # membership at all. Exempting /peer/* from the token gate
         # unconditionally therefore left it completely unauthenticated for any
         # local process (no token, or the wrong token, both worked) — the
         # private-memory leak this fixes. A loopback /peer/* caller has no mesh
         # credential to fall back on, so it must present the sidecar token like
         # every other loopback route; a mesh peer keeps its pre-existing
-        # token-free path since mesh membership already gated it above.
+        # token-free path since household membership already gated it above.
         if normalised.startswith(("/account", "/batches", "/split", "/circles")) and sidecar_token is None:
             return JSONResponse(status_code=503, content={"detail": "Private control requires an authenticated runtime. Run potluck up."})
         if sidecar_token is not None:
@@ -555,6 +568,10 @@ def main() -> None:
     # POTLUCK_BIND_HOST=127.0.0.1 to opt out (e.g. on a machine that should
     # never serve peer inference).
     bind_host = os.environ.get("POTLUCK_BIND_HOST", "0.0.0.0")
+    # proxy_headers is off on both servers below. uvicorn's default rewrites the
+    # caller's address from X-Forwarded-For when the connection comes from
+    # 127.0.0.1, which would let a local process pose as a mesh peer and skip
+    # the token that loopback /peer/* requires. Nothing proxies to the engine.
     if os.environ.get("POTLUCK_SHARED_RUNTIME") == "1":
         from potluck_local.runtime_control import RuntimeControl, cleanup_on_sigterm
 
@@ -563,7 +580,7 @@ def main() -> None:
                             owner=os.environ.get("POTLUCK_RUNTIME_OWNER", "standalone")) as control:
             app.state.runtime_control = control
             server = uvicorn.Server(uvicorn.Config(
-                app, host=bind_host, port=control.port,
+                app, host=bind_host, port=control.port, proxy_headers=False,
                 log_level="debug" if dev_mode else "info"))
             app.state.runtime_server = server
             server.run(sockets=[control.socket])
@@ -572,6 +589,7 @@ def main() -> None:
         app,
         host=bind_host,
         port=args.port,
+        proxy_headers=False,
         log_level="debug" if dev_mode else "info",
     )
 

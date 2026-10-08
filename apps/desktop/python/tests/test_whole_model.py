@@ -96,7 +96,9 @@ def test_runtime_load_whole_model_and_health() -> None:
 
         # /health surfaces it through loaded_pipeline (the shared slot's describe()).
         app = create_app()
-        with TestClient(app) as client:
+        # Loopback, like the frontend: only loopback and household members get
+        # the full /health body.
+        with TestClient(app, client=("127.0.0.1", 50000)) as client:
             body = client.get("/health").json()
             assert body["model_loaded"] is True
             assert body["active_model_id"] == MODEL_ID

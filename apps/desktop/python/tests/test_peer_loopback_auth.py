@@ -46,8 +46,13 @@ def loopback_client(app_with_token):
 
 
 @pytest.fixture()
-def mesh_client(app_with_token):
-    return TestClient(app_with_token, client=MESH_PEER, raise_server_exceptions=False)
+def mesh_client(app_with_token, fake_mesh):
+    # A household peer: listed as reachable by this machine's mesh sidecar and
+    # dialing this machine's own mesh address.
+    fake_mesh.add_peer(MESH_PEER[0])
+    return TestClient(
+        app_with_token, client=MESH_PEER, base_url=fake_mesh.base_url, raise_server_exceptions=False
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -108,10 +113,10 @@ def test_loopback_peer_capabilities_requires_token(loopback_client):
 
 def test_mesh_peer_still_reaches_peer_routes_without_a_token(mesh_client):
     resp = mesh_client.post("/peer/memory/search", json={"query": "test"})
-    assert resp.status_code != 401
+    assert resp.status_code not in (401, 403)
 
     resp2 = mesh_client.get("/peer/capabilities")
-    assert resp2.status_code != 401
+    assert resp2.status_code == 200
 
 
 # ---------------------------------------------------------------------------
