@@ -403,7 +403,11 @@ installer-linux-docker: ## Build .deb + .AppImage for linux/amd64 inside Docker 
 	@echo "==> Cloning a clean checkout of committed HEAD ($$(git rev-parse --short HEAD)) — working-tree changes are never included"
 	@rm -rf dist-linux/_src dist-linux/out
 	@mkdir -p dist-linux
-	git clone --local --quiet . dist-linux/_src
+	@# --no-local makes git send the objects as one pack. A --local clone copies
+	@# thousands of loose objects, and git inside the emulated container has
+	@# misread those over the shared folder ("loose object ... is corrupt"),
+	@# failing the Go build's version stamp or the CLI packager.
+	git clone --no-local --quiet . dist-linux/_src
 	@if [ -n "$(LINUX_SPLIT_ENGINE)" ]; then \
 		for f in llama-server rpc-server manifest.json LICENSE; do \
 			test -f "$(LINUX_SPLIT_ENGINE)/$$f" || { echo "error: $(LINUX_SPLIT_ENGINE)/$$f is missing"; exit 1; }; \
