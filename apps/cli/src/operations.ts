@@ -13,6 +13,7 @@ import { plainText, readLogs } from "./logs.js";
 import { ensureRuntime, startRuntime, stopRuntime } from "./runtime.js";
 import { manageGateway, manageModels } from "./manage.js";
 import { connect, disconnect, formatMember, household, login, logout, memberStatus } from "./member.js";
+import { formatCircles, manageCircles } from "./circle.js";
 import { runMachineSetup } from "./operational-setup.js";
 import { serveRuntime } from "./serve.js";
 import { manageService } from "./service.js";
@@ -32,6 +33,7 @@ export function operationHelp(command: string): string {
   if (command === "login") return "Usage: potluck login [--wait|--no-wait] [--no-browser] [--json]\nStarts the Potluck engine in the background if it is not running, then opens your browser to approve this terminal with the code filled in. Over SSH, without a display, or with --no-browser, it prints a link to open on any device instead.\nInteractive terminals wait by default; JSON and piped invocations return the pending code. Run again with --wait after approval to finish. Ctrl-C leaves the request resumable until expiry.\n";
   if (command === "logout") return "Usage: potluck logout [--local] [--json]\nRevoke this member session and remove local sign-in. --local removes it here without server revocation. Mesh enrollment is separate; use disconnect to unpair.\n";
   if (command === "whoami") return "Usage: potluck whoami [--json]\nShow the locally stored member profile without printing credentials.\n";
+  if (command === "circle") return 'Usage: potluck circle list [--json]\n       potluck circle create "<name>"\n       potluck circle invite "<circle>"\n       potluck circle join <invite-code-or-link> [--yes]\n       potluck circle leave "<circle>" --yes\n       potluck circle delete "<circle>" --yes\nTrusted circles are people who lend each other spare compute. Invite makes a code that works once. Join shows what the invite is for and joins only with --yes. List shows who is in each circle and which models its other members are offering now. To lend this machine: potluck contribute share circles, then potluck contribute on. To borrow: potluck run --scope circle.\n';
   if (command === "household") return "Usage: potluck household list [--json]\n       potluck household create [--name <household-name>] [--json]\n       potluck household invite --output <new-private-file> [--json]\nInvitations are one-use credentials, saved with permissions 0600 and never printed.\n";
   if (command === "connect") return "Usage: potluck connect [--invite-file <private-file>] [--name <machine-name>] [--json]\nConnect through the installed mesh daemon using your signed-in household or a private invitation file.\n";
   if (command === "disconnect") return "Usage: potluck disconnect [--json]\nRemove this machine's local mesh enrollment and keys. The old coordinator entry remains until cleanup.\n";
@@ -54,6 +56,12 @@ export async function runOperation(args: CliArgs, out: (value: string) => void):
     const report = await manageSessions(args.action!, args.target);
     out(args.json ? JSON.stringify(report) + "\n" : plainText(report.deleted ? `Deleted session ${report.deleted}.\n` :
       ((report.sessions as Array<Record<string, unknown>>).map(s => `${s.id}\t${s.model}\t${s.scope}\t${s.updatedAt}\t${s.cwd}`).join("\n") || "No saved sessions.") + `\n${report.unreadable ? `${report.unreadable} unreadable session(s) skipped.\n` : ""}`));
+    return 0;
+  }
+  if (args.command === "circle") {
+    await ensureRuntime(text => process.stderr.write(plainText(text)));
+    const report = await manageCircles(args);
+    out(args.json ? JSON.stringify(report) + "\n" : plainText(formatCircles(report)));
     return 0;
   }
   if (args.command === "contribute") {

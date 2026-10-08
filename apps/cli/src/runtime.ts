@@ -66,7 +66,7 @@ export async function verifyRuntime(record: RuntimeRecord, timeout: number, sign
 
 export async function runtimeRequest<T = Record<string, unknown>>(path: string, options: {
   timeout: number; method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown;
-  allowArray?: boolean; signal?: AbortSignal; errorHints?: Readonly<Record<string, string>>;
+  allowArray?: boolean; allowEmpty?: boolean; signal?: AbortSignal; errorHints?: Readonly<Record<string, string>>;
 }): Promise<T> {
   const record = await readRuntimeRecord();
   if (!record) throw new RuntimeError("No shared runtime found. Start it with potluck up.");

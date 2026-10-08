@@ -24,7 +24,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from potluck_local import __version__
-from potluck_local.routers import account, agents, batches, chat, contributor, gateway, hardware, health, memory, models, ollama, peer, readiness, settings, tasks, usage, vault, verify
+from potluck_local.routers import account, agents, batches, chat, circles, contributor, gateway, hardware, health, memory, models, ollama, peer, readiness, settings, tasks, usage, vault, verify
 from potluck_local.utils.logging import setup_logging
 from potluck_local.routers import split
 from potluck_local.services.split_native import SplitError
@@ -442,7 +442,7 @@ def create_app() -> FastAPI:
         # credential to fall back on, so it must present the sidecar token like
         # every other loopback route; a mesh peer keeps its pre-existing
         # token-free path since mesh membership already gated it above.
-        if normalised.startswith(("/account", "/batches", "/split")) and sidecar_token is None:
+        if normalised.startswith(("/account", "/batches", "/split", "/circles")) and sidecar_token is None:
             return JSONResponse(status_code=503, content={"detail": "Private control requires an authenticated runtime. Run potluck up."})
         if sidecar_token is not None:
             exempt = (
@@ -470,6 +470,7 @@ def create_app() -> FastAPI:
     app.include_router(split.peer_router, prefix="/peer/split", tags=["split"])
     app.include_router(health.router, tags=["health"])
     app.include_router(account.router, prefix="/account", tags=["account"])
+    app.include_router(circles.router, prefix="/circles", tags=["circles"])
     app.include_router(batches.router, prefix="/batches", tags=["batches"])
     app.include_router(readiness.router, tags=["readiness"])
     app.include_router(chat.router, prefix="/chat", tags=["chat"])

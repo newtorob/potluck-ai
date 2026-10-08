@@ -1,7 +1,7 @@
 /** Parse commands before touching config, starting a REPL, or making requests. */
 export class UsageError extends Error {}
 
-export type Command = "usage" | "split" | "batch" | "sessions" | "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
+export type Command = "circle" | "usage" | "split" | "batch" | "sessions" | "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
 export interface CliArgs {
   help: boolean;
   version: boolean;
@@ -53,7 +53,7 @@ export interface CliArgs {
   theme?: "dark" | "light";
 }
 
-const commands = new Set<Command>(["usage", "split", "batch", "sessions", "run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
+const commands = new Set<Command>(["circle", "usage", "split", "batch", "sessions", "run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
 
 export function parseArgs(argv: string[]): CliArgs {
   const out: CliArgs = { help: false, version: false, print: false, yes: false,
@@ -216,6 +216,13 @@ export function parseArgs(argv: string[]): CliArgs {
     } else if (out.command === "gateway") {
       out.action = positional[1] || "status";
       if (positional.length > 2 || !["status", "enable", "disable", "rotate"].includes(out.action)) throw new UsageError("Use potluck gateway status|enable|disable|rotate.");
+    } else if (out.command === "circle") {
+      out.action = positional[1] || "list"; out.target = positional[2];
+      if (!["list", "create", "invite", "join", "leave", "delete"].includes(out.action) || positional.length > 3) throw new UsageError("Use potluck circle list|create|invite|join|leave|delete.");
+      if (out.action === "list" ? out.target !== undefined : !out.target && !out.help) {
+        throw new UsageError(out.action === "list" ? "circle list takes no name." : out.action === "create" ? 'Name the circle: potluck circle create "Friends".'
+          : out.action === "join" ? "Paste the invite code or link: potluck circle join ABCD-EFGH-JKMN." : `Name the circle: potluck circle ${out.action} "Friends".`);
+      }
     } else if (out.command === "household") {
       out.action = positional[1] || "list";
       if (positional.length > 2 || !["list", "create", "invite"].includes(out.action)) throw new UsageError("Use potluck household list|create|invite.");
@@ -252,10 +259,12 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.command === "launch" && out.json) throw new UsageError("launch runs an external tool; JSON output is not supported.");
   if (out.command === "serve" && (out.json || seen.has("--timeout"))) throw new UsageError("serve runs in the foreground; use service status --json for reports.");
   if (out.command === "models" && !seen.has("--timeout")) out.timeout = 30000;
-  if (["setup", "login", "logout", "household", "connect", "disconnect"].includes(out.command || "") && !seen.has("--timeout")) out.timeout = 30000;
+  if (["setup", "login", "logout", "household", "connect", "disconnect", "circle"].includes(out.command || "") && !seen.has("--timeout")) out.timeout = 30000;
   if (out.command && out.version) throw new UsageError("--version must be used without a command.");
   if (out.command === "logs" && seen.has("--timeout")) throw new UsageError("--timeout applies to status, doctor, up, and down.");
-  if (out.command && (out.print || (out.model && !["setup", "launch", "run"].includes(out.command)) || out.verify || out.noVerify || out.yes)) {
+  // --yes confirms joining, leaving or deleting a circle; elsewhere it is an agent option.
+  const circleConfirm = out.command === "circle" && ["join", "leave", "delete"].includes(out.action || "");
+  if (out.command && (out.print || (out.model && !["setup", "launch", "run"].includes(out.command)) || out.verify || out.noVerify || (out.yes && !circleConfirm))) {
     throw new UsageError("Agent options cannot be combined with a management command.");
   }
   if (!operation && (out.json || seen.has("--timeout"))) {
