@@ -1,0 +1,41 @@
+{
+  "_comment": "One example of each circle response the coordinator sends, exactly as the desktop app reads it. services/coordinator/tests/test_circle_api_contract.py pins that the response models still have these fields; apps/desktop/frontend/src/lib/circles.contract.test.ts pins that the app still reads them. Change both together.",
+  "circle": {
+    "id": "7f0c5a2e-58a1-4b0c-9a51-0f5e3a6f1d11",
+    "name": "Friends",
+    "created_at": "2026-10-08T12:00:00Z",
+    "role": "owner",
+    "people": [
+      {"id": "0b0d7f0a-1f5d-4a39-8a65-2b0e2a9d6c22", "name": "Ada", "role": "owner", "is_you": true, "joined_at": "2026-10-08T12:00:00Z"},
+      {"id": "5c1b3e2d-9a47-4f0b-8d21-7e6f5a4b3c33", "name": "grace@example.test", "role": "member", "is_you": false, "joined_at": "2026-10-08T12:05:00Z"}
+    ],
+    "members": [
+      {"member_pubkey": "2xCWcJtYLHkBfruL1qfHNgqC04OG5e2XeldFcCuVJLw", "added_at": "2026-10-07T18:00:00Z"}
+    ]
+  },
+  "invite_created": {
+    "id": "9d2e4f6a-1b3c-4d5e-8f70-112233445566",
+    "code": "ABCD-EFGH-JKMN",
+    "url": "https://trypotluck.ai/circles/join#code=ABCD-EFGH-JKMN",
+    "expires_at": "2026-10-15T12:00:00Z",
+    "max_uses": 1
+  },
+  "invite": {
+    "id": "9d2e4f6a-1b3c-4d5e-8f70-112233445566",
+    "created_at": "2026-10-08T12:00:00Z",
+    "expires_at": "2026-10-15T12:00:00Z",
+    "max_uses": 1,
+    "uses": 0
+  },
+  "invite_preview": {
+    "circle_name": "Friends",
+    "invited_by": "Ada",
+    "people": 2,
+    "expires_at": "2026-10-15T12:00:00Z",
+    "already_in": false
+  },
+  "availability": {
+    "circle_id": "7f0c5a2e-58a1-4b0c-9a51-0f5e3a6f1d11",
+    "models": [{"slug": "qwen3-4b-instruct-2507-q4", "machines": 2}]
+  }
+}

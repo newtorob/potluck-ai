@@ -46,6 +46,7 @@ import {
   detailOf,
   type CoordinatorSessionResult,
 } from '@/lib/coordinatorAuth';
+import { normalizeCircle } from './circles';
 import type { ContributorStatus } from './contributorStatus';
 
 const LOCAL_BASE =
@@ -95,9 +96,8 @@ async function handle204(res: Response): Promise<void> {
  * same success/throw contract as `handleResponse`/`handle204`: any 2xx
  * status (including 204, for the circle/member delete routes, whose body is
  * unused) resolves the body cast to `T`; everything else throws
- * `[localApi] {status}: {detail}` — the exact `[localApi] 409: …` shape
- * CirclesView.tsx pattern-matches on to distinguish "already a member" from
- * other failures.
+ * `[localApi] {status}: {detail}`, the shape coordinatorError.ts parses back
+ * into a status and the coordinator's own message.
  */
 function fromSessionResult<T>(res: CoordinatorSessionResult): T {
   if (res.status >= 200 && res.status < 300) {
@@ -386,18 +386,68 @@ export interface PersistedConversationDetail extends PersistedConversation {
 
 // ---- Trusted circles (Phase 2) -------------------------------------------
 
-/** A member pubkey row inside a circle. */
+/** A machine key pasted into a circle by an older app version. Only the owner sees these. */
 export interface CircleMember {
   member_pubkey: string;
   added_at: string; // ISO-8601
 }
 
-/** A trusted circle owned by the calling member. */
+export type CircleRole = 'owner' | 'member';
+
+/** A person with a membership in a circle. `id` is what the owner removes by. */
+export interface CirclePerson {
+  id: string;
+  name: string;
+  role: CircleRole;
+  is_you: boolean;
+  joined_at: string; // ISO-8601
+}
+
+/** A trusted circle the calling member owns or has joined. */
 export interface Circle {
   id: string;
   name: string;
   created_at: string; // ISO-8601
+  /** The caller's own role. */
+  role: CircleRole;
+  /** Everyone with a membership, owner first. */
+  people: CirclePerson[];
+  /** Legacy machine keys; the coordinator returns [] to members. */
   members: CircleMember[];
+}
+
+/** What a coordinator sends. Older ones omit `role` and `people`; see normalizeCircle. */
+export type RawCircle = Omit<Circle, 'role' | 'people' | 'members'> & {
+  role?: CircleRole;
+  people?: CirclePerson[];
+  members?: CircleMember[];
+};
+
+/** Response from POST /me/circles/{id}/invites. The code is shown once and never returned again. */
+export interface CircleInviteCreated {
+  id: string;
+  code: string; // e.g. "ABCD-EFGH-JKMN"
+  url: string;
+  expires_at: string; // ISO-8601
+  max_uses: number;
+}
+
+/** An invite that can still be accepted, from GET /me/circles/{id}/invites. Never carries the code. */
+export interface CircleInvite {
+  id: string;
+  created_at: string; // ISO-8601
+  expires_at: string; // ISO-8601
+  max_uses: number;
+  uses: number;
+}
+
+/** Response from POST /circles/invites/preview: what the invite is for, before anything is joined. */
+export interface CircleInvitePreview {
+  circle_name: string;
+  invited_by: string;
+  people: number;
+  expires_at: string; // ISO-8601
+  already_in: boolean;
 }
 
 /** One model a circle can answer with now, and how many of its machines offer it. */
@@ -412,7 +462,7 @@ export interface CircleAvailability {
   models: CircleModel[];
 }
 
-/** Response from GET /me/circles. */
+/** Response from GET /me/circles, after normalizeCircle. */
 export interface ListCirclesResponse {
   circles: Circle[];
 }
@@ -1506,21 +1556,22 @@ export const localApi = {
   // every /me/* route, so these go through the bearer-attaching bridge
   // rather than a bare fetch.
   circles: {
-    /** GET /me/circles — the calling member's circles with their members. */
+    /** GET /me/circles: the circles the calling member owns or has joined. */
     list(): Promise<ListCirclesResponse> {
-      return coordinatorSessionRequest('GET', '/me/circles').then((r) =>
-        fromSessionResult<ListCirclesResponse>(r),
-      );
+      return coordinatorSessionRequest('GET', '/me/circles').then((r) => {
+        const body = fromSessionResult<{ circles: RawCircle[] }>(r);
+        return { circles: body.circles.map(normalizeCircle) };
+      });
     },
 
     /** POST /me/circles { name } — create a new trusted circle. */
     create(name: string): Promise<Circle> {
       return coordinatorSessionRequest('POST', '/me/circles', { name }).then((r) =>
-        fromSessionResult<Circle>(r),
+        normalizeCircle(fromSessionResult<RawCircle>(r)),
       );
     },
 
-    /** DELETE /me/circles/{circle_id} — delete a circle and all its members. */
+    /** DELETE /me/circles/{circle_id}: delete a circle and all its members. Owner only. */
     delete(circleId: string): Promise<void> {
       return coordinatorSessionRequest(
         'DELETE',
@@ -1528,8 +1579,8 @@ export const localApi = {
       ).then((r) => fromSessionResult<void>(r));
     },
 
-    /** POST /me/circles/{circle_id}/members { member_pubkey } — add a member.
-     *  Throws a [localApi] 409: … error on duplicate. */
+    /** POST /me/circles/{circle_id}/members { member_pubkey }: add a machine key.
+     *  Kept for older circles; the Circles view no longer offers it. */
     addMember(circleId: string, memberPubkey: string): Promise<CircleMember> {
       return coordinatorSessionRequest(
         'POST',
@@ -1546,11 +1597,73 @@ export const localApi = {
       ).then((r) => fromSessionResult<CircleAvailability>(r));
     },
 
-    /** DELETE /me/circles/{circle_id}/members/{member_pubkey} — remove a member. */
+    /** DELETE /me/circles/{circle_id}/members/{member_pubkey}: remove a legacy machine key. */
     removeMember(circleId: string, memberPubkey: string): Promise<void> {
       return coordinatorSessionRequest(
         'DELETE',
         `/me/circles/${encodeURIComponent(circleId)}/members/${encodeURIComponent(memberPubkey)}`,
+      ).then((r) => fromSessionResult<void>(r));
+    },
+
+    /** POST /me/circles/{circle_id}/invites: owner makes an invite. Defaults are 7 days
+     *  and one use. The code comes back once; the coordinator never returns it again. */
+    createInvite(
+      circleId: string,
+      opts: { expires_in_days?: number; max_uses?: number } = {},
+    ): Promise<CircleInviteCreated> {
+      return coordinatorSessionRequest(
+        'POST',
+        `/me/circles/${encodeURIComponent(circleId)}/invites`,
+        opts,
+      ).then((r) => fromSessionResult<CircleInviteCreated>(r));
+    },
+
+    /** GET /me/circles/{circle_id}/invites: invites that can still be accepted, without codes. */
+    listInvites(circleId: string): Promise<CircleInvite[]> {
+      return coordinatorSessionRequest(
+        'GET',
+        `/me/circles/${encodeURIComponent(circleId)}/invites`,
+      ).then((r) => fromSessionResult<CircleInvite[]>(r));
+    },
+
+    /** DELETE /me/circles/{circle_id}/invites/{invite_id}: withdraw an invite. */
+    revokeInvite(circleId: string, inviteId: string): Promise<void> {
+      return coordinatorSessionRequest(
+        'DELETE',
+        `/me/circles/${encodeURIComponent(circleId)}/invites/${encodeURIComponent(inviteId)}`,
+      ).then((r) => fromSessionResult<void>(r));
+    },
+
+    /** POST /circles/invites/preview { code }: what an invite is for, without joining.
+     *  `code` may be the code in any case, with or without dashes, or the whole link. */
+    previewInvite(code: string): Promise<CircleInvitePreview> {
+      return coordinatorSessionRequest('POST', '/circles/invites/preview', { code }).then((r) =>
+        fromSessionResult<CircleInvitePreview>(r),
+      );
+    },
+
+    /** POST /circles/invites/accept { code }: join the circle the invite is for.
+     *  Throws [localApi] 404 for a bad or used code and 409 when the circle is full. */
+    acceptInvite(code: string): Promise<Circle> {
+      return coordinatorSessionRequest('POST', '/circles/invites/accept', { code }).then((r) =>
+        normalizeCircle(fromSessionResult<RawCircle>(r)),
+      );
+    },
+
+    /** DELETE /me/circles/{circle_id}/membership: a member leaves. The owner gets a 409. */
+    leave(circleId: string): Promise<void> {
+      return coordinatorSessionRequest(
+        'DELETE',
+        `/me/circles/${encodeURIComponent(circleId)}/membership`,
+      ).then((r) => fromSessionResult<void>(r));
+    },
+
+    /** DELETE /me/circles/{circle_id}/people/{person_id}: owner removes a person
+     *  (`person_id` is `people[].id`). */
+    removePerson(circleId: string, personId: string): Promise<void> {
+      return coordinatorSessionRequest(
+        'DELETE',
+        `/me/circles/${encodeURIComponent(circleId)}/people/${encodeURIComponent(personId)}`,
       ).then((r) => fromSessionResult<void>(r));
     },
   },

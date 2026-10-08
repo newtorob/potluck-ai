@@ -1730,7 +1730,11 @@ ipcMain.handle('cloud:request', async (_evt, method, reqPath, body) => {
 // pre-registration for REQUIRE_REGISTERED_KEYS=true), the trusted-circle
 // + identity routes (GET /me/identity, GET/POST /me/circles, DELETE
 // /me/circles/{id}, POST /me/circles/{id}/members, DELETE
-// /me/circles/{id}/members/{pubkey} — coordinator's routers/circles.py), and
+// /me/circles/{id}/members/{pubkey}, plus the invite and membership routes:
+// POST /circles/invites/preview, POST /circles/invites/accept,
+// GET/POST /me/circles/{id}/invites, DELETE /me/circles/{id}/invites/{id},
+// DELETE /me/circles/{id}/membership, DELETE /me/circles/{id}/people/{id};
+// coordinator's routers/circles.py), and
 // the credit/contribution routes (GET /me/credit-balance, GET
 // /me/credit-history, GET /me/contributions, GET /me/contributions/weekly —
 // coordinator's routers/me.py), and GET /jobs/stats (own requester-side job
@@ -1765,6 +1769,9 @@ const COORDINATOR_SESSION_EXACT_ROUTES = new Set([
   'GET /me/identity',
   'GET /me/circles',
   'POST /me/circles',
+  // Invites are looked up and accepted by code, which travels in the body.
+  'POST /circles/invites/preview',
+  'POST /circles/invites/accept',
   'GET /me/credit-balance',
   'GET /me/credit-history',
   'GET /me/contributions',
@@ -1778,6 +1785,9 @@ const COORDINATOR_SESSION_EXACT_ROUTES = new Set([
 // coordinator's _PUBKEY_MAX_LEN (512 — circles.py). Both are validated by
 // regex, not just split on `/`, so a crafted path segment (e.g. containing
 // `../` or another `/`) can't smuggle a different route through the proxy.
+// Invite and person ids are UUIDs: the patterns below accept only that shape
+// in the second segment, and the check in isAllowedCoordinatorSessionRoute
+// still runs on it.
 const COORDINATOR_CIRCLE_ID_RE = /^[0-9a-f-]{36}$/i;
 const COORDINATOR_PUBKEY_RE = /^[A-Za-z0-9_-]{1,512}$/;
 const COORDINATOR_SESSION_DYNAMIC_ROUTES = [
@@ -1785,6 +1795,13 @@ const COORDINATOR_SESSION_DYNAMIC_ROUTES = [
   { method: 'GET', pattern: /^\/me\/circles\/([^/]+)\/availability$/ },
   { method: 'POST', pattern: /^\/me\/circles\/([^/]+)\/members$/ },
   { method: 'DELETE', pattern: /^\/me\/circles\/([^/]+)\/members\/([^/]+)$/ },
+  // Owner makes and lists invites, and withdraws one.
+  { method: 'POST', pattern: /^\/me\/circles\/([^/]+)\/invites$/ },
+  { method: 'GET', pattern: /^\/me\/circles\/([^/]+)\/invites$/ },
+  { method: 'DELETE', pattern: /^\/me\/circles\/([^/]+)\/invites\/([0-9a-fA-F-]{36})$/ },
+  // A member leaves; the owner removes a person.
+  { method: 'DELETE', pattern: /^\/me\/circles\/([^/]+)\/membership$/ },
+  { method: 'DELETE', pattern: /^\/me\/circles\/([^/]+)\/people\/([0-9a-fA-F-]{36})$/ },
   // Member removes a (stale/ghost) machine from their own household.
   { method: 'DELETE', pattern: /^\/mesh\/households\/current\/machines\/([0-9a-fA-F-]{36})$/ },
 ];
