@@ -11,6 +11,7 @@ const { autoUpdater } = require('electron-updater');
 const log = require('electron-log');
 const { discoverRuntime } = require('./runtime-control');
 const { readMemberSession } = require('./member-session');
+const { decideMeshServiceUpdate, SELF_RESTART_EXIT_CODE } = require('./mesh-service-update');
 
 // ─── App identity ────────────────────────────────────────────────────────────
 // Must be set BEFORE app.whenReady() so menu bar / app data path use the right
@@ -960,6 +961,9 @@ ipcMain.handle('mesh:request', async (_evt, method, reqPath, body) => {
 //                        daemon's own IPC socket hasn't answered yet
 //                        (freshly registered, or the daemon is unhealthy)
 //   'running'          — enabled AND the socket answered 200 on /status
+//   'outdated'         running, but not the sidecar binary this app shipped
+//                        (see "Mesh service version check" below); the mesh
+//                        works, the renderer offers a restart
 //   'unsupported'      — this platform's mechanism isn't implemented yet
 
 /**
@@ -1013,6 +1017,12 @@ function runMeshHelper(subcommand) {
  * registered. See the state-enum comment above for what each value means.
  */
 async function computeMacDaemonStatus() {
+  // While the version-check restart is unregistering and re-registering the
+  // service, the helper would report 'notRegistered' for a moment. Say
+  // 'starting' instead of showing the enable prompt for that gap.
+  if (meshServiceUpdate.macRestart) {
+    return { platform: 'darwin', state: 'starting', detail: 'restarting the mesh service after an update' };
+  }
   const helperResult = await runMeshHelper('status');
   if (!helperResult.ok) {
     return { platform: 'darwin', state: 'not_installed', detail: helperResult.error };
@@ -1029,6 +1039,10 @@ async function computeMacDaemonStatus() {
     try {
       const res = await meshRequest({ method: 'GET', path: '/status' });
       if (res.status === 200) {
+        const check = await checkMeshServiceVersion(res.body);
+        if (check.action === 'offer_restart') {
+          return { platform: 'darwin', state: 'outdated', detail: check.reason };
+        }
         return { platform: 'darwin', state: 'running' };
       }
       return { platform: 'darwin', state: 'starting', detail: `socket responded with HTTP ${res.status}` };
@@ -1041,6 +1055,222 @@ async function computeMacDaemonStatus() {
   // doesn't know how to map (see statusToken() in main.swift). Fail safe
   // toward "not installed" rather than silently claiming success.
   return { platform: 'darwin', state: 'not_installed', detail: `unrecognised helper status: ${token}` };
+}
+
+// ─── Mesh service version check ──────────────────────────────────────────────
+//
+// The mesh service outlives the app, so after an app update the binary on
+// disk is new but the running process can still be the old one. A sidecar new
+// enough to report exe_sha256 in GET /status also restarts itself when its
+// binary is replaced (go/potluck-mesh/cmd/potluck-mesh/selfrestart.go). This
+// section compares the hash the running sidecar reports with the hash of the
+// sidecar binary this app shipped. mesh-service-update.js holds the decision
+// (and its tests); this is the I/O around it.
+//
+//   macOS:         the app restarts the service without asking, through the
+//                  signed helper (unregister, then register), at most once per
+//                  launch. If the service is still the old one afterwards, or
+//                  the helper reports requires_approval, it stops there:
+//                  'outdated' or 'requires_approval' reaches the renderer and
+//                  nothing loops. SMAppService has no restart call, and the
+//                  daemon is root's, so unregister + register is the only way
+//                  an unprivileged app can bounce it. It is also what Apple
+//                  recommends after a daemon's executable changes
+//                  (SMAppService.h). unregister kills the running process
+//                  without waiting for it to exit, so the restart waits for
+//                  the socket to go quiet before it registers again.
+//   Linux/Windows: restarting needs the elevated helper and its prompt, which
+//                  is not shown on launch. computeLinuxDaemonStatus /
+//                  computeWindowsDaemonStatus report state 'outdated' and the
+//                  renderer offers "Restart mesh service", which runs
+//                  mesh:enable (the same elevated install, whose last step is
+//                  a service restart).
+//
+// A development build has no bundled sidecar to compare with, so nothing here
+// ever restarts anything there (the helpers also refuse outside a packaged
+// app).
+
+// Where the static LaunchDaemon plist runs the sidecar from. An app launched
+// from anywhere else cannot change which binary the service runs.
+const MAC_MESH_SERVICE_BIN = '/Applications/Potluck AI.app/Contents/Resources/mesh/potluck-mesh';
+const MAC_MESH_STOP_TIMEOUT_MS = 25_000; // launchd's own SIGTERM-to-SIGKILL timeout is 20s
+const MAC_MESH_START_TIMEOUT_MS = 30_000;
+const MESH_SERVICE_WATCH_INTERVAL_MS = 15_000;
+
+const meshServiceUpdate = {
+  bundledSha256: null, // Promise<string|null>, created on first use
+  mismatchSeen: null, // the decision module's grace-period tracker
+  macRestartAttempted: false, // the automatic macOS restart already ran this launch
+  macRestart: null, // Promise while a macOS restart is running
+  offered: false, // the last check asked the renderer to offer a restart
+  lastVerdict: null, // for logging transitions only
+};
+let meshServiceWatchTimer = null;
+
+/** Path of the sidecar binary this app shipped, or null when there is none to compare with. */
+function getBundledMeshBinPath() {
+  if (!app.isPackaged) return null;
+  if (process.platform === 'darwin') {
+    const bin = path.join(process.resourcesPath, 'mesh', 'potluck-mesh');
+    return bin === MAC_MESH_SERVICE_BIN ? bin : null;
+  }
+  if (process.platform === 'linux') return getLinuxMeshBinPath();
+  if (process.platform === 'win32') return getWindowsMeshBinPath();
+  return null;
+}
+
+/** Resolves to the lowercase hex SHA-256 of a file, or null if it cannot be read. */
+function sha256File(file) {
+  return new Promise((resolve) => {
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(file);
+    stream.on('error', (err) => {
+      log.warn(`[mesh-daemon] cannot hash ${file}: ${err.message}`);
+      resolve(null);
+    });
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('end', () => resolve(hash.digest('hex')));
+  });
+}
+
+/** The bundled sidecar's hash, computed once per launch. */
+function bundledMeshSha256() {
+  if (!meshServiceUpdate.bundledSha256) {
+    const bin = getBundledMeshBinPath();
+    meshServiceUpdate.bundledSha256 = bin ? sha256File(bin) : Promise.resolve(null);
+  }
+  return meshServiceUpdate.bundledSha256;
+}
+
+/**
+ * Compares a GET /status body (from a service that just answered) with the
+ * bundled sidecar and applies the decision's side effects: the macOS restart
+ * starts here. Returns the decision; callers turn action 'offer_restart' into
+ * state 'outdated'.
+ */
+async function checkMeshServiceVersion(statusBody) {
+  const bundledSha256 = await bundledMeshSha256();
+  // Everything below runs without awaiting, so two overlapping checks cannot
+  // both decide on the one automatic macOS restart.
+  const decision = decideMeshServiceUpdate({
+    platform: process.platform,
+    bundledSha256,
+    status: statusBody,
+    mismatchSeen: meshServiceUpdate.mismatchSeen,
+    now: Date.now(),
+    macRestartAttempted: meshServiceUpdate.macRestartAttempted,
+    isAppImage: process.platform === 'linux' && Boolean(process.env.APPIMAGE),
+  });
+  meshServiceUpdate.mismatchSeen = decision.mismatchSeen;
+  meshServiceUpdate.offered = decision.action === 'offer_restart';
+  if (decision.verdict !== meshServiceUpdate.lastVerdict) {
+    meshServiceUpdate.lastVerdict = decision.verdict;
+    log.info(`[mesh-daemon] service version: ${decision.verdict} (${decision.reason})`);
+  }
+  if (decision.action === 'restart_mac') {
+    void beginMacMeshRestart();
+  }
+  return decision;
+}
+
+/** Polls the local socket until it answers (up) or stops answering (down). Resolves false on timeout. */
+async function waitForMeshSocket({ up, timeoutMs }) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await meshRequest({ method: 'GET', path: '/status' });
+      if (up && res.status === 200) return true;
+    } catch (_) {
+      if (!up) return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return false;
+}
+
+/**
+ * Restarts the macOS service: unregister (launchd stops the old process),
+ * wait for its socket to go away, register again. Never rejects. Resolves to
+ * a daemon status: 'starting' means the service was registered and the caller
+ * should read the real state, 'failed' means nothing was changed, and
+ * 'not_installed' means it was unregistered and could not be registered again
+ * (the enable panel takes over). Registering again could ask the user to
+ * approve the item in System Settings; if it does, the helper says so and
+ * this reports 'requires_approval', which the renderer already handles.
+ */
+async function restartMacMeshService() {
+  try {
+    // Only touch a service that is registered and running. A sidecar started
+    // by hand answers on the same socket but is not launchd's to restart.
+    const before = await runMeshHelper('status');
+    if (!before.ok || before.output !== 'enabled') {
+      log.warn(`[mesh-daemon] not restarting: helper status is ${before.ok ? before.output : before.error}`);
+      return { platform: 'darwin', state: 'failed', detail: 'the running mesh service is not the registered one' };
+    }
+    log.info('[mesh-daemon] restarting the mesh service (unregister, then register) to pick up the updated binary.');
+    const unregistered = await runMeshHelper('unregister');
+    if (!unregistered.ok) {
+      return { platform: 'darwin', state: 'failed', detail: `could not stop the mesh service: ${unregistered.error}` };
+    }
+    if (!(await waitForMeshSocket({ up: false, timeoutMs: MAC_MESH_STOP_TIMEOUT_MS }))) {
+      log.warn('[mesh-daemon] the old mesh service still answers after unregister; registering anyway.');
+    }
+    const registered = await runMeshHelper('register');
+    if (!registered.ok) {
+      return { platform: 'darwin', state: 'not_installed', detail: registered.error };
+    }
+    if (registered.output === 'requiresApproval') {
+      log.info('[mesh-daemon] re-registered; awaiting Login Items approval.');
+      return { platform: 'darwin', state: 'requires_approval' };
+    }
+    if (registered.output !== 'enabled') {
+      return { platform: 'darwin', state: 'not_installed', detail: `unexpected status after register: ${registered.output}` };
+    }
+    if (!(await waitForMeshSocket({ up: true, timeoutMs: MAC_MESH_START_TIMEOUT_MS }))) {
+      log.warn('[mesh-daemon] the mesh service did not answer after re-registering.');
+    }
+    return { platform: 'darwin', state: 'starting' };
+  } catch (err) {
+    log.warn(`[mesh-daemon] restart failed: ${err && err.message ? err.message : err}`);
+    return { platform: 'darwin', state: 'failed', detail: 'restarting the mesh service failed' };
+  }
+}
+
+/** Starts a macOS restart unless one is running; both callers share the result. */
+function beginMacMeshRestart() {
+  if (!meshServiceUpdate.macRestart) {
+    meshServiceUpdate.macRestartAttempted = true;
+    meshServiceUpdate.offered = false;
+    meshServiceUpdate.macRestart = restartMacMeshService().finally(() => {
+      meshServiceUpdate.macRestart = null;
+    });
+  }
+  return meshServiceUpdate.macRestart;
+}
+
+/**
+ * macOS only: look at the service shortly after launch and every 15 seconds
+ * until the one automatic restart has run, so the service is brought up to
+ * date without the renderer having to be open. Linux and Windows do nothing
+ * here: they would need a prompt.
+ */
+function startMeshServiceWatch() {
+  if (process.platform !== 'darwin' || !app.isPackaged || meshServiceWatchTimer) return;
+  const tick = async () => {
+    if (meshServiceUpdate.macRestartAttempted) {
+      clearInterval(meshServiceWatchTimer);
+      return;
+    }
+    try {
+      const res = await meshRequest({ method: 'GET', path: '/status' });
+      if (res.status === 200) await checkMeshServiceVersion(res.body);
+    } catch (_) {
+      // Not answering: nothing to compare.
+    }
+  };
+  meshServiceWatchTimer = setInterval(() => void tick(), MESH_SERVICE_WATCH_INTERVAL_MS);
+  setTimeout(() => void tick(), 5_000).unref();
+  meshServiceWatchTimer.unref();
 }
 
 // ─── Mesh daemon supervision (Linux: root systemd unit via polkit/pkexec) ───
@@ -1219,12 +1449,19 @@ async function computeLinuxDaemonStatus() {
     // UI can offer "Retry" instead of spinning on "Starting…" indefinitely.
     const props = await systemctlShow('potluck-mesh.service');
     const restarts = Number(props.NRestarts || 0);
+    // The sidecar exits non-zero on purpose when its binary is replaced, and
+    // systemd starts it again after RestartSec. That wait still carries the
+    // previous run's Result=exit-code, but it is a restart, not a failure. A
+    // crash loop is caught by the restart count below.
+    const restartingAfterExit =
+      props.ActiveState === 'activating' && props.SubState === 'auto-restart' && restarts < 3;
     const failed =
-      activeState === 'failed' ||
-      props.ActiveState === 'failed' ||
-      props.SubState === 'failed' ||
-      (props.Result && props.Result !== 'success' && props.Result !== 'unset') ||
-      restarts >= 3; // auto-restart loop = effectively failed
+      !restartingAfterExit &&
+      (activeState === 'failed' ||
+        props.ActiveState === 'failed' ||
+        props.SubState === 'failed' ||
+        (props.Result && props.Result !== 'success' && props.Result !== 'unset') ||
+        restarts >= 3); // auto-restart loop = effectively failed
     if (failed) {
       return {
         platform: 'linux',
@@ -1239,6 +1476,10 @@ async function computeLinuxDaemonStatus() {
   try {
     const res = await meshRequest({ method: 'GET', path: '/status' });
     if (res.status === 200) {
+      const check = await checkMeshServiceVersion(res.body);
+      if (check.action === 'offer_restart') {
+        return { platform: 'linux', state: 'outdated', detail: check.reason };
+      }
       return { platform: 'linux', state: 'running' };
     }
     return { platform: 'linux', state: 'starting', detail: `socket responded with HTTP ${res.status}` };
@@ -1403,10 +1644,13 @@ async function computeWindowsDaemonStatus() {
     // LastTaskResult 0 = success (previous run exited cleanly — shouldn't
     // happen for a long-running daemon, but not itself a failure signal),
     // 267009 (0x41301) = "task is currently running" (a race with our own
-    // read), 267011 (0x41303) = "task has not yet run". Anything else
-    // non-zero is a real failure result from the last run attempt.
+    // read), 267011 (0x41303) = "task has not yet run", SELF_RESTART_EXIT_CODE
+    // = the sidecar left on purpose and the task starts it again within a
+    // minute. Anything else non-zero is a real failure result from the last
+    // run attempt.
     const lr = task.lastResult;
-    const isKnownBenign = lr === 0 || lr === 267009 || lr === 267011 || Number.isNaN(lr);
+    const isKnownBenign =
+      lr === 0 || lr === 267009 || lr === 267011 || lr === SELF_RESTART_EXIT_CODE || Number.isNaN(lr);
     if (!isKnownBenign || task.missedRuns >= 3) {
       return {
         platform: 'win32',
@@ -1422,6 +1666,10 @@ async function computeWindowsDaemonStatus() {
   try {
     const res = await meshRequest({ method: 'GET', path: '/status' });
     if (res.status === 200) {
+      const check = await checkMeshServiceVersion(res.body);
+      if (check.action === 'offer_restart') {
+        return { platform: 'win32', state: 'outdated', detail: check.reason };
+      }
       return { platform: 'win32', state: 'running' };
     }
     return { platform: 'win32', state: 'starting', detail: `pipe responded with HTTP ${res.status}` };
@@ -1502,6 +1750,14 @@ ipcMain.handle('mesh:enable', async () => {
       state: 'unsupported',
       detail: `mesh:enable not implemented on ${process.platform} (TODO)`,
     };
+  }
+
+  // The mesh service is up but is not the binary this app shipped, and the
+  // renderer's "Restart mesh service" button landed here. Restart it again,
+  // by hand this time, so it is not held to the once-per-launch limit.
+  if (meshServiceUpdate.macRestart || meshServiceUpdate.offered) {
+    const restarted = await beginMacMeshRestart();
+    return restarted.state === 'starting' ? computeMacDaemonStatus() : restarted;
   }
 
   const helperResult = await runMeshHelper('register');
@@ -2110,6 +2366,7 @@ app.whenReady().then(async () => {
 
   await createWindow();
   setupAutoUpdater();
+  startMeshServiceWatch();
 });
 
 app.on('activate', async () => {
@@ -2137,6 +2394,12 @@ app.on('before-quit', async (event) => {
     event.preventDefault();
     app.isQuitting = true;
     clearInterval(sharedRuntimePoll);
+    clearInterval(meshServiceWatchTimer);
+    if (meshServiceUpdate.macRestart) {
+      // Quitting between unregister and register would leave the service off.
+      log.info('[app] Waiting for the mesh service restart to finish before quitting.');
+      await Promise.race([meshServiceUpdate.macRestart, new Promise((r) => setTimeout(r, 60_000))]);
+    }
     if (attachedRuntime) {
       log.info('[app] Leaving the shared runtime running.');
       // Electron ignores a synchronous re-entrant quit while the first

@@ -78,6 +78,7 @@ import type { MeshPeer, MeshStatus, HouseholdMachine } from '@/types/mesh';
 import { AddMachineWizard } from '@/components/household/AddMachineWizard';
 import { MeshEnablePanel } from '@/components/household/MeshEnablePanel';
 import { CoordinatorMismatchBanner } from '@/components/household/CoordinatorMismatchBanner';
+import { MeshServiceOutdatedBanner } from '@/components/household/MeshServiceOutdatedBanner';
 import { describeCoordinatorAuthError } from '@/lib/coordinatorErrorMessage';
 import { ContributionReceiptsCard } from '@/components/household/ContributionReceiptsCard';
 import { deriveDiagnostics, getConnectedPeers, type PeerDiagnostic } from '@/lib/meshDiagnostics';
@@ -197,6 +198,7 @@ export function HouseholdView() {
         <HouseholdHeader status={status} />
 
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+          <MeshServiceOutdatedBanner />
           <CoordinatorMismatchBanner />
 
           {lastError !== null && (

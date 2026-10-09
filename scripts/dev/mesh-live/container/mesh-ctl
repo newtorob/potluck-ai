@@ -23,6 +23,9 @@ case "$1" in
     # optional: shorten the STUN refresh so endpoint_update (and so the
     # coordinator's roster "updated" broadcast) fires often
     [ -n "$STUN_REFRESH" ] && export POTLUCK_STUN_REFRESH_INTERVAL="$STUN_REFRESH"
+    # phases swap the binary under a running sidecar; it must not exit by itself
+    # when that happens (see cmd/potluck-mesh/selfrestart.go)
+    export POTLUCK_MESH_NO_SELF_RESTART=1
     nohup "$BIN" "$@" >> "$LOG" 2>&1 &
     echo $! > "$PIDF"
     echo "started pid $(cat $PIDF) (run $n)"

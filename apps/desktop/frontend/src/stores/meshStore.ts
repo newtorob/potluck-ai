@@ -35,6 +35,10 @@ import type { MeshStatus, MeshPeer, MeshDaemonStatus, MeshDaemonState } from '@/
 
 const STATUS_POLL_MS = 2_000;
 const PEERS_POLL_MS = 5_000;
+/** While the socket answers, how often to ask the main process whether the
+ *  running service is the sidecar this app shipped. Not every 2s: on Linux and
+ *  Windows each answer costs a systemctl or PowerShell call. */
+const SERVICE_VERSION_PROBE_MS = 30_000;
 
 // `reachability` lives on the connection between the renderer and the
 // sidecar — distinct from the WG-level peer reachability already on each
@@ -64,10 +68,15 @@ interface MeshState {
    *  carries `detail` for surfacing in the UI. Cleared once bridge is
    *  anything other than a daemon_* value. */
   daemonStatus: MeshDaemonStatus | null;
+  /** Set while the sidecar answers but is the one from before the last app
+   *  update (daemon state 'outdated'). Separate from `bridge`, which stays
+   *  'reachable': the mesh works, the UI only offers a restart. */
+  serviceOutdated: MeshDaemonStatus | null;
   lastError: string | null;
   isStarted: boolean;
 
   // Internals
+  _serviceProbeAt: number;
   _statusTimer: ReturnType<typeof setTimeout> | null;
   _peersTimer: ReturnType<typeof setTimeout> | null;
   _visibilityHandler: (() => void) | null;
@@ -82,9 +91,11 @@ export const useMeshStore = create<MeshState>()((set, get) => ({
   peers: [],
   bridge: 'unknown',
   daemonStatus: null,
+  serviceOutdated: null,
   lastError: null,
   isStarted: false,
 
+  _serviceProbeAt: 0,
   _statusTimer: null,
   _peersTimer: null,
   _visibilityHandler: null,
@@ -107,6 +118,8 @@ export const useMeshStore = create<MeshState>()((set, get) => ({
         daemonStatus: null,
         lastError: null,
       });
+      // Called by the panels' buttons after they act, so look at once.
+      void probeServiceVersion(get, set, true);
     } catch (err) {
       await handleStatusError(err, set);
     }
@@ -133,6 +146,7 @@ export const useMeshStore = create<MeshState>()((set, get) => ({
               const status = await meshClient.status();
               useConnectionStore.getState().adoptSidecarUrl(status.coordinator_url);
               set({ status, bridge: 'reachable', daemonStatus: null, lastError: null });
+              void probeServiceVersion(get, set);
             } catch (err) {
               // Awaited (not fire-and-forget) so the daemon-status probe this
               // triggers finishes — and any set() it does lands — before the
@@ -209,6 +223,7 @@ function daemonStateToBridge(state: MeshDaemonState): BridgeReachability {
     case 'unsupported':
       return 'daemon_unsupported';
     case 'running':
+    case 'outdated':
       return 'sidecar_offline';
   }
 }
@@ -222,6 +237,26 @@ async function probeDaemonStatus(): Promise<MeshDaemonStatus | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * While the socket answers, asks the main process whether the service that
+ * answers is the sidecar this app shipped (daemon state 'outdated'). The first
+ * call after start() and every refresh() go through; the 2s status poll is
+ * limited to one per SERVICE_VERSION_PROBE_MS. A failed probe leaves the last
+ * answer alone.
+ */
+async function probeServiceVersion(
+  get: () => MeshState,
+  set: (partial: Partial<MeshState>) => void,
+  force = false,
+): Promise<void> {
+  const now = Date.now();
+  if (!force && now - get()._serviceProbeAt < SERVICE_VERSION_PROBE_MS) return;
+  set({ _serviceProbeAt: now });
+  const daemon = await probeDaemonStatus();
+  if (daemon === null) return;
+  set({ serviceOutdated: daemon.state === 'outdated' ? daemon : null });
 }
 
 /**
@@ -239,9 +274,14 @@ async function refineBridgeOnUnreachable(
 ): Promise<void> {
   const daemon = await probeDaemonStatus();
   if (daemon) {
-    set({ bridge: daemonStateToBridge(daemon.state), daemonStatus: daemon, lastError: null });
+    set({
+      bridge: daemonStateToBridge(daemon.state),
+      daemonStatus: daemon,
+      serviceOutdated: null,
+      lastError: null,
+    });
   } else {
-    set({ bridge: 'sidecar_offline', daemonStatus: null, lastError: null });
+    set({ bridge: 'sidecar_offline', daemonStatus: null, serviceOutdated: null, lastError: null });
   }
 }
 

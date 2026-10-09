@@ -213,6 +213,40 @@ func TestHandleStatus_Starting(t *testing.T) {
 	}
 }
 
+// TestHandleStatus_ExeSHA256 pins exe_sha256: the hash main.go records at
+// startup is reported verbatim, and a sidecar that could not compute one still
+// sends the key, as an empty string (an older sidecar has no such key at all).
+func TestHandleStatus_ExeSHA256(t *testing.T) {
+	const sum = "3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b"
+
+	decode := func(cfg localapi.Config) map[string]any {
+		t.Helper()
+		client, _ := testServer(t, cfg)
+		resp := get(t, client, "/status")
+		defer resp.Body.Close()
+		var body map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return body
+	}
+
+	cfg := defaultCfg(t)
+	cfg.State.SetExeSHA256(sum)
+	if got := decode(cfg)["exe_sha256"]; got != sum {
+		t.Errorf("exe_sha256: got %v want %s", got, sum)
+	}
+
+	unset := decode(defaultCfg(t))
+	got, ok := unset["exe_sha256"]
+	if !ok {
+		t.Fatal("exe_sha256 key missing when no hash was recorded")
+	}
+	if got != "" {
+		t.Errorf("exe_sha256 with no hash recorded: got %v want empty string", got)
+	}
+}
+
 // TestHandleStatus_WGPortListening verifies that wg_port_listening=true when
 // the test pre-binds a UDP socket on the configured port (simulating what the
 // WireGuard device does) and SetWGPort is called with that port.

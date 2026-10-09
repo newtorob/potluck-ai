@@ -119,6 +119,7 @@ type State struct {
 	coordinatorURL       string // static launch-flag value; never empty
 	wgPort               int    // UDP port the WireGuard device listens on (default 51820)
 	features             []string
+	exeSHA256            string // SHA-256 of this process's own executable, taken at startup; "" if unknown
 }
 
 // NewState returns an idle State in the "starting" phase.
@@ -170,6 +171,17 @@ func (s *State) SetFeatures(features []string) {
 	cp := append([]string(nil), features...)
 	s.mu.Lock()
 	s.features = cp
+	s.mu.Unlock()
+}
+
+// SetExeSHA256 records the lowercase hex SHA-256 of the executable this process
+// was started from, as GET /status reports it in exe_sha256. The desktop app
+// compares it with the sidecar it shipped to tell that a service which outlived
+// an app update is still running the previous binary. Set it once at startup,
+// before serving; "" means the hash could not be computed.
+func (s *State) SetExeSHA256(sum string) {
+	s.mu.Lock()
+	s.exeSHA256 = sum
 	s.mu.Unlock()
 }
 
@@ -297,6 +309,7 @@ func (s *State) snapshot(peerCount int) statusResponse {
 		PeersOnlineCount:      peerCount,
 		CoordinatorURL:        s.coordinatorURL,
 		Features:              append([]string{}, s.features...),
+		ExeSHA256:             s.exeSHA256,
 	}
 	if s.nodeID != "" {
 		v := s.nodeID
@@ -591,6 +604,12 @@ type statusResponse struct {
 	// consumer that needs one checks for its name; an older sidecar has no such
 	// key at all. Always a list, empty when there are none.
 	Features []string `json:"features"`
+
+	// ExeSHA256 is the lowercase hex SHA-256 of the executable this process
+	// started from, taken once at startup. An empty string means it could not
+	// be computed. An older sidecar has no such key at all, which the desktop
+	// app reads as "started before this field existed". Additive field.
+	ExeSHA256 string `json:"exe_sha256"`
 }
 
 // scopeHousehold marks a peer that belongs to this machine's owner. Every peer

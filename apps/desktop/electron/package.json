@@ -42,6 +42,7 @@
       "main.js",
       "runtime-control.js",
       "member-session.js",
+      "mesh-service-update.js",
       "preload.js",
       "icons/**/*",
       "build-info.json"

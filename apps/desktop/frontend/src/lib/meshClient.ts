@@ -255,7 +255,8 @@ export const meshDaemon = {
    * Registers (or re-registers) the mesh daemon. Resolving with
    * `state: 'requires_approval'` is a normal, successful outcome — the
    * daemon is registered but macOS needs the user to approve it in System
-   * Settings before it starts. It is not an error.
+   * Settings before it starts. It is not an error. When the status is
+   * 'outdated' this restarts the service instead.
    */
   enable: (): Promise<MeshDaemonStatus> => getDaemonBridge().enable(),
 

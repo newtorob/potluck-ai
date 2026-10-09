@@ -154,6 +154,10 @@ export interface MeshBridgeResult<T> {
  *   starting          — registered + approved, but the local IPC socket
  *                        hasn't answered a status probe yet
  *   running           — registered, approved, and the socket answered
+ *   outdated          running and answering, but it is the sidecar from
+ *                        before the last app update, not the binary this app
+ *                        shipped. The mesh works; the UI offers a restart.
+ *   failed            installed, but the service crashed or is crash-looping
  *   unsupported       — this platform's daemon supervision isn't
  *                        implemented yet (Linux/Windows today)
  */
@@ -162,6 +166,7 @@ export type MeshDaemonState =
   | 'requires_approval'
   | 'starting'
   | 'running'
+  | 'outdated'
   | 'failed'
   | 'unsupported';
 

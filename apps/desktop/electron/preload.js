@@ -318,10 +318,14 @@ contextBridge.exposeInMainWorld('potluck', {
     // platform's exact mechanism.
     //
     // `state` values: 'not_installed' | 'requires_approval' | 'starting' |
-    // 'running' | 'failed' | 'unsupported'. Not every platform can produce
+    // 'running' | 'outdated' | 'failed' | 'unsupported'. Not every platform can produce
     // every value (e.g. only macOS reports 'requires_approval'; Windows and
     // Linux never do — see main.js for which states each platform's
     // compute*DaemonStatus() can return).
+    //
+    // 'outdated' means the service is up but is not the sidecar binary this
+    // app shipped (an app update left the old process running). enable()
+    // restarts it.
 
     /**
      * Current mesh daemon status. Safe to poll (e.g. every 2-5s from a
@@ -337,6 +341,10 @@ contextBridge.exposeInMainWorld('potluck', {
      * error: the daemon is registered but the user must approve it in
      * System Settings > Login Items & Extensions before it starts. Follow up
      * with openLoginItems() to take them straight there.
+     *
+     * When daemonStatus() says 'outdated' this restarts the service instead
+     * (macOS: unregister, then register; Linux/Windows: the same elevated
+     * install, which ends with a service restart).
      * @returns {Promise<{ platform: string, state: string, detail?: string }>}
      */
     enable: () => ipcRenderer.invoke('mesh:enable'),

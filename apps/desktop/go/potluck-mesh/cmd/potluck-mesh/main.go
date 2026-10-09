@@ -120,7 +120,7 @@ const handshakeFreshWindow = 3 * time.Minute
 const reachabilityCheckInterval = 30 * time.Second
 
 func main() {
-	os.Exit(run())
+	os.Exit(exitCodeAfterRun(run()))
 }
 
 func run() int {
@@ -258,6 +258,10 @@ func run() int {
 
 	// ---- IPC state ---- //
 	ipcState := localapi.NewState()
+	// Report the hash of this binary in /status and exit non-zero when the file
+	// is replaced on disk, so the service manager starts the new one
+	// (selfrestart.go). stop is what SIGTERM triggers.
+	startSelfRestart(ctx, stop, ipcState)
 	// The coordinator URL is a static launch-flag value; expose it in /status
 	// so the frontend can verify it matches what it expects (drift prevention).
 	ipcState.SetCoordinatorURL(cfg.CoordinatorURL)
