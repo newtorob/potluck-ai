@@ -22,6 +22,12 @@ Answer, the coordinator's own shapes:
     "message"}} when it did not, and [DONE] last. The meta carries the receipt
     (path "direct" or "relay", transport) next to the fields it always had.
 
+A failure to reach the coordinator is its own category, so the app does not blame
+a contributor that was never involved: "coordinator_unreachable" before the first
+event, "stream_interrupted" when the relay's stream breaks after events began.
+(A direct link's transport failures never get here as such: services/circle_link
+turns them into its own errors, "peer_unreachable" or "stream_timeout".)
+
 Only a circle request is accepted. A body for any other scope is refused (422):
 this route never sends anything to the open pool.
 
@@ -32,12 +38,14 @@ counts: this engine's own user's prompt is on its way to other people's machines
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import uuid
 from contextlib import aclosing
 from typing import Any, AsyncGenerator, Literal
 
+import httpx
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -74,7 +82,6 @@ class CircleJob(BaseModel):
 
 
 _DONE = "data: [DONE]\n\n"
-_END = object()
 
 
 def _sse(payload: dict[str, Any]) -> str:
@@ -97,7 +104,18 @@ def _event(chunk: dict) -> str | None:
     return None
 
 
-def _error_event(exc: BaseException) -> str:
+# What a failed connection to the coordinator looks like to this route.
+_TRANSPORT_ERRORS = (httpx.TransportError, OSError)
+
+
+def _error_event(exc: BaseException, *, started: bool = False) -> str:
+    """The in-stream error for `exc`. `started` says events had already gone out."""
+    if isinstance(exc, _TRANSPORT_ERRORS):
+        if started:
+            category, message = "stream_interrupted", "The connection ended before the reply finished."
+        else:
+            category, message = "coordinator_unreachable", "Could not reach the Potluck coordinator."
+        return _sse({"error": {"category": category, "message": message}})
     category = getattr(exc, "category", None)
     message = str(exc) if isinstance(exc, RemoteStreamError) else "The request failed."
     return _sse({"error": {"category": category if isinstance(category, str) else "inference_error", "message": message}})
@@ -121,23 +139,48 @@ async def circle_chat(job: CircleJob) -> Response:
         scope=pool_routing._CIRCLE_SCOPE,
         circle_id=str(job.circle_id),
     )
-    # Wait for the first event before answering, so that a refusal can still be an
-    # HTTP status the app already knows how to word.
+    # One task reads the whole stream (see _pump). This handler waits for its first
+    # event before answering, so that a refusal can still be an HTTP status the app
+    # already knows how to word.
+    inbox: asyncio.Queue[tuple[str, Any]] = asyncio.Queue()
+    pump = asyncio.ensure_future(_pump(chunks, inbox))
     try:
-        first: Any = await anext(chunks)
-    except StopAsyncIteration:
-        first = _END
-    except pool_routing.PoolDispatchError as exc:
-        await chunks.aclose()
-        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-    except Exception as exc:  # noqa: BLE001 - reported inside the stream, in the app's own shape
-        await chunks.aclose()
-        logger.info("circle_chat_failed error=%s", type(exc).__name__)
-        return StreamingResponse(_single(_error_event(exc)), media_type="text/event-stream", headers=_HEADERS)
-    return StreamingResponse(_stream(chunks, first), media_type="text/event-stream", headers=_HEADERS)
+        kind, value = await inbox.get()
+    except BaseException:
+        pump.cancel()
+        raise
+    if kind == "error":
+        pump.cancel()
+        if isinstance(value, pool_routing.PoolDispatchError):
+            return JSONResponse(status_code=value.status_code, content={"detail": value.detail})
+        logger.info("circle_chat_failed error=%s", type(value).__name__)
+        return StreamingResponse(_single(_error_event(value)), media_type="text/event-stream", headers=_HEADERS)
+    return StreamingResponse(_stream(inbox, pump, kind, value), media_type="text/event-stream", headers=_HEADERS)
 
 
 _HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+
+
+async def _pump(chunks: AsyncGenerator[dict, None], inbox: "asyncio.Queue[tuple[str, Any]]") -> None:
+    """Read `chunks` to the end in this one task and put what comes out in `inbox`:
+    ("chunk", dict) per chunk, then ("end", None) or ("error", exception).
+
+    The stream's timeouts (asyncio.timeout scopes that stay open between chunks, in
+    services/circle_link.py) belong to the task that first asks for a chunk, and
+    they cancel that task. The handler asks for the first one and the response body
+    asks for the rest; left like that, a timer firing mid-reply cancels the
+    handler's task, and the body's error event is lost to the cancellation that
+    follows. With one reader the timer cancels the reader, which reports it. The
+    queue never blocks the reader, so the timers time the lender and nothing else.
+    """
+    try:
+        async with aclosing(chunks):
+            async for chunk in chunks:
+                inbox.put_nowait(("chunk", chunk))
+    except Exception as exc:  # noqa: BLE001 - handed to the response, which words it
+        inbox.put_nowait(("error", exc))
+    else:
+        inbox.put_nowait(("end", None))
 
 
 async def _single(error: str) -> AsyncGenerator[str, None]:
@@ -145,18 +188,23 @@ async def _single(error: str) -> AsyncGenerator[str, None]:
     yield _DONE
 
 
-async def _stream(chunks: AsyncGenerator[dict, None], first: Any) -> AsyncGenerator[str, None]:
+async def _stream(
+    inbox: "asyncio.Queue[tuple[str, Any]]", pump: "asyncio.Future[None]", kind: str, value: Any
+) -> AsyncGenerator[str, None]:
     try:
-        async with aclosing(chunks):
-            if first is not _END:
-                event = _event(first)
+        try:
+            while kind != "end":
+                if kind == "error":
+                    raise value
+                event = _event(value)
                 if event is not None:
                     yield event
-            async for chunk in chunks:
-                event = _event(chunk)
-                if event is not None:
-                    yield event
-    except Exception as exc:  # noqa: BLE001
-        logger.info("circle_chat_failed error=%s", type(exc).__name__)
-        yield _error_event(exc)
+                kind, value = await inbox.get()
+        except Exception as exc:  # noqa: BLE001 - the reply has started: say so inside it
+            logger.info("circle_chat_failed error=%s", type(exc).__name__)
+            yield _error_event(exc, started=True)
+    finally:
+        # Normally the reader is finished by now. If the app hung up, this stops it,
+        # and closing the stream behind it is what stops the lender generating.
+        pump.cancel()
     yield _DONE

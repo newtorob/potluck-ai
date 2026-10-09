@@ -11,7 +11,7 @@ import json
 import httpx
 import pytest
 from circle_support import (
-    CIRCLE, DONE, MODEL, World, content, error_event, error_response, lender_error, stream_response,
+    CIRCLE, DONE, MODEL, World, content, error_event, error_response, lender_error, meta, sse, stream_response,
 )
 from fastapi.testclient import TestClient
 
@@ -188,7 +188,7 @@ def test_aborting_the_app_route_closes_the_upstream_stream(world):
                 seen += s.recv(4096)
             return seen  # leaving the block closes the connection mid-stream
 
-    async def go() -> bytes:
+    async def go() -> tuple[bytes, bool]:
         server = uvicorn.Server(uvicorn.Config(create_app(), host="127.0.0.1", port=port, log_level="warning",
                                                lifespan="off", proxy_headers=False))
         serving = asyncio.ensure_future(server.serve())
@@ -200,13 +200,15 @@ def test_aborting_the_app_route_closes_the_upstream_stream(world):
                 if upstream.closed:
                     break
                 await asyncio.sleep(0.01)
-            return seen
+            # Read before the server goes down: asyncio.run() cancels what is left
+            # at the end and would close the stream whether or not the route did.
+            return seen, upstream.closed
         finally:
             server.should_exit = True
             await asyncio.wait_for(serving, 10)
 
-    seen = asyncio.run(go())
-    assert b"Hel" in seen and upstream.closed, "the upstream connection was closed behind the abort"
+    seen, closed_behind_the_abort = asyncio.run(go())
+    assert b"Hel" in seen and closed_behind_the_abort, "the upstream connection was closed behind the abort"
 
 
 # ---- what a lender writes never reaches the app --------------------------------------------------------------
@@ -254,3 +256,176 @@ def test_the_app_route_never_carries_a_lenders_extra_keys_or_tool_calls(world):
     assert events[-2]["meta"]["finish_reason"] == "stop" and events[-1] == "[DONE]" and len(events) == 3
     for text in ("EVIL", "tool_calls", "reasoning", "fingerprint"):
         assert text not in resp.text
+
+
+# ---- an unreachable coordinator gets its own error, and no contributor is blamed -------------------------------
+
+import pytest  # noqa: E402
+
+UNREACHABLE = {"error": {"category": "coordinator_unreachable", "message": "Could not reach the Potluck coordinator."}}
+INTERRUPTED = {"error": {"category": "stream_interrupted", "message": "The connection ended before the reply finished."}}
+
+
+def refuse(exc):
+    def relay(body):
+        raise exc
+
+    return relay
+
+
+def route_log(caplog):
+    """The route's failure log lines. (Its other line, circle_chat_started, carries a count only.)"""
+    return [r.getMessage() for r in caplog.records
+            if r.name == "potluck_local.routers.chat_circle" and r.getMessage().startswith("circle_chat_failed")]
+
+
+@pytest.mark.parametrize("exc", [
+    httpx.ConnectError("EVILHOST 10.9.8.7 refused"),
+    httpx.ConnectTimeout("EVILHOST timed out"),
+    httpx.ReadTimeout("EVILHOST"),
+    httpx.RemoteProtocolError("EVILHOST"),
+    ConnectionRefusedError("EVILHOST"),
+    OSError("EVILHOST"),
+    TimeoutError("EVILHOST"),
+], ids=lambda e: type(e).__name__)
+def test_a_coordinator_that_cannot_be_reached_before_the_first_event_is_its_own_error(world, monkeypatch, caplog, exc):
+    from potluck_local.services import circle_link
+
+    caplog.set_level("INFO")
+    monkeypatch.setattr(circle_link, "direct_enabled", lambda: False)  # direct is not attempted
+    world.relay = refuse(exc)
+    resp = client().post("/chat/circle", json=APP_BODY)
+    assert resp.status_code == 200
+    assert frames(resp) == [UNREACHABLE, "[DONE]"], "exactly one error event, then the end"
+    assert route_log(caplog) == [f"circle_chat_failed error={type(exc).__name__}"], "the class name and nothing else"
+    assert "EVILHOST" not in caplog.text and "EVILHOST" not in resp.text
+
+
+def test_the_same_after_a_direct_attempt_that_failed(world, caplog):
+    caplog.set_level("INFO")
+    world.lender_default = lambda request, link: (_ for _ in ()).throw(httpx.ConnectError("EVILHOST lender refused"))
+    world.relay = refuse(httpx.ConnectError("EVILHOST coordinator refused"))
+    resp = client().post("/chat/circle", json=APP_BODY)
+    assert frames(resp) == [UNREACHABLE, "[DONE]"]
+    assert len(world.lender_calls()) == 2 and world.count("POST", "/links") == 2, "both lenders were tried first"
+    assert route_log(caplog) == ["circle_chat_failed error=ConnectError"] and "EVILHOST" not in caplog.text
+
+
+def test_the_same_when_the_coordinator_is_down_for_the_link_call_too(world):
+    world.create = refuse(httpx.ConnectError("refused"))
+    world.relay = refuse(httpx.ConnectError("refused"))
+    assert frames(client().post("/chat/circle", json=APP_BODY)) == [UNREACHABLE, "[DONE]"]
+    assert world.lender_calls() == []
+
+
+def test_a_relay_stream_that_breaks_after_events_began_is_stream_interrupted(world, monkeypatch, caplog):
+    from potluck_local.services import circle_link
+
+    caplog.set_level("INFO")
+    monkeypatch.setattr(circle_link, "direct_enabled", lambda: False)
+    world.relay = lambda body: stream_response(
+        sse({"choices": [{"delta": {"content": "Rel"}}]}), sse({"choices": [{"delta": {"content": "ay"}}]}),
+        httpx.ReadError("EVILHOST connection reset"))
+    resp = client().post("/chat/circle", json=APP_BODY)
+    assert frames(resp) == [{"choices": [{"delta": {"content": "Rel"}}]}, {"choices": [{"delta": {"content": "ay"}}]},
+                            INTERRUPTED, "[DONE]"], "the tokens already sent, then one error"
+    assert route_log(caplog) == ["circle_chat_failed error=ReadError"] and "EVILHOST" not in caplog.text
+
+
+def test_a_relay_that_drops_after_the_first_event_and_not_before_is_interrupted_not_unreachable(world, monkeypatch):
+    from potluck_local.services import circle_link
+
+    monkeypatch.setattr(circle_link, "direct_enabled", lambda: False)
+    world.relay = lambda body: stream_response(
+        sse({"choices": [{"delta": {"content": "R"}}]}), OSError("reset"))
+    events = frames(client().post("/chat/circle", json=APP_BODY))
+    assert events[-2] == INTERRUPTED and UNREACHABLE not in events
+
+
+def test_a_direct_links_connection_refused_on_both_attempts_gives_the_relays_reply_not_an_error(world):
+    world.lender_default = lambda request, link: (_ for _ in ()).throw(httpx.ConnectError("refused"))
+    events = frames(client().post("/chat/circle", json=APP_BODY))
+    assert events[0] == {"choices": [{"delta": {"content": "Relay"}}]} and events[-2]["meta"]["path"] == "relay"
+    assert not any("error" in e for e in events if isinstance(e, dict))
+
+
+@pytest.mark.parametrize("failure,category", [
+    (httpx.ReadError("EVILHOST"), "peer_unreachable"),
+    (httpx.RemoteProtocolError("EVILHOST"), "peer_unreachable"),
+    (OSError("EVILHOST"), "peer_unreachable"),
+])
+def test_a_direct_link_failing_after_the_first_token_is_never_coordinator_unreachable(world, failure, category):
+    world.lender["100.64.1.2"] = lambda r, l: stream_response(content("Hel"), failure)
+    resp = client().post("/chat/circle", json=APP_BODY)
+    events = frames(resp)
+    errors = [e["error"] for e in events if isinstance(e, dict) and "error" in e]
+    assert [e["category"] for e in errors] == [category] and errors[0]["category"] != "coordinator_unreachable"
+    assert "EVILHOST" not in resp.text and events[0] == {"choices": [{"delta": {"content": "Hel"}}]}
+    assert world.count("POST", "/jobs/stream") == 0, "the relay was not called to cover for it"
+
+
+def test_a_direct_link_that_goes_quiet_after_the_first_token_is_stream_timeout(world, monkeypatch):
+    # The idle timer cancels the task that reads the stream. If the handler read
+    # the first event and the response body read the rest, the timer would cancel
+    # the handler and the error event and [DONE] would be lost (a short reply that
+    # looks finished). One reader task reports the timeout in the stream.
+    from potluck_local.services import circle_link
+
+    monkeypatch.setattr(circle_link, "IDLE_TIMEOUT_S", 0.3)
+    world.lender["100.64.1.2"] = lambda r, l: stream_response(content("Hel"), 5.0, content("lo"), meta(), DONE)
+    events = frames(client().post("/chat/circle", json=APP_BODY))
+    errors = [e["error"]["category"] for e in events if isinstance(e, dict) and "error" in e]
+    assert errors == ["stream_timeout"]
+
+
+def test_other_exceptions_keep_the_generic_error(world, monkeypatch, caplog):
+    from potluck_local.services import pool_routing
+
+    caplog.set_level("INFO")
+
+    async def broken(*a, **kw):
+        raise ValueError("EVILTEXT")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(pool_routing, "stream_pool_openai", broken)
+    resp = client().post("/chat/circle", json=APP_BODY)
+    assert frames(resp) == [{"error": {"category": "inference_error", "message": "The request failed."}}, "[DONE]"]
+    assert "EVILTEXT" not in caplog.text and "EVILTEXT" not in resp.text
+
+
+def test_a_chunk_the_route_cannot_read_ends_the_reply_with_an_error_event(world, monkeypatch, caplog):
+    from potluck_local.services import pool_routing
+
+    caplog.set_level("INFO")
+
+    async def odd_stream(*a, **kw):
+        yield {"choices": [{"index": 0, "delta": {"content": "Hel"}, "finish_reason": None}]}
+        yield {"EVILKEY": "EVILTEXT"}
+
+    monkeypatch.setattr(pool_routing, "stream_pool_openai", odd_stream)
+    resp = client().post("/chat/circle", json=APP_BODY)
+    assert frames(resp) == [
+        {"choices": [{"delta": {"content": "Hel"}}]},
+        {"error": {"category": "inference_error", "message": "The request failed."}},
+        "[DONE]",
+    ]
+    assert route_log(caplog) == ["circle_chat_failed error=KeyError"]
+    assert "EVIL" not in resp.text and "EVIL" not in caplog.text
+
+
+def test_an_http_error_from_the_coordinator_is_still_its_status_and_detail(world, monkeypatch):
+    from potluck_local.services import circle_link
+
+    monkeypatch.setattr(circle_link, "direct_enabled", lambda: False)
+    world.relay = lambda body: httpx.Response(503, json={"detail": "No machine in this circle is online."})
+    resp = client().post("/chat/circle", json=APP_BODY)
+    assert resp.status_code == 503 and resp.json() == {"detail": "No machine in this circle is online."}
+
+
+def test_a_remote_stream_error_keeps_its_category_and_text(world, monkeypatch):
+    from potluck_local.services import circle_link
+
+    monkeypatch.setattr(circle_link, "direct_enabled", lambda: False)
+    world.relay = lambda body: stream_response(error_event("timeout", "Peer didn't complete within 120s"), DONE)
+    assert frames(client().post("/chat/circle", json=APP_BODY)) == [
+        {"error": {"category": "timeout", "message": "Peer didn't complete within 120s"}}, "[DONE]"]
