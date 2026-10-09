@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---- Server → Peer ---------------------------------------------------- #
@@ -30,6 +30,29 @@ class AcceptMessage(BaseModel):
     # The audiences from our attestation that the coordinator enforces.
     # Absent from a coordinator that predates audiences.
     audiences: list[str] | None = None
+    # Direct circle links. Both are sent only by a coordinator that has links
+    # switched on, and both are soft: a value of the wrong kind reads as absent,
+    # because an accept must never fail over them.
+    #   mesh_node_id: the mesh node this attestation was bound to (an echo).
+    #   circle_links: true when the coordinator brokers circle links. Absent or
+    #                 anything but true means "not supported": no listener.
+    mesh_node_id: uuid.UUID | None = None
+    circle_links: bool | None = None
+
+    @field_validator("mesh_node_id", mode="before")
+    @classmethod
+    def _lenient_mesh_node_id(cls, v: Any) -> uuid.UUID | None:
+        if isinstance(v, uuid.UUID):
+            return v
+        try:
+            return uuid.UUID(v) if isinstance(v, str) else None
+        except ValueError:
+            return None
+
+    @field_validator("circle_links", mode="before")
+    @classmethod
+    def _lenient_circle_links(cls, v: Any) -> bool | None:
+        return v if isinstance(v, bool) else None
 
 
 class RejectMessage(BaseModel):
@@ -73,6 +96,12 @@ class AttestationPayload(BaseModel):
     # Who this peer agrees to serve beyond its owner's own requests: "circle"
     # and/or "pool". None serves both (a peer from before audiences existed).
     audiences: list[str] | None = None
+    # Direct circle links: the mesh node this machine's sidecar is (its /status
+    # node_id) and the port the circle listener is bound to. Sent only while the
+    # listener is up; left out of the message otherwise, so a coordinator from
+    # before links sees exactly what it always did.
+    mesh_node_id: uuid.UUID | None = None
+    circle_port: int | None = Field(default=None, ge=1, le=65535)
 
 
 class HeartbeatMessage(BaseModel):

@@ -30,7 +30,9 @@ only where an operator set it (the dev fleet).
 
 Trusted circles: scope "circle" always names one circle (circle_id). The
 gateway caller picks it with X-Potluck-Circle (a name or an ID); with exactly
-one circle no choice is needed.
+one circle no choice is needed. A circle request goes through
+services/circle_link.py, which tries a direct link to a circle member's machine
+and falls back to the coordinator relay here. It is never sent to the pool.
 """
 
 from __future__ import annotations
@@ -40,6 +42,7 @@ import logging
 import os
 import time
 import uuid
+from contextlib import aclosing
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
@@ -377,6 +380,35 @@ async def stream_pool_openai(
     if not base:
         raise RuntimeError("open-pool routing is not configured (no coordinator URL)")
 
+    if scope == _CIRCLE_SCOPE and circle_id:
+        # A circle request tries a direct link to a circle member's machine first
+        # and falls back to the relay below. Whatever happens, it is never sent
+        # to the open pool. Imported here because circle_link imports this module.
+        from .circle_link import stream_circle_openai
+
+        async with aclosing(stream_circle_openai(
+            messages, model, temperature, max_tokens, circle_id,
+            relay=lambda: _stream_coordinator(base, messages, model, temperature, max_tokens, scope, circle_id),
+        )) as chunks:
+            async for chunk in chunks:
+                yield chunk
+        return
+
+    async with aclosing(_stream_coordinator(base, messages, model, temperature, max_tokens, scope, circle_id)) as chunks:
+        async for chunk in chunks:
+            yield chunk
+
+
+async def _stream_coordinator(
+    base: str,
+    messages: list[dict],
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    scope: str,
+    circle_id: str | None,
+):
+    """The coordinator's POST /jobs/stream, as OpenAI chunks: the relay."""
     timeout = httpx.Timeout(None, connect=_CONNECT_TIMEOUT_S)
     async with httpx.AsyncClient(timeout=timeout) as c:
         async with c.stream(

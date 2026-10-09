@@ -31,6 +31,10 @@ Enforces the manifesto-level privacy rules at CI time
           * routers/peer.py — peer_chat_completions / peer_memory_search
           * services/pool_routing.py — stream/complete_pool_openai
           * services/gateway_routing.py — stream/complete_peer_openai
+          * routers/circle_link.py: the circle listener (lender side of a
+            direct circle link)
+          * services/circle_link.py: borrowing over a direct circle link
+          * routers/chat_circle.py: the app's circle chat through the engine
         Same content-leak heuristic as #21 (sensitive name inside a
         logger / dump / open-write context, unless metadata-wrapped).
 
@@ -466,6 +470,12 @@ PEER_RELAY_FILES = (
     "apps/desktop/python/potluck_local/routers/peer.py",
     "apps/desktop/python/potluck_local/services/pool_routing.py",
     "apps/desktop/python/potluck_local/services/gateway_routing.py",
+    # Direct circle links: the lender's listener receives circle members'
+    # prompts, and the borrower's side and the app's /chat/circle route send
+    # this user's prompts to a circle member's machine.
+    "apps/desktop/python/potluck_local/routers/circle_link.py",
+    "apps/desktop/python/potluck_local/services/circle_link.py",
+    "apps/desktop/python/potluck_local/routers/chat_circle.py",
 )
 
 # Sensitive names for the relay surfaces: the contributor set plus the

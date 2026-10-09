@@ -15,6 +15,16 @@ second copy in memory); the busy signal, benchmarks and rpc_servers
 support all live in the runtime; and cancelling one task is a stop the
 coordinator observes within a heartbeat. See the M2.5 contract.
 
+Direct circle links (lending): while this machine shares with circles, the
+owner has not turned direct links off and its mesh sidecar advertises
+circle_link_v1 and a mesh address, the service also runs the circle listener
+(routers/circle_link.py), bound to that mesh address alone, and attests its node
+and port so the coordinator can pick it as a lender. The listener comes up
+before the first attestation, so that one already carries the fields; an accept
+that does not say circle_links stops it again. Requests that arrive over a link
+share this machine's job cap with relay jobs. A failure anywhere in this never
+reaches the loop: the relay keeps serving.
+
 Privacy: the member session token is held in memory only, never logged and
 never written to disk; status exposes counts, this peer's own id, and the
 coordinator host, nothing else. Heartbeats carry capacity only.
@@ -51,12 +61,23 @@ from potluck_local.contributor.telemetry import (
     full_hardware_summary,
     probe_capacity,
 )
+from potluck_local.services import circle_listener, circle_mesh
+from potluck_local.services.circle_gate import CircleRoster, DirectAdmission
 from potluck_local.services.settings_manager import PotluckSettings
 from potluck_local.services.contribution_policy import admission_reason
 
 logger = logging.getLogger(__name__)
 
 STOP_TIMEOUT_S = 5.0
+
+# How often the circle listener's conditions are looked at when nothing wakes
+# the watcher sooner (an accept, a settings change).
+CIRCLE_CHECK_INTERVAL_S = 5.0
+# After a failed bind or start, wait this long before trying again.
+CIRCLE_RETRY_S = 30.0
+# The mesh sidecar must fail this many checks in a row before a running listener
+# is taken down. A sidecar restart should not cost a reconnect.
+CIRCLE_SIDECAR_STRIKES = 3
 
 # What the coordinator's reject reasons mean to the person looking at the
 # Network view. Matched by substring on the reason string the coordinator
@@ -168,6 +189,8 @@ class ContributorStatus:
     max_concurrent_jobs: int | None = None
     # Who this machine serves beyond its owner while connected.
     audiences: list[str] | None = None
+    # The port the circle listener is bound to, while it is up (direct circle links).
+    circle_port: int | None = None
 
 
 def _now_iso() -> str:
@@ -186,6 +209,8 @@ class ContributorService:
         runtime_getter: Callable[[], Any] | None = None,
         loop_runner: LoopRunner | None = None,
         hardware_getter: Callable[[], Awaitable[dict[str, Any]]] | None = None,
+        circle_listener_factory: Callable[["ContributorService", str], Any] | None = None,
+        circle_status_reader: Callable[[], Awaitable[circle_mesh.SidecarStatus | None]] | None = None,
     ) -> None:
         self._runtime_getter = runtime_getter
         self._loop_runner = loop_runner or contributor_client.run_contributor_loop
@@ -200,6 +225,34 @@ class ContributorService:
         self._last_hooks: contributor_client.LoopHooks | None = None
         self._last_settings: ContributorSettings | None = None
         self._network = None
+        # Direct circle links (lending). The relay's jobs in flight, counted from
+        # the loop's events, and the direct requests, counted by the admission
+        # object, share one cap.
+        self._relay_in_flight = 0
+        self._admission = DirectAdmission(
+            cap=lambda: getattr(self._network, "max_concurrent_jobs", None),
+            other_in_flight=lambda: self._relay_in_flight,
+        )
+        self._roster = CircleRoster()
+        self._circle_listener_factory = circle_listener_factory
+        self._circle_status_reader = circle_status_reader or circle_mesh.read_status
+        self._circle_listener: Any = None
+        self._circle_task: asyncio.Task | None = None
+        self._circle_wake = asyncio.Event()
+        # One reconcile at a time: the watcher and the pre-connect preparation both run it.
+        self._circle_lock = asyncio.Lock()
+        # What this coordinator's accepts said about circle links: True, False
+        # (absent counts as False), or None before any accept in this run.
+        self._circle_links: bool | None = None
+        # Set while the service is being stopped: the loop may still be preparing a
+        # connection, and must not bring a listener up behind the stop.
+        self._circle_stopping = False
+        # The coordinator accepted this machine but would not bind its node, so a
+        # listener could never be used. Cleared by a new sign-in or a restart.
+        self._circle_bind_refused = False
+        self._circle_attest: tuple[str, int] | None = None
+        self._circle_retry_at = 0.0
+        self._circle_bad_streak = 0
 
     # ---- public surface ------------------------------------------------- #
 
@@ -220,8 +273,11 @@ class ContributorService:
         connect, so a token that arrives while the loop is backing off after
         an unauthorized reject is used on the next attempt."""
         self._session_token = token.strip() if token else None
-        # A different sign-in is a different member to register the key for.
+        # A different sign-in is a different member to register the key for, and
+        # may be bound to its node where the last one was not.
         self._key_registration_tried = False
+        self._circle_bind_refused = False
+        self._poke_circle()
         if self._session_token is None:
             logger.info("contributor_member_session_cleared")
         else:
@@ -279,6 +335,9 @@ class ContributorService:
                 return
             key = (ws_url, int(network.max_concurrent_jobs), tuple(audiences))
             if self.is_running and self._running_key == key:
+                # Nothing for the loop to redo, but the direct-links setting may
+                # have changed.
+                self._poke_circle()
                 return
             if self.is_running:
                 await self._stop_locked()
@@ -290,6 +349,7 @@ class ContributorService:
                 await self._stop_locked()
             else:
                 self._status.state = "stopped"
+                await self._stop_circle_locked()
 
     # ---- lifecycle ------------------------------------------------------ #
 
@@ -319,6 +379,9 @@ class ContributorService:
             max_concurrent_jobs=max_concurrent_jobs,
             audiences=list(audiences),
             on_state=self._on_state,
+            circle_attest=self.circle_attest,
+            direct_jobs=lambda: self._admission.in_flight,
+            circle_prepare=self.circle_prepare,
         )
         self._stop = asyncio.Event()
         self._status = ContributorStatus(
@@ -337,12 +400,19 @@ class ContributorService:
             name="potluck-contributor",
         )
         self._task.add_done_callback(self._on_task_done)
+        self._circle_links = None
+        self._circle_stopping = False
+        self._circle_bind_refused = False
+        self._circle_bad_streak = 0
+        self._circle_task = asyncio.create_task(self._circle_watch(), name="potluck-circle-watch")
         logger.info(
             "contributor_started coordinator_host=%s cap=%d binary_hash_source=%s",
             self._status.coordinator_host, max_concurrent_jobs, source,
         )
 
     async def _stop_locked(self) -> None:
+        # No new direct requests while the relay loop winds down.
+        await self._stop_circle_locked()
         task, stop = self._task, self._stop
         if stop is not None:
             stop.set()
@@ -358,6 +428,9 @@ class ContributorService:
         self._task = None
         self._stop = None
         self._running_key = None
+        # A connection being prepared while the stop began could have brought the
+        # listener up once more; the loop is gone now, so nothing can.
+        await self._stop_circle_listener()
         self._status.state = "stopped"
         self._status.jobs_in_flight = 0
         self._status.peer_id = None
@@ -441,6 +514,7 @@ class ContributorService:
             st.connected_since = _now_iso()
             st.last_error = None
             st.last_error_detail = None
+            self._on_accept(fields)
         elif event == "heartbeat":
             st.last_heartbeat_at = _now_iso()
             st.heartbeats_sent += 1
@@ -452,6 +526,9 @@ class ContributorService:
             st.last_error_detail = reason[:200]
             st.peer_id = None
             st.connected_since = None
+            self._relay_in_flight = 0
+            self._circle_links = False  # no fields for a coordinator that turns this machine away
+            self._poke_circle()
             if st.last_error == "device_key_not_registered":
                 self._schedule_key_registration()
         elif event == "disconnected":
@@ -464,13 +541,205 @@ class ContributorService:
             st.peer_id = None
             st.connected_since = None
             st.jobs_in_flight = 0
+            # The jobs of a session are per session; a new session starts at none.
+            self._relay_in_flight = 0
+        elif event == "reattest":
+            # The engine ended the session itself to attest again: connecting, not
+            # a failure, so no error is recorded.
+            if st.state != "rejected":
+                st.state = "connecting"
+            st.peer_id = None
+            st.connected_since = None
+            self._relay_in_flight = 0
         elif event == "job_started":
             st.jobs_in_flight += 1
+            self._relay_in_flight += 1
         elif event == "job_finished":
             st.jobs_in_flight = max(0, st.jobs_in_flight - 1)
+            self._relay_in_flight = max(0, self._relay_in_flight - 1)
         elif event == "stopped":
             st.state = "stopped"
             st.jobs_in_flight = 0
+            self._relay_in_flight = 0
+            self._circle_links = None
+
+    # ---- direct circle links (lending) ----------------------------------- #
+
+    def circle_attest(self) -> tuple[str, int] | None:
+        """(mesh node id, listener port) while the circle listener is up, for the
+        attestation. None otherwise, which leaves both fields out."""
+        return self._circle_attest
+
+    def circle_sharing_refusal(self) -> str | None:
+        """Why the circle listener must turn callers away right now, or None.
+        Read live on every request and on every recheck of a running one."""
+        network = self._network
+        if network is None:
+            return "not_configured"
+        if not getattr(network, "direct_circle_links", True):
+            return "links_off"
+        audiences = sharing_audiences(network)
+        if not audiences or "circle" not in audiences:
+            return "not_sharing_circles"
+        return admission_reason(network)
+
+    def _poke_circle(self) -> None:
+        self._circle_wake.set()
+
+    def _on_accept(self, fields: dict[str, Any]) -> None:
+        """Take in what the coordinator's accept said about circle links."""
+        links = fields.get("circle_links") is True  # absent means "not supported"
+        self._circle_links = links
+        if links and fields.get("circle_attested"):
+            if fields.get("circle_bound"):
+                self._circle_bind_refused = False
+            else:
+                # The coordinator would not bind the node this machine named. A
+                # listener could never be picked, and starting it again would only
+                # make the attestation flap.
+                if not self._circle_bind_refused:
+                    logger.warning("circle_binding_refused listener_stopped")
+                self._circle_bind_refused = True
+        self._poke_circle()
+
+    def _circle_wanted(self) -> bool:
+        """The conditions the listener runs under that this service can see: the
+        loop is running, the owner shares with circles and has not turned direct
+        links off, the engine is reachable from the mesh at all, and no accept
+        has said this coordinator does not broker links (before any accept it is
+        not known, and the listener comes up at once so the first attestation
+        carries it; a listener nobody can have a link to does no harm). The
+        sidecar's feature and mesh address are checked by the caller."""
+        network = self._network
+        if network is None or not self.is_running or self._circle_stopping:
+            return False
+        if not getattr(network, "direct_circle_links", True):
+            return False
+        audiences = sharing_audiences(network)
+        if not audiences or "circle" not in audiences:
+            return False
+        if circle_listener.host_is_loopback(circle_listener.bind_host()):
+            return False  # POTLUCK_BIND_HOST=127.0.0.1: this machine serves no one else
+        return self._circle_links is not False and not self._circle_bind_refused
+
+    async def circle_prepare(self) -> None:
+        """Called by the loop before it connects: bring the listener up if its
+        conditions hold, so the attestation about to be made carries its port. The
+        loop bounds this in time and ignores any failure."""
+        async with self._circle_lock:
+            await self._reconcile_circle()
+
+    async def _circle_watch(self) -> None:
+        """Keep the circle listener in step with its conditions. Nothing here may
+        end the task or reach the loop: it only starts and stops the listener."""
+        while True:
+            self._circle_wake.clear()
+            try:
+                async with self._circle_lock:
+                    await self._reconcile_circle()
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("circle_reconcile_failed error=%s", type(exc).__name__)
+            try:
+                # asyncio.timeout, not wait_for: before Python 3.12 wait_for can lose
+                # a cancellation that arrives as its inner wait finishes, and this
+                # task must end when it is cancelled.
+                async with asyncio.timeout(CIRCLE_CHECK_INTERVAL_S):
+                    await self._circle_wake.wait()
+            except TimeoutError:
+                pass
+
+    async def _reconcile_circle(self) -> None:
+        if not self._circle_wanted():
+            self._circle_bad_streak = 0
+            await self._stop_circle_listener()
+            return
+        status = await self._circle_status_reader()
+        if status is not None and not (status.supports_links and circle_mesh.usable_listen_address(status.mesh_ip)):
+            # Read fine, and it offers no links, has no node id, or has no mesh
+            # address to bind to: that is an answer, not a blip. Without an address
+            # there is no listener (never 0.0.0.0), only the relay.
+            self._circle_bad_streak = 0
+            await self._stop_circle_listener()
+            return
+        if status is None:
+            # Could not be read. A restart of the sidecar must not cost a reconnect.
+            self._circle_bad_streak += 1
+            if self._circle_bad_streak >= CIRCLE_SIDECAR_STRIKES:
+                await self._stop_circle_listener()
+            return
+        self._circle_bad_streak = 0
+        host = str(status.mesh_ip)
+        listener = self._circle_listener
+        if listener is not None and (not listener.running or listener.host != host):
+            # It died on its own, or the mesh address changed (the sidecar enrolled
+            # again): start afresh below, on the address there is now.
+            await self._stop_circle_listener()
+            listener = None
+        if listener is None:
+            if time.monotonic() < self._circle_retry_at:
+                return
+            await self._start_circle_listener(str(status.node_id), host)
+            return
+        # Up: keep the attested node in step with the sidecar's (it can re-enroll).
+        port = listener.port
+        self._circle_attest = (str(status.node_id), port) if port else None
+
+    async def _start_circle_listener(self, node_id: str, host: str) -> None:
+        try:
+            listener = self._make_circle_listener(host)
+            port = await listener.start()
+        except circle_listener.AddressNotAvailable:
+            # The sidecar reports an address the machine does not carry yet (just
+            # enrolled, or the interface is still coming up): ask again at the next check.
+            logger.info("circle_listener_waiting_for_address")
+            return
+        except Exception as exc:  # noqa: BLE001 - a bind failure must never reach the loop
+            self._circle_retry_at = time.monotonic() + CIRCLE_RETRY_S
+            logger.warning("circle_listener_start_failed error=%s", type(exc).__name__)
+            return
+        self._circle_listener = listener
+        self._circle_attest = (node_id, port)
+        self._status.circle_port = port
+        logger.info("circle_listener_up port=%d", port)
+
+    def _make_circle_listener(self, host: str) -> Any:
+        if self._circle_listener_factory is not None:
+            return self._circle_listener_factory(self, host)
+        from potluck_local.routers.circle_link import CircleDeps, create_circle_app
+
+        return circle_listener.CircleListener(
+            create_circle_app(
+                CircleDeps(
+                    roster=self._roster,
+                    admission=self._admission,
+                    sharing_refusal=self.circle_sharing_refusal,
+                    max_tokens_limit=lambda: getattr(self._network, "contributor_max_tokens", None),
+                    runtime=self._runtime,
+                )
+            ),
+            host=host,
+        )
+
+    async def _stop_circle_listener(self) -> None:
+        listener, self._circle_listener = self._circle_listener, None
+        self._circle_attest = None
+        self._status.circle_port = None
+        if listener is not None:
+            try:
+                await listener.stop()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("circle_listener_stop_failed error=%s", type(exc).__name__)
+
+    async def _stop_circle_locked(self) -> None:
+        self._circle_stopping = True
+        watcher, self._circle_task = self._circle_task, None
+        if watcher is not None:
+            watcher.cancel()
+            await asyncio.gather(watcher, return_exceptions=True)
+        await self._stop_circle_listener()
+        self._circle_links = None
 
     def _schedule_key_registration(self) -> None:
         """The coordinator does not know this machine yet. The desktop app

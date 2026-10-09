@@ -82,6 +82,16 @@ CAPABILITY_CHECK_INTERVAL_S = 5.0
 # Reconnect backoff bounds.
 RECONNECT_BACKOFF_INITIAL_S = 1.0
 RECONNECT_BACKOFF_MAX_S = 60.0
+# A session that was accepted and then lasted this long was healthy: the failure
+# that ends it starts the backoff over instead of continuing from where earlier
+# failures left it.
+HEALTHY_SESSION_S = 30.0
+# A reconnect the engine asked for itself (what it can serve changed, so it must
+# attest again) waits only this long and does not grow the backoff.
+REATTEST_PAUSE_S = 0.25
+# How long the engine may take, before connecting, to get its circle listener
+# ready for the first attestation. Past it, the attestation goes without.
+CIRCLE_PREPARE_TIMEOUT_S = 1.5
 
 
 class HandshakeFailed(Exception):
@@ -116,6 +126,20 @@ class LoopHooks:
     # rejected, disconnected, job_started, job_finished, stopped. Never
     # carries prompt content or member ids.
     on_state: StateCallback | None = None
+    # Direct circle links. Both stay None for the standalone client, which then
+    # behaves exactly as before them.
+    #   circle_attest() -> (mesh node id, circle listener port) while the
+    #     listener is up, else None. Read at every handshake and compared by the
+    #     capability watch, so a listener that comes up (or goes) is re-attested.
+    #   direct_jobs() -> how many direct circle requests are running now. They
+    #     share the job cap with relay jobs and count in the heartbeat.
+    #   circle_prepare() -> brings the listener up, if its local conditions hold,
+    #     before the connection is made, so the first attestation already carries
+    #     its node and port. Bounded in time and soft: a failure or a timeout means
+    #     the attestation goes without, and the capability watch catches up.
+    circle_attest: Callable[[], tuple[str, int] | None] | None = None
+    direct_jobs: Callable[[], int] | None = None
+    circle_prepare: Callable[[], Awaitable[None]] | None = None
 
 
 @dataclass
@@ -222,11 +246,63 @@ def _emit(hooks: LoopHooks, event: str, **fields: Any) -> None:
         logger.debug("on_state_callback_failed event=%s", event, exc_info=True)
 
 
+def _direct_jobs(hooks: LoopHooks) -> int:
+    """Direct circle requests running now. They count against the job cap and in
+    the heartbeat; a hook that fails counts as none."""
+    if hooks.direct_jobs is None:
+        return 0
+    try:
+        return max(0, int(hooks.direct_jobs()))
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+@dataclass
+class _SessionInfo:
+    """What one session tells the loop that is not in its exit: whether the coordinator
+    accepted it (and when), and whether the engine itself ended it to attest again."""
+
+    accepted_at: float | None = None
+    reattest: bool = False
+
+    def healthy(self) -> bool:
+        return self.accepted_at is not None and time.monotonic() - self.accepted_at >= HEALTHY_SESSION_S
+
+
+async def _prepare_circle(hooks: LoopHooks) -> None:
+    """Give the engine a moment to get its circle listener ready before the first
+    attestation. Never fails and never takes longer than CIRCLE_PREPARE_TIMEOUT_S."""
+    if hooks.circle_prepare is None:
+        return
+    try:
+        async with asyncio.timeout(CIRCLE_PREPARE_TIMEOUT_S):
+            await hooks.circle_prepare()
+    except Exception:  # noqa: BLE001 - includes the timeout; the attestation just goes without
+        logger.debug("circle_prepare_skipped", exc_info=True)
+
+
+def _circle_link(hooks: LoopHooks) -> tuple[str, int] | None:
+    """What to attest for direct circle links: (node id, listener port) or None."""
+    if hooks.circle_attest is None:
+        return None
+    try:
+        return hooks.circle_attest()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+# The two attestation fields that exist only for direct circle links. They are
+# left out of the message unless the listener is up, so a coordinator from
+# before links sees the bytes it always did.
+_LINK_FIELDS = {"mesh_node_id", "circle_port"}
+
+
 async def _do_handshake(
     ws: Any,
     settings: Settings,
     priv: Ed25519PrivateKey,
     hooks: LoopHooks,
+    link: tuple[str, int] | None = None,
 ) -> tuple[AcceptMessage, list[CapabilityEntry]]:
     # 1) receive challenge. A peer with no valid sign-in gets a reject here
     # in place of the challenge, so that case is a reject too.
@@ -259,13 +335,15 @@ async def _do_handshake(
         nonce_signature=base64.urlsafe_b64encode(sig).rstrip(b"=").decode("ascii"),
         capabilities=capabilities,
         audiences=hooks.audiences,
+        mesh_node_id=link[0] if link else None,
+        circle_port=link[1] if link else None,
     )
     if capabilities:
         logger.info(
             "advertising_capabilities slugs=%s",
             [c.model_slug for c in capabilities],
         )
-    await ws.send(attest.model_dump_json())
+    await ws.send(attest.model_dump_json(exclude=None if link else _LINK_FIELDS))
 
     # 3) receive accept or reject
     raw = await asyncio.wait_for(ws.recv(), timeout=HANDSHAKE_RESPONSE_TIMEOUT_S)
@@ -293,10 +371,10 @@ async def _heartbeat_loop(
     """Send a heartbeat every `heartbeat_interval_s`. Returns when the
     connection closes; caller handles reconnect.
 
-    current_jobs is the loop's own in-flight count, never a caller-supplied
-    number: the coordinator takes max(live, reported) so a low report can
-    only understate load, and this loop is the authority on what it is
-    serving.
+    current_jobs is the loop's own in-flight count (plus the direct circle
+    requests the engine reports), never a caller-supplied number: the
+    coordinator takes max(live, reported) so a low report can only understate
+    load, and this loop is the authority on what it is serving.
     """
     while True:
         await asyncio.sleep(accept.heartbeat_interval_s)
@@ -305,18 +383,19 @@ async def _heartbeat_loop(
         except Exception:  # noqa: BLE001
             logger.debug("capacity_probe_failed", exc_info=True)
             capacity = Capacity()
+        current_jobs = tracker.count + _direct_jobs(hooks)
         hb = HeartbeatMessage(
             peer_id=accept.peer_id,
             session_id=accept.session_id,
             timestamp=datetime.now(timezone.utc),
-            current_jobs=tracker.count,
+            current_jobs=current_jobs,
             gpu_utilization=capacity.gpu_utilization,
             vram_available_gb=capacity.vram_available_gb,
             max_concurrent_jobs=hooks.max_concurrent_jobs,
         )
         await ws.send(hb.model_dump_json())
-        logger.debug("heartbeat_sent peer_id=%s current_jobs=%d", accept.peer_id, tracker.count)
-        _emit(hooks, "heartbeat", current_jobs=tracker.count)
+        logger.debug("heartbeat_sent peer_id=%s current_jobs=%d", accept.peer_id, current_jobs)
+        _emit(hooks, "heartbeat", current_jobs=current_jobs)
 
 
 # m3 stub: per-token "inference" delay so the streaming feels real on the
@@ -558,7 +637,8 @@ async def _receive_loop(
 
     The in-flight cap is enforced HERE, once, for every caller: a job that
     arrives while ``max_concurrent_jobs`` are already running is declined on
-    the wire (category ``declined``) so the coordinator reroutes it.
+    the wire (category ``declined``) so the coordinator reroutes it. Direct
+    circle requests count against the same cap.
     """
     background_tasks: set[asyncio.Task] = set()
 
@@ -598,8 +678,9 @@ async def _receive_loop(
                         job.job_id, job.model_slug, len(job.prompt),
                     )
                 cap = hooks.max_concurrent_jobs
-                if cap is not None and tracker.count >= cap:
-                    await _decline_at_capacity(ws, job, cap, tracker.count)
+                running = tracker.count + _direct_jobs(hooks)
+                if cap is not None and running >= cap:
+                    await _decline_at_capacity(ws, job, cap, running)
                     continue
                 tracker.in_flight.add(job.job_id)
                 _emit(hooks, "job_started", job_id=str(job.job_id))
@@ -639,23 +720,30 @@ def _slugs(capabilities: list[CapabilityEntry]) -> frozenset[str]:
 
 
 async def _capability_watch(
-    ws: Any, hooks: LoopHooks, tracker: JobTracker, advertised: frozenset[str]
+    ws: Any,
+    hooks: LoopHooks,
+    tracker: JobTracker,
+    advertised: frozenset[str],
+    advertised_link: tuple[str, int] | None = None,
+    reattest: asyncio.Event | None = None,
 ) -> None:
     """End the session once what this machine can serve has changed.
 
     Capabilities travel only in the attestation, so a model loaded, swapped
     or unloaded after connecting (or a sharing window opening) reaches the
-    coordinator only through a new handshake. Acts on two matching checks
+    coordinator only through a new handshake. So does the circle listener's
+    node and port (direct circle links). Acts on two matching checks
     and an idle connection, so a brief flap or a job in flight never costs
     a reconnect."""
-    pending: frozenset[str] | None = None
+    pending: tuple[frozenset[str], tuple[str, int] | None] | None = None
+    baseline = (advertised, advertised_link)
     while True:
         await asyncio.sleep(CAPABILITY_CHECK_INTERVAL_S)
         try:
-            current = _slugs(await hooks.capabilities_provider())
+            current = (_slugs(await hooks.capabilities_provider()), _circle_link(hooks))
         except Exception:  # noqa: BLE001
             continue
-        if current == advertised:
+        if current == baseline:
             pending = None
             continue
         if current != pending:
@@ -664,6 +752,8 @@ async def _capability_watch(
         if tracker.count:
             continue
         logger.info("capabilities_changed reconnecting")
+        if reattest is not None:
+            reattest.set()  # before the close, so the loop sees this was our own doing
         await ws.close()
         return
 
@@ -673,18 +763,24 @@ async def _session(
     priv: Ed25519PrivateKey,
     hooks: LoopHooks,
     stop: asyncio.Event,
+    info: _SessionInfo | None = None,
 ) -> None:
+    info = info if info is not None else _SessionInfo()
     logger.info("connecting url=%s", settings.coordinator_url)
     _emit(hooks, "connecting")
+    await _prepare_circle(hooks)
+    reattest = asyncio.Event()
     async with websockets.connect(
         settings.coordinator_url, extra_headers=hooks.headers_provider()
     ) as ws:
+        link = _circle_link(hooks)
         try:
-            accept, advertised = await _do_handshake(ws, settings, priv, hooks)
+            accept, advertised = await _do_handshake(ws, settings, priv, hooks, link)
         except HandshakeFailed as e:
             logger.error("handshake_rejected reason=%s", e)
             _emit(hooks, "rejected", reason=str(e))
             raise
+        info.accepted_at = time.monotonic()
         logger.info(
             "session_opened peer_id=%s session_id=%s heartbeat_interval=%ds",
             accept.peer_id,
@@ -697,8 +793,17 @@ async def _session(
             peer_id=str(accept.peer_id),
             session_id=str(accept.session_id),
             heartbeat_interval_s=accept.heartbeat_interval_s,
+            # What the coordinator said about direct circle links, and whether it
+            # bound the node this attestation named.
+            circle_links=accept.circle_links,
+            circle_attested=link is not None,
+            circle_bound=accept.mesh_node_id is not None,
         )
         tracker = JobTracker()
+        # What the coordinator actually holds of the circle fields. One that did not
+        # take them up (older, links off, or it would not bind the node) holds
+        # nothing, so the listener going away again is no reason to attest anew.
+        held_link = link if accept.circle_links is True and accept.mesh_node_id is not None else None
         # Bidirectional: heartbeat outbound, receive incoming, stop watch.
         # First task to terminate ends the gather (typically the receive
         # loop on a ConnectionClosed); the outer loop handles backoff.
@@ -706,7 +811,7 @@ async def _session(
             asyncio.create_task(_heartbeat_loop(ws, accept, hooks, tracker)),
             asyncio.create_task(_receive_loop(ws, hooks, tracker)),
             asyncio.create_task(_stop_watch(ws, stop)),
-            asyncio.create_task(_capability_watch(ws, hooks, tracker, _slugs(advertised))),
+            asyncio.create_task(_capability_watch(ws, hooks, tracker, _slugs(advertised), held_link, reattest)),
         ]
         try:
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
@@ -716,7 +821,10 @@ async def _session(
             for t in done:
                 exc = t.exception() if not t.cancelled() else None
                 if exc is not None:
+                    if reattest.is_set() and isinstance(exc, websockets.ConnectionClosed):
+                        continue  # the close was ours: not a failure
                     raise exc
+            info.reattest = reattest.is_set()
         finally:
             for t in tasks:
                 if not t.done():
@@ -746,11 +854,19 @@ async def run_contributor_loop(
             pass
 
     while not stop.is_set():
+        info = _SessionInfo()
         try:
-            await _session(settings, priv, hooks, stop)
+            await _session(settings, priv, hooks, stop, info)
             backoff = RECONNECT_BACKOFF_INITIAL_S
             if stop.is_set():
                 break
+            if info.reattest:
+                # The engine ended this session itself to attest again. Come
+                # straight back, and leave the backoff where it is.
+                logger.info("reattesting")
+                _emit(hooks, "reattest")
+                await _sleep_or_stop(REATTEST_PAUSE_S)
+                continue
             logger.warning("session_ended retry_in_s=%.1f", backoff)
             _emit(hooks, "disconnected", error="session_ended")
         except HandshakeFailed:
@@ -776,6 +892,8 @@ async def run_contributor_loop(
             _emit(hooks, "disconnected", error=type(e).__name__)
         if stop.is_set():
             break
+        if info.healthy():
+            backoff = RECONNECT_BACKOFF_INITIAL_S
         await _sleep_or_stop(backoff)
         backoff = min(backoff * 2, RECONNECT_BACKOFF_MAX_S)
     _emit(hooks, "stopped")

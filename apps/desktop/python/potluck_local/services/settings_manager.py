@@ -52,6 +52,12 @@ class NetworkSettings(BaseModel):
     max_concurrent_jobs: int = Field(default=1, ge=0, le=64)
     contributor_max_tokens: int | None = Field(default=None, ge=1, le=32768)
     contributor_min_free_memory_gib: float = Field(default=0, ge=0, le=1024)
+    # Direct circle links: machine-to-machine requests inside a trusted circle,
+    # with the coordinator's relay as the fallback. On, this machine borrows over
+    # a direct link when it can and, while sharing with circles, lends over one.
+    # Off, circle requests go through the relay only and nothing is listening:
+    # behaviour is exactly what it was before links existed.
+    direct_circle_links: bool = True
     # HTTP base of the coordinator this node talks to (e.g. "http://127.0.0.1:8400").
     # Synced from the frontend's connection setting so the sidecar can reach the
     # open pool for gateway routing. Empty = not configured (pool unavailable).
