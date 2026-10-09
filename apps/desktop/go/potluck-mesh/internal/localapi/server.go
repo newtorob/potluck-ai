@@ -13,6 +13,7 @@
 //	POST  /pair      — enroll this node using a pairing token
 //	POST  /unpair    — wipe local keys + stop tunnel
 //	PATCH /settings  — runtime settings override (currently: coordinator_url)
+//	POST  /restart   shut down gracefully and exit 75 so the service manager starts the process again
 //	WS    /events    — subscribe to the event bus
 //
 // Every response includes X-Potluck-Protocol-Version: 1 per the spec.
@@ -120,7 +121,13 @@ type State struct {
 	wgPort               int    // UDP port the WireGuard device listens on (default 51820)
 	features             []string
 	exeSHA256            string // SHA-256 of this process's own executable, taken at startup; "" if unknown
+	restartFn            func() // what POST /restart does; nil when the process cannot restart itself
 }
+
+// FeatureRestartV1 is the name GET /status lists in features when POST /restart
+// is available (see SetRestartFunc). Reported only over the local socket; it is
+// not sent to the coordinator.
+const FeatureRestartV1 = "restart_v1"
 
 // NewState returns an idle State in the "starting" phase.
 func NewState() *State {
@@ -183,6 +190,21 @@ func (s *State) SetExeSHA256(sum string) {
 	s.mu.Lock()
 	s.exeSHA256 = sum
 	s.mu.Unlock()
+}
+
+// SetRestartFunc registers what POST /restart does: shut the process down the
+// way SIGTERM does and exit 75. Once set, GET /status lists FeatureRestartV1.
+// Set it once at startup, before serving.
+func (s *State) SetRestartFunc(fn func()) {
+	s.mu.Lock()
+	s.restartFn = fn
+	s.mu.Unlock()
+}
+
+func (s *State) restartFunc() func() {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.restartFn
 }
 
 func (s *State) SetCoordinatorConnState(st string) {
@@ -310,6 +332,9 @@ func (s *State) snapshot(peerCount int) statusResponse {
 		CoordinatorURL:        s.coordinatorURL,
 		Features:              append([]string{}, s.features...),
 		ExeSHA256:             s.exeSHA256,
+	}
+	if s.restartFn != nil {
+		resp.Features = append(resp.Features, FeatureRestartV1)
 	}
 	if s.nodeID != "" {
 		v := s.nodeID
@@ -467,6 +492,7 @@ func New(cfg Config) *Server {
 	mux.HandleFunc("GET /pairing/discovered", s.handlePairingDiscovered)
 	mux.HandleFunc("POST /pairing/reveal", s.handlePairingReveal)
 	mux.HandleFunc("PATCH /settings", s.handleSettingsPatch)
+	mux.HandleFunc("POST /restart", s.handleRestart)
 
 	// Wrap every response with the protocol-version header.
 	versionMW := func(next http.Handler) http.Handler {
@@ -1274,6 +1300,27 @@ func validateCoordinatorURL(raw string) (string, error) {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+// handleRestart answers 202 and then starts the same restart the binary
+// watcher starts when its executable is replaced: a graceful shutdown, then
+// exit 75, so a service manager that restarts on a non-zero exit starts the
+// process again. The trust is that of the other commands here: whoever can open
+// the socket. It is why the desktop app can restart a service it cannot signal.
+func (s *Server) handleRestart(w http.ResponseWriter, r *http.Request) {
+	fn := s.state.restartFunc()
+	if fn == nil {
+		writeError(w, http.StatusNotImplemented, "restart_unavailable", "this mesh service cannot restart itself")
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"restarting": true})
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+	slog.Info("localapi: restart requested")
+	// After the handler returns, so the shutdown's connection drain does not
+	// wait on this request.
+	go fn()
+}
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")

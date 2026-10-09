@@ -247,6 +247,111 @@ func TestHandleStatus_ExeSHA256(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// POST /restart
+// ---------------------------------------------------------------------------
+
+// TestRestart_AnswersAcceptedThenRunsTheRestart pins the contract the desktop
+// app relies on: 202 first, then the registered restart runs (it ends the
+// process, so it must not run before the response is written).
+func TestRestart_AnswersAcceptedThenRunsTheRestart(t *testing.T) {
+	cfg := defaultCfg(t)
+	ran := make(chan struct{}, 2)
+	cfg.State.SetRestartFunc(func() { ran <- struct{}{} })
+	client, _ := testServer(t, cfg)
+
+	resp, err := client.Post("http://localhost/restart", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST /restart: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("status: got %d want 202", resp.StatusCode)
+	}
+	checkProtocolHeader(t, resp)
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["restarting"] != true {
+		t.Errorf("restarting: got %v want true", body["restarting"])
+	}
+
+	select {
+	case <-ran:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the restart did not run after the 202")
+	}
+}
+
+func TestRestart_NotImplementedWithoutARestartFunc(t *testing.T) {
+	client, _ := testServer(t, defaultCfg(t))
+
+	resp, err := client.Post("http://localhost/restart", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST /restart: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotImplemented {
+		t.Fatalf("status: got %d want 501", resp.StatusCode)
+	}
+	var body map[string]map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body["error"]["code"] != "restart_unavailable" {
+		t.Errorf("error code: got %v want restart_unavailable", body["error"]["code"])
+	}
+}
+
+func TestRestart_OnlyPOST(t *testing.T) {
+	cfg := defaultCfg(t)
+	cfg.State.SetRestartFunc(func() { t.Error("restart ran for a GET") })
+	client, _ := testServer(t, cfg)
+
+	resp := get(t, client, "/restart")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("GET /restart: got %d want 405", resp.StatusCode)
+	}
+}
+
+// TestHandleStatus_RestartFeature: /status lists restart_v1 exactly when POST
+// /restart is available, next to whatever other features were set, so the app
+// can tell a sidecar that has the command from one that only reports its hash.
+func TestHandleStatus_RestartFeature(t *testing.T) {
+	features := func(cfg localapi.Config) []any {
+		t.Helper()
+		client, _ := testServer(t, cfg)
+		resp := get(t, client, "/status")
+		defer resp.Body.Close()
+		var body map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		list, ok := body["features"].([]any)
+		if !ok {
+			t.Fatalf("features: got %#v, want a list", body["features"])
+		}
+		return list
+	}
+
+	if got := features(defaultCfg(t)); len(got) != 0 {
+		t.Errorf("features without a restart command: %v, want none", got)
+	}
+
+	cfg := defaultCfg(t)
+	cfg.State.SetFeatures([]string{"circle_link_v1"})
+	cfg.State.SetRestartFunc(func() {})
+	got := features(cfg)
+	if len(got) != 2 || got[0] != "circle_link_v1" || got[1] != localapi.FeatureRestartV1 {
+		t.Errorf("features: got %v, want [circle_link_v1 %s]", got, localapi.FeatureRestartV1)
+	}
+	if localapi.FeatureRestartV1 != "restart_v1" {
+		t.Errorf("feature name changed to %q; the desktop app looks for restart_v1", localapi.FeatureRestartV1)
+	}
+}
+
 // TestHandleStatus_WGPortListening verifies that wg_port_listening=true when
 // the test pre-binds a UDP socket on the configured port (simulating what the
 // WireGuard device does) and SetWGPort is called with that port.

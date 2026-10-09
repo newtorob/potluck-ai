@@ -207,7 +207,8 @@ phase_L0() {
 
   step "every sidecar advertises circle_link_v1 and holds no circle peer"
   for n in node-a node-b node-e node-f; do
-    expect_eq "$n: /status features" '["circle_link_v1"]' "$(api $n GET /status | J -c '.features')"
+    # the list may name other features too (restart_v1 for one); this pass needs this one
+    expect_eq "$n: /status features include circle_link_v1" 'true' "$(api $n GET /status | J -c '(.features // []) | index("circle_link_v1") != null')"
     expect_eq "$n: /circle-peers is empty" '{"peers":[]}' "$(cpeers $n | J -c .)"
   done
 

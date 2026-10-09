@@ -342,9 +342,12 @@ contextBridge.exposeInMainWorld('potluck', {
      * System Settings > Login Items & Extensions before it starts. Follow up
      * with openLoginItems() to take them straight there.
      *
-     * When daemonStatus() says 'outdated' this restarts the service instead
-     * (macOS: unregister, then register; Linux/Windows: the same elevated
-     * install, which ends with a service restart).
+     * When daemonStatus() says 'outdated' this restarts the service instead.
+     * Linux/Windows: the same elevated install, which ends with a service
+     * restart. macOS: the registration is refreshed (unregister, then
+     * register), then the running service is asked to restart, or, if it is
+     * too old to have that command, the system's administrator dialog is
+     * shown to stop it. See main.js, "Mesh service version check".
      * @returns {Promise<{ platform: string, state: string, detail?: string }>}
      */
     enable: () => ipcRenderer.invoke('mesh:enable'),

@@ -12,8 +12,11 @@
  *
  * The button runs meshDaemon.enable(), the existing install path, which
  * restarts the service: on Linux and Windows that shows the system's
- * authentication prompt, on macOS it unregisters and registers the daemon
- * again. Nothing prompts until the user presses it.
+ * authentication prompt, on macOS it refreshes the daemon's registration and
+ * then either asks the running service to restart or, for a service old enough
+ * to have no such command, asks for administrator rights to stop it. Nothing
+ * prompts until the user presses it. On macOS a restart of the whole Mac does
+ * the same, so the line says so.
  *
  * Renders nothing when the store has no 'outdated' daemon status.
  */
@@ -23,6 +26,10 @@ import { AlertTriangle, Loader2, RotateCw } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { meshDaemon } from '@/lib/meshClient';
 import { useMeshStore } from '@/stores/meshStore';
+
+const RESTART_LINE = 'The mesh service is still running the previous version. Restart it to finish the update.';
+const RESTART_LINE_MAC =
+  'The mesh service is still running the previous version. Restart it to finish the update, or restart your Mac.';
 
 export function MeshServiceOutdatedBanner() {
   const serviceOutdated = useMeshStore((s) => s.serviceOutdated);
@@ -60,7 +67,7 @@ export function MeshServiceOutdatedBanner() {
       />
       <div className="min-w-0 flex-1 space-y-2">
         <p className="text-sm text-foreground leading-snug">
-          The mesh service is still running the previous version. Restart it to finish the update.
+          {serviceOutdated.platform === 'darwin' ? RESTART_LINE_MAC : RESTART_LINE}
         </p>
         <button
           type="button"

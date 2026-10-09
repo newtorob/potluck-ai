@@ -160,12 +160,13 @@ func New(privateKeyBase64 string, meshIPCIDR string, opts ...Option) (*Tunnel, e
 
 	ifName := tunInterfaceName()
 
-	slog.Info("tunnel: creating TUN device", "interface", ifName, "platform", runtime.GOOS)
-
 	tdev, err := tun.CreateTUN(ifName, DefaultMTU)
 	if err != nil {
 		return nil, fmt.Errorf("tunnel: create TUN %q: %w", ifName, err)
 	}
+	// Logged after the create, not before: a caller that waits for a busy device
+	// (cmd/potluck-mesh/tunnelwait.go) would otherwise log it on every attempt.
+	slog.Info("tunnel: created TUN device", "interface", ifName, "platform", runtime.GOOS)
 
 	// Bind: use the caller-supplied bind if provided (e.g. DerpBind for relay
 	// fallback), otherwise fall back to the standard OS UDP bind.

@@ -45,6 +45,44 @@ describe('MeshServiceOutdatedBanner', () => {
     expect(mocks.enable).not.toHaveBeenCalled();
   });
 
+  it('on macOS the line also says a restart of the Mac does it', () => {
+    useMeshStore.setState({ serviceOutdated: { ...OUTDATED, platform: 'darwin' } });
+    render(<MeshServiceOutdatedBanner />);
+
+    expect(
+      screen.getByText(
+        'The mesh service is still running the previous version. Restart it to finish the update, or restart your Mac.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Restart mesh service' })).toBeEnabled();
+  });
+
+  it.each(['linux', 'win32'])('on %s the line has no mention of restarting the Mac', (platform) => {
+    useMeshStore.setState({ serviceOutdated: { ...OUTDATED, platform } });
+    render(<MeshServiceOutdatedBanner />);
+
+    expect(
+      screen.getByText(
+        'The mesh service is still running the previous version. Restart it to finish the update.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/restart your Mac/i)).not.toBeInTheDocument();
+  });
+
+  it('shows the reason when the service cannot be restarted (macOS: several processes, no process)', async () => {
+    useMeshStore.setState({ serviceOutdated: { ...OUTDATED, platform: 'darwin' } });
+    mocks.enable.mockResolvedValue({
+      platform: 'darwin',
+      state: 'failed',
+      detail: 'more than one mesh service process is running; restart your Mac to finish the update',
+    });
+    render(<MeshServiceOutdatedBanner />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restart mesh service' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('restart your Mac to finish the update');
+  });
+
   it('runs the install path on click and re-reads the mesh state afterwards', async () => {
     useMeshStore.setState({ serviceOutdated: OUTDATED });
     mocks.enable.mockResolvedValue({ platform: 'linux', state: 'running' });

@@ -240,7 +240,9 @@ func run() int {
 	tunnelOpts = append(tunnelOpts, tunnel.WithPacketPolicy(pf))
 
 	// Start WG device with no mesh IP yet; SetMeshIP is called from OnWelcome.
-	tun, err := tunnel.New(privKeyBase64, "", tunnelOpts...)
+	tun, err := createTunnelWhenFree(ctx, func() (*tunnel.Tunnel, error) {
+		return tunnel.New(privKeyBase64, "", tunnelOpts...)
+	})
 	if err != nil {
 		slog.Error("tunnel init failed",
 			"err", err,

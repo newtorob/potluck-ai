@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -44,14 +45,18 @@ import (
 // A missing file, a file with the same content, or a file that keeps changing
 // never causes an exit. POTLUCK_MESH_NO_SELF_RESTART=1 turns the watcher off
 // (development, the Docker harness); the hash is still reported.
+//
+// The same shutdown is available on demand: POST /restart on the local socket
+// (internal/localapi) runs it, so the desktop app can restart a service it
+// cannot signal. The environment variable does not affect that command.
 
 const (
 	// envNoSelfRestart turns the watcher off when it parses as true.
 	envNoSelfRestart = "POTLUCK_MESH_NO_SELF_RESTART"
 
-	// exitSelfRestart is the exit code of a shutdown the watcher asked for. Any
-	// non-zero code restarts the service; this one is sysexits' EX_TEMPFAIL
-	// ("try again"), which no other path in this binary returns.
+	// exitSelfRestart is the exit code of a shutdown the watcher or POST /restart
+	// asked for. Any non-zero code restarts the service; this one is sysexits'
+	// EX_TEMPFAIL ("try again"), which no other path in this binary returns.
 	exitSelfRestart = 75
 )
 
@@ -86,23 +91,67 @@ func exitCodeAfterRun(code int) int {
 	return code
 }
 
-// exeHashSink receives the startup hash. *localapi.State implements it.
-type exeHashSink interface {
+// selfRestartSink receives the startup hash and the restart command.
+// *localapi.State implements it.
+type selfRestartSink interface {
 	SetExeSHA256(sum string)
+	SetRestartFunc(fn func())
 }
 
-// startSelfRestart hashes this process's executable, hands the hash to sink,
-// and starts the watcher unless POTLUCK_MESH_NO_SELF_RESTART turns it off.
-// shutdown must do what SIGTERM does (cancel the root context). If the
-// executable cannot be hashed the hash stays empty and no watcher runs. It
+// restarter shuts the process down the way SIGTERM does and makes it exit 75.
+// The watcher and POST /restart share one, so whichever asks first starts the
+// only shutdown. If the shutdown stalls, the process leaves anyway after
+// forceExit, because a service that never exits is not restarted.
+type restarter struct {
+	shutdown  func()
+	exit      func(code int)
+	clock     clock
+	forceExit time.Duration
+	requested *atomic.Bool
+	once      sync.Once
+}
+
+// request starts the shutdown unless one is under way. It reports whether this
+// call started it.
+func (r *restarter) request(reason string, attrs ...any) bool {
+	started := false
+	r.once.Do(func() {
+		started = true
+		slog.Warn("self-restart: shutting down so the service manager starts the process again",
+			append([]any{"reason", reason}, attrs...)...)
+		r.requested.Store(true)
+		r.shutdown()
+		go func() {
+			<-r.clock.After(r.forceExit)
+			slog.Error("self-restart: shutdown did not finish in time, exiting", "after", r.forceExit)
+			r.exit(exitSelfRestart)
+		}()
+	})
+	return started
+}
+
+// startSelfRestart hashes this process's executable, hands the hash and the
+// restart command to sink, and starts the watcher unless
+// POTLUCK_MESH_NO_SELF_RESTART turns it off. shutdown must do what SIGTERM does
+// (cancel the root context). If the executable cannot be hashed the hash stays
+// empty and no watcher runs; the restart command is registered either way. It
 // reports whether the watcher is running.
-func startSelfRestart(ctx context.Context, shutdown func(), sink exeHashSink) bool {
+func startSelfRestart(ctx context.Context, shutdown func(), sink selfRestartSink) bool {
+	rs := &restarter{
+		shutdown:  shutdown,
+		exit:      os.Exit,
+		clock:     systemClock{},
+		forceExit: selfRestartTimingsInUse.forceExit,
+		requested: &selfRestartRequested,
+	}
+	sink.SetRestartFunc(func() { rs.request("restart requested over the local API") })
+
 	path, err := ownExecutablePath()
 	if err != nil {
 		slog.Warn("self-restart: cannot locate own executable; exe_sha256 stays empty and the watcher is off", "err", err)
 		return false
 	}
-	w, err := newExeWatcher(path, selfRestartTimingsInUse, shutdown, os.Exit, &selfRestartRequested)
+	w, err := newExeWatcher(path, selfRestartTimingsInUse, rs)
 	if err != nil {
 		slog.Warn("self-restart: cannot hash own executable; exe_sha256 stays empty and the watcher is off", "path", path, "err", err)
 		return false
@@ -164,13 +213,11 @@ type exeWatcher struct {
 	startHash string      // SHA-256 of the file when the process started
 	baseline  os.FileInfo // the file's stat taken just before startHash
 
-	timings   selfRestartTimings
-	clock     clock
-	statFn    func(string) (os.FileInfo, error)
-	hashFn    func(string) (string, error)
-	shutdown  func()
-	exit      func(code int)
-	requested *atomic.Bool
+	timings selfRestartTimings
+	clock   clock
+	statFn  func(string) (os.FileInfo, error)
+	hashFn  func(string) (string, error)
+	restart *restarter
 
 	// A change that differs from baseline and is being waited out. check and run
 	// are the only users and run from one goroutine.
@@ -181,16 +228,14 @@ type exeWatcher struct {
 
 // newExeWatcher stats and hashes the file at path. The stat comes first, so a
 // file replaced between the two is seen as a change on the first poll.
-func newExeWatcher(path string, t selfRestartTimings, shutdown func(), exit func(int), requested *atomic.Bool) (*exeWatcher, error) {
+func newExeWatcher(path string, t selfRestartTimings, restart *restarter) (*exeWatcher, error) {
 	w := &exeWatcher{
-		path:      path,
-		timings:   t,
-		clock:     systemClock{},
-		statFn:    os.Stat,
-		hashFn:    hashFile,
-		shutdown:  shutdown,
-		exit:      exit,
-		requested: requested,
+		path:    path,
+		timings: t,
+		clock:   systemClock{},
+		statFn:  os.Stat,
+		hashFn:  hashFile,
+		restart: restart,
 	}
 	fi, err := w.statFn(path)
 	if err != nil {
@@ -255,16 +300,12 @@ func (w *exeWatcher) check(now time.Time) bool {
 	}
 
 	w.fired = true
-	slog.Warn("self-restart: executable replaced on disk, shutting down so the service manager starts the new one",
+	w.restart.request("executable replaced on disk",
 		"path", w.path, "running_sha256", w.startHash, "installed_sha256", sum)
-	w.requested.Store(true)
-	w.shutdown()
 	return true
 }
 
-// run polls until ctx is done or the watcher fires. After it fires it gives the
-// shutdown forceExit to finish and then exits the process, because a service
-// that never exits would never pick up the new binary.
+// run polls until ctx is done or the watcher fires.
 func (w *exeWatcher) run(ctx context.Context) {
 	for {
 		wait := w.timings.poll
@@ -277,9 +318,6 @@ func (w *exeWatcher) run(ctx context.Context) {
 		case <-w.clock.After(wait):
 		}
 		if w.check(w.clock.Now()) {
-			<-w.clock.After(w.timings.forceExit)
-			slog.Error("self-restart: shutdown did not finish in time, exiting", "after", w.timings.forceExit)
-			w.exit(exitSelfRestart)
 			return
 		}
 	}

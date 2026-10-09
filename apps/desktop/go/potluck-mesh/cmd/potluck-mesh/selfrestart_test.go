@@ -28,6 +28,19 @@ var quietTimings = selfRestartTimings{
 	forceExit: 20 * time.Second,
 }
 
+// newTestRestarter is a restarter whose shutdown and exit are recorded instead
+// of acted on, on a clock that only moves when the test moves it.
+func newTestRestarter(shutdowns *atomic.Int32, requested *atomic.Bool, exited chan int) (*restarter, *fakeClock) {
+	clk := newFakeClock()
+	return &restarter{
+		shutdown:  func() { shutdowns.Add(1) },
+		exit:      func(code int) { exited <- code },
+		clock:     clk,
+		forceExit: quietTimings.forceExit,
+		requested: requested,
+	}, clk
+}
+
 // watcherFixture is an exeWatcher over a real temporary file, with the
 // shutdown and exit functions recorded instead of acted on. hashCalls counts
 // hashes taken after the startup one.
@@ -35,17 +48,20 @@ type watcherFixture struct {
 	t         *testing.T
 	path      string
 	w         *exeWatcher
+	restart   *restarter
+	clock     *fakeClock
 	shutdowns atomic.Int32
-	exits     []int
+	exited    chan int
 	requested atomic.Bool
 	hashCalls atomic.Int32
 }
 
 func newFixture(t *testing.T, initial string) *watcherFixture {
 	t.Helper()
-	f := &watcherFixture{t: t, path: filepath.Join(t.TempDir(), "potluck-mesh")}
+	f := &watcherFixture{t: t, path: filepath.Join(t.TempDir(), "potluck-mesh"), exited: make(chan int, 4)}
+	f.restart, f.clock = newTestRestarter(&f.shutdowns, &f.requested, f.exited)
 	writeFile(t, f.path, initial)
-	w, err := newExeWatcher(f.path, quietTimings, func() { f.shutdowns.Add(1) }, func(code int) { f.exits = append(f.exits, code) }, &f.requested)
+	w, err := newExeWatcher(f.path, quietTimings, f.restart)
 	if err != nil {
 		t.Fatalf("newExeWatcher: %v", err)
 	}
@@ -136,8 +152,10 @@ func TestExeWatcher_ReplacedWithDifferentContentExitsOnceAfterQuietPeriod(t *tes
 	if n := f.shutdowns.Load(); n != 1 {
 		t.Fatalf("shutdown called %d times after later polls, want 1", n)
 	}
-	if len(f.exits) != 0 {
-		t.Fatalf("check must not exit the process itself, got exits %v", f.exits)
+	select {
+	case code := <-f.exited:
+		t.Fatalf("check must not exit the process itself, got exit(%d)", code)
+	default:
 	}
 }
 
@@ -320,11 +338,8 @@ func (c *fakeClock) release(w *fakeWaiter) {
 
 func TestExeWatcher_RunPollsSlowlyThenFastThenShutsDownThenForcesExit(t *testing.T) {
 	f := newFixture(t, "version one")
-	clk := newFakeClock()
+	clk := f.clock
 	f.w.clock = clk
-
-	exited := make(chan int, 1)
-	f.w.exit = func(code int) { exited <- code }
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -371,13 +386,13 @@ func TestExeWatcher_RunPollsSlowlyThenFastThenShutsDownThenForcesExit(t *testing
 		t.Fatalf("shutdown called %d times, want 1", n)
 	}
 	select {
-	case code := <-exited:
+	case code := <-f.exited:
 		t.Fatalf("exit(%d) before the shutdown had its time", code)
 	default:
 	}
 	clk.release(w)
 	select {
-	case code := <-exited:
+	case code := <-f.exited:
 		if code != exitSelfRestart {
 			t.Fatalf("forced exit code %d, want %d", code, exitSelfRestart)
 		}
@@ -389,9 +404,8 @@ func TestExeWatcher_RunPollsSlowlyThenFastThenShutsDownThenForcesExit(t *testing
 
 func TestExeWatcher_RunStopsWhenContextIsDone(t *testing.T) {
 	f := newFixture(t, "version one")
-	clk := newFakeClock()
+	clk := f.clock
 	f.w.clock = clk
-	f.w.exit = func(int) { t.Error("exit called after a normal shutdown") }
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -404,6 +418,62 @@ func TestExeWatcher_RunStopsWhenContextIsDone(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("run did not return after its context was cancelled")
 	}
+	select {
+	case code := <-f.exited:
+		t.Fatalf("exit(%d) called after a normal shutdown", code)
+	default:
+	}
+}
+
+// ---------------------------------------------------------------------------
+// the shared restarter (the watcher and POST /restart)
+// ---------------------------------------------------------------------------
+
+func TestRestarter_FirstRequestShutsDownOnceAndLaterOnesJoinIt(t *testing.T) {
+	var shutdowns atomic.Int32
+	var requested atomic.Bool
+	exited := make(chan int, 2)
+	rs, _ := newTestRestarter(&shutdowns, &requested, exited)
+
+	if !rs.request("restart requested over the local API") {
+		t.Fatal("first request did not start the shutdown")
+	}
+	if rs.request("executable replaced on disk") || rs.request("again") {
+		t.Fatal("a later request started a second shutdown")
+	}
+	if n := shutdowns.Load(); n != 1 {
+		t.Fatalf("shutdown called %d times, want 1", n)
+	}
+	if !requested.Load() {
+		t.Fatal("requested flag not set, main would exit 0")
+	}
+}
+
+func TestRestarter_LeavesAfterForceExitIfTheShutdownStalls(t *testing.T) {
+	var shutdowns atomic.Int32
+	var requested atomic.Bool
+	exited := make(chan int, 2)
+	rs, clk := newTestRestarter(&shutdowns, &requested, exited)
+
+	rs.request("restart requested over the local API")
+	w := clk.wait(t)
+	if w.d != quietTimings.forceExit {
+		t.Fatalf("force-exit timer %v, want %v", w.d, quietTimings.forceExit)
+	}
+	select {
+	case code := <-exited:
+		t.Fatalf("exit(%d) before the shutdown had its time", code)
+	default:
+	}
+	clk.release(w)
+	select {
+	case code := <-exited:
+		if code != exitSelfRestart {
+			t.Fatalf("exit code %d, want %d", code, exitSelfRestart)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("process did not leave after the force-exit time")
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -411,9 +481,16 @@ func TestExeWatcher_RunStopsWhenContextIsDone(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 type captureSink struct {
-	mu  sync.Mutex
-	sum string
-	n   int
+	mu      sync.Mutex
+	sum     string
+	n       int
+	restart func()
+}
+
+func (s *captureSink) SetRestartFunc(fn func()) {
+	s.mu.Lock()
+	s.restart = fn
+	s.mu.Unlock()
 }
 
 func (s *captureSink) SetExeSHA256(sum string) {
@@ -481,6 +558,24 @@ func TestStartSelfRestart_EnvironmentVariableTurnsTheWatcherOffButKeepsTheHash(t
 	}
 }
 
+func TestStartSelfRestart_RegistersTheRestartCommandWhateverTheWatcherDoes(t *testing.T) {
+	// POTLUCK_MESH_NO_SELF_RESTART turns off the binary watcher only. The
+	// command is not called here: it would shut the test process down.
+	for _, v := range []string{"", "1"} {
+		t.Setenv(envNoSelfRestart, v)
+		sink := &captureSink{}
+		ctx, cancel := context.WithCancel(context.Background())
+		startSelfRestart(ctx, cancel, sink)
+		sink.mu.Lock()
+		registered := sink.restart != nil
+		sink.mu.Unlock()
+		cancel()
+		if !registered {
+			t.Errorf("restart command not registered with %s=%q", envNoSelfRestart, v)
+		}
+	}
+}
+
 func TestExitCodeAfterRun(t *testing.T) {
 	t.Cleanup(func() { selfRestartRequested.Store(false) })
 
@@ -524,6 +619,16 @@ func TestSelfRestartHelperProcess(t *testing.T) {
 	}
 	sum, _ := sink.get()
 	fmt.Printf("ready %s\n", sum)
+	if os.Getenv("POTLUCK_SELFRESTART_MODE") == "command" {
+		// What POST /restart does once the local API has answered 202.
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			sink.mu.Lock()
+			fn := sink.restart
+			sink.mu.Unlock()
+			fn()
+		}()
+	}
 	select {
 	case <-ctx.Done():
 		// The same step main() takes after run() returns.
@@ -533,7 +638,11 @@ func TestSelfRestartHelperProcess(t *testing.T) {
 	}
 }
 
-func TestSelfRestart_RealProcess(t *testing.T) {
+// startHelperChild copies the test binary to a temporary path and runs
+// TestSelfRestartHelperProcess in the copy. It returns the copy's path, a
+// channel that receives the process's exit, and the hash the child reported.
+func startHelperChild(t *testing.T, mode string) (child string, done chan error, reportedSum string) {
+	t.Helper()
 	if runtime.GOOS == "windows" {
 		t.Skip("a running executable cannot be replaced by rename on Windows")
 	}
@@ -541,12 +650,11 @@ func TestSelfRestart_RealProcess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := t.TempDir()
-	child := filepath.Join(dir, "potluck-mesh-under-test")
+	child = filepath.Join(t.TempDir(), "potluck-mesh-under-test")
 	copyFile(t, self, child, nil)
 
 	cmd := exec.Command(child, "-test.run=^TestSelfRestartHelperProcess$")
-	cmd.Env = append(envWithout(os.Environ(), envNoSelfRestart), "POTLUCK_SELFRESTART_HELPER=1")
+	cmd.Env = append(envWithout(os.Environ(), envNoSelfRestart), "POTLUCK_SELFRESTART_HELPER=1", "POTLUCK_SELFRESTART_MODE="+mode)
 	out, err := cmd.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)
@@ -555,7 +663,7 @@ func TestSelfRestart_RealProcess(t *testing.T) {
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
-	done := make(chan error, 1)
+	done = make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
 	t.Cleanup(func() { _ = cmd.Process.Kill() })
 
@@ -565,12 +673,26 @@ func TestSelfRestart_RealProcess(t *testing.T) {
 		t.Fatalf("child printed no ready line: %v", err)
 	}
 	go func() { _, _ = io.Copy(io.Discard, lines) }()
+	return child, done, strings.TrimSpace(strings.TrimPrefix(line, "ready "))
+}
+
+func exitCodeOf(t *testing.T, err error) int {
+	t.Helper()
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("child exited without an exit code: %v", err)
+	}
+	return exitErr.ExitCode()
+}
+
+func TestSelfRestart_RealProcess(t *testing.T) {
+	child, done, reported := startHelperChild(t, "watch")
 	wantSum, err := hashFile(child)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.TrimSpace(strings.TrimPrefix(line, "ready ")); got != wantSum {
-		t.Fatalf("child reported hash %q, want %q", got, wantSum)
+	if reported != wantSum {
+		t.Fatalf("child reported hash %q, want %q", reported, wantSum)
 	}
 
 	// Same bytes under a new file: the child stays up through several polls.
@@ -585,15 +707,25 @@ func TestSelfRestart_RealProcess(t *testing.T) {
 	copyFile(t, child, child, []byte("\nnew release"))
 	select {
 	case err := <-done:
-		var exitErr *exec.ExitError
-		if !errors.As(err, &exitErr) {
-			t.Fatalf("child exited without an exit code: %v", err)
-		}
-		if exitErr.ExitCode() != exitSelfRestart {
-			t.Fatalf("child exit code %d, want %d", exitErr.ExitCode(), exitSelfRestart)
+		if code := exitCodeOf(t, err); code != exitSelfRestart {
+			t.Fatalf("child exit code %d, want %d", code, exitSelfRestart)
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("child did not exit after its binary was replaced")
+	}
+}
+
+// The restart command POST /restart runs ends the process the same way, with
+// its binary untouched.
+func TestSelfRestart_RealProcessRestartCommand(t *testing.T) {
+	_, done, _ := startHelperChild(t, "command")
+	select {
+	case err := <-done:
+		if code := exitCodeOf(t, err); code != exitSelfRestart {
+			t.Fatalf("child exit code %d, want %d", code, exitSelfRestart)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("child did not exit after the restart command ran")
 	}
 }
 
