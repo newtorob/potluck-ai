@@ -120,6 +120,21 @@ ensure_link() {
   wait_for 30 "the link answers with its token" link_works
 }
 
+# seed_household2 : the second household as rows (member M2, households row at 100.64.1.0/24, two pairing
+# tokens), then node-e and node-f enrol through the real POST /pair. Sets M2. Used by phase L0 and phase RH.
+seed_household2() {
+  M2=$(ex stun 'cat /proc/sys/kernel/random/uuid' | tr -d '\r')
+  expect_match "member 2 id" '^[0-9a-f-]{36}$' "$M2"
+  local hh2 t1 t2
+  hh2=$(psql -t -A -c "insert into households (owner_member_id, name, mesh_cidr) values ('$M2', 'meshlive lenders', '100.64.1.0/24') returning id" | head -1 | tr -d '\r')
+  expect_match "household 2 row" '^[0-9a-f-]{36}$' "$hh2"
+  t1=$(ex stun "python3 -c 'import secrets,base64;print(base64.b32encode(secrets.token_bytes(20)).decode())'" | tr -d '\r')
+  t2=$(ex stun "python3 -c 'import secrets,base64;print(base64.b32encode(secrets.token_bytes(20)).decode())'" | tr -d '\r')
+  psql -c "insert into pairing_tokens (token, household_id, issued_by_member_id, expires_at) values ('$t1','$hh2','$M2', now() + interval '1 hour'), ('$t2','$hh2','$M2', now() + interval '1 hour')" >/dev/null \
+    || fail "could not seed the pairing tokens"
+  pair_with "$t1" node-e node-e; pair_with "$t2" node-f node-f
+}
+
 dump_links() {
   printf '\n--- circle state (for diagnosis) ---\n'
   local n
@@ -154,16 +169,7 @@ phase_L0() {
   pair node-a node-a; pair node-b node-b
 
   step "household 2 (node-e, node-f): in development every HTTP caller is the one stub member, so this household, its two pairing tokens and the circle membership are rows"
-  M2=$(ex stun 'cat /proc/sys/kernel/random/uuid' | tr -d '\r')
-  expect_match "member 2 id" '^[0-9a-f-]{36}$' "$M2"
-  local hh2 t1 t2
-  hh2=$(psql -t -A -c "insert into households (owner_member_id, name, mesh_cidr) values ('$M2', 'meshlive lenders', '100.64.1.0/24') returning id" | head -1 | tr -d '\r')
-  expect_match "household 2 row" '^[0-9a-f-]{36}$' "$hh2"
-  t1=$(ex stun "python3 -c 'import secrets,base64;print(base64.b32encode(secrets.token_bytes(20)).decode())'" | tr -d '\r')
-  t2=$(ex stun "python3 -c 'import secrets,base64;print(base64.b32encode(secrets.token_bytes(20)).decode())'" | tr -d '\r')
-  psql -c "insert into pairing_tokens (token, household_id, issued_by_member_id, expires_at) values ('$t1','$hh2','$M2', now() + interval '1 hour'), ('$t2','$hh2','$M2', now() + interval '1 hour')" >/dev/null \
-    || fail "could not seed the pairing tokens"
-  pair_with "$t1" node-e node-e; pair_with "$t2" node-f node-f
+  seed_household2
   for n in node-a node-b node-e node-f; do wait_for 90 "$n joined" joined "$n"; done
   IPA=$(meship node-a); IPB=$(meship node-b); IPE=$(meship node-e); IPF=$(meship node-f)
   expect_match "household 1 addresses are in 100.64.0.0/24" '^100\.64\.0\.[0-9]+ 100\.64\.0\.[0-9]+$' "$IPA $IPB"

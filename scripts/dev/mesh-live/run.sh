@@ -20,6 +20,15 @@
 #   LINKS_PHASES      phases of the direct and relay passes, default "L0 L1 L2 L3 L4 L5 LT L6 L7 L8 L9 LU"
 #   LINK_RUNS         samples per setup-time measurement, default 8
 #   LINK_TTL_S        lifetime the coordinator gives a link, default 60
+#   WITH_RELAY=1      add phase RH: household peers with a relay configured, TCP right after both report reachable
+#                     and through a coordinator restart (about 1.5 minutes per stack start, see relay.sh and the README)
+#   RELAY_PHASES      phases of the relay pass, default "RH RO RS" (RO: a session that works one way only; RS: a peer in
+#                     stealth mode, repeated STEALTH_RUNS times; see relay.sh)
+#   STEALTH_RUNS      stack starts in phase RS, default 1
+#   RELAY_RUNS        stack starts in phase RH, default 1; the result line says how many of them passed
+#   RELAY_REF=<ref>   run phase RH on the sidecar built from that commit instead of the working tree
+#   RELAY_MAX_OUTAGE_MS / RELAY_WINDOW_S  phase RH: longest allowed time without a successful GET (default 5000), and how
+#                     long the probes keep running after the last welcome (default 25)
 #   BEFORE_REF=<ref>  also run A and C against the sidecar built from that older commit
 #   BEFORE_EXPECT     what the older binary should do with a bad address: accepts (default) or refuses
 #   MESH_LIVE_PRUNE_BASE=1  on exit also remove base images this run had to pull
@@ -29,7 +38,7 @@
 H="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$H/../../.." && pwd)"
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then sed -n '2,27p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0; fi
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then sed -n '2,36p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0; fi
 
 # Outer: run this script again with all output copied to the transcript, and
 # pass its exit status on. tee -i keeps the transcript alive through Ctrl-C so
@@ -49,6 +58,7 @@ set -u
 # shellcheck source=lib.sh
 . "$H/lib.sh"
 . "$H/links.sh"
+. "$H/relay.sh"
 export REPO_ROOT PROJECT
 VARIANT=after; export VARIANT
 INTERRUPTED=; FAIL_MSG=; SUMMARY=; BEFORE_DIR=; TORN_DOWN=; ALL_DONE=
@@ -849,6 +859,30 @@ links_pass() {
   LINKS_ON=; DUMP_NODES=
 }
 
+# relay_pass : WITH_RELAY=1. Phase RH on the default sidecar image with docker-compose.links.yml on top and a relay
+# configured on every sidecar. RELAY_REF=<commit> builds the sidecar from that commit (git archive) instead.
+relay_pass() {
+  local BEFORE_REF=${RELAY_REF:-} v=after
+  LINK_POLICY=relay; LINK_DIRECT=0; LINK_DERP_URL=tcp://derp:8443
+  LINKS_ON=1; LINK_TTL_S=${LINK_TTL_S:-60}; export LINKS_ON LINK_TTL_S LINK_MODEL LINK_DIRECT LINK_DERP_URL
+  RELAY_LABEL="working tree"
+  if [ -n "$BEFORE_REF" ]; then v=before; RELAY_LABEL="commit $(git -C "$REPO_ROOT" rev-parse --short "$BEFORE_REF" 2>/dev/null || echo "$BEFORE_REF")"; fi
+  VARIANT=$v; export VARIANT RELAY_LABEL
+  NODEA_IMAGE=$v; NODEE_IMAGE=$v; NODEE_FORWARD=0; export NODEA_IMAGE NODEE_IMAGE NODEE_FORWARD
+  DONE=; IPA=; IPB=; IPC=; IPE=; IPF=
+  build_variant "$v"
+  if ! docker image inspect meshlive-derp:local >/dev/null 2>&1; then
+    note "building meshlive-derp:local from services/derp"
+    dc build derp >"$H/out/build-derp.log" 2>&1 || { tail -n 30 "$H/out/build-derp.log"; fail "the relay image did not build (log: out/build-derp.log)"; }
+  fi
+  DUMP_NODES="node-a node-b node-e node-f"
+  local p
+  for p in ${RELAY_PHASES:-RH RO RS}; do run_phase "$p"; done
+  ALL_DONE="$ALL_DONE relay-household($(echo $DONE | tr ' ' ','))"
+  [ -n "${MESH_LIVE_KEEP:-}" ] || dc down -v --remove-orphans >/dev/null 2>&1
+  LINKS_ON=; DUMP_NODES=
+}
+
 run_pass() {  # VARIANT PHASE...
   VARIANT=$1; shift; export VARIANT
   DONE=; IPA=; IPB=; IPC=
@@ -866,7 +900,7 @@ docker compose version >/dev/null 2>&1 || { echo "mesh-live: needs 'docker compo
 docker buildx version >/dev/null 2>&1 || { echo "mesh-live: needs 'docker buildx'" >&2; exit 2; }
 printf 'mesh-live: start %s, repo %s, phases: %s%s%s%s\n' "$(date -u +%FT%TZ)" "$REPO_ROOT" "$PHASES" \
   "${BEFORE_REF:+, plus A and C on BEFORE_REF=$BEFORE_REF}" "${WITH_FILTER:+, plus the packet-filter phases F FO FR FH}" \
-  "${WITH_LINKS:+, plus the circle-link passes ${LINK_PASSES:-direct relay direct+relay hostile}}"
+  "${WITH_LINKS:+, plus the circle-link passes ${LINK_PASSES:-direct relay direct+relay hostile}}${WITH_RELAY:+, plus phase RH (household peers on a relay, ${RELAY_RUNS:-1} stack start(s)${RELAY_REF:+, sidecar from $RELAY_REF})}"
 
 # shellcheck disable=SC2086
 if [ "$PHASES" != none ]; then run_pass after $PHASES; fi
@@ -885,4 +919,5 @@ if [ -n "${WITH_LINKS:-}" ]; then
 link setup times:$LINK_TIMES
 "
 fi
+if [ -n "${WITH_RELAY:-}" ]; then relay_pass; fi
 exit 0
