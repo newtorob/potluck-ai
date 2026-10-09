@@ -54,7 +54,10 @@ import re
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+# This file lives in scripts/dev/, so the repository root is three levels up.
+# With two, every path below pointed into scripts/ and the lint scanned nothing
+# while reporting a pass. A missing target is now a failure (see below).
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # ---------------------------------------------------------------------------
 # Lint #20 — member_id forbidden in peer-bound payloads
@@ -161,7 +164,7 @@ def lint_peer_bound() -> list[str]:
     errors: list[str] = []
     coordinator_root = REPO_ROOT / "services" / "coordinator" / "coordinator"
     if not coordinator_root.is_dir():
-        return errors
+        return [f"{coordinator_root}: directory to scan is missing, so nothing was checked"]
     for path in sorted(coordinator_root.rglob("*.py")):
         rel = path.relative_to(REPO_ROOT).as_posix()
         if rel in PEER_LINT_WHITELIST:
@@ -227,6 +230,7 @@ def lint_aggregate_responses() -> list[str]:
     for relpath in AGGREGATE_RESPONSE_FILES:
         path = REPO_ROOT / relpath
         if not path.is_file():
+            errors.append(f"{relpath}: listed file is missing, so it was not checked")
             continue
         rel = path.relative_to(REPO_ROOT).as_posix()
         try:
@@ -440,7 +444,7 @@ def lint_contributor() -> list[str]:
         REPO_ROOT / "apps" / "desktop" / "python" / "potluck_local" / "contributor"
     )
     if not contributor_root.is_dir():
-        return errors
+        return [f"{contributor_root}: directory to scan is missing, so nothing was checked"]
     for path in sorted(contributor_root.rglob("*.py")):
         rel = path.relative_to(REPO_ROOT).as_posix()
         if rel in CONTRIBUTOR_LINT_WHITELIST:
@@ -475,6 +479,7 @@ def lint_peer_relay() -> list[str]:
     for relpath in PEER_RELAY_FILES:
         path = REPO_ROOT / relpath
         if not path.is_file():
+            errors.append(f"{relpath}: listed file is missing, so it was not checked")
             continue
         errors.extend(
             _scan_content_leaks(path, "relay-leak", PEER_RELAY_SENSITIVE_TOKENS)
