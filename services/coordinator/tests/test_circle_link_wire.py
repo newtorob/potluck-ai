@@ -32,7 +32,7 @@ from coordinator.models import (
 from coordinator.routers import circle_links as links_router
 from coordinator.routers import circles, mesh, peers
 from coordinator.services import attestation, circle_links, peer_registry
-from tests.circle_link_helpers import FakeSidecar, build_world, wg_key
+from tests.circle_link_helpers import FakeSidecar, build_world, issue_node_token, wg_key
 from tests.test_circle_links import links_on, make_world  # noqa: F401  (fixtures)
 from tests.test_contributor_m25 import _b64url, _cleanup, _pubkey, _seed_session
 
@@ -169,8 +169,12 @@ def _wait(predicate, timeout=3.0) -> bool:
 async def test_hello_features_are_recorded_per_connection_and_cleared_on_disconnect(make_world) -> None:
     w = await make_world(requester_connected=False)
     node = w.requester.node_id
+    # Links are offered only on a connection opened with the node's own token, as
+    # a sidecar that enrolled opens it; a connection without one is covered in
+    # test_circle_link_node_token.py.
+    auth = await issue_node_token(w.factory, node)
     with TestClient(make_app()) as client:
-        with client.websocket_connect("/mesh/signal") as ws:
+        with client.websocket_connect("/mesh/signal", headers=auth) as ws:
             assert _hello(ws, w.requester.wg_key, features=["circle_link_v1", "something_newer"])["type"] == "welcome"
             assert mesh.signal_node_features(node) == {"circle_link_v1", "something_newer"}
             assert mesh.signal_node_connected(node)
@@ -214,8 +218,11 @@ async def test_a_sidecar_with_no_features_is_not_selectable_for_a_link(make_worl
 @pytest.mark.asyncio
 async def test_unknown_messages_and_bad_acks_do_not_end_the_signal_loop(make_world) -> None:
     w = await make_world(requester_connected=False)
+    # Token-bound, so these acks reach the ack handler (a legacy connection's acks
+    # are dropped before it).
+    auth = await issue_node_token(w.factory, w.requester.node_id)
     with TestClient(make_app()) as client:
-        with client.websocket_connect("/mesh/signal") as ws:
+        with client.websocket_connect("/mesh/signal", headers=auth) as ws:
             assert _hello(ws, w.requester.wg_key, features=["circle_link_v1"])["type"] == "welcome"
             for junk in (
                 {"type": "circle_peer_future_thing", "x": 1},
@@ -243,12 +250,15 @@ async def test_create_over_the_real_transport_end_to_end(make_world, links_on, m
     w = await make_world(requester_connected=False, lender_kwargs={"connected": False})
     monkeypatch.setattr(circle_links, "ACK_TIMEOUT_S", 2.0)
     _env(monkeypatch, CIRCLE_LINKS_ENABLED="1")
+    req_auth = await issue_node_token(w.factory, w.requester.node_id)
+    len_auth = await issue_node_token(w.factory, w.lender.node_id)
     app = make_app()
     app.dependency_overrides[resolve_session_member_id] = lambda: w.member_id
     result: dict = {}
 
     with TestClient(app) as client:
-        with client.websocket_connect("/mesh/signal") as req_ws, client.websocket_connect("/mesh/signal") as len_ws:
+        with client.websocket_connect("/mesh/signal", headers=req_auth) as req_ws, \
+                client.websocket_connect("/mesh/signal", headers=len_auth) as len_ws:
             assert _hello(req_ws, w.requester.wg_key, features=["circle_link_v1"])["type"] == "welcome"
             assert _hello(len_ws, w.lender.wg_key, features=["circle_link_v1"])["type"] == "welcome"
 
@@ -304,10 +314,13 @@ async def test_a_silent_websocket_sidecar_is_a_504_over_http(make_world, links_o
     w = await make_world(requester_connected=False, lender_kwargs={"connected": False})
     monkeypatch.setattr(circle_links, "ACK_TIMEOUT_S", 1.0)
     _env(monkeypatch, CIRCLE_LINKS_ENABLED="1")
+    req_auth = await issue_node_token(w.factory, w.requester.node_id)
+    len_auth = await issue_node_token(w.factory, w.lender.node_id)
     app = make_app()
     app.dependency_overrides[resolve_session_member_id] = lambda: w.member_id
     with TestClient(app) as client:
-        with client.websocket_connect("/mesh/signal") as req_ws, client.websocket_connect("/mesh/signal") as len_ws:
+        with client.websocket_connect("/mesh/signal", headers=req_auth) as req_ws, \
+                client.websocket_connect("/mesh/signal", headers=len_auth) as len_ws:
             _hello(req_ws, w.requester.wg_key, features=["circle_link_v1"])
             _hello(len_ws, w.lender.wg_key, features=["circle_link_v1"])
             result: dict = {}
@@ -331,13 +344,15 @@ async def test_a_sidecar_that_reconnects_is_sent_its_live_links(make_world, link
     w = await make_world()
     out = await __import__("tests.test_circle_links", fromlist=["create"]).create(w)
     _env(monkeypatch, CIRCLE_LINKS_ENABLED="1")
+    auth = await issue_node_token(w.factory, w.lender.node_id)
     with TestClient(make_app()) as client:
-        with client.websocket_connect("/mesh/signal") as ws:
+        with client.websocket_connect("/mesh/signal", headers=auth) as ws:
             assert _hello(ws, w.lender.wg_key, features=["circle_link_v1"])["type"] == "welcome"
             add = ws.receive_json()
             assert (add["type"], add["role"], add["link_id"]) == ("circle_peer_add", "lender", str(out.link_id))
-        # A sidecar that does not advertise links is not sent them.
-        with client.websocket_connect("/mesh/signal") as ws:
+        # A sidecar that does not advertise links is not sent them (token-bound,
+        # so it is the missing feature that keeps them back, not the missing token).
+        with client.websocket_connect("/mesh/signal", headers=auth) as ws:
             assert _hello(ws, w.lender.wg_key)["type"] == "welcome"
             ws.send_json({"type": "ping"})
             assert ws.receive_json()["type"] == "pong"

@@ -18,7 +18,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, select, text, update
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from coordinator.models import (
@@ -32,6 +32,7 @@ from coordinator.models import (
     PeerCapability,
     TrustedCircle,
 )
+from coordinator.middleware.node_auth import hash_node_token
 from coordinator.routers import mesh
 from coordinator.services import circle_links
 from coordinator.services.peer_registry import PeerConnection, register_peer, unregister_peer
@@ -113,6 +114,21 @@ class Machine:
 
 def wg_key() -> str:
     return base64.b64encode(secrets.token_bytes(32)).decode("ascii")
+
+
+async def issue_node_token(factory: async_sessionmaker, node_id: uuid.UUID) -> dict[str, str]:
+    """Give a node row a node_token the way /mesh/enroll does (a fresh 256-bit
+    urlsafe token, only its hash stored in mesh_nodes.node_token_hash) and return
+    the header a sidecar sends with it on the /mesh/signal upgrade:
+    {"Authorization": "Bearer <token>"}. The coordinator checks that header against
+    the row, so a connection made with it is the node's own, token-bound one."""
+    raw = secrets.token_urlsafe(32)
+    async with factory() as db:
+        async with db.begin():
+            await db.execute(
+                update(MeshNode).where(MeshNode.id == node_id).values(node_token_hash=hash_node_token(raw))
+            )
+    return {"Authorization": f"Bearer {raw}"}
 
 
 async def fresh_address(db, taken: set[tuple[int, int]] | None = None) -> tuple[str, str]:

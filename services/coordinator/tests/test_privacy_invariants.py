@@ -293,8 +293,9 @@ def test_the_link_http_answer_names_the_lender_only_by_where_to_connect() -> Non
 def test_link_messages_go_out_only_through_the_mesh_signal_send_path() -> None:
     """lint #20 inspects `<expr>.ws.send_*()` calls, so a new send could slip
     past it by another route. The link service never writes to a socket itself:
-    every message goes through routers.mesh.signal_send, which uses the same
-    _safe_send the rest of the mesh signal code does."""
+    every message goes through routers.mesh.signal_send_link, which uses the same
+    _safe_send the rest of the mesh signal code does and refuses a connection
+    that was not opened with the node's own token (tests/test_circle_link_node_token.py)."""
     import ast
     from pathlib import Path
 
@@ -308,4 +309,4 @@ def test_link_messages_go_out_only_through_the_mesh_signal_send_path() -> None:
         ]
         assert not writes, f"{rel} writes to a socket directly: {writes}"
     service = (root / "services/circle_links.py").read_text(encoding="utf-8")
-    assert "signal_send" in service
+    assert "signal_send_link" in service

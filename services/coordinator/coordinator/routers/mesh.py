@@ -122,6 +122,12 @@ _local_endpoints: dict[uuid.UUID, list[str]] = {}
 # set when the node connects, cleared when its live connection goes. A node
 # that sent no features, or is not connected, has none, which is how an old
 # sidecar is kept out of direct circle links.
+#
+# The set is what the coordinator HONOURS, not what the hello said: the link
+# feature (circle_link_v1) is kept only when the connection was opened with that
+# node's own node_token. A WireGuard public key is not a secret, so a connection
+# that names a node by its key alone (the legacy path) must never be offered
+# link messages meant for that node.
 _signal_features: dict[uuid.UUID, frozenset[str]] = {}
 
 # Lock guarding `_signal_connections` so concurrent welcome / disconnect
@@ -1004,12 +1010,42 @@ async def signal_send(node_id: uuid.UUID, payload: dict) -> bool:
     connected or the send failed (a dead connection is dropped from the
     registry, as _broadcast_to_household does). Never raises.
 
-    The direct circle link service sends through here so it does not reach
-    into the private connection map. Callers build `payload` from a Signal*
-    model; nothing is added here.
+    Callers build `payload` from a Signal* model; nothing is added here. The
+    direct circle link service does not call this: it goes through
+    signal_send_link, which adds the node-token gate.
     """
+    return await _send_to_node(node_id, payload, require_feature=None)
+
+
+async def signal_send_link(node_id: uuid.UUID, payload: dict) -> bool:
+    """Send one circle_peer_* message (add, extend or remove) to a node, only if
+    its live connection is one the coordinator offers links on: it advertised
+    circle_link_v1 AND was opened with the node's own node_token (a legacy
+    connection never keeps the feature, see mesh_signal).
+
+    The check and the lookup of the socket happen under one lock hold, so a
+    connection that takes the node's slot between a caller's own check and this
+    send (a legacy hello for the same key, say) still cannot be written to. Every
+    link message goes through here, removes included: a remove carries only a
+    link id and a reason, but sending it would still tell whoever holds the
+    channel that this machine has a link and when it ended.
+
+    False means "not delivered" and is treated like an offline sidecar. Never
+    raises."""
+    return await _send_to_node(node_id, payload, require_feature=circle_links.LINK_FEATURE)
+
+
+async def _send_to_node(
+    node_id: uuid.UUID, payload: dict, *, require_feature: str | None
+) -> bool:
     async with _signal_lock:
         ws = _signal_connections.get(node_id)
+        if (
+            ws is not None
+            and require_feature is not None
+            and require_feature not in _signal_features.get(node_id, frozenset())
+        ):
+            ws = None
     if ws is None:
         return False
     ok = await _safe_send(ws, payload)
@@ -1027,7 +1063,9 @@ def signal_node_connected(node_id: uuid.UUID) -> bool:
 
 
 def signal_node_features(node_id: uuid.UUID) -> frozenset[str]:
-    """The features the node's sidecar advertised on its live connection."""
+    """The features the coordinator honours on the node's live connection: what
+    the sidecar advertised, minus circle_link_v1 unless the connection was
+    opened with the node's own node_token."""
     return _signal_features.get(node_id, frozenset())
 
 
@@ -1105,6 +1143,16 @@ async def mesh_signal(ws: WebSocket) -> None:
     matched, dev-mode passthrough) still identifies the node, as before.
     Stronger auth (signed-nonce member<->key challenge mirroring
     /peers/connect) is a v1 hardening item.
+
+    Direct circle links are the exception to "as before". A WireGuard public
+    key is not a secret, so a connection that names a node by its key alone
+    must not receive that node's link messages (they carry the other
+    household's key, address and, for a lender, the token hash). Such a
+    connection joins, gets its welcome and roster and takes part in the
+    household mesh exactly as it always did, but circle_link_v1 is dropped from
+    the features the coordinator keeps for it, and no link message is written
+    to it (see signal_send_link). Only a connection opened with the node's own
+    node_token is offered links. There is no setting that changes this.
     """
     await ws.accept()
 
@@ -1226,12 +1274,29 @@ async def mesh_signal(ws: WebSocket) -> None:
         node_snapshot = _peer_to_enrolled(node)
 
     # ---- 3. Register + welcome + broadcast added ---- #
+    # Did the node's own token open this connection? The check above already
+    # guarantees auth_node_id is this node's id whenever it is set; the equality
+    # is repeated so this stays true if that check is ever moved.
+    token_bound = auth_node_id is not None and auth_node_id == node_id
+    # hello.features is already cleaned (SignalHello drops anything malformed,
+    # never fails). Direct circle links are offered only on a token-bound
+    # connection: a node's WireGuard key is public, so a hello that merely names
+    # it must not make the coordinator send link messages here. Everything else
+    # about a legacy connection is left as it was.
+    features = frozenset(hello.features)
+    links_withheld = not token_bound and circle_links.LINK_FEATURE in features
+    if links_withheld:
+        features = features - {circle_links.LINK_FEATURE}
     async with _signal_lock:
         old_ws = _signal_connections.get(node_id)
         _signal_connections[node_id] = ws
-        # Replaces any set from the connection this one displaces. hello.features
-        # is already cleaned (SignalHello drops anything malformed, never fails).
-        _signal_features[node_id] = frozenset(hello.features)
+        # Replaces any set from the connection this one displaces, in the same
+        # lock hold as the connection itself, so signal_send_link never sees one
+        # connection with the other's features.
+        _signal_features[node_id] = features
+
+    if links_withheld:
+        logger.info("mesh_signal_links_need_node_token", node_id=str(node_id))
 
     if old_ws is not None:
         # A previous connection for this node existed — close it cleanly.
@@ -1265,6 +1330,7 @@ async def mesh_signal(ws: WebSocket) -> None:
         node_id=str(node_id),
         household_id=str(household_id),
         roster_size=len(roster),
+        token_bound=token_bound,
     )
 
     # Direct circle links this node is a party to are sent again, so a sidecar
@@ -1402,6 +1468,12 @@ async def mesh_signal(ws: WebSocket) -> None:
                 # A sidecar's answer to a circle_peer_add / _extend. Only wakes
                 # the create or renew that is waiting for it. Wrapped so nothing
                 # an ack carries can end this loop.
+                if not token_bound:
+                    # No add or extend is ever sent to this connection, so an
+                    # ack on it answers nothing the coordinator asked. Ignored,
+                    # like any message type it does not act on.
+                    logger.debug("circle_link_ack_from_legacy_connection", node_id=str(node_id))
+                    continue
                 try:
                     await circle_links.handle_ack(node_id, raw)
                 except Exception:

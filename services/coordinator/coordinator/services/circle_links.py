@@ -14,6 +14,15 @@ What this module decides:
   sharing audience is honoured. A circle request is never answered from the open
   pool. On top of that the lender must be bound to a mesh node whose sidecar is
   connected and advertises circle_link_v1.
+* A machine counts as link-capable (requester or lender) only while its live
+  signal connection was opened with that machine's own node_token. A connection
+  that names the machine by its WireGuard key alone (the legacy path) is kept
+  out: routers.mesh drops circle_link_v1 from the features it stores for it, and
+  signal_send_link refuses to write any link message to it even if the machine's
+  slot changes hands mid-request. Rows for links the machine already holds are
+  left alone and it is treated as offline: nothing is delivered, the other end
+  is still told, and the real sidecar gets the removes and adds again through
+  replay_for_node when it reconnects with its token.
 * The token is 32 random bytes, urlsafe base64, returned once to the requester.
   Only its SHA-256 is stored and forwarded (to the lender's sidecar, which hands
   it to the lender engine to check).
@@ -31,8 +40,9 @@ What this module decides:
 Privacy: a link reaches two households that are not each other's. The messages
 this module builds carry no member id, node id, node name, hostname or circle
 name (SignalCirclePeerAdd and friends; locked in test_privacy_invariants.py).
-Messages go out only through routers.mesh.signal_send, the same _safe_send path
-the rest of the mesh signal code uses. Log lines name the link, never a member
+Messages go out only through routers.mesh.signal_send_link, which sits on the
+same _safe_send path the rest of the mesh signal code uses and adds the
+node-token gate described above. Log lines name the link, never a member
 or machine.
 
 The module-level dicts (pending acknowledgements, create-rate counters, grace
@@ -221,9 +231,15 @@ async def handle_ack(node_id: uuid.UUID, raw: object) -> None:
 
 async def _send(node_id: uuid.UUID, payload: dict) -> bool:
     """One message to one sidecar, bounded: a sidecar that stops reading must not
-    hold a request (and the requester machine's create lock) open. Never raises."""
+    hold a request (and the requester machine's create lock) open. Never raises.
+
+    The only place this module writes to the signal channel. It goes through
+    signal_send_link, so a node whose live connection is not token-bound is not
+    sent anything (False, the same as offline)."""
     try:
-        return await asyncio.wait_for(_mesh().signal_send(node_id, payload), timeout=ACK_TIMEOUT_S)
+        return await asyncio.wait_for(
+            _mesh().signal_send_link(node_id, payload), timeout=ACK_TIMEOUT_S
+        )
     except Exception:
         return False
 
