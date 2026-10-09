@@ -8,8 +8,11 @@ household, so a caller is a member only when all of these hold:
 
   1. its source address is a reachable machine in the sidecar's `/peers` roster
      (a WireGuard handshake in the last three minutes),
-  2. that address is not this machine's own mesh address, and
-  3. the connection was accepted on this machine's own mesh address, so a
+  2. that roster entry is a household machine: its `scope` is the string
+     "household", or absent (a sidecar from before the tag existed). Any other
+     scope, such as a trusted circle's, never counts, whatever its value is,
+  3. that address is not this machine's own mesh address, and
+  4. the connection was accepted on this machine's own mesh address, so a
      process on this machine cannot pose as a peer by dialing 127.0.0.1 or a
      LAN address.
 
@@ -41,10 +44,13 @@ READ_TIMEOUT_S = 1.0
 
 IPAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 
+# The only peer scope that is one of the owner's own machines.
+HOUSEHOLD_SCOPE = "household"
+
 
 @dataclass(frozen=True)
 class Roster:
-    """This machine's mesh address and the addresses of its reachable peers."""
+    """This machine's mesh address and the addresses of its reachable household peers."""
 
     own_ip: IPAddress
     peer_ips: frozenset[IPAddress]
@@ -75,6 +81,11 @@ def parse_roster(status: Any, peers: Any) -> Roster | None:
     reachable: set[IPAddress] = set()
     for entry in peers["peers"]:
         if not isinstance(entry, dict) or entry.get("reachable") is not True:
+            continue
+        # Absent means an older sidecar, which only ever listed household
+        # machines. Present must be exactly "household": null, a number or any
+        # other string is a peer of some other kind and is ignored.
+        if "scope" in entry and entry["scope"] != HOUSEHOLD_SCOPE:
             continue
         ip = parse_ip(entry.get("mesh_ip"))
         if ip is not None and ip != own:

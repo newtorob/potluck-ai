@@ -381,6 +381,51 @@ func TestHandlePeers_NotFlippedNotReachable_ReportsNullMode(t *testing.T) {
 	}
 }
 
+// TestHandlePeers_EveryEntryCarriesHouseholdScope checks the scope tag on each
+// entry, whatever its reachability. The engine counts a peer as one of the
+// owner's machines only when the tag is absent or "household", so the tag has
+// to be present and exact on every entry this sidecar lists.
+func TestHandlePeers_EveryEntryCarriesHouseholdScope(t *testing.T) {
+	cfg := defaultCfg(t)
+	for i, ip := range []string{"100.64.0.7", "100.64.0.8", "100.64.0.9"} {
+		cfg.PeerStore.Upsert(signal.RosterPeer{
+			NodeID:      fmt.Sprintf("peer-%d", i),
+			NodeName:    fmt.Sprintf("box-%d", i),
+			MeshIP:      ip,
+			WGPublicKey: testKey(byte(i + 1)),
+		})
+	}
+	// One peer with a fresh handshake, one flipped to DERP with none, one idle.
+	fresh := testKey(1)
+	flipped := testKey(2)
+	cfg.PeerReachFn = func(pubkeyBase64 string) (time.Time, uint64, uint64, error) {
+		if pubkeyBase64 == fresh {
+			return time.Now(), 0, 0, nil
+		}
+		return time.Time{}, 0, 0, nil
+	}
+	cfg.IsDERPRoutedFn = func(pubkeyBase64 string) bool { return pubkeyBase64 == flipped }
+
+	client, _ := testServer(t, cfg)
+	resp := get(t, client, "/peers")
+	defer resp.Body.Close()
+
+	var body struct {
+		Peers []map[string]json.RawMessage `json:"peers"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(body.Peers) != 3 {
+		t.Fatalf("expected 3 peers, got %d", len(body.Peers))
+	}
+	for _, p := range body.Peers {
+		if got := string(p["scope"]); got != `"household"` {
+			t.Errorf("%s: scope = %s, want \"household\"", p["node_name"], got)
+		}
+	}
+}
+
 // TestHandlePeers_NeverListsRejectedEntries feeds the peer store entries the
 // gate must refuse (a gateway address, this node's own address, two nodes on one
 // address, a malformed key, a hostile mesh_ip) beside good ones, and checks that

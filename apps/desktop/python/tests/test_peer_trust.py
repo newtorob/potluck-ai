@@ -312,6 +312,105 @@ def test_non_peer_paths_stay_forbidden_for_members(app, fake_mesh):
 
 
 # ---------------------------------------------------------------------------
+# Peer scope: only the household counts
+# ---------------------------------------------------------------------------
+
+CIRCLE = "100.64.7.20"  # a machine of another household, listed by this machine's sidecar
+
+# Anything but the exact string "household" means the entry is not the owner's
+# machine. Includes values of the wrong type, which must not be coerced.
+NOT_HOUSEHOLD = [
+    "circle", "open", "pool", "Household", "HOUSEHOLD", " household", "household ",
+    "household\n", "household\x00", "house-hold", "", None, 0, 1, 1.5, True, False,
+    [], ["household"], {}, {"scope": "household"},
+]
+
+
+def test_scope_absent_is_allowed(app, fake_mesh):
+    # A sidecar from before the tag existed lists no scope at all.
+    household(fake_mesh)
+    assert "scope" not in fake_mesh.peers[0]
+    assert client_for(app, PEER).get("/peer/capabilities").status_code == 200
+
+
+def test_scope_household_is_allowed(app, fake_mesh):
+    fake_mesh.own_ip = OWN
+    fake_mesh.add_peer(PEER, scope="household")
+    assert client_for(app, PEER).get("/peer/capabilities").status_code == 200
+
+
+def test_scope_circle_is_refused(app, fake_mesh):
+    household(fake_mesh)
+    fake_mesh.add_peer(CIRCLE, scope="circle")
+    assert client_for(app, CIRCLE).get("/peer/capabilities").status_code == 403
+
+
+@pytest.mark.parametrize("scope", NOT_HOUSEHOLD, ids=repr)
+def test_any_other_scope_is_refused(app, fake_mesh, scope):
+    household(fake_mesh)
+    fake_mesh.add_peer(CIRCLE, scope=scope)
+    assert client_for(app, CIRCLE).get("/peer/capabilities").status_code == 403
+
+
+@pytest.mark.parametrize("scope", NOT_HOUSEHOLD, ids=repr)
+def test_parse_roster_ignores_any_scope_but_household(scope):
+    status = {"mesh_ip": OWN}
+    entry = {"mesh_ip": CIRCLE, "reachable": True, "scope": scope}
+    roster = parse_roster(status, {"peers": [entry]})
+    assert roster is not None and roster.peer_ips == frozenset()
+
+
+def test_parse_roster_counts_absent_and_household_scope():
+    status = {"mesh_ip": OWN}
+    peers = {"peers": [
+        {"mesh_ip": "100.64.0.9", "reachable": True},
+        {"mesh_ip": "100.64.0.10", "reachable": True, "scope": "household"},
+        {"mesh_ip": "100.64.0.11", "reachable": True, "scope": "circle"},
+        {"mesh_ip": "100.64.0.12", "reachable": True, "scope": None},
+        {"mesh_ip": "100.64.0.13", "reachable": False, "scope": "household"},
+    ]}
+    roster = parse_roster(status, peers)
+    assert roster is not None
+    assert roster.peer_ips == frozenset({parse_ip("100.64.0.9"), parse_ip("100.64.0.10")})
+
+
+def test_a_circle_entry_does_not_hide_a_household_one_or_the_reverse(app, fake_mesh):
+    household(fake_mesh)
+    fake_mesh.add_peer(CIRCLE, scope="circle")
+    assert client_for(app, PEER).get("/peer/capabilities").status_code == 200
+    assert client_for(app, CIRCLE).get("/peer/capabilities").status_code == 403
+
+
+def test_a_circle_entry_cannot_reach_any_peer_route(app, fake_mesh, monkeypatch):
+    # The middleware is the real one and the roster is read through the real
+    # parser: only the sidecar is faked. Reachable, in range, accepted on this
+    # machine's own mesh address, and still refused on every /peer/* route,
+    # including memory search with the owner's opt-in on.
+    monkeypatch.setenv("POTLUCK_PEER_MEMORY_ENABLED", "1")
+    household(fake_mesh)
+    fake_mesh.add_peer(CIRCLE, scope="circle")
+    circle = client_for(app, CIRCLE)
+    for method, path in [
+        ("GET", "/peer/capabilities"), ("POST", "/peer/chat/completions"),
+        ("POST", "/peer/memory/search"), ("GET", "/peer/split/status"), ("GET", "/peer/anything"),
+    ]:
+        resp = circle.request(method, path, json={"query": "anything"})
+        assert resp.status_code == 403, path
+        assert "household" in resp.json()["detail"], path
+        assert "memories" not in resp.json(), path
+    # Same refusal body as a stranger gets, so the scope is not revealed either.
+    stranger = client_for(app, TAILSCALE).get("/peer/capabilities")
+    assert circle.get("/peer/capabilities").json() == stranger.json()
+
+
+def test_a_circle_entry_gets_only_the_minimal_health_body(app, fake_mesh):
+    household(fake_mesh)
+    fake_mesh.add_peer(CIRCLE, scope="circle")
+    assert client_for(app, CIRCLE).get("/health").json() == {"status": "ok"}
+    assert "version" in client_for(app, PEER).get("/health").json()
+
+
+# ---------------------------------------------------------------------------
 # /health
 # ---------------------------------------------------------------------------
 

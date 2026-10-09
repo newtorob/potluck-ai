@@ -569,11 +569,19 @@ type statusResponse struct {
 	PeersConnectingCount int `json:"peers_connecting_count"`
 }
 
+// scopeHousehold marks a peer that belongs to this machine's owner. Every peer
+// the sidecar can hold today is one. A consumer that treats a listed peer as
+// one of the owner's own machines (the engine's /peer/* gate, prompt routing)
+// must count only the household scope, so a peer of another kind can be added
+// later without being mistaken for one.
+const scopeHousehold = "household"
+
 type peerResponse struct {
 	NodeID           string   `json:"node_id"`
 	NodeName         string   `json:"node_name"`
 	MeshIP           string   `json:"mesh_ip"`
 	WGPublicKey      string   `json:"wg_public_key"`
+	Scope            string   `json:"scope"`
 	LastEndpoint     *string  `json:"last_endpoint,omitempty"`
 	LocalEndpoints   []string `json:"local_endpoints,omitempty"`
 	LastSeenAt       *string  `json:"last_seen_at,omitempty"`
@@ -663,6 +671,7 @@ func (s *Server) handlePeers(w http.ResponseWriter, r *http.Request) {
 			NodeName:    p.NodeName,
 			MeshIP:      p.MeshIP,
 			WGPublicKey: p.WGPublicKey,
+			Scope:       scopeHousehold,
 		}
 		if p.LastEndpoint != nil {
 			pr.LastEndpoint = p.LastEndpoint
