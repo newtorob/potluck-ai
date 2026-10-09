@@ -36,6 +36,15 @@ class AcceptMessage(BaseModel):
     # coordinator from before audiences existed and must not serve. None for
     # a peer that named no audiences.
     audiences: list[str] | None = None
+    # Direct circle links. Both are sent only when the coordinator has links
+    # switched on; with the switch off the keys are left out of the message, so
+    # a coordinator with links off sends exactly what it sent before.
+    #   mesh_node_id: the mesh node this attestation was bound to, echoed. Absent
+    #                 when binding was refused or not attempted.
+    #   circle_links: true when this coordinator brokers circle links. An engine
+    #                 that does not see it must not start a circle listener.
+    mesh_node_id: uuid.UUID | None = None
+    circle_links: bool | None = None
 
 
 class RejectMessage(BaseModel):
@@ -114,6 +123,33 @@ class AttestationPayload(BaseModel):
     # before audiences existed, which serves both. Unknown names are ignored,
     # so naming only audiences this coordinator does not know serves no one.
     audiences: list[str] | None = Field(default=None, max_length=8)
+    # Direct circle links. The mesh node this machine's sidecar is, as the
+    # sidecar's /status reports it, and the port the engine's circle listener
+    # is bound to. Both are optional and soft: a value that is not a UUID or a
+    # port reads as absent, because an attestation must never be rejected over
+    # them (a reject takes the machine off the relay). The coordinator binds
+    # the node only when the machine's owner owns that node's household.
+    mesh_node_id: uuid.UUID | None = None
+    circle_port: int | None = None
+
+    @field_validator("mesh_node_id", mode="before")
+    @classmethod
+    def _lenient_mesh_node_id(cls, v: object) -> uuid.UUID | None:
+        if v is None or isinstance(v, bool):
+            return None
+        if isinstance(v, uuid.UUID):
+            return v
+        try:
+            return uuid.UUID(str(v)) if isinstance(v, str) else None
+        except ValueError:
+            return None
+
+    @field_validator("circle_port", mode="before")
+    @classmethod
+    def _lenient_circle_port(cls, v: object) -> int | None:
+        if isinstance(v, bool) or not isinstance(v, int):
+            return None
+        return v if 1 <= v <= 65535 else None
 
 
 class HeartbeatMessage(BaseModel):

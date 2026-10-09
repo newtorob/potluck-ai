@@ -2,8 +2,35 @@ from __future__ import annotations
 
 import functools
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Bounds for a direct circle link's lifetime. The mesh sidecar accepts 5..1800
+# seconds in a circle_peer_add, so the configured value is clamped into that
+# range instead of failing: a typo in an optional setting must not stop the
+# coordinator, which would take every household's mesh down with it.
+CIRCLE_LINK_TTL_MIN_S = 5
+CIRCLE_LINK_TTL_MAX_S = 1800
+
+
+def _lenient_bool(value: object, default: bool = False) -> bool:
+    """Read a switch the way an operator writes it. Anything that is not a
+    clear yes or no gives the default, so a stray value cannot stop boot."""
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "on"}:
+        return True
+    if text in {"0", "false", "no", "off", ""}:
+        return False
+    return default
+
+
+def _lenient_int(value: object, default: int) -> int:
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
 
 
 class Settings(BaseSettings):
@@ -67,6 +94,59 @@ class Settings(BaseSettings):
     #     default and (b) every enrolled mesh_nodes row has a
     #     signing_public_key (fresh enroll, or a backfill/re-enroll pass).
     derp_pop_required: bool = False
+
+    # ---- Direct circle links (services/circle_links.py) -------------------
+    # Kill switch. OFF by default: every link endpoint answers 503
+    # links_disabled, attestation never reports circle_links, the sweeper does
+    # not run, and no sidecar is ever sent a circle_peer_* message. Nothing
+    # changes for any existing client until this is switched on.
+    circle_links_enabled: bool = Field(
+        default=False, validation_alias="POTLUCK_CIRCLE_LINKS_ENABLED"
+    )
+    # Transport policy. OFF (default) is relay-only between members: the
+    # circle_peer_add messages carry no public or LAN address and
+    # direct_window_ms 0, so the two sidecars meet over the DERP relay and
+    # neither member learns the other's address. ON fills the endpoints in
+    # (LAN candidates only when both nodes report the same public address).
+    circle_link_direct: bool = Field(
+        default=False, validation_alias="POTLUCK_CIRCLE_LINK_DIRECT"
+    )
+    # Lifetime of one link, and so the time between renewals (renew_after_s is
+    # half of it). Clamped to CIRCLE_LINK_TTL_MIN_S..CIRCLE_LINK_TTL_MAX_S.
+    circle_link_ttl_s: int = Field(
+        default=600, validation_alias="POTLUCK_CIRCLE_LINK_TTL_S"
+    )
+    # How often the sweeper ends lapsed links and removes old rows.
+    circle_link_sweep_interval_s: int = Field(
+        default=15, validation_alias="POTLUCK_CIRCLE_LINK_SWEEP_INTERVAL_S"
+    )
+    # Development and the harness only. A shared-token engine names its own
+    # member, so its mesh_node_id claim is not trusted unless the peer signed
+    # in with a member session. Refused in production by the preflight.
+    circle_link_bind_without_session: bool = Field(
+        default=False, validation_alias="POTLUCK_CIRCLE_LINK_BIND_WITHOUT_SESSION"
+    )
+
+    @field_validator(
+        "circle_links_enabled",
+        "circle_link_direct",
+        "circle_link_bind_without_session",
+        mode="before",
+    )
+    @classmethod
+    def _switches_are_lenient(cls, v: object) -> bool:
+        return _lenient_bool(v)
+
+    @field_validator("circle_link_ttl_s", mode="before")
+    @classmethod
+    def _clamp_link_ttl(cls, v: object) -> int:
+        ttl = _lenient_int(v, 600)
+        return max(CIRCLE_LINK_TTL_MIN_S, min(CIRCLE_LINK_TTL_MAX_S, ttl))
+
+    @field_validator("circle_link_sweep_interval_s", mode="before")
+    @classmethod
+    def _clamp_sweep_interval(cls, v: object) -> int:
+        return max(1, min(300, _lenient_int(v, 15)))
 
     @field_validator("env")
     @classmethod

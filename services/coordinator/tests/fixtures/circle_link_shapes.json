@@ -1,0 +1,575 @@
+{
+  "_comment": "Direct circle link wire shapes. The coordinator tests (tests/test_circle_link_contract.py, test_circle_links.py, test_privacy_invariants.py) pin its models and its behaviour to these examples; the sidecar (Go) and the engine (Python) suites decode and re-encode them. Every example lists every field of its shape. Change all sides together.",
+  "_notes": {
+    "_how_to_read": "Each key below names a shape in this file by its path. 'sender' is who puts it on the wire, 'reader' is who acts on it. Values are examples only (ids, keys, addresses, ports, times, tokens); the SHA-256 in vectors pins the hash function, and the token / token_sha256 pairs in http.create_response and signal.circle_peer_add_lender are real pairs.",
+    "vectors": "sender: none, a test vector. reader: every side's tests. Pins the token hash. token_sha256 is the lowercase hex SHA-256 of the token's ASCII text exactly as the requester sends it after 'Bearer ' (the 43-character urlsafe base64 string). Hash the string as sent, never the 32 bytes it decodes to. Python: hashlib.sha256(token.encode('ascii')).hexdigest(). The lender engine compares with hmac.compare_digest.",
+    "http.create_request": "sender: requester engine, with the member session as Authorization: Bearer, POST /me/circles/{circle_id}/links. reader: coordinator. requester_node_id is node_id from the local sidecar's GET /status (a machine of the caller's own household). model_slug is the exact slug (1 to 128 chars). exclude_link_ids lists up to 4 links the engine just failed on; the coordinator skips the lenders behind them and ignores ids that are not the caller's.",
+    "http.create_request_minimal": "sender: requester engine. reader: coordinator. Same as create_request with exclude_link_ids left out; it defaults to an empty list.",
+    "http.create_response": "sender: coordinator, status 201. reader: requester engine. token appears here and nowhere else, ever; keep it in memory only. lender.mesh_ip and lender.port are where to connect (TCP, over the mesh); the port is the one the lender's engine reported, never assumed to be 8340. ttl_s is the lifetime from now, renew_after_s is half of it, expires_at is UTC to the second. ready is always true on a 201: a create that could not get both sidecars to acknowledge is an error, not a 201. By the time the engine sees this, both sidecars have installed the other as a peer (acknowledged ready); a WireGuard handshake may not have happened yet.",
+    "http.renew_request": "sender: requester engine, POST /me/circles/{circle_id}/links/{link_id}/renew, body {} (anything else in the body is ignored). reader: coordinator. Renew at renew_after_s, and only while the link is in use or was used in the last minute or two. Renewing sooner than a tenth of the lifetime after the previous renewal (or the creation) is refused with 429 too_many_links and a Retry-After header; an engine that renews at renew_after_s never sees it.",
+    "http.renew_response": "sender: coordinator, status 200. reader: requester engine. expires_at moves to now plus ttl_s. delivered says which sidecar acknowledged the extension within 2 seconds; false is information, not a failure (the link is still renewed on the coordinator, and a sidecar that missed it expires its own copy on its own clock). A 410 means the link has ended: stop using it and do not retry the renew.",
+    "http.errors": "sender: coordinator. reader: requester engine. detail is an object with code (for programs), message (for people) and reason (null except for sidecar_rejected and link_ended). Errors the framework raises keep their own shape: http.errors_framework. Treat any other status or code as 'use the relay'. Only 410 link_ended means 'stop, do not retry this link'. 'headers' lists headers that accompany the status. too_many_links has three causes with the same code: more than 30 creates a minute (Retry-After set), more than 8 live links (no Retry-After), and a renewal sent too soon after the last one (Retry-After set). link_conflict (409) is the rare case of two creates for one pair colliding; try again or use the relay.",
+    "http.errors_framework": "sender: the web framework inside the coordinator. reader: requester engine. FastAPI's own bodies, not ours: 401 when the session is missing or expired ({\"detail\": \"Not authenticated\"} or {\"detail\": \"Session expired or invalid\"}), 422 for a malformed request (detail is a list of problems). With the kill switch off, 503 links_disabled wins over both.",
+    "signal.hello": "sender: sidecar, first message on /mesh/signal. reader: coordinator. features is new, optional, at most 16 short lowercase names. The coordinator drops anything malformed in it (it never closes the channel over features). A sidecar that sends no features is never sent circle_peer_* messages. Old coordinators ignore the key.",
+    "signal.circle_peer_add_lender": "sender: coordinator. reader: the LENDER's sidecar (role is the receiver's role). Add the other machine as a restricted WireGuard peer: allowed-ips is peer_mesh_ip/32 only, and the filter lets it reach only TCP port 'port' on this machine's own mesh address. token_sha256 goes to the lender engine (via the sidecar's /circle-peers inbound entry); only the lender receives it. peer_endpoint is the requester's public endpoint (direct policy). Hold the link ttl_s seconds from receipt (cap it at 30 minutes locally). Answer with a circle_peer_ack for op add.",
+    "signal.circle_peer_add_requester": "sender: coordinator. reader: the REQUESTER's sidecar. Same shape; token_sha256 is null (the requester has the token itself). peer_mesh_ip is the lender's mesh address and port is the lender engine's circle port. The filter lets this machine open TCP connections to that address and port only.",
+    "signal.circle_peer_add_requester_lan": "sender: coordinator. reader: the REQUESTER's sidecar. Same message as circle_peer_add_requester under the direct policy when both machines report the same public address: peer_local_endpoints carries the lender's private LAN candidates (RFC1918 only, at most 4). Never present when the public addresses differ.",
+    "signal.circle_peer_add_lender_relay_only": "sender: coordinator. reader: the LENDER's sidecar. The lender's add under the relay-only policy (the server default): peer_endpoint null, peer_local_endpoints empty, direct_window_ms 0. The sidecar must not try a direct path: use the DERP relay from the start. Neither member learns the other's address.",
+    "signal.circle_peer_add_requester_relay_only": "sender: coordinator. reader: the REQUESTER's sidecar. The requester's add under the relay-only policy. See circle_peer_add_lender_relay_only.",
+    "signal.circle_peer_extend": "sender: coordinator. reader: either sidecar. New deadline is receipt time plus ttl_s (cap at 30 minutes locally). peer_endpoint is the other machine's current public endpoint (null under relay-only). A sidecar that does not hold link_id answers with ack state rejected, reason unknown_grant, and the coordinator then sends the add again to it. Answer with a circle_peer_ack for op extend.",
+    "signal.circle_peer_extend_relay_only": "sender: coordinator. reader: either sidecar. circle_peer_extend under the relay-only policy: peer_endpoint is null.",
+    "signal.circle_peer_remove": "sender: coordinator. reader: either sidecar. Drop the link now. Idempotent, no ack. reason is one of ended, revoked, expired, superseded. A remove for a link_id that does not currently own the peer entry is a no-op: after a repeat create for the same pair the new add (new link_id) replaces the old grant for that peer, and the coordinator then sends remove with reason superseded for the OLD link_id, which must not tear the peer down.",
+    "signal.circle_peer_ack_add_ready": "sender: sidecar. reader: coordinator. ready means the filter entry, WireGuard peer and route are installed. A handshake may not have happened yet. Send it within 2 seconds of the add; the coordinator waits that long. Send it again for an add of a link already held (the coordinator re-sends adds when a sidecar reconnects).",
+    "signal.circle_peer_ack_add_rejected": "sender: sidecar. reader: coordinator. rejected carries a reason: invalid_peer, address_conflict, limit, unsupported, not_enrolled, tunnel_error (unknown_grant is for extend). The coordinator revokes the link, tells the requester 502 sidecar_rejected with this reason, and (if the lender refused) tries one other lender.",
+    "signal.circle_peer_ack_extend_ready": "sender: sidecar. reader: coordinator. The extension was applied.",
+    "signal.circle_peer_ack_extend_rejected": "sender: sidecar. reader: coordinator. unknown_grant: this sidecar does not hold link_id. The coordinator answers by sending the circle_peer_add again.",
+    "attestation.attest_added": "sender: engine, added to its /peers/connect attestation. reader: coordinator. mesh_node_id is the node_id from the local sidecar's /status (omit it if the sidecar does not advertise circle_link_v1). circle_port is the port the engine's circle listener is actually bound to (its default is 8340; the coordinator never assumes it). Both are optional and soft: a value that is not a UUID or a port is treated as absent; an attestation is never rejected over them. The coordinator honours mesh_node_id only for a member-session connection (or its development flag) and only when that member owns the node's household.",
+    "attestation.accept_added": "sender: coordinator, added to its accept message when direct circle links are switched on. reader: engine. mesh_node_id echoes the binding (the engine knows it was bound); circle_links true means this coordinator brokers links. Start the circle listener and advertise only when circle_links is true.",
+    "attestation.accept_added_unbound": "sender: coordinator. reader: engine. The accept when links are on but the node was not bound: circle_links true and no mesh_node_id key. Do not start a listener that depends on it; the machine still serves through the relay.",
+    "attestation.accept_links_off": "sender: coordinator. reader: engine. The accept when links are switched off, or from an older coordinator: neither key is present. Treat as 'links not supported'.",
+    "sidecar.status_addition": "sender: sidecar, added to GET /status on its local API. reader: engine. Presence of circle_link_v1 in features is the engine's cue that node_id and /circle-peers are usable.",
+    "sidecar.circle_peers": "sender: sidecar, GET /circle-peers on its local API (also over the Windows pipe). reader: engine. One entry per WireGuard circle peer; the same peer can be inbound (this machine lends to it), outbound (this machine borrows from it), or both. inbound.token_sha256 is what the lender engine checks the Bearer token against. Deliberately absent: node name, node id, last endpoint, local endpoints, the WireGuard key. Never shown to a user. Never part of GET /peers (household only).",
+    "engine.capabilities": "sender: lender engine's circle listener, GET /circle/capabilities. reader: requester engine. No hostname, hardware, rpc endpoint or tokens-per-second.",
+    "engine.chat_request": "sender: requester engine, POST /circle/chat/completions with Authorization: Bearer <token>. reader: lender engine's circle listener. The body is the household peer chat body without potluck_batch and potluck_model_sha256, unknown keys rejected. model is required, stream must be true, max_tokens at most 4096, role is system, user or assistant.",
+    "engine.sse": "sender: lender engine. reader: requester engine (remote_stream.openai_chunks parses the same lines the relay sends). Chunks, then a meta line, then [DONE]. On failure mid-stream: a data line with an error object (category inference_error), then [DONE].",
+    "engine.errors": "sender: lender engine's circle listener. reader: requester engine. Before the first token any of these means 'try another lender, then the relay'. busy comes with a Retry-After: 2 header. Every other path on this port is 404.",
+    "receipt.meta_direct": "sender: requester engine, the terminal meta it builds itself for a request that went machine to machine. reader: the app. Numeric fields come from the lender's stream; path and transport are the requester's own. transport comes from the /circle-peers reachability_mode at stream start (udp for direct, derp for the relay, null if unknown).",
+    "receipt.meta_relay": "sender: requester engine, the terminal meta for a circle request that fell back to the coordinator relay. reader: the app. path relay, transport null; the other fields are the relay's own.",
+    "enums": "The closed sets used above. Coordinator tests pin them to the code.",
+    "rules": [
+      "One live link per (requester machine, lender machine). A repeat create for the pair gives a new link_id and a new token and ends the old one (superseded). A request already streaming on the old link is not cut: the lender engine checks the token only when a request starts.",
+      "Order of messages to one sidecar is the order sent. A repeat create sends add(new), waits for the acks, then remove(old, superseded).",
+      "Add for a peer key the sidecar already holds under another link_id replaces that grant (new link_id, token hash, deadline).",
+      "On every /mesh/signal reconnect the coordinator first sends circle_peer_remove for each link that ended in the last 30 minutes (a sidecar that does not hold the link ignores it, so a removal missed while the channel was down is repeated), and then circle_peer_add for each live link of that node, with the remaining lifetime. A sidecar that already holds a live link acknowledges again and keeps one entry.",
+      "The coordinator never sends circle_peer_* to a sidecar whose hello had no circle_link_v1, and a sidecar that does not understand a type ignores it.",
+      "No message carries a member id, node id, node name, hostname or circle name. Neither does anything the engine sends to the lender.",
+      "Lifetimes: default 600 s, renew_after_s half of it; the sidecar's own cap is 30 minutes and its own clock is authoritative for dropping the peer."
+    ]
+  },
+  "enums": {
+    "role": [
+      "lender",
+      "requester"
+    ],
+    "remove_reason": [
+      "ended",
+      "revoked",
+      "expired",
+      "superseded"
+    ],
+    "ack_op": [
+      "add",
+      "extend"
+    ],
+    "ack_state": [
+      "ready",
+      "rejected"
+    ],
+    "ack_reason": [
+      "invalid_peer",
+      "address_conflict",
+      "limit",
+      "unsupported",
+      "not_enrolled",
+      "tunnel_error",
+      "unknown_grant"
+    ],
+    "reachability_mode": [
+      "direct",
+      "derp",
+      "connecting",
+      null
+    ],
+    "feature": [
+      "circle_link_v1"
+    ]
+  },
+  "vectors": {
+    "token": "abc",
+    "token_sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  },
+  "http": {
+    "create_request": {
+      "requester_node_id": "3b1f0c52-7d1e-4a55-9a0e-1f2b3c4d5e6f",
+      "model_slug": "qwen3-4b-instruct-2507-q4",
+      "exclude_link_ids": [
+        "d00dfeed-1111-4222-8333-444455556666"
+      ]
+    },
+    "create_request_minimal": {
+      "requester_node_id": "3b1f0c52-7d1e-4a55-9a0e-1f2b3c4d5e6f",
+      "model_slug": "qwen3-4b-instruct-2507-q4"
+    },
+    "create_response": {
+      "link_id": "c0ffee00-1111-4222-8333-444455556666",
+      "circle_id": "7f0c5a2e-58a1-4b0c-9a51-0f5e3a6f1d11",
+      "model_slug": "qwen3-4b-instruct-2507-q4",
+      "token": "ZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1-f4CBgoM",
+      "lender": {
+        "mesh_ip": "100.64.1.2",
+        "port": 8347
+      },
+      "ttl_s": 600,
+      "renew_after_s": 300,
+      "expires_at": "2026-10-09T12:10:00Z",
+      "ready": true
+    },
+    "renew_request": {},
+    "renew_response": {
+      "link_id": "c0ffee00-1111-4222-8333-444455556666",
+      "ttl_s": 600,
+      "renew_after_s": 300,
+      "expires_at": "2026-10-09T12:20:00Z",
+      "delivered": {
+        "requester": true,
+        "lender": true
+      }
+    },
+    "errors": {
+      "circle_not_found": {
+        "status": 404,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "circle_not_found",
+            "message": "Circle not found.",
+            "reason": null
+          }
+        }
+      },
+      "node_not_found": {
+        "status": 404,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "node_not_found",
+            "message": "Machine not found.",
+            "reason": null
+          }
+        }
+      },
+      "link_not_found": {
+        "status": 404,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "link_not_found",
+            "message": "Link not found.",
+            "reason": null
+          }
+        }
+      },
+      "no_lender": {
+        "status": 409,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "no_lender",
+            "message": "No machine in this circle can serve this model directly right now.",
+            "reason": null
+          }
+        }
+      },
+      "requester_sidecar_offline": {
+        "status": 409,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "requester_sidecar_offline",
+            "message": "This machine's mesh service is not connected to the network.",
+            "reason": null
+          }
+        }
+      },
+      "requester_sidecar_unsupported": {
+        "status": 409,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "requester_sidecar_unsupported",
+            "message": "This machine's mesh service is too old for direct circle links.",
+            "reason": null
+          }
+        }
+      },
+      "link_conflict": {
+        "status": 409,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "link_conflict",
+            "message": "Another link for this pair was just made. Try again.",
+            "reason": null
+          }
+        }
+      },
+      "link_ended": {
+        "status": 410,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "link_ended",
+            "message": "This link has ended. Make a new one.",
+            "reason": "member_left"
+          }
+        }
+      },
+      "too_many_links": {
+        "status": 429,
+        "headers": {
+          "Retry-After": "12"
+        },
+        "body": {
+          "detail": {
+            "code": "too_many_links",
+            "message": "Too many link requests. Wait a moment and try again.",
+            "reason": null
+          }
+        }
+      },
+      "sidecar_rejected": {
+        "status": 502,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "sidecar_rejected",
+            "message": "The lender's machine could not accept the link.",
+            "reason": "address_conflict"
+          }
+        }
+      },
+      "links_disabled": {
+        "status": 503,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "links_disabled",
+            "message": "Direct circle links are not available on this network.",
+            "reason": null
+          }
+        }
+      },
+      "sidecar_timeout": {
+        "status": 504,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "sidecar_timeout",
+            "message": "A machine did not confirm the link in time. Try again.",
+            "reason": null
+          }
+        }
+      }
+    },
+    "errors_framework": {
+      "unauthenticated": {
+        "status": 401,
+        "body": {
+          "detail": "Not authenticated"
+        }
+      },
+      "validation": {
+        "status": 422,
+        "body": {
+          "detail": [
+            {
+              "type": "missing",
+              "loc": [
+                "body",
+                "model_slug"
+              ],
+              "msg": "Field required",
+              "input": {}
+            }
+          ]
+        }
+      }
+    }
+  },
+  "signal": {
+    "hello": {
+      "type": "hello",
+      "wg_public_key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "features": [
+        "circle_link_v1"
+      ]
+    },
+    "circle_peer_add_lender": {
+      "type": "circle_peer_add",
+      "link_id": "c0ffee00-1111-4222-8333-444455556666",
+      "role": "lender",
+      "peer_wg_public_key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "peer_mesh_ip": "100.64.0.7",
+      "port": 8347,
+      "ttl_s": 600,
+      "token_sha256": "45827150f595bab19278b82d22eba203d126486c59732655abb65ea67d209ee6",
+      "peer_endpoint": "198.51.100.4:51820",
+      "peer_local_endpoints": [],
+      "direct_window_ms": 3000
+    },
+    "circle_peer_add_requester": {
+      "type": "circle_peer_add",
+      "link_id": "c0ffee00-1111-4222-8333-444455556666",
+      "role": "requester",
+      "peer_wg_public_key": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+      "peer_mesh_ip": "100.64.1.2",
+      "port": 8347,
+      "ttl_s": 600,
+      "token_sha256": null,
+      "peer_endpoint": "203.0.113.9:51820",
+      "peer_local_endpoints": [],
+      "direct_window_ms": 3000
+    },
+    "circle_peer_add_requester_lan": {
+      "type": "circle_peer_add",
+      "link_id": "c0ffee00-1111-4222-8333-444455556666",
+      "role": "requester",
+      "peer_wg_public_key": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+      "peer_mesh_ip": "100.64.1.2",
+      "port": 8347,
+      "ttl_s": 600,
+      "token_sha256": null,
+      "peer_endpoint": "203.0.113.9:51820",
+      "peer_local_endpoints": [
+        "192.168.1.23:51820"
+      ],
+      "direct_window_ms": 3000
+    },
+    "circle_peer_add_lender_relay_only": {
+      "type": "circle_peer_add",
+      "link_id": "c0ffee00-1111-4222-8333-444455556666",
+      "role": "lender",
+      "peer_wg_public_key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "peer_mesh_ip": "100.64.0.7",
+      "port": 8347,
+      "ttl_s": 600,
+      "token_sha256": "45827150f595bab19278b82d22eba203d126486c59732655abb65ea67d209ee6",
+      "peer_endpoint": null,
+      "peer_local_endpoints": [],
+      "direct_window_ms": 0
+    },
+    "circle_peer_add_requester_relay_only": {
+      "type": "circle_peer_add",
+      "link_id": "c0ffee00-1111-4222-8333-444455556666",
+      "role": "requester",
+      "peer_wg_public_key": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+      "peer_mesh_ip": "100.64.1.2",
+      "port": 8347,
+      "ttl_s": 600,
+      "token_sha256": null,
+      "peer_endpoint": null,
+      "peer_local_endpoints": [],
+      "direct_window_ms": 0
+    },
+    "circle_peer_extend": {
+      "type": "circle_peer_extend",
+      "link_id": "c0ffee00-1111-4222-8333-444455556666",
+      "ttl_s": 600,
+      "peer_endpoint": "203.0.113.9:51820"
+    },
+    "circle_peer_extend_relay_only": {
+      "type": "circle_peer_extend",
+      "link_id": "c0ffee00-1111-4222-8333-444455556666",
+      "ttl_s": 600,
+      "peer_endpoint": null
+    },
+    "circle_peer_remove": {
+      "type": "circle_peer_remove",
+      "link_id": "c0ffee00-1111-4222-8333-444455556666",
+      "reason": "revoked"
+    },
+    "circle_peer_ack_add_ready": {
+      "type": "circle_peer_ack",
+      "link_id": "c0ffee00-1111-4222-8333-444455556666",
+      "op": "add",
+      "state": "ready",
+      "reason": null
+    },
+    "circle_peer_ack_add_rejected": {
+      "type": "circle_peer_ack",
+      "link_id": "c0ffee00-1111-4222-8333-444455556666",
+      "op": "add",
+      "state": "rejected",
+      "reason": "address_conflict"
+    },
+    "circle_peer_ack_extend_ready": {
+      "type": "circle_peer_ack",
+      "link_id": "c0ffee00-1111-4222-8333-444455556666",
+      "op": "extend",
+      "state": "ready",
+      "reason": null
+    },
+    "circle_peer_ack_extend_rejected": {
+      "type": "circle_peer_ack",
+      "link_id": "c0ffee00-1111-4222-8333-444455556666",
+      "op": "extend",
+      "state": "rejected",
+      "reason": "unknown_grant"
+    }
+  },
+  "attestation": {
+    "attest_added": {
+      "mesh_node_id": "3b1f0c52-7d1e-4a55-9a0e-1f2b3c4d5e6f",
+      "circle_port": 8347
+    },
+    "accept_added": {
+      "mesh_node_id": "3b1f0c52-7d1e-4a55-9a0e-1f2b3c4d5e6f",
+      "circle_links": true
+    },
+    "accept_added_unbound": {
+      "circle_links": true
+    },
+    "accept_links_off": {}
+  },
+  "sidecar": {
+    "status_addition": {
+      "features": [
+        "circle_link_v1"
+      ]
+    },
+    "circle_peers": {
+      "peers": [
+        {
+          "scope": "circle",
+          "mesh_ip": "100.64.0.7",
+          "reachable": true,
+          "reachability_mode": "direct",
+          "handshake_age_seconds": 3.2,
+          "inbound": {
+            "link_id": "c0ffee00-1111-4222-8333-444455556666",
+            "port": 8347,
+            "token_sha256": "45827150f595bab19278b82d22eba203d126486c59732655abb65ea67d209ee6",
+            "expires_in_s": 412
+          },
+          "outbound": null
+        },
+        {
+          "scope": "circle",
+          "mesh_ip": "100.64.1.2",
+          "reachable": false,
+          "reachability_mode": "connecting",
+          "handshake_age_seconds": null,
+          "inbound": null,
+          "outbound": {
+            "link_id": "d00dfeed-1111-4222-8333-444455556666",
+            "port": 8340,
+            "expires_in_s": 590
+          }
+        }
+      ]
+    }
+  },
+  "engine": {
+    "capabilities": {
+      "schemaVersion": 1,
+      "protocol_version": 1,
+      "available_for_inference": true,
+      "loaded_model": "qwen3-4b-instruct-2507-q4",
+      "busy": false,
+      "in_flight": 0,
+      "max_concurrent_jobs": 2
+    },
+    "chat_request": {
+      "messages": [
+        {
+          "role": "user",
+          "content": "hi"
+        }
+      ],
+      "model": "qwen3-4b-instruct-2507-q4",
+      "stream": true,
+      "temperature": 0.7,
+      "max_tokens": 512,
+      "stop": null
+    },
+    "sse": [
+      "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Hello\"},\"finish_reason\":null}]}",
+      "data: {\"meta\":{\"served_by\":\"contributor\",\"served_scope\":\"circle\",\"output_tokens\":1,\"duration_ms\":120,\"finish_reason\":\"stop\"}}",
+      "data: [DONE]"
+    ],
+    "errors": {
+      "bad_token": {
+        "status": 401,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "bad_token",
+            "message": "unauthorized"
+          }
+        }
+      },
+      "not_a_circle_peer": {
+        "status": 403,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "not_a_circle_peer",
+            "message": "forbidden"
+          }
+        }
+      },
+      "model_mismatch": {
+        "status": 409,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "model_mismatch",
+            "message": "model not loaded"
+          }
+        }
+      },
+      "busy": {
+        "status": 429,
+        "headers": {
+          "Retry-After": "2"
+        },
+        "body": {
+          "detail": {
+            "code": "busy",
+            "message": "busy"
+          }
+        }
+      },
+      "not_sharing": {
+        "status": 503,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "not_sharing",
+            "message": "not sharing with circles"
+          }
+        }
+      },
+      "no_model": {
+        "status": 503,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "no_model",
+            "message": "no model loaded"
+          }
+        }
+      }
+    }
+  },
+  "receipt": {
+    "meta_direct": {
+      "served_by": "contributor",
+      "served_scope": "circle",
+      "path": "direct",
+      "transport": "derp",
+      "output_tokens": 1,
+      "duration_ms": 120,
+      "finish_reason": "stop"
+    },
+    "meta_relay": {
+      "served_by": "contributor",
+      "served_scope": "circle",
+      "path": "relay",
+      "transport": null,
+      "output_tokens": 1,
+      "duration_ms": 120,
+      "finish_reason": "stop"
+    }
+  }
+}

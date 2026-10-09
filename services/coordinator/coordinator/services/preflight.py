@@ -304,6 +304,29 @@ def run_preflight(settings: Settings) -> list[Check]:
         )
     )
 
+    # --- Direct circle links: development-only binding flag ------------------
+    # circle_link_bind_without_session trusts a shared-token engine's claim of
+    # which mesh node it is. The claim is only as good as the shared token, so
+    # in a network env the flag must be off; the node is then bound only for
+    # engines that signed in with a member session.
+    unsafe_bind = settings.circle_links_enabled and settings.circle_link_bind_without_session
+    checks.append(
+        Check(
+            name="circle_link_bind_without_session",
+            status="fail" if (prod and unsafe_bind) else "ok",
+            detail=(
+                "circle_link_bind_without_session is on with direct circle links "
+                "enabled: an engine's mesh node claim is trusted without a member session."
+                if (prod and unsafe_bind)
+                else "Direct circle links bind an engine to a mesh node only for "
+                "member-session engines (or links are off)."
+                if not unsafe_bind
+                else "circle_link_bind_without_session is on (development only)."
+            ),
+            remedy="Unset POTLUCK_CIRCLE_LINK_BIND_WITHOUT_SESSION in staging/production.",
+        )
+    )
+
     return checks
 
 

@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from coordinator.config import get_settings
 from coordinator.db.database import close_db, init_db
-from coordinator.routers import health, jobs, me, mesh, peers, transparency, circles
+from coordinator.routers import circle_links, circles, health, jobs, me, mesh, peers, transparency
 
 # CORS controls which browser-context origins may call the coordinator's HTTP
 # endpoints (the Electron renderer hitting POST /jobs/stream). Curl + the WS
@@ -90,7 +90,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         reaper_task = asyncio.create_task(run_reaper_loop(reaper_stop))
         logger.info("peer_reaper_loop_scheduled")
 
+    # Direct circle link sweeper: ends lapsed links, reconciles them against the
+    # circles and lenders, deletes old rows. Only when links are switched on.
+    link_sweeper_stop = asyncio.Event()
+    link_sweeper_task: asyncio.Task | None = None
+    if settings.circle_links_enabled:
+        from coordinator.services.circle_links import run_sweeper_loop
+
+        link_sweeper_task = asyncio.create_task(run_sweeper_loop(link_sweeper_stop))
+        logger.info("circle_link_sweeper_scheduled")
+
     yield
+
+    link_sweeper_stop.set()
+    if link_sweeper_task is not None:
+        link_sweeper_task.cancel()
+        try:
+            await link_sweeper_task
+        except asyncio.CancelledError:
+            pass
 
     verification_stop.set()
     if verification_task is not None:
@@ -142,5 +160,6 @@ def create_app() -> FastAPI:
     app.include_router(mesh.router)
     app.include_router(me.router)
     app.include_router(circles.router)
+    app.include_router(circle_links.router)
 
     return app

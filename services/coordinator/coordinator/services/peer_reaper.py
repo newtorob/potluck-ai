@@ -52,9 +52,11 @@ async def reap_stale_peers(session_factory: async_sessionmaker) -> int:
     reconnect-race hazard `register_peer`/`unregister_peer` document).
     """
     from coordinator.models.peer import PeerHeartbeat
+    from coordinator.services import circle_links
     from coordinator.services.peer_registry import (
         HEARTBEAT_TTL_SECONDS,
         drain_peer_jobs,
+        get_peer,
         online_peer_sessions,
         unregister_peer,
     )
@@ -80,6 +82,7 @@ async def reap_stale_peers(session_factory: async_sessionmaker) -> int:
     reaped = 0
     for peer_id in stale_ids:
         session_id = sessions[peer_id]
+        conn = await get_peer(peer_id)
         drained = await drain_peer_jobs(peer_id, session_id=session_id)
         removed = await unregister_peer(peer_id, session_id=session_id)
         if not removed:
@@ -87,6 +90,11 @@ async def reap_stale_peers(session_factory: async_sessionmaker) -> int:
             # the guards above already no-op'd; nothing to log as a reap.
             continue
         reaped += 1
+        # A reaped lender engine is a disconnect for its direct circle links.
+        # Its own handler will not report it: the registry entry is already gone
+        # when that handler finally unwinds. No-op when links are off.
+        if conn is not None:
+            circle_links.on_peer_gone(peer_id, conn.mesh_node_id)
         logger.info(
             "peer_reaped_stale_heartbeat",
             peer_id=str(peer_id),

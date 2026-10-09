@@ -16,7 +16,8 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from coordinator.db.database import get_db
+from coordinator.config import get_settings
+from coordinator.db.database import get_db, get_session_factory
 from coordinator.middleware.auth import coordinator_token_matches
 from coordinator.middleware.session_auth import resolve_member_from_bearer, session_auth_enabled
 from coordinator.schemas.peer import (
@@ -29,7 +30,12 @@ from coordinator.schemas.peer import (
     JobTokenMessage,
     RejectMessage,
 )
-from coordinator.services.attestation import AttestationError, verify_attestation
+from coordinator.services import circle_links
+from coordinator.services.attestation import (
+    AttestationError,
+    resolve_mesh_binding,
+    verify_attestation,
+)
 from coordinator.services.peer_registry import (
     PeerConnection,
     complete_job,
@@ -169,6 +175,23 @@ async def peer_connect(
 
     await db.commit()
 
+    # Direct circle links: bind this engine to the mesh node it names. A soft
+    # step after the attestation is already committed, so nothing it does can
+    # reject the peer or take it off the relay. None when links are off, when
+    # the engine named no node, or when the node is not provably its owner's.
+    # It reads on a session of its own, so a failure there cannot touch this
+    # handshake's session or the peer rows it holds.
+    links_on = get_settings().circle_links_enabled
+    mesh_node_id = None
+    if links_on:
+        try:
+            async with get_session_factory()() as bind_db:
+                mesh_node_id = await resolve_mesh_binding(
+                    bind_db, payload, peer.member_id, session_member_id=session_member_id
+                )
+        except Exception:
+            logger.exception("circle_link_bind_failed")
+
     session_id = uuid.uuid4()
     audiences = honoured_audiences(payload.audiences)
     accept = AcceptMessage(
@@ -177,10 +200,19 @@ async def peer_connect(
         server_time=datetime.now(timezone.utc),
         heartbeat_interval_s=HEARTBEAT_INTERVAL_S,
         audiences=audiences,
+        mesh_node_id=mesh_node_id,
+        circle_links=True if links_on else None,
     )
+    accept_payload = accept.model_dump(mode="json")
+    if not links_on:
+        # Links off: the message is exactly what it was before they existed.
+        accept_payload.pop("mesh_node_id", None)
+        accept_payload.pop("circle_links", None)
+    elif mesh_node_id is None:
+        accept_payload.pop("mesh_node_id", None)
 
     try:
-        await ws.send_json(accept.model_dump(mode="json"))
+        await ws.send_json(accept_payload)
     except WebSocketDisconnect:
         logger.info("peer_disconnected_before_accept", peer_id=str(peer.id))
         return
@@ -205,14 +237,26 @@ async def peer_connect(
             member_id=peer.member_id,
             serves_circle=audiences is None or "circle" in audiences,
             serves_pool=audiences is None or "pool" in audiences,
+            mesh_node_id=mesh_node_id,
+            circle_port=payload.circle_port if mesh_node_id is not None else None,
         )
     )
-
     # ---- post-handshake message loop ----
     binary_hash = payload.binary_hash
     client_version = payload.client_version
 
     try:
+        # A reconnecting lender engine cancels its disconnect grace, and ends the
+        # links it can no longer back (it stopped sharing with circles, or answers
+        # on another machine or port). Inside the try so that, whatever happens
+        # here, the peer is unregistered below. No-op when links are off.
+        if links_on:
+            await circle_links.on_peer_registered(
+                peer.id,
+                serves_circle=audiences is None or "circle" in audiences,
+                mesh_node_id=mesh_node_id,
+                circle_port=payload.circle_port if mesh_node_id is not None else None,
+            )
         while True:
             msg = await ws.receive_json()
             msg_type = msg.get("type") if isinstance(msg, dict) else None
@@ -420,4 +464,9 @@ async def peer_connect(
                 session_id=str(session_id),
                 job_ids=[str(job_id) for job_id in drained],
             )
-        await unregister_peer(peer.id, session_id=session_id)
+        was_current = await unregister_peer(peer.id, session_id=session_id)
+        if was_current:
+            # The lender engine is gone: its direct circle links end after a
+            # short grace unless it reconnects. (A same-key reconnect replaced
+            # this connection already, so was_current is False then.)
+            circle_links.on_peer_gone(peer.id, mesh_node_id)

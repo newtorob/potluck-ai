@@ -6,6 +6,7 @@ on any failure (caller turns that into a `reject` message + WS close).
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -20,7 +21,9 @@ from coordinator.config import get_settings
 from coordinator.crypto import KeyDecodeError, b64url_decode, decode_ed25519_public_key
 from coordinator.models import (
     ContributorRelease,
+    Household,
     MemberKey,
+    MeshNode,
     Peer,
     PeerCapability,
     PeerHeartbeat,
@@ -228,3 +231,58 @@ async def verify_attestation(
         )
 
     return peer
+
+
+async def resolve_mesh_binding(
+    db: AsyncSession,
+    payload: AttestationPayload,
+    bound_member_id: uuid.UUID,
+    *,
+    session_member_id: uuid.UUID | None,
+) -> uuid.UUID | None:
+    """The mesh node this attestation may be bound to, or None.
+
+    A separate, soft step after verify_attestation. It never rejects: a hard
+    reject would take the machine off the relay, and binding only matters for
+    direct circle links. Any doubt, and any error, gives None, and the machine
+    simply is not offered for links. Returns None when links are off.
+
+    Bound only when all hold:
+      * the payload names a mesh node (an old engine sends none);
+      * the peer signed in with a member session, whose member is the one the
+        device key is pinned to; or the development flag
+        circle_link_bind_without_session is set, since a shared-token engine
+        names its own member and that name is not proof of anything;
+      * the node's household belongs to that same member. The mesh node id is
+        not secret (a household's machines list it), so ownership is the check.
+    """
+    settings = get_settings()
+    if not settings.circle_links_enabled or payload.mesh_node_id is None:
+        return None
+    try:
+        if session_member_id is None:
+            if not settings.circle_link_bind_without_session:
+                logger.info("circle_link_bind_refused", reason="no_session")
+                return None
+        elif session_member_id != bound_member_id:
+            logger.info("circle_link_bind_refused", reason="session_member_mismatch")
+            return None
+        owned = await db.scalar(
+            select(MeshNode.id)
+            .join(Household, Household.id == MeshNode.household_id)
+            .where(
+                MeshNode.id == payload.mesh_node_id,
+                Household.owner_member_id == bound_member_id,
+            )
+        )
+        if owned is None:
+            logger.info("circle_link_bind_refused", reason="node_not_owned")
+            return None
+        return owned
+    except Exception:
+        logger.exception("circle_link_bind_failed")
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        return None

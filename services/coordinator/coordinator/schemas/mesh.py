@@ -17,11 +17,14 @@ Privacy notes:
 """
 from __future__ import annotations
 
+import base64
+import binascii
 import ipaddress
+import re
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # Cap on how many LAN candidates a node may advertise. Multi-homed hosts have a
 # handful of RFC1918 addresses; more than this is almost certainly noise or
@@ -149,6 +152,11 @@ def _filter_local_endpoints(values: list[str]) -> list[str]:
         if len(out) >= MAX_LOCAL_ENDPOINTS:
             break
     return out
+
+
+# Public names for the two helpers the circle link service uses.
+parse_ip_port = _parse_ip_port
+filter_local_endpoints = _filter_local_endpoints
 
 
 # ---------------------------------------------------------------------------
@@ -326,9 +334,12 @@ class PairingTokenIssueResponse(BaseModel):
 # The contract is bidirectional — server and client both send + receive.
 #
 # Client → Server messages: SignalHello, SignalEndpointUpdate,
-#                            SignalRequestPunch, SignalPing
+#                            SignalRequestPunch, SignalPing,
+#                            SignalCirclePeerAck
 # Server → Client messages: SignalWelcome, SignalRosterUpdate,
-#                            SignalPunchCoord, SignalPong, SignalError
+#                            SignalPunchCoord, SignalPong, SignalError,
+#                            SignalCirclePeerAdd, SignalCirclePeerExtend,
+#                            SignalCirclePeerRemove
 #
 # The first message a client sends MUST be SignalHello with its
 # wg_public_key. If it's not registered in mesh_nodes, server closes
@@ -342,9 +353,39 @@ from typing import Literal
 # ---- Client → Server ---- #
 
 
+# What a sidecar may advertise in hello.features: short lowercase names. Anything
+# else is dropped, never rejected (see SignalHello._lenient_features).
+MAX_HELLO_FEATURES = 16
+_FEATURE_NAME = re.compile(r"^[a-z0-9_]{1,40}$")
+
+
 class SignalHello(BaseModel):
     type: Literal["hello"] = "hello"
     wg_public_key: str = Field(..., min_length=32, max_length=128)
+    # Optional capabilities of this sidecar, e.g. "circle_link_v1". Absent from
+    # a sidecar that predates the field. The coordinator records it per live
+    # connection and uses it to decide which messages that sidecar may be sent.
+    features: list[str] = Field(default_factory=list, max_length=MAX_HELLO_FEATURES)
+
+    @field_validator("features", mode="before")
+    @classmethod
+    def _lenient_features(cls, v: object) -> list[str]:
+        """A bad value must never fail the hello: a hello_invalid closes the
+        node's whole signal channel, which cuts its household mesh. So a value
+        that is not a list gives an empty list, entries that are not short
+        lowercase names are dropped, and extras beyond the cap are ignored."""
+        try:
+            if not isinstance(v, list):
+                return []
+            out: list[str] = []
+            for item in v:
+                if isinstance(item, str) and _FEATURE_NAME.match(item) and item not in out:
+                    out.append(item)
+                    if len(out) >= MAX_HELLO_FEATURES:
+                        break
+            return out
+        except Exception:
+            return []
 
 
 class SignalEndpointUpdate(BaseModel):
@@ -389,6 +430,22 @@ class SignalPing(BaseModel):
     type: Literal["ping"] = "ping"
 
 
+class SignalCirclePeerAck(BaseModel):
+    """A sidecar's answer to circle_peer_add or circle_peer_extend.
+
+    `ready` means the sidecar's filter entry, WireGuard peer and route are
+    installed; a handshake may not have happened yet. `reason` is set only
+    on `rejected`. It is a free string here so a newer sidecar's reason cannot
+    make the ack unreadable; the coordinator reports only the names it knows.
+    """
+
+    type: Literal["circle_peer_ack"] = "circle_peer_ack"
+    link_id: uuid.UUID
+    op: Literal["add", "extend"]
+    state: Literal["ready", "rejected"]
+    reason: str | None = Field(default=None, max_length=32)
+
+
 # ---- Server → Client ---- #
 
 
@@ -431,6 +488,134 @@ class SignalPunchCoord(BaseModel):
     @classmethod
     def _validate_peer_endpoint(cls, v: str | None) -> str | None:
         return _validate_endpoint_field(v)
+
+
+# Reasons a sidecar may give when it rejects a circle_peer_add or _extend.
+CIRCLE_PEER_ACK_REASONS = (
+    "invalid_peer",
+    "address_conflict",
+    "limit",
+    "unsupported",
+    "not_enrolled",
+    "tunnel_error",
+    "unknown_grant",
+)
+
+# Why a link is being removed, as the sidecars hear it. The coordinator keeps
+# the exact cause on the row; these four are all a sidecar needs.
+CIRCLE_PEER_REMOVE_REASONS = ("ended", "revoked", "expired", "superseded")
+
+# The shared address pool every household's mesh address comes from.
+_MESH_POOL = ipaddress.ip_network("100.64.0.0/10")
+
+
+def _is_canonical_wg_key(value: str) -> bool:
+    """A WireGuard public key as the sidecar writes it: standard base64 of
+    exactly 32 bytes, 44 characters with one '=' of padding."""
+    if len(value) != 44:
+        return False
+    try:
+        raw = base64.b64decode(value, validate=True)
+    except (binascii.Error, ValueError):
+        return False
+    return len(raw) == 32 and base64.b64encode(raw).decode("ascii") == value
+
+
+class SignalCirclePeerAdd(BaseModel):
+    """Server → one sidecar: add the other machine of a circle link as a
+    restricted WireGuard peer.
+
+    Sent to both ends of the link; `role` is the RECEIVING sidecar's role.
+    Privacy: a link reaches two households that are not each other's. The
+    message names the other machine only by what the tunnel needs (key, mesh
+    address, port, token hash, optional endpoints). It carries no member id,
+    node id, node name, hostname or circle name. The field set is locked in
+    tests/test_privacy_invariants.py.
+    """
+
+    type: Literal["circle_peer_add"] = "circle_peer_add"
+    link_id: uuid.UUID
+    role: Literal["lender", "requester"]
+    peer_wg_public_key: str = Field(..., min_length=44, max_length=44)
+    peer_mesh_ip: str = Field(..., max_length=15)
+    # The lender engine's circle port, as that engine reported it.
+    port: int = Field(..., ge=1, le=65535)
+    # Seconds this sidecar should hold the link, counted from receipt.
+    ttl_s: int = Field(..., ge=5, le=1800)
+    # SHA-256 of the link token, hex. Present only for role "lender", whose
+    # engine checks the token. The requester never receives it.
+    token_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    # The other machine's public endpoint. Null when the server's transport
+    # policy is relay-only, or when none is known.
+    peer_endpoint: str | None = Field(default=None, max_length=64)
+    # The other machine's private LAN candidates. Filled only when both
+    # machines report the same public address; always RFC1918.
+    peer_local_endpoints: list[str] = Field(default_factory=list)
+    # How long to try a direct path before using the DERP relay. 0 means do
+    # not try: go straight to the relay.
+    direct_window_ms: int = Field(default=3000, ge=0, le=10000)
+
+    @field_validator("peer_wg_public_key")
+    @classmethod
+    def _validate_peer_key(cls, v: str) -> str:
+        if not _is_canonical_wg_key(v):
+            raise ValueError("peer_wg_public_key must be base64 of 32 bytes")
+        return v
+
+    @field_validator("peer_mesh_ip")
+    @classmethod
+    def _validate_peer_mesh_ip(cls, v: str) -> str:
+        try:
+            ip = ipaddress.IPv4Address(v)
+        except ValueError:
+            raise ValueError("peer_mesh_ip must be an IPv4 address")
+        if ip not in _MESH_POOL:
+            raise ValueError("peer_mesh_ip must be inside 100.64.0.0/10")
+        return str(ip)
+
+    @field_validator("peer_endpoint")
+    @classmethod
+    def _validate_peer_endpoint(cls, v: str | None) -> str | None:
+        return _validate_endpoint_field(v)
+
+    @field_validator("peer_local_endpoints", mode="before")
+    @classmethod
+    def _sanitize_peer_local_endpoints(cls, v: object) -> list[str]:
+        if not isinstance(v, list):
+            return []
+        return _filter_local_endpoints(v)
+
+    @model_validator(mode="after")
+    def _check_role_and_policy(self) -> "SignalCirclePeerAdd":
+        if (self.role == "lender") != (self.token_sha256 is not None):
+            raise ValueError("token_sha256 is for role lender only")
+        if self.direct_window_ms == 0 and (self.peer_endpoint or self.peer_local_endpoints):
+            raise ValueError("relay-only (direct_window_ms 0) carries no endpoints")
+        return self
+
+
+class SignalCirclePeerExtend(BaseModel):
+    """Server → one sidecar: keep a link this long from receipt. A sidecar
+    that does not know the link answers with a rejected ack (unknown_grant)
+    and the coordinator sends the add again."""
+
+    type: Literal["circle_peer_extend"] = "circle_peer_extend"
+    link_id: uuid.UUID
+    ttl_s: int = Field(..., ge=5, le=1800)
+    peer_endpoint: str | None = Field(default=None, max_length=64)
+
+    @field_validator("peer_endpoint")
+    @classmethod
+    def _validate_peer_endpoint(cls, v: str | None) -> str | None:
+        return _validate_endpoint_field(v)
+
+
+class SignalCirclePeerRemove(BaseModel):
+    """Server → one sidecar: drop this link now. Idempotent, no ack."""
+
+    type: Literal["circle_peer_remove"] = "circle_peer_remove"
+    link_id: uuid.UUID
+    reason: Literal["ended", "revoked", "expired", "superseded"]
 
 
 class SignalPong(BaseModel):

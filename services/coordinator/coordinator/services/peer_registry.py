@@ -60,6 +60,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -93,6 +94,12 @@ class PeerConnection:
     # AttestationPayload.audiences). Both true for a peer that named none.
     serves_circle: bool = True
     serves_pool: bool = True
+    # Direct circle links: the mesh node this engine's machine is and the port
+    # its circle listener is bound to, both set at attestation. None for an
+    # engine that predates links or whose binding was refused. A peer without
+    # both is never offered a link; it still serves through the relay.
+    mesh_node_id: uuid.UUID | None = None
+    circle_port: int | None = None
 
 
 AUDIENCES = ("circle", "pool")
@@ -425,6 +432,7 @@ async def pick_peer_for_model(
     circle_member_ids: set[uuid.UUID] | None = None,
     exclude_peer_ids: set[uuid.UUID] | None = None,
     audience: str | None = None,
+    peer_filter: Callable[[PeerConnection], bool] | None = None,
 ) -> PeerConnection | None:
     """Pick a connected peer that advertises the requested model_slug.
 
@@ -458,6 +466,12 @@ async def pick_peer_for_model(
     a peer that already proved dead-on-arrival for THIS request must never be
     re-picked on a retry attempt. Default None = current behavior (no
     exclusion), so every existing caller is unaffected.
+
+    `peer_filter`, when set, is a plain (non-async) predicate on a peer's live
+    connection; a peer it rejects is not a candidate. Direct circle links use
+    it to offer only engines bound to a mesh node whose sidecar is connected
+    and advertises links. It runs under the registry lock, so it must not
+    wait. Default None applies no filter.
     """
     from sqlalchemy import select
     from coordinator.models import PeerCapability
@@ -620,6 +634,8 @@ async def pick_peer_for_model(
                 continue
             if audience == "pool" and not _peers[peer_id].serves_pool:
                 continue
+            if peer_filter is not None and not peer_filter(_peers[peer_id]):
+                continue
             candidates.append(peer_id)
         if not candidates:
             return None
@@ -646,6 +662,7 @@ async def select_peer_for_request(
     circle_pubkeys: "set[str] | None" = None,
     circle_member_ids: "set[uuid.UUID] | None" = None,
     exclude_peer_ids: "set[uuid.UUID] | None" = None,
+    peer_filter: "Callable[[PeerConnection], bool] | None" = None,
 ) -> "tuple[PeerConnection | None, str | None]":
     """Pick a peer honoring the routing scope. `scope` is the WIDEST tier the
     requester accepts; we always try the closest/most-trusted tier first and
@@ -664,6 +681,11 @@ async def select_peer_for_request(
     call at every tier — a peer excluded because it was dead-on-arrival on a
     failover retry must stay excluded whether the retry re-checks My Machines,
     Circle, or Pool. Default None = current behavior.
+
+    `peer_filter` is forwarded the same way (see pick_peer_for_model). Direct
+    circle links call this function, with the circle's lender ids, so lender
+    choice is the relay's own: the requester's machines stay excluded and each
+    peer's sharing audience is honoured.
     """
     if scope == "circle":
         # Circle scope: dispatch strictly to peers in the circle. No fallback
@@ -680,6 +702,7 @@ async def select_peer_for_request(
             circle_member_ids=circle_member_ids or None,
             exclude_peer_ids=exclude_peer_ids,
             audience="circle",
+            peer_filter=peer_filter,
         )
         if peer is not None:
             return peer, "circle"
@@ -691,6 +714,7 @@ async def select_peer_for_request(
         model_slug,
         owner_member_id=requester_member_id,
         exclude_peer_ids=exclude_peer_ids,
+        peer_filter=peer_filter,
     )
     if peer is not None:
         return peer, "mine"
@@ -701,7 +725,7 @@ async def select_peer_for_request(
     # serve strangers again.
     peer = await pick_peer_for_model(
         db, model_slug, enforce_pool_trust=True, exclude_peer_ids=exclude_peer_ids,
-        audience="pool",
+        audience="pool", peer_filter=peer_filter,
     )
     if peer is not None:
         return peer, "pool"

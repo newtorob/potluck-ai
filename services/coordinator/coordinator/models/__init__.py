@@ -19,4 +19,5 @@ from coordinator.models.circle import (  # noqa: F401
     CircleMembership,
     TrustedCircle,
 )
+from coordinator.models.circle_link import CircleLink  # noqa: F401
 from coordinator.models.peer_quality import PeerQualityScore  # noqa: F401

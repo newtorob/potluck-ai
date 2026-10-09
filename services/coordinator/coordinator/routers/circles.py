@@ -42,6 +42,7 @@ from coordinator.db.database import get_db
 from coordinator.middleware.session_auth import resolve_session_member_id
 from coordinator.models.circle import CircleInvite, CircleMember, CircleMembership, TrustedCircle
 from coordinator.models.member_key import MemberKey
+from coordinator.services import circle_links
 from coordinator.services.circles import (
     MAX_CIRCLE_PEOPLE,
     hash_invite_code,
@@ -256,9 +257,13 @@ async def delete_circle(
 ) -> Response:
     """Delete a circle and all its members. 404 if not owned by caller."""
     circle = await _get_own_circle(db, circle_id, member_id)
+    # Direct circle links end first: the rows would vanish with the circle
+    # (CASCADE) while the sidecars still held the peers.
+    ended_links = await circle_links.guarded_end(db, circle_links.end_for_circle, circle_id)
     # CASCADE on FK takes care of circle_members rows.
     await db.delete(circle)
     await db.commit()
+    await circle_links.push_removed(ended_links)
     logger.info("circle_deleted", circle_id=str(circle_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -326,7 +331,13 @@ async def remove_circle_member(
             CircleMember.member_pubkey == member_pubkey,
         )
     )
+    # The person behind a pasted key is not named here, so end whichever of the
+    # circle's direct links it no longer allows.
+    ended_links = await circle_links.guarded_end(
+        db, circle_links.end_not_allowed_in_circle, circle_id, "member_removed"
+    )
     await db.commit()
+    await circle_links.push_removed(ended_links)
     logger.info(
         "circle_member_removed",
         circle_id=str(circle_id),
@@ -613,8 +624,13 @@ async def leave_circle(
             status_code=status.HTTP_409_CONFLICT,
             detail="You own this circle. Delete it to end it for everyone.",
         )
+    # Direct links the member is on either end of end at once.
+    ended_links = await circle_links.guarded_end(
+        db, circle_links.end_for_circle_member, circle_id, member_id, "member_left"
+    )
     await db.delete(mine)
     await db.commit()
+    await circle_links.push_removed(ended_links)
     logger.info("circle_left", circle_id=str(circle_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -632,6 +648,19 @@ async def remove_person(
     """Remove someone from the caller's circle. 204 whether or not they were
     in it. The owner cannot be removed."""
     await _get_own_circle(db, circle_id, member_id)
+    # Who the membership belongs to, for the direct links they are on.
+    removed_member = (await db.execute(
+        select(CircleMembership.member_id).where(
+            CircleMembership.id == person_id,
+            CircleMembership.circle_id == circle_id,
+            CircleMembership.role != "owner",
+        )
+    )).scalar_one_or_none()
+    ended_links = []
+    if removed_member is not None:
+        ended_links = await circle_links.guarded_end(
+            db, circle_links.end_for_circle_member, circle_id, removed_member, "member_removed"
+        )
     await db.execute(
         delete(CircleMembership).where(
             CircleMembership.id == person_id,
@@ -640,6 +669,7 @@ async def remove_person(
         )
     )
     await db.commit()
+    await circle_links.push_removed(ended_links)
     logger.info("circle_person_removed", circle_id=str(circle_id))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

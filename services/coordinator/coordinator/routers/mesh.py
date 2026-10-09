@@ -90,6 +90,7 @@ from coordinator.middleware.node_auth import (
     resolve_node_from_token,
 )
 from coordinator.middleware.session_auth import resolve_session_member_id
+from coordinator.services import circle_links
 from coordinator.services.household_allocator import (
     HouseholdCIDRExhausted,
     allocate_household_cidr,
@@ -116,9 +117,16 @@ _signal_connections: dict[uuid.UUID, WebSocket] = {}
 # process deployment would lift this into shared state. Cleared on disconnect.
 _local_endpoints: dict[uuid.UUID, list[str]] = {}
 
+# In-memory map: mesh_node.id → the features that node's sidecar advertised in
+# its hello (e.g. "circle_link_v1"). Connection-scoped like _local_endpoints:
+# set when the node connects, cleared when its live connection goes. A node
+# that sent no features, or is not connected, has none, which is how an old
+# sidecar is kept out of direct circle links.
+_signal_features: dict[uuid.UUID, frozenset[str]] = {}
+
 # Lock guarding `_signal_connections` so concurrent welcome / disconnect
 # / broadcast operations don't race on dict mutation. Also guards
-# `_local_endpoints`.
+# `_local_endpoints` and `_signal_features`.
 _signal_lock = asyncio.Lock()
 
 logger = structlog.get_logger(__name__)
@@ -341,8 +349,14 @@ async def remove_household_machine(
     target_id_str = str(target.id)
     household_id = target.household_id
 
+    # Direct circle links to or from this machine end first: the rows would
+    # otherwise vanish with the node (ON DELETE CASCADE) while the other
+    # household's sidecar still held the peer.
+    ended_links = await circle_links.guarded_end(db, circle_links.end_for_node, target.id)
+
     await db.delete(target)
     await db.commit()
+    await circle_links.push_removed(ended_links)
 
     logger.info(
         "mesh_node_removed_by_member",
@@ -734,8 +748,11 @@ async def delete_mesh_node(
     target_id_str = str(target.id)
     household_id = target.household_id
 
+    ended_links = await circle_links.guarded_end(db, circle_links.end_for_node, target.id)
+
     await db.delete(target)
     await db.commit()
+    await circle_links.push_removed(ended_links)
 
     logger.info(
         "mesh_node_deleted",
@@ -982,6 +999,44 @@ async def _safe_send(ws: WebSocket, payload: dict) -> bool:
         return False
 
 
+async def signal_send(node_id: uuid.UUID, payload: dict) -> bool:
+    """Send one payload to a single connected node. False if the node is not
+    connected or the send failed (a dead connection is dropped from the
+    registry, as _broadcast_to_household does). Never raises.
+
+    The direct circle link service sends through here so it does not reach
+    into the private connection map. Callers build `payload` from a Signal*
+    model; nothing is added here.
+    """
+    async with _signal_lock:
+        ws = _signal_connections.get(node_id)
+    if ws is None:
+        return False
+    ok = await _safe_send(ws, payload)
+    if not ok:
+        async with _signal_lock:
+            if _signal_connections.get(node_id) is ws:
+                _signal_connections.pop(node_id, None)
+    return ok
+
+
+def signal_node_connected(node_id: uuid.UUID) -> bool:
+    """True if the node has a live signal connection. A plain read of the
+    registry, like _peer_to_enrolled's: a stale answer costs one failed send."""
+    return node_id in _signal_connections
+
+
+def signal_node_features(node_id: uuid.UUID) -> frozenset[str]:
+    """The features the node's sidecar advertised on its live connection."""
+    return _signal_features.get(node_id, frozenset())
+
+
+def signal_local_endpoints(node_id: uuid.UUID) -> list[str]:
+    """The node's last-reported private LAN candidates (RFC1918, already
+    filtered when they were stored). Empty if none or not connected."""
+    return list(_local_endpoints.get(node_id, []))
+
+
 async def _broadcast_to_household(
     household_id: uuid.UUID,
     payload: dict,
@@ -1174,6 +1229,9 @@ async def mesh_signal(ws: WebSocket) -> None:
     async with _signal_lock:
         old_ws = _signal_connections.get(node_id)
         _signal_connections[node_id] = ws
+        # Replaces any set from the connection this one displaces. hello.features
+        # is already cleaned (SignalHello drops anything malformed, never fails).
+        _signal_features[node_id] = frozenset(hello.features)
 
     if old_ws is not None:
         # A previous connection for this node existed — close it cleanly.
@@ -1208,6 +1266,15 @@ async def mesh_signal(ws: WebSocket) -> None:
         household_id=str(household_id),
         roster_size=len(roster),
     )
+
+    # Direct circle links this node is a party to are sent again, so a sidecar
+    # that restarted (and so lost them) picks them up. A no-op unless links are
+    # on and this sidecar advertised them. Must never end the signal loop: this
+    # channel carries the household's mesh.
+    try:
+        await circle_links.replay_for_node(node_id)
+    except Exception:
+        logger.exception("circle_link_replay_failed", node_id=str(node_id))
 
     # ---- 4. Message loop ---- #
     try:
@@ -1331,6 +1398,16 @@ async def mesh_signal(ws: WebSocket) -> None:
                 )
                 continue
 
+            if msg_type == "circle_peer_ack":
+                # A sidecar's answer to a circle_peer_add / _extend. Only wakes
+                # the create or renew that is waiting for it. Wrapped so nothing
+                # an ack carries can end this loop.
+                try:
+                    await circle_links.handle_ack(node_id, raw)
+                except Exception:
+                    logger.exception("circle_link_ack_failed", node_id=str(node_id))
+                continue
+
             # Unknown message types are non-fatal — log + ignore so
             # forward-compatible protocol additions don't break old
             # coordinators.
@@ -1354,6 +1431,7 @@ async def mesh_signal(ws: WebSocket) -> None:
             # meaningless once it's gone. Only clear if THIS ws is the live one
             # (a newer reconnection may have already replaced it).
             _local_endpoints.pop(node_id, None)
+            _signal_features.pop(node_id, None)
 
     try:
         async with get_session_factory()() as db:
