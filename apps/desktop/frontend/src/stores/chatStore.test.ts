@@ -292,6 +292,88 @@ describe('chatStore persistence and routing', () => {
     expect(messages?.at(-1)).toMatchObject({ status: 'error' });
     expect(state.isStreaming).toBe(false);
   });
+  describe('circle chat answered through the engine', () => {
+    function lastMessage() {
+      const state = useChatStore.getState();
+      return state.conversations[state.activeConversationId!]?.messages.at(-1);
+    }
+    async function sendToCircle(): Promise<void> {
+      useChatStore.setState({ routingScope: 'circle', activeCircleId: 'selected-circle', networkModelSlug: 'test-model' });
+      await useChatStore.getState().createConversation();
+      await useChatStore.getState().sendMessage('hello');
+      await flush();
+    }
+    const refusal = (status: number, detail: unknown, statusText = '') =>
+      new Response(JSON.stringify({ detail }), { status, statusText, headers: { 'Content-Type': 'application/json' } });
+
+    it('keeps how a direct answer arrived on the message, next to its scope', async () => {
+      streamNetworkJob.mockResolvedValue(
+        sse(
+          'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n' +
+            'data: {"meta":{"served_by":"contributor","served_scope":"circle","path":"direct","transport":"udp","finish_reason":"stop"}}\n\n' +
+            'data: [DONE]\n\n',
+        ),
+      );
+      await sendToCircle();
+
+      expect(lastMessage()).toMatchObject({
+        status: 'complete',
+        meta: { served_by: 'contributor', served_scope: 'circle', path: 'direct', transport: 'udp' },
+      });
+    });
+
+    it('leaves path and transport off a message the coordinator relayed', async () => {
+      streamNetworkJob.mockResolvedValue(
+        sse(
+          'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n' +
+            'data: {"meta":{"served_by":"contributor","served_scope":"circle","finish_reason":"stop"}}\n\n' +
+            'data: [DONE]\n\n',
+        ),
+      );
+      await sendToCircle();
+
+      const meta = lastMessage()?.meta;
+      expect(meta).toMatchObject({ served_scope: 'circle' });
+      expect(meta).not.toHaveProperty('path');
+      expect(meta).not.toHaveProperty('transport');
+    });
+
+    it('does not write how a reply arrived to the saved history', async () => {
+      streamNetworkJob.mockResolvedValue(
+        sse(
+          'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n' +
+            'data: {"meta":{"served_by":"contributor","served_scope":"circle","path":"direct","transport":"derp","finish_reason":"stop"}}\n\n' +
+            'data: [DONE]\n\n',
+        ),
+      );
+      await sendToCircle();
+
+      const saved = history.appendMessage.mock.calls.find(([, row]) => (row as { role: string }).role === 'assistant')?.[1];
+      expect(saved).toMatchObject({ served_by: 'contributor' });
+      expect(saved).not.toHaveProperty('path');
+      expect(saved).not.toHaveProperty('transport');
+    });
+
+    // The engine answers a refusal in the coordinator's shape, so the words are the same.
+    it.each([
+      [401, 'Sign in to use a trusted circle.', 'Your sign-in has expired. Sign in again to send requests over the network.'],
+      [404, 'circle not found', 'This circle no longer exists. Pick another circle in the scope menu.'],
+      [503, "No online peer serves model 'test-model'", 'No machine in this circle is offering test-model right now. Ask a member to open Potluck with sharing on, or pick another circle model.'],
+      [403, 'Only the owner can do that.', '[localApi] 403: Only the owner can do that.'],
+      [429, 'Too many live links. End one or wait for it to expire.', '[localApi] 429: Too many live links. End one or wait for it to expire.'],
+    ])('words a %i from the engine as it words the coordinator\'s', async (status, detail, expected) => {
+      streamNetworkJob.mockResolvedValue(refusal(status, detail));
+      await sendToCircle();
+      expect(lastMessage()).toMatchObject({ status: 'error', errorText: expected });
+    });
+
+    it('keeps the status line for a refusal whose detail is not a string, as before', async () => {
+      streamNetworkJob.mockResolvedValue(refusal(422, [{ type: 'uuid_parsing' }], 'Unprocessable Entity'));
+      await sendToCircle();
+      expect(lastMessage()).toMatchObject({ status: 'error', errorText: '[localApi] 422: Unprocessable Entity' });
+    });
+  });
+
   // -------------------------------------------------------------------------
   // Privacy: settings.privacy.chat_history_enabled gates every content write
   // -------------------------------------------------------------------------

@@ -117,6 +117,12 @@ export interface MessageMeta {
    *  machines, 'circle' = a trusted-circle member, 'pool' = an open-pool peer.
    *  Session-only (not persisted). */
   served_scope?: 'mine' | 'circle' | 'pool';
+  /** How a circle request reached the answering machine: 'direct' = a link from
+   *  this machine's engine, 'relay' = through the coordinator. Session-only. */
+  path?: 'direct' | 'relay';
+  /** Carrier of a 'direct' link: 'udp' = peer to peer, 'derp' = through the
+   *  Potluck relay as encrypted packets. Session-only. */
+  transport?: 'udp' | 'derp';
   /** Name of the machine that served a 'household' response. Session-only. */
   served_peer?: string;
   output_tokens?: number;
@@ -270,7 +276,9 @@ interface StreamFailure {
   category?: string;
 }
 
-/** Fixed copy per coordinator error category.
+/** Fixed copy per error category, from the coordinator or from the local
+ *  engine's /chat/circle route (the model_mismatch to coordinator_unreachable
+ *  rows). inference_error has no row on purpose: the generic line is right.
  *
  *  A Map, not an object literal: the category is attacker-influenced, and an
  *  object lookup for "__proto__", "constructor" or "toString" returns an
@@ -283,6 +291,13 @@ const CONTRIBUTOR_ERROR_COPY = new Map<string, string>([
   ['model_not_loaded', 'The contributor did not have this model loaded.'],
   ['declined', 'The contributor declined this request.'],
   ['internal', 'The contributor hit an internal error.'],
+  ['model_mismatch', 'The contributor no longer has this model loaded.'],
+  ['link_ended', 'The link to the contributor ended before the reply finished.'],
+  ['stream_protocol_error', 'The contributor sent a reply this app could not read.'],
+  ['stream_interrupted', 'The connection to the contributor ended before the reply finished.'],
+  ['stream_timeout', 'The contributor stopped answering.'],
+  ['peer_unreachable', 'The connection to the contributor failed.'],
+  ['coordinator_unreachable', 'Could not reach the Potluck coordinator.'],
 ]);
 
 const UNKNOWN_CONTRIBUTOR_ERROR = 'The contributor could not finish this reply.';
@@ -806,7 +821,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
       //                 (full history forwarded; trusted machines we own)
       //   cooperative — through the coordinator to an open-pool peer
       //                 (this desktop path sends only the latest prompt)
-      //   circle      — coordinator dispatch restricted to the selected circle;
+      //   circle      — dispatch restricted to the selected circle, through the
+      //                 local engine (a direct link, else the coordinator);
       //                 fail if no circle was selected when the user sent.
       //   local       — this machine's Python sidecar (default)
       let response: Response;
@@ -845,7 +861,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
         if (!activeCircleId) {
           throw new Error('Choose a trusted circle before sending.');
         }
-        // Route through the coordinator but restrict to the chosen circle.
+        // Restrict to the chosen circle. localApi sends this through the local
+        // engine and falls back to the coordinator; it never uses the pool.
         response = await localApi.streamNetworkJob(content, {
           modelSlug: networkModelSlug,
           abortSignal: controller.signal,
@@ -961,6 +978,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
                     if (m.id !== assistantId) return m;
                     const meta: NonNullable<AppMessage['meta']> = { served_by: event.served_by };
                     if (event.served_scope !== undefined) meta.served_scope = event.served_scope;
+                    if (event.path !== undefined) meta.path = event.path;
+                    if (event.transport !== undefined) meta.transport = event.transport;
                     if (event.output_tokens !== undefined) meta.output_tokens = event.output_tokens;
                     if (event.duration_ms !== undefined) meta.duration_ms = event.duration_ms;
                     if (event.finish_reason !== undefined) meta.finish_reason = event.finish_reason;

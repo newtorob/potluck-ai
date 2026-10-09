@@ -197,6 +197,17 @@ interface Scenario {
   contributor: Record<string, unknown>;
   circleModels: { slug: string; machines: number }[];
   coordinator?: FakeCoordinator;
+  /** The meta the engine's POST /chat/circle sends with its answer. Unset: the engine has no such route, as one from before it. */
+  engineMeta?: Record<string, unknown>;
+  /** Makes POST /chat/circle end its stream with this error instead of an answer. */
+  engineError?: { category: string; message: string };
+}
+
+/** A finished answer in the server-sent events both the engine and the coordinator send. */
+function answer(text: string, meta: Record<string, unknown>): string {
+  return `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`
+    + `data: ${JSON.stringify({ meta: { served_by: 'contributor', served_scope: 'circle', finish_reason: 'stop', ...meta } })}\n\n`
+    + 'data: [DONE]\n\n';
 }
 
 async function desktop(page: Page, scenario: Scenario) {
@@ -232,6 +243,16 @@ async function desktop(page: Page, scenario: Scenario) {
   await page.route(/:8321\//, (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
+    if (path === '/chat/circle') {
+      if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+      if (scenario.engineError !== undefined) {
+        return route.fulfill({ headers: cors, contentType: 'text/event-stream',
+          body: `data: ${JSON.stringify({ error: scenario.engineError })}\n\ndata: [DONE]\n\n` });
+      }
+      if (scenario.engineMeta === undefined) return route.fulfill({ status: 404, headers: cors, json: { detail: 'Not Found' } });
+      return route.fulfill({ headers: cors, contentType: 'text/event-stream', body: answer('Answered over a direct link.', scenario.engineMeta) });
+    }
     if (path === '/settings' && request.method() === 'PATCH') {
       const patch = request.postDataJSON() as { network?: Record<string, unknown> };
       patches.push(patch);
@@ -256,6 +277,9 @@ async function desktop(page: Page, scenario: Scenario) {
       return route.fulfill({ headers: cors, json: { circle_id: CIRCLE_ID, models: scenario.circleModels } });
     }
     if (path === '/me/device-keys') return route.fulfill({ status: 201, headers: cors, json: {} });
+    if (path === '/jobs/stream' && request.method() === 'POST') {
+      return route.fulfill({ headers: cors, contentType: 'text/event-stream', body: answer('Answered through the coordinator.', {}) });
+    }
     const body = request.method() === 'POST' ? (request.postDataJSON() as Record<string, unknown> | null) ?? {} : {};
     const reply = coordinator.handle(request.method(), path, body);
     if (reply === null) return route.fulfill({ status: 503, headers: cors, json: { detail: 'Unavailable in UI test' } });
@@ -332,6 +356,89 @@ test('a requester is told when no circle machine is sharing', async ({ page }) =
   await page.goto('/#/chat');
   await expect(page.getByText('No machine in this circle is sharing a model right now.')).toBeVisible();
   await capture(page, 'chat-circle-empty');
+});
+
+// ---- Sending a circle chat: the engine first, the coordinator as the fallback ----
+
+const CHAT_MODEL = 'qwen3-4b-instruct-2507-q4';
+
+/** Requests the app makes to the engine's circle route and the coordinator's job stream, with their bodies. */
+function watchChatRequests(page: Page) {
+  const seen: { to: 'engine' | 'coordinator'; body: Record<string, unknown> }[] = [];
+  page.on('request', (request) => {
+    if (request.method() !== 'POST') return;
+    const path = new URL(request.url()).pathname;
+    if (path !== '/chat/circle' && path !== '/jobs/stream') return;
+    seen.push({ to: path === '/chat/circle' ? 'engine' : 'coordinator', body: request.postDataJSON() as Record<string, unknown> });
+  });
+  return seen;
+}
+
+async function sendCircleChat(page: Page) {
+  await page.goto('/#/chat');
+  await expect(page.getByRole('combobox', { name: 'Model this circle will answer with' })).toHaveValue(CHAT_MODEL);
+  await page.getByRole('textbox').fill('Explain how a direct link works.');
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+}
+
+/** The opened receipt under the reply. */
+async function openReceipt(page: Page) {
+  await page.locator('button[aria-controls^="receipt-body-"]').click();
+  return page.getByRole('region', { name: 'Privacy receipt detail' });
+}
+
+const ANSWERED =
+  'A machine owned by a member of your circle answered this. It processed your prompt to generate the reply, so that machine saw your request text.';
+
+test('a circle answer that came over a direct link says so on its receipt', async ({ page }) => {
+  await desktop(page, { audience: 'mine', contributor: connected, circleModels: [{ slug: CHAT_MODEL, machines: 1 }],
+    engineMeta: { path: 'direct', transport: 'udp' } });
+  const requests = watchChatRequests(page);
+  await sendCircleChat(page);
+
+  await expect(page.getByText('Answered over a direct link.')).toBeVisible();
+  const receipt = await openReceipt(page);
+  await expect(receipt.getByText('Answered by your trusted circle')).toBeVisible();
+  await expect(receipt.getByText(/^A machine owned/)).toHaveText(
+    `${ANSWERED} Your machine sent it straight to theirs over an encrypted link. The Potluck coordinator set up the link and did not carry your prompt.`,
+  );
+  await capture(page, 'chat-circle-direct-receipt');
+
+  // One request, to the engine, for this circle. Nothing went to the coordinator or the pool.
+  expect(requests).toHaveLength(1);
+  expect(requests[0]).toMatchObject({ to: 'engine', body: { scope: 'circle', circle_id: CIRCLE_ID, model_slug: CHAT_MODEL } });
+});
+
+test('a circle chat still goes through the coordinator when the engine has no circle route', async ({ page }) => {
+  await desktop(page, { audience: 'mine', contributor: connected, circleModels: [{ slug: CHAT_MODEL, machines: 1 }] });
+  const requests = watchChatRequests(page);
+  await sendCircleChat(page);
+
+  await expect(page.getByText('Answered through the coordinator.')).toBeVisible();
+  // No path in the meta: the receipt reads as it did before direct links.
+  const receipt = await openReceipt(page);
+  await expect(receipt.getByText(/^A machine owned/)).toHaveText(
+    `${ANSWERED} The Potluck coordinator relayed it over encrypted connections, only to machines in the circle you chose.`,
+  );
+  await capture(page, 'chat-circle-fallback-receipt');
+
+  // The engine was tried once, then the same request went to the coordinator, as a circle request both times.
+  expect(requests.map((r) => r.to)).toEqual(['engine', 'coordinator']);
+  expect(requests[1]?.body).toEqual(requests[0]?.body);
+  expect(requests.every((r) => r.body['scope'] === 'circle' && r.body['circle_id'] === CIRCLE_ID)).toBe(true);
+});
+
+test('a circle chat the engine could not send to the coordinator says so, in the app\'s words', async ({ page }) => {
+  await desktop(page, { audience: 'mine', contributor: connected, circleModels: [{ slug: CHAT_MODEL, machines: 1 }],
+    engineError: { category: 'coordinator_unreachable', message: 'anything' } });
+  const requests = watchChatRequests(page);
+  await sendCircleChat(page);
+
+  await expect(page.getByText('Could not reach the Potluck coordinator.')).toBeVisible();
+  await expect(page.getByText('anything')).toHaveCount(0);
+  await capture(page, 'chat-circle-coordinator-unreachable');
+  // The engine already said what happened, so the app does not send the request again.
+  expect(requests.map((r) => r.to)).toEqual(['engine']);
 });
 
 // ---- The Circles page: invites, joining, leaving, removing ----------------

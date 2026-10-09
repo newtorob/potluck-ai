@@ -93,6 +93,57 @@ describe('route receipt', () => {
     expect(detail).not.toContain('do not know it came from you');
   });
 
+  describe('circle receipt wording', () => {
+    const ANSWERED =
+      'A machine owned by a member of your circle answered this. It processed your prompt to generate the reply, so that machine saw your request text.';
+    const RELAYED = `${ANSWERED} The Potluck coordinator relayed it over encrypted connections, only to machines in the circle you chose.`;
+    const TITLE = 'Answered by your trusted circle';
+    const circle = (extra: Partial<NonNullable<AppMessage['meta']>>): AppMessage =>
+      message({ content: 'hi', meta: { served_by: 'contributor', served_scope: 'circle', ...extra } });
+
+    /** The title and body paragraphs of the opened receipt, exactly as shown. */
+    function receipt(msg: AppMessage): { title: string | null; body: string | null } {
+      renderBubble(msg);
+      fireEvent.click(screen.getByRole('button', { name: /Trusted circle/ }));
+      const [title, body] = screen.getByRole('region', { name: 'Privacy receipt detail' }).querySelectorAll('p');
+      return { title: title?.textContent ?? null, body: body?.textContent ?? null };
+    }
+
+    it('reads as the relay when the message has no path, as saved before direct links', () => {
+      expect(receipt(circle({}))).toEqual({ title: TITLE, body: RELAYED });
+    });
+
+    it('reads as the relay when the path is relay, whatever the transport field says', () => {
+      expect(receipt(circle({ path: 'relay', transport: 'udp' }))).toEqual({ title: TITLE, body: RELAYED });
+    });
+
+    it('says the request went straight over an encrypted link for direct over udp', () => {
+      expect(receipt(circle({ path: 'direct', transport: 'udp' }))).toEqual({
+        title: TITLE,
+        body: `${ANSWERED} Your machine sent it straight to theirs over an encrypted link. The Potluck coordinator set up the link and did not carry your prompt.`,
+      });
+    });
+
+    it('says the link passed through the relay for direct over derp', () => {
+      expect(receipt(circle({ path: 'direct', transport: 'derp' }))).toEqual({
+        title: TITLE,
+        body: `${ANSWERED} Your machine sent it to theirs over an encrypted link that passed through the Potluck relay, which moves the encrypted packets and cannot read them. The Potluck coordinator set up the link and did not carry your prompt.`,
+      });
+    });
+
+    it('says only that the link was encrypted for direct with no transport', () => {
+      expect(receipt(circle({ path: 'direct' }))).toEqual({
+        title: TITLE,
+        body: `${ANSWERED} Your machine sent it to theirs over an encrypted link. The Potluck coordinator set up the link and did not carry your prompt.`,
+      });
+    });
+
+    it('keeps the same badge for every route', () => {
+      renderBubble(circle({ path: 'direct', transport: 'udp' }));
+      expect(screen.getByText('Trusted circle')).toBeTruthy();
+    });
+  });
+
   it('keeps the open pool receipt for an open pool answer', () => {
     renderBubble(message({ content: 'hi', meta: { served_by: 'contributor', served_scope: 'pool' } }));
 

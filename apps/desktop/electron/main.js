@@ -1606,19 +1606,24 @@ function sidecarRequest(method, reqPath, body) {
   return fetch(`http://127.0.0.1:${PYTHON_PORT}${reqPath}`, init).finally(() => clearTimeout(timer));
 }
 
+// Resolves true when a session was handed to the sidecar, false when there was
+// none to hand over or the sidecar did not take it.
 async function syncContributorSession({ allowClear = true } = {}) {
   const token = loadCloudToken();
   // Opening a signed-out app must not sign out a runtime started from the CLI.
-  if (!token && attachedRuntime && !allowClear) return;
+  if (!token && attachedRuntime && !allowClear) return false;
   try {
     const res = token
       ? await sidecarRequest('PUT', '/contributor/session', { token })
       : await sidecarRequest('DELETE', '/contributor/session');
     if (!res.ok) {
       log.warn(`[contributor] session sync returned HTTP ${res.status}`);
+      return false;
     }
+    return Boolean(token);
   } catch (err) {
     log.warn(`[contributor] session sync failed: ${err.message}`);
+    return false;
   }
 }
 
@@ -1632,6 +1637,12 @@ async function syncContributorSessionWhenReady() {
   const ready = await waitForSidecar();
   if (ready) await syncContributorSession({ allowClear: false });
 }
+
+// The renderer's circle chat goes through the sidecar, which answers 401 when it
+// holds no session (it restarted without us, or never got one). The renderer
+// asks for the hand-off again here; no token goes in or comes out, only whether
+// the sidecar now has one.
+ipcMain.handle('cloud:resync-engine-session', () => syncContributorSession({ allowClear: false }));
 
 ipcMain.handle('cloud:set-token', async (_evt, token) => {
   if (process.platform !== 'win32' && (app.isPackaged || attachedRuntime)) {

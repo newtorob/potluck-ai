@@ -275,6 +275,13 @@ contextBridge.exposeInMainWorld('potluck', {
      */
     setCoordinatorBase: (baseUrl) =>
       ipcRenderer.invoke('coordinator:set-base', String(baseUrl)),
+    /**
+     * Ask main to hand the member session to the local engine again. For a
+     * circle chat the engine refused with 401 because it holds no session
+     * (it restarted, or never got one). No token goes in or comes out.
+     * @returns {Promise<boolean>} true when the engine now has a session.
+     */
+    resyncEngineSession: () => ipcRenderer.invoke('cloud:resync-engine-session'),
   },
 
   // ── Mesh sidecar bridge ────────────────────────────────────────────────────

@@ -296,6 +296,53 @@ describe('contributor text containment', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Categories the engine's /chat/circle route can end a stream with
+// ---------------------------------------------------------------------------
+
+describe('engine circle categories', () => {
+  const GENERIC = 'The contributor could not finish this reply.';
+  // The engine's own text is never shown, so each case carries text nobody should see.
+  const ENGINE_TEXT = 'ENGINE-WORDING-NOBODY-SHOULD-SEE';
+
+  async function send(scope: 'circle' | 'cooperative', error: unknown): Promise<string | undefined> {
+    useChatStore.setState(
+      scope === 'circle'
+        ? { routingScope: 'circle', activeCircleId: 'selected-circle' }
+        : { routingScope: 'cooperative', networkMode: true },
+    );
+    streamNetworkJob.mockResolvedValue(sse(`data: ${JSON.stringify({ error })}\n\n`));
+    await useChatStore.getState().createConversation();
+    await useChatStore.getState().sendMessage('hello');
+    await flush();
+    return lastMessage()?.errorText;
+  }
+
+  describe.each(['circle', 'cooperative'] as const)('on the %s scope', (scope) => {
+    it.each([
+      ['model_mismatch', 'The contributor no longer has this model loaded.'],
+      ['link_ended', 'The link to the contributor ended before the reply finished.'],
+      ['stream_protocol_error', 'The contributor sent a reply this app could not read.'],
+      ['stream_interrupted', 'The connection to the contributor ended before the reply finished.'],
+      ['stream_timeout', 'The contributor stopped answering.'],
+      ['peer_unreachable', 'The connection to the contributor failed.'],
+      ['coordinator_unreachable', 'Could not reach the Potluck coordinator.'],
+    ])('says its own sentence for %s and never the engine message', async (category, sentence) => {
+      const text = await send(scope, { category, message: ENGINE_TEXT });
+      expect(text).toBe(sentence);
+      expect(text).not.toContain(ENGINE_TEXT);
+    });
+
+    it('keeps the generic line for inference_error, an unknown category and prototype keys', async () => {
+      for (const category of ['inference_error', 'quantum_flux', '__proto__', 'constructor', 'toString']) {
+        useChatStore.setState({ conversations: {}, activeConversationId: null });
+        const text = await send(scope, { category, message: ENGINE_TEXT });
+        expect(text, `category ${category}`).toBe(GENERIC);
+      }
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Prototype keys in the category lookup
 // ---------------------------------------------------------------------------
 

@@ -166,6 +166,45 @@ describe('streamTokens', () => {
     });
   });
 
+  describe('how a circle request reached the answering machine', () => {
+    const metaOf = async (meta: Record<string, unknown>) => {
+      const events = await collect(
+        sse(`data: ${JSON.stringify({ meta: { served_by: 'contributor', served_scope: 'circle', ...meta } })}\n\ndata: [DONE]\n\n`),
+      );
+      return events[0];
+    };
+
+    it('reads a direct link over udp', async () => {
+      expect(await metaOf({ path: 'direct', transport: 'udp' })).toEqual({
+        type: 'meta', served_by: 'contributor', served_scope: 'circle', path: 'direct', transport: 'udp',
+      });
+    });
+
+    it('reads a direct link through the relay', async () => {
+      expect(await metaOf({ path: 'direct', transport: 'derp' })).toMatchObject({ path: 'direct', transport: 'derp' });
+    });
+
+    it('reads a relayed request with a null transport as relay only', async () => {
+      const meta = await metaOf({ path: 'relay', transport: null });
+      expect(meta).toMatchObject({ path: 'relay' });
+      expect(meta).not.toHaveProperty('transport');
+    });
+
+    it.each(['Direct', 'p2p', '', 1, true, null, ['direct']])('leaves out a path of %j', async (path) => {
+      expect(await metaOf({ path })).not.toHaveProperty('path');
+    });
+
+    it.each(['UDP', 'tcp', 'relay', '', 1, true, null])('leaves out a transport of %j', async (transport) => {
+      expect(await metaOf({ path: 'direct', transport })).not.toHaveProperty('transport');
+    });
+
+    it('leaves meta from an older producer exactly as it was', async () => {
+      expect(await metaOf({ output_tokens: 3, finish_reason: 'stop' })).toEqual({
+        type: 'meta', served_by: 'contributor', served_scope: 'circle', output_tokens: 3, finish_reason: 'stop',
+      });
+    });
+  });
+
   it('falls back to a fixed message for an error envelope with no readable text', async () => {
     const events = await collect(sse('data: {"error":{}}\n\n'));
 

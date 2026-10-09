@@ -28,6 +28,13 @@ export interface StreamMeta {
    *  own machines, "circle" = a trusted-circle member, "pool" = an open-pool
    *  peer. Tier label only, never identity. */
   served_scope?: 'mine' | 'circle' | 'pool';
+  /** How a circle request reached the machine that answered: "direct" = this
+   *  machine's engine linked to it, "relay" = the coordinator carried it. Sent
+   *  by the engine's /chat/circle route; absent from every other producer. */
+  path?: 'direct' | 'relay';
+  /** Carrier of a direct link: "udp" = peer to peer, "derp" = through the
+   *  Potluck relay as encrypted packets. Absent when the engine did not say. */
+  transport?: 'udp' | 'derp';
   output_tokens?: number;
   duration_ms?: number;
   finish_reason?: string;
@@ -318,6 +325,10 @@ function extractMeta(parsed: unknown): StreamMeta | null {
   const result: StreamMeta = { type: 'meta', served_by: served };
   const scope = m['served_scope'];
   if (scope === 'mine' || scope === 'circle' || scope === 'pool') result.served_scope = scope;
+  const path = m['path'];
+  if (path === 'direct' || path === 'relay') result.path = path;
+  const transport = m['transport'];
+  if (transport === 'udp' || transport === 'derp') result.transport = transport;
   if (typeof m['output_tokens'] === 'number') result.output_tokens = m['output_tokens'];
   if (typeof m['duration_ms'] === 'number') result.duration_ms = m['duration_ms'];
   if (typeof m['finish_reason'] === 'string') result.finish_reason = m['finish_reason'];

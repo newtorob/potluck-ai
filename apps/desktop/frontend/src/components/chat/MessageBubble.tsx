@@ -129,6 +129,26 @@ interface ReceiptContent {
   body: string;
 }
 
+const CIRCLE_ANSWERED =
+  'A machine owned by a member of your circle answered this. It processed your prompt to generate the reply, so that machine saw your request text.';
+
+/** What happened to a circle request after the first two sentences, which are
+ *  the same for every route. A message without `path` (the coordinator relayed
+ *  it, or it was saved before direct links) reads as the relay. */
+function circleReceiptBody(meta: NonNullable<AppMessage['meta']>): string {
+  if (meta.path !== 'direct') {
+    return `${CIRCLE_ANSWERED} The Potluck coordinator relayed it over encrypted connections, only to machines in the circle you chose.`;
+  }
+  const setUp = 'The Potluck coordinator set up the link and did not carry your prompt.';
+  if (meta.transport === 'udp') {
+    return `${CIRCLE_ANSWERED} Your machine sent it straight to theirs over an encrypted link. ${setUp}`;
+  }
+  if (meta.transport === 'derp') {
+    return `${CIRCLE_ANSWERED} Your machine sent it to theirs over an encrypted link that passed through the Potluck relay, which moves the encrypted packets and cannot read them. ${setUp}`;
+  }
+  return `${CIRCLE_ANSWERED} Your machine sent it to theirs over an encrypted link. ${setUp}`;
+}
+
 function buildReceiptContent(meta: AppMessage['meta']): ReceiptContent {
   if (!meta || meta.served_by === 'local') {
     return {
@@ -153,10 +173,7 @@ function buildReceiptContent(meta: AppMessage['meta']): ReceiptContent {
   }
 
   if (meta.served_scope === 'circle') {
-    return {
-      title: 'Answered by your trusted circle',
-      body: 'A machine owned by a member of your circle answered this. It processed your prompt to generate the reply, so that machine saw your request text. The Potluck coordinator relayed it over encrypted connections, only to machines in the circle you chose.',
-    };
+    return { title: 'Answered by your trusted circle', body: circleReceiptBody(meta) };
   }
 
   if (meta.served_scope !== 'pool') {

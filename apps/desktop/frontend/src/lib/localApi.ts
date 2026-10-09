@@ -153,6 +153,110 @@ async function timedFetch(
 }
 
 // ---------------------------------------------------------------------------
+// Network job streams (SSE: raw fetch, no timeout, the caller owns the abort)
+// ---------------------------------------------------------------------------
+
+/** POST /jobs/stream against the coordinator, as the renderer always has. */
+function streamViaCoordinator(init: RequestInit): Promise<Response> {
+  // coordinator-bare-fetch-ok: SSE stream, so it can't route through the
+  // buffering coordinatorSessionRequest bridge (res.text() can't consume a
+  // live stream). Authenticated at the NETWORK layer instead: main.js's
+  // onBeforeSendHeaders injector (packaged app only) attaches the member
+  // session bearer to requests matching the coordinator origin the
+  // renderer pushes via 'coordinator:set-base'; see connectionStore.ts.
+  return nativeFetch(`${coordinatorBase()}/jobs/stream`, init);
+}
+
+function discard(res: Response): void {
+  void res.body?.cancel().catch(() => undefined);
+}
+
+/**
+ * True when a 404 from /chat/circle came from an engine that has no such route
+ * (FastAPI's bare {"detail":"Not Found"}, or no JSON detail at all), as opposed
+ * to the coordinator's own answer relayed by the engine ("circle not found").
+ * Reads a clone, so a response that is passed on still has its body.
+ */
+async function isMissingRoute(res: Response): Promise<boolean> {
+  const body: unknown = await res.clone().json().catch(() => null);
+  if (typeof body !== 'object' || body === null || !('detail' in body)) return true;
+  const detail = body.detail;
+  if (typeof detail === 'string') return detail === 'Not Found';
+  // An object is the coordinator's structured answer; any other value is no answer.
+  return !(typeof detail === 'object' && detail !== null);
+}
+
+/**
+ * Ask Electron main to hand the member session to the engine again. Resolves
+ * true when main had a session and the engine took it. The token stays in
+ * main; the renderer only learns whether the hand-off happened. False outside
+ * the Electron app, where there is no bridge.
+ */
+async function resyncEngineSession(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  const cloud = (
+    window as unknown as { potluck?: { cloud?: { resyncEngineSession?: () => Promise<boolean> } } }
+  ).potluck?.cloud;
+  if (!cloud?.resyncEngineSession) return false;
+  try {
+    return (await cloud.resyncEngineSession()) === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * POST /chat/circle on the local engine. Resolves null when the engine cannot
+ * take the request at all (no such route, or not running), so the caller can
+ * use the coordinator instead. Any other answer, including a refusal, is
+ * returned as the engine sent it.
+ */
+async function postCircleJobToEngine(init: RequestInit): Promise<Response | null> {
+  let res: Response;
+  try {
+    res = await nativeFetch(`${LOCAL_BASE}/chat/circle`, init);
+  } catch {
+    // The caller stopping is not an engine that is down.
+    init.signal?.throwIfAborted();
+    return null;
+  }
+  if (res.status === 405 || (res.status === 404 && (await isMissingRoute(res)))) {
+    discard(res);
+    return null;
+  }
+  return res;
+}
+
+/**
+ * A circle chat. The engine tries a direct link to a circle member's machine
+ * and relays through the coordinator itself when it cannot, so it goes first.
+ * The coordinator is the fallback only when the engine cannot take the request
+ * (an engine from before /chat/circle, or none running) or answers 401 twice:
+ * the engine holds the member session separately from the one the renderer's
+ * own coordinator calls use, and it may not have it yet. The request body is
+ * identical on every path and always says scope "circle"; nothing here sends a
+ * circle chat to the open pool.
+ */
+async function streamCircleJob(init: RequestInit): Promise<Response> {
+  let res = await postCircleJobToEngine(init);
+  if (res?.status === 401) {
+    discard(res);
+    res = null;
+    if (await resyncEngineSession()) {
+      init.signal?.throwIfAborted();
+      res = await postCircleJobToEngine(init);
+      if (res?.status === 401) {
+        discard(res);
+        res = null;
+      }
+    }
+  }
+  if (res) return res;
+  init.signal?.throwIfAborted();
+  return streamViaCoordinator(init);
+}
+
+// ---------------------------------------------------------------------------
 // Readiness probes
 // ---------------------------------------------------------------------------
 
@@ -711,7 +815,10 @@ export const localApi = {
   },
 
   /**
-   * POST /jobs/stream against the coordinator (NOT the local sidecar).
+   * POST /jobs/stream against the coordinator (NOT the local sidecar), or for
+   * a circle chat POST /chat/circle on the local engine, which answers with
+   * the coordinator's own shapes and falls back to the coordinator when the
+   * engine cannot take it (see streamCircleJob).
    * Returns a Response whose body is an OpenAI-compatible SSE stream
    * — same shape /chat/completions emits, so streamTokens() consumes
    *   it without any modification.
@@ -756,13 +863,7 @@ export const localApi = {
       body: JSON.stringify(body),
     };
     if (options.abortSignal) init.signal = options.abortSignal;
-    // coordinator-bare-fetch-ok: SSE stream — can't route through the
-    // buffering coordinatorSessionRequest bridge (res.text() can't consume a
-    // live stream). Authenticated at the NETWORK layer instead: main.js's
-    // onBeforeSendHeaders injector (packaged app only) attaches the member
-    // session bearer to requests matching the coordinator origin the
-    // renderer pushes via 'coordinator:set-base' — see connectionStore.ts.
-    return nativeFetch(`${coordinatorBase()}/jobs/stream`, init);
+    return options.circleId !== undefined ? streamCircleJob(init) : streamViaCoordinator(init);
   },
 
   // ---- Models --------------------------------------------------------------
