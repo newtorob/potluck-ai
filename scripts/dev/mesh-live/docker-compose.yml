@@ -7,7 +7,7 @@ x-sidecar: &sidecar
   image: meshlive-sidecar:${VARIANT:-after}
   init: true
   command: ["sleep", "infinity"]
-  cap_add: [NET_ADMIN]
+  cap_add: [NET_ADMIN, NET_RAW]   # NET_RAW: the filter phases send hand-made packets
   devices: ["/dev/net/tun:/dev/net/tun"]
   depends_on:
     coordinator: { condition: service_healthy }

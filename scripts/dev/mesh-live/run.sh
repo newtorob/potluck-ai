@@ -6,20 +6,24 @@
 #
 #   run.sh [--help]
 # Environment:
-#   PHASES            phases to run, default "up A B E1 C W S"
+#   PHASES            phases to run, default "up A B E1 C W S"; "none" skips this pass
 #   WITH_E2=1         add E2 (forced rejoin, about 1 to 3 minutes)
 #   WITH_R=1          add R (needs the two-minute roster refresh, about 4 minutes)
 #   WITH_D=1          add D (own address, duplicates, bad keys, via a stand-in coordinator)
-#   WITH_PROTO=1      add the throwaway port-filter prototype (a second stack, phase P)
+#   WITH_FILTER=1     add the packet-filter phases: F, FO, FR and FH on a second image that has the
+#                     harness shim (about 6 minutes), and FT on the default image (about 6 more)
+#   FILTER_PHASES     phases of the filter pass, default "up F FO FR FH"
+#   FT_FIRST/FT_SECOND  which arm phase FT runs first (filter or nofilter), default filter then nofilter
 #   BEFORE_REF=<ref>  also run A and C against the sidecar built from that older commit
 #   BEFORE_EXPECT     what the older binary should do with a bad address: accepts (default) or refuses
 #   MESH_LIVE_PRUNE_BASE=1  on exit also remove base images this run had to pull
+#   MESH_LIVE_KEEP=1  do not tear the stack down on exit, to look at a failure (then run make mesh-live-clean)
 # Exit status: 0 all assertions held, 1 an assertion failed, 2 cannot run here, 130 interrupted.
 
 H="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$H/../../.." && pwd)"
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0; fi
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then sed -n '2,21p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0; fi
 
 # Outer: run this script again with all output copied to the transcript, and
 # pass its exit status on. tee -i keeps the transcript alive through Ctrl-C so
@@ -42,7 +46,7 @@ export REPO_ROOT PROJECT
 VARIANT=after; export VARIANT
 INTERRUPTED=; FAIL_MSG=; SUMMARY=; BEFORE_DIR=; TORN_DOWN=; ALL_DONE=
 T_START=$SECONDS
-PHASES=${PHASES:-"up A B E1${WITH_E2:+ E2} C W${WITH_R:+ R} S${WITH_D:+ D}"}
+PHASES=${PHASES:-"up A B E1${WITH_E2:+ E2} C W${WITH_R:+ R} S${WITH_D:+ D}${WITH_FILTER:+ FT}"}
 BEFORE_EXPECT=${BEFORE_EXPECT:-accepts}
 BASE_IMAGES="golang:1.22-bookworm python:3.11-slim debian:12-slim postgres:16-alpine"
 PRE_IMAGES=
@@ -51,9 +55,12 @@ for i in $BASE_IMAGES; do docker image inspect "$i" >/dev/null 2>&1 && PRE_IMAGE
 # ------------------------------------------------------------------ teardown
 teardown() {
   [ -n "$TORN_DOWN" ] && return; TORN_DOWN=1
+  if [ -n "${MESH_LIVE_KEEP:-}" ]; then
+    printf '\n-- teardown skipped (MESH_LIVE_KEEP is set); remove it with: make mesh-live-clean\n'; return
+  fi
   printf '\n-- teardown\n'
   dc down -v --remove-orphans 2>&1 | tail -n 4
-  docker image rm meshlive-sidecar:after meshlive-sidecar:before meshlive-sidecar:proto meshlive-coordinator:local 2>&1 | grep -v "No such image"
+  docker image rm meshlive-sidecar:after meshlive-sidecar:before meshlive-sidecar:filter meshlive-coordinator:local 2>&1 | grep -v "No such image"
   [ -n "$BEFORE_DIR" ] && rm -rf "$BEFORE_DIR"
   if [ -n "${MESH_LIVE_PRUNE_BASE:-}" ]; then
     for i in $BASE_IMAGES; do case "$PRE_IMAGES " in *" $i "*) ;; *) docker image rm "$i" 2>&1 | grep -v "No such image";; esac; done
@@ -83,10 +90,10 @@ trap on_exit EXIT
 trap 'INTERRUPTED=1; exit 130' INT TERM
 
 # ------------------------------------------------------------------ builds
-build_sidecar() {  # VARIANT CONTEXT_DIR COMMIT [PROTO]
+build_sidecar() {  # VARIANT CONTEXT_DIR COMMIT [SHIM]
   note "building meshlive-sidecar:$1 from $2"
   docker buildx build --load -f "$H/Dockerfile.sidecar" --build-context harness="$H" \
-    --build-arg COMMIT="$3" --build-arg PROTO="${4:-}" -t "meshlive-sidecar:$1" "$2" \
+    --build-arg COMMIT="$3" --build-arg SHIM="${4:-}" -t "meshlive-sidecar:$1" "$2" \
     >"$H/out/build-$1.log" 2>&1 || { tail -n 30 "$H/out/build-$1.log"; fail "the $1 sidecar image did not build (log: out/build-$1.log)"; }
 }
 build_variant() {
@@ -95,7 +102,7 @@ build_variant() {
   [ -n "$(git -C "$REPO_ROOT" status --porcelain -- apps/desktop/go/potluck-mesh 2>/dev/null)" ] && sha="$sha+uncommitted"
   case $1 in
     after) build_sidecar after "$REPO_ROOT/apps/desktop/go/potluck-mesh" "$sha" ;;
-    proto) build_sidecar proto "$REPO_ROOT/apps/desktop/go/potluck-mesh" "$sha+portfilter-prototype" portfilter ;;
+    filter) build_sidecar filter "$REPO_ROOT/apps/desktop/go/potluck-mesh" "$sha+filter-shim" filter ;;
     before)
       git -C "$REPO_ROOT" rev-parse --verify "${BEFORE_REF}^{commit}" >/dev/null 2>&1 || fail "BEFORE_REF=$BEFORE_REF is not a commit in this repository"
       BEFORE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/meshlive-before.XXXXXX")
@@ -158,6 +165,10 @@ phase_A() {
   expect_match "node-a opens the mesh interface and the WireGuard port" '-i potluck0 -j ACCEPT[[:space:]]*.*--dport 51820 -j ACCEPT|--dport 51820 -j ACCEPT[[:space:]]*.*-i potluck0 -j ACCEPT' "$(ex node-a 'iptables -S INPUT | tr "\n" " "')"
   expect_eq "node-a dropped no roster entry" 0 "$(log_count node-a 'roster: dropping peer')"
   expect_eq "node-b dropped no roster entry" 0 "$(log_count node-b 'roster: dropping peer')"
+  if [ "$VARIANT" != before ]; then
+    expect_eq "node-a's packet filter dropped no mesh-range packet while the household talked" 0 "$(log_count node-a 'tunnel filter: dropped packets')"
+    expect_eq "node-b's packet filter dropped no mesh-range packet while the household talked" 0 "$(log_count node-b 'tunnel filter: dropped packets')"
+  fi
   phase_end
 }
 
@@ -506,45 +517,293 @@ phase_D() {
   phase_end
 }
 
-# ------------------------------------------------------------------ P (flag): port-filter prototype
-phase_P() {
-  phase P "Port-filter prototype: a circle peer reaches one TCP port and nothing else [$VARIANT]"
-  step "node-a's sidecar runs the prototype; node-b is the circle peer (100.64.0.2), node-c a household peer"
-  # In this phase "circle peer" is only a setting on node-a: PORTFILTER_PEERS. node-a lets the circle peer
-  # reach TCP 8080 on itself and lets itself reach TCP 9090 on the circle peer. Everything else to and from it is dropped.
-  ex node-a 'PORTFILTER_PEERS=100.64.0.2 PORTFILTER_LOCAL_PORT=8080 PORTFILTER_REMOTE_PORT=9090 mesh-ctl start' >/dev/null
-  ex node-b 'mesh-ctl start' >/dev/null; ex node-c 'mesh-ctl start' >/dev/null
+# ------------------------------------------------------------------ F, FO, FR, FT (WITH_FILTER=1): the shipped packet filter
+# F, FO and FR run on the "filter" image: the shipped sidecar plus a harness-only file (shim/) that, because no
+# circle peer can exist yet, makes node-b look like one on node-a: the household function the filter is given says
+# "not a household peer" for node-b's address, and node-b's entry is registered with the filter's own SetEntry.
+# The wrapper, the verdict, the flow table and the deadlines are the shipped code. FT runs on the default image.
+phase_F() {
+  phase F "The shipped packet filter confines one restricted peer to one TCP port [$VARIANT]"
+  step "node-a runs the filter build; node-b will be made a restricted peer on node-a, node-c stays a household peer"
+  ex node-a 'mesh-ctl start' >/dev/null; ex node-b 'mesh-ctl start' >/dev/null; ex node-c 'mesh-ctl start' >/dev/null
   expect_match "household created" '^[0-9a-f-]{36}$' "$(coord POST /mesh/households '{"name":"meshlive"}' | J -r '.id // empty')"
   pair node-a node-a; pair node-b node-b; pair node-c node-c
   wait_for 60 "node-a joined" joined node-a; wait_for 60 "node-b joined" joined node-b; wait_for 60 "node-c joined" joined node-c
   IPA=$(meship node-a); IPB=$(meship node-b); IPC=$(meship node-c)
-  expect_match "node-a started the prototype filter" 'PORT FILTER PROTOTYPE ACTIVE.*peers=1 local_port=8080 remote_port=9090' "$(log_lines node-a 'PORT FILTER')"
-  expect_eq "node-b got the address the filter treats as the circle peer" 100.64.0.2 "$IPB"
+  expect_match "node-a runs the harness build of the packet filter" 'MESHLIVE FILTER SHIM ACTIVE' "$(log_lines node-a 'MESHLIVE FILTER')"
+  local p
+  for p in "node-a node-b" "node-a node-c" "node-b node-a" "node-c node-a" "node-b node-c" "node-c node-b"; do
+    # shellcheck disable=SC2086
+    wait_for 60 "${p% *} sees ${p#* } reachable" peer_reachable $p
+  done
+  # node-b's own servers (9090 and up) start in the outbound step: a client cannot use a source port that a
+  # listener on the same address already holds, and the inbound checks below use 9090 as a source port.
+  srv node-a "$IPA" 8080; srv node-a "$IPA" 8081; acceptlog node-a "$IPA" 8082
+  srv node-c "$IPC" 8080; srv node-c "$IPC" 9091
+  step "control: before node-b is restricted it is a household peer and reaches every port"
+  expect_eq "node-b reaches node-a:8080" "served-by=node-a bound=$IPA client=$IPB" "$(tcp_get node-b "$IPA" 8080)"
+  expect_eq "node-b reaches node-a:8081" "served-by=node-a bound=$IPA client=$IPB" "$(tcp_get node-b "$IPA" 8081)"
+  expect_eq "node-a has no restricted peer yet" 0 "$(fstate node-a | J -r '.entries|length')"
+
+  step "node-a restricts node-b: it may reach TCP 8080 on node-a, and node-a may reach TCP 9090 on node-b"
+  restrict node-a "$IPB" 8080 9090 3600
+  expect_eq "the filter lists one entry for node-b with those ports" "$IPB 8080 9090 false" "$(fstate node-a | J -r '.entries[]|"\(.peer) \(.in) \(.out) \(.expired)"')"
+
+  step "inbound TCP from the restricted peer"
+  expect_eq "node-b reaches node-a:8080 (the granted port)" "served-by=node-a bound=$IPA client=$IPB" "$(tcp_get node-b "$IPA" 8080)"
+  assert_tcp_blocked node-b "$IPA" "node-b cannot reach node-a:8081 (a server is listening there)" 8081 5
+  assert_tcp_blocked node-b "$IPA" "node-b cannot reach node-a:8082 either" 8082 5
+  expect_eq "the listener on 8082 accepted nothing from node-b" 0 "$(accepted_from node-a 8082 "$IPB")"
+  expect_eq "control: node-b can use source port 8080 to reach the granted port, so a block below is the filter and not a bind error" "served-by=node-a bound=$IPA client=$IPB" "$(tcp_get node-b "$IPA" 8080 8 "--local-port 8080")"
+  assert_tcp_blocked node-b "$IPA" "node-b cannot open 8081 from source port 9090 (its own circle port: the reply-direction hole)" 8081 5 "--local-port 9090"
+  assert_tcp_blocked node-b "$IPA" "node-b cannot open 8081 from source port 8080 (the granted port used as a source)" 8081 5 "--local-port 8080"
+  expect_eq "control: source port 9090 does reach the granted port, so the lines above were the filter" "served-by=node-a bound=$IPA client=$IPB" "$(tcp_get node-b "$IPA" 8080 8 "--local-port 9090")"
+  expect_eq "node-c, a household peer, reaches node-a:8081" "served-by=node-a bound=$IPA client=$IPC" "$(tcp_get node-c "$IPA" 8081)"
+  expect_eq "node-c reaches node-a:8082 (the listener records it)" 1 "$(tcp_get node-c "$IPA" 8082 5 >/dev/null; accepted_from node-a 8082 "$IPC")"
+  expect_eq "node-b still reaches node-a:8080 after all the blocked attempts" "served-by=node-a bound=$IPA client=$IPB" "$(tcp_get node-b "$IPA" 8080)"
+
+  step "hand-made packets from the restricted peer reach the host's network stack only if the filter let them through (each one is also sent from household node-c as a control)"
+  assert_raw_blocked "node-b: stray ACK from its own circle port 9090 to a port nobody opened" node-b ack node-a Tcp OutRsts 9090 40001
+  assert_raw_reaches "node-c: the same stray ACK" node-c ack node-a Tcp OutRsts 9090 40001
+  assert_raw_blocked "node-b: stray SYN-ACK from port 9090 to a port nobody opened" node-b synack node-a Tcp OutRsts 9090 40002
+  assert_raw_reaches "node-c: the same stray SYN-ACK" node-c synack node-a Tcp OutRsts 9090 40002
+  assert_raw_blocked "node-b: stray ACK from the granted port 8080 to node-a:8081" node-b ack node-a Tcp OutRsts 8080 8081
+  assert_raw_reaches "node-c: the same ACK" node-c ack node-a Tcp OutRsts 8080 8081
+  assert_raw_blocked "node-b: SYN to a closed port" node-b syn node-a Tcp OutRsts 40003 8090
+  assert_raw_reaches "node-c: the same SYN" node-c syn node-a Tcp OutRsts 40003 8090
+  assert_raw_blocked "node-b: a SYN to the granted port 8080 split into two fragments" node-b fragsyn node-a Ip ReasmReqds 40004 8080
+  assert_raw_reaches "node-c: the same fragments" node-c fragsyn node-a Ip ReasmReqds 40004 8080
+  # A lone later fragment cannot be sent from these containers: the sender's netfilter defragmentation holds it
+  # until the reassembly timeout and never emits it. The unit tests cover it.
+  assert_raw_blocked "node-b: ICMP echo request" node-b icmp node-a Icmp InEchos
+  assert_raw_reaches "node-c: the same ICMP echo request" node-c icmp node-a Icmp InEchos
+  assert_raw_blocked "node-b: UDP datagram to a closed port" node-b udp node-a Udp NoPorts 40005 9999
+  assert_raw_reaches "node-c: the same UDP datagram" node-c udp node-a Udp NoPorts 40005 9999
+
+  step "outbound: node-a to the restricted peer"
+  srv node-b "$IPB" 9090; srv node-b "$IPB" 9091; acceptlog node-b "$IPB" 9092
+  expect_eq "node-a reaches node-b:9090 (the granted port)" "served-by=node-b bound=$IPB client=$IPA" "$(tcp_get node-a "$IPB" 9090)"
+  assert_tcp_blocked node-a "$IPB" "node-a cannot reach node-b:9091" 9091 5
+  assert_tcp_blocked node-a "$IPB" "node-a cannot reach node-b:9092 either" 9092 5
+  expect_eq "the listener on node-b:9092 accepted nothing from node-a" 0 "$(accepted_from node-b 9092 "$IPA")"
+  srv_stop node-a 8080   # node-a's own listener holds 8080; a client cannot bind it as a source port while it is up
+  expect_eq "control: node-a can use source port 8080 to reach the granted port on node-b, so a block below is the filter and not a bind error" "served-by=node-b bound=$IPB client=$IPA" "$(srcget node-a "$IPB" 9090 8080)"
+  assert_src_blocked node-a "$IPB" 9091 8080 "node-a cannot open node-b:9091 from source port 8080 (its own granted inbound port)"
+  srv node-a "$IPA" 8080
+  expect_eq "node-a reaches household node-c on 9091" "served-by=node-c bound=$IPC client=$IPA" "$(tcp_get node-a "$IPC" 9091)"
+  assert_raw_blocked "node-a: UDP datagram to node-b" node-a udp node-b Udp NoPorts 40006 9999
+  assert_raw_reaches "node-a: the same UDP datagram to household node-c" node-a udp node-c Udp NoPorts 40006 9999
+  assert_raw_blocked "node-a: ICMP echo to node-b" node-a icmp node-b Icmp InEchos
+  assert_raw_reaches "node-a: the same ICMP echo to household node-c" node-a icmp node-c Icmp InEchos
+
+  step "a large transfer arrives whole and in order through the filter, both ways (sha256 of a seeded random stream)"
+  local sz=30000000 want got
+  want=$(ex node-a "curl -s 'http://$IPA:8080/sha/$sz?seed=11'")
+  got=$(ex node-b "curl -s -m 120 --interface $IPB 'http://$IPA:8080/rand/$sz?seed=11' | sha256sum | cut -d' ' -f1")
+  expect_eq "node-b downloads $sz bytes from node-a:8080, sha256 matches" "$want" "$got"
+  want=$(ex node-b "curl -s 'http://$IPB:9090/sha/$sz?seed=12'")
+  got=$(ex node-a "curl -s -m 120 --interface $IPA 'http://$IPB:9090/rand/$sz?seed=12' | sha256sum | cut -d' ' -f1")
+  expect_eq "node-a downloads $sz bytes from node-b:9090, sha256 matches" "$want" "$got"
+
+  step "the filter counted what it dropped, and never panicked"
+  for p in port_not_allowed no_tracked_flow not_tcp fragment; do
+    [ "$(fdrops node-a "$p")" -ge 1 ] && ok "node-a's filter counted drops for $p ($(fdrops node-a "$p"))" || fail "node-a's filter counted no drops for $p"
+  done
+  expect_eq "no panic in the filter" 0 "$(fdrops node-a panic)"
+  expect_eq "node-a logged no panic" 0 "$(log_count node-a 'panic')"
+
+  step "a deadline cuts an open stream and refuses new connections; a renewal restores service"
+  fshim node-a POST "/entry?peer=$IPB&in=8080&out=9090&ttl=16" >/dev/null
+  ex node-b "rm -f /tmp/ticks.out; nohup curl -sN -m 60 --interface $IPB -o /tmp/ticks.out http://$IPA:8080/ticks/60 >/dev/null 2>&1 & echo \$! > /run/ticks.pid"
+  sleep 8
+  local early; early=$(ex node-b 'wc -l < /tmp/ticks.out' | tr -d '\r ')
+  expect_ge "the stream is flowing before the deadline (lines so far)" 4 "$early"
+  sleep 14
+  local at_cut after; at_cut=$(ex node-b 'wc -l < /tmp/ticks.out' | tr -d '\r '); sleep 8; after=$(ex node-b 'wc -l < /tmp/ticks.out' | tr -d '\r ')
+  expect_eq "no more of the stream arrives after the deadline (lines at +22s and +30s)" "$at_cut" "$after"
+  [ "$at_cut" -le 19 ] && ok "the stream stopped at about the 16 second deadline ($at_cut lines, not 30)" || fail "the stream kept flowing past the deadline ($at_cut lines)"
+  expect_eq "the filter reports the entry expired" true "$(fstate node-a | J -r '.entries[0].expired')"
+  assert_tcp_blocked node-b "$IPA" "a new connection to the granted port is refused after the deadline" 8080 5
+  expect_ge "the filter counted entry_expired drops" 1 "$(fdrops node-a entry_expired)"
+  fshim node-a POST "/entry?peer=$IPB&in=8080&out=9090&ttl=3600" >/dev/null
+  expect_eq "after a renewal a new connection works again" "served-by=node-a bound=$IPA client=$IPB" "$(tcp_get node-b "$IPA" 8080)"
+  ex node-b 'kill $(cat /run/ticks.pid) 2>/dev/null; true' >/dev/null
+
+  step "the entry is removed: the peer is neither household nor restricted, so nothing passes; then it is released to the household"
+  fshim node-a DELETE "/entry?peer=$IPB" >/dev/null
+  assert_tcp_blocked node-b "$IPA" "with no entry the peer reaches nothing, not even 8080" 8080 5
+  assert_tcp_blocked node-a "$IPB" "node-a reaches nothing on node-b either" 9090 5
+  fshim node-a POST "/release?peer=$IPB" >/dev/null
+  expect_eq "released, node-b is a household peer again and reaches 8081" "served-by=node-a bound=$IPA client=$IPB" "$(tcp_get node-b "$IPA" 8081)"
+
+  step "household traffic between the three machines was untouched throughout"
+  srv node-b "$IPB" 8080
+  assert_tcp node-a node-b; assert_tcp node-b node-a; assert_tcp node-c node-a; assert_tcp node-a node-c
+  expect_eq "node-b (its own sidecar has no restriction) reaches household node-c on 8080" "served-by=node-c bound=$IPC client=$IPB" "$(tcp_get node-b "$IPC" 8080)"
+  phase_end
+}
+
+# shim_up NODE : the shim answers
+shim_up() { fstate "$1" | J -e 'has("entries")' >/dev/null; }
+# reach_ok FROM TO PORT : a TCP exchange FROM -> TO:PORT returns the right reply
+reach_ok() { [ "$(tcp_get "$1" "$(ipof "$2")" "${3:-8080}" 4)" = "served-by=$2 bound=$(ipof "$2") client=$(ipof "$1")" ]; }
+
+phase_FO() {
+  phase FO "The forbidden port never accepts while the entry and the peer flap, and the sidecar dies mid-flap [$VARIANT]"
+  require F
+  local env="MESHLIVE_FILTER=$IPB:8080:9090:3600"
+  step "node-a restarts with node-b restricted from its very first packet (set in the environment of the harness build)"
+  restart_sidecar node-a "$env"
+  wait_for 60 "node-a sees node-b reachable" peer_reachable node-a node-b
+  wait_for 60 "node-b sees node-a reachable" peer_reachable node-b node-a
+  wait_for 20 "node-a's shim answers" shim_up node-a
+  expect_eq "node-a starts with node-b restricted" "$IPB 8080 9090" "$(fstate node-a | J -r '.entries[]|"\(.peer) \(.in) \(.out)"')"
+  srv_stop node-a 8081   # phase F left a plain server on 8081; the recording listener must own the port
+  srv node-a "$IPA" 8080; acceptlog node-a "$IPA" 8081
+  wait_for 30 "node-b reaches node-a:8080" reach_ok node-b node-a 8080
+  assert_tcp_blocked node-b "$IPA" "node-b cannot reach node-a:8081" 8081 4
+  expect_eq "the forbidden port has accepted nothing from node-b so far" 0 "$(accepted_from node-a 8081 "$IPB")"
+
+  step "60 seconds: node-b hammers node-a:8081 from 16 threads; node-a's entry changes 40 times a second; node-b's sidecar restarts every 7 seconds; node-a's sidecar is killed with SIGKILL once and restarted"
+  ex node-b "rm -f /tmp/hammer.out; nohup python3 /opt/meshlive/hammer.py $IPB $IPA 8081 64 /tmp/hammer.out 16 >/dev/null 2>&1 &"
+  fshim node-a POST "/flap?peer=$IPB&in=8080&out=9090&hz=40&seconds=58" >/dev/null
+  local t0=$SECONDS killed= restarts=0 next=4 flaps1=0 flaps2=0
+  while [ $((SECONDS-t0)) -lt 60 ]; do
+    if [ $((SECONDS-t0)) -ge 28 ] && [ -z "$killed" ]; then
+      flaps1=$(fstate node-a | J -r '.flaps // 0')
+      note "killing node-a's sidecar with SIGKILL after $flaps1 entry changes"
+      ex node-a 'mesh-ctl kill9' >/dev/null
+      ex node-a "$env mesh-ctl start" >/dev/null
+      killed=1
+      wait_for 30 "node-a's shim is back" shim_up node-a
+      fshim node-a POST "/flap?peer=$IPB&in=8080&out=9090&hz=40&seconds=$((58-(SECONDS-t0)))" >/dev/null
+    elif [ $((SECONDS-t0)) -ge $next ]; then
+      ex node-b 'mesh-ctl restart' >/dev/null; restarts=$((restarts+1)); next=$((next+7))
+    fi
+    sleep 1
+  done
+  wait_for 30 "the hammer on node-b finished" ex node-b 'test -s /tmp/hammer.out'
+  sleep 3
+  flaps2=$(fstate node-a | J -r '.flaps // 0')
+  local res attempts connected
+  res=$(ex node-b 'cat /tmp/hammer.out' | tr -d '\r'); attempts=${res#attempts=}; attempts=${attempts%% *}; connected=${res##*connected=}
+  note "hammer: $res; node-b sidecar restarts: $restarts; entry changes: $flaps1 before the kill, $flaps2 after"
+
+  step "nothing got through"
+  expect_eq "the hammer's connections that completed" 0 "$connected"
+  expect_ge "the hammer really ran (attempts)" 500 "$attempts"
+  expect_eq "the forbidden port accepted no connection from node-b" 0 "$(accepted_from node-a 8081 "$IPB")"
+  expect_eq "the forbidden port accepted no connection from anyone" 0 "$(ex node-a 'wc -l < /tmp/accept-8081.log' | tr -d '\r ')"
+  expect_ge "the flap really ran before the kill (entry changes)" 300 "$flaps1"
+  expect_ge "the flap really ran after the restart (entry changes)" 300 "$flaps2"
+  expect_ge "node-b's sidecar restarted several times during the run" 5 "$restarts"
+  expect_eq "no panic in the filter" 0 "$(fdrops node-a panic)"
+
+  step "afterwards the granted port works and the forbidden one is still closed"
+  wait_for 90 "node-b reaches node-a:8080 again" reach_ok node-b node-a 8080
+  assert_tcp_blocked node-b "$IPA" "node-b still cannot reach node-a:8081" 8081 4
+  assert_tcp node-c node-a
+  phase_end
+}
+
+phase_FR() {
+  phase FR "Throughput of a restricted peer (flow-tracked) against the same peer as a household peer, alternating [$VARIANT]"
+  require F
+  wait_for 60 "node-b sees node-a reachable" peer_reachable node-b node-a
+  srv node-a "$IPA" 8080
+  local bytes=400000000 rounds=8 i r h
+  local -a rs hs
+  step "node-b downloads $bytes bytes from node-a:8080, $rounds rounds, restricted and household in alternating order"
+  note "Docker Desktop VM numbers: they show a gross change, not a few percent"
+  bulk node-b "$IPA" 8080 100000000 >/dev/null
+  for i in $(seq 1 $rounds); do
+    if [ $((i%2)) -eq 1 ]; then order="household restricted"; else order="restricted household"; fi
+    for arm in $order; do
+      if [ "$arm" = restricted ]; then restrict node-a "$IPB" 8080 9090 3600; else fshim node-a POST "/release?peer=$IPB" >/dev/null; fi
+      r=$(bulk node-b "$IPA" 8080 $bytes)
+      [ "$r" != FAILED ] || fail "the $arm transfer in round $i did not arrive whole"
+      printf 'round %s %-10s %s MB/s\n' "$i" "$arm" "${r#* }"
+      if [ "$arm" = restricted ]; then rs+=("${r#* }"); else hs+=("${r#* }"); fi
+    done
+  done
+  ok "all $((2*rounds)) transfers arrived whole ($bytes bytes each)"
+  step "compare the two arms"
+  stats "household peer (unrestricted)" "${hs[@]}"
+  stats "restricted peer (flow tracking)" "${rs[@]}"
+  h=$(median "${hs[@]}"); r=$(median "${rs[@]}")
+  note "median restricted / median household = $(awk -v a="$r" -v b="$h" 'BEGIN{printf "%.2f", a/b}'). The spread inside each arm is the noise floor: a difference smaller than that proves nothing"
+  # A gross guard only: catching a per-packet sleep or a lock convoy, not a few percent.
+  awk -v a="$r" -v b="$h" 'BEGIN{exit !(a >= 0.25*b)}' && ok "the restricted median is at least a quarter of the household median (gross sanity bound only)" \
+    || fail "restricted median $r MB/s is under a quarter of the household median $h MB/s (restricted: ${rs[*]}; household: ${hs[*]})"
+  phase_end
+}
+
+phase_FT() {
+  phase FT "Household throughput with the filter and without it, alternating the binary [$VARIANT]"
+  require A
+  local BEFORE_REF=${BEFORE_REF:-HEAD} rounds=7 bytes=400000000 i arm env r exe
+  step "build the sidecar without the filter from $BEFORE_REF and put it next to the shipped one in node-a and node-b"
+  build_variant before
+  CUR_PHASE=FT; CUR_STEP="build the sidecar without the filter"
+  docker run --rm --entrypoint cat meshlive-sidecar:before /usr/local/bin/potluck-mesh > "$H/out/potluck-mesh-nofilter" || fail "could not read the baseline binary"
+  chmod +x "$H/out/potluck-mesh-nofilter"
+  expect_eq "the baseline binary has no packet filter in it" 0 "$(grep -a -c 'tunnel filter' "$H/out/potluck-mesh-nofilter")"
+  expect_ge "the shipped binary has the packet filter in it" 1 "$(ex node-a "grep -a -c 'tunnel filter' /usr/local/bin/potluck-mesh")"
+  dc cp "$H/out/potluck-mesh-nofilter" node-a:/usr/local/bin/potluck-mesh-nofilter && dc cp "$H/out/potluck-mesh-nofilter" node-b:/usr/local/bin/potluck-mesh-nofilter || fail "could not copy the baseline binary into the containers"
+  local -a fs ns
+  note "node-b downloads $bytes bytes from node-a:8080 over the household path; each run restarts both sidecars on the binary under test; $rounds rounds, order alternates"
+  for i in $(seq 1 $rounds); do
+    if [ $((i%2)) -eq 1 ]; then order="${FT_FIRST:-filter} ${FT_SECOND:-nofilter}"; else order="${FT_SECOND:-nofilter} ${FT_FIRST:-filter}"; fi
+    for arm in $order; do
+      if [ "$arm" = nofilter ]; then env="MESH_BIN=/usr/local/bin/potluck-mesh-nofilter"; exe=/usr/local/bin/potluck-mesh-nofilter; else env=""; exe=/usr/local/bin/potluck-mesh; fi
+      restart_sidecar node-a "$env"; restart_sidecar node-b "$env"
+      expect_eq "both sidecars run $exe" "$exe $exe" "$(ex node-a 'readlink /proc/$(cat /run/mesh.pid)/exe' | tr -d '\r') $(ex node-b 'readlink /proc/$(cat /run/mesh.pid)/exe' | tr -d '\r')"
+      wait_for 90 "node-a sees node-b reachable" peer_reachable node-a node-b
+      wait_for 90 "node-b sees node-a reachable" peer_reachable node-b node-a
+      srv node-a "$IPA" 8080
+      bulk node-b "$IPA" 8080 100000000 >/dev/null
+      r=$(bulk node-b "$IPA" 8080 $bytes)
+      [ "$r" != FAILED ] || fail "the $arm transfer in round $i did not arrive whole"
+      printf 'round %s %-9s %s MB/s\n' "$i" "$arm" "${r#* }"
+      if [ "$arm" = nofilter ]; then ns+=("${r#* }"); else fs+=("${r#* }"); fi
+    done
+  done
+  ok "all $((2*rounds)) transfers arrived whole ($bytes bytes each)"
+  step "compare the two arms"
+  stats "without the filter (baseline binary)" "${ns[@]}"
+  stats "with the filter (shipped binary)" "${fs[@]}"
+  note "median with / median without = $(awk -v a="$(median "${fs[@]}")" -v b="$(median "${ns[@]}")" 'BEGIN{printf "%.2f", a/b}'). The spread inside each arm is the noise floor: a difference smaller than that proves nothing"
+  awk -v a="$(median "${fs[@]}")" -v b="$(median "${ns[@]}")" 'BEGIN{exit !(a >= 0.5*b)}' && ok "the filtered median is at least half of the baseline median (gross sanity bound only)" \
+    || fail "the filtered median is under half of the baseline median (with: ${fs[*]}; without: ${ns[*]})"
+  phase_end
+}
+
+
+# household_has NODE IP : the roster store on NODE holds IP right now (what the filter treats as a household peer)
+household_has() { fshim "$1" GET "/household?peer=$2" | J -e '.household == true' >/dev/null; }
+household_gone() { ! household_has "$1" "$2"; }
+
+phase_FH() {
+  phase FH "The household set on a live sidecar follows the roster: a machine removed at the coordinator leaves it [$VARIANT]"
+  require F
+  fshim node-a POST "/release?peer=$IPB" >/dev/null   # FO leaves node-b restricted
   wait_for 60 "node-a sees node-b reachable" peer_reachable node-a node-b
   wait_for 60 "node-a sees node-c reachable" peer_reachable node-a node-c
-  wait_for 60 "node-b sees node-a reachable" peer_reachable node-b node-a
-  wait_for 60 "node-c sees node-a reachable" peer_reachable node-c node-a
-  step "inbound: the circle peer to this host"
-  srv node-a "$IPA" 8080; srv node-a "$IPA" 8081
-  expect_eq "node-b reaches node-a TCP 8080" "served-by=node-a bound=$IPA client=$IPB" "$(tcp_get node-b "$IPA" 8080)"
-  assert_tcp_blocked node-b "$IPA" "node-b cannot reach node-a TCP 8081 (a server is listening there)" 8081 5
-  assert_tcp_blocked node-b "$IPA" "node-b cannot open 8081 from its source port 9090 (the reply-direction hole)" 8081 5 "--local-port 9090"
-  expect_eq "control: node-b can use source port 9090 to reach node-a TCP 8080, so the line above was the filter" "served-by=node-a bound=$IPA client=$IPB" "$(tcp_get node-b "$IPA" 8080 8 "--local-port 9090")"
-  expect_eq "node-c, a household peer, reaches node-a TCP 8081" "served-by=node-a bound=$IPA client=$IPC" "$(tcp_get node-c "$IPA" 8081)"
-  expect_eq "node-b still reaches node-a TCP 8080 after the blocked attempts" "served-by=node-a bound=$IPA client=$IPB" "$(tcp_get node-b "$IPA" 8080)"
-  step "outbound: this host to the circle peer"
-  srv node-b "$IPB" 9090; srv node-b "$IPB" 9091; srv node-c "$IPC" 8081
-  expect_eq "node-a reaches node-b TCP 9090 (the peer's circle port)" "served-by=node-b bound=$IPB client=$IPA" "$(tcp_get node-a "$IPB" 9090)"
-  assert_tcp_blocked node-a "$IPB" "node-a cannot reach node-b TCP 9091" 9091 5
-  expect_eq "node-a reaches household node-c on TCP 8081" "served-by=node-c bound=$IPC client=$IPA" "$(tcp_get node-a "$IPC" 8081)"
-  step "the filter ran, and a long transfer through it arrives whole"
-  expect_true "node-a's sidecar logged dropped packets" log_gt node-a 'portfilter: dropped a packet' 0
-  local sz=30000000 filtered open
-  filtered=$(ex node-b "curl -s -m 60 --interface $IPB -o /dev/null -w '%{size_download} %{speed_download}' http://$IPA:8080/bytes/$sz")
-  expect_match "node-b downloaded all $sz bytes from node-a:8080 through the filter" "^$sz " "$filtered"
-  open=$(ex node-c "curl -s -m 60 --interface $IPC -o /dev/null -w '%{size_download} %{speed_download}' http://$IPA:8080/bytes/$sz")
-  expect_match "node-c downloaded all $sz bytes from node-a:8080 (no filter for it)" "^$sz " "$open"
-  note "speed through the filter (circle peer b): ${filtered#* } bytes/s; unfiltered household peer c: ${open#* } bytes/s. Docker Desktop VM numbers, only a sanity check"
+  step "both peers are in node-a's household set, and so is nothing else"
+  expect_true "node-b is in node-a's household set" household_has node-a "$IPB"
+  expect_true "node-c is in node-a's household set" household_has node-a "$IPC"
+  expect_false "node-a's own address is not in its household set" household_has node-a "$IPA"
+  expect_false "an address nobody holds is not in it" household_has node-a 100.64.0.99
+  srv node-b "$IPB" 8080
+  assert_tcp node-a node-b; assert_tcp node-a node-c
+  step "the owner removes node-c at the coordinator"
+  local cid code; cid=$(node_id_of node-c)
+  code=$(dc exec -T node-a curl -s -m 20 -X DELETE -o /dev/null -w '%{http_code}' "http://coordinator:8400/mesh/households/current/machines/$cid" </dev/null)
+  expect_match "coordinator accepts the removal" '^20[0-9]$' "$code"
+  wait_for 30 "node-a drops node-c from the peer list" peer_absent node-a node-c
+  wait_for 30 "node-c's address leaves node-a's household set" household_gone node-a "$IPC"
+  expect_true "node-b is still in the set" household_has node-a "$IPB"
+  assert_tcp node-a node-b; assert_tcp node-b node-a
   phase_end
 }
 
@@ -565,10 +824,11 @@ docker info >/dev/null 2>&1 || { echo "mesh-live: the Docker daemon is not runni
 docker compose version >/dev/null 2>&1 || { echo "mesh-live: needs 'docker compose' (v2)" >&2; exit 2; }
 docker buildx version >/dev/null 2>&1 || { echo "mesh-live: needs 'docker buildx'" >&2; exit 2; }
 printf 'mesh-live: start %s, repo %s, phases: %s%s%s\n' "$(date -u +%FT%TZ)" "$REPO_ROOT" "$PHASES" \
-  "${BEFORE_REF:+, plus A and C on BEFORE_REF=$BEFORE_REF}" "${WITH_PROTO:+, plus the port-filter prototype}"
+  "${BEFORE_REF:+, plus A and C on BEFORE_REF=$BEFORE_REF}" "${WITH_FILTER:+, plus the packet-filter phases F FO FR FH}"
 
 # shellcheck disable=SC2086
-run_pass after $PHASES
+if [ "$PHASES" != none ]; then run_pass after $PHASES; fi
 if [ -n "${BEFORE_REF:-}" ]; then run_pass before up A Cbefore; fi
-if [ -n "${WITH_PROTO:-}" ]; then run_pass proto up P; fi
+# shellcheck disable=SC2086
+if [ -n "${WITH_FILTER:-}" ]; then run_pass filter ${FILTER_PHASES:-up F FO FR FH}; fi
 exit 0

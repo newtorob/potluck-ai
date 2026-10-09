@@ -208,3 +208,65 @@ show() {
   printf '[%s] peers: ' "$1"; api "$1" GET /peers | J -c '[.peers[]|{node_name,mesh_ip,reachable,mode:.reachability_mode,scope}]' | trim
   printf '[%s] routes on potluck0: %s\n' "$1" "$(tunnel_routes "$1")"
 }
+
+# ---------------------------------------------------------------- packet filter phases (SHIM=filter image)
+# fshim NODE METHOD PATH : the harness shim's control socket in that node's sidecar
+fshim()   { ex "$1" "curl -s -m 10 --unix-socket /run/filter-shim.sock -X $2 'http://localhost$3'"; }
+fstate()  { fshim "$1" GET /state; }
+# fdrops NODE REASON : the filter's own count of packets dropped for that reason
+fdrops()  { fstate "$1" | J -r --arg r "$2" '.dropped[$r] // 0'; }
+# restrict NODE PEERIP IN OUT TTL : treat PEERIP as a circle peer of NODE and register its entry
+restrict() { fshim "$1" POST "/restrict?peer=$2&in=$3&out=$4&ttl=$5" >/dev/null; }
+# snmp NODE PROTO FIELD : a kernel counter from /proc/net/snmp in that container (Tcp OutRsts, Ip ReasmReqds, Icmp InEchos, Udp NoPorts ...)
+snmp()    { ex "$1" "awk -v p='$2:' -v f='$3' '\$1==p { if (!h) { for (i=1;i<=NF;i++) idx[\$i]=i; h=1 } else { print \$idx[f]; exit } }' /proc/net/snmp" | tr -d '\r'; }
+# raw_delta FROMNODE KIND TONODE PROTO FIELD [SPORT DPORT] : send one hand-made packet from FROMNODE's mesh
+# address to TONODE's, wait a second, and print how far TONODE's kernel counter PROTO FIELD moved. A nonzero
+# delta means the packet reached TONODE's network stack; zero means something dropped it on the way.
+raw_delta() {
+  local from=$1 kind=$2 to=$3 proto=$4 field=$5 sp=${6:-40000} dp=${7:-8080} b a
+  b=$(snmp "$to" "$proto" "$field")
+  ex "$from" "python3 /opt/meshlive/rawsend.py $kind $(ipof "$from") $(ipof "$to") $sp $dp" >/dev/null
+  sleep 1
+  a=$(snmp "$to" "$proto" "$field")
+  echo $((a-b))
+}
+# assert_raw_blocked / assert_raw_reaches : a restricted peer's packet must not reach the stack, the same packet from a household peer must
+assert_raw_blocked() {  # DESC FROMNODE KIND TONODE PROTO FIELD [SPORT DPORT]
+  local d=$1; shift; expect_eq "$d: dropped before the host's network stack" 0 "$(raw_delta "$@")"
+}
+assert_raw_reaches() {  # DESC FROMNODE KIND TONODE PROTO FIELD [SPORT DPORT]
+  local d=$1 n; shift; n=$(raw_delta "$@")
+  [ "$n" -ge 1 ] && ok "$d: reaches the host's network stack (counter +$n)" || fail "$d: expected the packet to reach the host (counter +$n)"
+}
+# acceptlog NODE IP PORT : a listener that records every connection it accepts (must stay empty for a peer that is blocked)
+acceptlog() {
+  local n=$1 ip=$2 port=$3
+  ex "$n" "[ -f /run/acc-$port.pid ] && kill \$(cat /run/acc-$port.pid) 2>/dev/null; rm -f /tmp/accept-$port.log; nohup python3 /opt/meshlive/acceptlog.py $ip $port /tmp/accept-$port.log >/tmp/acc-$port.out 2>&1 & echo \$! > /run/acc-$port.pid"
+  wait_for 10 "$n logs connections to $ip:$port" ex "$n" "ss -ltn | grep -q '$ip:$port '"
+}
+# accepted_from NODE PORT IP : how many connections from IP the acceptlog on NODE:PORT has taken
+accepted_from() { ex "$1" "grep -c '^$3:' /tmp/accept-$2.log || true" | tr -d '\r'; }
+# bulk NODE TOIP PORT BYTES : download BYTES zero bytes from TOIP:PORT using NODE's mesh address; prints "<bytes> <MB/s>" or FAILED
+bulk() {
+  local n=$1 to=$2 port=$3 bytes=$4 fip
+  fip=$(ipof "$n")
+  ex "$n" "curl -s -m 120 --interface $fip -o /dev/null -w '%{size_download} %{speed_download}' http://$to:$port/bytes/$bytes" \
+    | awk -v want="$bytes" '{ if ($1 == want) printf "%d %.2f\n", $1, $2/1048576; else print "FAILED" }'
+}
+# stats LABEL V1 V2... : n, min, median, mean, max and the spread (max-min)/median of the numbers
+stats() {
+  local label=$1; shift
+  printf '%s\n' "$@" | sort -n | awk -v l="$label" '{v[NR]=$1; s+=$1} END {m=(NR%2)?v[(NR+1)/2]:(v[NR/2]+v[NR/2+1])/2; printf "%s: n=%d min=%.2f median=%.2f mean=%.2f max=%.2f MB/s, spread (max-min)/median = %.0f%%\n", l, NR, v[1], m, s/NR, v[NR], (m>0)?100*(v[NR]-v[1])/m:0}'
+}
+median() { printf '%s\n' "$@" | sort -n | awk '{v[NR]=$1} END {print (NR%2)?v[(NR+1)/2]:(v[NR/2]+v[NR/2+1])/2}'; }
+
+# srcget FROMNODE TOIP PORT SRCPORT [TIMEOUT] : one GET from FROMNODE's mesh address using a chosen source port
+# (SO_REUSEADDR). Prints the reply line or FAILED:bind|connect|read:<error>. A block shows as FAILED:connect:timed out.
+srcget() {
+  local from=$1 to=$2 port=$3 sp=$4 t=${5:-5}
+  ex "$from" "python3 /opt/meshlive/connect.py $(ipof "$from") $sp $to $port $t" | tr -d '\r'
+}
+# assert_src_blocked FROMNODE TOIP PORT SRCPORT DESC : the connect attempt times out; a bind error would not count
+assert_src_blocked() {
+  expect_eq "$5" "FAILED:connect:timed out" "$(srcget "$1" "$2" "$3" "$4" 5)"
+}

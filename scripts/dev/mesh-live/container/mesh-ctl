@@ -6,6 +6,7 @@
 LOGDIR=/var/log/mesh
 LOG=$LOGDIR/mesh.log
 PIDF=/run/mesh.pid
+BIN=${MESH_BIN:-/usr/local/bin/potluck-mesh}
 mkdir -p "$LOGDIR" /state /run
 alive() { [ -f "$PIDF" ] && kill -0 "$(cat "$PIDF")" 2>/dev/null; }
 case "$1" in
@@ -22,7 +23,7 @@ case "$1" in
     # optional: shorten the STUN refresh so endpoint_update (and so the
     # coordinator's roster "updated" broadcast) fires often
     [ -n "$STUN_REFRESH" ] && export POTLUCK_STUN_REFRESH_INTERVAL="$STUN_REFRESH"
-    nohup /usr/local/bin/potluck-mesh "$@" >> "$LOG" 2>&1 &
+    nohup "$BIN" "$@" >> "$LOG" 2>&1 &
     echo $! > "$PIDF"
     echo "started pid $(cat $PIDF) (run $n)"
     ;;

@@ -4,26 +4,25 @@
 # sidecar shells out to (ip, iptables) and the tools the check uses (curl, jq,
 # python3).
 #
-# PROTO=portfilter builds the throwaway port-filter prototype from proto/. It is
-# copied into a scratch copy of the source inside this build only. The default
-# build never sees it.
+# SHIM=filter builds the packet-filter harness variant: shim/packetfilter_shim.go
+# is copied into cmd/potluck-mesh/ of a scratch copy of the source inside this
+# build only, and replaces the shipped packetfilter.go through the build tag
+# meshlive_filter. The default build never sees it.
 FROM golang:1.22-bookworm AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-COPY --from=harness proto/ /harness-proto/
+COPY --from=harness shim/ /harness-shim/
 ARG COMMIT=unknown
-ARG PROTO=
+ARG SHIM=
 # CGO off: the linux build has no cgo imports, so this is the same program as a
 # default build, just statically linked.
 RUN set -e; TAGS=""; \
-    if [ "$PROTO" = portfilter ]; then \
-      cp /harness-proto/portfilter_proto.go internal/tunnel/; \
-      sed -i 's/tun\.CreateTUN(ifName, DefaultMTU)/createTUNFiltered(ifName, DefaultMTU)/' internal/tunnel/tunnel.go; \
-      grep -q createTUNFiltered internal/tunnel/tunnel.go; \
-      TAGS="-tags meshlive_portfilter"; \
-    elif [ -n "$PROTO" ]; then echo "unknown PROTO=$PROTO" >&2; exit 1; fi; \
+    if [ "$SHIM" = filter ]; then \
+      cp /harness-shim/packetfilter_shim.go cmd/potluck-mesh/; \
+      TAGS="-tags meshlive_filter"; \
+    elif [ -n "$SHIM" ]; then echo "unknown SHIM=$SHIM" >&2; exit 1; fi; \
     CGO_ENABLED=0 GOOS=linux go build $TAGS -trimpath \
       -ldflags "-s -w -X main.version=${COMMIT}" \
       -o /out/potluck-mesh ./cmd/potluck-mesh; \

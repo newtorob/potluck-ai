@@ -218,7 +218,7 @@ m3-smoke: ## End-to-end Phase G m3 acceptance check (needs coordinator + at leas
 mesh-smoke: ## End-to-end Phase G mesh week-1 acceptance (needs coordinator + Postgres)
 	@python3 scripts/dev/mesh-smoke.py $(MESH_ARGS)
 
-mesh-live: check-docker ## Live mesh check: real sidecars + WireGuard in Docker, built from this tree, about 4 min. Needs /dev/net/tun + NET_ADMIN. NOT part of `make test`, not for CI. Flags WITH_E2/WITH_R/WITH_D/WITH_PROTO=1, BEFORE_REF=<commit>; see scripts/dev/mesh-live/README.md
+mesh-live: check-docker ## Live mesh check: real sidecars + WireGuard in Docker, built from this tree, about 4 min. Needs /dev/net/tun + NET_ADMIN. NOT part of `make test`, not for CI. Flags WITH_E2/WITH_R/WITH_D/WITH_FILTER=1, BEFORE_REF=<commit>; see scripts/dev/mesh-live/README.md
 	@scripts/dev/mesh-live/run.sh
 
 mesh-live-clean: ## Remove containers, network, volumes and images a killed `make mesh-live` left behind
