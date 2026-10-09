@@ -6,8 +6,16 @@
 
 PROJECT=meshlive
 IPA=; IPB=; IPC=          # mesh addresses, set once a node is paired
+IPE=; IPF=                # the second household's, in the WITH_LINKS phases
 
-dc()   { docker compose -p "$PROJECT" -f "$H/docker-compose.yml" --profile fake "$@"; }
+dc() {
+  # WITH_LINKS=1 layers docker-compose.links.yml over the base file (see run.sh links_pass); nothing else does.
+  if [ -n "${LINKS_ON:-}" ]; then
+    docker compose -p "$PROJECT" -f "$H/docker-compose.yml" -f "$H/docker-compose.links.yml" --profile fake --profile engine --profile derp "$@"
+  else
+    docker compose -p "$PROJECT" -f "$H/docker-compose.yml" --profile fake "$@"
+  fi
+}
 # ex NODE 'shell command' : run it inside a container (stdin closed)
 ex()   { local n=$1; shift; dc exec -T "$n" sh -c "$*" </dev/null; }
 # J ARGS : jq, run in a container so the host needs no jq. Reads stdin.
@@ -53,6 +61,7 @@ fail() {
   FAIL_MSG=$*
   printf '\nFAIL  phase %s, step "%s"\n      %s\n' "$CUR_PHASE" "$CUR_STEP" "$FAIL_MSG"
   dump_state
+  type dump_links >/dev/null 2>&1 && [ -n "${LINKS_ON:-}" ] && dump_links
   exit 1
 }
 # run_phase PHASE : run it unless it already ran in this pass
@@ -69,7 +78,7 @@ require() {
 dump_state() {
   printf '\n--- state at the failure (for diagnosis) ---\n'
   local n
-  for n in node-a node-b node-c; do
+  for n in ${DUMP_NODES:-node-a node-b node-c}; do
     printf '[%s] peers: ' "$n"
     api "$n" GET /peers 2>/dev/null | J -c '[.peers[]|{node_name,mesh_ip,reachable,scope}]' 2>/dev/null || echo '(sidecar not answering)'
     printf '[%s] routes on potluck0: ' "$n"; ex "$n" 'ip -4 route show dev potluck0 | awk "{print \$1}" | tr "\n" " "' 2>/dev/null; echo
@@ -112,7 +121,7 @@ stable_for() {
 }
 
 # ---------------------------------------------------------------- queries
-ipof() { case $1 in node-a) echo "$IPA";; node-b) echo "$IPB";; node-c) echo "$IPC";; esac; }
+ipof() { case $1 in node-a) echo "$IPA";; node-b) echo "$IPB";; node-c) echo "$IPC";; node-e) echo "$IPE";; node-f) echo "$IPF";; esac; }
 meship()         { api "$1" GET /status | J -r '.mesh_ip // empty'; }
 sidecar_pid()    { ex "$1" 'cat /run/mesh.pid' | tr -d '\r'; }
 joined()         { api "$1" GET /status | J -e '.mesh_ip!=null and .mesh_ip!="" and .coordinator_connection=="connected"' >/dev/null; }

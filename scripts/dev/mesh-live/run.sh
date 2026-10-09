@@ -14,6 +14,12 @@
 #                     harness shim (about 6 minutes), and FT on the default image (about 6 more)
 #   FILTER_PHASES     phases of the filter pass, default "up F FO FR FH"
 #   FT_FIRST/FT_SECOND  which arm phase FT runs first (filter or nofilter), default filter then nofilter
+#   WITH_LINKS=1      add the direct-circle-link passes: two households, a circle, a lender's stand-in engine, one
+#                     pass per transport policy (about 8 minutes each, see links.sh and the README)
+#   LINK_PASSES       policies for the link passes, default "direct relay direct+relay hostile"
+#   LINKS_PHASES      phases of the direct and relay passes, default "L0 L1 L2 L3 L4 L5 LT L6 L7 L8 L9 LU"
+#   LINK_RUNS         samples per setup-time measurement, default 8
+#   LINK_TTL_S        lifetime the coordinator gives a link, default 60
 #   BEFORE_REF=<ref>  also run A and C against the sidecar built from that older commit
 #   BEFORE_EXPECT     what the older binary should do with a bad address: accepts (default) or refuses
 #   MESH_LIVE_PRUNE_BASE=1  on exit also remove base images this run had to pull
@@ -23,7 +29,7 @@
 H="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$H/../../.." && pwd)"
 
-if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then sed -n '2,21p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0; fi
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then sed -n '2,27p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0; fi
 
 # Outer: run this script again with all output copied to the transcript, and
 # pass its exit status on. tee -i keeps the transcript alive through Ctrl-C so
@@ -42,6 +48,7 @@ fi
 set -u
 # shellcheck source=lib.sh
 . "$H/lib.sh"
+. "$H/links.sh"
 export REPO_ROOT PROJECT
 VARIANT=after; export VARIANT
 INTERRUPTED=; FAIL_MSG=; SUMMARY=; BEFORE_DIR=; TORN_DOWN=; ALL_DONE=
@@ -60,7 +67,7 @@ teardown() {
   fi
   printf '\n-- teardown\n'
   dc down -v --remove-orphans 2>&1 | tail -n 4
-  docker image rm meshlive-sidecar:after meshlive-sidecar:before meshlive-sidecar:filter meshlive-coordinator:local 2>&1 | grep -v "No such image"
+  docker image rm meshlive-sidecar:after meshlive-sidecar:before meshlive-sidecar:filter meshlive-sidecar:hostile meshlive-coordinator:local meshlive-derp:local 2>&1 | grep -v "No such image"
   [ -n "$BEFORE_DIR" ] && rm -rf "$BEFORE_DIR"
   if [ -n "${MESH_LIVE_PRUNE_BASE:-}" ]; then
     for i in $BASE_IMAGES; do case "$PRE_IMAGES " in *" $i "*) ;; *) docker image rm "$i" 2>&1 | grep -v "No such image";; esac; done
@@ -103,6 +110,7 @@ build_variant() {
   case $1 in
     after) build_sidecar after "$REPO_ROOT/apps/desktop/go/potluck-mesh" "$sha" ;;
     filter) build_sidecar filter "$REPO_ROOT/apps/desktop/go/potluck-mesh" "$sha+filter-shim" filter ;;
+    hostile) build_sidecar hostile "$REPO_ROOT/apps/desktop/go/potluck-mesh" "$sha+hostile-requester" hostile ;;
     before)
       git -C "$REPO_ROOT" rev-parse --verify "${BEFORE_REF}^{commit}" >/dev/null 2>&1 || fail "BEFORE_REF=$BEFORE_REF is not a commit in this repository"
       BEFORE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/meshlive-before.XXXXXX")
@@ -808,6 +816,39 @@ phase_FH() {
 }
 
 # ------------------------------------------------------------------ passes
+# links_pass POLICY PHASE... : WITH_LINKS=1. POLICY is direct (no relay), relay (relay-only) or direct+relay.
+# It runs on the default sidecar image (the real packet filter wiring, no shim) with docker-compose.links.yml on top.
+links_pass() {
+  LINK_POLICY=$1; shift
+  LINKS_ON=1; LINK_TTL_S=${LINK_TTL_S:-60}; export LINKS_ON LINK_TTL_S LINK_MODEL
+  case $LINK_POLICY in
+    direct)       LINK_DIRECT=1; LINK_DERP_URL= ;;
+    relay)        LINK_DIRECT=0; LINK_DERP_URL=tcp://derp:8443 ;;
+    direct+relay) LINK_DIRECT=1; LINK_DERP_URL=tcp://derp:8443 ;;
+    hostile)      LINK_DIRECT=1; LINK_DERP_URL= ;;
+    *) fail "LINK_PASSES: unknown policy '$LINK_POLICY' (use direct, relay, direct+relay or hostile)" ;;
+  esac
+  export LINK_DIRECT LINK_DERP_URL
+  VARIANT=after; export VARIANT
+  NODEA_IMAGE=after; NODEE_IMAGE=after; NODEE_FORWARD=0
+  DONE=; IPA=; IPB=; IPC=; IPE=; IPF=; LINK=; TOKEN=
+  build_variant after
+  if [ "$LINK_POLICY" = hostile ]; then
+    build_variant hostile; build_variant filter
+    NODEA_IMAGE=hostile; NODEE_IMAGE=filter; NODEE_FORWARD=1
+  fi
+  export NODEA_IMAGE NODEE_IMAGE NODEE_FORWARD
+  if [ -n "$LINK_DERP_URL" ] && ! docker image inspect meshlive-derp:local >/dev/null 2>&1; then
+    note "building meshlive-derp:local from services/derp"
+    dc build derp >"$H/out/build-derp.log" 2>&1 || { tail -n 30 "$H/out/build-derp.log"; fail "the relay image did not build (log: out/build-derp.log)"; }
+  fi
+  local p
+  for p in "$@"; do run_phase "$p"; done
+  ALL_DONE="$ALL_DONE links:$LINK_POLICY($(echo $DONE | tr ' ' ','))"
+  [ -n "${MESH_LIVE_KEEP:-}" ] || dc down -v --remove-orphans >/dev/null 2>&1
+  LINKS_ON=; DUMP_NODES=
+}
+
 run_pass() {  # VARIANT PHASE...
   VARIANT=$1; shift; export VARIANT
   DONE=; IPA=; IPB=; IPC=
@@ -823,12 +864,25 @@ run_pass() {  # VARIANT PHASE...
 docker info >/dev/null 2>&1 || { echo "mesh-live: the Docker daemon is not running" >&2; exit 2; }
 docker compose version >/dev/null 2>&1 || { echo "mesh-live: needs 'docker compose' (v2)" >&2; exit 2; }
 docker buildx version >/dev/null 2>&1 || { echo "mesh-live: needs 'docker buildx'" >&2; exit 2; }
-printf 'mesh-live: start %s, repo %s, phases: %s%s%s\n' "$(date -u +%FT%TZ)" "$REPO_ROOT" "$PHASES" \
-  "${BEFORE_REF:+, plus A and C on BEFORE_REF=$BEFORE_REF}" "${WITH_FILTER:+, plus the packet-filter phases F FO FR FH}"
+printf 'mesh-live: start %s, repo %s, phases: %s%s%s%s\n' "$(date -u +%FT%TZ)" "$REPO_ROOT" "$PHASES" \
+  "${BEFORE_REF:+, plus A and C on BEFORE_REF=$BEFORE_REF}" "${WITH_FILTER:+, plus the packet-filter phases F FO FR FH}" \
+  "${WITH_LINKS:+, plus the circle-link passes ${LINK_PASSES:-direct relay direct+relay hostile}}"
 
 # shellcheck disable=SC2086
 if [ "$PHASES" != none ]; then run_pass after $PHASES; fi
 if [ -n "${BEFORE_REF:-}" ]; then run_pass before up A Cbefore; fi
 # shellcheck disable=SC2086
 if [ -n "${WITH_FILTER:-}" ]; then run_pass filter ${FILTER_PHASES:-up F FO FR FH}; fi
+if [ -n "${WITH_LINKS:-}" ]; then
+  for pol in ${LINK_PASSES:-direct relay direct+relay hostile}; do
+    case $pol in
+      direct+relay) links_pass "$pol" ${LINK_FALLBACK_PHASES:-L0 L1 LD LT} ;;
+      hostile)      links_pass "$pol" ${LINK_HOSTILE_PHASES:-L0 L1 LH} ;;
+      *)            links_pass "$pol" ${LINKS_PHASES:-L0 L1 L2 L3 L4 L5 LT L6 L7 L8 L9 LU} ;;
+    esac
+  done
+  [ -n "${LINK_TIMES:-}" ] && SUMMARY="${SUMMARY:-}
+link setup times:$LINK_TIMES
+"
+fi
 exit 0

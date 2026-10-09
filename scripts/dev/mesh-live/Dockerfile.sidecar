@@ -8,6 +8,11 @@
 # is copied into cmd/potluck-mesh/ of a scratch copy of the source inside this
 # build only, and replaces the shipped packetfilter.go through the build tag
 # meshlive_filter. The default build never sees it.
+#
+# SHIM=hostile builds a requester that has been rewritten to try to leave its
+# circle grant (phase LH): shim/packetfilter_open.go replaces packetfilter.go the
+# same way, and the scratch copy of internal/circlelink has the circle peer's
+# allowed-ips widened to 100.64.1.0/24, the lender household's range.
 FROM golang:1.22-bookworm AS build
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -22,6 +27,11 @@ RUN set -e; TAGS=""; \
     if [ "$SHIM" = filter ]; then \
       cp /harness-shim/packetfilter_shim.go cmd/potluck-mesh/; \
       TAGS="-tags meshlive_filter"; \
+    elif [ "$SHIM" = hostile ]; then \
+      cp /harness-shim/packetfilter_open.go cmd/potluck-mesh/; \
+      TAGS="-tags meshlive_filter"; \
+      sed -i 's#\[\]string{p.addr.String() + "/32"}#[]string{p.addr.String() + "/32", "100.64.1.0/24"}#' internal/circlelink/controller.go; \
+      grep -q '"100.64.1.0/24"' internal/circlelink/controller.go; \
     elif [ -n "$SHIM" ]; then echo "unknown SHIM=$SHIM" >&2; exit 1; fi; \
     CGO_ENABLED=0 GOOS=linux go build $TAGS -trimpath \
       -ldflags "-s -w -X main.version=${COMMIT}" \

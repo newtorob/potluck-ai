@@ -1,0 +1,103 @@
+# Layered over docker-compose.yml by run.sh, and only for WITH_LINKS=1 (direct
+# circle links). The default run never reads this file.
+#
+#   - the coordinator runs with direct circle links on, a short link lifetime and
+#     the dev flag that lets a shared-token engine bind to its mesh node;
+#   - the network gets a fixed subnet from TEST-NET-2 (198.51.100.0/24), so the
+#     endpoints the sidecars report through STUN are addresses a sidecar will
+#     accept as public. Docker's default subnets are RFC1918 and the sidecar
+#     (rightly) never sends a circle peer's packets to a private endpoint it was
+#     not told is a LAN candidate. The network stays internal: no route out;
+#   - a second household (node-e, node-f), the lender's stand-in engine, and, when
+#     asked for, a DERP relay built from services/derp.
+name: meshlive
+
+x-sidecar: &sidecar
+  image: meshlive-sidecar:${VARIANT:-after}
+  init: true
+  command: ["sleep", "infinity"]
+  cap_add: [NET_ADMIN, NET_RAW]
+  devices: ["/dev/net/tun:/dev/net/tun"]
+  depends_on:
+    coordinator: { condition: service_healthy }
+    stun: { condition: service_started }
+  networks: [meshnet]
+
+x-sidecar-env: &sidecar-env
+  COORDINATOR_URL: http://coordinator:8400
+  STUN_SERVERS: stun:3478,stun:3479
+  POTLUCK_DERP_URL: ${LINK_DERP_URL:-}
+
+services:
+  # Answers with the WireGuard port, as a port-preserving NAT would show it (see container/stun_server.py).
+  stun:
+    environment: { STUN_REPORT_PORT: "51820" }
+
+  coordinator:
+    environment:
+      POTLUCK_CIRCLE_LINKS_ENABLED: "1"
+      POTLUCK_CIRCLE_LINK_BIND_WITHOUT_SESSION: "1"
+      POTLUCK_CIRCLE_LINK_DIRECT: "${LINK_DIRECT:-0}"
+      POTLUCK_CIRCLE_LINK_TTL_S: "${LINK_TTL_S:-60}"
+      POTLUCK_CIRCLE_LINK_SWEEP_INTERVAL_S: "2"
+
+  # node-a and node-e run another build only in the hostile-requester pass (phase LH): node-a a rewritten
+  # requester, node-e the filter build with drop counters and IP forwarding switched on. Every other pass
+  # leaves both on the default image, with forwarding off (the container default).
+  node-a:
+    image: meshlive-sidecar:${NODEA_IMAGE:-after}
+    environment: { POTLUCK_DERP_URL: "${LINK_DERP_URL:-}" }
+  node-b:
+    environment: { POTLUCK_DERP_URL: "${LINK_DERP_URL:-}" }
+
+  # The lender's household.
+  node-e:
+    <<: *sidecar
+    image: meshlive-sidecar:${NODEE_IMAGE:-after}
+    hostname: node-e
+    environment: { <<: *sidecar-env, NODE_NAME: node-e }
+    sysctls: ["net.ipv4.ip_forward=${NODEE_FORWARD:-0}"]
+    volumes: [state-e:/state]
+  node-f:
+    <<: *sidecar
+    hostname: node-f
+    environment: { <<: *sidecar-env, NODE_NAME: node-f }
+    volumes: [state-f:/state]
+
+  # The lender's engine, as far as the coordinator can tell. Started by the
+  # harness once node-e is paired and its node id is known.
+  lender-engine:
+    profiles: [engine]
+    image: meshlive-coordinator:local
+    user: "0"
+    command: ["python", "/opt/meshlive/lender_engine.py"]
+    volumes: ["./container/lender_engine.py:/opt/meshlive/lender_engine.py:ro"]
+    environment:
+      LENDER_MEMBER_ID: ${LENDER_MEMBER_ID:-}
+      LENDER_NODE_ID: ${LENDER_NODE_ID:-}
+      LINK_MODEL: ${LINK_MODEL:-}
+      CIRCLE_PORT: "8347"
+    depends_on:
+      coordinator: { condition: service_healthy }
+    networks: [meshnet]
+
+  # DERP relay for the relay-only policy and the direct-then-relay fallback.
+  derp:
+    profiles: [derp]
+    build: { context: "${REPO_ROOT}/services/derp", dockerfile: Dockerfile }
+    image: meshlive-derp:local
+    command: ["--insecure-cleartext", "--port", "8443"]
+    environment:
+      POTLUCK_DERP_JWT_KEY: dev-only-derp-jwt-key-change-me-000000000000000000000000000000000000
+    networks: [meshnet]
+
+networks:
+  meshnet:
+    internal: true
+    ipam:
+      config:
+        - subnet: 198.51.100.0/24
+
+volumes:
+  state-e:
+  state-f:

@@ -8,9 +8,15 @@ does. On a flat Docker network that address is the container's own IP, so no
 NAT is involved. Listens on two ports so the sidecar's NAT classifier (which
 wants two servers) has two.
 """
-import socket, struct, select, sys
+import os, socket, struct, select, sys
 
 COOKIE = 0x2112A442
+
+# STUN_REPORT_PORT (the WITH_LINKS stack sets it to the WireGuard port): answer with that port, not the one
+# the request came from. In this stack a sidecar's probe leaves from an ephemeral port (its endpoint comes out
+# as, say, 198.51.100.6:59364), not from 51820 where WireGuard listens. A home NAT that keeps the source port
+# (most do) would show 51820, which is what this answers. Unset (the default run), nothing changes.
+REPORT_PORT = int(os.environ.get("STUN_REPORT_PORT", "0"))
 
 def serve(ports):
     socks = []
@@ -29,7 +35,7 @@ def serve(ports):
             if mtype != 0x0001:
                 continue
             txid = data[8:20]
-            xport = port ^ (COOKIE >> 16)
+            xport = (REPORT_PORT or port) ^ (COOKIE >> 16)
             xaddr = struct.unpack("!I", socket.inet_aton(ip))[0] ^ COOKIE
             attr = struct.pack("!HHBBHI", 0x0020, 8, 0, 1, xport, xaddr)
             resp = struct.pack("!HHI", 0x0101, len(attr), COOKIE) + txid + attr
