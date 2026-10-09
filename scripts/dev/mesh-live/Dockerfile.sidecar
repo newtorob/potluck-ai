@@ -1,0 +1,43 @@
+# Sidecar test image: builds the real potluck-mesh for linux from whatever source
+# tree is the build context (the working tree for "after", a git archive of
+# BEFORE_REF for "before"), then wraps it in a small Debian with the tools the
+# sidecar shells out to (ip, iptables) and the tools the check uses (curl, jq,
+# python3).
+#
+# PROTO=portfilter builds the throwaway port-filter prototype from proto/. It is
+# copied into a scratch copy of the source inside this build only. The default
+# build never sees it.
+FROM golang:1.22-bookworm AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+COPY --from=harness proto/ /harness-proto/
+ARG COMMIT=unknown
+ARG PROTO=
+# CGO off: the linux build has no cgo imports, so this is the same program as a
+# default build, just statically linked.
+RUN set -e; TAGS=""; \
+    if [ "$PROTO" = portfilter ]; then \
+      cp /harness-proto/portfilter_proto.go internal/tunnel/; \
+      sed -i 's/tun\.CreateTUN(ifName, DefaultMTU)/createTUNFiltered(ifName, DefaultMTU)/' internal/tunnel/tunnel.go; \
+      grep -q createTUNFiltered internal/tunnel/tunnel.go; \
+      TAGS="-tags meshlive_portfilter"; \
+    elif [ -n "$PROTO" ]; then echo "unknown PROTO=$PROTO" >&2; exit 1; fi; \
+    CGO_ENABLED=0 GOOS=linux go build $TAGS -trimpath \
+      -ldflags "-s -w -X main.version=${COMMIT}" \
+      -o /out/potluck-mesh ./cmd/potluck-mesh; \
+    sha256sum /out/potluck-mesh | cut -c1-16 > /out/sha.txt
+
+FROM debian:12-slim
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      iproute2 iptables curl jq python3 procps ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+ARG COMMIT=unknown
+LABEL meshlive.commit=${COMMIT}
+COPY --from=build /out/potluck-mesh /usr/local/bin/potluck-mesh
+COPY --from=build /out/sha.txt /etc/potluck-mesh.sha
+COPY --from=harness container/ /opt/meshlive/
+RUN chmod +x /opt/meshlive/mesh-ctl && ln -s /opt/meshlive/mesh-ctl /usr/local/bin/mesh-ctl
+CMD ["sleep", "infinity"]

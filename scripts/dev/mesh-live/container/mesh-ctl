@@ -1,0 +1,50 @@
+#!/bin/sh
+# Start, stop and restart the sidecar PROCESS inside the container without
+# touching the container (so the network namespace, state volume and log file
+# survive). Kills by pid, never by pattern.
+#   mesh-ctl start|stop|restart|kill9|status|log-since-last-start
+LOGDIR=/var/log/mesh
+LOG=$LOGDIR/mesh.log
+PIDF=/run/mesh.pid
+mkdir -p "$LOGDIR" /state /run
+alive() { [ -f "$PIDF" ] && kill -0 "$(cat "$PIDF")" 2>/dev/null; }
+case "$1" in
+  start)
+    if alive; then echo "already running pid $(cat $PIDF)"; exit 0; fi
+    n=$(cat $LOGDIR/runs 2>/dev/null || echo 0); n=$((n+1)); echo $n > $LOGDIR/runs
+    echo "=== run $n start $(date -u +%FT%TZ) ===" >> "$LOG"
+    set -- --coordinator-url "${COORDINATOR_URL:?}" \
+           --wg-private-key-path /state/wg.key \
+           --local-api-socket /run/potluck-mesh.sock \
+           --node-name "${NODE_NAME:?}" \
+           --stun-servers "${STUN_SERVERS:?}" \
+           --log-format text
+    # optional: shorten the STUN refresh so endpoint_update (and so the
+    # coordinator's roster "updated" broadcast) fires often
+    [ -n "$STUN_REFRESH" ] && export POTLUCK_STUN_REFRESH_INTERVAL="$STUN_REFRESH"
+    nohup /usr/local/bin/potluck-mesh "$@" >> "$LOG" 2>&1 &
+    echo $! > "$PIDF"
+    echo "started pid $(cat $PIDF) (run $n)"
+    ;;
+  stop)
+    if alive; then
+      p=$(cat $PIDF); kill -TERM "$p"
+      i=0; while kill -0 "$p" 2>/dev/null && [ $i -lt 100 ]; do sleep 0.1; i=$((i+1)); done
+      kill -0 "$p" 2>/dev/null && kill -KILL "$p"
+      echo "=== stopped $(date -u +%FT%TZ) ===" >> "$LOG"
+    fi
+    rm -f "$PIDF" /run/potluck-mesh.sock
+    echo stopped
+    ;;
+  kill9)
+    if alive; then kill -KILL "$(cat $PIDF)"; sleep 0.3; fi
+    rm -f "$PIDF"
+    echo "=== killed -9 $(date -u +%FT%TZ) ===" >> "$LOG"
+    echo killed
+    ;;
+  restart) "$0" stop; "$0" start ;;
+  status) if alive; then echo "running pid $(cat $PIDF)"; else echo "not running"; exit 1; fi ;;
+  log-since-last-start)
+    n=$(cat $LOGDIR/runs); sed -n "/^=== run $n start/,\$p" "$LOG" ;;
+  *) echo "usage: mesh-ctl start|stop|restart|kill9|status|log-since-last-start" >&2; exit 2 ;;
+esac

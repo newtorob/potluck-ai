@@ -1,0 +1,117 @@
+# Used only by run.sh, always as `docker compose -p meshlive`. No ports are
+# published to the host. The network is internal: containers reach each other
+# and nothing else (no route to the internet).
+name: meshlive
+
+x-sidecar: &sidecar
+  image: meshlive-sidecar:${VARIANT:-after}
+  init: true
+  command: ["sleep", "infinity"]
+  cap_add: [NET_ADMIN]
+  devices: ["/dev/net/tun:/dev/net/tun"]
+  depends_on:
+    coordinator: { condition: service_healthy }
+    stun: { condition: service_started }
+  networks: [meshnet]
+
+x-sidecar-env: &sidecar-env
+  COORDINATOR_URL: http://coordinator:8400
+  STUN_SERVERS: stun:3478,stun:3479
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: potluck
+      POSTGRES_PASSWORD: potluck
+      POSTGRES_DB: potluck
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U potluck -d potluck"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks: [meshnet]
+
+  # One-shot: coordinator alembic upgrade (its own version table).
+  coordinator-migrate:
+    build: { context: "${REPO_ROOT}/services/coordinator", dockerfile: Dockerfile }
+    image: meshlive-coordinator:local
+    depends_on: { postgres: { condition: service_healthy } }
+    environment:
+      DATABASE_URL: postgresql+asyncpg://potluck:potluck@postgres:5432/potluck
+      ENV: development
+      SENTRY_DSN: ""
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    networks: [meshnet]
+
+  coordinator:
+    image: meshlive-coordinator:local
+    depends_on:
+      postgres: { condition: service_healthy }
+      coordinator-migrate: { condition: service_completed_successfully }
+    environment:
+      DATABASE_URL: postgresql+asyncpg://potluck:potluck@postgres:5432/potluck
+      ENV: development
+      SENTRY_DSN: ""
+      POTLUCK_DERP_JWT_KEY: dev-only-derp-jwt-key-change-me-000000000000000000000000000000000000
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(\"http://localhost:8400/health\").status==200 else 1)'"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    networks: [meshnet]
+
+  # Local STUN so the sidecars never contact a public STUN server. It also
+  # serves as the tools container (jq) for the host-side script.
+  stun:
+    image: meshlive-sidecar:${VARIANT:-after}
+    init: true
+    command: ["python3", "/opt/meshlive/stun_server.py"]
+    networks: [meshnet]
+
+  node-a:
+    <<: *sidecar
+    hostname: node-a
+    environment: { <<: *sidecar-env, NODE_NAME: node-a }
+    volumes: [state-a:/state]
+  node-b:
+    <<: *sidecar
+    hostname: node-b
+    environment: { <<: *sidecar-env, NODE_NAME: node-b }
+    volumes: [state-b:/state]
+  node-c:
+    <<: *sidecar
+    hostname: node-c
+    environment: { <<: *sidecar-env, NODE_NAME: node-c }
+    volumes: [state-c:/state]
+
+  # Phase D only (profile "fake"): a stand-in coordinator that can send rosters
+  # the real one cannot, and a sidecar pointed at it.
+  fakecoord:
+    profiles: [fake]
+    image: meshlive-sidecar:${VARIANT:-after}
+    init: true
+    command: ["python3", "/opt/meshlive/fake_coordinator.py"]
+    networks: [meshnet]
+  node-d:
+    <<: *sidecar
+    profiles: [fake]
+    hostname: node-d
+    depends_on:
+      fakecoord: { condition: service_started }
+    environment: { <<: *sidecar-env, NODE_NAME: node-d, COORDINATOR_URL: "http://fakecoord:8400" }
+    volumes: [state-d:/state]
+
+networks:
+  meshnet:
+    internal: true
+
+volumes:
+  pgdata:
+  state-a:
+  state-b:
+  state-c:
+  state-d:

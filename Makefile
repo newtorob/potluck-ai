@@ -19,7 +19,7 @@ COMPOSE ?= $(shell \
   fi)
 
 .PHONY: help setup check-python check-docker up down restart logs api-logs pg-logs coord-logs migrate psql \
-        api-shell coord-shell test test-fast test-api test-coordinator test-sidecar test-go test-frontend test-cli test-landing m3-smoke mesh-smoke lint smoke-prod install-hooks dev desktop frontend \
+        api-shell coord-shell test test-fast test-api test-coordinator test-sidecar test-go test-frontend test-cli test-landing m3-smoke mesh-smoke mesh-live mesh-live-clean lint smoke-prod install-hooks dev desktop frontend \
         sidecar sidecar-setup sidecar-go installer-deps installer-bundle installer-mac installer-mac-dir installer-win installer-linux installer-linux-docker installer-clean \
         install-mac-app kill dogfood \
         coordinator coordinator-setup frontend-setup electron-setup ps status clean reset eval-retrieval bench \
@@ -217,6 +217,13 @@ m3-smoke: ## End-to-end Phase G m3 acceptance check (needs coordinator + at leas
 
 mesh-smoke: ## End-to-end Phase G mesh week-1 acceptance (needs coordinator + Postgres)
 	@python3 scripts/dev/mesh-smoke.py $(MESH_ARGS)
+
+mesh-live: check-docker ## Live mesh check: real sidecars + WireGuard in Docker, built from this tree, about 4 min. Needs /dev/net/tun + NET_ADMIN. NOT part of `make test`, not for CI. Flags WITH_E2/WITH_R/WITH_D/WITH_PROTO=1, BEFORE_REF=<commit>; see scripts/dev/mesh-live/README.md
+	@scripts/dev/mesh-live/run.sh
+
+mesh-live-clean: ## Remove containers, network, volumes and images a killed `make mesh-live` left behind
+	@REPO_ROOT=$(CURDIR) docker compose -p meshlive -f scripts/dev/mesh-live/docker-compose.yml --profile fake down -v --remove-orphans
+	@docker image rm meshlive-sidecar:after meshlive-sidecar:before meshlive-sidecar:proto meshlive-coordinator:local 2>/dev/null || true
 
 eval-retrieval: ## Eval B — retrieval quality: RRF vs keyword-only on labeled corpus
 	@if [ ! -x apps/desktop/python/.venv/bin/python ]; then \
