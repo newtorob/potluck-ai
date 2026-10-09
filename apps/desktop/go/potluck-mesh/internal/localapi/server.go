@@ -118,6 +118,7 @@ type State struct {
 	lastError            string
 	coordinatorURL       string // static launch-flag value; never empty
 	wgPort               int    // UDP port the WireGuard device listens on (default 51820)
+	features             []string
 }
 
 // NewState returns an idle State in the "starting" phase.
@@ -160,6 +161,15 @@ func (s *State) SetLocalEndpoints(eps []string) {
 	cp := append([]string(nil), eps...)
 	s.mu.Lock()
 	s.localEndpoints = cp
+	s.mu.Unlock()
+}
+
+// SetFeatures records the optional capabilities GET /status reports (see
+// signal.FeatureCircleLinkV1). Set it once at startup, before serving.
+func (s *State) SetFeatures(features []string) {
+	cp := append([]string(nil), features...)
+	s.mu.Lock()
+	s.features = cp
 	s.mu.Unlock()
 }
 
@@ -286,6 +296,7 @@ func (s *State) snapshot(peerCount int) statusResponse {
 		CoordinatorConnection: coordConnState,
 		PeersOnlineCount:      peerCount,
 		CoordinatorURL:        s.coordinatorURL,
+		Features:              append([]string{}, s.features...),
 	}
 	if s.nodeID != "" {
 		v := s.nodeID
@@ -357,6 +368,10 @@ type Config struct {
 	Platform           string           // runtime.GOOS
 	LanPair            *lanpair.Service // LAN pairing-token broadcast/listen; may be nil
 
+	// Circle is the holder of direct circle links (GET /circle-peers, and what
+	// POST /unpair clears). nil when this build holds none.
+	Circle CircleSource
+
 	// SettingsPath is where PATCH /settings persists a runtime coordinator-URL
 	// override (internal/runtimesettings). "" disables persistence (tests) —
 	// the live update via ApplyCoordinatorURLFn still happens, it just won't
@@ -388,6 +403,7 @@ type Server struct {
 	platform              string
 	socketPath            string
 	lanpair               *lanpair.Service
+	circle                CircleSource
 	settingsPath          string
 	applyCoordinatorURLFn func(url string)
 
@@ -422,6 +438,7 @@ func New(cfg Config) *Server {
 		platform:              cfg.Platform,
 		socketPath:            sp,
 		lanpair:               cfg.LanPair,
+		circle:                cfg.Circle,
 		settingsPath:          cfg.SettingsPath,
 		applyCoordinatorURLFn: cfg.ApplyCoordinatorURLFn,
 	}
@@ -429,6 +446,7 @@ func New(cfg Config) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /status", s.handleStatus)
 	mux.HandleFunc("GET /peers", s.handlePeers)
+	mux.HandleFunc("GET /circle-peers", s.handleCirclePeers)
 	mux.HandleFunc("POST /pair", s.handlePair)
 	mux.HandleFunc("POST /unpair", s.handleUnpair)
 	mux.HandleFunc("GET /events", s.handleEvents)
@@ -567,6 +585,12 @@ type statusResponse struct {
 	// "connecting" in GET /peers. A whole-node summary so a systray/global
 	// indicator doesn't need to walk the peer list itself. Additive field.
 	PeersConnectingCount int `json:"peers_connecting_count"`
+
+	// Features lists the optional capabilities of this sidecar, for example
+	// "circle_link_v1" (the circle_peer_* messages and GET /circle-peers). A
+	// consumer that needs one checks for its name; an older sidecar has no such
+	// key at all. Always a list, empty when there are none.
+	Features []string `json:"features"`
 }
 
 // scopeHousehold marks a peer that belongs to this machine's owner. Every peer
@@ -946,6 +970,10 @@ func (s *Server) handleUnpair(w http.ResponseWriter, r *http.Request) {
 
 	s.enrolled.Store(0)
 	s.state.ClearEnrollment()
+	// A node that leaves its household must not keep a stranger's peer.
+	if s.circle != nil {
+		s.circle.Clear()
+	}
 	s.bus.Publish(events.NewStatusChanged(string(StatusStopped)))
 
 	// TODO(week7): call coordinator DELETE /mesh/nodes/{id} to deregister.

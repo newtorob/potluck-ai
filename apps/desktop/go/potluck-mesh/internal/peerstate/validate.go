@@ -180,3 +180,16 @@ func warnRejected(rejected []Rejection) {
 		slog.Warn("roster: dropping peer", "node_id", r.NodeID, "reason", r.Reason)
 	}
 }
+
+// CheckMeshAddr applies the roster's address rules to raw: a bare dotted IPv4
+// host address inside this store's mesh range, not the broadcast address and not
+// self. Callers that hold peers outside the roster (circle links) use it so one
+// definition of "a usable mesh address" covers both. The returned error never
+// echoes raw.
+func (s *Store) CheckMeshAddr(raw string, self netip.Addr) (netip.Addr, error) {
+	return validateMeshIP(raw, s.mesh, self)
+}
+
+// ValidateWGKey applies the roster's key rule to raw: canonical base64 of 32
+// bytes.
+func ValidateWGKey(raw string) error { return validateWGKey(raw) }

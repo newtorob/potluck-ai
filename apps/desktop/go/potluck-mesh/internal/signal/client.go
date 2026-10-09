@@ -103,6 +103,12 @@ type Client struct {
 	// can Load it without racing against runOnce's Store(new) / Store(nil)
 	// across reconnects. See package doc for the lifecycle contract.
 	sendCh atomic.Pointer[chan any]
+
+	// circleMu guards the circle-link settings below. They are set once before
+	// Run, but the lock keeps a late setter race-free. See circle.go.
+	circleMu sync.RWMutex
+	circle   CircleHandler
+	features []string
 }
 
 // NewClient creates a Client. Call Run(ctx) to start the connection loop.
@@ -324,7 +330,7 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 	defer conn.CloseNow() // best-effort cleanup; error intentionally ignored
 
 	// ---- send hello ---- //
-	if err := wsjson.Write(ctx, conn, NewHello(c.WGPublicKey())); err != nil {
+	if err := wsjson.Write(ctx, conn, NewHelloWithFeatures(c.WGPublicKey(), c.helloFeatures())); err != nil {
 		return false, fmt.Errorf("signal: send hello: %w", err)
 	}
 
@@ -498,6 +504,9 @@ func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
 				continue
 			}
 			c.handler.OnPunchCoord(pc)
+
+		case "circle_peer_add", "circle_peer_extend", "circle_peer_remove":
+			c.dispatchCircle(env.Type, raw)
 
 		case "error":
 			var se ServerError

@@ -226,3 +226,18 @@ func (s *Store) All() []signal.RosterPeer {
 	}
 	return out
 }
+
+// HasKey reports whether a stored household peer has this WireGuard public key
+// (base64). A WireGuard key names exactly one peer on the device, so a second
+// holder of the same key, such as a circle peer, would overwrite the household
+// peer's allowed-ips.
+func (s *Store) HasKey(key string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, p := range s.peers {
+		if p.WGPublicKey == key {
+			return true
+		}
+	}
+	return false
+}

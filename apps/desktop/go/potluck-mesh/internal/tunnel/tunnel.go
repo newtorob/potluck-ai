@@ -33,6 +33,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.zx2c4.com/wireguard/conn"
@@ -71,6 +72,31 @@ type Peer struct {
 	// explicitly opts into "stay reachable while idle."
 	// TODO(keepalive-toggle): wire a user setting that sets this to 60+.
 	PersistentKeepalive int
+	// Private marks a peer that belongs to someone outside the household (a
+	// circle link). Its endpoint is another person's address, so the tunnel
+	// never logs it, at any level (this sidecar writes debug lines to the same
+	// file), and never writes the relay endpoint, which spells out the peer's
+	// whole key. A household peer's log lines are not changed.
+	Private bool
+}
+
+// endpointForLog is what the tunnel may write about a peer's endpoint at info
+// and error level: the endpoint for a household peer, nothing for a private one.
+func endpointForLog(p Peer) string {
+	if p.Private {
+		return "<not logged>"
+	}
+	return truncateForLog(p.Endpoint)
+}
+
+// errForLog is the error a rejection line may carry: the error itself for a
+// household peer, a fixed phrase for a private one, because a validation error
+// quotes the endpoint it refused.
+func errForLog(p Peer, err error) any {
+	if p.Private {
+		return "invalid config (details withheld for a circle peer)"
+	}
+	return err
 }
 
 // Tunnel wraps a userspace WireGuard device and its associated TUN interface.
@@ -82,6 +108,10 @@ type Tunnel struct {
 	meshIP net.IP
 	wgPort int
 	filter *PacketFilter // nil when no packet policy was installed
+
+	// keep, when set, names WireGuard peers that live outside the household
+	// roster (circle links) and that SetPeers must carry over. See SetKeptPeers.
+	keep atomic.Pointer[func() []Peer]
 }
 
 // Option configures optional behaviour for New.
@@ -382,9 +412,63 @@ func validateEndpoint(endpoint string) error {
 	return nil
 }
 
+// SetKeptPeers installs the source of peers that SetPeers must keep. SetPeers
+// writes replace_peers=true, which removes every WireGuard peer that is not in
+// its list, and the household roster does not contain the restricted peers of a
+// circle link. Without this a welcome, which arrives on every signal reconnect
+// and every coordinator restart, would silently remove them while the sidecar
+// still believed they were live.
+//
+// fn runs inside SetPeers with the tunnel lock held, so it must not call back
+// into the Tunnel and must not take a lock that a caller of the Tunnel holds
+// across a Tunnel call. The circle controller answers from an immutable snapshot.
+// It must return only peers that are still wanted: whatever it returns is
+// configured, and a peer it leaves out is removed.
+func (t *Tunnel) SetKeptPeers(fn func() []Peer) {
+	if fn == nil {
+		t.keep.Store(nil)
+		return
+	}
+	t.keep.Store(&fn)
+}
+
+// keptPeers returns the kept peers that do not clash with the batch. A kept peer
+// that shares a key or an allowed-ip with a batch peer is dropped: the batch is
+// the household roster and it wins, because wireguard-go would otherwise let the
+// later one take the other's key or address.
+func (t *Tunnel) keptPeers(batch []Peer) []Peer {
+	fn := t.keep.Load()
+	if fn == nil {
+		return nil
+	}
+	taken := make(map[string]bool, 2*len(batch))
+	for _, p := range batch {
+		taken["key:"+p.PublicKey] = true
+		for _, cidr := range p.AllowedIPs {
+			taken["ip:"+cidr] = true
+		}
+	}
+	var out []Peer
+	for _, p := range (*fn)() {
+		clash := taken["key:"+p.PublicKey]
+		for _, cidr := range p.AllowedIPs {
+			clash = clash || taken["ip:"+cidr]
+		}
+		if clash {
+			slog.Warn("tunnel: kept peer clashes with a roster peer, not carrying it over",
+				"pubkey_prefix", util.TruncatePubkey(p.PublicKey),
+				"allowed_ips", p.AllowedIPs,
+			)
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
 // SetPeers atomically replaces all WG peers on the device with the provided
-// list. Uses the UAPI `replace_peers=true` directive so stale peers are
-// removed in the same transaction.
+// list plus the peers named by SetKeptPeers. Uses the UAPI `replace_peers=true`
+// directive so stale peers are removed in the same transaction.
 //
 // Peers with an empty Endpoint are configured without an endpoint — they are
 // known to WG (and will accept inbound traffic if they initiate) but we
@@ -394,7 +478,8 @@ func (t *Tunnel) SetPeers(peers []Peer) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if len(peers) == 0 {
+	kept := t.keptPeers(peers)
+	if len(peers) == 0 && len(kept) == 0 {
 		// Explicit replace with no peers: remove all existing peers.
 		if err := t.dev.IpcSet("replace_peers=true\n"); err != nil {
 			return fmt.Errorf("tunnel: clear peers: %w", err)
@@ -406,7 +491,7 @@ func (t *Tunnel) SetPeers(peers []Peer) error {
 	var sb strings.Builder
 	sb.WriteString("replace_peers=true\n")
 	skipped := 0
-	for _, p := range peers {
+	for _, p := range append(append([]Peer(nil), peers...), kept...) {
 		if err := appendPeerConfig(&sb, p); err != nil {
 			// A single malformed/malicious peer entry must not abort the
 			// whole batch (which would tear down every other peer's config
@@ -414,8 +499,8 @@ func (t *Tunnel) SetPeers(peers []Peer) error {
 			// being applied. Drop just this peer and keep going.
 			slog.Error("tunnel: rejecting peer with invalid config, excluding from SetPeers batch",
 				"pubkey_prefix", util.TruncatePubkey(p.PublicKey),
-				"endpoint", truncateForLog(p.Endpoint),
-				"err", err,
+				"endpoint", endpointForLog(p),
+				"err", errForLog(p, err),
 			)
 			skipped++
 			continue
@@ -426,7 +511,7 @@ func (t *Tunnel) SetPeers(peers []Peer) error {
 		return fmt.Errorf("tunnel: set peers: %w", err)
 	}
 
-	slog.Info("tunnel: peers configured", "count", len(peers)-skipped, "rejected", skipped)
+	slog.Info("tunnel: peers configured", "count", len(peers)+len(kept)-skipped, "rejected", skipped, "kept", len(kept))
 	return nil
 }
 
@@ -440,8 +525,8 @@ func (t *Tunnel) AddPeer(p Peer) error {
 	if err := appendPeerConfig(&sb, p); err != nil {
 		slog.Error("tunnel: rejecting AddPeer with invalid config",
 			"pubkey_prefix", util.TruncatePubkey(p.PublicKey),
-			"endpoint", truncateForLog(p.Endpoint),
-			"err", err,
+			"endpoint", endpointForLog(p),
+			"err", errForLog(p, err),
 		)
 		return fmt.Errorf("tunnel: add peer %s: %w", p.PublicKey, err)
 	}
@@ -450,6 +535,13 @@ func (t *Tunnel) AddPeer(p Peer) error {
 		return fmt.Errorf("tunnel: add peer %s: %w", p.PublicKey, err)
 	}
 
+	if p.Private {
+		slog.Info("tunnel: peer added",
+			"pubkey_prefix", util.TruncatePubkey(p.PublicKey),
+			"allowed_ips", p.AllowedIPs,
+		)
+		return nil
+	}
 	slog.Info("tunnel: peer added",
 		"pubkey_prefix", util.TruncatePubkey(p.PublicKey),
 		"endpoint", p.Endpoint,

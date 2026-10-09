@@ -17,13 +17,25 @@ import (
 
 // Hello is the first message a client sends after connecting.
 // The server closes with code 1008 if the wg_public_key is not in mesh_nodes.
+//
+// Features lists optional capabilities of this sidecar (see
+// FeatureCircleLinkV1). The coordinator never sends a message type to a sidecar
+// that did not name it, and an old coordinator ignores the key.
 type Hello struct {
-	Type        string `json:"type"`
-	WGPublicKey string `json:"wg_public_key"`
+	Type        string   `json:"type"`
+	WGPublicKey string   `json:"wg_public_key"`
+	Features    []string `json:"features,omitempty"`
 }
 
 func NewHello(pubKey string) Hello {
 	return Hello{Type: "hello", WGPublicKey: pubKey}
+}
+
+// NewHelloWithFeatures is NewHello plus the capability list.
+func NewHelloWithFeatures(pubKey string, features []string) Hello {
+	h := NewHello(pubKey)
+	h.Features = append([]string(nil), features...)
+	return h
 }
 
 // EndpointUpdate tells the coordinator about this node's current external
@@ -136,7 +148,8 @@ type Envelope struct {
 // knownType returns true for server-sent types the client knows how to handle.
 func knownType(t string) bool {
 	switch t {
-	case "welcome", "roster_update", "punch_coord", "pong", "error":
+	case "welcome", "roster_update", "punch_coord", "pong", "error",
+		"circle_peer_add", "circle_peer_extend", "circle_peer_remove":
 		return true
 	}
 	return false

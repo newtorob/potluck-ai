@@ -236,7 +236,8 @@ func run() int {
 	// The store comes before the tunnel because the TUN packet filter asks it,
 	// on every packet, whether an address is a household peer.
 	ps := peerstate.New()
-	tunnelOpts = append(tunnelOpts, tunnel.WithPacketPolicy(newPacketFilter(ps)))
+	pf := newPacketFilter(ps)
+	tunnelOpts = append(tunnelOpts, tunnel.WithPacketPolicy(pf))
 
 	// Start WG device with no mesh IP yet; SetMeshIP is called from OnWelcome.
 	tun, err := tunnel.New(privKeyBase64, "", tunnelOpts...)
@@ -364,6 +365,22 @@ func run() int {
 	// SendRequestPunch from OnWelcome / OnRosterUpdate.
 	handler.setClient(client)
 
+	// ---- direct circle links ---- //
+	// Restricted peers of other households, held for one link each. See
+	// circle.go and internal/circlelink.
+	circle := setupCircleLinks(circleDeps{
+		tun:          tun,
+		filter:       pf,
+		dBind:        dBind,
+		ps:           ps,
+		client:       client,
+		ipc:          ipcState,
+		symmetricNAT: isSymmetricNAT.Load,
+		localNets:    localep.LocalIPNets,
+	})
+	handler.setCircle(circle)
+	go circle.Run(ctx)
+
 	// signalRestart is called from POST /pair after enrollment to reconnect
 	// the signal client with the new WG key. The signal client Run loop
 	// reconnects automatically when its connection is dropped; we trigger a
@@ -467,6 +484,7 @@ func run() int {
 		SocketPath:            cfg.LocalAPISocketPath,
 		Platform:              cfg.Platform,
 		LanPair:               lanSvc,
+		Circle:                circle,
 	})
 
 	// Discover this node's private-LAN endpoints once at startup so they show
@@ -1727,6 +1745,10 @@ type rosterHandler struct {
 	// the one-shot classifier completes.
 	isSymmetricNATFn func() bool
 
+	// circle, when set, is told which roster entries became household machines
+	// so a circle peer that held the same address or key can be removed first.
+	circle circleGuard
+
 	// punchMu guards punchState.
 	punchMu     sync.Mutex
 	punchState  map[string]*punchEntry // keyed by node_id
@@ -1851,6 +1873,10 @@ func (h *rosterHandler) OnWelcome(w msignal.Welcome) {
 	previous := h.ps.All()
 	kept, rejected := h.ps.Reset(w.MeshIP, w.Roster)
 	w.Roster = kept
+	// A circle peer on an address the household now claims goes before SetPeers,
+	// which keeps the other circle peers and would otherwise hand the address to
+	// two keys.
+	h.guardCircle(w.MeshIP, kept)
 	h.removeRoutesOfRejected(previous, rejected)
 
 	// 4. Build WG Peer list and apply.
@@ -1993,6 +2019,7 @@ func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
 		}
 	}
 	u.Removed = removed
+	h.guardCircle("", append(append([]msignal.RosterPeer(nil), u.Added...), u.Updated...))
 
 	// Added peers: insert into cache + configure WG peer.
 	for _, p := range u.Added {
