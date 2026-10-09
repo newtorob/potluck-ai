@@ -21,6 +21,7 @@ import (
 	"errors"
 	"net/netip"
 	"sync"
+	"sync/atomic"
 
 	"github.com/potluck-ai/potluck-mesh/internal/signal"
 )
@@ -31,14 +32,66 @@ type Store struct {
 	peers map[string]signal.RosterPeer // keyed by NodeID
 	mesh  netip.Prefix                 // every stored mesh_ip falls inside this
 	self  netip.Addr                   // this node's own mesh IP; zero until the first Reset
+
+	// members is the immutable address set of peers. Writers replace it while
+	// holding mu (see publishLocked); the packet filter loads it without a lock.
+	members atomic.Pointer[AddrSet]
 }
 
 // New returns an empty Store.
 func New() *Store {
-	return &Store{
+	s := &Store{
 		peers: make(map[string]signal.RosterPeer),
 		mesh:  meshRange(),
 	}
+	s.members.Store(&AddrSet{})
+	return s
+}
+
+// AddrSet is an immutable set of IPv4 addresses. It is never modified after it
+// is published, so any number of goroutines may call Contains at once.
+type AddrSet struct {
+	m map[[4]byte]struct{}
+}
+
+// Contains reports whether a is in the set. A nil set is empty.
+func (s *AddrSet) Contains(a [4]byte) bool {
+	if s == nil {
+		return false
+	}
+	_, ok := s.m[a]
+	return ok
+}
+
+// Len returns the number of addresses in the set.
+func (s *AddrSet) Len() int {
+	if s == nil {
+		return 0
+	}
+	return len(s.m)
+}
+
+// IsHousehold reports whether a is the mesh address of a peer the store holds
+// right now. It takes no lock and does not allocate, so it is safe on the
+// per-packet path. The answer is exactly the store's contents as of the last
+// completed Reset, Merge or Remove.
+func (s *Store) IsHousehold(a [4]byte) bool {
+	return s.members.Load().Contains(a)
+}
+
+// publishLocked rebuilds the address snapshot from s.peers and publishes it.
+// The caller holds s.mu for writing and calls this before it unlocks, so no
+// caller can observe a changed peer map with an old snapshot.
+func (s *Store) publishLocked() {
+	set := &AddrSet{m: make(map[[4]byte]struct{}, len(s.peers))}
+	for _, p := range s.peers {
+		// Every stored entry passed validateMeshIP, so this parse cannot fail;
+		// an entry that somehow did not parse simply contributes no address.
+		if a, err := netip.ParseAddr(p.MeshIP); err == nil && a.Is4() {
+			set.m[a.As4()] = struct{}{}
+		}
+	}
+	s.members.Store(set)
 }
 
 // Reset replaces the entire peer map with the entries of peers that pass
@@ -62,6 +115,7 @@ func (s *Store) Reset(selfMeshIP string, peers []signal.RosterPeer) (kept []sign
 		s.peers[p.NodeID] = p
 		kept = append(kept, p)
 	}
+	s.publishLocked()
 	s.mu.Unlock()
 	warnRejected(rejected)
 	return kept, rejected
@@ -119,6 +173,7 @@ func (s *Store) Merge(added, updated []signal.RosterPeer) (keptAdded, keptUpdate
 	for _, nodeID := range lostHeld {
 		markEvict(nodeID)
 	}
+	s.publishLocked()
 	s.mu.Unlock()
 	warnRejected(rejected)
 	return keptAdded, keptUpdated, evict, rejected
@@ -147,6 +202,7 @@ func (s *Store) Remove(nodeID string) (signal.RosterPeer, bool) {
 	p, ok := s.peers[nodeID]
 	if ok {
 		delete(s.peers, nodeID)
+		s.publishLocked()
 	}
 	return p, ok
 }

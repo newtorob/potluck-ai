@@ -81,13 +81,15 @@ type Tunnel struct {
 	ifName string
 	meshIP net.IP
 	wgPort int
+	filter *PacketFilter // nil when no packet policy was installed
 }
 
 // Option configures optional behaviour for New.
 type Option func(*tunnelOptions)
 
 type tunnelOptions struct {
-	bind conn.Bind
+	bind   conn.Bind
+	filter *PacketFilter
 }
 
 // WithBind supplies a custom conn.Bind implementation to the WireGuard device
@@ -101,6 +103,16 @@ type tunnelOptions struct {
 func WithBind(b conn.Bind) Option {
 	return func(o *tunnelOptions) {
 		o.bind = b
+	}
+}
+
+// WithPacketPolicy installs a packet filter around the TUN device that
+// wireguard-go reads and writes (see PacketFilter). Without it every packet
+// wireguard-go delivers reaches the host. SetMeshIP keeps the filter told of
+// this host's own address.
+func WithPacketPolicy(f *PacketFilter) Option {
+	return func(o *tunnelOptions) {
+		o.filter = f
 	}
 }
 
@@ -137,7 +149,13 @@ func New(privateKeyBase64 string, meshIPCIDR string, opts ...Option) (*Tunnel, e
 	}
 
 	logger := newWGLogger()
-	dev := device.NewDevice(tdev, bind, logger)
+	// wireguard-go gets the filtered view of the TUN device when a packet policy
+	// was supplied. Everything else here keeps the real device.
+	var wgTUN tun.Device = tdev
+	if o.filter != nil {
+		wgTUN = o.filter.Wrap(tdev)
+	}
+	dev := device.NewDevice(wgTUN, bind, logger)
 
 	// Resolve the actual interface name (macOS may allocate a different utun index).
 	realName, _ := tdev.Name()
@@ -150,6 +168,7 @@ func New(privateKeyBase64 string, meshIPCIDR string, opts ...Option) (*Tunnel, e
 		tdev:   tdev,
 		ifName: realName,
 		wgPort: wgPort,
+		filter: o.filter,
 	}
 
 	if err := t.applyBaseConfig(privateKeyBase64); err != nil {
@@ -249,6 +268,12 @@ func (t *Tunnel) SetMeshIP(meshIP string) error {
 	ifName := t.ifName
 	wgPort := t.wgPort
 	t.mu.Unlock()
+
+	// The filter learns the address before the interface carries it, so the
+	// first inbound packet to it is already judged against the right host.
+	if t.filter != nil {
+		t.filter.SetSelf(ip)
+	}
 
 	if err := assignInterfaceAddress(ifName, meshIP); err != nil {
 		return fmt.Errorf("tunnel: assign interface address: %w", err)

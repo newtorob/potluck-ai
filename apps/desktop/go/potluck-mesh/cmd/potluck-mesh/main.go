@@ -232,6 +232,12 @@ func run() int {
 		}
 	}
 
+	// ---- peer state cache + packet filter ---- //
+	// The store comes before the tunnel because the TUN packet filter asks it,
+	// on every packet, whether an address is a household peer.
+	ps := peerstate.New()
+	tunnelOpts = append(tunnelOpts, tunnel.WithPacketPolicy(newPacketFilter(ps)))
+
 	// Start WG device with no mesh IP yet; SetMeshIP is called from OnWelcome.
 	tun, err := tunnel.New(privKeyBase64, "", tunnelOpts...)
 	if err != nil {
@@ -244,9 +250,6 @@ func run() int {
 		return 1
 	}
 	defer tun.Close()
-
-	// ---- peer state cache ---- //
-	ps := peerstate.New()
 
 	// ---- event bus ---- //
 	bus := events.NewBus()

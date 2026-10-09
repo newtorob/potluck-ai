@@ -586,3 +586,148 @@ func TestStoreIsRaceFree(t *testing.T) {
 	}
 	wg.Wait()
 }
+
+// ---- household address set (read by the TUN packet filter without a lock) ----
+
+func a4(s string) [4]byte { return netip.MustParseAddr(s).As4() }
+
+func wantIn(t *testing.T, what string, s *Store, in, out []string) {
+	t.Helper()
+	for _, ip := range in {
+		if !s.IsHousehold(a4(ip)) {
+			t.Errorf("%s: %s should be in the household set", what, ip)
+		}
+	}
+	for _, ip := range out {
+		if s.IsHousehold(a4(ip)) {
+			t.Errorf("%s: %s should not be in the household set", what, ip)
+		}
+	}
+}
+
+func TestHouseholdSet_FollowsTheStore(t *testing.T) {
+	s := New()
+	wantIn(t, "empty store", s, nil, []string{"100.64.0.2", "100.64.0.3"})
+
+	s.Reset("100.64.0.1", []signal.RosterPeer{peer("a", "100.64.0.2", 1), peer("b", "100.64.0.3", 2)})
+	wantIn(t, "after Reset", s, []string{"100.64.0.2", "100.64.0.3"}, []string{"100.64.0.1", "100.64.0.4"})
+
+	s.Merge([]signal.RosterPeer{peer("c", "100.64.0.4", 3)}, nil)
+	wantIn(t, "after Merge add", s, []string{"100.64.0.2", "100.64.0.3", "100.64.0.4"}, nil)
+
+	s.Remove("b")
+	wantIn(t, "after Remove", s, []string{"100.64.0.2", "100.64.0.4"}, []string{"100.64.0.3"})
+
+	if _, ok := s.Remove("b"); ok {
+		t.Fatal("second Remove found the peer")
+	}
+	wantIn(t, "after a Remove of an unknown id", s, []string{"100.64.0.2", "100.64.0.4"}, []string{"100.64.0.3"})
+
+	if err := s.Upsert(peer("d", "100.64.0.9", 4)); err != nil {
+		t.Fatal(err)
+	}
+	wantIn(t, "after Upsert", s, []string{"100.64.0.9"}, nil)
+
+	// A welcome replaces the whole set.
+	s.Reset("100.64.0.1", []signal.RosterPeer{peer("a", "100.64.0.2", 1)})
+	wantIn(t, "after a second Reset", s, []string{"100.64.0.2"}, []string{"100.64.0.4", "100.64.0.9"})
+	s.Reset("100.64.0.1", nil)
+	wantIn(t, "after an empty Reset", s, nil, []string{"100.64.0.2"})
+}
+
+// Entries the store refuses never reach the set, and a refused update of a held
+// peer takes it out only once the store itself drops it.
+func TestHouseholdSet_RefusedAndEvictedEntries(t *testing.T) {
+	s := New()
+	bad := peer("bad", "192.168.1.1", 9)
+	s.Reset("100.64.0.1", []signal.RosterPeer{peer("a", "100.64.0.2", 1), bad})
+	wantIn(t, "refused at Reset", s, []string{"100.64.0.2"}, []string{"192.168.1.1"})
+
+	// A second node claims a's address: both are refused, a is evicted. a stays
+	// in the store (and so in the set) until the caller removes it, exactly as
+	// the store reports it.
+	_, _, evict, _ := s.Merge([]signal.RosterPeer{peer("thief", "100.64.0.2", 5)}, nil)
+	if len(evict) != 1 || evict[0] != "a" {
+		t.Fatalf("evict = %v", evict)
+	}
+	wantIn(t, "evicted but not yet removed", s, []string{"100.64.0.2"}, nil)
+	s.Remove("a")
+	wantIn(t, "evicted and removed", s, nil, []string{"100.64.0.2"})
+
+	// A held peer whose update is refused is evicted the same way.
+	s.Merge([]signal.RosterPeer{peer("b", "100.64.0.3", 2)}, nil)
+	_, _, evict, _ = s.Merge(nil, []signal.RosterPeer{peer("b", "10.0.0.5", 2)})
+	if len(evict) != 1 || evict[0] != "b" {
+		t.Fatalf("evict = %v", evict)
+	}
+	wantIn(t, "refused update, before removal", s, []string{"100.64.0.3"}, []string{"10.0.0.5"})
+	s.Remove("b")
+	wantIn(t, "refused update, after removal", s, nil, []string{"100.64.0.3", "10.0.0.5"})
+}
+
+// A node that rejoins with the same key and address is a Merge of an entry the
+// store already holds: its address stays in the set the whole time.
+func TestHouseholdSet_SameKeyRejoinKeepsTheAddress(t *testing.T) {
+	s := New()
+	s.Reset("100.64.0.1", []signal.RosterPeer{peer("a", "100.64.0.2", 1)})
+	before := s.members.Load()
+	s.Merge([]signal.RosterPeer{peer("a", "100.64.0.2", 1)}, nil)
+	wantIn(t, "after a rejoin Merge", s, []string{"100.64.0.2"}, nil)
+	if before == s.members.Load() {
+		t.Error("a Merge should publish a fresh snapshot, never edit the one readers hold")
+	}
+}
+
+// A snapshot a reader already holds never changes.
+func TestHouseholdSet_SnapshotsAreImmutable(t *testing.T) {
+	s := New()
+	s.Reset("100.64.0.1", []signal.RosterPeer{peer("a", "100.64.0.2", 1)})
+	old := s.members.Load()
+	s.Merge([]signal.RosterPeer{peer("b", "100.64.0.3", 2)}, nil)
+	s.Remove("a")
+	if !old.Contains(a4("100.64.0.2")) || old.Contains(a4("100.64.0.3")) || old.Len() != 1 {
+		t.Error("an earlier snapshot changed after later store calls")
+	}
+}
+
+func TestAddrSet_NilIsEmpty(t *testing.T) {
+	var s *AddrSet
+	if s.Contains([4]byte{1, 2, 3, 4}) || s.Len() != 0 {
+		t.Error("a nil AddrSet should be empty")
+	}
+}
+
+// Readers on the packet path run while the store changes. Run with -race.
+func TestHouseholdSet_ConcurrentReadersAndWriters(t *testing.T) {
+	s := New()
+	s.Reset("100.64.0.1", []signal.RosterPeer{peer("stable", "100.64.0.2", 1)})
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+	for i := 0; i < 4; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				if !s.IsHousehold(a4("100.64.0.2")) {
+					t.Error("a peer that was never removed went missing from the set")
+					return
+				}
+				s.IsHousehold(a4("100.64.0.3"))
+			}
+		}()
+	}
+	for i := 0; i < 2000; i++ {
+		s.Merge([]signal.RosterPeer{peer("x", "100.64.0.3", 2)}, nil)
+		s.Remove("x")
+		if i%50 == 0 {
+			s.Reset("100.64.0.1", []signal.RosterPeer{peer("stable", "100.64.0.2", 1)})
+		}
+	}
+	close(stop)
+	wg.Wait()
+}
