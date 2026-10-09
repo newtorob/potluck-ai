@@ -16,14 +16,28 @@ import (
 type recoveryTunnel struct {
 	*tunnel.Tunnel // Unexpected OS/tunnel operations fail the test.
 	handshake      time.Time
+	mu             sync.Mutex // guards added: the second machine of a pair sets its keepalive from a timer
 	added          []tunnel.Peer
+	removed        int
 }
 
 func (f *recoveryTunnel) PeerReachability(string) (time.Time, uint64, uint64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	return f.handshake, 0, 0, nil
 }
-func (f *recoveryTunnel) AddPeer(p tunnel.Peer) error             { f.added = append(f.added, p); return nil }
-func (f *recoveryTunnel) RemovePeer(string) error                 { return nil }
+func (f *recoveryTunnel) AddPeer(p tunnel.Peer) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.added = append(f.added, p)
+	return nil
+}
+func (f *recoveryTunnel) RemovePeer(string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.removed++
+	return nil
+}
 func (f *recoveryTunnel) AddPeerRoute(string) error               { return nil }
 func (f *recoveryTunnel) UpdatePeerEndpoint(string, string) error { return nil }
 

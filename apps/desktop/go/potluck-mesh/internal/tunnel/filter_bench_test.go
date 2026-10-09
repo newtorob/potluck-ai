@@ -100,6 +100,29 @@ func BenchmarkHouseholdBatch128(b *testing.B) {
 		}
 		b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(128*b.N), "ns/pkt")
 	})
+	// The inbound watch (filter_watch.go) on the same batch: the packets' source is watched, other
+	// addresses are watched, or eight other addresses are watched.
+	watchRun := func(name string, watched ...[4]byte) {
+		b.Run(name, func(b *testing.B) {
+			for _, a := range watched {
+				f.WatchInbound(addr(a))
+			}
+			defer func() {
+				for _, a := range watched {
+					f.UnwatchInbound(addr(a))
+				}
+			}()
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				w.Write(bufs, wgOffset)
+			}
+			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(128*b.N), "ns/pkt")
+		})
+	}
+	watchRun("write-watching-the-source", [4]byte{100, 64, 0, 3})
+	watchRun("write-watching-another-address", [4]byte{100, 64, 0, 9})
+	watchRun("write-watching-8-other-addresses", [4]byte{100, 64, 0, 9}, [4]byte{100, 64, 0, 10}, [4]byte{100, 64, 0, 11}, [4]byte{100, 64, 0, 12},
+		[4]byte{100, 64, 0, 13}, [4]byte{100, 64, 0, 14}, [4]byte{100, 64, 0, 15}, [4]byte{100, 64, 0, 16})
 	b.Run("write-baseline-no-filter", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {

@@ -185,7 +185,8 @@ type PacketFilter struct {
 	household func(addr [4]byte) bool
 	self      atomic.Uint32 // this host's mesh address, 0 when not known
 	table     atomic.Pointer[entryTable]
-	writeMu   sync.Mutex // serialises changes to table
+	watch     atomic.Pointer[watchTable] // nil unless some address is watched, see filter_watch.go
+	writeMu   sync.Mutex                 // serialises changes to table and watch
 	now       clock
 
 	drops     [numDropReasons]atomic.Uint64
@@ -445,6 +446,9 @@ func (f *PacketFilter) filterRead(bufs [][]byte, sizes []int, offset, n int) {
 // at once, so nothing here is shared between calls except the pooled scratch
 // slice, which each call takes for itself.
 func (w *filteredTUN) Write(bufs [][]byte, offset int) (int, error) {
+	if t := w.f.watch.Load(); t != nil {
+		t.observe(bufs, offset) // read-only, before the verdict, see filter_watch.go
+	}
 	kept, pooled := w.f.filterWrite(bufs, offset)
 	if len(kept) == 0 {
 		w.f.putScratch(pooled)

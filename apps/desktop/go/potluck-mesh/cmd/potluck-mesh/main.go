@@ -301,6 +301,14 @@ func run() int {
 	handler := newRosterHandler(tun, ps, bus, ipcState)
 	handler.setModeTracker(modes)
 
+	// ---- direct-path trial verification (trialverify.go) ---- //
+	// Probe and inbound-packet evidence for peers in a WAN punch trial or a LAN
+	// trial; pf supplies the inbound counts. Only reached when a relay is
+	// configured (punch trial) or POTLUCK_LAN_DIRECT is on (LAN trial); with
+	// neither, nothing ever calls it and no address is watched.
+	trialVerify := newTrialVerifier(ipcState.MeshIP, pf)
+	handler.setTrialVerifier(trialVerify)
+
 	// ---- WAN punch-trial tracker (Phase 3) ---- //
 	// Only meaningfully used when a DERP relay is configured (dBind != nil,
 	// wired below) — a punch trial needs a DERP floor to fall back to on
@@ -360,6 +368,7 @@ func run() int {
 			copy(pub[:], kb)
 			flipToDERP(tun, dBind, pubkey, pub)
 			modes.set(pubkey, modeDERP)
+			trialVerify.finish(pubkey) // a trial in progress ends here: stop watching the peer
 		})
 	}
 
@@ -549,14 +558,14 @@ func run() int {
 	// myLocalIPNets is recomputed on each LAN trial decision (interfaces come +
 	// go) via localep.LocalIPNets — passed as a provider so the loop always sees
 	// the current interface set rather than a startup snapshot.
-	go runReachabilityLoop(ctx, tun, ps, dBind, bus, modes, localep.LocalIPNets)
+	go runReachabilityLoop(ctx, tun, ps, dBind, bus, modes, localep.LocalIPNets, trialVerify)
 
 	// ---- WAN punch-trial verify/timeout/direct-health-check goroutine (Phase 3) ---- //
 	// Runs unconditionally whenever a DERP relay is configured — NOT gated by
 	// POTLUCK_LAN_DIRECT, since WAN direct is the general-purpose upgrade over
 	// the always-on DERP floor. See landirect.go's Phase-3 doc comment.
 	if dBind != nil {
-		go runPunchTrialLoop(ctx, tun, ps, dBind, bus, modes, punchTrials)
+		go runPunchTrialLoop(ctx, tun, ps, dBind, bus, modes, punchTrials, trialVerify)
 		go handler.runPunchRecoveryLoop(ctx)
 	}
 
@@ -871,6 +880,7 @@ func runReachabilityLoop(
 	bus *events.Bus,
 	modes *modeTracker,
 	localIPNetsFn func() []net.IPNet,
+	tv *trialVerifier,
 ) {
 	// reachableState maps pubkey → last known reachable bool.
 	// true = reachable, false = unreachable.
@@ -979,6 +989,7 @@ func runReachabilityLoop(
 		st.trialLanEp = lanEp
 		st.derpRouted = false
 		modes.set(pubkey, modeLANTrial)
+		tv.begin(pubkey, p.MeshIP) // after the add: only packets of the new session count
 
 		slog.Info("lan_trial: started — DERP off, peer re-pinned to direct LAN endpoint (force-rekey)",
 			"node_id", p.NodeID,
@@ -1019,10 +1030,30 @@ func runReachabilityLoop(
 				continue
 			}
 			outcome := evaluateLANTrial(lastHS, st.preTrialHandshake, st.trialDeadline, now, handshakeFreshWindow)
-			switch outcome {
-			case trialPending:
+			switch trialStepFor(tv, pubkey, p.MeshIP, outcome, st.trialDeadline, now) {
+			case stepPending:
 				continue
-			case trialVerified:
+			case stepRekey:
+				// Same rule as the WAN trial (see runPunchTrialLoop): a fresh handshake
+				// with no answer to the probe through the tunnel. Add the peer again, once.
+				slog.Warn("lan_trial: handshake without a data path, adding the peer again once",
+					"node_id", p.NodeID,
+					"pubkey_prefix", util.TruncatePubkey(pubkey),
+					"lan_endpoint", st.trialLanEp,
+				)
+				st.preTrialHandshake = lastHS
+				if err := repinTrialPeer(tun, pubkey, p.MeshIP, st.trialLanEp, lanTrialKeepalive); err != nil {
+					slog.Warn("lan_trial: adding the peer again failed (the trial ends at its deadline)",
+						"node_id", p.NodeID,
+						"pubkey_prefix", util.TruncatePubkey(pubkey),
+						"err", err,
+					)
+				}
+				tv.markRekeyed(pubkey, now) // after the add: only evidence from the new session counts
+				continue
+			case stepVerified:
+				verifiedBy := tv.proof(pubkey)
+				tv.finish(pubkey)
 				// Stop keepalive-spamming a confirmed link: re-add the peer with
 				// the standard mesh keepalive (25s), keeping it pinned to the
 				// verified LAN endpoint. appendPeerConfig overwrites the existing
@@ -1051,25 +1082,36 @@ func runReachabilityLoop(
 				slog.Info("lan_trial: VERIFIED — peer reachable on direct LAN endpoint, staying direct",
 					"node_id", p.NodeID,
 					"pubkey_prefix", util.TruncatePubkey(pubkey),
+					"verified_by", verifiedBy,
 					"lan_endpoint", st.trialLanEp,
 					"handshake_age", formatHandshakeAge(lastHS),
 				)
 				if bus != nil {
 					bus.Publish(events.NewPeerUpdated(rosterPeerToSnapshot(p, true, false)))
 				}
-			case trialTimedOut:
+			case stepTimedOut, stepNoPath:
 				kb, decErr := base64.StdEncoding.DecodeString(pubkey)
 				if decErr != nil || len(kb) != 32 {
 					continue
 				}
 				var pub [32]byte
 				copy(pub[:], kb)
-				slog.Warn("lan_trial: TIMEOUT — no fresh handshake on LAN endpoint, restoring DERP floor + backoff",
-					"node_id", p.NodeID,
-					"pubkey_prefix", util.TruncatePubkey(pubkey),
-					"lan_endpoint", st.trialLanEp,
-					"backoff_min", int(lanTrialBackoff.Minutes()),
-				)
+				tv.finish(pubkey)
+				if outcome == trialTimedOut {
+					slog.Warn("lan_trial: TIMEOUT — no fresh handshake on LAN endpoint, restoring DERP floor + backoff",
+						"node_id", p.NodeID,
+						"pubkey_prefix", util.TruncatePubkey(pubkey),
+						"lan_endpoint", st.trialLanEp,
+						"backoff_min", int(lanTrialBackoff.Minutes()),
+					)
+				} else {
+					slog.Warn("lan_trial: NO DATA PATH, the handshake is fresh but the probe through the tunnel got no answer and no packet came from the peer; restoring DERP floor + backoff",
+						"node_id", p.NodeID,
+						"pubkey_prefix", util.TruncatePubkey(pubkey),
+						"lan_endpoint", st.trialLanEp,
+						"backoff_min", int(lanTrialBackoff.Minutes()),
+					)
+				}
 				if dBind != nil {
 					// The trial cleared the session and re-added the peer pinned to
 					// the (dead) LAN endpoint with a short keepalive. A bare
@@ -1506,7 +1548,7 @@ func flipToDERP(tun rosterTunnel, dBind *derp.DerpBind, pubkeyBase64 string, pub
 // AddPeer failure the peer is left on its trial (short) keepalive rather than
 // stranded with no session — the caller logs and the next reachability check
 // still sees a fresh handshake.
-func promoteToDirect(tun *tunnel.Tunnel, pubkeyBase64, meshIP, endpoint string, keepalive int) error {
+func promoteToDirect(tun rosterTunnel, pubkeyBase64, meshIP, endpoint string, keepalive int) error {
 	return tun.AddPeer(tunnel.Peer{
 		PublicKey:           pubkeyBase64,
 		AllowedIPs:          []string{meshIP + "/32"},
@@ -1556,9 +1598,33 @@ func runPunchTrialLoop(
 	bus *events.Bus,
 	modes *modeTracker,
 	trials *punchTrialTracker,
+	tv *trialVerifier,
 ) {
-	tick := func() {
-		now := time.Now()
+	tick := punchTrialTick(tun, ps, dBind, bus, modes, trials, tv)
+	ticker := time.NewTicker(punchVerifyInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			tick(time.Now())
+		}
+	}
+}
+
+// punchTrialTick returns what runPunchTrialLoop does on every verify tick, taking
+// the time as an argument so that a test can drive it against any rosterTunnel.
+func punchTrialTick(
+	tun rosterTunnel,
+	ps *peerstate.Store,
+	dBind *derp.DerpBind,
+	bus *events.Bus,
+	modes *modeTracker,
+	trials *punchTrialTracker,
+	tv *trialVerifier,
+) func(now time.Time) {
+	return func(now time.Time) {
 		for _, p := range ps.All() {
 			pubkey := p.WGPublicKey
 			mode := modes.get(pubkey)
@@ -1607,10 +1673,33 @@ func runPunchTrialLoop(
 				// evaluate against; wait for the next tick / a resync.
 				continue
 			}
-			switch evaluateLANTrial(lastHS, st.preTrialHandshake, st.deadline, now, handshakeFreshWindow) {
-			case trialPending:
+			outcome := evaluateLANTrial(lastHS, st.preTrialHandshake, st.deadline, now, handshakeFreshWindow)
+			switch trialStepFor(tv, pubkey, p.MeshIP, outcome, st.deadline, now) {
+			case stepPending:
 				continue
-			case trialVerified:
+			case stepRekey:
+				// A fresh handshake has stood for trialRekeyAfter and the probe through
+				// the tunnel was not answered: the session may work in one direction
+				// only. Clear the peer and add it again, once. The handshake it makes
+				// has to be newer than the one that failed the probe.
+				slog.Warn("punch_trial: handshake without a data path, adding the peer again once",
+					"node_id", p.NodeID,
+					"pubkey_prefix", util.TruncatePubkey(pubkey),
+					"endpoint", st.endpoint,
+				)
+				trials.setPreHandshake(pubkey, lastHS)
+				if err := repinTrialPeer(tun, pubkey, p.MeshIP, st.endpoint, punchTrialKeepalive); err != nil {
+					slog.Warn("punch_trial: adding the peer again failed (the trial ends at its deadline)",
+						"node_id", p.NodeID,
+						"pubkey_prefix", util.TruncatePubkey(pubkey),
+						"err", err,
+					)
+				}
+				tv.markRekeyed(pubkey, now) // after the add: only evidence from the new session counts
+				continue
+			case stepVerified:
+				verifiedBy := tv.proof(pubkey)
+				tv.finish(pubkey)
 				if err := promoteToDirect(tun, pubkey, p.MeshIP, st.endpoint, punchDirectKeepalive); err != nil {
 					slog.Warn("punch_trial: restoring standard keepalive on verified peer failed (keeping trial keepalive)",
 						"node_id", p.NodeID,
@@ -1630,19 +1719,32 @@ func runPunchTrialLoop(
 				slog.Info("punch_trial: VERIFIED — peer reachable direct cross-network, staying off DERP",
 					"node_id", p.NodeID,
 					"pubkey_prefix", util.TruncatePubkey(pubkey),
+					"verified_by", verifiedBy,
 					"endpoint", st.endpoint,
 					"handshake_age", formatHandshakeAge(lastHS),
 				)
 				if bus != nil {
 					bus.Publish(events.NewPeerUpdated(rosterPeerToSnapshot(p, true, false)))
 				}
-			case trialTimedOut:
+			case stepTimedOut:
 				slog.Warn("punch_trial: TIMEOUT — no fresh handshake on punched endpoint, restoring DERP floor + backoff",
 					"node_id", p.NodeID,
 					"pubkey_prefix", util.TruncatePubkey(pubkey),
 					"endpoint", st.endpoint,
 					"backoff_min", int(punchTrialBackoff.Minutes()),
 				)
+				tv.finish(pubkey)
+				restoreDERPFloor(tun, dBind, p, pubkey, pub)
+				modes.set(pubkey, modeDERP)
+				trials.setBackoff(pubkey, now.Add(punchTrialBackoff))
+			case stepNoPath:
+				slog.Warn("punch_trial: NO DATA PATH, the handshake is fresh but the probe through the tunnel got no answer and no packet came from the peer; restoring DERP floor + backoff",
+					"node_id", p.NodeID,
+					"pubkey_prefix", util.TruncatePubkey(pubkey),
+					"endpoint", st.endpoint,
+					"backoff_min", int(punchTrialBackoff.Minutes()),
+				)
+				tv.finish(pubkey)
 				restoreDERPFloor(tun, dBind, p, pubkey, pub)
 				modes.set(pubkey, modeDERP)
 				trials.setBackoff(pubkey, now.Add(punchTrialBackoff))
@@ -1656,17 +1758,7 @@ func runPunchTrialLoop(
 			live[p.WGPublicKey] = true
 		}
 		trials.prune(live)
-	}
-
-	ticker := time.NewTicker(punchVerifyInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			tick()
-		}
+		tv.prune(live)
 	}
 }
 
@@ -1749,6 +1841,20 @@ type rosterHandler struct {
 	// the one-shot classifier completes.
 	isSymmetricNATFn func() bool
 
+	// verifier holds the probe state of direct-path trials (trialverify.go).
+	// nil means trials are verified on the handshake alone.
+	verifier *trialVerifier
+
+	// selfKeyFn returns this machine's WireGuard public key (base64). It decides
+	// which machine of a pair starts the handshake of a simultaneous trial
+	// (trialLeader). nil, or an empty answer, means this machine starts it.
+	selfKeyFn func() string
+
+	// followerDelay is how long the machine that does not start a simultaneous
+	// trial's handshake waits before it sets its trial keepalive
+	// (punchFollowerDelay; a field so tests can shorten it).
+	followerDelay time.Duration
+
 	// circle, when set, is told which roster entries became household machines
 	// so a circle peer that held the same address or key can be removed first.
 	circle circleGuard
@@ -1767,7 +1873,20 @@ func newRosterHandler(tun rosterTunnel, ps *peerstate.Store, bus *events.Bus, ip
 		ipcState:    ipcState,
 		punchState:  make(map[string]*punchEntry),
 		localIPNets: localep.LocalIPNets,
+
+		followerDelay: punchFollowerDelay,
 	}
+}
+
+// selfKey returns this machine's WireGuard public key, or "" when unknown.
+func (h *rosterHandler) selfKey() string {
+	if h.selfKeyFn != nil {
+		return h.selfKeyFn()
+	}
+	if h.ipcState != nil {
+		return h.ipcState.WGPublicKey()
+	}
+	return ""
 }
 
 // setIsDERPRoutedFn wires the DERP-routing introspection callback. Called in
@@ -1809,6 +1928,11 @@ func (h *rosterHandler) setPunchTrials(pt *punchTrialTracker) {
 // OnPunchCoord treats every peer as not-symmetric — see the field doc above.
 func (h *rosterHandler) setIsSymmetricNATFn(fn func() bool) {
 	h.isSymmetricNATFn = fn
+}
+
+// setTrialVerifier wires the probe state shared with the two trial loops.
+func (h *rosterHandler) setTrialVerifier(v *trialVerifier) {
+	h.verifier = v
 }
 
 // setClient wires the signal client back into the handler after construction.
@@ -2164,6 +2288,7 @@ func (h *rosterHandler) OnRosterUpdate(u msignal.RosterUpdate) {
 		if h.modes != nil {
 			h.modes.remove(cached.WGPublicKey)
 		}
+		h.verifier.finish(cached.WGPublicKey)
 	}
 }
 
@@ -2362,14 +2487,28 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 	}
 	// (3) Re-add pinned to the punched endpoint with a short keepalive so WG
 	// initiates a handshake-init toward it PROMPTLY, even on an idle mesh.
-	// The peer does the same simultaneously (it also received a punch_coord),
-	// so when both handshake-inits cross in flight, the NATs on both sides
-	// record the mapping and the next inbound packet traverses cleanly.
+	//
+	// Only one machine of the pair does that at once (trialLeader, see
+	// trialverify.go). Two initiations that cross in flight leave wireguard-go
+	// with no session at all or with a session that only works one way, so the
+	// other machine adds the peer with no keepalive, sends nothing, and sets its
+	// trial keepalive punchFollowerDelay later (startFollowerKeepalive). That
+	// still opens the NAT mapping on its side when the first initiation did not
+	// get through.
+	leader := trialLeader(h.selfKey(), coord.PeerWGPublicKey)
 	trialPeer := tunnel.Peer{
 		PublicKey:           coord.PeerWGPublicKey,
 		AllowedIPs:          []string{p.MeshIP + "/32"},
 		Endpoint:            targetEndpoint,
 		PersistentKeepalive: punchTrialKeepalive,
+	}
+	if !leader {
+		// No keepalive, and no endpoint either: with no session wireguard-go starts
+		// a handshake for any packet this machine sends to the peer, and with no
+		// endpoint that attempt has nowhere to go, so nothing can cross the other
+		// machine's initiation. The endpoint is learned from that initiation.
+		trialPeer.PersistentKeepalive = 0
+		trialPeer.Endpoint = ""
 	}
 	if err := h.tun.AddPeer(trialPeer); err != nil {
 		slog.Error("punch_coord: AddPeer pinned to punched endpoint failed, rolling back to DERP",
@@ -2382,17 +2521,68 @@ func (h *rosterHandler) OnPunchCoord(coord msignal.PunchCoord) {
 		return
 	}
 
-	h.punchTrials.startTrial(coord.PeerWGPublicKey, targetEndpoint, preHS, now.Add(punchTrialDuration))
+	deadline := now.Add(punchTrialDuration)
+	h.punchTrials.startTrial(coord.PeerWGPublicKey, targetEndpoint, preHS, deadline)
 	h.modes.set(coord.PeerWGPublicKey, modePunchTrial)
+	h.verifier.begin(coord.PeerWGPublicKey, p.MeshIP) // after the add: only packets of the new session count
 
 	slog.Info("punch_coord: WAN direct trial started — DERP off, peer re-pinned to punched endpoint (force-rekey)",
 		"peer_node_id", coord.PeerNodeID,
 		"pubkey_prefix", util.TruncatePubkey(coord.PeerWGPublicKey),
 		"endpoint", targetEndpoint,
 		"role", coord.Role,
-		"keepalive_s", punchTrialKeepalive,
+		"keepalive_s", trialPeer.PersistentKeepalive,
+		"starts_handshake", leader,
 		"deadline_ms", punchTrialDuration.Milliseconds(),
 	)
+	if !leader {
+		meshIP := p.MeshIP
+		pubkey := coord.PeerWGPublicKey
+		time.AfterFunc(h.followerDelay, func() { h.startFollowerKeepalive(pubkey, meshIP, deadline) })
+	}
+}
+
+// startFollowerKeepalive runs punchFollowerDelay after a trial started on the
+// machine that did not start the handshake. If the other machine's handshake got
+// through by now, it sets the trial keepalive on that session and leaves the
+// endpoint, which was learned from the other machine's first packet. If not (a NAT
+// that drops unsolicited packets, a lost initiation), it adds the peer again pinned
+// to the endpoint with the trial keepalive. A peer added fresh sends its
+// initiation at once, which is what opens this machine's NAT mapping, and it no
+// longer crosses the other machine's. Does nothing when the trial it was scheduled
+// for is over (rejoin re-sync, a newer trial, the peer gone).
+func (h *rosterHandler) startFollowerKeepalive(pubkey, meshIP string, trialDeadline time.Time) {
+	if h.modes == nil || h.punchTrials == nil || h.modes.get(pubkey) != modePunchTrial {
+		return
+	}
+	st, ok := h.punchTrials.get(pubkey)
+	if !ok || !st.deadline.Equal(trialDeadline) {
+		return
+	}
+	if lastHS, _, _, err := h.tun.PeerReachability(pubkey); err == nil && lastHS.After(st.preTrialHandshake) && time.Since(lastHS) < handshakeFreshWindow {
+		err := h.tun.AddPeer(tunnel.Peer{
+			PublicKey:           pubkey,
+			AllowedIPs:          []string{meshIP + "/32"},
+			PersistentKeepalive: punchTrialKeepalive,
+		})
+		if err != nil {
+			slog.Warn("punch_coord: setting the trial keepalive on the second machine of the pair failed",
+				"pubkey_prefix", util.TruncatePubkey(pubkey),
+				"err", err,
+			)
+		}
+		return
+	}
+	slog.Debug("punch_coord: no handshake from the other machine yet, starting this machine's own",
+		"pubkey_prefix", util.TruncatePubkey(pubkey),
+		"endpoint", st.endpoint,
+	)
+	if err := repinTrialPeer(h.tun, pubkey, meshIP, st.endpoint, punchTrialKeepalive); err != nil {
+		slog.Warn("punch_coord: starting the second machine's handshake failed (the trial times out if none arrives)",
+			"pubkey_prefix", util.TruncatePubkey(pubkey),
+			"err", err,
+		)
+	}
 }
 
 // maybeSendRequestPunch requests a direct path for a disconnected or relayed

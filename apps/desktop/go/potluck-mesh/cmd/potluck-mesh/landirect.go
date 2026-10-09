@@ -453,6 +453,17 @@ func (pt *punchTrialTracker) setBackoff(pubkeyBase64 string, until time.Time) {
 	st.backoffUntil = until
 }
 
+// setPreHandshake replaces the pre-trial handshake snapshot, used when the peer
+// is added again mid-trial so that only a handshake newer than the one that failed
+// the probe counts. A no-op for a peer with no trial.
+func (pt *punchTrialTracker) setPreHandshake(pubkeyBase64 string, t time.Time) {
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
+	if st, ok := pt.states[pubkeyBase64]; ok {
+		st.preTrialHandshake = t
+	}
+}
+
 // startTrial records a freshly-started trial's bookkeeping, overwriting any
 // prior state for the peer (a new trial always supersedes stale data, but
 // preserves nothing — backoffUntil from a PRIOR failed trial is intentionally
