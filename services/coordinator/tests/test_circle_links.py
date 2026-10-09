@@ -36,7 +36,7 @@ from coordinator.services.peer_registry import (
     select_peer_for_request,
     unregister_peer,
 )
-from tests.circle_link_helpers import FakeSidecar, _WS, build_world, raw_dump, wg_key
+from tests.circle_link_helpers import FakeSidecar, _WS, build_world, raw_dump, report_endpoints, wg_key
 
 
 @pytest.fixture()
@@ -238,13 +238,21 @@ async def test_a_lapsed_unswept_row_for_the_pair_does_not_block_a_new_link(make_
 # ---------------------------------------------------------------------------
 
 
-async def _set_endpoints(w, requester_ep, lender_ep):
+async def _set_endpoints(w, requester_ep, lender_ep, requester_local=(), lender_local=()):
+    """Leave each machine's endpoints everywhere the coordinator keeps them, as a
+    token-bound sidecar's endpoint_update does: the stored row and the household's
+    LAN candidates (what the roster and punch coordination read), and the report
+    from its live connection (what the direct policy reads)."""
     async with w.factory() as db:
         await db.execute(text("UPDATE mesh_nodes SET last_endpoint = :e WHERE id = :i"),
                          {"e": requester_ep, "i": w.requester.node_id})
         await db.execute(text("UPDATE mesh_nodes SET last_endpoint = :e WHERE id = :i"),
                          {"e": lender_ep, "i": w.lender.node_id})
         await db.commit()
+    for machine, ep, local in ((w.requester, requester_ep, requester_local),
+                               (w.lender, lender_ep, lender_local)):
+        mesh._local_endpoints[machine.node_id] = list(local)
+        report_endpoints(machine, ep, local)
 
 
 def _adds(w):
@@ -255,9 +263,8 @@ def _adds(w):
 @pytest.mark.asyncio
 async def test_relay_only_is_the_default_and_discloses_no_address(make_world) -> None:
     w = await make_world()
-    await _set_endpoints(w, "198.51.100.4:51820", "203.0.113.9:51820")
-    mesh._local_endpoints[w.lender.node_id] = ["192.168.1.23:51820"]
-    mesh._local_endpoints[w.requester.node_id] = ["192.168.1.40:51820"]
+    await _set_endpoints(w, "198.51.100.4:51820", "203.0.113.9:51820",
+                         requester_local=["192.168.1.40:51820"], lender_local=["192.168.1.23:51820"])
     assert get_settings().circle_link_direct is False
     await create(w)
     for msg in _adds(w):
@@ -276,8 +283,7 @@ async def test_direct_policy_shares_each_machines_public_endpoint(make_world) ->
     try:
         w_env.setenv("POTLUCK_CIRCLE_LINK_DIRECT", "1")
         get_settings.cache_clear()
-        await _set_endpoints(w, "198.51.100.4:51820", "203.0.113.9:51820")
-        mesh._local_endpoints[w.lender.node_id] = ["192.168.1.23:51820"]
+        await _set_endpoints(w, "198.51.100.4:51820", "203.0.113.9:51820", lender_local=["192.168.1.23:51820"])
         await create(w)
         lender_msg, requester_msg = _adds(w)
         assert lender_msg["peer_endpoint"] == "198.51.100.4:51820"      # the requester's
@@ -298,9 +304,10 @@ async def test_direct_policy_shares_lan_candidates_only_behind_one_public_addres
         w_env.setenv("POTLUCK_CIRCLE_LINK_DIRECT", "1")
         get_settings.cache_clear()
         # Same public address, different ports: one home or office.
-        await _set_endpoints(w, "198.51.100.4:51820", "198.51.100.4:51999")
-        mesh._local_endpoints[w.lender.node_id] = ["192.168.1.23:51999", "8.8.8.8:1", "100.64.9.9:1"]
-        mesh._local_endpoints[w.requester.node_id] = ["192.168.1.40:51820"]
+        await _set_endpoints(
+            w, "198.51.100.4:51820", "198.51.100.4:51999",
+            requester_local=["192.168.1.40:51820"],
+            lender_local=["192.168.1.23:51999", "8.8.8.8:1", "100.64.9.9:1"])
         await create(w)
         lender_msg, requester_msg = _adds(w)
         # Public candidates and anything not RFC1918 are filtered again here.

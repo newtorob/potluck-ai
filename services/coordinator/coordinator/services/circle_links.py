@@ -37,6 +37,12 @@ What this module decides:
 * Setup waits up to 2 seconds for both sidecars to acknowledge. A missing
   acknowledgement revokes the link.
 
+* Under the direct policy the address each sidecar is told for the other machine
+  is what that machine's live, token-bound connection reported itself
+  (routers.mesh.signal_link_endpoints), never a stored value: a machine's
+  endpoint is written only by its node token, and a link additionally ignores
+  anything its current connection has not said.
+
 Privacy: a link reaches two households that are not each other's. The messages
 this module builds carry no member id, node id, node name, hostname or circle
 name (SignalCirclePeerAdd and friends; locked in test_privacy_invariants.py).
@@ -296,14 +302,25 @@ def _endpoints_for(own: MeshNode, other: MeshNode, *, direct: bool) -> tuple[str
     relay-only policy neither is ever disclosed. Under direct, the public
     endpoint is shared and the LAN candidates only when both machines report the
     same public address (otherwise two unrelated homes that both use
-    192.168.1.0/24 would send handshakes at each other's LAN hosts)."""
+    192.168.1.0/24 would send handshakes at each other's LAN hosts).
+
+    Both machines' addresses come from routers.mesh.signal_link_endpoints and
+    nowhere else: what the machine's live, token-bound signal connection has
+    itself reported. The stored MeshNode.last_endpoint and the household's LAN
+    candidates are not read. They are written by the household mesh paths and may
+    be older than the connection (a row from before endpoints were tied to the
+    node token), and an address that reaches another household's sidecar has to
+    be one the machine said on this connection. Until it has said it, nothing is
+    sent, which is the relay's job to cover (a sidecar reports right after every
+    welcome, and a renewal carries the address once it is known)."""
     if not direct:
         return None, []
-    endpoint = safe_endpoint_or_none(other.last_endpoint)
+    own_endpoint, _own_local = _mesh().signal_link_endpoints(own.id)
+    other_endpoint, other_local = _mesh().signal_link_endpoints(other.id)
     local: list[str] = []
-    if _same_public_ip(own.last_endpoint, other.last_endpoint):
-        local = filter_local_endpoints(_mesh().signal_local_endpoints(other.id))
-    return endpoint, local
+    if _same_public_ip(own_endpoint, other_endpoint):
+        local = filter_local_endpoints(other_local)
+    return safe_endpoint_or_none(other_endpoint), local
 
 
 def build_add(

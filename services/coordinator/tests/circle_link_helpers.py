@@ -16,7 +16,7 @@ import os
 import secrets
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
 from sqlalchemy import delete, select, text, update
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -114,6 +114,20 @@ class Machine:
 
 def wg_key() -> str:
     return base64.b64encode(secrets.token_bytes(32)).decode("ascii")
+
+
+def report_endpoints(machine: "Machine", external: str, local: Iterable[str] = ()) -> None:
+    """Make the machine's live connection (its FakeSidecar) the source of an
+    endpoint report, as the endpoint_update handler does for a token-bound
+    sidecar. The values are stored as given, unfiltered, so a test can show that
+    the broker filters LAN candidates again itself. The direct policy takes a
+    machine's addresses from this report and from nothing else (see
+    routers.mesh.signal_link_endpoints)."""
+    mesh._endpoint_reports[machine.node_id] = mesh._EndpointReport(
+        ws=machine.sidecar,  # type: ignore[arg-type]
+        external_endpoint=external,
+        local_endpoints=tuple(local),
+    )
 
 
 async def issue_node_token(factory: async_sessionmaker, node_id: uuid.UUID) -> dict[str, str]:
@@ -283,6 +297,7 @@ class World:
             mesh._signal_connections.pop(m.node_id, None)
             mesh._signal_features.pop(m.node_id, None)
             mesh._local_endpoints.pop(m.node_id, None)
+            mesh._endpoint_reports.pop(m.node_id, None)
             if m.peer_id is not None:
                 await unregister_peer(m.peer_id)
         for task in list(circle_links._grace_tasks.values()):

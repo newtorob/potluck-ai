@@ -34,6 +34,7 @@ import base64
 import os
 import secrets
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -130,9 +131,35 @@ _local_endpoints: dict[uuid.UUID, list[str]] = {}
 # link messages meant for that node.
 _signal_features: dict[uuid.UUID, frozenset[str]] = {}
 
+
+@dataclass(frozen=True)
+class _EndpointReport:
+    """What one signal connection said its node's endpoints are."""
+
+    ws: WebSocket
+    external_endpoint: str
+    local_endpoints: tuple[str, ...]
+
+
+# In-memory map: mesh_node.id → the endpoints the node's own live signal
+# connection last reported, kept ONLY for a connection opened with the node's own
+# node_token. This is the one endpoint source the direct circle link broker reads
+# (signal_link_endpoints). The broker never reads MeshNode.last_endpoint or
+# `_local_endpoints`: those feed the household roster and punch coordination, and
+# a value in them can be older than the live connection (a row stored before
+# endpoints were tied to the node token, say), so it is not proof that this
+# machine said it.
+#
+# A report is made in one place, the endpoint_update handler, and only while the
+# reporting connection is a token-bound one and the node's live connection. It is
+# dropped when another connection takes the node's slot and when the live one
+# goes, so a connection starts with no report and has to send its own
+# endpoint_update (a sidecar does so right after every welcome).
+_endpoint_reports: dict[uuid.UUID, _EndpointReport] = {}
+
 # Lock guarding `_signal_connections` so concurrent welcome / disconnect
 # / broadcast operations don't race on dict mutation. Also guards
-# `_local_endpoints` and `_signal_features`.
+# `_local_endpoints`, `_signal_features` and `_endpoint_reports`.
 _signal_lock = asyncio.Lock()
 
 logger = structlog.get_logger(__name__)
@@ -802,6 +829,13 @@ async def heartbeat(
     flow. Gated by `resolve_node_from_token`: EITHER a per-node
     `node_token` (bound to exactly `req.node_id`, enforced below) OR the
     legacy coordinator token (back-compat, no per-node binding).
+
+    The endpoint is stricter than the rest. If the node has a node token, only
+    a request that presented it may set `last_endpoint`; with the legacy
+    credential the heartbeat still succeeds and updates `last_seen_at`, and the
+    endpoint in the body is dropped. The WireGuard key that identifies the node
+    here is public, and a node's stored endpoint can reach another household's
+    sidecar in a direct circle link message.
     """
     node = await db.get(MeshNode, req.node_id)
     if node is None:
@@ -812,7 +846,16 @@ async def heartbeat(
         raise HTTPException(status_code=403, detail="wg_public_key mismatch")
     enforce_node_scope(auth_node, node.id)
 
-    node.last_endpoint = req.external_endpoint
+    # A machine with a node token has its endpoint written only by a request
+    # that presented that token. `auth_node` is set only by a valid node_token
+    # (and enforce_node_scope has just shown it is this node's), so with the
+    # legacy credential, which names the node by its non-secret WireGuard key,
+    # the request still counts as a heartbeat but the endpoint is left alone. A
+    # node enrolled before tokens existed has no hash and is handled as before.
+    if node.node_token_hash is None or auth_node is not None:
+        node.last_endpoint = req.external_endpoint
+    else:
+        logger.info("mesh_heartbeat_endpoint_needs_node_token", node_id=str(node.id))
     node.last_seen_at = datetime.now(timezone.utc)
     await db.commit()
 
@@ -1069,10 +1112,20 @@ def signal_node_features(node_id: uuid.UUID) -> frozenset[str]:
     return _signal_features.get(node_id, frozenset())
 
 
-def signal_local_endpoints(node_id: uuid.UUID) -> list[str]:
-    """The node's last-reported private LAN candidates (RFC1918, already
-    filtered when they were stored). Empty if none or not connected."""
-    return list(_local_endpoints.get(node_id, []))
+def signal_link_endpoints(node_id: uuid.UUID) -> tuple[str | None, list[str]]:
+    """The node's public endpoint and private LAN candidates, for a direct circle
+    link message to another household. (None, []) unless the node's live
+    connection is a token-bound one that has itself reported them.
+
+    Reads _endpoint_reports and nothing else, so a value stored through any other
+    path (a legacy signal connection, a heartbeat, a row from before endpoints
+    were tied to the node token) is never returned. A report counts only while
+    the connection that made it is still the node's live connection. The LAN
+    candidates were filtered to RFC1918 when they were stored."""
+    report = _endpoint_reports.get(node_id)
+    if report is None or _signal_connections.get(node_id) is not report.ws:
+        return None, []
+    return report.external_endpoint, list(report.local_endpoints)
 
 
 async def _broadcast_to_household(
@@ -1129,7 +1182,9 @@ async def mesh_signal(ws: WebSocket) -> None:
          household members ('added' on first connect, 'updated' otherwise).
       4. Server + client exchange messages until disconnect.
       5. On disconnect: server removes the connection from the registry
-         and broadcasts the node's `removed` to the household.
+         and broadcasts the node's `removed` to the household. A connection
+         that a newer one for the same node displaced does not broadcast it:
+         the node is still there.
 
     v0.6 auth: the WS upgrade is gated by EITHER a per-node `node_token`
     (`Authorization: Bearer <node_token>` header on the upgrade request —
@@ -1153,6 +1208,14 @@ async def mesh_signal(ws: WebSocket) -> None:
     the features the coordinator keeps for it, and no link message is written
     to it (see signal_send_link). Only a connection opened with the node's own
     node_token is offered links. There is no setting that changes this.
+
+    Endpoints follow the same rule. A node that has a node token (a
+    node_token_hash) has its endpoints written only by a connection opened with
+    that token: an `endpoint_update` on any other connection is neither stored
+    nor passed on to the household, and the connection gets one info log line.
+    A node enrolled before tokens existed has no hash and its connection writes
+    endpoints as it always did. What a direct circle link sends another
+    household comes from a narrower store still, see _endpoint_reports.
     """
     await ws.accept()
 
@@ -1294,6 +1357,9 @@ async def mesh_signal(ws: WebSocket) -> None:
         # lock hold as the connection itself, so signal_send_link never sees one
         # connection with the other's features.
         _signal_features[node_id] = features
+        # A new connection starts with no endpoint report: only what it sends
+        # itself, as a token-bound connection, can be given to a link.
+        _endpoint_reports.pop(node_id, None)
 
     if links_withheld:
         logger.info("mesh_signal_links_need_node_token", node_id=str(node_id))
@@ -1343,6 +1409,9 @@ async def mesh_signal(ws: WebSocket) -> None:
         logger.exception("circle_link_replay_failed", node_id=str(node_id))
 
     # ---- 4. Message loop ---- #
+    # One log line per connection when a legacy connection's endpoint_update is
+    # ignored (see the endpoint_update branch).
+    endpoint_ignored_logged = False
     try:
         while True:
             raw = await ws.receive_json()
@@ -1370,28 +1439,55 @@ async def mesh_signal(ws: WebSocket) -> None:
                     )
                     continue
 
-                # Store the last-reported LAN candidates in-memory (already
-                # filtered to private ip:port + capped by the schema validator)
-                # so they flow into roster snapshots via _peer_to_enrolled.
-                # No DB write — these are volatile and connection-scoped.
-                async with _signal_lock:
-                    _local_endpoints[node_id] = list(upd.local_endpoints)
-
                 async with get_session_factory()() as db:
                     db_node = await db.get(MeshNode, node_id)
-                    if db_node is not None:
-                        db_node.last_endpoint = upd.external_endpoint
-                        db_node.last_seen_at = datetime.now(timezone.utc)
-                        await db.commit()
-                        # Broadcast as 'updated' so peers can refresh.
-                        await _broadcast_to_household(
-                            household_id,
-                            SignalRosterUpdate(
-                                updated=[_peer_to_enrolled(db_node)]
-                            ).model_dump(mode="json"),
-                            db=db,
-                            except_node_id=node_id,
-                        )
+                    if db_node is None:
+                        continue
+                    if db_node.node_token_hash is not None and not token_bound:
+                        # A machine with a node token has its endpoints written
+                        # only by something that presented that token. This
+                        # connection names the node by its WireGuard key, which
+                        # is not a secret, so nothing it sends is stored or
+                        # passed on. A node enrolled before tokens existed has
+                        # no hash and is handled as it always was.
+                        if not endpoint_ignored_logged:
+                            endpoint_ignored_logged = True
+                            logger.info(
+                                "mesh_signal_endpoint_needs_node_token",
+                                node_id=str(node_id),
+                            )
+                        continue
+
+                    # Store the last-reported LAN candidates in-memory (already
+                    # filtered to private ip:port + capped by the schema
+                    # validator) so they flow into roster snapshots via
+                    # _peer_to_enrolled. No DB write for these: they are
+                    # volatile and connection-scoped.
+                    async with _signal_lock:
+                        _local_endpoints[node_id] = list(upd.local_endpoints)
+                        if token_bound and _signal_connections.get(node_id) is ws:
+                            # The one place an endpoint report is made, see
+                            # _endpoint_reports. Only the live connection's
+                            # report counts, so a connection that was displaced
+                            # a moment ago cannot replace the live one's.
+                            _endpoint_reports[node_id] = _EndpointReport(
+                                ws=ws,
+                                external_endpoint=upd.external_endpoint,
+                                local_endpoints=tuple(upd.local_endpoints),
+                            )
+
+                    db_node.last_endpoint = upd.external_endpoint
+                    db_node.last_seen_at = datetime.now(timezone.utc)
+                    await db.commit()
+                    # Broadcast as 'updated' so peers can refresh.
+                    await _broadcast_to_household(
+                        household_id,
+                        SignalRosterUpdate(
+                            updated=[_peer_to_enrolled(db_node)]
+                        ).model_dump(mode="json"),
+                        db=db,
+                        except_node_id=node_id,
+                    )
                 continue
 
             if msg_type == "request_punch":
@@ -1504,20 +1600,26 @@ async def mesh_signal(ws: WebSocket) -> None:
             # (a newer reconnection may have already replaced it).
             _local_endpoints.pop(node_id, None)
             _signal_features.pop(node_id, None)
+            _endpoint_reports.pop(node_id, None)
+        # A newer connection for this node is live: this one was displaced. The
+        # node has not left, so its household is not told it has.
+        displaced = current is not None and current is not ws
 
-    try:
-        async with get_session_factory()() as db:
-            await _broadcast_to_household(
-                household_id,
-                SignalRosterUpdate(removed=[node_id]).model_dump(mode="json"),
-                db=db,
-                except_node_id=node_id,
-            )
-    except Exception:
-        logger.exception("mesh_signal_disconnect_broadcast_failed", node_id=str(node_id))
+    if not displaced:
+        try:
+            async with get_session_factory()() as db:
+                await _broadcast_to_household(
+                    household_id,
+                    SignalRosterUpdate(removed=[node_id]).model_dump(mode="json"),
+                    db=db,
+                    except_node_id=node_id,
+                )
+        except Exception:
+            logger.exception("mesh_signal_disconnect_broadcast_failed", node_id=str(node_id))
 
     logger.info(
         "mesh_signal_disconnected",
         node_id=str(node_id),
         household_id=str(household_id),
+        displaced=displaced,
     )
