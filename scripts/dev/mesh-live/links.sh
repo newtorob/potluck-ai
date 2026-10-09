@@ -39,6 +39,16 @@ engine_log()     { dc logs --no-log-prefix lender-engine 2>&1; }
 engine_accepts() { engine_log | grep -c 'accepted .*bound=True' || true; }
 engine_bound()   { engine_log | grep -q 'accepted .*circle_links=True bound=True'; }
 engine_newer_than() { [ "$(engine_accepts)" -gt "$1" ]; }
+# signal_token_bound NODE_ID : the coordinator's latest mesh_signal_connected line for that node says
+# token_bound=True. The coordinator offers circle links only on a /mesh/signal connection that the node's
+# own node token opened (a sidecar gets that token from /pair and sends it on every dial), so a sidecar on
+# any other connection shows up in the link phases only as a 409 requester_sidecar_unsupported or no_lender.
+# Colour codes are stripped first; the pattern also reads a JSON log line.
+signal_token_bound() {
+  [ -n "$1" ] || return 1
+  dc logs --no-log-prefix coordinator 2>&1 | perl -pe 's/\e\[[0-9;]*m//g' | grep -F 'mesh_signal_connected' \
+    | grep -F "$1" | tail -n 1 | grep -Eq 'token_bound"?[=:] ?"?[Tt]rue'
+}
 coordinator_up()   { [ -n "$(dc ps -q --status running coordinator)" ] && coord GET /health | J -e '.status=="ok"' >/dev/null; }
 # start_gate : (re)start the lender's token gate on node-e
 start_gate() {
@@ -193,6 +203,11 @@ phase_L0() {
   for n in node-a node-b node-e node-f; do
     expect_eq "$n: /status features" '["circle_link_v1"]' "$(api $n GET /status | J -c '.features')"
     expect_eq "$n: /circle-peers is empty" '{"peers":[]}' "$(cpeers $n | J -c .)"
+  done
+
+  step "every sidecar's signal connection was opened with its own node token, the only kind the coordinator offers links on"
+  for n in node-a node-b node-e node-f; do
+    wait_for 30 "the coordinator's latest signal connection for $n is token-bound" signal_token_bound "$(api $n GET /status | J -r .node_id)"
   done
   phase_end
 }
