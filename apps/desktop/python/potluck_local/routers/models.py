@@ -18,6 +18,7 @@ import os
 import shutil
 import time
 from pathlib import Path
+from typing import Literal
 
 import psutil
 from fastapi import APIRouter, BackgroundTasks, HTTPException
@@ -105,32 +106,53 @@ async def available_models() -> dict:
 
 class ModelTestRequest(BaseModel):
     sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    level: Literal["quick", "full"] = "quick"
+    # True ignores a stored proof and runs the checks now.
+    force: bool = False
 
 
 @router.post("/{slug}/test")
 async def test_local_model(slug: str, request: ModelTestRequest) -> dict:
-    """Fixed, synthetic local-only prompt; no gateway, account or project content."""
+    """Fixed, synthetic local-only prompts; no gateway, account or project content.
+
+    Checks that the loaded model's answers are right (services/acceptance.py),
+    reusing a stored proof unless `force`. With the check turned off in settings
+    it only proves the model returns some text, and says the check was skipped.
+    """
+    from potluck_local.services import acceptance
     from potluck_local.services.model_identity import ModelIdentityError
     _safe_model_dir(slug)
     start = time.monotonic()
+    runtime = get_runtime()
+    verify = get_settings().runtime.verify_answers
     try:
-        result = await get_runtime().chat(
-            [{"role": "user", "content": "Reply briefly: what is 2 + 2? /no_think"}],
-            expected_model=slug, expected_sha256=request.sha256, temperature=0, max_tokens=64,
-        )
+        if verify:
+            report, output_tokens = await runtime.accept_loaded_async(
+                expected_model=slug, expected_sha256=request.sha256, level=request.level, force=request.force,
+            )
+        else:
+            result = await runtime.chat(
+                [{"role": "user", "content": "Reply briefly: what is 2 + 2? /no_think"}],
+                expected_model=slug, expected_sha256=request.sha256, temperature=0, max_tokens=64,
+            )
     except ModelIdentityError as exc:
         raise HTTPException(409, str(exc)) from exc
     except InferenceFailure as exc:
         raise HTTPException(503, exc.message) from exc
     except Exception as exc:
         raise HTTPException(503, "Local inference test failed. Check model and runtime settings.") from exc
-    content = (result.get("choices") or [{}])[0].get("message", {}).get("content")
-    if not isinstance(content, str) or not content.strip():
-        raise HTTPException(503, "The local model returned no text. Check its chat template or context settings.")
-    usage = result.get("usage") or {}
+    if verify:
+        if report["status"] != acceptance.PASSED:
+            raise HTTPException(503, report["message"] or acceptance.MODEL_FAILED_TEXT)
+    else:
+        content = (result.get("choices") or [{}])[0].get("message", {}).get("content")
+        if not isinstance(content, str) or not content.strip():
+            raise HTTPException(503, "The local model returned no text. Check its chat template or context settings.")
+        output_tokens = (result.get("usage") or {}).get("completion_tokens")
+        report = acceptance.summary(status=acceptance.SKIPPED, model_id=slug)
     return {"schemaVersion": 1, "status": "passed", "model": slug,
             "durationMs": round((time.monotonic() - start) * 1000),
-            "outputTokens": usage.get("completion_tokens"), "scope": "local"}
+            "outputTokens": output_tokens, "scope": "local", "acceptance": report}
 
 
 @router.post("/benchmark")
@@ -533,6 +555,7 @@ async def _load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
             n_gpu_layers=settings.runtime.gpu_layers,
             n_threads=settings.runtime.threads or None,
             rpc_servers=rpc_servers,
+            verify_answers=settings.runtime.verify_answers,
         )
     except TypeError as exc:
         # Stock (non-Potluck-patched) llama-cpp-python doesn't accept the

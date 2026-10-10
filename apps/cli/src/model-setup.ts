@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import type { CliArgs } from "./args.js";
 import { ControlError } from "./control.js";
+import { label, parseAcceptance, setupAcceptanceLine } from "./benchmark-stats.js";
 import { loadCliPrefs, saveCliPrefs } from "./config.js";
 import { plainText } from "./logs.js";
 import { pinnedModel, readProjectModelLock } from "./model-lock.js";
@@ -18,6 +19,22 @@ export interface SetupOptions {
 export const gib = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
 export const validID = (id: unknown): id is string => typeof id === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}$/.test(id);
 const SETUP_STOPPED = "Setup interrupted. Run setup again to resume; existing weights are preserved.";
+
+/** Statuses for which the engine's `detail` on POST /models/{id}/test is a plain sentence for this machine's own user. */
+const TEST_DETAIL: readonly number[] = [409, 503];
+export const TEST_NOT_PASSED = "Model did not pass the local response check. Check potluck logs.";
+/** POST /models/{id}/test. The engine's sentence for a refusal is kept on the error; `testFailure` words it. */
+export const testRequest = (id: string, body: Record<string, unknown>, timeout: number): Promise<Record<string, unknown>> =>
+  runtimeRequest(`/models/${encodeURIComponent(id)}/test`, { timeout, method: "POST", body, detailFor: TEST_DETAIL });
+/**
+ * A refused test shows the engine's own sentence and nothing else from the response. An error the engine words
+ * differently, or not at all, stays the generic one it always was.
+ */
+export function testFailure(error: unknown): unknown {
+  if (!(error instanceof ControlError) || !TEST_DETAIL.includes(error.status ?? 0)) return error;
+  const detail = label(error.detail, 300);
+  return detail ? new RuntimeError(detail) : error;
+}
 
 /** The engine's hardware, disk and model list. `feature` names the command in the upgrade message. */
 export async function readSetupOptions(timeout: number, feature: string, signal?: AbortSignal): Promise<SetupOptions> {
@@ -154,13 +171,16 @@ export async function setupModel(args: CliArgs, io?: OnboardingIO, deps: ModelDe
     if (!model.loaded) await loadModel(transfer, id);
     checkStopped(transfer);
     io?.progress("Checking a real local response...\n");
-    const test = await request(prefix + "/test", lock ? { sha256: lock.model.sha256 } : {});
-    if (test.status !== "passed" || test.model !== id || test.scope !== "local") throw new RuntimeError("Model did not pass the local response check. Check potluck logs.");
+    let test: Record<string, unknown>;
+    try { test = await testRequest(id, lock ? { sha256: lock.model.sha256 } : {}, args.timeout); } catch (error) { throw testFailure(error); }
+    if (test.status !== "passed" || test.model !== id || test.scope !== "local") throw new RuntimeError(TEST_NOT_PASSED);
+    const acceptance = parseAcceptance(test.acceptance), checked = setupAcceptanceLine(acceptance);
+    if (checked) io?.progress(label(checked, 400) + "\n");
     // Persist only a successful selection; project-specific intent stays in its lock.
     if (!lock) { const prefs = await loadCliPrefs(); await saveCliPrefs({ ...prefs, model: id }); }
     io?.progress(`Ready: ${id} returned a local response.\n`);
     return { status: "ready", model: id, scope: "local", durationMs: test.durationMs, outputTokens: test.outputTokens,
-      pinned: Boolean(lock), gatewayRequiredForAgent: true };
+      pinned: Boolean(lock), gatewayRequiredForAgent: true, ...(acceptance ? { acceptance } : {}) };
   } catch (error) {
     if (io?.signal?.aborted) {
       if (ownDownload) { try { await request(prefix + "/cancel-download", {}); } catch { /* progress command reports actual state */ } }

@@ -17,6 +17,8 @@ export interface DiagnosticReport {
   mesh: { reachable: boolean; paired: boolean | null; connected: boolean | null; peersOnline: number | null; peersKnown: number | null };
   gateway: { endpoint: string; configured: boolean; reachable: boolean; models: string[] };
   performance?: import("./status.js").PerformanceReport | null;
+  /** The engine's answer check for the loaded model. Null when the engine has none; only `status` fills it. */
+  acceptance?: import("./benchmark-stats.js").Acceptance | null;
 }
 
 const string = (v: unknown): string | null => typeof v === "string" ? v : null;

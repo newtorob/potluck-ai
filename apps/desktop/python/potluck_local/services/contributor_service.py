@@ -61,7 +61,7 @@ from potluck_local.contributor.telemetry import (
     full_hardware_summary,
     probe_capacity,
 )
-from potluck_local.services import circle_listener, circle_mesh, inference_errors
+from potluck_local.services import acceptance, circle_listener, circle_mesh, inference_errors
 from potluck_local.services.circle_gate import CircleRoster, DirectAdmission
 from potluck_local.services.settings_manager import PotluckSettings
 from potluck_local.services.contribution_policy import admission_reason
@@ -260,9 +260,19 @@ class ContributorService:
         snapshot = asdict(self._status)
         snapshot["running"] = self.is_running
         reason = admission_reason(self._network) if self._network is not None else 'disabled'
+        if reason is None and self._loaded_model_unverified():
+            reason = "model_not_verified"
         snapshot["accepting_jobs"] = reason is None and self._status.state == 'connected'
         snapshot["pause_reason"] = reason
         return snapshot
+
+    def _loaded_model_unverified(self) -> bool:
+        """A model is loaded and has not passed its answer check, so this machine
+        turns other people's requests away."""
+        try:
+            return self._runtime().answers_verified() is False
+        except Exception:  # noqa: BLE001 - status must always answer
+            return False
 
     @property
     def is_running(self) -> bool:
@@ -488,6 +498,10 @@ class ContributorService:
         except Exception:  # noqa: BLE001
             loaded = None
         if not loaded:
+            return []
+        if not acceptance.lending_allowed(runtime):
+            # Do not offer what will be refused. The loop asks again every few
+            # seconds and attests anew when this changes, as it does for a model swap.
             return []
         bench = {}
         try:
@@ -818,6 +832,14 @@ class ContributorService:
                 error_message=f"this peer serves '{loaded}', not '{job.model_slug}'",
             ))
             logger.info("contributor_job_declined job_id=%s reason=model_mismatch", job.job_id)
+            return
+        if not acceptance.lending_allowed(runtime):
+            # Not verified on this machine: the coordinator reroutes. Fixed text.
+            await self._send(ws, JobErrorMessage(
+                job_id=job.job_id, error_category="declined",
+                error_message=inference_errors.other_machine_text(inference_errors.MODEL_NOT_VERIFIED),
+            ))
+            logger.info("contributor_job_declined job_id=%s reason=model_not_verified", job.job_id)
             return
 
         if job.messages:

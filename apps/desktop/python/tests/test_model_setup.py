@@ -51,9 +51,11 @@ def test_existing_loaded_model_does_not_require_its_memory_twice(options, monkey
     monkeypatch.setattr(setup, 'get_runtime', lambda: SimpleNamespace(is_loaded=lambda: True, current_model_id=lambda: 'small'))
     assert setup.setup_options()['recommendedModel'] == 'small'
 
+# With runtime.verify_answers off the route keeps its first behaviour: some text must come back.
+# The answer check that replaced it by default is in test_acceptance_routes.py.
 @pytest.mark.parametrize('result,status', [({'choices': [{'message': {'content': '4'}}]}, 200), ({'choices': []}, 503),
                                           ({'choices': [{'message': {'content': ''}}]}, 503)])
-def test_local_probe_requires_generated_content_and_exact_identity(monkeypatch, result, status):
+def test_local_probe_requires_generated_content_and_exact_identity(monkeypatch, answer_check_off, result, status):
     chat = AsyncMock(return_value=result)
     monkeypatch.setattr(models, 'get_runtime', lambda: SimpleNamespace(chat=chat))
     app = FastAPI(); app.include_router(models.router, prefix='/models')
@@ -63,7 +65,7 @@ def test_local_probe_requires_generated_content_and_exact_identity(monkeypatch, 
     assert chat.call_args.kwargs['expected_sha256'] == 'a' * 64
     assert chat.call_args.args[0][0]['content'].endswith('/no_think')
 
-def test_probe_model_swap_is_clear_conflict(monkeypatch):
+def test_probe_model_swap_is_clear_conflict(monkeypatch, answer_check_off):
     monkeypatch.setattr(models, 'get_runtime', lambda: SimpleNamespace(chat=AsyncMock(side_effect=ModelIdentityError('changed'))))
     app = FastAPI(); app.include_router(models.router, prefix='/models')
     assert TestClient(app).post('/models/small/test', json={}).status_code == 409

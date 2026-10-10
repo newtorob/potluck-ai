@@ -36,6 +36,7 @@ from dataclasses import dataclass
 
 GPU_OUT_OF_MEMORY = "gpu_out_of_memory"
 INFERENCE_ERROR = "inference_error"
+MODEL_NOT_VERIFIED = "model_not_verified"
 
 # Microsoft C++ exception code, as ctypes reports it for an uncaught C++ throw.
 MSVC_CPP_EXCEPTION = 0xE06D7363
@@ -48,11 +49,16 @@ GPU_OUT_OF_MEMORY_TEXT = (
     "Close other programs that use the GPU, or load a smaller model."
 )
 
+# Refusing to serve because the loaded model has not passed its answer check
+# (services/acceptance.py). Fixed text, part of the HTTP contract.
+MODEL_NOT_VERIFIED_TEXT = "The serving machine has not verified this model."
+
 # For any other machine. Chosen by category, never built from an exception.
 _OTHER_MACHINE_TEXT: dict[str, str] = {
     INFERENCE_ERROR: "Inference failed",
     GPU_OUT_OF_MEMORY: "The serving machine's GPU most likely ran out of memory.",
     "model_mismatch": "Model identity changed",
+    MODEL_NOT_VERIFIED: MODEL_NOT_VERIFIED_TEXT,
 }
 
 _GPU_OOM_PHRASES = (

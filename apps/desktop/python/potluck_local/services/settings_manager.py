@@ -26,6 +26,10 @@ class RuntimeSettings(BaseModel):
     threads: int = 0       # 0 = auto-detect
     temperature: float = 0.7
     max_tokens: int = 2048
+    # After a model loads, check that it gives right answers on this machine
+    # before trusting it, and move it to the CPU if only the GPU does not. Off
+    # means no checks and no move, and the model is not offered to other people.
+    verify_answers: bool = True
 
 
 class PrivacySettings(BaseModel):

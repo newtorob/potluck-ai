@@ -47,6 +47,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from potluck_local.services import windows_gpu
+from potluck_local.services.driver_fingerprint import driver_fingerprint
 
 logger = logging.getLogger(__name__)
 
@@ -351,8 +352,10 @@ def run_probe(lib_dir: Path, *, timeout: float = _PROBE_TIMEOUT_SECONDS) -> dict
 
 
 def _signature(dirs: dict[str, Path]) -> str:
-    """Fingerprint the backend sets so a rebuilt bundle re-probes."""
-    parts = [platform.platform(), platform.machine()]
+    """Fingerprint the backend sets so a rebuilt bundle re-probes. The graphics
+    driver is part of it: an update can fix or break a backend, and the cache
+    would otherwise outlive it for a week."""
+    parts = [platform.platform(), platform.machine(), f"driver:{driver_fingerprint()}"]
     for name in sorted(dirs):
         parts.append(name)
         for f in sorted(dirs[name].iterdir()):
@@ -361,6 +364,12 @@ def _signature(dirs: dict[str, Path]) -> str:
             except OSError:
                 parts.append(f"{f.name}:?")
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()[:32]
+
+
+def library_signature() -> str:
+    """The signature the probe cache uses, for tying other results (the answer
+    check's proofs) to this build, this machine and this driver."""
+    return _signature(available_backends())
 
 
 def _cache_path() -> Path:

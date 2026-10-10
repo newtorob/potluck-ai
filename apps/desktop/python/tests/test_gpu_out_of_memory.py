@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 
 from potluck_local.routers import gateway, models, peer
 from potluck_local.services import inference_errors as ie
+from potluck_local.services.acceptance import MODEL_FAILED_TEXT
 from potluck_local.services.runtime import LLMRuntime
 
 OWN_TEXT = "The GPU stopped this reply, most likely because it ran out of memory. Close other programs that use the GPU, or load a smaller model."
@@ -235,6 +236,15 @@ def test_the_local_gateway_without_streaming_returns_a_clear_503(served):
 
 
 def test_the_model_test_route_says_why(served):
+    resp = served.client.post("/models/test/test", json={})
+    assert resp.status_code == 503 and resp.json()["detail"] == OWN_TEXT
+    served.runtime = make_runtime(RuntimeError("an ordinary failure"))
+    resp = served.client.post("/models/test/test", json={})
+    # Every check threw, so the answer check says the model did not pass.
+    assert resp.status_code == 503 and resp.json()["detail"] == MODEL_FAILED_TEXT
+
+
+def test_the_model_test_route_keeps_its_texts_with_the_answer_check_off(served, answer_check_off):
     resp = served.client.post("/models/test/test", json={})
     assert resp.status_code == 503 and resp.json()["detail"] == OWN_TEXT
     served.runtime = make_runtime(RuntimeError("an ordinary failure"))

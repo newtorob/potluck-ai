@@ -87,10 +87,42 @@ describe('contributorStatusLine', () => {
       { state: 'error', last_error: 'coordinator_not_configured' },
       { state: 'error', last_error: 'loop_crashed' },
       { state: 'stopped' },
+      { pause_reason: 'model_not_verified' },
     ];
     for (const s of states) {
       expect(contributorStatusLine(status(s))?.text ?? '').not.toContain('—');
     }
+  });
+
+  it('says lending is paused when the loaded model has not passed its answer check', () => {
+    const line = contributorStatusLine(status({ pause_reason: 'model_not_verified', jobs_served: 4 }));
+    expect(line).toEqual({
+      text: 'Lending is paused because this model has not passed its answer check on this machine.',
+      tone: 'warn',
+    });
+  });
+
+  it('keeps the usual connected line for a pause reason the app has no sentence for, or none', () => {
+    const reasons: Array<Partial<ContributorStatus>> = [
+      {},
+      { pause_reason: null },
+      { pause_reason: 'low_memory' },
+      { pause_reason: 'outside_schedule' },
+      { pause_reason: '__proto__' },
+      { pause_reason: 'constructor' },
+      { pause_reason: 'toString' },
+    ];
+    for (const reason of reasons) {
+      expect(contributorStatusLine(status({ jobs_served: 2, ...reason }))?.text).toBe(
+        'Connected to the network · 2 jobs served',
+      );
+    }
+  });
+
+  it('shows the pause only while connected: other states keep their own line', () => {
+    expect(contributorStatusLine(status({ state: 'connecting', pause_reason: 'model_not_verified' }))?.text)
+      .toBe('Connecting to the coordinator');
+    expect(contributorStatusLine(status({ enabled: false, state: 'stopped', pause_reason: 'model_not_verified' }))).toBeNull();
   });
 
   it('says who is being served when the machine is shared with circles only', () => {

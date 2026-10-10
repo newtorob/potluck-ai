@@ -27,7 +27,18 @@ export interface ContributorStatus {
   has_member_session: boolean;
   /** Who this machine serves beyond its owner while connected. */
   audiences?: string[] | null;
+  /** Why a connected machine is not taking new jobs right now, when it is not. */
+  pause_reason?: string | null;
 }
+
+/**
+ * Pause reasons the app has a sentence for. A Map, so a reason like
+ * "__proto__" finds nothing. A reason that is not listed adds no line; the
+ * Contribute card then shows the usual connected line.
+ */
+const PAUSE_REASON_COPY = new Map<string, string>([
+  ['model_not_verified', 'Lending is paused because this model has not passed its answer check on this machine.'],
+]);
 
 /** Who the Contribute toggle lets use this machine. */
 export type ContributorAudience = 'mine' | 'circles' | 'everyone';
@@ -62,6 +73,8 @@ export function contributorStatusLine(status: ContributorStatus | null): Contrib
 
   switch (status.state) {
     case 'connected': {
+      const paused = typeof status.pause_reason === 'string' ? PAUSE_REASON_COPY.get(status.pause_reason) : undefined;
+      if (paused !== undefined) return { text: paused, tone: 'warn' };
       const busy = status.jobs_in_flight > 0 ? ', serving now' : '';
       const circlesOnly = Array.isArray(status.audiences) && !status.audiences.includes('pool');
       const lead = circlesOnly ? 'Sharing with your trusted circles' : 'Connected to the network';

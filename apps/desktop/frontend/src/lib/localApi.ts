@@ -790,6 +790,18 @@ export const localApi = {
   health(): Promise<HealthResponse> {
     return timedFetch(`${LOCAL_BASE}/health`).then((r) => handleResponse<HealthResponse>(r));
   },
+  /**
+   * GET /health/inference: backend, devices and, from engines that check the
+   * model's answers, the `acceptance` result. Unlike /health this route needs
+   * the engine token; Electron main attaches it to every renderer request to
+   * the engine, as for the other routes. Returns the raw body: lib/acceptance.ts
+   * reads only the part the app shows.
+   */
+  inferenceHealth(): Promise<Record<string, unknown>> {
+    return timedFetch(`${LOCAL_BASE}/health/inference`).then((r) =>
+      handleResponse<Record<string, unknown>>(r),
+    );
+  },
 
   // ---- Chat ----------------------------------------------------------------
 

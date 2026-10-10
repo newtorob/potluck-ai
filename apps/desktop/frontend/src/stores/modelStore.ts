@@ -12,6 +12,7 @@
 
 import { create } from 'zustand';
 import { localApi } from '@/lib/localApi';
+import { useAcceptanceStore } from '@/stores/acceptanceStore';
 
 // Sidecar base URL — mirrors the constant in localApi.ts.
 // localApi encapsulates most calls, but the polling loop and
@@ -225,6 +226,7 @@ export const useModelStore = create<ModelState>()((set, get) => ({
     try {
       await localApi.loadModel(slug);
       set({ activeModelSlug: slug });
+      void useAcceptanceStore.getState().refresh();
       void get().fetchModels();
     } catch (err) {
       get()._setLoadError(slug, err instanceof Error ? err.message : 'Failed to load model');

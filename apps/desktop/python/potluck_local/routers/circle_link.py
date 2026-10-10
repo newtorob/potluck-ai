@@ -53,7 +53,7 @@ from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from potluck_local.services import circle_gate, inference_errors
+from potluck_local.services import acceptance, circle_gate, inference_errors
 from potluck_local.services.circle_gate import CircleRoster, DirectAdmission, DirectSlot
 from potluck_local.services.model_identity import ModelIdentityError
 
@@ -138,6 +138,10 @@ def _no_model() -> JSONResponse:
 
 def _model_mismatch() -> JSONResponse:
     return _error(409, "model_mismatch", "model not loaded")
+
+
+def _model_not_verified() -> JSONResponse:
+    return _error(503, inference_errors.MODEL_NOT_VERIFIED, inference_errors.MODEL_NOT_VERIFIED_TEXT)
 
 
 def _busy() -> JSONResponse:
@@ -249,7 +253,9 @@ def _deps(request: Request) -> CircleDeps:
 
 async def capabilities(request: Request) -> Response:
     """What this machine can serve right now. No hostname, hardware, rpc endpoint
-    or speed: a circle member learns only what it needs to pick this machine."""
+    or speed: a circle member learns only what it needs to pick this machine. A
+    model whose answers are not verified is not offered (chat_completions refuses
+    it as well)."""
     deps = _deps(request)
     runtime = deps.runtime()
     loaded = runtime.current_model_id() if runtime.is_loaded() else None
@@ -258,7 +264,7 @@ async def capabilities(request: Request) -> Response:
         {
             "schemaVersion": 1,
             "protocol_version": 1,
-            "available_for_inference": loaded is not None,
+            "available_for_inference": loaded is not None and acceptance.lending_allowed(runtime),
             "loaded_model": loaded,
             "busy": cap is not None and in_flight >= cap,
             "in_flight": in_flight,
@@ -310,6 +316,11 @@ async def chat_completions(request: Request) -> Response:
     loaded = runtime.current_model_id()
     if body.model != loaded:
         return _model_mismatch()
+    if not acceptance.lending_allowed(runtime):
+        # A model whose answers were not shown right on this machine is not
+        # lent to other people. Before the first token, so the caller tries
+        # another lender and then the relay.
+        return _model_not_verified()
     limit = deps.max_tokens_limit()
     if limit is not None and body.max_tokens > limit:
         return _error(422, "max_tokens_over_limit", "max_tokens is over this machine's limit")

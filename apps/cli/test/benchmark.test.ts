@@ -589,7 +589,7 @@ describe("the command", () => {
     expect(code).toBe(0);
     expect(stdout.trim().split("\n")).toHaveLength(1);
     const report = JSON.parse(stdout) as BenchmarkReport;
-    expect(Object.keys(report).sort()).toEqual(["gpuDevices", "lastBenchmarkBefore", "loadedAtEnd", "loadedAtEndConfirmed", "localSkipped", "machine", "mine", "model", "ranOn",
+    expect(Object.keys(report).sort()).toEqual(["acceptance", "gpuDevices", "lastBenchmarkBefore", "loadedAtEnd", "loadedAtEndConfirmed", "localSkipped", "machine", "mine", "model", "ranOn",
       "requestedRuns", "runs", "schemaVersion", "status", "summary", "switch"]);
     expect(report).toMatchObject({ schemaVersion: 1, status: "complete", model: "small", requestedRuns: 2, loadedAtEnd: "big", switch: { from: "big", to: "small", outcome: "restored" },
       machine: { description: "Apple M2 Pro, 16 GiB memory, 8.0 GiB available now", ramTotalGB: 16, ramAvailableGB: 8 }, ranOn: { kind: "gpu", backend: "Metal", layersOnGpu: 37, totalLayers: 37, contextTokens: 8192 },

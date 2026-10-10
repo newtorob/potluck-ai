@@ -3,6 +3,7 @@ import { availableModels } from "./availability.js";
 import type { CliArgs } from "./args.js";
 import { ControlError } from "./control.js";
 import { runtimeRequest } from "./runtime.js";
+import { testModel } from "./model-test.js";
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new ControlError("invalid_response", "Service returned an invalid response.");
@@ -23,6 +24,7 @@ export async function manageGateway(args: CliArgs): Promise<Record<string, unkno
 export async function manageModels(args: CliArgs): Promise<Record<string, unknown>> {
   if (args.action === "available") return { ...await availableModels(args.timeout) };
   if (["pin", "lock", "sync", "unpin"].includes(args.action!)) return manageModelLock(args);
+  if (args.action === "test") return { ...await testModel(args) };
   if (args.action === "autoload") {
     const settings = await runtimeRequest("/settings", args.target
       ? { method: "PATCH", body: { ui: { "potluck.autoload_on_startup": String(args.target === "on") } }, timeout: args.timeout }

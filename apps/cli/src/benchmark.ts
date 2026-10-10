@@ -9,8 +9,8 @@ import { UsageError, type CliArgs } from "./args.js";
 import { ControlError } from "./control.js";
 import { plainText } from "./logs.js";
 import { emptyMine, formatMine, localGateway, measureMine, type MineReport } from "./benchmark-mesh.js";
-import { describeLoaded, describeMachine, fmtMs, fmtRate, formatSummary, gpuNote, Interrupted, parseInference, parseRun,
-  roundRun, summarizeRuns, type InferenceInfo, type LastBenchmark, type Machine, type Placement, type RunResult, type RunSummary } from "./benchmark-stats.js";
+import { acceptanceFor, acceptanceLine, describeLoaded, describeMachine, fmtMs, fmtRate, formatSummary, gpuNote, Interrupted, parseInference, parseRun,
+  roundRun, summarizeRuns, type Acceptance, type InferenceInfo, type LastBenchmark, type Machine, type Placement, type RunResult, type RunSummary } from "./benchmark-stats.js";
 import { ensureInstalled, gib, isLoadPending, loadModel, readSetupOptions, validID, type ModelCall, type ModelDeps, type SetupModel, type SetupOptions, type TransferContext } from "./model-setup.js";
 import type { OnboardingIO } from "./operational-setup.js";
 import { RuntimeError, runtimeRequest } from "./runtime.js";
@@ -39,6 +39,8 @@ export interface BenchmarkReport {
   localSkipped: { reason: "no_model_loaded"; message: string } | null;
   /** Where that model ran, read after it was loaded. Null when the engine does not say. */
   ranOn: Placement | null;
+  /** The engine's check of this model's answers on this setup. Null when the engine has no such check or has not run it on this load. */
+  acceptance: Acceptance | null;
   gpuDevices: string[];
   /** The engine's remembered result for this model from before this run. */
   lastBenchmarkBefore: LastBenchmark | null;
@@ -129,7 +131,7 @@ export async function benchmarkMachine(args: CliArgs, io: BenchmarkIO, deps: Ben
     return { id: null, confirmed: false };
   };
 
-  const report: BenchmarkReport = { schemaVersion: 1, status: "complete", machine: describeMachine({} as SetupOptions["hardware"]), model: null, localSkipped: null, ranOn: null,
+  const report: BenchmarkReport = { schemaVersion: 1, status: "complete", machine: describeMachine({} as SetupOptions["hardware"]), model: null, localSkipped: null, ranOn: null, acceptance: null,
     gpuDevices: [], lastBenchmarkBefore: null, requestedRuns: runs, runs: [], summary: null, switch: null, loadedAtEnd: null, loadedAtEndConfirmed: false };
   try {
     // Nothing on the machine changes until the checks below pass; a failure here throws.
@@ -145,7 +147,10 @@ export async function benchmarkMachine(args: CliArgs, io: BenchmarkIO, deps: Ben
     let inference = await readInference();
     if (io.interactive) {
       io.progress(`This machine: ${report.machine.description}\n${describeLoaded(before, inference.placement)}\n`);
-      const note = gpuNote(inference.placement, inference.gpuDevices);
+      const checked = acceptanceFor(inference.acceptance, before);
+      const answers = acceptanceLine(checked);
+      if (answers) io.progress(answers + "\n");
+      const note = gpuNote(inference.placement, inference.gpuDevices, checked);
       if (note) io.progress(note + "\n");
       const last = inference.lastBenchmark;
       if (before && last?.model === before && last.tokensPerSecond !== null) io.progress(`Last benchmark: ${fmtRate(last.tokensPerSecond)} tokens/s counted over the whole response${last.firstTokenMs !== null ? `, first token ${fmtMs(last.firstTokenMs)}` : ""}.\n`);
@@ -209,7 +214,7 @@ export async function benchmarkMachine(args: CliArgs, io: BenchmarkIO, deps: Ben
         halt();
         inference = await readInference(); // describe the model that is measured, not the one before
       }
-      report.ranOn = inference.placement; report.gpuDevices = inference.gpuDevices;
+      report.ranOn = inference.placement; report.gpuDevices = inference.gpuDevices; report.acceptance = acceptanceFor(inference.acceptance, id);
       report.lastBenchmarkBefore = inference.lastBenchmark?.model === id ? inference.lastBenchmark : null;
       const bench = async (): Promise<RunResult> => {
         halt();
@@ -226,6 +231,15 @@ export async function benchmarkMachine(args: CliArgs, io: BenchmarkIO, deps: Ben
       }
       if (raw.every(r => r.outputTokens === 0)) throw new RuntimeError("The model returned no text, so there is nothing to measure. Check it with potluck run --scope local.");
       report.summary = summarizeRuns(raw);
+      if (report.acceptance?.status === "running") {
+        // The check was still going when the model was described; the runs gave it time to finish.
+        const later = acceptanceFor((await readInference()).acceptance, id);
+        if (later && later.status !== "running") {
+          report.acceptance = later;
+          const answers = acceptanceLine(later);
+          if (io.interactive && answers) io.progress(answers + "\n");
+        }
+      }
     } catch (error) { failure = error; }
 
     const interrupted = failure instanceof Interrupted || Boolean(signal?.aborted);
@@ -286,12 +300,15 @@ export function formatReport(r: BenchmarkReport, headerShown = false): string {
   if (r.localSkipped) lines.push(r.localSkipped.message);
   if (r.model && !(headerShown && !r.switch)) {
     lines.push(describeLoaded(r.model, r.ranOn));
-    const note = gpuNote(r.ranOn, r.gpuDevices);
+    const answers = acceptanceLine(r.acceptance);
+    if (answers) lines.push(answers);
+    const note = gpuNote(r.ranOn, r.gpuDevices, r.acceptance);
     if (note) lines.push(note);
     const last = r.lastBenchmarkBefore;
     if (last && last.tokensPerSecond !== null) lines.push(`Last benchmark of ${r.model} before this run: ${fmtRate(last.tokensPerSecond)} tokens/s counted over the whole response${last.firstTokenMs !== null ? `, first token ${fmtMs(last.firstTokenMs)}` : ""}.`);
   }
   if (r.summary) lines.push(...formatSummary(r.model!, r.runs.length, r.summary));
+  if (r.summary && r.acceptance?.status === "failed") lines.push("These speeds are for a model whose answers did not pass the check on this setup.");
   if (r.status === "failed") lines.push(`Benchmark did not complete: ${r.error?.message}`);
   if (r.status === "interrupted") lines.push(`Interrupted.${r.runs.length ? ` ${r.runs.length} of ${r.requestedRuns} runs finished.` : ""}${r.switch ? "" : " The model loaded on this machine was not changed."}`);
   if (r.switch) {

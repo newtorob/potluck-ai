@@ -186,6 +186,11 @@ class PeerCapabilities(BaseModel):
     # low-jitter peers. Detected once + cached; torch-free so it stays on this hot path.
     link_type: str | None = None
 
+    # Whether the loaded model passed its answer check (services/acceptance.py).
+    # None when nothing is loaded or the engine cannot say. Circle and pool
+    # requests are refused when this is not true; household peers are served either way.
+    answers_verified: bool | None = None
+
 
 # Cache the hardware detect — it shells out to system tools (lspci, system_profiler,
 # GPUtil) on first call. Hardware doesn't change at runtime, so we re-detect once
@@ -293,6 +298,7 @@ async def peer_capabilities() -> PeerCapabilities:
         available_for_big_model=available_for_big_model,
         available_for_pipeline=available_for_pipeline,
         link_type=link_type,
+        answers_verified=runtime.answers_verified() if loaded else None,
     )
 
 

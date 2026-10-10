@@ -105,6 +105,9 @@ async def gpu_test() -> dict:
             "ran": "inference",
             "latency_ms": latency_ms,
             "detail": detail,
+            # The 1-token probe above only shows that a token came out. This is
+            # whether the answers are right (services/acceptance.py).
+            "acceptance": runtime.acceptance_summary(),
         }
 
     # No model loaded — try a raw compute probe.

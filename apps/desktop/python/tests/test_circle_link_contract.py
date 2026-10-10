@@ -253,6 +253,9 @@ def test_each_error_the_listener_gives_is_the_fixtures(listener, name):
     elif name == "not_sharing":
         listener.refusal = "not_sharing_circles"
         resp = listener.client().post("/circle/chat/completions", json=CHAT, headers=auth())
+    elif name == "model_not_verified":
+        listener.runtime.verified = False
+        resp = listener.client().post("/circle/chat/completions", json=CHAT, headers=auth())
     else:
         assert name == "no_model"
         listener.runtime.model = None
@@ -285,7 +288,8 @@ def test_the_requester_reads_the_fixtures_stream():
 
 def test_every_error_the_listener_gives_is_a_failure_before_the_first_token():
     # engine.errors: "Before the first token any of these means 'try another lender, then the relay'."
-    assert ENGINE["errors"].keys() == {"bad_token", "not_a_circle_peer", "model_mismatch", "busy", "not_sharing", "no_model"}
+    assert ENGINE["errors"].keys() == {"bad_token", "not_a_circle_peer", "model_mismatch", "busy", "not_sharing", "no_model",
+                                       "model_not_verified"}
 
 
 # ---- the receipt -----------------------------------------------------------------------------------------

@@ -549,6 +549,16 @@
             "message": "no model loaded"
           }
         }
+      },
+      "model_not_verified": {
+        "status": 503,
+        "headers": {},
+        "body": {
+          "detail": {
+            "code": "model_not_verified",
+            "message": "The serving machine has not verified this model."
+          }
+        }
       }
     }
   },

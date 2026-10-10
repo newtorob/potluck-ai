@@ -374,6 +374,7 @@ ERROR_TEXT: dict[str, str] = {
     "inference_error": "The circle member's computer could not finish the reply.",
     "gpu_out_of_memory": "The circle member's GPU most likely ran out of memory.",
     "model_mismatch": "The circle member's computer no longer has that model loaded.",
+    "model_not_verified": "The serving machine has not verified this model.",
     "link_ended": "The link to the circle member's computer ended.",
     "stream_protocol_error": "The circle member's computer sent a reply this app could not read.",
     "stream_interrupted": "The connection to the circle member's computer ended before the reply finished.",

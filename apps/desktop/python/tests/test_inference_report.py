@@ -12,6 +12,8 @@ from collections import deque
 import sys
 from types import SimpleNamespace
 
+import pytest
+
 from potluck_local.services import runtime as runtime_module
 from potluck_local.services.runtime import LLMRuntime, _parse_load_log
 
@@ -211,3 +213,115 @@ def test_the_summary_carries_no_paths_or_prompts():
     summary = runtime.inference_summary()
     assert "model_path" not in summary
     assert not any("/" in str(v) for v in summary.values() if isinstance(v, str))
+
+
+# ---------------------------------------------------------------------------
+# Metal: the weights buffer is "MTL0_Mapped", the device is "MTL0"
+# ---------------------------------------------------------------------------
+
+METAL_LOG = [
+    "load_tensors: offloaded 25/25 layers to GPU\n",
+    "load_tensors:   MTL0_Mapped model buffer size =   373.71 MiB\n",
+    "load_tensors:   CPU_Mapped model buffer size =   137.94 MiB\n",
+]
+MAC = [{"name": "MTL0", "description": "Apple M2 Pro", "type": "gpu"}, {"name": "CPU", "description": "Apple M2 Pro", "type": "cpu"}]
+
+
+def test_a_mac_reports_its_device_and_a_backend_label_without_the_buffer_suffix():
+    summary = _runtime(_report(METAL_LOG, MAC)).inference_summary()
+    assert summary["device_kind"] == "gpu" and summary["execution_verified"] is True
+    assert summary["backend"] == "mtl"
+    assert summary["device_name"] == "Apple M2 Pro"
+
+
+def test_a_mac_whose_devices_are_unknown_still_gets_labels_without_the_suffix():
+    summary = _runtime(_report(METAL_LOG, [])).inference_summary()
+    assert (summary["backend"], summary["device_name"]) == ("mtl", "MTL0")
+
+
+@pytest.mark.parametrize("buffer,backend,device", [
+    ("Vulkan0", "vulkan", "Vulkan0"), ("Vulkan0_Mapped", "vulkan", "Vulkan0"), ("CUDA0", "cuda", "CUDA0"),
+    ("CUDA0_Mapped", "cuda", "CUDA0"), ("Metal_Mapped", "metal", "Metal"), ("Metal", "metal", "Metal"),
+])
+def test_the_suffix_is_removed_from_any_device_buffer_name(buffer, backend, device):
+    log = ["load_tensors: offloaded 9/9 layers to GPU\n", f"load_tensors: {buffer} model buffer size = 100.00 MiB\n"]
+    summary = _runtime(_report(log, [])).inference_summary()
+    assert (summary["backend"], summary["device_name"]) == (backend, device)
+
+
+def test_a_host_buffer_stays_out_even_when_a_device_buffer_has_a_suffix():
+    log = [
+        "load_tensors: offloaded 9/9 layers to GPU\n",
+        "load_tensors: CUDA_Host model buffer size = 9000.00 MiB\n",
+        "load_tensors: CUDA0_Mapped model buffer size = 100.00 MiB\n",
+    ]
+    assert _runtime(_report(log, [])).inference_summary()["device_name"] == "CUDA0"
+
+
+def _fake_llama(accepts_op_offload: bool):
+    calls = []
+
+    if accepts_op_offload:
+        class Llama:
+            def __init__(self, model_path, n_ctx=512, n_gpu_layers=0, n_threads=None, verbose=True, op_offload=None, **kw):
+                calls.append({"n_gpu_layers": n_gpu_layers, "op_offload": op_offload})
+    else:
+        class Llama:
+            def __init__(self, model_path, n_ctx=512, n_gpu_layers=0, n_threads=None, verbose=True):
+                calls.append({"n_gpu_layers": n_gpu_layers})
+    return Llama, calls
+
+
+@pytest.fixture()
+def native_free(monkeypatch, tmp_path):
+    """load_model with the native Llama replaced and no backend probe."""
+    import llama_cpp
+
+    from potluck_local.services import llama_backend
+
+    monkeypatch.setattr(llama_backend, "current_selection",
+                        lambda: llama_backend.Selection("bundled", None, "wheel default", [], probed=False))
+    monkeypatch.setattr(llama_backend, "describe_devices", lambda *a: [dict(d) for d in MAC])
+    path = tmp_path / "models" / "thing" / "model.gguf"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"weights")
+
+    def install(accepts_op_offload: bool = True):
+        fake, calls = _fake_llama(accepts_op_offload)
+        monkeypatch.setattr(llama_cpp, "Llama", fake)
+        return calls
+
+    return str(path), install
+
+
+def test_a_load_with_nothing_probed_asks_ggml_which_devices_it_has(native_free):
+    path, install = native_free
+    install()
+    runtime = LLMRuntime()
+    runtime.load_model(path, n_ctx=512, n_gpu_layers=-1)
+    assert [d["description"] for d in runtime._load_report["backend_selection"]["devices"]] == ["Apple M2 Pro", "Apple M2 Pro"]
+    runtime._load_report.update(_parse_load_log(METAL_LOG))
+    assert runtime.inference_summary()["device_name"] == "Apple M2 Pro"
+    runtime.unload_model()
+
+
+def test_a_cpu_only_load_asks_for_no_layers_and_no_gpu_help(native_free):
+    path, install = native_free
+    calls = install()
+    runtime = LLMRuntime()
+    runtime.load_model(path, n_ctx=512, n_gpu_layers=-1, cpu_only=True)
+    assert calls == [{"n_gpu_layers": 0, "op_offload": False}]
+    assert runtime._load_report["cpu_only"] is True and runtime._load_report["used_n_gpu_layers"] == 0
+    runtime.load_model(path, n_ctx=512, n_gpu_layers=-1)
+    assert calls[-1] == {"n_gpu_layers": -1, "op_offload": None}  # an ordinary load is left alone
+    assert runtime._load_report["cpu_only"] is False
+    runtime.unload_model()
+
+
+def test_a_wrapper_without_op_offload_is_not_given_it(native_free):
+    path, install = native_free
+    calls = install(accepts_op_offload=False)
+    runtime = LLMRuntime()
+    runtime.load_model(path, n_ctx=512, n_gpu_layers=-1, cpu_only=True)
+    assert calls == [{"n_gpu_layers": 0}]
+    runtime.unload_model()

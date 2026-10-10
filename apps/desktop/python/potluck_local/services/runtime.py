@@ -26,7 +26,7 @@ from contextlib import aclosing, asynccontextmanager
 from functools import partial
 from pathlib import Path
 
-from potluck_local.services import inference_errors
+from potluck_local.services import acceptance, inference_errors
 from potluck_local.services.model_identity import ModelIdentityError, artifact_identity, file_stamp
 
 logger = logging.getLogger(__name__)
@@ -41,6 +41,8 @@ _BUFFER_RE = re.compile(r"load_tensors:\s+(\S+) model buffer size =\s+([\d.]+) M
 # still ends up spilling.
 _KV_RE = re.compile(r"(\S+) KV buffer size =\s+([\d.]+) MiB")
 _COMPUTE_RE = re.compile(r"(\S+) compute buffer size =\s+([\d.]+) MiB")
+# "MTL0_Mapped", "CPU_Mapped": a buffer named for its device plus how it is held.
+_BUFFER_SUFFIX_RE = re.compile(r"_[A-Za-z]+$")
 
 # Keep placement evidence separately from verbose tensor/scheduler messages.
 # Native 0.3.36 emits thousands of those after allocating the weights, which
@@ -152,6 +154,12 @@ class LLMRuntime:
         # backend was selected, how many layers it actually put on the GPU,
         # and the per-device weight buffers. None when nothing is loaded.
         self._load_report: dict | None = None
+        # The answer check of the loaded model (services/acceptance.py), in the
+        # shape /health/inference reports, and what is needed to load it again
+        # on the CPU. None when nothing was checked.
+        self._acceptance: dict | None = None
+        self._acceptance_tokens: int | None = None
+        self._load_args: dict | None = None
         # Ensure unload runs before ggml-metal's atexit finalize on process exit.
         self._atexit_registered = False
 
@@ -252,11 +260,13 @@ class LLMRuntime:
         verified = bool(buffers)
 
         # "CUDA_Host" / "Vulkan_Host" are pinned system memory, not device memory.
-        gpu_buffers = {
-            k: v
-            for k, v in buffers.items()
-            if not k.upper().startswith("CPU") and "HOST" not in k.upper()
-        }
+        # A device's weights can also be named with a suffix ("MTL0_Mapped" on
+        # Metal); the device is the name without it.
+        gpu_buffers: dict[str, float] = {}
+        for name, size in buffers.items():
+            if not name.upper().startswith("CPU") and "HOST" not in name.upper():
+                device = _BUFFER_SUFFIX_RE.sub("", name)
+                gpu_buffers[device] = gpu_buffers.get(device, 0.0) + size
         if not verified:
             device_kind = "unknown"
         elif offloaded is not None and total:
@@ -303,8 +313,12 @@ class LLMRuntime:
         n_gpu_layers: int = -1,
         n_threads: int | None = None,
         rpc_servers: list[str] | None = None,
+        cpu_only: bool = False,
     ) -> dict:
         """Load a GGUF model. Blocks until loaded. Thread-safe swap via _load_lock.
+
+        cpu_only: no layers on a GPU and no GPU help with prompt batches either.
+        The answer check loads this way to tell a broken GPU from a weak model.
 
         rpc_servers: optional list of llama.cpp RPC server endpoints (e.g.
         ["100.64.0.6:50052"]) to register as remote ggml-backend devices.
@@ -330,9 +344,12 @@ class LLMRuntime:
             requested_n_ctx = n_ctx
             plan = None
             selected_device = None
-            if selection.backend == "cpu":
+            if selection.backend == "cpu" or cpu_only:
                 plan = llama_backend.OffloadPlan(
-                    0, selection.reason, n_ctx=n_ctx, requested_n_ctx=n_ctx,
+                    0,
+                    selection.reason if selection.backend == "cpu" else "the answer check is trying the CPU",
+                    n_ctx=n_ctx,
+                    requested_n_ctx=n_ctx,
                 )
                 n_gpu_layers = 0
             elif selection.probed:
@@ -407,6 +424,13 @@ class LLMRuntime:
                 # on its much larger shared-memory figure.
                 kwargs["split_mode"] = LLAMA_SPLIT_MODE_NONE
                 kwargs["main_gpu"] = selected_device[0]
+            if cpu_only:
+                # With layers on the CPU, a GPU backend still takes large prompt
+                # batches unless told not to. Older wrappers have no such switch.
+                import inspect
+
+                if "op_offload" in inspect.signature(Llama.__init__).parameters:
+                    kwargs["op_offload"] = False
             if rpc_servers:
                 # Only thread the param through when set — keeps the call
                 # backwards-compatible with stock (non-Potluck-patched)
@@ -443,14 +467,20 @@ class LLMRuntime:
             self._model_id = Path(model_path).parent.name
             self._loaded_n_ctx = n_ctx
             self._loaded_rpc_servers = tuple(rpc_servers) if rpc_servers else None
+            backend_selection = selection.as_dict()
+            if not backend_selection["devices"]:
+                # Metal, or a wheel with one backend set: nothing was probed, so
+                # ask ggml now. This is what names the device in inference_summary.
+                backend_selection["devices"] = llama_backend.describe_devices()
             self._load_report = {
-                "backend_selection": selection.as_dict(),
+                "backend_selection": backend_selection,
                 "requested_n_gpu_layers": requested_gpu_layers,
                 "used_n_gpu_layers": n_gpu_layers,
                 "requested_n_ctx": requested_n_ctx,
                 "used_n_ctx": n_ctx,
                 "offload_plan": plan.as_dict() if plan else None,
                 "offload_device": selected_device[1] if selected_device else None,
+                "cpu_only": cpu_only,
                 **load_log,
             }
             # Register after Llama() so our atexit runs before ggml-metal's
@@ -683,14 +713,20 @@ class LLMRuntime:
         n_gpu_layers: int = -1,
         n_threads: int | None = None,
         rpc_servers: list[str] | None = None,
+        verify_answers: bool | None = None,
     ) -> dict:
+        """verify_answers: True checks the model's answers as part of the load
+        (and may move it to the CPU), False records that the owner turned the
+        check off, None leaves the check alone."""
         if self._split_worker_reserved:
             raise RuntimeError("This machine is reserved as a split worker. Run potluck split worker off first.")
-        return await self._run_lifecycle(
-            partial(self.load_model, model_path, n_ctx=n_ctx,
-                    n_gpu_layers=n_gpu_layers, n_threads=n_threads,
-                    rpc_servers=rpc_servers)
-        )
+        load = partial(self.load_model, model_path, n_ctx=n_ctx,
+                       n_gpu_layers=n_gpu_layers, n_threads=n_threads,
+                       rpc_servers=rpc_servers)
+        if verify_answers is not None:
+            load = partial(self._load_with_check, model_path, verify=verify_answers, n_ctx=n_ctx,
+                           n_gpu_layers=n_gpu_layers, n_threads=n_threads, rpc_servers=rpc_servers)
+        return await self._run_lifecycle(load)
 
     async def load_pipeline_async(self, model_id: str, **kwargs) -> dict:
         if self._split_worker_reserved:
@@ -725,6 +761,307 @@ class LLMRuntime:
             if self._model is model:
                 self.unload_model()
         await self._run_lifecycle(release)
+
+    # -----------------------------------------------------------------
+    # Answer check. The checks, the proofs and the sentences are in
+    # services/acceptance.py; this is where they meet the loaded model.
+    # Everything here runs on the lifecycle worker with both gates held, so
+    # no request is served between a load and its check, and a move to the
+    # CPU cannot race one.
+
+    @staticmethod
+    def _checking_answers() -> bool:
+        """runtime.verify_answers, read live: turning it off takes effect at once."""
+        from potluck_local.services.settings_manager import get_settings
+
+        try:
+            return bool(get_settings().runtime.verify_answers)
+        except Exception:  # noqa: BLE001
+            return True
+
+    def _check_covers_load(self) -> bool:
+        """Whether the answer check applies to what is loaded: one llama.cpp model
+        on this machine. A managed split, a pipeline or whole-model load and a load
+        with rpc_servers are not checked (see services/acceptance.py)."""
+        return (self._pipeline is None and not self._loaded_rpc_servers
+                and not getattr(self._model, "managed_split", False))
+
+    def acceptance_summary(self) -> dict:
+        """The answer-check result for what is loaded, as /health/inference reports it."""
+        if not self.is_loaded():
+            return acceptance.summary()
+        if not self._check_covers_load():
+            return acceptance.summary(model_id=self._model_id)
+        if not self._checking_answers():
+            return acceptance.summary(status=acceptance.SKIPPED, model_id=self._model_id)
+        return dict(self._acceptance) if self._acceptance is not None else acceptance.summary(model_id=self._model_id)
+
+    def answers_verified(self) -> bool | None:
+        """True when the loaded model passed its answer check, False when it did
+        not, was not checked, or the owner turned the check off. None when nothing
+        is loaded, and when the check does not cover this kind of load."""
+        if not self.is_loaded() or not self._check_covers_load():
+            return None
+        return bool(self._acceptance and self._acceptance["status"] == acceptance.PASSED and self._checking_answers())
+
+    async def accept_loaded_async(
+        self, *, expected_model: str | None, expected_sha256: str | None, level: str, force: bool
+    ) -> tuple[dict, int | None]:
+        """Check the loaded model's answers now, or reuse its proof, unless force.
+        Returns the result and the tokens the checks generated. May move the model
+        to the CPU, so it takes the same gates as a load."""
+        if self._model is None:
+            raise RuntimeError("No model loaded")
+        return await self._run_lifecycle(
+            partial(self._accept_loaded, expected_model, expected_sha256, level, force)
+        )
+
+    def _accept_loaded(self, expected_model, expected_sha256, level, force) -> tuple[dict, int | None]:
+        self.assert_model_identity(expected_model, expected_sha256)
+        if self._model is None or getattr(self._model, "managed_split", False):
+            raise RuntimeError("No model loaded")
+        self._check_loaded(level, force=force)
+        return self.acceptance_summary(), self._acceptance_tokens
+
+    def _load_with_check(self, model_path: str, *, verify: bool, **load_kwargs) -> dict:
+        """load_model, then the answer check, as one lifecycle step."""
+        if load_kwargs.get("rpc_servers"):
+            # The weights are spread over other machines: there is no single
+            # device to cross-check, so this load is not verified.
+            result = self.load_model(model_path, **load_kwargs)
+            self._acceptance = acceptance.summary(model_id=self._model_id)
+            return result
+        args = {"model_path": model_path, **load_kwargs}
+        known_bad = self._known_bad_gpu(args) if verify else None
+        result = self.load_model(model_path, **load_kwargs, **({"cpu_only": True} if known_bad else {}))
+        self._load_args = args
+        if not verify:
+            self._acceptance = acceptance.summary(status=acceptance.SKIPPED, model_id=self._model_id)
+            return result
+        try:
+            result = self._check_loaded("quick", force=False, known_bad=known_bad) or result
+        except Exception as exc:  # noqa: BLE001 - a fault in the check must not undo a good load
+            if self._model is None:
+                raise  # a reload inside the check failed and left nothing loaded: the load failed
+            logger.error("answer_check_error model_id=%s error=%s", self._model_id, type(exc).__name__)
+            self._acceptance = acceptance.summary(model_id=self._model_id)
+        return result
+
+    def _check_loaded(self, level: str, *, force: bool, known_bad: dict | None = None) -> dict | None:
+        """Prove the answers of what is loaded, or reuse a proof of them.
+
+        When the checks fail on a load with layers on a GPU, the same model is
+        loaded on the CPU and checked again. Right there and wrong on the GPU
+        means the GPU is the problem and the model stays on the CPU. Wrong on
+        both means the model is the problem, and the planned (faster) load is
+        put back. Returns the result of the last load when this moved the model.
+        """
+        args = self._load_args
+        store = acceptance.get_store()
+        sha = self.current_model_sha256()
+        moved: dict | None = None
+
+        if force and args and (self._acceptance or {}).get("fallback"):
+            # Asking again from a CPU fallback asks the GPU again: the driver may be fixed.
+            moved = self._reload(args)
+            known_bad = None
+
+        key = self._key_now(level, sha)
+        if known_bad is None and not force and key:
+            proof = store.get(key)
+            if proof and proof.get("verdict") == acceptance.OK:
+                self._publish(level, key, proof=proof)
+                return moved
+            if proof and proof.get("verdict") == acceptance.MODEL_FAILED:
+                # Failed on this setup within the last week, on the CPU as well as the GPU
+                # if it had one. The planned load stays as it is.
+                self._publish(level, key, proof=proof, status=acceptance.FAILED, verdict=acceptance.MODEL_FAILED,
+                              message=acceptance.MODEL_FAILED_TEXT)
+                return moved
+            if proof and proof.get("verdict") == acceptance.GPU_WRONG_OUTPUT and self._gpu_offload_active() and args:
+                known_bad = proof  # loaded before this was known: move it now
+
+        gpu_run = None
+        if known_bad is None:
+            run = self._run_checks_now(level)
+            if run.passed:
+                self._store(key, run, acceptance.OK)
+                self._publish(level, key, run=run)
+                return moved
+            if not self._gpu_offload_active() or not args:
+                self._store(key, run, acceptance.MODEL_FAILED)
+                self._publish(level, key, run=run, status=acceptance.FAILED, verdict=acceptance.MODEL_FAILED,
+                              message=acceptance.MODEL_FAILED_TEXT)
+                return moved
+            gpu_run = run
+        gpu_key = known_bad["key"] if known_bad is not None else key
+
+        if not (self._load_report or {}).get("cpu_only"):
+            try:
+                moved = self._reload(args, cpu_only=True)
+            except Exception as exc:  # noqa: BLE001 - e.g. not enough memory for a second copy
+                logger.error("answer_check_cpu_load_failed model_id=%s error=%s", self._model_id, type(exc).__name__)
+                # That attempt freed the first load. Put it back, so the engine says what it has.
+                moved = self._reload(args)
+                shown = gpu_run.api() if gpu_run else [
+                    {k: c[k] for k in ("id", "passed", "required")} for c in (known_bad or {}).get("checks", [])
+                ]
+                self._publish(level, self._key_now(level, sha), checks=shown, status=acceptance.FAILED,
+                              verdict=acceptance.MODEL_FAILED, message=acceptance.MODEL_FAILED_TEXT)
+                return moved
+
+        cpu_key = self._key_now(level, sha)
+        cpu_proof = store.get(cpu_key) if (cpu_key and known_bad is not None and not force) else None
+        if cpu_proof and cpu_proof.get("verdict") == acceptance.OK:
+            self._publish(level, cpu_key, proof=cpu_proof, verdict=acceptance.GPU_WRONG_OUTPUT,
+                          fallback=acceptance.FALLBACK_TO_CPU, message=acceptance.GPU_WRONG_TEXT)
+            return moved
+        cpu_run = self._run_checks_now(level)
+        if cpu_run.passed:
+            if gpu_run is not None:
+                self._store(gpu_key, gpu_run, acceptance.GPU_WRONG_OUTPUT, cross_check={"device": "CPU", "passed": True})
+            self._store(cpu_key, cpu_run, acceptance.OK)
+            self._publish(level, cpu_key, run=cpu_run, verdict=acceptance.GPU_WRONG_OUTPUT,
+                          fallback=acceptance.FALLBACK_TO_CPU, message=acceptance.GPU_WRONG_TEXT)
+            return moved
+
+        # Wrong on the CPU too: the model is the problem, not the GPU. The GPU is
+        # faster, so the planned load goes back.
+        cross_check = {"device": "CPU", "passed": False}
+        self._store(cpu_key, cpu_run, acceptance.MODEL_FAILED)
+        # The GPU key holds the verdict for the load that is put back. When it
+        # held "the GPU is wrong", the CPU now says otherwise and this replaces it.
+        self._store(gpu_key, gpu_run or cpu_run, acceptance.MODEL_FAILED, cross_check=cross_check)
+        moved = self._reload(args)
+        self._publish(level, self._key_now(level, sha), run=gpu_run or cpu_run, status=acceptance.FAILED,
+                      verdict=acceptance.MODEL_FAILED, message=acceptance.MODEL_FAILED_TEXT)
+        return moved
+
+    def _reload(self, args: dict, *, cpu_only: bool = False) -> dict:
+        """Load the same model again with the arguments of the original load."""
+        extra = {"cpu_only": True} if cpu_only else {}
+        result = self.load_model(
+            args["model_path"], n_ctx=args["n_ctx"], n_gpu_layers=args["n_gpu_layers"],
+            n_threads=args["n_threads"], rpc_servers=None, **extra,
+        )
+        self._load_args = args  # the release inside load_model forgot it
+        return result
+
+    def _run_checks_now(self, level: str) -> acceptance.CheckRun:
+        before = self._acceptance
+        self._acceptance = acceptance.summary(
+            status=acceptance.RUNNING, model_id=self._model_id, level=level, ran_on=self._ran_on(None),
+        )
+        try:
+            return acceptance.run_checks(
+                self._model, level, n_ctx=self._loaded_n_ctx, on_cpu=not self._gpu_offload_active(),
+            )
+        except BaseException:
+            self._acceptance = before  # "running" must not outlive the checks
+            raise
+
+    @staticmethod
+    def _store(key: dict | None, run: acceptance.CheckRun, verdict: str, **extra) -> None:
+        if key is not None:
+            acceptance.get_store().put(key, {
+                "verdict": verdict, "level": run.level, "duration_ms": run.duration_ms,
+                "output_tokens": run.output_tokens, "checks": run.records(), **extra,
+            })
+
+    def _publish(
+        self, level: str, key: dict | None, *, run: acceptance.CheckRun | None = None, proof: dict | None = None,
+        checks: list[dict] | None = None, status: str = acceptance.PASSED, verdict: str = acceptance.OK,
+        fallback: dict | None = None, message: str | None = None,
+    ) -> None:
+        tokens = None
+        if run is not None:
+            checks, checked_at, tokens = run.api(), acceptance.iso(), run.output_tokens
+        elif proof is not None:
+            checks = [{k: c[k] for k in ("id", "passed", "required")} for c in proof.get("checks", [])]
+            checked_at, tokens = proof.get("checked_at"), proof.get("output_tokens")
+        else:
+            checked_at = acceptance.iso()
+        self._acceptance_tokens = tokens
+        self._acceptance = acceptance.summary(
+            status=status, model_id=self._model_id, level=level, checked_at=checked_at,
+            from_proof=run is None and proof is not None, ran_on=self._ran_on(key), checks=checks,
+            verdict=verdict, fallback=fallback, message=message,
+        )
+        logger.info(
+            "answer_check status=%s verdict=%s level=%s from_proof=%s fallback=%s checks_passed=%d/%d model_id=%s",
+            status, verdict, level, proof is not None and run is None, fallback is not None,
+            sum(1 for c in checks or [] if c["passed"]), len(checks or []), self._model_id,
+        )
+
+    def _ran_on(self, key: dict | None) -> dict:
+        summary = self.inference_summary() or {}
+        return {
+            "device_kind": summary.get("device_kind", "unknown"),
+            "backend": summary.get("backend", "unknown"),
+            "device_name": summary.get("device_name", "unknown"),
+            "driver": (key or {}).get("driver"),
+        }
+
+    def _key_now(self, level: str, sha: str | None) -> dict | None:
+        """The proof key of what is loaded right now. None when the file's hash is unknown."""
+        if not sha or not self._model_path:
+            return None
+        report = self._load_report or {}
+        return self._key_for(
+            sha, self._model_path, report.get("used_n_gpu_layers", 0), cpu_only=bool(report.get("cpu_only")),
+            level=level, device=report.get("offload_device"),
+        )
+
+    @staticmethod
+    def _key_for(sha: str, model_path: str, n_gpu_layers: int, *, cpu_only: bool, level: str,
+                 device: dict | None = None) -> dict:
+        from potluck_local.services import llama_backend
+        from potluck_local.services.driver_fingerprint import driver_fingerprint
+
+        selection = llama_backend.current_selection()
+        if n_gpu_layers == 0:
+            kind, name = "cpu", "CPU"
+        else:
+            kind = "gpu" if n_gpu_layers < 0 else "mixed"
+            if device is None:
+                chosen = llama_backend.offload_device(llama_backend.describe_devices() or selection.devices)
+                device = chosen[1] if chosen else {}
+            name = device.get("description") or device.get("name") or "unknown"
+        return acceptance.build_key(
+            sha256=sha, backend=selection.backend, device=name, device_kind=kind, n_gpu_layers=n_gpu_layers,
+            total_layers=llama_backend.read_gguf_layer_count(model_path), cpu_only=cpu_only,
+            driver=driver_fingerprint(None if kind == "cpu" else name),
+            library=llama_backend.library_signature(), level=level,
+        )
+
+    def _known_bad_gpu(self, args: dict) -> dict | None:
+        """A stored proof that the GPU this load is about to use gives wrong
+        answers, so the load can start on the CPU instead of waiting on a GPU
+        known to be wrong. A machine with no such proof pays for one file read."""
+        store = acceptance.get_store()
+        try:
+            if not store.holds_gpu_wrong_output():
+                return None
+            from potluck_local.services import llama_backend
+
+            path = args["model_path"]
+            # Mirrors the plan load_model is about to make with the same inputs.
+            selection = llama_backend.current_selection()
+            layers = args["n_gpu_layers"]
+            if selection.backend == "cpu":
+                layers = 0
+            elif selection.probed:
+                layers = llama_backend.plan_gpu_layers(
+                    path, requested=layers, n_ctx=args["n_ctx"], devices=llama_backend.describe_devices(),
+                ).n_gpu_layers
+            if layers == 0:
+                return None
+            sha = (self.current_model_sha256() if self._model_path == path else None) or artifact_identity(Path(path))[0]
+            proof = store.get(self._key_for(sha, path, layers, cpu_only=False, level="quick"))
+            return proof if proof and proof.get("verdict") == acceptance.GPU_WRONG_OUTPUT else None
+        except Exception as exc:  # noqa: BLE001 - the lookup only saves time
+            logger.debug("answer_check_lookup_failed error=%s", type(exc).__name__)
+            return None
 
     async def _run_lifecycle(self, operation):
         async with self._admission_lock, self._inference_lock:
@@ -773,6 +1110,9 @@ class LLMRuntime:
         """Inner release — must be called while _load_lock is held."""
         self._artifact = None
         self._verified_artifact = None
+        self._acceptance = None
+        self._acceptance_tokens = None
+        self._load_args = None
         if self._model is not None:
             import gc
 

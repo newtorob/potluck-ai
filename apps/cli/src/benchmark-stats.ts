@@ -77,12 +77,83 @@ export interface Placement {
   layersOnGpu: number | null; totalLayers: number | null; contextTokens: number | null; verified: boolean;
 }
 export interface LastBenchmark { model: string | null; tokensPerSecond: number | null; firstTokenMs: number | null; promptTokensPerSecond: number | null }
+
+/** The engine's check of the model's answers (the `acceptance` object of GET /health/inference and POST /models/{id}/test). `message` is the engine's own sentence for this machine's user. */
+export interface Acceptance {
+  status: "passed" | "failed" | "running" | "not_run" | "skipped";
+  modelId: string | null; level: "quick" | "full" | null;
+  /** ISO 8601 UTC, normalised. */
+  checkedAt: string | null;
+  /** A stored result was reused; nothing ran now. */
+  fromProof: boolean;
+  ranOn: { deviceKind: Placement["kind"]; backend: string | null; deviceName: string | null; driver: string | null } | null;
+  checks: Array<{ id: string; passed: boolean; required: boolean }>;
+  verdict: "ok" | "gpu_wrong_output" | "model_failed" | null;
+  fallback: { from: string | null; to: string | null; reason: string | null } | null;
+  message: string | null;
+}
+const oneOf = <T extends string>(v: unknown, allowed: readonly T[]): T | null => allowed.includes(v as T) ? v as T : null;
+/** Null for an engine that sends no `acceptance` (an older engine) or one this client cannot read; callers then show nothing. */
+export function parseAcceptance(value: unknown): Acceptance | null {
+  const a = obj(value);
+  const status = oneOf(a.status, ["passed", "failed", "running", "not_run", "skipped"] as const);
+  if (!status) return null;
+  const time = typeof a.checked_at === "string" ? Date.parse(a.checked_at) : NaN;
+  const r = obj(a.ran_on), f = obj(a.fallback);
+  return { status, modelId: label(a.model_id, 200), level: oneOf(a.level, ["quick", "full"] as const),
+    checkedAt: Number.isFinite(time) ? new Date(time).toISOString() : null, fromProof: a.from_proof === true,
+    ranOn: Object.keys(r).length === 0 ? null : { deviceKind: oneOf(r.device_kind, ["gpu", "cpu", "mixed"] as const) ?? "unknown",
+      backend: backendName(label(r.backend, 24)), deviceName: label(r.device_name), driver: label(r.driver) },
+    checks: (Array.isArray(a.checks) ? a.checks.slice(0, 32) : []).flatMap(c => { const id = label(obj(c).id, 60); return id ? [{ id, passed: obj(c).passed === true, required: obj(c).required === true }] : []; }),
+    verdict: oneOf(a.verdict, ["ok", "gpu_wrong_output", "model_failed"] as const),
+    fallback: Object.keys(f).length === 0 ? null : { from: label(f.from, 24), to: label(f.to, 24), reason: label(f.reason, 40) },
+    message: label(a.message, 300) };
+}
+/** An acceptance result belongs to the model it checked. One for another model (the load changed meanwhile) says nothing about this one. */
+export const acceptanceFor = (a: Acceptance | null, model: string | null): Acceptance | null => a && a.modelId && model && a.modelId !== model ? null : a;
+const day = (a: Acceptance) => a.checkedAt?.slice(0, 10) ?? null;
+/** Where the check ran, for example "the GPU (CUDA)". Null when the engine does not say. */
+export function describeRanOn(r: Acceptance["ranOn"], withDevice = false): string | null {
+  if (!r) return null;
+  const where = { gpu: "the GPU", cpu: "the CPU", mixed: "the GPU and CPU", unknown: "a device that could not be confirmed" }[r.deviceKind];
+  const backend = r.backend && !(r.deviceKind === "cpu" && /^cpu$/i.test(r.backend)) ? ` (${r.backend})` : "";
+  const device = withDevice && r.deviceName && !(r.deviceKind === "cpu" && /^cpu$/i.test(r.deviceName)) ? `, ${r.deviceName}` : "";
+  return `${where}${backend}${device}`;
+}
+/**
+ * The one line `benchmark` and `status` show. A fallback or a failure is the engine's own sentence, unchanged.
+ * Null when there is nothing to say: no result, an older engine, or no check made on this load yet.
+ */
+export function acceptanceLine(a: Acceptance | null): string | null {
+  if (!a) return null;
+  const head = "Answers checked on this setup:";
+  if (a.fallback) return a.message ?? `${head} moved from the GPU to the CPU`;
+  if (a.status === "failed") return a.message ?? `${head} failed`;
+  if (a.status === "passed") return `${head} passed${day(a) ? `, ${day(a)}` : ""}${a.fromProof ? " (reused from an earlier check)" : ""}`;
+  if (a.status === "running") return `${head} still running`;
+  if (a.status === "skipped") return `${head} no, the check is turned off`;
+  return null;
+}
+
+/** The line `setup` prints after its test reply: that the answers were checked and where, or the engine's sentence after a fallback or a failure. */
+export function setupAcceptanceLine(a: Acceptance | null): string | null {
+  if (!a) return null;
+  if (a.fallback || a.status === "failed") return acceptanceLine(a);
+  const where = describeRanOn(a.ranOn);
+  if (a.status === "passed") return `Answers checked: passed${where ? ` on ${where}` : ""}${a.fromProof ? `, reused from an earlier check${day(a) ? ` on ${day(a)}` : ""}` : ""}.`;
+  if (a.status === "running") return "Answers check: still running.";
+  if (a.status === "skipped") return "Answers were not checked: the check is turned off.";
+  return null;
+}
+
 export interface InferenceInfo {
   /** Null when the engine reports nothing loaded the usual way (no model, a split or pipeline model, or an engine without the route). */
   placement: Placement | null; gpuDevices: string[]; lastBenchmark: LastBenchmark | null; reported: boolean;
+  /** Null for an engine without the answer check. */
+  acceptance: Acceptance | null;
 }
 export function parseInference(value: Record<string, unknown> | null): InferenceInfo {
-  if (!value) return { placement: null, gpuDevices: [], lastBenchmark: null, reported: false };
+  if (!value) return { placement: null, gpuDevices: [], lastBenchmark: null, reported: false, acceptance: null };
   const loaded = obj(value.loaded), summary = obj(loaded.summary);
   const kind = ["gpu", "cpu", "mixed"].includes(String(summary.device_kind)) ? summary.device_kind as Placement["kind"] : "unknown";
   const placement: Placement | null = Object.keys(loaded).length === 0 ? null : {
@@ -95,7 +166,7 @@ export function parseInference(value: Record<string, unknown> | null): Inference
   const b = obj(value.benchmark);
   const last = Object.keys(b).length === 0 ? null : { model: label(b.model_id, 200), tokensPerSecond: roundOrNull(num(b.tokens_per_sec)),
     firstTokenMs: roundOrNull(num(b.ttft_ms)), promptTokensPerSecond: roundOrNull(num(b.prompt_tokens_per_sec)) };
-  return { placement, gpuDevices, lastBenchmark: last, reported: true };
+  return { placement, gpuDevices, lastBenchmark: last, reported: true, acceptance: parseAcceptance(value.acceptance) };
 }
 
 export interface Machine {
@@ -132,9 +203,9 @@ export function describeLoaded(model: string | null, p: Placement | null): strin
   return `Loaded: ${model} (where it runs could not be confirmed)${context}`;
 }
 
-/** One line when the model is on the CPU, or only partly on the GPU, although the engine lists a GPU. */
-export function gpuNote(p: Placement | null, gpuDevices: string[]): string | null {
-  if (!p || !gpuDevices.length) return null;
+/** One line when the model is on the CPU, or only partly on the GPU, although the engine lists a GPU. After a fallback the engine's own sentence says why, so this stays quiet. */
+export function gpuNote(p: Placement | null, gpuDevices: string[], acceptance: Acceptance | null = null): string | null {
+  if (!p || !gpuDevices.length || acceptance?.fallback) return null;
   if (p.kind === "cpu") return `Note: this model runs on the CPU although the engine lists a GPU (${gpuDevices[0]}). The speeds below are CPU speeds.`;
   if (p.kind === "mixed") return `Note: only ${p.layersOnGpu ?? "some"} of ${p.totalLayers ?? "all"} layers are on the GPU (${gpuDevices[0]}); the rest run on the CPU.`;
   return null;

@@ -38,6 +38,16 @@ def _no_real_mesh_sidecar(monkeypatch, tmp_path_factory):
     circle_link.reset()
 
 
+@pytest.fixture()
+def answer_check_off():
+    """runtime.verify_answers = false, in this test's data directory."""
+    from potluck_local.services.settings_manager import get_settings, save_settings
+
+    settings = get_settings().model_copy(deep=True)
+    settings.runtime.verify_answers = False
+    save_settings(settings)
+
+
 class FakeMesh:
     """Stands in for this machine's mesh sidecar (`/status`, `/peers` and, for
     direct circle links, `/circle-peers`)."""

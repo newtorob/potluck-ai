@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { StatusBar } from '@/components/layout/StatusBar';
 import { SidecarReconnectingBanner } from '@/components/layout/SidecarReconnectingBanner';
 import { UpdateBanner } from '@/components/layout/UpdateBanner';
+import { AnswerCheckBanner } from '@/components/layout/AnswerCheckBanner';
 import { UpdateRequiredGate } from '@/components/layout/UpdateRequiredGate';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { ChatView } from '@/views/ChatView';
@@ -246,6 +247,9 @@ export default function App() {
 
       {/* Thin strip driving the auto-update download/restart flow */}
       <UpdateBanner />
+
+      {/* Thin strip shown when the answer check moved the model to the CPU or the model failed it */}
+      <AnswerCheckBanner />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <AuthGate>

@@ -55,6 +55,10 @@ class Runtime:
         self.closed = 0
         self.gate = None  # an asyncio.Event the stream waits on after its first word
         self.forever = False
+        self.verified = True  # the answer check (services/acceptance.py)
+
+    def answers_verified(self):
+        return self.verified if self.model is not None else None
 
     def is_loaded(self) -> bool:
         return self.model is not None

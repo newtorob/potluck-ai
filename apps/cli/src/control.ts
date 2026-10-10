@@ -6,7 +6,8 @@ import { join } from "node:path";
 
 export type FailureCode = "unreachable" | "permission_denied" | "unauthorized" | "timeout" | "invalid_response" | "http_error";
 export class ControlError extends Error {
-  constructor(readonly code: FailureCode, message: string, readonly status?: number) { super(message); }
+  /** `detail`: the engine's own sentence, kept only when the caller asked for it (`detailFor`). Raw: callers strip and bound it before showing it. */
+  constructor(readonly code: FailureCode, message: string, readonly status?: number, readonly detail?: string) { super(message); }
 }
 
 export function meshSocketPath(platform = process.platform, env = process.env): string {
@@ -41,6 +42,8 @@ export function requestJSON<T = Record<string, unknown>>(options: {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown;
   allowArray?: boolean; allowEmpty?: boolean; signal?: AbortSignal;
   errorHints?: Readonly<Record<string, string>>;
+  /** Statuses whose JSON `detail` string is kept on the error. For routes where the engine's detail is a plain sentence for this machine's own user. */
+  detailFor?: readonly number[];
 }): Promise<T> {
   return new Promise((resolve, reject) => {
     let url: URL;
@@ -73,15 +76,33 @@ export function requestJSON<T = Record<string, unknown>>(options: {
       let size = 0;
       // No redirect following: a redirect must never forward a local credential.
       if (status < 200 || status >= 300) {
-        clearTimeout(timer); res.resume();
         // Display only caller-supplied hints for a recognized code. Never echo
         // arbitrary response bodies/headers that could contain credentials.
         const code = res.headers["x-potluck-error"];
         const hint = typeof code === "string" && Object.hasOwn(options.errorHints ?? {}, code)
           ? options.errorHints![code] : undefined;
-        reject(new ControlError(status === 401 || status === 403 ? "unauthorized" : "http_error",
-          hint ?? `Service returned HTTP ${status}.`, status));
-        req.destroy(); return;
+        let settled = false;
+        const fail = (detail?: string) => {
+          if (settled) return;
+          settled = true; clearTimeout(timer);
+          reject(new ControlError(status === 401 || status === 403 ? "unauthorized" : "http_error",
+            hint ?? `Service returned HTTP ${status}.`, status, detail));
+          req.destroy();
+        };
+        if (!options.detailFor?.includes(status)) { res.resume(); fail(); return; }
+        // Only the `detail` string of a small JSON body is kept; the request timeout still applies while it is read.
+        const body: Buffer[] = [];
+        let seen = 0;
+        res.on("data", (part: Buffer) => { seen += part.length; if (seen > 16384) fail(); else body.push(part); });
+        res.once("error", () => fail());
+        res.once("end", () => {
+          try {
+            const value: unknown = JSON.parse(Buffer.concat(body).toString("utf8"));
+            const detail = value && typeof value === "object" ? (value as { detail?: unknown }).detail : undefined;
+            fail(typeof detail === "string" ? detail.slice(0, 1000) : undefined);
+          } catch { fail(); }
+        });
+        return;
       }
       res.on("data", (part: Buffer) => {
         size += part.length;

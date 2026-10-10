@@ -57,6 +57,10 @@ class FakeRuntime:
         ]
         self.bench = bench or {}
         self.calls: list[dict] = []
+        self.verified = True  # the answer check (services/acceptance.py)
+
+    def answers_verified(self):
+        return self.verified if self.model_id is not None else None
 
     def is_loaded(self):
         return self.model_id is not None

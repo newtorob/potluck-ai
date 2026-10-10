@@ -278,7 +278,9 @@ interface StreamFailure {
 
 /** Fixed copy per error category, from the coordinator or from the local
  *  engine's /chat/circle route (the model_mismatch to coordinator_unreachable
- *  rows). inference_error has no row on purpose: the generic line is right.
+ *  rows), plus model_not_verified, which a machine answers with when its loaded
+ *  model has not passed the engine's answer check. inference_error has no row
+ *  on purpose: the generic line is right.
  *
  *  A Map, not an object literal: the category is attacker-influenced, and an
  *  object lookup for "__proto__", "constructor" or "toString" returns an
@@ -299,6 +301,7 @@ const CONTRIBUTOR_ERROR_COPY = new Map<string, string>([
   ['stream_timeout', 'The contributor stopped answering.'],
   ['peer_unreachable', 'The connection to the contributor failed.'],
   ['coordinator_unreachable', 'Could not reach the Potluck coordinator.'],
+  ['model_not_verified', 'The contributor has not verified this model on its machine.'],
 ]);
 
 const UNKNOWN_CONTRIBUTOR_ERROR = 'The contributor could not finish this reply.';

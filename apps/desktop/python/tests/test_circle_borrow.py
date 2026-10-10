@@ -467,11 +467,13 @@ FIRST_LENDER_FAILS = {
     "busy": lambda r, l: lender_error(429, "busy", "busy", **{"Retry-After": "2"}),
     "not_sharing": lambda r, l: lender_error(503, "not_sharing"),
     "no_model": lambda r, l: lender_error(503, "no_model"),
+    "model_not_verified": lambda r, l: lender_error(503, "model_not_verified", "The serving machine has not verified this model."),
     "invalid": lambda r, l: lender_error(422, "invalid_request"),
     "server_error": lambda r, l: httpx.Response(500, text="oops"),
     "refused": lambda r, l: (_ for _ in ()).throw(httpx.ConnectError("refused")),
     "connect_timeout": lambda r, l: (_ for _ in ()).throw(httpx.ConnectTimeout("slow")),
     "error_event": lambda r, l: stream_response(error_event("model_mismatch", "Model changed"), DONE),
+    "unverified_event": lambda r, l: stream_response(error_event("model_not_verified", "anything"), DONE),
     "role_then_error": lambda r, l: stream_response(
         sse({"choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}]}),
         error_event(), DONE),

@@ -38,6 +38,9 @@ export interface CliArgs {
   /** benchmark: leave a model it switched to loaded / switch back to the one loaded before. */
   keep?: boolean;
   restore?: boolean;
+  /** models test: the longer answer check / run it now even if a stored result exists. */
+  full?: boolean;
+  force?: boolean;
   withModel?: boolean;
   message?: string;
   jobs?: number;
@@ -91,6 +94,8 @@ export function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--once") out.once = true;
     else if (arg === "--keep") out.keep = true;
     else if (arg === "--restore") out.restore = true;
+    else if (arg === "--full") out.full = true;
+    else if (arg === "--force") out.force = true;
     else if (flag === "--runs") {
       const v = value();
       if (!/^\d+$/.test(v) || Number(v) < 1 || Number(v) > 10) throw new UsageError("--runs must be an integer from 1 to 10.");
@@ -219,10 +224,10 @@ export function parseArgs(argv: string[]): CliArgs {
       if (positional.length > 2 || !["install", "uninstall", "start", "stop", "restart", "status"].includes(out.action)) throw new UsageError("Use potluck service install|uninstall|start|stop|restart|status.");
     } else if (out.command === "models") {
       out.action = positional[1] || "list";
-      if (!["list", "available", "install", "load", "unload", "progress", "cancel", "autoload", "pin", "lock", "sync", "unpin"].includes(out.action)) throw new UsageError("Unknown model action. Run potluck models --help.");
+      if (!["list", "available", "install", "load", "unload", "progress", "cancel", "autoload", "pin", "lock", "sync", "unpin", "test"].includes(out.action)) throw new UsageError("Unknown model action. Run potluck models --help.");
       out.target = positional[2];
       if (positional.length > 3 || (["list", "available", "lock", "sync", "unpin"].includes(out.action) && out.target)
-          || (!["list", "available", "autoload", "lock", "sync", "unpin"].includes(out.action) && !out.target && !out.help)) throw new UsageError("Use potluck models <action> <model-id>.");
+          || (!["list", "available", "autoload", "lock", "sync", "unpin", "test"].includes(out.action) && !out.target && !out.help)) throw new UsageError("Use potluck models <action> <model-id>.");
       if (out.action === "autoload" && out.target && !["on", "off"].includes(out.target)) throw new UsageError("Use potluck models autoload [on|off].");
       if (out.target && (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(out.target) || out.target.length > 200)) throw new UsageError("Use a model ID from potluck models list.");
     } else if (out.command === "gateway") {
@@ -270,10 +275,14 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.command === "run" && !seen.has("--timeout")) out.timeout = 120000;
   // A benchmark waits on model loads and 64-token generations, which a slow CPU can stretch past 30 s.
   if (out.command === "benchmark" && !seen.has("--timeout")) out.timeout = 120000;
-  if (out.command !== "run" && out.command !== "benchmark" && out.timeout > 30000) throw new UsageError("--timeout must be an integer from 1 to 30000 for this command.");
+  // The answer check generates text, which a slow CPU can stretch past 30 s.
+  const modelTest = out.command === "models" && out.action === "test";
+  if (modelTest && !seen.has("--timeout")) out.timeout = 120000;
+  if (out.command !== "run" && out.command !== "benchmark" && !modelTest && out.timeout > 30000) throw new UsageError("--timeout must be an integer from 1 to 30000 for this command.");
   if (out.command === "launch" && out.json) throw new UsageError("launch runs an external tool; JSON output is not supported.");
   if (out.command === "serve" && (out.json || seen.has("--timeout"))) throw new UsageError("serve runs in the foreground; use service status --json for reports.");
-  if (out.command === "models" && !seen.has("--timeout")) out.timeout = 30000;
+  if (out.command === "models" && !modelTest && !seen.has("--timeout")) out.timeout = 30000;
+  if ((out.full || out.force) && !modelTest) throw new UsageError("--full and --force require models test.");
   if (["setup", "login", "logout", "household", "connect", "disconnect", "circle"].includes(out.command || "") && !seen.has("--timeout")) out.timeout = 30000;
   if (out.command && out.version) throw new UsageError("--version must be used without a command.");
   if (out.command === "logs" && seen.has("--timeout")) throw new UsageError("--timeout applies to status, doctor, up, and down.");

@@ -5,7 +5,8 @@
  * Polls every 30 seconds and refetches on window focus.
  *
  * Clicking an unloaded model triggers POST /models/{slug}/load with a spinner.
- * Shows a green dot when a model is loaded, grey otherwise.
+ * Shows a green dot when a model is loaded, grey otherwise. A quiet "On CPU"
+ * follows the name when the engine's answer check moved the model off the GPU.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -13,6 +14,8 @@ import { ChevronDown, Circle, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/components/ui/cn';
 import { localApi } from '@/lib/localApi';
+import { movedToCpu } from '@/lib/acceptance';
+import { useAcceptanceStore } from '@/stores/acceptanceStore';
 import type { Model } from '@/types/models';
 
 // ---------------------------------------------------------------------------
@@ -32,6 +35,8 @@ export function ModelSelector({ disabled = false }: ModelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [fetchError, setFetchError] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const acceptance = useAcceptanceStore((s) => s.acceptance);
+  const onCpu = movedToCpu(acceptance, loadedSlug);
 
   const fetchModels = useCallback(async () => {
     try {
@@ -93,6 +98,7 @@ export function ModelSelector({ disabled = false }: ModelSelectorProps) {
     try {
       await localApi.loadModel(slug);
       setLoadedSlug(slug);
+      void useAcceptanceStore.getState().refresh();
     } catch {
       // silently fall through; model stays at prior state
     } finally {
@@ -132,6 +138,14 @@ export function ModelSelector({ disabled = false }: ModelSelectorProps) {
           />
         )}
         <span className="max-w-[160px] truncate">{buttonLabel}</span>
+        {onCpu && !isLoadingModel && (
+          <span
+            className="shrink-0 text-xs font-normal text-muted-foreground"
+            {...(acceptance.message !== null ? { title: acceptance.message } : {})}
+          >
+            On CPU
+          </span>
+        )}
         <ChevronDown
           className={cn('h-3.5 w-3.5 text-muted-foreground transition-transform', isOpen && 'rotate-180')}
           aria-hidden="true"

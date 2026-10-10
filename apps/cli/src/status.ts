@@ -3,6 +3,7 @@ import type { CliArgs } from "./args.js";
 import { diagnose, formatDiagnostics, type DiagnosticReport } from "./diagnostics.js";
 import { runtimeRequest } from "./runtime.js";
 import { plainText } from "./logs.js";
+import { acceptanceFor, acceptanceLine, parseInference } from "./benchmark-stats.js";
 
 export interface PerformanceReport {
   sampledAt: string;
@@ -31,13 +32,20 @@ export async function statusSnapshot(args: CliArgs, signal?: AbortSignal): Promi
   const report = await diagnose({ ...args, signal });
   try { report.performance = sanitizePerformance(await runtimeRequest(`/usage/performance?household=${report.scope === "mine"}`, { timeout: args.timeout, signal })); }
   catch { report.performance = null; }
+  // An engine without this route or without the answer check reports nothing here; that is not an error.
+  try { report.acceptance = acceptanceFor(parseInference(await runtimeRequest("/health/inference", { timeout: args.timeout, signal })).acceptance, report.runtime.model); }
+  catch { report.acceptance = null; }
   return report;
 }
 export function formatStatus(report: DiagnosticReport): string {
-  const lines = [formatDiagnostics(report, false)], p = report.performance;
-  if (!p) { lines.push("Performance metrics unavailable; a compatible local runtime is required."); return lines.join("\n"); }
+  const lines = [formatDiagnostics(report, false)], p = report.performance, answers = acceptanceLine(report.acceptance ?? null);
+  if (!p) {
+    if (answers) lines.push(answers);
+    lines.push("Performance metrics unavailable; a compatible local runtime is required."); return lines.join("\n");
+  }
   const n = (v: number | null, unit: string) => v === null ? "unavailable" : `${Number(v.toFixed(1))}${unit}`;
   lines.push(`Local runtime: ${p.local.busy ? "busy" : "idle"}; context ${p.local.contextTokens ?? "unknown"}; free RAM ${n(p.local.memoryAvailableGiB, " GiB")}.`);
+  if (answers) lines.push(answers);
   lines.push(`Last benchmark: ${n(p.local.benchmarkTokensPerSecond, " tok/s")}; first token ${n(p.local.benchmarkTtftMs, " ms")}.`);
   if (p.usage) lines.push(`Recorded last 24h: ${p.usage.requests ?? "unknown"} requests; average first token ${n(p.usage.avgTtftMs, " ms")}; average duration ${n(p.usage.avgDurationMs, " ms")}.`);
   if (p.household) {

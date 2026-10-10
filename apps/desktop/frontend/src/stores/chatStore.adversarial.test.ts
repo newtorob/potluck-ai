@@ -327,6 +327,7 @@ describe('engine circle categories', () => {
       ['stream_timeout', 'The contributor stopped answering.'],
       ['peer_unreachable', 'The connection to the contributor failed.'],
       ['coordinator_unreachable', 'Could not reach the Potluck coordinator.'],
+      ['model_not_verified', 'The contributor has not verified this model on its machine.'],
     ])('says its own sentence for %s and never the engine message', async (category, sentence) => {
       const text = await send(scope, { category, message: ENGINE_TEXT });
       expect(text).toBe(sentence);

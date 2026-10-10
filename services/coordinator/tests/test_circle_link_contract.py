@@ -398,7 +398,7 @@ def test_engine_listener_shapes() -> None:
 
     assert {c: e["status"] for c, e in ENGINE["errors"].items()} == {
         "bad_token": 401, "not_a_circle_peer": 403, "model_mismatch": 409, "busy": 429,
-        "not_sharing": 503, "no_model": 503,
+        "not_sharing": 503, "no_model": 503, "model_not_verified": 503,
     }
     for code, entry in ENGINE["errors"].items():
         assert set(entry) == {"status", "headers", "body"}

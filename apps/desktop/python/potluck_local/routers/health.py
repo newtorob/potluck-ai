@@ -101,6 +101,9 @@ async def inference_diagnostics() -> dict[str, object]:
         # Last measured speed for this model, from POST /models/{slug}/benchmark.
         # Null until one has been run: nothing here is estimated.
         "benchmark": benchmark,
+        # Whether the loaded model gave right answers on this machine, and what
+        # the engine did about it (services/acceptance.py).
+        "acceptance": runtime.acceptance_summary(),
     }
 
 

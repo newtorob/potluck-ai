@@ -17,6 +17,15 @@ const GIB = 1024 ** 3;
 export const token = "a".repeat(64);
 export const gatewayKey = "sk-potluck-engine-gateway-key";
 
+/** The `acceptance` object of the engine's answer check, as the contract spells it. */
+export const acceptanceFixture = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+  schema_version: 1, status: "passed", model_id: "big", level: "quick", checked_at: "2026-10-09T14:32:05Z", from_proof: false,
+  ran_on: { device_kind: "gpu", backend: "cuda", device_name: "NVIDIA GeForce RTX 2080 Ti", driver: "560.35" },
+  checks: [{ id: "arithmetic", passed: true, required: true }, { id: "echo", passed: true, required: false }],
+  verdict: "ok", fallback: null, message: null, ...over });
+export const FALLBACK_MESSAGE = "The GPU gave wrong answers for this model, so it is running on the CPU, which is slower. Updating the graphics driver usually fixes this.";
+export const FAILED_MESSAGE = "This model did not pass its answer check on this machine. You can still use it yourself. It is not offered to other people.";
+
 export class FakeEngine {
   dir = ""; url = ""; server!: Server;
   instanceId = "00000000-0000-0000-0000-000000000042";
@@ -45,6 +54,10 @@ export class FakeEngine {
   /** A failed load that already released the model that was loaded. */
   releaseOnFailedLoad = false;
   inferenceRoute = true;
+  /** The `acceptance` object GET /health/inference and a passing POST /models/{id}/test carry. Null leaves the key out, as an older engine does. */
+  acceptance: Record<string, unknown> | null = null;
+  /** Answer POST /models/{id}/test with this status and body instead of a pass. */
+  testRefusal: { status: number; body: unknown } | null = null;
   /** Answer GET /models/setup-options with an error, as an engine that has gone away would. */
   setupFails = false;
   placement: (model: string) => Record<string, unknown> | null = model => ({
@@ -96,6 +109,7 @@ export class FakeEngine {
     const call: Call = { method: req.method ?? "GET", path, body: raw ? JSON.parse(raw) : undefined, headers: req.headers };
     this.calls.push(call);
     if (path.startsWith("/v1/")) return this.v1(call, res);
+    if (path === "/health") return this.json(res, { status: "ok", version: "0.1.0", active_model_id: this.loaded });
     if (req.headers.authorization !== `Bearer ${token}`) return this.json(res, { detail: "secret traceback from the engine" }, 401);
     if (path === "/control") return this.json(res, { schemaVersion: 1, instanceId: this.instanceId, pid: process.pid, owner: "cli", url: this.url });
     if (path === "/settings") return this.json(res, { gateway: this.gateway, runtime: {}, ui: {} });
@@ -105,7 +119,14 @@ export class FakeEngine {
       if (!this.inferenceRoute) return this.json(res, { detail: "not found" }, 404);
       const bench = this.loaded ? this.lastBenchmarks.get(this.loaded) ?? null : null;
       return this.json(res, { build: { backend: "metal", lib_dir: "/private/secret/lib" }, devices: this.devices,
-        loaded: this.loaded ? this.placement(this.loaded) : null, benchmark: bench });
+        loaded: this.loaded ? this.placement(this.loaded) : null, benchmark: bench, ...(this.acceptance ? { acceptance: this.acceptance } : {}) });
+    }
+    const test = /^\/models\/([^/]+)\/test$/.exec(path);
+    if (test && call.method === "POST") {
+      const id = decodeURIComponent(test[1]);
+      if (this.testRefusal) return this.json(res, this.testRefusal.body, this.testRefusal.status);
+      if (this.loaded !== id) return this.json(res, { detail: "Requested model is no longer loaded. Load the requested model and retry." }, 409);
+      return this.json(res, { schemaVersion: 1, status: "passed", model: id, durationMs: 25, outputTokens: 8, scope: "local", ...(this.acceptance ? { acceptance: this.acceptance } : {}) });
     }
     if (path === "/models/benchmark") {
       if (!this.loaded) return this.json(res, { detail: "No model loaded to benchmark." }, 503);
