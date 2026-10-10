@@ -1,0 +1,30 @@
+========================================================================
+Potluck AI — Inference Benchmark Results
+========================================================================
+  Hardware:     AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD  63.9 GB RAM
+  OS:           Windows 10 (10.0.26300)  (AMD64)
+  GPU/Accel:    Vulkan — AMD Radeon RX 6600 XT  0 GB VRAM — n_gpu_layers=-1
+  llama-cpp-python: 0.3.35
+  Prompt suite: inference_v1
+  Runs/cell:    3
+  Date:         20261010T193909Z
+
+RESULTS TABLE
+------------------------------------------------------------------------------------
+Model                                       GenTok/s  WallTok/s   PETok/s   TTFT(ms)  PeakRSS(MB)
+------------------------------------------------------------------------------------
+  qwen3-8b-q4                                   43.6       43.0     540.4        546         5194
+------------------------------------------------------------------------------------
+
+Columns:
+  GenTok/s  — generation tokens per second from llama.cpp's own counters (the headline number)
+  WallTok/s — the same answer against the wall clock, including sampling and Python time
+  PETok/s   — prompt eval tokens per second (context ingestion speed)
+  TTFT(ms)  — time to first token in milliseconds
+  PeakRSS   — peak resident set size in MB (approximate; sampled at 100ms)
+
+All values are medians across 3 runs per (model x prompt) cell.
+Rates are timed on the second pass alone. Results written before 2026-10-10 divided one
+answer's tokens by the time of both passes and understate generation by about half.
+Per-prompt detail: bench/results/<timestamp>/inference_results.json
+========================================================================

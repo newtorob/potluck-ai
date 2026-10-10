@@ -274,10 +274,17 @@ def run_model(
                 "ttft_s": round(m.ttft_s, 3),
                 "prompt_eval_time_s": round(m.prompt_eval_time_s, 3),
                 "generation_time_s": round(m.generation_time_s, 3),
+                "pass2_wall_s": round(m.pass2_wall_s, 3),
+                "timing_source": m.timing_source,
                 "prompt_tokens": m.prompt_tokens,
                 "output_tokens": m.output_tokens,
                 "prompt_eval_toks_per_s": round(m.prompt_eval_toks_per_s, 1),
                 "gen_toks_per_s": round(m.gen_toks_per_s, 1),
+                # The same answer against the wall clock of the second pass
+                # after prompt evaluation: includes sampling and Python time.
+                "gen_toks_per_s_wall": round(
+                    m.output_tokens / max(0.001, m.pass2_wall_s - m.prompt_eval_time_s), 1
+                ) if m.output_tokens > 0 and m.pass2_wall_s > 0 else 0.0,
                 "peak_rss_bytes": m.peak_rss_bytes,
                 "output_text": m.output_text if verbose else m.output_text[:200],
             }
@@ -308,6 +315,7 @@ def run_model(
             summary = {
                 "n_successful": len(successful),
                 "median_gen_toks_per_s": _med("gen_toks_per_s"),
+                "median_gen_toks_per_s_wall": _med("gen_toks_per_s_wall"),
                 "median_prompt_eval_toks_per_s": _med("prompt_eval_toks_per_s"),
                 "median_ttft_s": _med("ttft_s"),
                 "median_ttft_ms": round(_med("ttft_s") * 1000, 1),
@@ -355,6 +363,7 @@ def run_model(
 def _aggregate_model_summary(per_prompt: list[dict], model_name: str) -> dict:
     """Aggregate per-prompt median stats across all prompts."""
     all_gen: list[float] = []
+    all_gen_wall: list[float] = []
     all_prompt_eval: list[float] = []
     all_ttft: list[float] = []
     all_rss: list[float] = []
@@ -364,6 +373,8 @@ def _aggregate_model_summary(per_prompt: list[dict], model_name: str) -> dict:
         if s.get("n_successful", 0) > 0:
             if s.get("median_gen_toks_per_s", 0) > 0:
                 all_gen.append(s["median_gen_toks_per_s"])
+            if s.get("median_gen_toks_per_s_wall", 0) > 0:
+                all_gen_wall.append(s["median_gen_toks_per_s_wall"])
             if s.get("median_prompt_eval_toks_per_s", 0) > 0:
                 all_prompt_eval.append(s["median_prompt_eval_toks_per_s"])
             if s.get("median_ttft_s", 0) > 0:
@@ -377,6 +388,7 @@ def _aggregate_model_summary(per_prompt: list[dict], model_name: str) -> dict:
     return {
         "model": model_name,
         "overall_median_gen_toks_per_s": _med(all_gen),
+        "overall_median_gen_toks_per_s_wall": _med(all_gen_wall),
         "overall_median_prompt_eval_toks_per_s": _med(all_prompt_eval),
         "overall_median_ttft_ms": round(_med(all_ttft) * 1000, 1),
         "overall_median_peak_rss_mb": round(_med(all_rss) / (1 << 20), 1),
@@ -421,9 +433,9 @@ def _format_summary(results: dict) -> str:
         f"  Date:         {results['timestamp']}",
         "",
         "RESULTS TABLE",
-        "-" * 72,
-        f"{'Model':<42} {'GenTok/s':>9} {'PETok/s':>9} {'TTFT(ms)':>10} {'PeakRSS(MB)':>12}",
-        "-" * 72,
+        "-" * 84,
+        f"{'Model':<42} {'GenTok/s':>9} {'WallTok/s':>10} {'PETok/s':>9} {'TTFT(ms)':>10} {'PeakRSS(MB)':>12}",
+        "-" * 84,
     ]
     for model_result in results["models"]:
         name = model_result["model"]
@@ -438,19 +450,27 @@ def _format_summary(results: dict) -> str:
         lines.append(
             f"  {disp:<40} "
             f"{s.get('overall_median_gen_toks_per_s', 0):>9.1f} "
+            f"{s.get('overall_median_gen_toks_per_s_wall', 0):>10.1f} "
             f"{s.get('overall_median_prompt_eval_toks_per_s', 0):>9.1f} "
             f"{s.get('overall_median_ttft_ms', 0):>10.0f} "
             f"{s.get('overall_median_peak_rss_mb', 0):>12.0f}"
         )
-    lines.append("-" * 72)
+    lines.append("-" * 84)
     lines.append("")
     lines.append("Columns:")
-    lines.append("  GenTok/s  — output tokens per second (generation speed; the headline number)")
+    lines.append("  GenTok/s  — generation tokens per second from llama.cpp's own counters (the headline number)")
+    lines.append("  WallTok/s — the same answer against the wall clock, including sampling and Python time")
     lines.append("  PETok/s   — prompt eval tokens per second (context ingestion speed)")
     lines.append("  TTFT(ms)  — time to first token in milliseconds")
     lines.append("  PeakRSS   — peak resident set size in MB (approximate; sampled at 100ms)")
     lines.append("")
     lines.append("All values are medians across 3 runs per (model x prompt) cell.")
+    lines.append(
+        "Rates are timed on the second pass alone. Results written before 2026-10-10 divided one"
+    )
+    lines.append(
+        "answer's tokens by the time of both passes and understate generation by about half."
+    )
     lines.append(
         "Per-prompt detail: bench/results/<timestamp>/inference_results.json"
     )
@@ -616,6 +636,10 @@ def main() -> int:
 
     full_results = {
         "benchmark": "potluck-inference-v1",
+        # 2: rates are timed on the second pass alone (llama.cpp counters, with a
+        # wall-clock figure beside them). Files without this key are version 1,
+        # which divided one answer's tokens by the time of both passes.
+        "timing_version": 2,
         "timestamp": ts,
         "prompt_suite": prompts_data["version"],
         "n_runs": args.runs,

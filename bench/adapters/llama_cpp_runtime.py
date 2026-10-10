@@ -43,6 +43,13 @@ class InferenceMetrics:
     prompt_eval_toks_per_s: float = 0.0
     gen_toks_per_s: float = 0.0
 
+    # Where the two rates above came from: "llama_perf" (llama.cpp's own
+    # counters for the second pass) or "pass2_wall" (wall clock of the second
+    # pass, when the counters are unavailable).
+    timing_source: str = ""
+    # Wall clock of the second pass alone. wall_time_s covers both passes.
+    pass2_wall_s: float = 0.0
+
     # Memory
     peak_rss_bytes: int = 0
 
@@ -227,6 +234,11 @@ class LlamaCppRuntime:
         # Reset again: the TTFT streaming pass cached the prompt prefix.
         # Pass 2 must be a cold eval to produce accurate prompt_eval_toks_per_s.
         self.reset_kv_cache()
+        # The rates are taken from this pass alone. Pass 1 generated the whole
+        # answer too, so timing from wall_start would count two generations
+        # against one answer's tokens.
+        self._reset_perf()
+        pass2_start = time.monotonic()
         try:
             response = self._model.create_chat_completion(
                 messages=messages,
@@ -245,9 +257,11 @@ class LlamaCppRuntime:
             return metrics
 
         wall_end = time.monotonic()
+        perf = self._read_perf()
         peak_rss = rss_poller.stop()
 
         metrics.wall_time_s = wall_end - wall_start
+        metrics.pass2_wall_s = wall_end - pass2_start
         metrics.peak_rss_bytes = peak_rss
 
         # Extract token counts from usage
@@ -255,31 +269,25 @@ class LlamaCppRuntime:
         metrics.prompt_tokens = usage.get("prompt_tokens", 0)
         metrics.output_tokens = usage.get("completion_tokens", 0)
 
-        # Extract timing from llama.cpp metadata if available
-        # llama-cpp-python >= 0.2.x exposes timings in the response dict
-        timings = response.get("timings", {})
-        if timings:
-            prompt_ms = timings.get("prompt_ms", 0.0)
-            predicted_ms = timings.get("predicted_ms", 0.0)
-            if prompt_ms > 0:
-                metrics.prompt_eval_time_s = prompt_ms / 1000.0
-            if predicted_ms > 0:
-                metrics.generation_time_s = predicted_ms / 1000.0
+        # Timing for the two rates, from the second pass only.
+        if perf is not None and perf["t_eval_ms"] > 0 and perf["n_eval"] > 0:
+            # llama.cpp's own counters: the figures llama_perf_context_print shows.
+            metrics.timing_source = "llama_perf"
+            metrics.generation_time_s = perf["t_eval_ms"] / 1000.0
+            metrics.gen_toks_per_s = perf["n_eval"] / metrics.generation_time_s
+            if perf["t_p_eval_ms"] > 0 and perf["n_p_eval"] > 0:
+                metrics.prompt_eval_time_s = perf["t_p_eval_ms"] / 1000.0
+                metrics.prompt_eval_toks_per_s = perf["n_p_eval"] / metrics.prompt_eval_time_s
         else:
-            # Fallback: approximate from wall time and TTFT
-            # Wall time ≈ prompt_eval + generation; TTFT ≈ prompt_eval
-            metrics.prompt_eval_time_s = metrics.ttft_s
-            metrics.generation_time_s = max(
-                0.001, metrics.wall_time_s - metrics.ttft_s
-            )
-
-        # Derived rates
-        if metrics.prompt_eval_time_s > 0 and metrics.prompt_tokens > 0:
-            metrics.prompt_eval_toks_per_s = (
-                metrics.prompt_tokens / metrics.prompt_eval_time_s
-            )
-        if metrics.generation_time_s > 0 and metrics.output_tokens > 0:
-            metrics.gen_toks_per_s = metrics.output_tokens / metrics.generation_time_s
+            # No counters: wall clock of the second pass, with the first pass's
+            # time to first token standing in for prompt evaluation.
+            metrics.timing_source = "pass2_wall"
+            metrics.prompt_eval_time_s = min(metrics.ttft_s, metrics.pass2_wall_s)
+            metrics.generation_time_s = max(0.001, metrics.pass2_wall_s - metrics.prompt_eval_time_s)
+            if metrics.prompt_eval_time_s > 0 and metrics.prompt_tokens > 0:
+                metrics.prompt_eval_toks_per_s = metrics.prompt_tokens / metrics.prompt_eval_time_s
+            if metrics.output_tokens > 0:
+                metrics.gen_toks_per_s = metrics.output_tokens / metrics.generation_time_s
 
         # Capture output text
         choices = response.get("choices", [])
@@ -287,6 +295,30 @@ class LlamaCppRuntime:
             metrics.output_text = choices[0].get("message", {}).get("content", "")
 
         return metrics
+
+    def _reset_perf(self) -> None:
+        """Zero llama.cpp's timing counters for this context. Best effort."""
+        try:
+            import llama_cpp
+
+            llama_cpp.llama_perf_context_reset(self._model.ctx)
+        except Exception:
+            pass
+
+    def _read_perf(self) -> dict | None:
+        """llama.cpp's timing counters since the last reset, or None if unreadable."""
+        try:
+            import llama_cpp
+
+            data = llama_cpp.llama_perf_context(self._model.ctx)
+            return {
+                "t_p_eval_ms": float(data.t_p_eval_ms),
+                "t_eval_ms": float(data.t_eval_ms),
+                "n_p_eval": int(data.n_p_eval),
+                "n_eval": int(data.n_eval),
+            }
+        except Exception:
+            return None
 
     def _measure_ttft(
         self,
