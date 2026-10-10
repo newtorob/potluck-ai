@@ -37,6 +37,12 @@
 #      re-install (app update, or the user re-clicking Enable) re-copies;
 #      nothing about the running service depends on the per-user directory
 #      remaining untampered after this step completes.
+#      Because the task runs that copy, an app update does not touch the file
+#      the running daemon watches for replacement (cmd/potluck-mesh/
+#      selfrestart.go): only this script replaces it, after stopping the
+#      process. So on Windows the daemon does not restart itself after an
+#      update. The app compares the daemon's exe_sha256 with the binary it
+#      shipped and offers "Restart mesh service", which runs this script.
 #
 # WHY A SCHEDULED TASK, NOT A REAL WINDOWS SERVICE
 # ---------------------------------------------------
@@ -50,9 +56,21 @@
 # needs none of that: Task Scheduler just launches the .exe directly, exactly
 # like running it from a console, so the existing binary works unmodified.
 # This was verified end-to-end on a real Windows box (see the deliverable
-# report) — daemon runs as NT AUTHORITY\SYSTEM, survives reboots (AtStartup
-# trigger), and Task Scheduler's own restart-on-failure settings (below)
-# cover the crash-loop case systemd's Restart=on-failure covers on Linux.
+# report): the daemon runs as NT AUTHORITY\SYSTEM and survives reboots
+# (AtStartup trigger).
+#
+# HOW IT COMES BACK AFTER IT EXITS
+# ------------------------------------
+# The sidecar exits non-zero on purpose when its binary is replaced (see
+# cmd/potluck-mesh/selfrestart.go), and may crash. Task Scheduler's
+# "restart on failure" setting (RestartCount below) is capped at 3 restarts
+# per trigger and is not documented to treat a program's non-zero exit code
+# as a failure, so the task does not rely on it alone. It also carries a
+# repetition trigger that fires every minute with MultipleInstances set to
+# IgnoreNew: while the daemon runs the ticks do nothing, and within a minute
+# of any exit the next tick starts it again. A definition change only
+# reaches a machine when this script runs again (the app's "Restart mesh
+# service" button), because Register-ScheduledTask is only called here.
 #
 # WHY THE PIPE IS STILL REACHABLE
 # -----------------------------------
@@ -219,6 +237,10 @@ function Do-Install {
         Set-Acl -Path $dir -AclObject $acl
     }
 
+    # An existing task from this script's current definition has a repetition
+    # trigger. If a tick started the old binary after the stop above, stop it
+    # again right before the copy so the copy does not hit a locked file.
+    Get-Process -Name 'potluck-mesh' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Copy-Item -LiteralPath $sourceBin -Destination $InstalledBin -Force
     Copy-Item -LiteralPath $sourceWintun -Destination (Join-Path $InstallDir 'wintun.dll') -Force
 
@@ -232,16 +254,22 @@ function Do-Install {
     # process — no wrapper needed here, unlike the debug logging setup used
     # during manual testing. Kept simple and direct.
     $action = New-ScheduledTaskAction -Execute $InstalledBin -Argument $exeArgs
-    $trigger = New-ScheduledTaskTrigger -AtStartup
+    $atStartup = New-ScheduledTaskTrigger -AtStartup
+    # Keeps the daemon coming back after any exit, including the deliberate
+    # non-zero exit when its binary is replaced (see the header comment). With
+    # MultipleInstances IgnoreNew a tick while the daemon runs does nothing.
+    $keepAlive = New-ScheduledTaskTrigger -Once -At (Get-Date) `
+        -RepetitionInterval (New-TimeSpan -Minutes 1) -RepetitionDuration (New-TimeSpan -Days 3650)
     $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
-    # RestartCount/RestartInterval = Task Scheduler's crash-loop recovery,
-    # the analog of systemd's Restart=on-failure/RestartSec on Linux.
+    # RestartCount/RestartInterval = Task Scheduler's own crash recovery, kept
+    # as a second path next to the repetition trigger above.
     $settings = New-ScheduledTaskSettingsSet `
         -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `
+        -MultipleInstances IgnoreNew `
         -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero) `
         -DontStopIfGoingOnBatteries -AllowStartIfOnBatteries
 
-    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger @($atStartup, $keepAlive) `
         -Principal $principal -Settings $settings -Force | Out-Null
 
     Start-ScheduledTask -TaskName $TaskName
