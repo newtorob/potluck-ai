@@ -1,0 +1,30 @@
+========================================================================
+Potluck AI — Inference Benchmark Results
+========================================================================
+  Hardware:     x86_64  62.6 GB RAM
+  OS:           Ubuntu 22.04.5 LTS  (x86_64)
+  GPU/Accel:    CUDA — NVIDIA GeForce RTX 2080 Ti  11.0 GB VRAM — n_gpu_layers=-1
+  llama-cpp-python: 0.3.25
+  Prompt suite: inference_v1
+  Runs/cell:    3
+  Date:         20260618T212446Z
+
+RESULTS TABLE
+------------------------------------------------------------------------
+Model                                       GenTok/s   PETok/s   TTFT(ms)  PeakRSS(MB)
+------------------------------------------------------------------------
+  Phi-3-mini-4k-instruct-Q4_K_M.gguf            69.2    3537.1         88          582
+  Qwen2.5-7B-Instruct-Q4_K_M.gguf               45.9    2302.4        126          909
+  Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf                                 FAILED / OOM
+    Error: Failed to create llama_context
+------------------------------------------------------------------------
+
+Columns:
+  GenTok/s  — output tokens per second (generation speed; the headline number)
+  PETok/s   — prompt eval tokens per second (context ingestion speed)
+  TTFT(ms)  — time to first token in milliseconds
+  PeakRSS   — peak resident set size in MB (approximate; sampled at 100ms)
+
+All values are medians across 3 runs per (model x prompt) cell.
+Per-prompt detail: bench/results/<timestamp>/inference_results.json
+========================================================================
