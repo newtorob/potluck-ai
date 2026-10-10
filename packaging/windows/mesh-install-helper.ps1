@@ -76,14 +76,17 @@
 # -----------------------------------
 # The daemon runs as SYSTEM, same "needs elevation for the TUN/Wintun
 # adapter" reasoning as root on macOS/Linux. Reachability for the
-# interactively logged-in desktop user is fixed on the Go side:
-# internal/localapi/listener_windows.go's platformListen() now grants the
-# named pipe's DACL to BOTH the running (SYSTEM) account and the active
-# console session's user SID (via WTSGetActiveConsoleSessionId ->
-# WTSQueryUserToken), so Electron — running as that same logged-in user —
-# can connect. Nothing in this script needs to know or pass along who that
-# user is; the Go binary works it out at pipe-bind time, every time it
-# (re)starts.
+# interactively logged-in desktop user is handled on the Go side:
+# internal/localapi/listener_windows.go grants the named pipe's DACL to
+# BOTH the running (SYSTEM) account and the SID of the user signed in at the
+# console (via WTSGetActiveConsoleSessionId -> WTSQueryUserToken), so
+# Electron, running as that same user, can connect. The task starts at boot
+# before anyone has signed in, so the daemon checks the console user every
+# few seconds and rewrites the pipe's DACL in place when it changes (nobody
+# to user at sign-in, user to nobody at sign-out, user to user on fast user
+# switching). The pipe is not closed or re-created to do this, so open
+# connections keep working. Nothing in this script needs to know or pass
+# along who that user is, and no restart is needed after a sign-in.
 #
 # USAGE
 # ------
