@@ -39,3 +39,32 @@ describe("command dispatch", () => {
     expect(() => parseArgs(args)).toThrow();
   });
 });
+
+describe("benchmark options", () => {
+  it("parses the model, runs, switch handling, scope and output options", () => {
+    expect(parseArgs(["benchmark"])).toMatchObject({ command: "benchmark", timeout: 120000, yes: false, json: false });
+    expect(parseArgs(["benchmark", "--model", "qwen3-8b-q4", "--runs", "5", "--keep", "--yes", "--scope", "mine", "--json", "--timeout", "300000"]))
+      .toMatchObject({ command: "benchmark", model: "qwen3-8b-q4", runs: 5, keep: true, yes: true, scope: "mine", json: true, timeout: 300000 });
+    expect(parseArgs(["benchmark", "--restore", "-m", "small", "-y", "--runs=10", "--scope=local"]))
+      .toMatchObject({ restore: true, model: "small", yes: true, runs: 10, scope: "local" });
+    expect(parseArgs(["benchmark", "--help"])).toMatchObject({ command: "benchmark", help: true });
+  });
+  it.each([
+    ["benchmark", "--runs", "0"], ["benchmark", "--runs", "11"], ["benchmark", "--runs", "2.5"], ["benchmark", "--runs", "many"], ["benchmark", "--runs"],
+    ["benchmark", "--keep", "--restore"], ["benchmark", "extra"], ["benchmark", "--model", "../private"], ["benchmark", "--model", "-x"],
+    ["benchmark", "--scope", "circle"], ["benchmark", "--scope", "pool"], ["benchmark", "--timeout", "300001"], ["benchmark", "--timeout", "0"],
+    ["benchmark", "--circle", "Friends"], ["benchmark", "-p", "hello"], ["benchmark", "--verify", "test"], ["benchmark", "--keep=yes"],
+  ])("rejects invalid invocation %j", (...args) => {
+    expect(() => parseArgs(args)).toThrow();
+  });
+  it.each([["status", "--runs", "3"], ["models", "list", "--keep"], ["run", "hi", "--restore"], ["setup", "--runs", "3"], ["--keep"]])("keeps benchmark options to benchmark: %j", (...args) => {
+    expect(() => parseArgs(args)).toThrow();
+  });
+  it("leaves the limits and flags of other commands as they were", () => {
+    expect(() => parseArgs(["status", "--timeout", "30001"])).toThrow();
+    expect(() => parseArgs(["models", "list", "--yes"])).toThrow();
+    expect(() => parseArgs(["models", "list", "--model", "x"])).toThrow();
+    expect(parseArgs(["status"]).timeout).toBe(3000);
+    expect(parseArgs(["run", "hi"]).timeout).toBe(120000);
+  });
+});

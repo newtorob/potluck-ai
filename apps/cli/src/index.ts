@@ -90,6 +90,7 @@ function printHelp(): void {
       "  potluck service status         inspect the background service",
       "  potluck serve                  run the runtime in the foreground",
       "  potluck models list            list/install/load/unload local models",
+      "  potluck benchmark              measure the model on this machine, or switch to another",
       '  potluck run "prompt"           plain inference, with optional piped stdin',
       "  potluck launch aider           use an installed Aider with Potluck",
       "  potluck contribute status      control contribution, schedules and limits",

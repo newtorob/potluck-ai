@@ -34,6 +34,8 @@ export interface StreamOptions {
   circle?: string;
   /** Require the terminal SSE marker before accepting a response as complete. */
   requireDone?: boolean;
+  /** Sees the response headers once the gateway accepted the request. Throwing stops the stream before any text is read. */
+  onHeaders?: (headers: Headers) => void;
 }
 
 interface ModelsResponse {
@@ -137,6 +139,9 @@ export async function* streamChat(
     throw new GatewayRefusedError(res.status, body);
   }
 
+  if (opts.onHeaders) {
+    try { opts.onHeaders(res.headers); } catch (error) { await res.body.cancel(); throw error; }
+  }
   if (lock && (res.headers.get("x-potluck-model-lock") !== "1"
       || res.headers.get("x-potluck-model-sha256") !== lock.model.sha256)) {
     await res.body.cancel();

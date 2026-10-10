@@ -1,7 +1,7 @@
 /** Parse commands before touching config, starting a REPL, or making requests. */
 export class UsageError extends Error {}
 
-export type Command = "circle" | "usage" | "split" | "batch" | "sessions" | "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect";
+export type Command = "circle" | "usage" | "split" | "batch" | "sessions" | "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect" | "benchmark";
 export interface CliArgs {
   help: boolean;
   version: boolean;
@@ -33,6 +33,11 @@ export interface CliArgs {
   signIn?: boolean;
   connect?: boolean;
   preferences?: boolean;
+  /** benchmark: timed runs after the warm-up call. */
+  runs?: number;
+  /** benchmark: leave a model it switched to loaded / switch back to the one loaded before. */
+  keep?: boolean;
+  restore?: boolean;
   withModel?: boolean;
   message?: string;
   jobs?: number;
@@ -53,7 +58,7 @@ export interface CliArgs {
   theme?: "dark" | "light";
 }
 
-const commands = new Set<Command>(["circle", "usage", "split", "batch", "sessions", "run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect"]);
+const commands = new Set<Command>(["circle", "usage", "split", "batch", "sessions", "run", "contribute", "launch", "setup", "status", "doctor", "logs", "up", "down", "serve", "service", "models", "gateway", "login", "logout", "whoami", "household", "connect", "disconnect", "benchmark"]);
 
 export function parseArgs(argv: string[]): CliArgs {
   const out: CliArgs = { help: false, version: false, print: false, yes: false,
@@ -84,6 +89,13 @@ export function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--connect") out.connect = true;
     else if (arg === "--preferences") out.preferences = true;
     else if (arg === "--once") out.once = true;
+    else if (arg === "--keep") out.keep = true;
+    else if (arg === "--restore") out.restore = true;
+    else if (flag === "--runs") {
+      const v = value();
+      if (!/^\d+$/.test(v) || Number(v) < 1 || Number(v) > 10) throw new UsageError("--runs must be an integer from 1 to 10.");
+      out.runs = Number(v);
+    }
     else if (flag === "--window") {
       const v = value();
       if (!["1", "7", "30", "90"].includes(v)) throw new UsageError("--window must be 1, 7, 30, or 90 days.");
@@ -245,6 +257,7 @@ export function parseArgs(argv: string[]): CliArgs {
     "--name": ["household", "connect", "setup"], "--output": ["household", "batch"],
     "--invite-file": ["connect"], "--no-input": ["setup"], "--enable-gateway": ["setup"],
     "--message": ["launch"], "--with-model": ["setup"], "--sign-in": ["setup"], "--connect": ["setup"], "--preferences": ["setup"],
+    "--runs": ["benchmark"], "--keep": ["benchmark"], "--restore": ["benchmark"],
   };
   for (const [flag, supported] of Object.entries(allowed)) {
     if (seen.has(flag) && !supported.includes(out.command || "")) throw new UsageError(`${flag} requires ${supported.join(" or ")}.`);
@@ -255,7 +268,9 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.preferences && (out.noInput || out.json || out.enableGateway || out.signIn || out.connect || out.name || out.model || out.withModel)) throw new UsageError("--preferences is an interactive preferences-only wizard.");
   if (["up", "down"].includes(out.command || "") && !seen.has("--timeout")) out.timeout = 15000;
   if (out.command === "run" && !seen.has("--timeout")) out.timeout = 120000;
-  if (out.command !== "run" && out.timeout > 30000) throw new UsageError("--timeout must be an integer from 1 to 30000 for this command.");
+  // A benchmark waits on model loads and 64-token generations, which a slow CPU can stretch past 30 s.
+  if (out.command === "benchmark" && !seen.has("--timeout")) out.timeout = 120000;
+  if (out.command !== "run" && out.command !== "benchmark" && out.timeout > 30000) throw new UsageError("--timeout must be an integer from 1 to 30000 for this command.");
   if (out.command === "launch" && out.json) throw new UsageError("launch runs an external tool; JSON output is not supported.");
   if (out.command === "serve" && (out.json || seen.has("--timeout"))) throw new UsageError("serve runs in the foreground; use service status --json for reports.");
   if (out.command === "models" && !seen.has("--timeout")) out.timeout = 30000;
@@ -264,7 +279,7 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.command === "logs" && seen.has("--timeout")) throw new UsageError("--timeout applies to status, doctor, up, and down.");
   // --yes confirms joining, leaving or deleting a circle; elsewhere it is an agent option.
   const circleConfirm = out.command === "circle" && ["join", "leave", "delete"].includes(out.action || "");
-  if (out.command && (out.print || (out.model && !["setup", "launch", "run"].includes(out.command)) || out.verify || out.noVerify || (out.yes && !circleConfirm))) {
+  if (out.command && (out.print || (out.model && !["setup", "launch", "run", "benchmark"].includes(out.command)) || out.verify || out.noVerify || (out.yes && !circleConfirm && out.command !== "benchmark"))) {
     throw new UsageError("Agent options cannot be combined with a management command.");
   }
   if (!operation && (out.json || seen.has("--timeout"))) {
@@ -273,8 +288,8 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.command !== "logs" && (seen.has("--source") || seen.has("--lines"))) {
     throw new UsageError("--source and --lines require logs.");
   }
-  if (out.scope && out.command && !["status", "doctor", "launch", "run", "batch"].includes(out.command)) {
-    throw new UsageError("--scope is supported by status, doctor, and the coding agent.");
+  if (out.scope && out.command && !["status", "doctor", "launch", "run", "batch", "benchmark"].includes(out.command)) {
+    throw new UsageError("--scope is supported by status, doctor, benchmark, and the coding agent.");
   }
   // A single prompt can go to a trusted circle. Everything else that takes a
   // scope stays on the member's own machines.
@@ -283,6 +298,8 @@ export function parseArgs(argv: string[]): CliArgs {
   } else if (operation && out.scope && !["local", "mine"].includes(out.scope)) {
     throw new UsageError(operation === "run" ? "Run --scope must be local, mine or circle." : "Diagnostic --scope must be local or mine.");
   }
+  if (out.keep && out.restore) throw new UsageError("Choose --keep or --restore.");
+  if (out.command === "benchmark" && out.model !== undefined && !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}$/.test(out.model)) throw new UsageError("Use a model ID from potluck models list.");
   if (out.circle !== undefined && out.scope !== "circle") throw new UsageError("--circle requires --scope circle.");
   if (out.verify !== undefined && out.noVerify) throw new UsageError("Choose --verify or --no-verify.");
   return out;
