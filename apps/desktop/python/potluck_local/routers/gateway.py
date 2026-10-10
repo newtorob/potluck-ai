@@ -31,6 +31,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from potluck_local.services import gateway_routing, pool_routing
+from potluck_local.services.inference_errors import InferenceFailure
 from potluck_local.services.remote_stream import RemoteStreamError
 from potluck_local.services.model_registry import list_models
 from potluck_local.services.runtime import get_runtime
@@ -284,7 +285,7 @@ async def chat_completions_openai(
                         messages, temperature=req.temperature, max_tokens=max_tokens, stop=stop, **identity
                     ):
                         if isinstance(chunk, dict) and "__error__" in chunk:
-                            yield f'data: {json.dumps({"error": {"message": chunk["__error__"], "type": "inference_error"}})}\n\n'
+                            yield f'data: {json.dumps({"error": {"message": chunk["__error__"], "type": "inference_error", "code": chunk.get("__category__", "inference_error")}})}\n\n'
                             break
                         yield f"data: {json.dumps(chunk)}\n\n"
                 # Terminator on normal completion. Not in finally: a client
@@ -329,6 +330,9 @@ async def chat_completions_openai(
                 result.setdefault("model", local)
     except ModelIdentityError as exc:
         raise HTTPException(409, str(exc)) from exc
+    except InferenceFailure as exc:
+        # This machine's own GPU: the caller is this machine's user or agent.
+        raise HTTPException(status_code=503, detail={"code": exc.category, "message": exc.message}) from exc
     except RemoteStreamError as exc:
         raise HTTPException(status_code=502, detail={"code": exc.category, "message": str(exc)}) from exc
     except pool_routing.PoolDispatchError as exc:
@@ -478,7 +482,7 @@ async def text_completions(
                     )
                 async for chunk in source:
                     if isinstance(chunk, dict) and "__error__" in chunk:
-                        yield f'data: {json.dumps({"error": {"message": chunk["__error__"], "type": "inference_error"}})}\n\n'
+                        yield f'data: {json.dumps({"error": {"message": chunk["__error__"], "type": "inference_error", "code": chunk.get("__category__", "inference_error")}})}\n\n'
                         break
                     if chunk.get("choices") and chunk["choices"][0].get("finish_reason"):
                         finish_reason = chunk["choices"][0]["finish_reason"]
@@ -548,6 +552,9 @@ async def text_completions(
                 result.setdefault("model", local)
     except ModelIdentityError as exc:
         raise HTTPException(409, str(exc)) from exc
+    except InferenceFailure as exc:
+        # This machine's own GPU: the caller is this machine's user or agent.
+        raise HTTPException(status_code=503, detail={"code": exc.category, "message": exc.message}) from exc
     except RemoteStreamError as exc:
         raise HTTPException(status_code=502, detail={"code": exc.category, "message": str(exc)}) from exc
     except pool_routing.PoolDispatchError as exc:

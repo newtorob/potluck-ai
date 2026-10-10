@@ -57,6 +57,8 @@ async def _run_inference_probe(runtime) -> tuple[bool, float, str]:
     import json
     from contextlib import aclosing
 
+    from potluck_local.services.inference_errors import GPU_OUT_OF_MEMORY, GPU_OUT_OF_MEMORY_TEXT
+
     t0 = time.monotonic()
     completed = False
     try:
@@ -68,6 +70,8 @@ async def _run_inference_probe(runtime) -> tuple[bool, float, str]:
                     if line == "data: [DONE]":
                         completed = True
                     if line.startswith("data: {") and "error" in json.loads(line[6:]):
+                        if json.loads(line[6:]).get("category") == GPU_OUT_OF_MEMORY:
+                            return False, 0.0, GPU_OUT_OF_MEMORY_TEXT
                         return False, 0.0, "Loaded-model self-test failed"
         return completed, round((time.monotonic() - t0) * 1000, 2), (
             "1-token inference completed" if completed else "Loaded-model self-test was interrupted")

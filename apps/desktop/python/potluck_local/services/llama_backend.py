@@ -46,6 +46,8 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from potluck_local.services import windows_gpu
+
 logger = logging.getLogger(__name__)
 
 # Backend override. "auto" probes, "cpu" forces the CPU set, "vulkan" forces the
@@ -69,10 +71,33 @@ _CACHE_TTL_SECONDS = 7 * 24 * 3600
 # IGPU precedes ACCEL; reversing them hides Intel/AMD integrated graphics.
 _DEV_TYPE = {0: "cpu", 1: "gpu", 2: "igpu", 3: "accel", 4: "meta"}
 
-# Bytes held back for the KV cache and compute buffers. Deliberately generous:
-# a model that spills past the end of VRAM streams its weights over PCIe on
-# every token, which is slower than staying on the CPU.
-_VRAM_RESERVE_BYTES = 1024 * 1024 * 1024
+# Bytes held back when sizing an offload, in two named parts so a load report can
+# say what each is for. A model that spills past the end of VRAM streams its
+# weights over PCIe on every token, which is slower than staying on the CPU, so
+# the total is deliberately generous.
+#
+# Engine overhead: what the engine allocates beyond the weights file plus the KV
+# cache (compute buffers, driver allocations). Measured 2026-10-09 on an RX 6600
+# XT with the Vulkan backend: qwen3-8b-q4 at n_ctx 8192 held 5.92 GiB on the card,
+# against 5.81 GiB for weights (4.68 GiB file) plus KV cache (1.125 GiB), so the
+# plan's two terms were 0.11 GiB low. The file also contains the input token
+# embedding, which llama.cpp keeps in host memory (about 0.33 GiB for this
+# model, computed from vocabulary and width), so the compute buffers are larger
+# than 0.11 GiB and that table offsets them. Compute buffers grow with the
+# context once flash attention is off: llama.cpp reserved 302 MiB at 8192 and
+# 969 MiB at 32768 for a 14-head 0.5B model measured on the CPU backend on
+# 2026-10-09. 256 MiB is 2.2x the measured shortfall; it is part of the reserve
+# and not an addition to it, so a card with nothing else on it is planned
+# exactly as before. Re-measure on Vulkan before shrinking it.
+_ENGINE_OVERHEAD_BYTES = 256 * 1024 * 1024
+# Room for the other programs on the card to grow while the model loads. A load
+# took 175 s on the machine above, long enough for a game to load a level.
+_SHARING_MARGIN_BYTES = 768 * 1024 * 1024
+_VRAM_RESERVE_BYTES = _ENGINE_OVERHEAD_BYTES + _SHARING_MARGIN_BYTES  # 1 GiB, as before
+
+# A DXGI dedicated size and ggml's device total describe the same card within
+# this fraction (8,543,391,744 against 8,573,157,376 bytes on the RX 6600 XT).
+_TOTAL_MATCH_TOLERANCE = 0.05
 
 # Never shrink the context below this to make a GPU offload fit. Past this
 # point the offload is buying speed the user did not ask to pay for in
@@ -645,7 +670,21 @@ class OffloadPlan:
     model_bytes: int | None = None
     kv_bytes: int | None = None
     total_layers: int | None = None
+    # The figure the plan was sized against: ggml's free figure, lowered to what
+    # Windows says is free system-wide when that is smaller and could be read.
     free_vram_bytes: int | None = None
+    # What ggml reported as free, before the system-wide figure was applied.
+    reported_free_vram_bytes: int | None = None
+    # Dedicated memory in use by programs other than this engine, when known.
+    other_programs_vram_bytes: int | None = None
+    vram_total_bytes: int | None = None
+    reserve_bytes: int | None = None
+    # free_vram_bytes less the reserve: what weights plus KV cache had to fit in.
+    budget_bytes: int | None = None
+    # The system-wide reading and how it was matched to this device (see SystemGpuUse).
+    system_use: dict | None = None
+    # One plain sentence about the memory check, for the load report and the log.
+    memory_note: str | None = None
 
     def as_dict(self) -> dict:
         return {
@@ -657,12 +696,24 @@ class OffloadPlan:
             "kv_bytes": self.kv_bytes,
             "total_layers": self.total_layers,
             "free_vram_bytes": self.free_vram_bytes,
+            "reported_free_vram_bytes": self.reported_free_vram_bytes,
+            "other_programs_vram_bytes": self.other_programs_vram_bytes,
+            "vram_total_bytes": self.vram_total_bytes,
+            "reserve_bytes": self.reserve_bytes,
+            "budget_bytes": self.budget_bytes,
+            "system_use": self.system_use,
+            "memory_note": self.memory_note,
         }
 
 
 def _round_down_ctx(n: int) -> int:
     """Contexts are conventionally multiples of 4096. Keep it tidy."""
     return (n // 4096) * 4096
+
+
+def _gb(n: int | float) -> str:
+    """Bytes as the GB figure Windows and this app show (binary, one decimal)."""
+    return f"{n / 1024 ** 3:.1f} GB"
 
 
 def offload_device(devices: list[dict]) -> tuple[int, dict] | None:
@@ -675,6 +726,147 @@ def offload_device(devices: list[dict]) -> tuple[int, dict] | None:
     candidates = [(i, d) for i, d in enumerate(gpus) if d.get("total_bytes")]
     dedicated = [(i, d) for i, d in candidates if d.get("type") == "gpu"]
     return max(dedicated or candidates, key=lambda item: int(item[1].get("free_bytes") or 0), default=None)
+
+
+# ---------------------------------------------------------------------------
+# What the rest of the machine is using (Windows)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class SystemGpuUse:
+    """System-wide dedicated memory use on the adapter the plan offloads to.
+
+    ``status`` is "ok" (figures below are set), "unavailable" (could not be
+    read or matched; ``detail`` says why, and the plan then behaves as it did
+    before this reading existed) or "not_applicable" (not Windows).
+    """
+
+    status: str
+    detail: str = ""
+    adapter: str | None = None
+    luid: str | None = None
+    # How the Windows adapter was matched to ggml's device: "description",
+    # "description+dedicated_size", "dedicated_size", "only_adapter" or
+    # "largest_dedicated_total", with "_most_used" added when several adapters
+    # fit equally and the busiest was assumed.
+    matched_by: str | None = None
+    source: str = ""
+    total_bytes: int | None = None
+    used_bytes: int | None = None  # every program, this engine included
+    own_bytes: int = 0  # this engine's share of used_bytes
+    other_programs_bytes: int | None = None
+
+    def as_dict(self) -> dict:
+        return {
+            "status": self.status,
+            "detail": self.detail,
+            "adapter": self.adapter,
+            "luid": self.luid,
+            "matched_by": self.matched_by,
+            "source": self.source,
+            "total_bytes": self.total_bytes,
+            "used_bytes": self.used_bytes,
+            "own_bytes": self.own_bytes,
+            "other_programs_bytes": self.other_programs_bytes,
+        }
+
+
+def read_system_gpu_memory():  # -> windows_gpu.AdapterReading
+    """The one place the system-wide GPU memory figures are read.
+
+    Tests replace this function. On anything but Windows the reading is
+    "not_applicable" and nothing is probed.
+    """
+    return windows_gpu.read_adapter_memory()
+
+
+def _match_adapter(device: dict, adapters: list) -> tuple[object | None, str, str]:
+    """Pick the Windows adapter that is ggml's *device*: ``(adapter, matched_by, why_not)``.
+
+    ggml does not expose a LUID, so the match uses what both sides know: the
+    adapter name, then the dedicated size, then (when neither separates them)
+    the largest dedicated card. When several adapters fit equally, the busiest
+    is assumed, because under-counting the load on a card is the costly error.
+    """
+    hardware = [a for a in adapters if not a.software]
+    if not hardware:
+        return None, "", "Windows lists no hardware display adapter"
+    ggml_total = int(device.get("total_bytes") or 0)
+
+    def size_fits(a) -> bool:  # noqa: ANN001
+        return bool(
+            a.dedicated_total_bytes
+            and ggml_total
+            and abs(a.dedicated_total_bytes - ggml_total) <= _TOTAL_MATCH_TOLERANCE * ggml_total
+        )
+
+    def busiest(group: list):
+        return max(group, key=lambda a: a.dedicated_used_bytes)
+
+    named = [a for a in hardware if windows_gpu.names_match(device.get("description"), a.description)]
+    if len(named) == 1:
+        return named[0], "description", ""
+    if len(named) > 1:
+        sized = [a for a in named if size_fits(a)]
+        if len(sized) == 1:
+            return sized[0], "description+dedicated_size", ""
+        return busiest(sized or named), "description_most_used", ""
+
+    sized = [a for a in hardware if size_fits(a)]
+    if len(sized) == 1:
+        return sized[0], "dedicated_size", ""
+    if len(sized) > 1:
+        return busiest(sized), "dedicated_size_most_used", ""
+
+    if len(adapters) == 1:
+        return adapters[0], "only_adapter", ""
+    known = [a for a in hardware if a.dedicated_total_bytes]
+    if known and len(known) == len(hardware):
+        return max(known, key=lambda a: a.dedicated_total_bytes), "largest_dedicated_total", ""
+    return None, "", "Windows could not say which of several adapters is the one being offloaded to"
+
+
+def system_gpu_use(device: dict) -> SystemGpuUse:
+    """What every program on the machine is using on *device*'s adapter. Never raises."""
+    try:
+        reading = read_system_gpu_memory()
+    except Exception as exc:  # noqa: BLE001 - this must never stop a load
+        return SystemGpuUse("unavailable", f"the reader failed ({type(exc).__name__})")
+    if reading.status == "not_applicable":
+        return SystemGpuUse("not_applicable", reading.detail)
+    if reading.status != "ok":
+        return SystemGpuUse("unavailable", reading.detail or "the reader gave no figure")
+    if device.get("type") == "igpu":
+        return SystemGpuUse(
+            "unavailable",
+            "the offload device is an integrated GPU, which shares system memory "
+            "that the dedicated-memory counters do not describe",
+            source=reading.source,
+        )
+    adapter, matched_by, why_not = _match_adapter(device, list(reading.adapters))
+    if adapter is None:
+        return SystemGpuUse("unavailable", why_not, source=reading.source)
+    total = adapter.dedicated_total_bytes or int(device.get("total_bytes") or 0)
+    if total <= 0:
+        return SystemGpuUse("unavailable", "the adapter's dedicated size is unknown", source=reading.source)
+    own = max(0, min(adapter.own_used_bytes, adapter.dedicated_used_bytes))
+    return SystemGpuUse(
+        "ok",
+        adapter=adapter.description or device.get("description"),
+        luid=adapter.luid,
+        matched_by=matched_by,
+        source=reading.source,
+        total_bytes=total,
+        used_bytes=adapter.dedicated_used_bytes,
+        own_bytes=own,
+        other_programs_bytes=adapter.dedicated_used_bytes - own,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Sizing
+# ---------------------------------------------------------------------------
 
 
 def plan_gpu_layers(
@@ -696,13 +888,23 @@ def plan_gpu_layers(
     conversation pays for it across PCIe. So the context is reduced first, the
     layer count second, and the CPU is the floor.
 
-    What "free" means here, exactly: it is the figure ``ggml_backend_dev_memory``
-    reports for the device. That tracks what this process has allocated, and on
-    some drivers nothing more. Measured on an AMD RX 6600 XT on Windows
-    (2026-09-13), the reported figure was identical with a game holding a large
-    share of the card and with the machine idle, so it is not a live system-wide
-    budget. A user on a busy card can pin ``gpu_layers`` instead, and the load
-    report afterwards says where the weights actually went.
+    What "free" means here. ``ggml_backend_dev_memory`` reports a figure that
+    tracks what this process has allocated and nothing else: on an AMD RX 6600
+    XT on Windows it was identical with a game holding 1.4 GiB of the card and
+    with the machine idle (2026-09-13). It is close to the OS budget for the
+    process: on 2026-10-09 DXGI's QueryVideoMemoryInfo read a budget of
+    7.21 GiB with 4.55 GiB of the card in use, where ggml had reported 7.18 GiB
+    free on the same card, so neither moves with the other programs' use. A plan
+    sized from it filled a card other programs were using, and every inference
+    afterwards failed. On Windows the plan is therefore sized against
+
+        min(what ggml reports free, adapter total - dedicated memory in use by
+            every other program) - reserve
+
+    where the second term comes from Windows itself (windows_gpu.py). If that
+    figure cannot be read, or cannot be matched to the offload device, the plan
+    is sized from ggml's figure alone, as it was before, and the plan says so.
+    A user on a busy card can still pin ``gpu_layers``.
     """
     if requested >= 0:
         return OffloadPlan(
@@ -720,7 +922,7 @@ def plan_gpu_layers(
             requested_n_ctx=n_ctx,
         )
 
-    free = int(selected[1].get("free_bytes") or 0)
+    reported_free = int(selected[1].get("free_bytes") or 0)
     try:
         model_bytes = Path(model_path).stat().st_size
     except OSError:
@@ -731,68 +933,108 @@ def plan_gpu_layers(
             requested_n_ctx=n_ctx,
         )
 
-    budget = free - _VRAM_RESERVE_BYTES
+    system = system_gpu_use(selected[1])
+    free = reported_free
+    other_programs: int | None = None
+    if system.status == "ok":
+        other_programs = int(system.other_programs_bytes or 0)
+        free = min(reported_free, max(0, int(system.total_bytes or 0) - other_programs))
+
     info = read_gguf_model_info(model_path)
     total_layers = info.get("block_count")
     kv_per_token = kv_cache_bytes(info, 1)
 
-    def plan(layers: int, reason: str, ctx: int) -> OffloadPlan:
-        return OffloadPlan(
-            layers,
-            reason,
-            n_ctx=ctx,
-            requested_n_ctx=n_ctx,
-            model_bytes=model_bytes,
-            kv_bytes=(kv_per_token * ctx) if kv_per_token else None,
-            total_layers=total_layers,
-            free_vram_bytes=free,
+    def decide(free_bytes: int) -> tuple[int, str, int]:
+        """(layers, reason, ctx) for this much free memory. The arithmetic is
+        the same whatever produced the figure."""
+        budget = free_bytes - _VRAM_RESERVE_BYTES
+        if kv_per_token is None:
+            # No KV arithmetic available: fall back to weights only, and say so.
+            if budget >= model_bytes:
+                return (
+                    -1,
+                    "the weights fit in free VRAM; the KV cache could not be sized "
+                    "from this model's header",
+                    n_ctx,
+                )
+            if not total_layers:
+                return (
+                    0,
+                    "the model does not fit in free VRAM and its layer count is "
+                    "unreadable, so it runs on the CPU",
+                    n_ctx,
+                )
+            fits = max(0, min(total_layers, int(budget / (model_bytes / total_layers))))
+            if fits == 0:
+                return 0, "not enough free VRAM for even one layer, so it runs on the CPU", n_ctx
+            return fits, f"{fits} of {total_layers} layers fit in free VRAM", n_ctx
+
+        # Everything on the card at the requested context.
+        if budget >= model_bytes + kv_per_token * n_ctx:
+            return -1, "the model and its KV cache fit in free VRAM", n_ctx
+
+        # Shrink the context until weights plus KV fit.
+        room = budget - model_bytes
+        if room > 0:
+            fitted_ctx = _round_down_ctx(int(room / kv_per_token))
+            if fitted_ctx >= _MIN_GPU_CTX:
+                return (
+                    -1,
+                    f"context reduced from {n_ctx} to {fitted_ctx} so the KV cache fits in VRAM",
+                    fitted_ctx,
+                )
+
+        # Context is already at its floor; give the GPU as many layers as it can hold.
+        if total_layers:
+            per_layer = model_bytes / total_layers + kv_per_token * _MIN_GPU_CTX / total_layers
+            fits = max(0, min(total_layers, int(budget / per_layer))) if budget > 0 else 0
+            if fits > 0:
+                return (
+                    fits,
+                    f"{fits} of {total_layers} layers fit at an {_MIN_GPU_CTX}-token context",
+                    _MIN_GPU_CTX,
+                )
+
+        return 0, "not enough free VRAM for a useful offload, so it runs on the CPU", n_ctx
+
+    layers, reason, ctx = decide(free)
+
+    memory_note: str | None = None
+    if system.status == "ok":
+        # Would the driver's figure alone have chosen differently? Then the
+        # other programs are the reason, and the reason says so.
+        alone = decide(reported_free)
+        if (layers, ctx) != (alone[0], alone[2]):
+            reason = f"{reason}, because {_gb(other_programs)} of the card is in use by other programs"
+        memory_note = (
+            f"{system.adapter} has {_gb(system.total_bytes)} and other programs are using "
+            f"{_gb(other_programs)} of it; the driver reported {_gb(reported_free)} free. "
+            f"The plan used {_gb(free)}, less {_gb(_VRAM_RESERVE_BYTES)} held back "
+            f"({_gb(_ENGINE_OVERHEAD_BYTES)} for compute buffers and driver allocations, "
+            f"{_gb(_SHARING_MARGIN_BYTES)} for other programs to grow)."
+        )
+    elif system.status == "unavailable":
+        memory_note = (
+            f"The system-wide figure for GPU memory used by other programs was unavailable "
+            f"({system.detail}), so the plan used the driver's free-memory figure "
+            f"of {_gb(reported_free)} only."
         )
 
-    if kv_per_token is None:
-        # No KV arithmetic available: fall back to weights only, and say so.
-        if budget >= model_bytes:
-            return plan(
-                -1,
-                "the weights fit in free VRAM; the KV cache could not be sized "
-                "from this model's header",
-                n_ctx,
-            )
-        if not total_layers:
-            return plan(
-                0,
-                "the model does not fit in free VRAM and its layer count is "
-                "unreadable, so it runs on the CPU",
-                n_ctx,
-            )
-        fits = max(0, min(total_layers, int(budget / (model_bytes / total_layers))))
-        if fits == 0:
-            return plan(0, "not enough free VRAM for even one layer, so it runs on the CPU", n_ctx)
-        return plan(fits, f"{fits} of {total_layers} layers fit in free VRAM", n_ctx)
-
-    # Everything on the card at the requested context.
-    if budget >= model_bytes + kv_per_token * n_ctx:
-        return plan(-1, "the model and its KV cache fit in free VRAM", n_ctx)
-
-    # Shrink the context until weights plus KV fit.
-    room = budget - model_bytes
-    if room > 0:
-        fitted_ctx = _round_down_ctx(int(room / kv_per_token))
-        if fitted_ctx >= _MIN_GPU_CTX:
-            return plan(
-                -1,
-                f"context reduced from {n_ctx} to {fitted_ctx} so the KV cache fits in VRAM",
-                fitted_ctx,
-            )
-
-    # Context is already at its floor; give the GPU as many layers as it can hold.
-    if total_layers:
-        per_layer = model_bytes / total_layers + kv_per_token * _MIN_GPU_CTX / total_layers
-        fits = max(0, min(total_layers, int(budget / per_layer))) if budget > 0 else 0
-        if fits > 0:
-            return plan(
-                fits,
-                f"{fits} of {total_layers} layers fit at a {_MIN_GPU_CTX}-token context",
-                _MIN_GPU_CTX,
-            )
-
-    return plan(0, "not enough free VRAM for a useful offload, so it runs on the CPU", n_ctx)
+    vram_total = system.total_bytes if system.status == "ok" else (int(selected[1].get("total_bytes") or 0) or None)
+    return OffloadPlan(
+        layers,
+        reason,
+        n_ctx=ctx,
+        requested_n_ctx=n_ctx,
+        model_bytes=model_bytes,
+        kv_bytes=(kv_per_token * ctx) if kv_per_token else None,
+        total_layers=total_layers,
+        free_vram_bytes=free,
+        reported_free_vram_bytes=reported_free,
+        other_programs_vram_bytes=other_programs,
+        vram_total_bytes=vram_total,
+        reserve_bytes=_VRAM_RESERVE_BYTES,
+        budget_bytes=free - _VRAM_RESERVE_BYTES,
+        system_use=None if system.status == "not_applicable" else system.as_dict(),
+        memory_note=memory_note,
+    )

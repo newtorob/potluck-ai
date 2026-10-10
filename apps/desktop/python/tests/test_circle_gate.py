@@ -1138,3 +1138,18 @@ def test_a_watcher_that_fails_cuts_the_stream_instead_of_leaving_it_running(lend
     sent = asyncio.run(go())
     assert '"category":"link_ended"' in body_text(sent)
     assert lender.admission.in_flight == 0 and lender.runtime.closed == 1
+
+
+def test_a_gpu_out_of_memory_chunk_reaches_the_circle_member_as_fixed_text(lender):
+    class OutOfMemory(Runtime):
+        async def stream_chat_raw(self, messages, **kw):
+            yield {"choices": [{"delta": {"content": "Hel"}}]}
+            yield {"__error__": "[WinError -529697949] Windows Error 0xe06d7363", "__category__": "gpu_out_of_memory"}
+
+    lender.runtime = OutOfMemory()
+    lender.deps.runtime = lambda: lender.runtime
+    resp = lender.client().post("/circle/chat/completions", json=CHAT, headers=auth())
+    frames = events(resp)
+    assert frames[1] == {"error": {"category": "gpu_out_of_memory", "message": "The serving machine's GPU most likely ran out of memory."}}
+    assert "WinError" not in resp.text and "0xe06d7363" not in resp.text and frames[-1] == "[DONE]"
+    assert lender.admission.in_flight == 0

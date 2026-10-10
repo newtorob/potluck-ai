@@ -26,6 +26,7 @@ from contextlib import aclosing, asynccontextmanager
 from functools import partial
 from pathlib import Path
 
+from potluck_local.services import inference_errors
 from potluck_local.services.model_identity import ModelIdentityError, artifact_identity, file_stamp
 
 logger = logging.getLogger(__name__)
@@ -161,6 +162,16 @@ class LLMRuntime:
 
     def current_model_id(self) -> str | None:
         return self._model_id
+
+    def _gpu_offload_active(self) -> bool:
+        """Whether the loaded model has layers on a GPU. Used only to decide if a
+        native C++ exception can be a device allocation failure (a CPU load cannot
+        throw one)."""
+        report = self._load_report or {}
+        offloaded = report.get("offloaded_layers")
+        if offloaded is not None:
+            return offloaded > 0
+        return bool(report.get("used_n_gpu_layers"))
 
     def current_model_sha256(self) -> str | None:
         if getattr(self._model, "managed_split", False) and self._model.closed:
@@ -340,7 +351,35 @@ class LLMRuntime:
                 n_gpu_layers = plan.n_gpu_layers
                 if plan.n_ctx and plan.n_ctx != n_ctx:
                     n_ctx = plan.n_ctx
-                if plan.n_gpu_layers != requested_gpu_layers or plan.n_ctx != requested_n_ctx:
+                if plan.system_use is not None:
+                    # Windows only: what the rest of the machine is using, or why
+                    # that could not be read.
+                    use = plan.system_use
+                    if use["status"] == "ok":
+                        logger.info(
+                            "gpu_memory_check status=ok adapter=%s matched_by=%s source=%s "
+                            "total_bytes=%s other_programs_bytes=%s driver_free_bytes=%s "
+                            "reserve_bytes=%s budget_bytes=%s",
+                            use["adapter"],
+                            use["matched_by"],
+                            use["source"],
+                            plan.vram_total_bytes,
+                            plan.other_programs_vram_bytes,
+                            plan.reported_free_vram_bytes,
+                            plan.reserve_bytes,
+                            plan.budget_bytes,
+                        )
+                    else:
+                        logger.info(
+                            "gpu_memory_check status=unavailable detail=%s driver_free_bytes=%s",
+                            use["detail"],
+                            plan.reported_free_vram_bytes,
+                        )
+                if (
+                    plan.n_gpu_layers != requested_gpu_layers
+                    or plan.n_ctx != requested_n_ctx
+                    or plan.system_use is not None
+                ):
                     logger.info(
                         "gpu_offload_planned requested_layers=%s using_layers=%s "
                         "requested_n_ctx=%s using_n_ctx=%s reason=%s",
@@ -840,8 +879,9 @@ class LLMRuntime:
                         loop.call_soon_threadsafe(queue.put_nowait, piece)
                 loop.call_soon_threadsafe(queue.put_nowait, None)
             except Exception as exc:
-                logger.error("%s error=%s", label, type(exc).__name__)
-                loop.call_soon_threadsafe(queue.put_nowait, f"\x00ERROR\x00{exc}")
+                failure = inference_errors.describe_failure(exc, gpu_offload=self._gpu_offload_active())
+                logger.error("%s error=%s category=%s", label, type(exc).__name__, failure.category)
+                loop.call_soon_threadsafe(queue.put_nowait, failure)
                 loop.call_soon_threadsafe(queue.put_nowait, None)
 
         fut = loop.run_in_executor(None, _generate)
@@ -854,9 +894,11 @@ class LLMRuntime:
                 if item is None:
                     completed = True
                     break
-                if isinstance(item, str) and item.startswith("\x00ERROR\x00"):
-                    err_msg = item[len("\x00ERROR\x00"):]
-                    yield f'data: {json.dumps({"error": str(err_msg)})}\n\n'
+                if isinstance(item, inference_errors.FailureDescription):
+                    # "error" stays a string for the clients that read it as one;
+                    # "category" is the stable code. Routes that serve another
+                    # machine choose their own text from the category.
+                    yield f'data: {json.dumps({"error": item.message, "category": item.category})}\n\n'
                     break
                 token_count += 1
                 yield f'data: {json.dumps({"choices": [{"delta": {"content": item}}]})}\n\n'
@@ -910,6 +952,14 @@ class LLMRuntime:
             except asyncio.CancelledError:
                 if getattr(model, "managed_split", False):
                     await asyncio.to_thread(model.cancel)
+                raise
+            except Exception as exc:
+                failure = inference_errors.describe_failure(exc, gpu_offload=self._gpu_offload_active())
+                logger.error(
+                    "chat_error model_id=%s error=%s category=%s", model_id, type(exc).__name__, failure.category
+                )
+                if failure.category == inference_errors.GPU_OUT_OF_MEMORY:
+                    raise inference_errors.InferenceFailure(failure.category, failure.message) from exc
                 raise
             finally:
                 # A cancelled request must not free the inference lock while the
@@ -982,8 +1032,17 @@ class LLMRuntime:
                         loop.call_soon_threadsafe(queue.put_nowait, chunk)
                     loop.call_soon_threadsafe(queue.put_nowait, None)
                 except Exception as exc:
-                    logger.error("gateway_stream_error model_id=%s error=%s", model_id, type(exc).__name__)
-                    loop.call_soon_threadsafe(queue.put_nowait, {"__error__": str(exc)})
+                    failure = inference_errors.describe_failure(exc, gpu_offload=self._gpu_offload_active())
+                    logger.error(
+                        "gateway_stream_error model_id=%s error=%s category=%s",
+                        model_id, type(exc).__name__, failure.category,
+                    )
+                    # "__error__" is the text for this machine's own user. A route
+                    # that serves another machine must use "__category__" instead.
+                    loop.call_soon_threadsafe(
+                        queue.put_nowait,
+                        {"__error__": failure.message, "__category__": failure.category},
+                    )
                     loop.call_soon_threadsafe(queue.put_nowait, None)
 
             fut = loop.run_in_executor(None, _generate)

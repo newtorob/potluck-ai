@@ -32,6 +32,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 from potluck_local.services.context_manager import handle_context_overflow
+from potluck_local.services.inference_errors import InferenceFailure
 from potluck_local.services.memory_extraction import get_memory_extractor
 from potluck_local.services.memory_retrieval import get_memory_retriever
 from potluck_local.services.context_relevance import latest_user_query, relevant_tasks
@@ -439,11 +440,14 @@ async def chat_completions(request: ChatRequest) -> object:
         )
 
     # Non-streaming path.
-    result = await runtime.chat(
-        messages=enhanced_messages,
-        temperature=request.temperature,
-        max_tokens=request.max_tokens,
-    )
+    try:
+        result = await runtime.chat(
+            messages=enhanced_messages,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+        )
+    except InferenceFailure as exc:
+        raise HTTPException(status_code=503, detail=exc.message) from exc
 
     # Schedule extraction after the response is assembled.
     if should_extract:

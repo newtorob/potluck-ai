@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from potluck_local.services import model_registry
 from potluck_local.services.context_tuning import resolve_context_size
+from potluck_local.services.inference_errors import InferenceFailure
 from potluck_local.services.model_downloader import get_downloader
 from potluck_local.services.model_lifecycle import get_model_lifecycle
 from potluck_local.services.runtime import get_runtime
@@ -119,6 +120,8 @@ async def test_local_model(slug: str, request: ModelTestRequest) -> dict:
         )
     except ModelIdentityError as exc:
         raise HTTPException(409, str(exc)) from exc
+    except InferenceFailure as exc:
+        raise HTTPException(503, exc.message) from exc
     except Exception as exc:
         raise HTTPException(503, "Local inference test failed. Check model and runtime settings.") from exc
     content = (result.get("choices") or [{}])[0].get("message", {}).get("content")

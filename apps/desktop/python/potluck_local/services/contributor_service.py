@@ -61,7 +61,7 @@ from potluck_local.contributor.telemetry import (
     full_hardware_summary,
     probe_capacity,
 )
-from potluck_local.services import circle_listener, circle_mesh
+from potluck_local.services import circle_listener, circle_mesh, inference_errors
 from potluck_local.services.circle_gate import CircleRoster, DirectAdmission
 from potluck_local.services.settings_manager import PotluckSettings
 from potluck_local.services.contribution_policy import admission_reason
@@ -834,6 +834,14 @@ class ContributorService:
                 stop=job.sampling.stop_sequences,
             ):
                 if isinstance(chunk, dict) and "__error__" in chunk:
+                    if chunk.get("__category__") == inference_errors.GPU_OUT_OF_MEMORY:
+                        # The coordinator's own category for this. The text is
+                        # fixed; the engine's message never leaves this machine.
+                        await self._send(ws, JobErrorMessage(
+                            job_id=job.job_id, error_category="oom",
+                            error_message=inference_errors.other_machine_text(inference_errors.GPU_OUT_OF_MEMORY),
+                        ))
+                        return
                     raise RuntimeError(str(chunk["__error__"]))
                 delta = None
                 try:

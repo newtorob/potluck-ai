@@ -64,6 +64,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from potluck_local.services import inference_errors
 from potluck_local.services.hardware_detect import detect_hardware
 from potluck_local.services.runtime import get_runtime
 from potluck_local.services.model_identity import ModelIdentityError, lock_headers
@@ -478,7 +479,8 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
                 async with aclosing(source):
                     async for chunk in source:
                         if "__error__" in chunk:
-                            yield 'data: {"error":{"message":"Inference failed","category":"inference_error"}}\n\n'
+                            event = {"error": inference_errors.other_machine_error(chunk.get("__category__"))}
+                            yield f"data: {json.dumps(event)}\n\n"
                             return
                         yield f"data: {json.dumps(chunk)}\n\n"
                 yield "data: [DONE]\n\n"
@@ -522,7 +524,7 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
             stop=request.stop,
             **identity,
         ):
-            chunks.append(chunk)
+            chunks.append(_fixed_error_event(chunk))
     except ModelIdentityError as exc:
         raise HTTPException(409, str(exc)) from exc
     await _record_served(served_model, _count_content_chunks(chunks),
@@ -531,6 +533,30 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
     # endpoint would emit. The runtime's chat() helper would do this
     # for us in a future refactor; for now we just stitch the stream.
     return JSONResponse({"raw_chunks": chunks}, headers=lock_headers(digest))
+
+
+def _fixed_error_event(chunk: str) -> str:
+    """Rewrite an error event so another machine gets fixed text chosen by category.
+
+    The runtime's error events carry the engine's message for this machine's own
+    user, and on Windows that can be a raw exception string. Whatever the event
+    says, the peer receives `{"error": {"category", "message"}}` with the message
+    taken from inference_errors by category alone. Chunks that are not top-level
+    error events pass through untouched.
+    """
+    if not chunk.startswith("data: {") or '"error"' not in chunk:
+        return chunk
+    try:
+        payload = json.loads(chunk[6:])
+    except ValueError:
+        return chunk
+    if not isinstance(payload, dict) or "error" not in payload:
+        return chunk
+    err = payload["error"]
+    # The runtime puts the category beside a string message; the batch path puts
+    # it inside an object.
+    category = err.get("category") if isinstance(err, dict) else payload.get("category")
+    return f"data: {json.dumps({'error': inference_errors.other_machine_error(category)})}\n\n"
 
 
 def _count_content_chunks(chunks: list[str]) -> int:
@@ -569,7 +595,7 @@ async def _served_metering_stream(
             async for chunk in upstream:
                 if chunk and "[DONE]" not in chunk:
                     count += 1
-                yield chunk
+                yield _fixed_error_event(chunk)
     except ModelIdentityError as exc:
         yield f'data: {json.dumps({"error": {"message": str(exc), "code": exc.category}})}\n\n'
         yield "data: [DONE]\n\n"

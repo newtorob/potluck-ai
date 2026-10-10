@@ -320,6 +320,7 @@ describe('engine circle categories', () => {
   describe.each(['circle', 'cooperative'] as const)('on the %s scope', (scope) => {
     it.each([
       ['model_mismatch', 'The contributor no longer has this model loaded.'],
+      ['gpu_out_of_memory', "The contributor's GPU most likely ran out of memory."],
       ['link_ended', 'The link to the contributor ended before the reply finished.'],
       ['stream_protocol_error', 'The contributor sent a reply this app could not read.'],
       ['stream_interrupted', 'The connection to the contributor ended before the reply finished.'],

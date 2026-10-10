@@ -53,7 +53,7 @@ from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from potluck_local.services import circle_gate
+from potluck_local.services import circle_gate, inference_errors
 from potluck_local.services.circle_gate import CircleRoster, DirectAdmission, DirectSlot
 from potluck_local.services.model_identity import ModelIdentityError
 
@@ -351,7 +351,8 @@ async def _stream_reply(runtime: Any, body: CircleChatRequest, loaded: str) -> A
         async with aclosing(source):
             async for chunk in source:
                 if isinstance(chunk, dict) and "__error__" in chunk:
-                    yield _error_event("inference_error", "Inference failed")
+                    fixed = inference_errors.other_machine_error(chunk.get("__category__"))
+                    yield _error_event(fixed["category"], fixed["message"])
                     yield _DONE
                     return
                 try:

@@ -403,6 +403,19 @@ async def _heartbeat_loop(
 _STUB_TOKEN_DELAY_S = 0.03
 
 
+def _job_error_fields(exc: BaseException, *, gpu_offload: bool) -> tuple[str, str]:
+    """(error_category, error_message) for a job_error sent to the coordinator.
+
+    The message is fixed text chosen by category. It used to be the first 200
+    characters of the exception, which went to another machine.
+    """
+    from potluck_local.services import inference_errors
+
+    if inference_errors.classify_inference_error(exc, gpu_offload=gpu_offload) == inference_errors.GPU_OUT_OF_MEMORY:
+        return "oom", inference_errors.other_machine_text(inference_errors.GPU_OUT_OF_MEMORY)
+    return "internal", type(exc).__name__
+
+
 async def _handle_real_job(
     ws: Any,
     job: JobAssignedMessage,
@@ -480,11 +493,8 @@ async def _handle_real_job(
             )
     except Exception as exc:
         logger.exception("real_job_engine_init_failed job_id=%s", job.job_id)
-        err = JobErrorMessage(
-            job_id=job.job_id,
-            error_category="internal",
-            error_message=str(exc)[:200],
-        )
+        category, message = _job_error_fields(exc, gpu_offload=settings.n_gpu_layers != 0)
+        err = JobErrorMessage(job_id=job.job_id, error_category=category, error_message=message)
         await ws.send(err.model_dump_json())
         return
 
@@ -546,11 +556,8 @@ async def _handle_real_job(
     except Exception as exc:  # pragma: no cover — defensive
         logger.exception("real_job_internal_error job_id=%s", job.job_id)
         try:
-            err = JobErrorMessage(
-                job_id=job.job_id,
-                error_category="internal",
-                error_message=str(exc)[:200],
-            )
+            category, message = _job_error_fields(exc, gpu_offload=settings.n_gpu_layers != 0)
+            err = JobErrorMessage(job_id=job.job_id, error_category=category, error_message=message)
             await ws.send(err.model_dump_json())
         except Exception:
             pass
@@ -597,11 +604,8 @@ async def _handle_stub_job(
     except Exception as exc:  # pragma: no cover — defensive
         logger.exception("stub_job_internal_error job_id=%s", job.job_id)
         try:
-            err = JobErrorMessage(
-                job_id=job.job_id,
-                error_category="internal",
-                error_message=str(exc)[:200],
-            )
+            category, message = _job_error_fields(exc, gpu_offload=False)
+            err = JobErrorMessage(job_id=job.job_id, error_category=category, error_message=message)
             await ws.send(err.model_dump_json())
         except Exception:
             pass

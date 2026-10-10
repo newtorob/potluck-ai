@@ -372,6 +372,7 @@ def _fits_a_lender(messages: Any, model: Any, temperature: Any, max_tokens: Any)
 # the two cannot be told apart cleanly, so every one is treated as the lender's.
 ERROR_TEXT: dict[str, str] = {
     "inference_error": "The circle member's computer could not finish the reply.",
+    "gpu_out_of_memory": "The circle member's GPU most likely ran out of memory.",
     "model_mismatch": "The circle member's computer no longer has that model loaded.",
     "link_ended": "The link to the circle member's computer ended.",
     "stream_protocol_error": "The circle member's computer sent a reply this app could not read.",

@@ -560,3 +560,19 @@ def test_settings_patch_reconciles_contributor(monkeypatch, tmp_path):
             assert applied[-1] is False
     finally:
         cs.set_contributor_service_for_tests(None)
+
+
+@run_async
+async def test_gpu_out_of_memory_becomes_the_coordinators_oom_with_fixed_text():
+    rt = FakeRuntime(chunks=[{"choices": [{"delta": {"content": "x"}}]},
+                             {"__error__": "[WinError -529697949] Windows Error 0xe06d7363",
+                              "__category__": "gpu_out_of_memory"}])
+    svc = cs.ContributorService(runtime_getter=lambda: rt, loop_runner=FakeLoopRunner())
+    ws = FakeWS()
+    job = JobAssignedMessage(type="job_assigned", job_id=uuid.uuid4(),
+                             model_slug="qwen3-4b-instruct-2507-q4", prompt="hi")
+    await svc._serve_job(ws, job)
+    err = ws.sent[-1]
+    assert err["type"] == "job_error" and err["error_category"] == "oom"
+    assert err["error_message"] == "The serving machine's GPU most likely ran out of memory."
+    assert "WinError" not in str(ws.sent) and svc.status()["jobs_served"] == 0

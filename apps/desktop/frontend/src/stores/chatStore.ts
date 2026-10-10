@@ -288,6 +288,7 @@ const CONTRIBUTOR_ERROR_COPY = new Map<string, string>([
   ['timeout', 'The contributor timed out before finishing.'],
   ['peer_disconnected', 'The contributor disconnected before finishing.'],
   ['oom', 'The contributor ran out of memory.'],
+  ['gpu_out_of_memory', "The contributor's GPU most likely ran out of memory."],
   ['model_not_loaded', 'The contributor did not have this model loaded.'],
   ['declined', 'The contributor declined this request.'],
   ['internal', 'The contributor hit an internal error.'],
