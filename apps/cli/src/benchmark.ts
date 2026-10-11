@@ -11,7 +11,7 @@ import { plainText } from "./logs.js";
 import { emptyMine, formatMine, localGateway, measureMine, type MineReport } from "./benchmark-mesh.js";
 import { acceptanceFor, acceptanceLine, describeLoaded, describeMachine, fmtMs, fmtRate, formatSummary, gpuNote, Interrupted, parseInference, parseRun,
   roundRun, summarizeRuns, type Acceptance, type InferenceInfo, type LastBenchmark, type Machine, type Placement, type RunResult, type RunSummary } from "./benchmark-stats.js";
-import { ensureInstalled, gib, isLoadPending, loadModel, readSetupOptions, validID, type ModelCall, type ModelDeps, type SetupModel, type SetupOptions, type TransferContext } from "./model-setup.js";
+import { ensureInstalled, gib, isLoadPending, loadModel, parseRecommended, readSetupOptions, recommendedLines, validID, type ModelCall, type ModelDeps, type Recommendation, type SetupModel, type SetupOptions, type TransferContext } from "./model-setup.js";
 import type { OnboardingIO } from "./operational-setup.js";
 import { RuntimeError, runtimeRequest } from "./runtime.js";
 
@@ -41,6 +41,8 @@ export interface BenchmarkReport {
   ranOn: Placement | null;
   /** The engine's check of this model's answers on this setup. Null when the engine has no such check or has not run it on this load. */
   acceptance: Acceptance | null;
+  /** The engine's picks for this machine (at most three, best first). Empty for an engine that does not rank models. */
+  recommended: Recommendation[];
   gpuDevices: string[];
   /** The engine's remembered result for this model from before this run. */
   lastBenchmarkBefore: LastBenchmark | null;
@@ -77,7 +79,8 @@ function listModels(models: SetupModel[], recommended: string | null, io: Onboar
 }
 
 /** Ask which model to measure. Enter keeps the loaded one; q quits. Null means quit. */
-async function pickModel(options: SetupOptions, models: SetupModel[], before: string | null, io: BenchmarkIO, halt: () => void): Promise<string | null> {
+async function pickModel(options: SetupOptions, models: SetupModel[], before: string | null, io: BenchmarkIO, halt: () => void, picks: Recommendation[]): Promise<string | null> {
+  for (const line of recommendedLines(picks, models)) io.progress(plainText(line + "\n"));
   listModels(models, options.recommendedModel, io);
   const fallback = before ?? options.recommendedModel;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -131,7 +134,7 @@ export async function benchmarkMachine(args: CliArgs, io: BenchmarkIO, deps: Ben
     return { id: null, confirmed: false };
   };
 
-  const report: BenchmarkReport = { schemaVersion: 1, status: "complete", machine: describeMachine({} as SetupOptions["hardware"]), model: null, localSkipped: null, ranOn: null, acceptance: null,
+  const report: BenchmarkReport = { schemaVersion: 1, status: "complete", machine: describeMachine({} as SetupOptions["hardware"]), model: null, localSkipped: null, ranOn: null, acceptance: null, recommended: [],
     gpuDevices: [], lastBenchmarkBefore: null, requestedRuns: runs, runs: [], summary: null, switch: null, loadedAtEnd: null, loadedAtEndConfirmed: false };
   try {
     // Nothing on the machine changes until the checks below pass; a failure here throws.
@@ -139,6 +142,7 @@ export async function benchmarkMachine(args: CliArgs, io: BenchmarkIO, deps: Ben
     const options = await readSetupOptions(quickTimeout, "benchmark", signal);
     halt();
     const models = options.models.filter(m => validID(m.id));
+    report.recommended = parseRecommended(options.recommended, models);
     const before = validID(options.currentModel) ? options.currentModel : null;
     // A loaded model with an ID this command cannot pass back to the engine could not be loaded again after a switch.
     if (options.currentModel && !before) throw new RuntimeError("The model loaded on this machine has an ID that benchmark cannot switch back to. Unload it with potluck models unload first. Nothing was changed.");
@@ -169,7 +173,7 @@ export async function benchmarkMachine(args: CliArgs, io: BenchmarkIO, deps: Ben
     let id: string;
     if (args.model) id = args.model;
     else if (io.interactive) {
-      const picked = await pickModel(options, models, before, io, halt);
+      const picked = await pickModel(options, models, before, io, halt, report.recommended);
       if (picked === null) { report.status = "quit"; return report; }
       id = picked;
     } else if (before) id = before;

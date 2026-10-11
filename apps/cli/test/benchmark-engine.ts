@@ -9,7 +9,9 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-export interface FakeModel { id: string; sizeBytes: number; installed: boolean; fits?: boolean; reasons?: string[] }
+export interface FakeModel { id: string; sizeBytes: number; installed: boolean; fits?: boolean; reasons?: string[];
+  /** What an engine that measures adds to a model. Left out, as an older engine does. */
+  fitBasis?: "measured" | "estimate"; measured?: Record<string, unknown> | null; checked?: "passed" | "failed" | null }
 export interface Call { method: string; path: string; body: unknown; headers: Record<string, string | string[] | undefined> }
 export interface BenchResult { output_tokens: number; ttft_ms: number; duration_ms: number; tokens_per_sec: number; prompt_tokens_per_sec: number | null }
 
@@ -37,6 +39,8 @@ export class FakeEngine {
     { id: "huge", sizeBytes: 60 * GIB, installed: false, fits: false, reasons: ["Needs about 73.5 GiB available RAM and 73.5 GiB total RAM."] },
     { id: "fresh", sizeBytes: 3 * GIB, installed: false },
   ];
+  /** The `recommended` list of GET /models/setup-options. Undefined leaves the key out, as an older engine does. */
+  recommended: unknown = undefined;
   hardware: Record<string, unknown> = { os: "Darwin", arch: "arm64", cpu_name: "arm", ram_total_gb: 16, ram_available_gb: 8, gpu_name: "Apple M2 Pro" };
   /** Progress states a download walks through before it is complete. */
   downloadStates = ["downloading", "verifying", "complete"];
@@ -98,7 +102,9 @@ export class FakeEngine {
   private setup(): unknown {
     return { schemaVersion: 1, hardware: this.hardware, diskFreeBytes: 100 * GIB, currentModel: this.loaded, recommendedModel: "small",
       models: this.models.map(m => ({ id: m.id, name: m.id.toUpperCase(), sizeBytes: m.sizeBytes, installed: m.installed, loaded: m.id === this.loaded,
-        fits: m.fits ?? true, reasons: m.reasons ?? [], estimatedWorkingGiB: 4 })) };
+        fits: m.fits ?? true, reasons: m.reasons ?? [], estimatedWorkingGiB: 4,
+        ...(m.fitBasis ? { fitBasis: m.fitBasis, measured: m.measured ?? null, checked: m.checked ?? null } : {}) })),
+      ...(this.recommended !== undefined ? { recommended: this.recommended } : {}) };
   }
 
   private async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {

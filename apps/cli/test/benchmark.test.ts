@@ -319,6 +319,56 @@ describe("choosing in a terminal", () => {
     expect(said.join("")).toContain("nope is not in the list.");
     expect(said.join("")).toContain("huge is not possible on this machine right now: Needs about 73.5 GiB");
   });
+  it("shows the engine's picks for this machine ahead of the full list, with why and what was measured", async () => {
+    engine.models[0] = { ...engine.models[0], fitBasis: "measured", checked: "passed",
+      measured: { hostGiB: 5.2, gpuGiB: 5.4, contextTokens: 4096, tokensPerSecond: 45, checkedAt: "2026-10-09T10:00:00Z" } };
+    engine.models[1] = { ...engine.models[1], fitBasis: "measured", checked: "passed",
+      measured: { hostGiB: 2.4, gpuGiB: null, contextTokens: 4096, tokensPerSecond: 12.3, checkedAt: "2026-10-09T10:00:00Z" } };
+    engine.recommended = [{ id: "big", basis: "proven_fast", tokensPerSecond: 45 }, { id: "small", basis: "proven_slow", tokensPerSecond: 12.3 },
+      { id: "fresh", basis: "estimate", tokensPerSecond: null }];
+    const { io, text } = terminal([""]);
+    const report = await run([], io);
+    expect(text()).toContain([
+      "Recommended for this machine:",
+      "  big (5.0 GiB, loaded): passed its answer check here, 45.0 tokens/s; needs 5.2 GiB, measured here",
+      "  small (2.0 GiB, installed): passed its answer check here, 12.3 tokens/s; needs 2.4 GiB, measured here",
+      "  fresh (3.0 GiB, download): not measured on this machine yet",
+      "Installed on this machine:"].join("\n"));
+    expect(report.recommended).toEqual(engine.recommended);
+  });
+  it("shows a fresh machine's picks as not measured yet, three at most, and nothing the engine did not list", async () => {
+    engine.recommended = [{ id: "fresh", basis: "estimate", tokensPerSecond: null }, { id: "small", basis: "estimate", tokensPerSecond: null },
+      { id: "big", basis: "estimate", tokensPerSecond: null }, { id: "huge", basis: "estimate", tokensPerSecond: null },
+      { id: "fresh", basis: "estimate", tokensPerSecond: null }, { id: "not-installed-anywhere", basis: "estimate" }, "huge", null];
+    const { io, text } = terminal([""]);
+    const report = await run([], io);
+    const block = text().split("Installed on this machine:")[0].split("Recommended for this machine:\n")[1];
+    expect(block.trimEnd().split("\n")).toEqual([
+      "  fresh (3.0 GiB, download): not measured on this machine yet", "  small (2.0 GiB, installed): not measured on this machine yet",
+      "  big (5.0 GiB, loaded): not measured on this machine yet"]);
+    expect(report.recommended.map(p => p.id)).toEqual(["fresh", "small", "big"]);
+  });
+  it("prints nothing new for an engine that does not send picks, and the report says none", async () => {
+    const { io, text } = terminal([""]);
+    const report = await run([], io);
+    expect(text()).not.toContain("Recommended for this machine");
+    expect(report.recommended).toEqual([]);
+    expect(JSON.parse(JSON.stringify(report))).toMatchObject({ schemaVersion: 1, status: "complete", model: "big", recommended: [] });
+  });
+  it("shows a pick without proof wording it does not know, and strips engine text", async () => {
+    engine.recommended = [{ id: "small", basis: "from_a_newer_engine\u001b[31m", tokensPerSecond: 20 }];
+    const { io, text } = terminal([""]);
+    await run([], io);
+    expect(text()).toContain("Recommended for this machine:\n  small (2.0 GiB, installed)\n");
+    expect(text()).not.toContain("\u001b");
+  });
+  it("lists the picks only in the questions, not in a piped run", async () => {
+    engine.recommended = [{ id: "small", basis: "estimate", tokensPerSecond: null }];
+    const { io, said } = piped();
+    const report = await run([], io);
+    expect(said.join("")).not.toContain("Recommended for this machine");
+    expect(report.recommended).toEqual([{ id: "small", basis: "estimate", tokensPerSecond: null }]);
+  });
   it("offers the recommended model when nothing is loaded", async () => {
     engine.loaded = null;
     const { io, asked } = terminal(["q"]);
@@ -589,7 +639,7 @@ describe("the command", () => {
     expect(code).toBe(0);
     expect(stdout.trim().split("\n")).toHaveLength(1);
     const report = JSON.parse(stdout) as BenchmarkReport;
-    expect(Object.keys(report).sort()).toEqual(["acceptance", "gpuDevices", "lastBenchmarkBefore", "loadedAtEnd", "loadedAtEndConfirmed", "localSkipped", "machine", "mine", "model", "ranOn",
+    expect(Object.keys(report).sort()).toEqual(["acceptance", "gpuDevices", "lastBenchmarkBefore", "loadedAtEnd", "loadedAtEndConfirmed", "localSkipped", "machine", "mine", "model", "ranOn", "recommended",
       "requestedRuns", "runs", "schemaVersion", "status", "summary", "switch"]);
     expect(report).toMatchObject({ schemaVersion: 1, status: "complete", model: "small", requestedRuns: 2, loadedAtEnd: "big", switch: { from: "big", to: "small", outcome: "restored" },
       machine: { description: "Apple M2 Pro, 16 GiB memory, 8.0 GiB available now", ramTotalGB: 16, ramAvailableGB: 8 }, ranOn: { kind: "gpu", backend: "Metal", layersOnGpu: 37, totalLayers: 37, contextTokens: 8192 },

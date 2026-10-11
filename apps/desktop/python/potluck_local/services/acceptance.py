@@ -37,7 +37,9 @@ fault gives. See the calibration notes in the tests.
 Proofs
 ------
 A result is kept as a proof, tied to everything that could change the answer
-(see build_key). A passing proof is reused so a load does not repeat the checks;
+(see build_key). A proof also carries what the load cost this machine
+(memory_probe.py) and which file it was for, so model_setup.py can judge fit
+from a measurement. A passing proof is reused so a load does not repeat the checks;
 a proof that the GPU gave wrong answers is reused so a known-bad GPU is not
 loaded again; a proof that the model itself failed is reused for
 MODEL_FAILED_DAYS, so a model that fails does not load three times at every
@@ -453,10 +455,15 @@ class ProofStore:
     tolerant of a missing, damaged or oversized file, which reads as empty.
     A failure to write is logged and ignored: the check result is still used
     for this load.
+
+    The same class keeps the persisted benchmark results (model_evidence.py),
+    under its own file and section name: a benchmark is tied to a key the same
+    way a proof is, and ages out the same way.
     """
 
-    def __init__(self, path: Path | Callable[[], Path] | None = None) -> None:
+    def __init__(self, path: Path | Callable[[], Path] | None = None, *, section: str = "proofs") -> None:
         self._path = path
+        self._section = section
         self._lock = threading.Lock()
 
     def path(self) -> Path:
@@ -472,7 +479,7 @@ class ProofStore:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return {}
-        proofs = payload.get("proofs") if isinstance(payload, dict) else None
+        proofs = payload.get(self._section) if isinstance(payload, dict) else None
         if not isinstance(proofs, dict):
             return {}
         return {k: v for k, v in proofs.items() if isinstance(v, dict) and isinstance(v.get("key"), dict)}
@@ -484,7 +491,7 @@ class ProofStore:
             fd, temporary = tempfile.mkstemp(prefix=".acceptance-", dir=path.parent)
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as stream:
-                    json.dump({"schema_version": SCHEMA_VERSION, "proofs": proofs}, stream, separators=(",", ":"))
+                    json.dump({"schema_version": SCHEMA_VERSION, self._section: proofs}, stream, separators=(",", ":"))
                     stream.flush()
                     os.fsync(stream.fileno())
                 os.replace(temporary, path)
@@ -506,11 +513,39 @@ class ProofStore:
             return None
         return proof
 
+    def entries(self, *, now: float | None = None) -> list[dict]:
+        """Every entry that has not aged out, newest first. For lookups that match on part of a key."""
+        moment = time.time() if now is None else now
+        with self._lock:
+            found = [p for p in self._read().values() if isinstance(p.get("checked_at_epoch"), (int, float))]
+        live = [p for p in found if moment - p["checked_at_epoch"] <= _max_age_seconds(p["key"], p.get("verdict"))]
+        return sorted(live, key=lambda p: p["checked_at_epoch"], reverse=True)
+
+    def attach(self, key: dict, fields: dict) -> None:
+        """Add fields the stored entry for exactly this key does not have yet. Nothing already stored is
+        replaced and the time of the check does not move."""
+        with self._lock:
+            proofs = self._read()
+            entry = proofs.get(key_id(key))
+            if entry is None or entry.get("key") != key:
+                return
+            missing = {k: v for k, v in fields.items() if k not in entry}
+            if missing:
+                entry.update(missing)
+                self._write(proofs)
+
     def put(self, key: dict, record: dict) -> None:
         stamp = time.time()
         entry = {**record, "key": key, "checked_at_epoch": stamp, "checked_at": iso(stamp)}
         with self._lock:
             proofs = self._read()
+            earlier = proofs.get(key_id(key))
+            if earlier is not None and earlier.get("key") == key:
+                # The same weights, backend, device, driver and library: what the load cost
+                # is still the best figure there is until a newer one replaces it.
+                for kept in ("measurement", "model"):
+                    if kept not in entry and kept in earlier:
+                        entry[kept] = earlier[kept]
             proofs[key_id(key)] = entry
             proofs = {k: v for k, v in proofs.items()
                       if stamp - float(v.get("checked_at_epoch") or 0) <= _max_age_seconds(v["key"], v.get("verdict"))}

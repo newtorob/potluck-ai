@@ -170,3 +170,69 @@ def test_the_default_location_is_in_the_engine_data_directory(tmp_path, monkeypa
     assert (tmp_path / "data" / "acceptance-proofs.json").is_file()
     monkeypatch.setenv("POTLUCK_DATA_DIR", str(tmp_path / "other"))
     assert s.get(make_key()) is None  # the location follows the data directory
+
+
+# ---- what a load cost, kept with the proof; the same file format holds benchmarks -----------
+
+MEASURED = {"measurement": {"host_fall_bytes": 123, "n_ctx": 4096}, "model": {"id": "m", "size": 1, "mtime_ns": 2}}
+
+
+def test_a_newer_result_for_the_same_key_keeps_the_cost_and_the_file_when_it_brings_none(store):
+    store.put(make_key(), {**RECORD, **MEASURED})
+    store.put(make_key(), RECORD)  # a later check that measured nothing
+    proof = store.get(make_key())
+    assert proof["measurement"] == MEASURED["measurement"] and proof["model"] == MEASURED["model"]
+
+
+def test_a_newer_measurement_replaces_the_older_one(store):
+    store.put(make_key(), {**RECORD, **MEASURED})
+    store.put(make_key(), {**RECORD, "measurement": {"host_fall_bytes": 456}})
+    assert store.get(make_key())["measurement"] == {"host_fall_bytes": 456}
+
+
+def test_a_cost_is_never_carried_to_a_different_key(store):
+    store.put(make_key(), {**RECORD, **MEASURED})
+    store.put(make_key(driver="32.0.1"), RECORD)
+    assert "measurement" not in store.get(make_key(driver="32.0.1"))
+
+
+def test_attach_adds_only_what_is_missing_and_leaves_the_time_of_the_check_alone(store):
+    store.put(make_key(), RECORD)
+    before = store.get(make_key())
+    store.attach(make_key(), {"measurement": {"host_fall_bytes": 1}, "verdict": "model_failed", "model": {"id": "m"}})
+    after = store.get(make_key())
+    assert after["measurement"] == {"host_fall_bytes": 1} and after["model"] == {"id": "m"}
+    assert after["verdict"] == "ok", "a stored field is never replaced"
+    assert after["checked_at_epoch"] == before["checked_at_epoch"]
+    store.attach(make_key(), {"measurement": {"host_fall_bytes": 2}})
+    assert store.get(make_key())["measurement"] == {"host_fall_bytes": 1}
+
+
+def test_attach_to_a_key_that_is_not_stored_does_nothing(store):
+    store.attach(make_key(), {"measurement": {}})
+    assert not store.path().exists()
+
+
+def test_entries_lists_what_has_not_aged_out_newest_first(store):
+    store.put(make_key(sha256="a" * 64), RECORD)
+    store.put(make_key(sha256="b" * 64), RECORD)
+    store.put(make_key(sha256="c" * 64), {**RECORD, "verdict": a.MODEL_FAILED})
+    payload = json.loads(store.path().read_text())
+    ids = {p["key"]["model_sha256"][0]: i for i, p in payload["proofs"].items()}
+    payload["proofs"][ids["a"]]["checked_at_epoch"] -= 1000 * DAY      # too old for anything
+    payload["proofs"][ids["c"]]["checked_at_epoch"] -= (a.MODEL_FAILED_DAYS + 1) * DAY  # a failure is forgotten sooner
+    payload["proofs"][ids["b"]]["checked_at_epoch"] -= 1 * DAY
+    store.path().write_text(json.dumps(payload))
+    assert [p["key"]["model_sha256"][0] for p in store.entries()] == ["b"]
+    assert store.entries(now=payload["proofs"][ids["b"]]["checked_at_epoch"] + 500 * DAY) == []
+
+
+def test_a_second_section_in_its_own_file_is_independent_and_read_back_the_same_way(tmp_path):
+    results = a.ProofStore(tmp_path / "benchmark-results.json", section="benchmarks")
+    proofs = a.ProofStore(tmp_path / "acceptance-proofs.json")
+    results.put(make_key(level="benchmark"), {"result": {"tokens_per_sec": 20.0}})
+    assert json.loads(results.path().read_text())["benchmarks"] and "proofs" not in json.loads(results.path().read_text())
+    assert results.get(make_key(level="benchmark"))["result"] == {"tokens_per_sec": 20.0}
+    assert proofs.entries() == []
+    # a file written under the other section name reads as empty, never as this one's entries
+    assert a.ProofStore(results.path()).entries() == []

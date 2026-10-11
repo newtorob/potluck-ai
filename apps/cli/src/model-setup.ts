@@ -1,23 +1,68 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import type { CliArgs } from "./args.js";
 import { ControlError } from "./control.js";
-import { label, parseAcceptance, setupAcceptanceLine } from "./benchmark-stats.js";
+import { fmtRate, label, parseAcceptance, setupAcceptanceLine } from "./benchmark-stats.js";
 import { loadCliPrefs, saveCliPrefs } from "./config.js";
 import { plainText } from "./logs.js";
 import { pinnedModel, readProjectModelLock } from "./model-lock.js";
 import { runtimeRequest, RuntimeError } from "./runtime.js";
 import type { OnboardingIO } from "./operational-setup.js";
 
+/** What the engine measured for a model on this machine. Absent from engines that do not measure. */
+export interface Measured { hostGiB: number | null; gpuGiB: number | null; contextTokens: number | null; tokensPerSecond: number | null; checkedAt: string | null }
 export interface SetupModel {
   id: string; name: string; sizeBytes: number; installed: boolean; loaded: boolean;
   fits: boolean; reasons: string[]; estimatedWorkingGiB: number;
+  /** Whether `fits` was judged from a measurement on this machine or from the size-based estimate. */
+  fitBasis?: "measured" | "estimate"; measured?: Measured | null; checked?: "passed" | "failed" | null;
 }
+/** One of the engine's (at most three) picks for this machine, best first. */
+export interface Recommendation { id: string; basis: string; tokensPerSecond: number | null }
 export interface SetupOptions {
   schemaVersion: number; hardware: { ram_total_gb: number; ram_available_gb: number; gpu_name?: string; cpu_name?: string; os?: string; arch?: string };
   diskFreeBytes: number; currentModel: string | null; recommendedModel: string | null; models: SetupModel[];
+  /** Absent from an engine that does not rank models. */
+  recommended?: Recommendation[];
 }
 export const gib = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
 export const validID = (id: unknown): id is string => typeof id === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}$/.test(id);
+
+/**
+ * The engine's picks as this client will show them: valid IDs of models in `models`, each once, at most three,
+ * in the engine's order. An engine without `recommended`, or one that sends something else, gives none.
+ */
+export function parseRecommended(value: unknown, models: SetupModel[]): Recommendation[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>(), picks: Recommendation[] = [];
+  for (const item of value) {
+    const r = item && typeof item === "object" && !Array.isArray(item) ? item as Record<string, unknown> : {};
+    if (!validID(r.id) || seen.has(r.id) || !models.some(m => m.id === r.id)) continue;
+    seen.add(r.id);
+    const speed = typeof r.tokensPerSecond === "number" && Number.isFinite(r.tokensPerSecond) && r.tokensPerSecond >= 0 ? r.tokensPerSecond : null;
+    picks.push({ id: r.id, basis: label(r.basis, 40) ?? "", tokensPerSecond: speed });
+    if (picks.length === 3) break;
+  }
+  return picks;
+}
+/** Why a model is picked, in the words a person reads. A basis this client does not know says nothing about proof. */
+function whyPicked(pick: Recommendation, model: SetupModel): string {
+  const rate = pick.tokensPerSecond !== null ? `${fmtRate(pick.tokensPerSecond)} tokens/s` : null;
+  const proof = pick.basis === "proven_fast" || pick.basis === "proven_slow" ? `passed its answer check here${rate ? ", " + rate : ""}`
+    : pick.basis === "proven_speed_unknown" ? "passed its answer check here, speed not measured yet"
+    : pick.basis === "estimate" ? "not measured on this machine yet" : "";
+  const need = model.fitBasis === "measured" && typeof model.measured?.hostGiB === "number" ? `needs ${model.measured.hostGiB.toFixed(1)} GiB, measured here` : "";
+  return [proof, need].filter(Boolean).join("; ");
+}
+/** The "Recommended for this machine" block shown ahead of the full list. Empty when the engine gave no picks. */
+export function recommendedLines(picks: Recommendation[], models: SetupModel[]): string[] {
+  const rows = picks.flatMap(pick => {
+    const model = models.find(m => m.id === pick.id);
+    if (!model) return [];
+    const why = whyPicked(pick, model);
+    return [`  ${pick.id} (${gib(model.sizeBytes)}${model.loaded ? ", loaded" : model.installed ? ", installed" : ", download"})${why ? ": " + why : ""}`];
+  });
+  return rows.length ? ["Recommended for this machine:", ...rows] : [];
+}
 const SETUP_STOPPED = "Setup interrupted. Run setup again to resume; existing weights are preserved.";
 
 /** Statuses for which the engine's `detail` on POST /models/{id}/test is a plain sentence for this machine's own user. */
@@ -123,12 +168,14 @@ export async function setupModel(args: CliArgs, io?: OnboardingIO, deps: ModelDe
     options.models = [...options.models.filter(m => m.id !== lock.model.id), pinned];
   }
   let id = selected ?? options.currentModel ?? options.recommendedModel;
+  const picks = parseRecommended(options.recommended, options.models), found = picks.length ? { recommended: picks } : {};
   if (io && !selected && !args.withModel) {
+    for (const line of recommendedLines(picks, options.models)) io.progress(plainText(line + "\n"));
     const choices = [...options.models].sort((a, b) => Number(b.fits) - Number(a.fits) || Number(b.installed) - Number(a.installed) || a.sizeBytes - b.sizeBytes);
     for (const m of choices.slice(0, 8)) io.progress(plainText(`  ${m.id}: ${gib(m.sizeBytes)}${m.loaded ? ", loaded" : m.installed ? ", installed" : " download"}${m.fits ? "" : ", " + m.reasons.join(" ")}\n`));
     const answer = await io.ask(`Model ID${id ? ` [${id}]` : ""}, or skip: `);
     if (answer === null) throw new RuntimeError("Setup interrupted. Run setup again to resume.");
-    if (answer.trim().toLowerCase() === "skip") return { status: "skipped" };
+    if (answer.trim().toLowerCase() === "skip") return { status: "skipped", ...found };
     id = answer.trim() || id;
   }
   if (!id || !validID(id)) throw new RuntimeError("No fitting model was found. Free memory/disk space or choose an installed model with setup --model <id>.");
@@ -139,7 +186,7 @@ export async function setupModel(args: CliArgs, io?: OnboardingIO, deps: ModelDe
     const action = `${model.installed ? "Use" : "Download " + gib(model.sizeBytes) + " for"} ${id}, load it locally, and run a short test? [y/N] `;
     const answer = await io.ask(action);
     if (answer === null) throw new RuntimeError("Setup interrupted. Run setup again to resume.");
-    if (!/^(y|yes)$/i.test(answer.trim())) return { status: "skipped" };
+    if (!/^(y|yes)$/i.test(answer.trim())) return { status: "skipped", ...found };
   }
   const prefix = `/models/${encodeURIComponent(id)}`;
   let ownDownload = false;
@@ -180,7 +227,7 @@ export async function setupModel(args: CliArgs, io?: OnboardingIO, deps: ModelDe
     if (!lock) { const prefs = await loadCliPrefs(); await saveCliPrefs({ ...prefs, model: id }); }
     io?.progress(`Ready: ${id} returned a local response.\n`);
     return { status: "ready", model: id, scope: "local", durationMs: test.durationMs, outputTokens: test.outputTokens,
-      pinned: Boolean(lock), gatewayRequiredForAgent: true, ...(acceptance ? { acceptance } : {}) };
+      pinned: Boolean(lock), gatewayRequiredForAgent: true, ...(acceptance ? { acceptance } : {}), ...found };
   } catch (error) {
     if (io?.signal?.aborted) {
       if (ownDownload) { try { await request(prefix + "/cancel-download", {}); } catch { /* progress command reports actual state */ } }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { parseArgs } from "../src/args.js";
-import { setupModel } from "../src/model-setup.js";
+import { parseRecommended, recommendedLines, setupModel, type SetupModel } from "../src/model-setup.js";
 import { runtimeRequest } from "../src/runtime.js";
 import { readProjectModelLock } from "../src/model-lock.js";
 import { loadCliPrefs, saveCliPrefs } from "../src/config.js";
@@ -91,4 +91,61 @@ it("follows a preexisting locked download without cancelling it, then verifies e
   expect((await setupModel(parseArgs(["setup", "--with-model"]), undefined, deps)).status).toBe("ready");
   expect(installs).toBe(2);
   expect(request.mock.calls.some(c => c[0].endsWith("/cancel-download"))).toBe(false);
+});
+
+const GIB = 1024 ** 3;
+const sized = (id: string, gib: number, over: Partial<SetupModel> = {}): SetupModel => ({ ...model, id, sizeBytes: gib * GIB, ...over });
+it("shows the engine's picks before the list in a terminal, and returns them in the result", async () => {
+  const picks = [{ id: "big", basis: "proven_fast", tokensPerSecond: 45 }, { id: "small", basis: "estimate", tokensPerSecond: null }];
+  serve({ ...base, recommended: picks, models: [sized("big", 5, { installed: true, fitBasis: "measured", checked: "passed",
+    measured: { hostGiB: 5.2, gpuGiB: null, contextTokens: 4096, tokensPerSecond: 45, checkedAt: null } }), sized("small", 1)] } as never);
+  const said: string[] = [], ask = vi.fn().mockResolvedValueOnce("small").mockResolvedValueOnce("n");
+  const result = await setupModel(parseArgs(["setup"]), { ask, progress: m => { said.push(m); } }, deps);
+  expect(result).toEqual({ status: "skipped", recommended: picks });
+  const out = said.join("");
+  expect(out.indexOf("Recommended for this machine:")).toBeGreaterThan(-1);
+  expect(out).toContain("  big (5.0 GiB, installed): passed its answer check here, 45.0 tokens/s; needs 5.2 GiB, measured here\n");
+  expect(out).toContain("  small (1.0 GiB, download): not measured on this machine yet\n");
+  expect(out.indexOf("Recommended for this machine:")).toBeLessThan(out.indexOf("  big: 5.0 GiB, installed"));
+});
+it("keeps the model prompt default as it was: the loaded model, else the engine's single recommendedModel", async () => {
+  serve({ ...base, recommendedModel: "small", recommended: [{ id: "big", basis: "proven_fast", tokensPerSecond: 45 }],
+    models: [sized("big", 5, { installed: true }), sized("small", 1)] } as never);
+  const ask = vi.fn().mockResolvedValueOnce("").mockResolvedValueOnce("n");
+  await setupModel(parseArgs(["setup"]), { ask, progress: vi.fn() }, deps);
+  expect(ask.mock.calls[0][0]).toBe("Model ID [small], or skip: ");
+});
+it("adds the picks to a finished setup's result and leaves the result alone for an engine without them", async () => {
+  serve({ ...base, recommended: [{ id: "small", basis: "estimate", tokensPerSecond: null }] } as never);
+  expect(await setupModel(parseArgs(["setup", "--model", "small", "--no-input"]), undefined, deps))
+    .toMatchObject({ status: "ready", model: "small", recommended: [{ id: "small", basis: "estimate", tokensPerSecond: null }] });
+  serve();
+  expect(await setupModel(parseArgs(["setup", "--model", "small", "--no-input"]), undefined, deps)).not.toHaveProperty("recommended");
+});
+it("prints no list and no new line for an engine without picks", async () => {
+  serve(); const said: string[] = [], ask = vi.fn().mockResolvedValueOnce("small").mockResolvedValueOnce("n");
+  await setupModel(parseArgs(["setup"]), { ask, progress: m => { said.push(m); } }, deps);
+  expect(said.join("")).not.toContain("Recommended");
+});
+it("keeps valid IDs of listed models, once each, three at most, in the engine's order", () => {
+  const models = ["a", "b", "c", "d"].map(id => sized(id, 1));
+  const raw = [{ id: "b", basis: "estimate" }, { id: "b", basis: "estimate" }, { id: "zzz", basis: "estimate" }, { id: "../x", basis: "estimate" },
+    7, null, [], { id: "a", basis: "proven_fast", tokensPerSecond: -1 }, { id: "c", basis: "estimate", tokensPerSecond: Number.NaN }, { id: "d" }];
+  expect(parseRecommended(raw, models)).toEqual([{ id: "b", basis: "estimate", tokensPerSecond: null },
+    { id: "a", basis: "proven_fast", tokensPerSecond: null }, { id: "c", basis: "estimate", tokensPerSecond: null }]);
+  expect(parseRecommended(undefined, models)).toEqual([]);
+  expect(parseRecommended({ id: "a" }, models)).toEqual([]);
+});
+it("words each kind of pick, and names the measurement only where the fit came from one", () => {
+  const models = [sized("fast", 4, { installed: true, loaded: true, fitBasis: "measured", measured: { hostGiB: 5.24, gpuGiB: null, contextTokens: null, tokensPerSecond: null, checkedAt: null } }),
+    sized("slow", 2, { installed: true, fitBasis: "estimate", measured: null }), sized("nospeed", 1, { fitBasis: "measured", measured: { hostGiB: 1.04, gpuGiB: null, contextTokens: null, tokensPerSecond: null, checkedAt: null } }),
+    sized("new", 3)];
+  const lines = recommendedLines([{ id: "fast", basis: "proven_fast", tokensPerSecond: 130.4 }, { id: "slow", basis: "proven_slow", tokensPerSecond: 9 },
+    { id: "nospeed", basis: "proven_speed_unknown", tokensPerSecond: null }, { id: "new", basis: "estimate", tokensPerSecond: null }], models);
+  expect(lines).toEqual(["Recommended for this machine:",
+    "  fast (4.0 GiB, loaded): passed its answer check here, 130 tokens/s; needs 5.2 GiB, measured here",
+    "  slow (2.0 GiB, installed): passed its answer check here, 9.0 tokens/s",
+    "  nospeed (1.0 GiB, download): passed its answer check here, speed not measured yet; needs 1.0 GiB, measured here",
+    "  new (3.0 GiB, download): not measured on this machine yet"]);
+  expect(recommendedLines([], models)).toEqual([]);
 });

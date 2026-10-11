@@ -26,10 +26,12 @@ from contextlib import aclosing, asynccontextmanager
 from functools import partial
 from pathlib import Path
 
-from potluck_local.services import acceptance, inference_errors
+from potluck_local.services import acceptance, inference_errors, memory_probe, model_evidence
 from potluck_local.services.model_identity import ModelIdentityError, artifact_identity, file_stamp
 
 logger = logging.getLogger(__name__)
+
+PERSISTED_BENCHMARKS_TTL = 30.0
 
 # llama.cpp reports what it actually did while loading a model. These are the
 # lines that carry it. Parsing the engine's own output is the only way to say
@@ -150,6 +152,9 @@ class LLMRuntime:
         # loads so the Models page + peer rows can show "last bench" without
         # re-running. Populated by benchmark().
         self._benchmarks: dict[str, dict] = {}
+        # Results kept from before this process started (services/model_evidence.py),
+        # read at most every PERSISTED_BENCHMARKS_TTL seconds: peers ask often.
+        self._persisted_benchmarks: tuple[float, dict[str, dict]] | None = None
         # What llama.cpp reported while loading the current model: which
         # backend was selected, how many layers it actually put on the GPU,
         # and the per-device weight buffers. None when nothing is loaded.
@@ -160,6 +165,11 @@ class LLMRuntime:
         self._acceptance: dict | None = None
         self._acceptance_tokens: int | None = None
         self._load_args: dict | None = None
+        # What loading the current model cost this machine (services/memory_probe.py):
+        # the window's figures so far, and the GPU meter that goes with them. The checks
+        # extend the window; the proof stores it. None when nothing was measured.
+        self._load_memory: dict | None = None
+        self._gpu_meter = None
         # Ensure unload runs before ggml-metal's atexit finalize on process exit.
         self._atexit_registered = False
 
@@ -234,8 +244,28 @@ class LLMRuntime:
         return self._batcher is not None
 
     def benchmarks(self) -> dict[str, dict]:
-        """Last benchmark result keyed by model_id (tokens/sec + TTFT)."""
-        return dict(self._benchmarks)
+        """Last benchmark result keyed by model_id (tokens/sec + TTFT).
+
+        Results from before a restart are included while they still describe this
+        file, backend, driver and library; one measured in this process wins."""
+        merged = self._remembered_benchmarks()
+        merged.update(self._benchmarks)
+        return merged
+
+    def _remembered_benchmarks(self) -> dict[str, dict]:
+        cached = self._persisted_benchmarks
+        if cached is not None and time.monotonic() - cached[0] < PERSISTED_BENCHMARKS_TTL:
+            return dict(cached[1])
+        from potluck_local.utils.paths import models_dir
+
+        loaded = None
+        if self._model is not None and self._model_id:
+            report = self._load_report or {}
+            loaded = {"id": self._model_id, "cpu_only": bool(report.get("cpu_only")),
+                      "n_gpu_layers": report.get("used_n_gpu_layers", 0)}
+        found = model_evidence.persisted_benchmarks(models_dir(), loaded)
+        self._persisted_benchmarks = (time.monotonic(), found)
+        return dict(found)
 
     def inference_summary(self) -> dict | None:
         """Where the loaded model is actually executing, as llama.cpp reported it.
@@ -444,7 +474,14 @@ class LLMRuntime:
             except OSError:
                 identity = None
             _LOG_LINES.clear()
-            model = Llama(**kwargs)
+            # The memory window opens here: the previous model is already gone and the
+            # weights have not been read yet. The answer check extends it (see _run_checks_now).
+            meter = None if rpc_servers or n_gpu_layers == 0 else self._gpu_meter_for(selected_device)
+            sampler = None if rpc_servers else self._open_memory_window(meter)
+            try:
+                model = Llama(**kwargs)
+            finally:
+                window = sampler.stop() if sampler is not None else None
             verified_identity = None
             try:
                 if identity:
@@ -467,6 +504,9 @@ class LLMRuntime:
             self._model_id = Path(model_path).parent.name
             self._loaded_n_ctx = n_ctx
             self._loaded_rpc_servers = tuple(rpc_servers) if rpc_servers else None
+            self._load_memory = {**window, "window": "load"} if window else None
+            self._gpu_meter = meter if window else None
+            self._persisted_benchmarks = None
             backend_selection = selection.as_dict()
             if not backend_selection["devices"]:
                 # Metal, or a wheel with one backend set: nothing was probed, so
@@ -514,6 +554,25 @@ class LLMRuntime:
                 "rpc_servers": list(rpc_servers) if rpc_servers else None,
                 "inference": self.inference_summary(),
             }
+
+    @staticmethod
+    def _gpu_meter_for(selected_device):
+        """The meter for the device layers are offloaded to, or None when no honest GPU figure exists."""
+        from potluck_local.services import llama_backend
+
+        try:
+            chosen = selected_device or llama_backend.offload_device(llama_backend.describe_devices())
+            return memory_probe.gpu_meter(chosen[1]) if chosen else None
+        except Exception:  # noqa: BLE001 - a measurement must never stop a load
+            return None
+
+    @staticmethod
+    def _open_memory_window(meter):
+        try:
+            return memory_probe.MemorySampler(gpu=meter).start()
+        except Exception:  # noqa: BLE001
+            logger.debug("memory_window_not_started", exc_info=True)
+            return None
 
     def load_pipeline(
         self,
@@ -871,29 +930,32 @@ class LLMRuntime:
             proof = store.get(key)
             if proof and proof.get("verdict") == acceptance.OK:
                 self._publish(level, key, proof=proof)
+                self._remember_measurement(key, proof)
                 return moved
             if proof and proof.get("verdict") == acceptance.MODEL_FAILED:
                 # Failed on this setup within the last week, on the CPU as well as the GPU
                 # if it had one. The planned load stays as it is.
                 self._publish(level, key, proof=proof, status=acceptance.FAILED, verdict=acceptance.MODEL_FAILED,
                               message=acceptance.MODEL_FAILED_TEXT)
+                self._remember_measurement(key, proof)
                 return moved
             if proof and proof.get("verdict") == acceptance.GPU_WRONG_OUTPUT and self._gpu_offload_active() and args:
                 known_bad = proof  # loaded before this was known: move it now
 
-        gpu_run = None
+        gpu_run = gpu_measured = None
         if known_bad is None:
             run = self._run_checks_now(level)
+            measured = self._measurement_now()  # before any reload replaces the window
             if run.passed:
-                self._store(key, run, acceptance.OK)
+                self._store(key, run, acceptance.OK, measurement=measured)
                 self._publish(level, key, run=run)
                 return moved
             if not self._gpu_offload_active() or not args:
-                self._store(key, run, acceptance.MODEL_FAILED)
+                self._store(key, run, acceptance.MODEL_FAILED, measurement=measured)
                 self._publish(level, key, run=run, status=acceptance.FAILED, verdict=acceptance.MODEL_FAILED,
                               message=acceptance.MODEL_FAILED_TEXT)
                 return moved
-            gpu_run = run
+            gpu_run, gpu_measured = run, measured
         gpu_key = known_bad["key"] if known_bad is not None else key
 
         if not (self._load_report or {}).get("cpu_only"):
@@ -915,12 +977,15 @@ class LLMRuntime:
         if cpu_proof and cpu_proof.get("verdict") == acceptance.OK:
             self._publish(level, cpu_key, proof=cpu_proof, verdict=acceptance.GPU_WRONG_OUTPUT,
                           fallback=acceptance.FALLBACK_TO_CPU, message=acceptance.GPU_WRONG_TEXT)
+            self._remember_measurement(cpu_key, cpu_proof)
             return moved
         cpu_run = self._run_checks_now(level)
+        cpu_measured = self._measurement_now()
         if cpu_run.passed:
             if gpu_run is not None:
-                self._store(gpu_key, gpu_run, acceptance.GPU_WRONG_OUTPUT, cross_check={"device": "CPU", "passed": True})
-            self._store(cpu_key, cpu_run, acceptance.OK)
+                self._store(gpu_key, gpu_run, acceptance.GPU_WRONG_OUTPUT, cross_check={"device": "CPU", "passed": True},
+                            measurement=gpu_measured)
+            self._store(cpu_key, cpu_run, acceptance.OK, measurement=cpu_measured)
             self._publish(level, cpu_key, run=cpu_run, verdict=acceptance.GPU_WRONG_OUTPUT,
                           fallback=acceptance.FALLBACK_TO_CPU, message=acceptance.GPU_WRONG_TEXT)
             return moved
@@ -928,10 +993,11 @@ class LLMRuntime:
         # Wrong on the CPU too: the model is the problem, not the GPU. The GPU is
         # faster, so the planned load goes back.
         cross_check = {"device": "CPU", "passed": False}
-        self._store(cpu_key, cpu_run, acceptance.MODEL_FAILED)
+        self._store(cpu_key, cpu_run, acceptance.MODEL_FAILED, measurement=cpu_measured)
         # The GPU key holds the verdict for the load that is put back. When it
         # held "the GPU is wrong", the CPU now says otherwise and this replaces it.
-        self._store(gpu_key, gpu_run or cpu_run, acceptance.MODEL_FAILED, cross_check=cross_check)
+        self._store(gpu_key, gpu_run or cpu_run, acceptance.MODEL_FAILED, cross_check=cross_check,
+                    measurement=gpu_measured)
         moved = self._reload(args)
         self._publish(level, self._key_now(level, sha), run=gpu_run or cpu_run, status=acceptance.FAILED,
                       verdict=acceptance.MODEL_FAILED, message=acceptance.MODEL_FAILED_TEXT)
@@ -952,6 +1018,9 @@ class LLMRuntime:
         self._acceptance = acceptance.summary(
             status=acceptance.RUNNING, model_id=self._model_id, level=level, ran_on=self._ran_on(None),
         )
+        # The checks belong to the load's memory window: a long prompt can need buffers
+        # the load did not. Without a window (nothing measured the load) they add none.
+        sampler = self._open_memory_window_over(self._load_memory)
         try:
             return acceptance.run_checks(
                 self._model, level, n_ctx=self._loaded_n_ctx, on_cpu=not self._gpu_offload_active(),
@@ -959,14 +1028,56 @@ class LLMRuntime:
         except BaseException:
             self._acceptance = before  # "running" must not outlive the checks
             raise
+        finally:
+            if sampler is not None:
+                self._load_memory = {**sampler.stop(), "window": "load+checks"}
 
-    @staticmethod
-    def _store(key: dict | None, run: acceptance.CheckRun, verdict: str, **extra) -> None:
+    def _open_memory_window_over(self, window: dict | None):
+        if window is None:
+            return None
+        try:
+            return memory_probe.MemorySampler(previous=window, gpu=self._gpu_meter).start()
+        except Exception:  # noqa: BLE001
+            logger.debug("memory_window_not_extended", exc_info=True)
+            return None
+
+    def _measurement_now(self) -> dict | None:
+        """What loading (and, once they ran, checking) the current model cost, with the context size
+        and layer split it was measured at. None when nothing was measured."""
+        window = self._load_memory
+        if not window:
+            return None
+        report = self._load_report or {}
+        return {**window, "n_ctx": self._loaded_n_ctx, "n_gpu_layers": report.get("used_n_gpu_layers"),
+                "offloaded_layers": report.get("offloaded_layers"), "total_layers": report.get("total_layers"),
+                "measured_at": acceptance.iso()}
+
+    def _loaded_file(self) -> dict | None:
+        return model_evidence.file_identity(self._model_path, self._model_id) if self._model_path else None
+
+    def _remember_measurement(self, key: dict | None, proof: dict | None) -> None:
+        """A reused proof keeps the measurement it was stored with. One stored before measurements
+        existed gets this load's reading, once, so the model is measured without being checked again."""
+        if key is None or proof is None:
+            return
+        fields = {}
+        if "model" not in proof and (identity := self._loaded_file()):
+            fields["model"] = identity
+        if "measurement" not in proof and (measured := self._measurement_now()):
+            fields["measurement"] = measured
+        if fields:
+            acceptance.get_store().attach(key, fields)
+
+    def _store(self, key: dict | None, run: acceptance.CheckRun, verdict: str, *,
+               measurement: dict | None = None, **extra) -> None:
         if key is not None:
-            acceptance.get_store().put(key, {
-                "verdict": verdict, "level": run.level, "duration_ms": run.duration_ms,
-                "output_tokens": run.output_tokens, "checks": run.records(), **extra,
-            })
+            record = {"verdict": verdict, "level": run.level, "duration_ms": run.duration_ms,
+                      "output_tokens": run.output_tokens, "checks": run.records(), **extra}
+            if measurement is not None:
+                record["measurement"] = measurement
+            if (identity := self._loaded_file()) is not None:
+                record["model"] = identity
+            acceptance.get_store().put(key, record)
 
     def _publish(
         self, level: str, key: dict | None, *, run: acceptance.CheckRun | None = None, proof: dict | None = None,
@@ -1113,6 +1224,9 @@ class LLMRuntime:
         self._acceptance = None
         self._acceptance_tokens = None
         self._load_args = None
+        self._load_memory = None
+        self._gpu_meter = None
+        self._persisted_benchmarks = None
         if self._model is not None:
             import gc
 
@@ -1627,7 +1741,22 @@ class LLMRuntime:
             )
             if model_id:
                 self._benchmarks[model_id] = result
+                await loop.run_in_executor(None, self._remember_benchmark, result)
             return result
+
+    def _remember_benchmark(self, result: dict) -> None:
+        """Keep the result across a restart, under a key like the answer check's (same weights, backend,
+        device, layer split, driver and library). Called with the inference lock held, so what is
+        loaded cannot change underneath it. A fault here costs the persistence, never the benchmark."""
+        try:
+            key = self._key_now("benchmark", self.current_model_sha256())
+            identity = self._loaded_file()
+            if key is None or identity is None:
+                return
+            model_evidence.get_benchmark_store().put(key, {"model": identity, "result": result, "n_ctx": self._loaded_n_ctx})
+            self._persisted_benchmarks = None
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("benchmark_not_saved error=%s", type(exc).__name__)
 
 
 # Fixed prompt for the prompt-processing benchmark: about 700 tokens of
