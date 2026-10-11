@@ -494,6 +494,7 @@ class LLMRuntime:
                 model = Llama(**kwargs)
             finally:
                 window = sampler.stop() if sampler is not None else None
+            model_traits.fit_model(model)
             verified_identity = None
             try:
                 if identity:
