@@ -24,10 +24,10 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from potluck_local import __version__
-from potluck_local.routers import account, agents, batches, chat, chat_circle, circles, contributor, gateway, hardware, health, memory, models, ollama, peer, readiness, settings, tasks, usage, vault, verify
+from potluck_local.routers import account, agents, anthropic, batches, chat, chat_circle, circles, contributor, gateway, hardware, health, memory, models, ollama, peer, readiness, settings, tasks, usage, vault, verify
 from potluck_local.utils.logging import setup_logging
 from potluck_local.routers import split
-from potluck_local.services import peer_trust
+from potluck_local.services import anthropic_messages, peer_trust
 from potluck_local.services.split_native import SplitError
 
 logger = logging.getLogger(__name__)
@@ -74,6 +74,24 @@ def _resolve_mesh_network() -> ipaddress.IPv4Network | ipaddress.IPv6Network:
             "invalid_mesh_cidr value=%r falling back to default=%s", raw, _DEFAULT_MESH_CIDR
         )
         return ipaddress.ip_network(_DEFAULT_MESH_CIDR)
+
+
+# The Anthropic Messages routes answer in Anthropic's error shape, including the
+# refusals made here before a request reaches them.
+_MESSAGES_PATHS = ("/v1/messages", "/v1/messages/count_tokens")
+
+
+def _refusal(path: str, status: int, detail: str) -> JSONResponse:
+    """A refusal by the middleware. The Messages routes get {"type": "error", ...};
+    every other path keeps {"detail": ...}."""
+    if path in _MESSAGES_PATHS:
+        return JSONResponse(status_code=status, content=anthropic_messages.error_body(status, detail))
+    return JSONResponse(status_code=status, content={"detail": detail})
+
+
+def _key_matches(presented: str, key: str) -> bool:
+    """Constant-time comparison. Bytes, so a non-ASCII header is a mismatch and not an error."""
+    return bool(presented) and hmac.compare_digest(presented.encode("utf-8", "replace"), key.encode("utf-8", "replace"))
 
 
 def _client_ip_in_network(
@@ -347,14 +365,10 @@ def create_app() -> FastAPI:
         # reachable from another machine, even one in the same household.
         if not is_loopback:
             if not (normalised.startswith("/peer/") or normalised == "/health"):
-                return JSONResponse(
-                    status_code=403,
-                    content={
-                        "detail": (
-                            "this path is only available to localhost; "
-                            "household peers may call /peer/* or /health"
-                        ),
-                    },
+                return _refusal(
+                    normalised, 403,
+                    "this path is only available to localhost; "
+                    "household peers may call /peer/* or /health",
                 )
 
             # /peer/* and the full /health body are for household members only
@@ -412,21 +426,20 @@ def create_app() -> FastAPI:
                 except Exception:
                     effective_key = None
             if effective_key is not None:
+                # The key is a bearer token (OpenAI clients) or an x-api-key header
+                # (the Anthropic SDKs). Either one may carry it.
                 auth = request.headers.get("authorization", "")
-                presented = auth[7:] if auth[:7].lower() == "bearer " else ""
-                if not (presented and hmac.compare_digest(presented, effective_key)):
-                    return JSONResponse(
-                        status_code=401,
-                        content={"detail": "missing or invalid gateway API key"},
-                    )
+                bearer = auth[7:] if auth[:7].lower() == "bearer " else ""
+                if not (
+                    _key_matches(bearer, effective_key)
+                    or _key_matches(request.headers.get("x-api-key", ""), effective_key)
+                ):
+                    return _refusal(normalised, 401, "missing or invalid gateway API key")
                 return await call_next(request)
             # Gateway not configured: open only when the sidecar gate is off (dev).
             # In production (token set) it stays disabled until the user enables it.
             if sidecar_token is not None:
-                return JSONResponse(
-                    status_code=404,
-                    content={"detail": "gateway disabled; enable it in Settings -> Connect tools"},
-                )
+                return _refusal(normalised, 404, "gateway disabled; enable it in Settings -> Connect tools")
             return await call_next(request)
 
         # Shared-secret gate — applies to loopback callers too. When a token is
@@ -500,6 +513,7 @@ def create_app() -> FastAPI:
     app.include_router(contributor.router, prefix="/contributor", tags=["contributor"])
     app.include_router(verify.router, prefix="/verify", tags=["verify"])
     app.include_router(gateway.router, prefix="/v1", tags=["gateway"])
+    app.include_router(anthropic.router, prefix="/v1", tags=["gateway"])
     app.include_router(ollama.router, prefix="/api", tags=["ollama"])
 
     return app

@@ -32,6 +32,7 @@ word "memory".
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 GPU_OUT_OF_MEMORY = "gpu_out_of_memory"
@@ -127,6 +128,18 @@ def describe_failure(exc: BaseException, *, gpu_offload: bool) -> FailureDescrip
     if isinstance(exc, InferenceFailure):
         return FailureDescription(category, exc.message)
     return FailureDescription(category, str(exc))
+
+
+# What llama-cpp-python raises when the prompt does not fit the context window:
+# "Requested tokens (N) exceed context window of M". It raises when N is M or more.
+_PROMPT_OVERFLOW = re.compile(r"Requested tokens \((\d+)\) exceed context window of (\d+)")
+
+
+def prompt_overflow(text: object) -> tuple[int, int] | None:
+    """``(prompt tokens, context window)`` when ``text`` is the engine's message for a
+    prompt that does not fit, else None. Takes the exception or its text."""
+    match = _PROMPT_OVERFLOW.search(str(text)) if text is not None else None
+    return (int(match.group(1)), int(match.group(2))) if match else None
 
 
 def fixed_category(value: object) -> str:

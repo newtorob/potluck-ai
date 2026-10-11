@@ -7,6 +7,8 @@ instead of requiring the native Potluck UI.
 
 Endpoints:
   POST /v1/chat/completions  (streaming + non-streaming, native OpenAI shape)
+  POST /v1/messages          (Anthropic Messages API, in routers/anthropic.py; it
+                              shares this module's routing through plan_chat)
   POST /v1/completions       (legacy text-completion; routes the same as chat/completions)
   GET  /v1/models            (installed models)
   POST /v1/embeddings        (local embedding; no peer/pool routing)
@@ -30,6 +32,7 @@ import json
 import logging
 import time
 import uuid
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from fastapi import APIRouter, Header, HTTPException
@@ -48,7 +51,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_DEFAULT_MAX_TOKENS = 2048
+DEFAULT_MAX_TOKENS = 2048
+DEFAULT_TEMPERATURE = 0.7
 
 
 class GatewayMessage(BaseModel):
@@ -65,7 +69,7 @@ class ChatCompletionRequest(BaseModel):
     messages: list[GatewayMessage]
     model: str | None = None
     potluck_model_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
-    temperature: float = 0.7
+    temperature: float = DEFAULT_TEMPERATURE
     max_tokens: int | None = None
     stream: bool = False
     stop: list[str] | str | None = None
@@ -220,7 +224,7 @@ def _tool_route_error(prepared: gateway_request.Prepared, runtime, peer: dict | 
     return HTTPException(status_code=400, detail={"code": "tools_not_supported", "message": message})
 
 
-def _shape_options(req: ChatCompletionRequest, prepared: gateway_request.Prepared, runtime,
+def _shape_options(split_reasoning: bool, prepared: gateway_request.Prepared, runtime,
                    remote: bool) -> gateway_reply.ShapeOptions:
     """How to shape this reply. Reply text from another machine does not say whether
     its template opened the reasoning block; this machine's own template does."""
@@ -229,37 +233,79 @@ def _shape_options(req: ChatCompletionRequest, prepared: gateway_request.Prepare
         traits = traits_of_runtime(runtime)
         starts = None if traits is None else traits.opens_reasoning
     return gateway_reply.ShapeOptions(
-        split_reasoning=req.reasoning_format != "none",
+        split_reasoning=split_reasoning,
         starts_in_reasoning=starts,
         offered=prepared.offered_names or None,
     )
 
 
-@router.post("/chat/completions")
-async def chat_completions_openai(
-    req: ChatCompletionRequest,
-    x_potluck_scope: str | None = Header(default=None),
-    x_potluck_circle: str | None = Header(default=None),
-):
-    """OpenAI /v1/chat/completions. Serves the local model, or routes to a
-    household peer (your own machine over the mesh) that has the requested model
-    loaded. Routing is by model id: local first, then a reachable peer.
+@dataclass(frozen=True)
+class ChatJob:
+    """One chat request after its own API's parsing. /v1/chat/completions and
+    /v1/messages both hand one of these to plan_chat, so they share one routing path."""
+
+    prepared: gateway_request.Prepared
+    model: str | None
+    temperature: float
+    max_tokens: int | None
+    stream: bool
+    stop: list[str] | None = None
+    split_reasoning: bool = True
+    digest: str | None = None
+    # The OpenAI route has never passed `stop` to a reply it does not stream; the
+    # Messages route does.
+    stop_when_blocking: bool = False
+
+
+@dataclass(frozen=True)
+class ChatPlan:
+    """Where a ChatJob goes, decided once: this machine, a household peer, a circle or the pool."""
+
+    job: ChatJob
+    runtime: Any
+    local: str | None
+    peer: dict | None
+    use_pool: bool
+    # The scope string sent in the job body when use_pool is True. "pool" = open
+    # pool (strangers, single-turn by default); "circle" = trusted members
+    # (always multi-turn).
+    coordinator_scope: str
+    circle_id: str | None
+    served_model: str | None
+    served_by: str
+    options: gateway_reply.ShapeOptions
+    max_tokens: int
+
+    @property
+    def messages(self) -> list[dict]:
+        return self.job.prepared.messages
+
+    @property
+    def stop(self) -> list[str] | None:
+        return self.job.stop
+
+    @property
+    def identity(self) -> dict:
+        return {"expected_model": self.job.model or self.local, "expected_sha256": self.job.digest}
+
+    @property
+    def peer_identity(self) -> dict:
+        return {"sha256": self.job.digest} if self.job.digest else {}
+
+    @property
+    def tool_kwargs(self) -> dict:
+        return self.job.prepared.runtime_kwargs()  # empty unless the request offered tools
+
+
+async def plan_chat(job: ChatJob, x_potluck_scope: str | None, x_potluck_circle: str | None) -> ChatPlan:
+    """Choose the route for ``job``. Raises HTTPException when no route can serve it.
 
     X-Potluck-Scope controls the routing tier for this single request:
-      "local"  — this node only; 503 if no local model is loaded.
-      "mine"   — local first, then household peer; pool never used.
-      absent / any other value — default: local -> household -> pool-if-enabled.
+      "local"  - this node only; 503 if no local model is loaded.
+      "mine"   - local first, then household peer; pool never used.
+      absent / any other value - default: local -> household -> pool-if-enabled.
     """
-    try:
-        prepared = gateway_request.prepare(
-            [gateway_request.normalise_message(m.role, m.content, tool_calls_=m.tool_calls,
-                                               tool_call_id=m.tool_call_id, name=m.name)
-             for m in req.messages],
-            req.tools, req.tool_choice,
-        )
-    except gateway_request.RequestError as exc:
-        raise _refusal(exc) from exc
-
+    prepared = job.prepared
     runtime = get_runtime()
     local = runtime.current_model_id() if runtime.is_loaded() else None
 
@@ -269,17 +315,12 @@ async def chat_completions_openai(
     scope = (x_potluck_scope or "").lower().strip()
     peer = None
     use_pool = False
-    # coordinator_scope is the scope string sent in the job body when use_pool is
-    # True. "pool" = open pool (strangers, single-turn by default); "circle" =
-    # trusted members (always multi-turn).
     coordinator_scope = pool_routing._POOL_SCOPE
     circle_id: str | None = None
 
-    digest = req.potluck_model_sha256
-    identity = {"expected_model": req.model or local, "expected_sha256": digest}
-    peer_identity = {"sha256": digest} if digest else {}
+    digest = job.digest
     if digest:
-        peer = await _locked_route(runtime, req.model, digest, scope)
+        peer = await _locked_route(runtime, job.model, digest, scope)
     elif scope == "local":
         # This node only. Fail immediately — no fall-through to peer or pool.
         if local is None:
@@ -287,16 +328,16 @@ async def chat_completions_openai(
                 status_code=503,
                 detail="No local model loaded; load one or retry with X-Potluck-Scope: mine",
             )
-        if req.model and req.model != local:
+        if job.model and job.model != local:
             raise HTTPException(409, "Requested model is not loaded locally. Load that model or use mine scope.")
     elif scope == "mine":
         # Local first, then household peer. Pool is never reached.
-        if req.model and req.model != local:
-            peer = await gateway_routing.peer_for_model(req.model)
+        if job.model and job.model != local:
+            peer = await gateway_routing.peer_for_model(job.model)
             if peer is None:
                 raise HTTPException(
                     status_code=404,
-                    detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
+                    detail=f"model '{job.model}' is not loaded here or on a reachable household peer",
                 )
         if peer is None and local is None:
             raise HTTPException(
@@ -312,15 +353,15 @@ async def chat_completions_openai(
     else:
         # Default: local -> household peer -> open pool (if opted in). Existing
         # behavior preserved byte-for-byte when the header is absent.
-        if req.model and req.model != local:
-            peer = await gateway_routing.peer_for_model(req.model)
+        if job.model and job.model != local:
+            peer = await gateway_routing.peer_for_model(job.model)
             if peer is None:
                 if pool_routing.pool_enabled():
                     use_pool = True
                 else:
                     raise HTTPException(
                         status_code=404,
-                        detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
+                        detail=f"model '{job.model}' is not loaded here or on a reachable household peer",
                     )
         if not use_pool and peer is None and local is None:
             raise HTTPException(
@@ -332,12 +373,8 @@ async def chat_completions_openai(
     if refusal is not None:
         raise refusal
 
-    messages = prepared.messages
-    tool_kwargs = prepared.runtime_kwargs()  # empty unless the request offered tools
-    options = _shape_options(req, prepared, runtime, remote=bool(peer or use_pool))
-    max_tokens = req.max_tokens or _DEFAULT_MAX_TOKENS
-    stop = _normalise_stop(req.stop)
-    served_model = req.model if (peer or use_pool) else local
+    options = _shape_options(job.split_reasoning, prepared, runtime, remote=bool(peer or use_pool))
+    served_model = job.model if (peer or use_pool) else local
     if use_pool:
         served_by = coordinator_scope  # "pool" or "circle"
     elif peer:
@@ -347,36 +384,140 @@ async def chat_completions_openai(
 
     logger.info(
         "gateway_chat served_by=%s model=%s messages=%d stream=%s tools=%d",
-        served_by, served_model, len(messages), req.stream, len(prepared.tools or ()),
+        served_by, served_model, len(prepared.messages), job.stream, len(prepared.tools or ()),
+    )
+    return ChatPlan(
+        job=job, runtime=runtime, local=local, peer=peer, use_pool=use_pool,
+        coordinator_scope=coordinator_scope, circle_id=circle_id, served_model=served_model,
+        served_by=served_by, options=options, max_tokens=job.max_tokens or DEFAULT_MAX_TOKENS,
+    )
+
+
+def shaped_chunks(plan: ChatPlan):
+    """The reply to ``plan`` as OpenAI chat.completion.chunk dicts, with reasoning
+    and tool calls shaped (services/gateway_reply.py). An async iterator.
+
+    A failure on this machine's own model arrives as a chunk with an ``__error__``
+    key. Failures on the other routes are raised.
+    """
+    job = plan.job
+    if plan.use_pool:
+        # pool_routing applies the multi-turn privacy policy:
+        # circle always sends full messages; pool sends full messages
+        # only when pool_multiturn is explicitly opted in; otherwise
+        # only the last user message (prompt) crosses the wire.
+        return gateway_reply.shape_stream(pool_routing.stream_pool_openai(
+            plan.messages, plan.served_model, job.temperature, plan.max_tokens,
+            scope=plan.coordinator_scope, circle_id=plan.circle_id,
+        ), plan.options)
+    if plan.peer:
+        return gateway_reply.shape_stream(gateway_routing.stream_peer_openai(
+            plan.peer, plan.messages, plan.served_model, job.temperature, plan.max_tokens,
+            **plan.peer_identity, **plan.tool_kwargs
+        ), plan.options)
+    return gateway_reply.shape_stream(plan.runtime.stream_chat_raw(
+        plan.messages, temperature=job.temperature, max_tokens=plan.max_tokens, stop=plan.stop,
+        **plan.identity, **plan.tool_kwargs
+    ), plan.options)
+
+
+def http_failure(exc: BaseException, plan: ChatPlan) -> HTTPException:
+    """The HTTP error for an inference that failed before it produced a reply."""
+    if isinstance(exc, ModelIdentityError):
+        return HTTPException(409, str(exc))
+    if isinstance(exc, InferenceFailure):
+        # This machine's own GPU: the caller is this machine's user or agent.
+        return HTTPException(status_code=503, detail={"code": exc.category, "message": exc.message})
+    if isinstance(exc, RemoteStreamError):
+        return HTTPException(status_code=502, detail={"code": exc.category, "message": str(exc)})
+    if isinstance(exc, pool_routing.PoolDispatchError):
+        # Surface the coordinator's real status when it's meaningful (e.g. 503
+        # "no peer serves this model", the same condition as a local 404); any other
+        # upstream failure is a bad-gateway (502).
+        status = exc.status_code if exc.status_code in (401, 404, 503) else 502
+        return HTTPException(
+            status_code=status,
+            detail=pool_routing.refusal_message(exc, plan.coordinator_scope, plan.served_model),
+        )
+    logger.error("gateway_chat_failed", exc_info=exc)
+    return HTTPException(status_code=500, detail=f"inference failed: {type(exc).__name__}")
+
+
+async def complete_chat(plan: ChatPlan) -> dict:
+    """The whole reply to ``plan``, as a shaped OpenAI chat.completion. Records the
+    usage row. Raises HTTPException; the exception that caused it is its __cause__."""
+    job = plan.job
+    try:
+        if plan.use_pool:
+            result = await pool_routing.complete_pool_openai(
+                plan.messages, plan.served_model, job.temperature, plan.max_tokens,
+                scope=plan.coordinator_scope, circle_id=plan.circle_id,
+            )
+        elif plan.peer:
+            result = await gateway_routing.complete_peer_openai(
+                plan.peer, plan.messages, plan.served_model, job.temperature, plan.max_tokens,
+                **plan.peer_identity, **plan.tool_kwargs
+            )
+        else:
+            stop = {"stop": plan.stop} if (job.stop_when_blocking and plan.stop) else {}
+            result = await plan.runtime.chat(plan.messages, temperature=job.temperature,
+                                             max_tokens=plan.max_tokens, **plan.identity,
+                                             **plan.tool_kwargs, **stop)
+            if isinstance(result, dict):
+                result.setdefault("model", plan.local)
+    except Exception as exc:  # noqa: BLE001
+        raise http_failure(exc, plan) from exc
+    result = gateway_reply.shape_completion(result, plan.options)
+    _usage = result.get("usage", {}) if isinstance(result, dict) else {}
+    await record_usage(
+        plan,
+        input_tokens=int(_usage.get("prompt_tokens", 0) or 0),
+        output_tokens=int(_usage.get("completion_tokens", 0) or 0),
+    )
+    return result
+
+
+@router.post("/chat/completions")
+async def chat_completions_openai(
+    req: ChatCompletionRequest,
+    x_potluck_scope: str | None = Header(default=None),
+    x_potluck_circle: str | None = Header(default=None),
+):
+    """OpenAI /v1/chat/completions. Serves the local model, or routes to a
+    household peer (your own machine over the mesh) that has the requested model
+    loaded. Routing is by model id: local first, then a reachable peer.
+
+    X-Potluck-Scope controls the routing tier for this single request:
+      "local"  - this node only; 503 if no local model is loaded.
+      "mine"   - local first, then household peer; pool never used.
+      absent / any other value - default: local -> household -> pool-if-enabled.
+    """
+    try:
+        prepared = gateway_request.prepare(
+            [gateway_request.normalise_message(m.role, m.content, tool_calls_=m.tool_calls,
+                                               tool_call_id=m.tool_call_id, name=m.name)
+             for m in req.messages],
+            req.tools, req.tool_choice,
+        )
+    except gateway_request.RequestError as exc:
+        raise _refusal(exc) from exc
+
+    digest = req.potluck_model_sha256
+    plan = await plan_chat(
+        ChatJob(prepared, req.model, req.temperature, req.max_tokens, req.stream,
+                stop=_normalise_stop(req.stop), split_reasoning=req.reasoning_format != "none",
+                digest=digest),
+        x_potluck_scope, x_potluck_circle,
     )
 
     if req.stream:
         async def event_stream():
             try:
-                if use_pool:
-                    # pool_routing applies the multi-turn privacy policy:
-                    # circle always sends full messages; pool sends full messages
-                    # only when pool_multiturn is explicitly opted in; otherwise
-                    # only the last user message (prompt) crosses the wire.
-                    async for chunk in gateway_reply.shape_stream(pool_routing.stream_pool_openai(
-                        messages, served_model, req.temperature, max_tokens,
-                        scope=coordinator_scope, circle_id=circle_id,
-                    ), options):
-                        yield f"data: {json.dumps(chunk)}\n\n"
-                elif peer:
-                    async for chunk in gateway_reply.shape_stream(gateway_routing.stream_peer_openai(
-                        peer, messages, served_model, req.temperature, max_tokens, **peer_identity, **tool_kwargs
-                    ), options):
-                        yield f"data: {json.dumps(chunk)}\n\n"
-                else:
-                    async for chunk in gateway_reply.shape_stream(runtime.stream_chat_raw(
-                        messages, temperature=req.temperature, max_tokens=max_tokens, stop=stop,
-                        **identity, **tool_kwargs
-                    ), options):
-                        if isinstance(chunk, dict) and "__error__" in chunk:
-                            yield f'data: {json.dumps({"error": {"message": chunk["__error__"], "type": "inference_error", "code": chunk.get("__category__", "inference_error")}})}\n\n'
-                            break
-                        yield f"data: {json.dumps(chunk)}\n\n"
+                async for chunk in shaped_chunks(plan):
+                    if isinstance(chunk, dict) and "__error__" in chunk:
+                        yield f'data: {json.dumps({"error": {"message": chunk["__error__"], "type": "inference_error", "code": chunk.get("__category__", "inference_error")}})}\n\n'
+                        break
+                    yield f"data: {json.dumps(chunk)}\n\n"
                 # Terminator on normal completion. Not in finally: a client
                 # disconnect aclose()s this generator (GeneratorExit), and
                 # yielding during that raises and can wedge the stream.
@@ -384,7 +525,7 @@ async def chat_completions_openai(
             except pool_routing.PoolDispatchError as exc:
                 # Turned away before any answer started: say why, as a
                 # refusal the caller can show, not an inference failure.
-                refusal = {"message": pool_routing.refusal_message(exc, coordinator_scope, served_model),
+                refusal = {"message": pool_routing.refusal_message(exc, plan.coordinator_scope, plan.served_model),
                            "type": "routing_refused", "code": "refused", "status": exc.status_code}
                 yield f'data: {json.dumps({"error": refusal})}\n\n'
                 yield "data: [DONE]\n\n"
@@ -394,54 +535,17 @@ async def chat_completions_openai(
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(
-            _metered_consumed(event_stream(), _canonical_scope(served_by), served_model),
+            _metered_consumed(event_stream(), _canonical_scope(plan.served_by), plan.served_model),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache", "X-Accel-Buffering": "no",
-                "Connection": "keep-alive", "X-Potluck-Served-By": served_by, **lock_headers(digest),
+                "Connection": "keep-alive", "X-Potluck-Served-By": plan.served_by, **lock_headers(digest),
             },
         )
 
     # Non-streaming.
-    try:
-        if use_pool:
-            result = await pool_routing.complete_pool_openai(
-                messages, served_model, req.temperature, max_tokens,
-                scope=coordinator_scope, circle_id=circle_id,
-            )
-        elif peer:
-            result = await gateway_routing.complete_peer_openai(
-                peer, messages, served_model, req.temperature, max_tokens, **peer_identity, **tool_kwargs
-            )
-        else:
-            result = await runtime.chat(messages, temperature=req.temperature, max_tokens=max_tokens,
-                                        **identity, **tool_kwargs)
-            if isinstance(result, dict):
-                result.setdefault("model", local)
-    except ModelIdentityError as exc:
-        raise HTTPException(409, str(exc)) from exc
-    except InferenceFailure as exc:
-        # This machine's own GPU: the caller is this machine's user or agent.
-        raise HTTPException(status_code=503, detail={"code": exc.category, "message": exc.message}) from exc
-    except RemoteStreamError as exc:
-        raise HTTPException(status_code=502, detail={"code": exc.category, "message": str(exc)}) from exc
-    except pool_routing.PoolDispatchError as exc:
-        # Surface the coordinator's real status when it's meaningful (e.g. 503
-        # "no peer serves this model" — same condition as a local 404); any other
-        # upstream failure is a bad-gateway (502).
-        status = exc.status_code if exc.status_code in (401, 404, 503) else 502
-        raise HTTPException(status_code=status, detail=pool_routing.refusal_message(exc, coordinator_scope, served_model))
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("gateway_chat_failed")
-        raise HTTPException(status_code=500, detail=f"inference failed: {type(exc).__name__}")
-    result = gateway_reply.shape_completion(result, options)
-    _usage = result.get("usage", {}) if isinstance(result, dict) else {}
-    await _record_consumed(
-        _canonical_scope(served_by), served_model,
-        input_tokens=int(_usage.get("prompt_tokens", 0) or 0),
-        output_tokens=int(_usage.get("completion_tokens", 0) or 0),
-    )
-    return JSONResponse(result, headers={"X-Potluck-Served-By": served_by, **lock_headers(digest)})
+    result = await complete_chat(plan)
+    return JSONResponse(result, headers={"X-Potluck-Served-By": plan.served_by, **lock_headers(digest)})
 
 
 # ---------------------------------------------------------------------------
@@ -535,7 +639,7 @@ async def text_completions(
 
     prompt_text = _prompt_to_message(req.prompt)
     messages = [{"role": "user", "content": prompt_text}]
-    max_tokens = req.max_tokens or _DEFAULT_MAX_TOKENS
+    max_tokens = req.max_tokens or DEFAULT_MAX_TOKENS
     stop = _normalise_stop(req.stop)
     served_model = req.model if (peer or use_pool) else local
     if use_pool:
@@ -788,6 +892,12 @@ async def _record_consumed(
         )
     except Exception:
         logger.debug("usage_record_consumed_gateway_failed", exc_info=True)
+
+
+async def record_usage(plan: ChatPlan, **fields: Any) -> None:
+    """Record one consumed usage row for a request served by ``plan``. For the
+    routers that share plan_chat; the fields are those of _record_consumed."""
+    await _record_consumed(_canonical_scope(plan.served_by), plan.served_model, **fields)
 
 
 async def _metered_consumed(gen, scope: str, model_slug: str):

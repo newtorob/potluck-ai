@@ -238,6 +238,21 @@ class LLMRuntime:
         reasoning block). None when nothing is loaded or the backend cannot say."""
         return model_traits.traits_of_model(self._model) if self._pipeline is None else None
 
+    async def count_tokens(self, text: str) -> int | None:
+        """Tokens in ``text`` by the loaded llama.cpp model's own tokenizer, or None
+        when this runtime cannot say (nothing loaded, or a backend without one).
+        Never loads a model. Waits for a load or unload in progress, so the native
+        model cannot be freed while it is read."""
+        async with self._admission_lock:
+            tokenize = getattr(self._model, "tokenize", None)
+            if not callable(tokenize):
+                return None
+            try:
+                return len(tokenize(text.encode("utf-8", "replace"), add_bos=False))
+            except Exception as exc:  # noqa: BLE001 - a count is a convenience, never a failure
+                logger.debug("count_tokens_failed error=%s", type(exc).__name__)
+                return None
+
     def loaded_rpc_servers(self) -> tuple[str, ...] | None:
         """Return the RPC server endpoints the current model was loaded with.
         None when the model is loaded locally (or no model is loaded)."""
@@ -1390,6 +1405,7 @@ class LLMRuntime:
         max_tokens: int = 2048,
         tools: list[dict] | None = None,
         tool_choice: str | dict | None = None,
+        stop: list[str] | None = None,
     ) -> dict:
         """Non-streaming completion. Returns raw llama result dict."""
         if self._pipeline is not None:
@@ -1414,6 +1430,7 @@ class LLMRuntime:
                     temperature=temperature,
                     max_tokens=max_tokens,
                     stream=False,
+                    **({"stop": stop} if stop else {}),
                     **tool_calls.completion_kwargs(tools, tool_choice),
                 ),
             )
