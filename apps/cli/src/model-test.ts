@@ -62,7 +62,7 @@ export function formatModelTest(r: ModelTestReport): string {
     const where = describeRanOn(a.ranOn, true);
     if (where) lines.push(`Ran on: ${where}`);
     if (a.ranOn?.driver) lines.push(`Driver: ${a.ranOn.driver}`);
-    if (a.checks.length) lines.push("Checks:", ...a.checks.map(c => `  ${c.id}: ${c.passed ? "passed" : "failed"}, ${c.required ? "required" : "not required"}`));
+    if (a.checks.length) lines.push("Checks:", ...a.checks.map(c => `  ${c.id}: ${c.skipped ? `skipped (${c.skipped})` : c.passed ? "passed" : "failed"}, ${c.required ? "required" : "not required"}`));
   } else if (a) {
     lines.push(acceptanceLine(a) ?? "The engine has no answer check result for this model yet.");
   } else if (r.status === "passed") lines.push("This engine does not report an answer check, so only one reply was tested.");

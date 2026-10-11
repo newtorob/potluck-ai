@@ -14,6 +14,12 @@ Endpoints:
 Deliberately thin and clean: no memory injection or conversation persistence
 (those are desktop-app features on /chat). A faithful OpenAI provider.
 
+Chat completions also keep a thinking model's reasoning out of the answer text
+(message.reasoning_content, delta.reasoning_content; opt out with
+reasoning_format "none") and support function tools: tools, tool_choice,
+assistant tool_calls and role "tool" messages. See services/gateway_reply.py,
+services/tool_calls.py and services/reasoning_split.py for the rules.
+
 Auth: the app-level middleware gates /v1 with POTLUCK_GATEWAY_API_KEY (a separate
 opt-in key for external tools), NOT the internal sidecar token. See app.py.
 """
@@ -24,14 +30,15 @@ import json
 import logging
 import time
 import uuid
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from potluck_local.services import gateway_routing, pool_routing
+from potluck_local.services import gateway_reply, gateway_request, gateway_routing, pool_routing
 from potluck_local.services.inference_errors import InferenceFailure
+from potluck_local.services.model_traits import traits_of_runtime
 from potluck_local.services.remote_stream import RemoteStreamError
 from potluck_local.services.model_registry import list_models
 from potluck_local.services.runtime import get_runtime
@@ -46,7 +53,12 @@ _DEFAULT_MAX_TOKENS = 2048
 
 class GatewayMessage(BaseModel):
     role: str
-    content: str = ""
+    # A string, null, or a list of text parts. Checked in the handler so an image
+    # part is a clear 400 and not a 422 about the type.
+    content: str | list[Any] | None = ""
+    tool_calls: list[Any] | None = None
+    tool_call_id: str | None = None
+    name: str | None = None
 
 
 class ChatCompletionRequest(BaseModel):
@@ -57,6 +69,13 @@ class ChatCompletionRequest(BaseModel):
     max_tokens: int | None = None
     stream: bool = False
     stop: list[str] | str | None = None
+    # Function tools, in OpenAI's shape. Checked in the handler (clear 400s).
+    tools: list[Any] | None = None
+    tool_choice: Any = None
+    # llama.cpp's server calls this reasoning_format. "none" leaves the model's
+    # <think> block in `content`, as the gateway did before. "auto" and "deepseek"
+    # (and leaving it out) move the reasoning to `reasoning_content`.
+    reasoning_format: Literal["auto", "deepseek", "none"] | None = None
 
 
 def _normalise_stop(stop: list[str] | str | None) -> list[str] | None:
@@ -90,10 +109,13 @@ async def list_models_openai() -> dict:
     # Household peers' loaded models, so a tool sees the whole mesh's models and
     # can pick one that lives on another machine.
     try:
-        for slug in (await gateway_routing.household_model_map()).keys():
+        for slug, info in (await gateway_routing.household_model_map()).items():
             if slug not in seen:
                 seen.add(slug)
-                data.append({"id": slug, "object": "model", "created": created, "owned_by": "potluck-household"})
+                entry = {"id": slug, "object": "model", "created": created, "owned_by": "potluck-household"}
+                if isinstance(info, dict) and isinstance(info.get("_capabilities"), dict):
+                    entry["supports_tools"] = info["_capabilities"].get("supports_tools") is True
+                data.append(entry)
     except Exception:
         logger.exception("gateway_household_models_failed")
     # Open-pool models (other members' machines), only when the user opted in.
@@ -106,12 +128,21 @@ async def list_models_openai() -> dict:
                     data.append({"id": slug, "object": "model", "created": created, "owned_by": "potluck-pool"})
         except Exception:
             logger.exception("gateway_pool_models_failed")
+    # Whether the model on this machine takes tools. Known only for the loaded one.
+    traits = traits_of_runtime(runtime)
+    if cur and traits is not None:
+        for entry in data:
+            if entry["id"] == cur and entry["owned_by"] == "potluck":
+                entry["supports_tools"] = traits.supports_tools
     return {"object": "list", "data": data}
 
 
 @router.get("/potluck/capabilities")
 async def model_lock_capabilities() -> dict:
-    return {"model_lock_version": 1, "scopes": ["local", "mine"], "artifact_format": "gguf"}
+    # supports_tools is about the model loaded on this machine now.
+    traits = traits_of_runtime(get_runtime())
+    return {"model_lock_version": 1, "scopes": ["local", "mine"], "artifact_format": "gguf",
+            "supports_tools": bool(traits and traits.supports_tools)}
 
 
 async def _circle_id(selector: str | None) -> str:
@@ -163,6 +194,47 @@ async def model_readiness(req: ReadinessRequest) -> dict:
             "model": req.model, "scope": req.scope, "route": route}
 
 
+def _refusal(exc: gateway_request.RequestError) -> HTTPException:
+    return HTTPException(status_code=400, detail={"code": exc.code, "message": exc.message})
+
+
+def _tool_route_error(prepared: gateway_request.Prepared, runtime, peer: dict | None,
+                      use_pool: bool, pool_scope: str) -> HTTPException | None:
+    """The 400 for a request that uses tools when the chosen route cannot serve them."""
+    if not prepared.needs_tool_support:
+        return None
+    if use_pool:
+        message = (f"Tool calls are not available on {pool_scope} requests yet. "
+                   "Use this machine's model, or one of your own machines (X-Potluck-Scope: mine).")
+    elif peer:
+        if (peer.get("_capabilities") or {}).get("supports_tools") is True:
+            return None
+        message = ("The household machine serving this model does not support tool calls. "
+                   "Update Potluck on that machine, or use a model on this one.")
+    else:
+        traits = traits_of_runtime(runtime)
+        if traits is not None and traits.supports_tools:
+            return None
+        message = ("The loaded model does not support tool calls: its chat template has no tool section. "
+                   "Load a model that does, for example a Qwen model.")
+    return HTTPException(status_code=400, detail={"code": "tools_not_supported", "message": message})
+
+
+def _shape_options(req: ChatCompletionRequest, prepared: gateway_request.Prepared, runtime,
+                   remote: bool) -> gateway_reply.ShapeOptions:
+    """How to shape this reply. Reply text from another machine does not say whether
+    its template opened the reasoning block; this machine's own template does."""
+    starts: bool | None = None
+    if not remote:
+        traits = traits_of_runtime(runtime)
+        starts = None if traits is None else traits.opens_reasoning
+    return gateway_reply.ShapeOptions(
+        split_reasoning=req.reasoning_format != "none",
+        starts_in_reasoning=starts,
+        offered=prepared.offered_names or None,
+    )
+
+
 @router.post("/chat/completions")
 async def chat_completions_openai(
     req: ChatCompletionRequest,
@@ -178,6 +250,16 @@ async def chat_completions_openai(
       "mine"   — local first, then household peer; pool never used.
       absent / any other value — default: local -> household -> pool-if-enabled.
     """
+    try:
+        prepared = gateway_request.prepare(
+            [gateway_request.normalise_message(m.role, m.content, tool_calls_=m.tool_calls,
+                                               tool_call_id=m.tool_call_id, name=m.name)
+             for m in req.messages],
+            req.tools, req.tool_choice,
+        )
+    except gateway_request.RequestError as exc:
+        raise _refusal(exc) from exc
+
     runtime = get_runtime()
     local = runtime.current_model_id() if runtime.is_loaded() else None
 
@@ -246,7 +328,13 @@ async def chat_completions_openai(
                 detail="No model loaded on this node, and no household peer matched.",
             )
 
-    messages = [m.model_dump() for m in req.messages]
+    refusal = _tool_route_error(prepared, runtime, peer, use_pool, coordinator_scope)
+    if refusal is not None:
+        raise refusal
+
+    messages = prepared.messages
+    tool_kwargs = prepared.runtime_kwargs()  # empty unless the request offered tools
+    options = _shape_options(req, prepared, runtime, remote=bool(peer or use_pool))
     max_tokens = req.max_tokens or _DEFAULT_MAX_TOKENS
     stop = _normalise_stop(req.stop)
     served_model = req.model if (peer or use_pool) else local
@@ -258,8 +346,8 @@ async def chat_completions_openai(
         served_by = "local"
 
     logger.info(
-        "gateway_chat served_by=%s model=%s messages=%d stream=%s",
-        served_by, served_model, len(messages), req.stream,
+        "gateway_chat served_by=%s model=%s messages=%d stream=%s tools=%d",
+        served_by, served_model, len(messages), req.stream, len(prepared.tools or ()),
     )
 
     if req.stream:
@@ -270,20 +358,21 @@ async def chat_completions_openai(
                     # circle always sends full messages; pool sends full messages
                     # only when pool_multiturn is explicitly opted in; otherwise
                     # only the last user message (prompt) crosses the wire.
-                    async for chunk in pool_routing.stream_pool_openai(
+                    async for chunk in gateway_reply.shape_stream(pool_routing.stream_pool_openai(
                         messages, served_model, req.temperature, max_tokens,
                         scope=coordinator_scope, circle_id=circle_id,
-                    ):
+                    ), options):
                         yield f"data: {json.dumps(chunk)}\n\n"
                 elif peer:
-                    async for chunk in gateway_routing.stream_peer_openai(
-                        peer, messages, served_model, req.temperature, max_tokens, **peer_identity
-                    ):
+                    async for chunk in gateway_reply.shape_stream(gateway_routing.stream_peer_openai(
+                        peer, messages, served_model, req.temperature, max_tokens, **peer_identity, **tool_kwargs
+                    ), options):
                         yield f"data: {json.dumps(chunk)}\n\n"
                 else:
-                    async for chunk in runtime.stream_chat_raw(
-                        messages, temperature=req.temperature, max_tokens=max_tokens, stop=stop, **identity
-                    ):
+                    async for chunk in gateway_reply.shape_stream(runtime.stream_chat_raw(
+                        messages, temperature=req.temperature, max_tokens=max_tokens, stop=stop,
+                        **identity, **tool_kwargs
+                    ), options):
                         if isinstance(chunk, dict) and "__error__" in chunk:
                             yield f'data: {json.dumps({"error": {"message": chunk["__error__"], "type": "inference_error", "code": chunk.get("__category__", "inference_error")}})}\n\n'
                             break
@@ -322,10 +411,11 @@ async def chat_completions_openai(
             )
         elif peer:
             result = await gateway_routing.complete_peer_openai(
-                peer, messages, served_model, req.temperature, max_tokens, **peer_identity
+                peer, messages, served_model, req.temperature, max_tokens, **peer_identity, **tool_kwargs
             )
         else:
-            result = await runtime.chat(messages, temperature=req.temperature, max_tokens=max_tokens, **identity)
+            result = await runtime.chat(messages, temperature=req.temperature, max_tokens=max_tokens,
+                                        **identity, **tool_kwargs)
             if isinstance(result, dict):
                 result.setdefault("model", local)
     except ModelIdentityError as exc:
@@ -344,6 +434,7 @@ async def chat_completions_openai(
     except Exception as exc:  # noqa: BLE001
         logger.exception("gateway_chat_failed")
         raise HTTPException(status_code=500, detail=f"inference failed: {type(exc).__name__}")
+    result = gateway_reply.shape_completion(result, options)
     _usage = result.get("usage", {}) if isinstance(result, dict) else {}
     await _record_consumed(
         _canonical_scope(served_by), served_model,

@@ -20,6 +20,16 @@ a weak model, so the smallest model in the catalog passes on a healthy machine.
   recorded     fact        the capital of France
                stops       an answer ended by itself (finish_reason "stop")
                long_prompt a code planted in a long prompt is recalled
+               reasoning   a thinking model's reasoning comes back separately and
+                           17 x 23 is answered 391 (acceptance_gates.py)
+               tools       a weather tool is called with the right city and its
+                           result is used in the reply (acceptance_gates.py)
+
+A recorded check that does not apply to the model (reasoning for a model that
+does not think, tools for a template with no tool section), or whose reply the
+engine cut off at the token budget, is kept in the proof as passed with a
+"skipped" reason, so the stored shape only gains a key. The public list carries
+the same key, and only on those entries (see public_checks).
 
 Only the required checks decide the result. Changing any prompt or rule means
 bumping SUITE_VERSION, which makes every stored proof stale.
@@ -78,12 +88,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from potluck_local.services import inference_errors
+from potluck_local.services import acceptance_gates, inference_errors, model_traits
 
 logger = logging.getLogger(__name__)
 
 # Bump when a prompt, a judging rule or the set of required checks changes.
-SUITE_VERSION = 1
+SUITE_VERSION = 2
 SCHEMA_VERSION = 1
 LEVELS = ("quick", "full")
 
@@ -214,15 +224,21 @@ class Outcome:
     excerpt: str = ""
     ms: int = 0
     error: str | None = None
+    skipped: str | None = None  # why a recorded check did not apply or could not finish; it then counts as passed
 
     def api(self) -> dict:
-        return {"id": self.id, "passed": self.passed, "required": self.required}
+        out = {"id": self.id, "passed": self.passed, "required": self.required}
+        if self.skipped:
+            out["skipped"] = self.skipped
+        return out
 
     def record(self) -> dict:
         out = {"id": self.id, "passed": self.passed, "required": self.required, "finish_reason": self.finish_reason,
                "tokens": self.tokens, "excerpt": self.excerpt, "ms": self.ms}
         if self.error:
             out["error"] = self.error
+        if self.skipped:
+            out["skipped"] = self.skipped
         return out
 
 
@@ -319,11 +335,12 @@ def run_checks(model: Any, level: str, *, n_ctx: int | None, on_cpu: bool) -> Ch
     think_off = has_no_think_switch(model)
     replies: dict[str, Reply] = {}
 
-    def check(check_id: str, required: bool, prompt: str, max_tokens: int, judge: Callable[[Reply], bool]) -> None:
+    def check(check_id: str, required: bool, prompt: str, max_tokens: int, judge: Callable[[Reply], bool],
+              ask: Callable[[], Reply] | None = None) -> None:
         t0 = time.monotonic()
         outcome = Outcome(check_id, required, False)
         try:
-            reply = _ask_checked(model, prompt, max_tokens, think_off)
+            reply = ask() if ask else _ask_checked(model, prompt, max_tokens, think_off)
             replies[check_id] = reply
             outcome.finish_reason, outcome.tokens = reply.finish_reason, reply.tokens
             outcome.excerpt = _excerpt(reply.visible or reply.raw)
@@ -361,6 +378,33 @@ def run_checks(model: Any, level: str, *, n_ctx: int | None, on_cpu: bool) -> Ch
                 prompt = None
             if prompt is not None:
                 check("long_prompt", False, prompt, 24, lambda r: _VAULT_CODE in r.visible)
+
+    def inconclusive(check_id: str) -> None:
+        """A recorded check the engine cut off at its token budget is skipped, not failed."""
+        reply, outcome = replies.get(check_id), run.outcomes[-1]
+        if reply is not None and outcome.id == check_id and not outcome.passed:
+            why = acceptance_gates.out_of_budget(check_id, reply.raw, reply.visible, reply.finish_reason, traits)
+            if why:
+                outcome.passed, outcome.skipped = True, why
+
+    slow = on_cpu and level != "full"
+    broken = any(o.required and not o.passed for o in run.outcomes)  # no point probing further
+    traits = model_traits.traits_of_model(model)
+    why = acceptance_gates.SKIP_FAILED if broken else acceptance_gates.reasoning_skip(traits, slow=slow)
+    if why:
+        run.outcomes.append(Outcome("reasoning", False, True, skipped=why))
+    else:
+        check("reasoning", False, "", acceptance_gates.REASONING_TOKENS,
+              lambda r: acceptance_gates.judge_reasoning(r.raw, traits),
+              ask=lambda: Reply(*acceptance_gates.ask_reasoning(model, traits)))
+        inconclusive("reasoning")
+    why = acceptance_gates.SKIP_FAILED if broken else acceptance_gates.tools_skip(traits, slow=slow)
+    if why:
+        run.outcomes.append(Outcome("tools", False, True, skipped=why))
+    else:
+        check("tools", False, "", acceptance_gates.FIRST_TURN_TOKENS, lambda r: acceptance_gates.judge_tools(r.visible),
+              ask=lambda: Reply(*acceptance_gates.ask_tools(model, traits, think_off=think_off)))
+        inconclusive("tools")
 
     try:
         model.reset()  # leave no checked prompt in the cache for the next request
@@ -581,6 +625,18 @@ def iso(epoch: float | None = None) -> str:
 # ---------------------------------------------------------------------------
 # What /health/inference reports (the HTTP contract)
 # ---------------------------------------------------------------------------
+
+
+def public_checks(records: list[dict] | None) -> list[dict]:
+    """The public form of stored check records: id, passed and required, and the
+    reason when a recorded check was skipped. Nothing else of a record is public."""
+    out = []
+    for c in records or []:
+        item = {k: c[k] for k in ("id", "passed", "required")}
+        if c.get("skipped"):
+            item["skipped"] = c["skipped"]
+        out.append(item)
+    return out
 
 
 def summary(

@@ -26,7 +26,14 @@ from contextlib import aclosing, asynccontextmanager
 from functools import partial
 from pathlib import Path
 
-from potluck_local.services import acceptance, inference_errors, memory_probe, model_evidence
+from potluck_local.services import (
+    acceptance,
+    inference_errors,
+    memory_probe,
+    model_evidence,
+    model_traits,
+    tool_calls,
+)
 from potluck_local.services.model_identity import ModelIdentityError, artifact_identity, file_stamp
 
 logger = logging.getLogger(__name__)
@@ -225,6 +232,11 @@ class LLMRuntime:
     def loaded_n_ctx(self) -> int | None:
         """Return the n_ctx the currently loaded model was initialised with, or None."""
         return self._loaded_n_ctx
+
+    def template_traits(self) -> "model_traits.TemplateTraits | None":
+        """What the loaded llama.cpp model's chat template can do (tools, an opened
+        reasoning block). None when nothing is loaded or the backend cannot say."""
+        return model_traits.traits_of_model(self._model) if self._pipeline is None else None
 
     def loaded_rpc_servers(self) -> tuple[str, ...] | None:
         """Return the RPC server endpoints the current model was loaded with.
@@ -965,9 +977,7 @@ class LLMRuntime:
                 logger.error("answer_check_cpu_load_failed model_id=%s error=%s", self._model_id, type(exc).__name__)
                 # That attempt freed the first load. Put it back, so the engine says what it has.
                 moved = self._reload(args)
-                shown = gpu_run.api() if gpu_run else [
-                    {k: c[k] for k in ("id", "passed", "required")} for c in (known_bad or {}).get("checks", [])
-                ]
+                shown = gpu_run.api() if gpu_run else acceptance.public_checks((known_bad or {}).get("checks", []))
                 self._publish(level, self._key_now(level, sha), checks=shown, status=acceptance.FAILED,
                               verdict=acceptance.MODEL_FAILED, message=acceptance.MODEL_FAILED_TEXT)
                 return moved
@@ -1088,7 +1098,7 @@ class LLMRuntime:
         if run is not None:
             checks, checked_at, tokens = run.api(), acceptance.iso(), run.output_tokens
         elif proof is not None:
-            checks = [{k: c[k] for k in ("id", "passed", "required")} for c in proof.get("checks", [])]
+            checks = acceptance.public_checks(proof.get("checks", []))
             checked_at, tokens = proof.get("checked_at"), proof.get("output_tokens")
         else:
             checked_at = acceptance.iso()
@@ -1271,6 +1281,8 @@ class LLMRuntime:
         top_p: float = 1.0,
         top_k: int = 0,
         seed: int | None = None,
+        tools: list[dict] | None = None,
+        tool_choice: str | dict | None = None,
     ):
         """Yield OpenAI SSE with shared admission only for continuous batchers.
 
@@ -1295,7 +1307,7 @@ class LLMRuntime:
                 def produce():
                     for chunk in model.create_chat_completion(
                         messages=messages, temperature=temperature, max_tokens=max_tokens,
-                        stop=stop or [], stream=True,
+                        stop=stop or [], stream=True, **tool_calls.completion_kwargs(tools, tool_choice),
                     ):
                         yield chunk["choices"][0].get("delta", {}).get("content")
             else:
@@ -1375,6 +1387,8 @@ class LLMRuntime:
         expected_sha256: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 2048,
+        tools: list[dict] | None = None,
+        tool_choice: str | dict | None = None,
     ) -> dict:
         """Non-streaming completion. Returns raw llama result dict."""
         if self._pipeline is not None:
@@ -1399,6 +1413,7 @@ class LLMRuntime:
                     temperature=temperature,
                     max_tokens=max_tokens,
                     stream=False,
+                    **tool_calls.completion_kwargs(tools, tool_choice),
                 ),
             )
             try:
@@ -1446,6 +1461,8 @@ class LLMRuntime:
         temperature: float = 0.7,
         max_tokens: int = 2048,
         stop: list[str] | None = None,
+        tools: list[dict] | None = None,
+        tool_choice: str | dict | None = None,
     ):
         """Yield llama-cpp's native OpenAI-shaped streaming chunk dicts.
 
@@ -1480,6 +1497,7 @@ class LLMRuntime:
                         max_tokens=max_tokens,
                         stop=stop or [],
                         stream=True,
+                        **tool_calls.completion_kwargs(tools, tool_choice),
                     ):
                         if cancel_event.is_set():
                             break

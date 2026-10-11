@@ -87,7 +87,8 @@ export interface Acceptance {
   /** A stored result was reused; nothing ran now. */
   fromProof: boolean;
   ranOn: { deviceKind: Placement["kind"]; backend: string | null; deviceName: string | null; driver: string | null } | null;
-  checks: Array<{ id: string; passed: boolean; required: boolean }>;
+  /** `skipped`: why a check did not apply or could not finish; such a check is not a failure. */
+  checks: Array<{ id: string; passed: boolean; required: boolean; skipped: string | null }>;
   verdict: "ok" | "gpu_wrong_output" | "model_failed" | null;
   fallback: { from: string | null; to: string | null; reason: string | null } | null;
   message: string | null;
@@ -104,7 +105,7 @@ export function parseAcceptance(value: unknown): Acceptance | null {
     checkedAt: Number.isFinite(time) ? new Date(time).toISOString() : null, fromProof: a.from_proof === true,
     ranOn: Object.keys(r).length === 0 ? null : { deviceKind: oneOf(r.device_kind, ["gpu", "cpu", "mixed"] as const) ?? "unknown",
       backend: backendName(label(r.backend, 24)), deviceName: label(r.device_name), driver: label(r.driver) },
-    checks: (Array.isArray(a.checks) ? a.checks.slice(0, 32) : []).flatMap(c => { const id = label(obj(c).id, 60); return id ? [{ id, passed: obj(c).passed === true, required: obj(c).required === true }] : []; }),
+    checks: (Array.isArray(a.checks) ? a.checks.slice(0, 32) : []).flatMap(c => { const id = label(obj(c).id, 60); return id ? [{ id, passed: obj(c).passed === true, required: obj(c).required === true, skipped: label(obj(c).skipped, 120) }] : []; }),
     verdict: oneOf(a.verdict, ["ok", "gpu_wrong_output", "model_failed"] as const),
     fallback: Object.keys(f).length === 0 ? null : { from: label(f.from, 24), to: label(f.to, 24), reason: label(f.reason, 40) },
     message: label(a.message, 300) };

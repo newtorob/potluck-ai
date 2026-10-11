@@ -50,14 +50,18 @@ class PeerDispatchError(RemoteStreamError):
                          "peer_unavailable")
 
 
-async def _replacement_peer(model: str, excluded: set[str], sha256: str | None = None) -> dict | None:
+async def _replacement_peer(model: str, excluded: set[str], sha256: str | None = None, *,
+                            tools: bool = False) -> dict | None:
     # Read current membership on every retry. Never route through the pool or
     # relax the requested model because an earlier household machine failed.
+    # A request with tools only goes to a machine that says it supports them.
     peers = [p for p in await household_peers() if p["mesh_ip"] not in excluded]
     async with httpx.AsyncClient(timeout=_CAPS_TIMEOUT_S) as client:
         caps = await asyncio.gather(*(_peer_caps(client, peer) for peer in peers))
     for peer, cap in zip(peers, caps):
         if cap and cap.get("available_for_inference") and cap.get("loaded_model") == model and (
+            not tools or cap.get("supports_tools") is True
+        ) and (
             sha256 is None or (cap.get("model_lock_version") == 1
                                and (cap.get("loaded_model_detail") or {}).get("sha256") == sha256)
         ):
@@ -180,7 +184,8 @@ async def _peer_chunks(peer: dict, body: dict, model: str, sha256: str | None):
 
 async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
                              temperature: float, max_tokens: int, *, sha256: str | None = None,
-                             retry: bool = True, batch: bool = False):
+                             retry: bool = True, batch: bool = False,
+                             tools: list[dict] | None = None, tool_choice: str | dict | None = None):
     """Retry another household machine only while no output has been yielded.
 
     One absolute budget spans headers, prefill, every attempt and decoding.
@@ -191,6 +196,9 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
         body["potluck_model_sha256"] = sha256
     if batch:
         body["potluck_batch"] = True
+    if tools:
+        body["tools"] = tools
+        body["tool_choice"] = tool_choice
     loop = asyncio.get_running_loop()
     deadline = loop.time() + REQUEST_TIMEOUT_S
     excluded: set[str] = set()
@@ -200,7 +208,8 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
         try:
             if attempt:
                 async with asyncio.timeout_at(deadline):
-                    peer = await _replacement_peer(model, excluded, **({"sha256": sha256} if sha256 else {}))
+                    peer = await _replacement_peer(model, excluded, **({"sha256": sha256} if sha256 else {}),
+                                                   **({"tools": True} if tools else {}))
                 if peer is None:
                     break
             excluded.add(peer["mesh_ip"])
@@ -243,9 +252,11 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
 
 
 async def complete_peer_openai(peer: dict, messages: list[dict], model: str,
-                               temperature: float, max_tokens: int, *, sha256: str | None = None) -> dict:
+                               temperature: float, max_tokens: int, *, sha256: str | None = None,
+                               tools: list[dict] | None = None, tool_choice: str | dict | None = None) -> dict:
     """Dispatch to a peer (streamed under the hood) and return one OpenAI
     chat.completion envelope."""
     return await collect_completion(
-        stream_peer_openai(peer, messages, model, temperature, max_tokens, **({"sha256": sha256} if sha256 else {}))
+        stream_peer_openai(peer, messages, model, temperature, max_tokens, **({"sha256": sha256} if sha256 else {}),
+                           **({"tools": tools, "tool_choice": tool_choice} if tools else {}))
     )

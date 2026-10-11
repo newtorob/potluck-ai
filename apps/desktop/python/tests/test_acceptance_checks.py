@@ -103,6 +103,7 @@ def test_right_answers_pass_every_check_and_only_three_are_required():
     assert [(o.id, o.required, o.passed) for o in r.outcomes] == [
         ("copy", True, True), ("arithmetic", True, True), ("repeats", True, True),
         ("fact", False, True), ("stops", False, True), ("long_prompt", False, True),
+        ("reasoning", False, True), ("tools", False, True),  # skipped for this fake: no thinking, no tool template
     ]
     assert r.api()[0] == {"id": "copy", "passed": True, "required": True}
 
@@ -164,7 +165,7 @@ def test_a_model_that_throws_has_failed_the_check_and_the_run_does_not_raise():
 
     r = run(Throws())
     assert r.passed is False
-    assert all(o.error == "RuntimeError" for o in r.outcomes if o.id != "stops")
+    assert all(o.error == "RuntimeError" for o in r.outcomes if o.id != "stops" and not o.skipped)
 
 
 @pytest.mark.parametrize("answer,expected", [
@@ -213,7 +214,9 @@ def test_the_no_think_switch_is_added_only_where_the_template_has_one():
     assert not any("/no_think" in q["prompt"] for q in plain.asked)
     qwen3 = FakeModel(template="{%- if enable_thinking is defined and enable_thinking is false %}")
     run(qwen3)
-    assert all(q["prompt"].endswith(" /no_think") for q in qwen3.asked)
+    # The reasoning check is the one prompt asked with thinking on.
+    assert all(q["prompt"].endswith(" /no_think") for q in qwen3.asked if "17 * 23" not in q["prompt"])
+    assert any("17 * 23" in q["prompt"] and "/no_think" not in q["prompt"] for q in qwen3.asked)
 
 
 # The reply shape qwen3-8b-q4 produced with /no_think in our runs.
@@ -236,7 +239,7 @@ def test_repeats_passes_a_reply_that_starts_with_an_empty_think_block():
     model.good_answer = lambda p: EMPTY_THINK_ANSWER.split("</think>\n\n", 1)[1] if "two short sentences" in p else FakeModel.good_answer(model, p)
     r = run(model)
     assert results(r) == {"copy": True, "arithmetic": True, "repeats": True, "fact": True, "stops": True,
-                          "long_prompt": True}
+                          "long_prompt": True, "reasoning": True, "tools": True}
     assert r.passed
 
 

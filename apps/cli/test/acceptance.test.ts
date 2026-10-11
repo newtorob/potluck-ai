@@ -54,7 +54,7 @@ describe("reading the engine's acceptance object", () => {
     const a = parseAcceptance(accept({ secret: "never-echo", ran_on: { device_kind: "gpu", backend: "cuda", device_name: "RTX", driver: "560.35", token: "never-echo" },
       checks: [{ id: "arithmetic", passed: true, required: true, hint: "never-echo" }] }));
     expect(a).toEqual({ status: "passed", modelId: "big", level: "quick", checkedAt: "2026-10-09T14:32:05.000Z", fromProof: false,
-      ranOn: { deviceKind: "gpu", backend: "CUDA", deviceName: "RTX", driver: "560.35" }, checks: [{ id: "arithmetic", passed: true, required: true }],
+      ranOn: { deviceKind: "gpu", backend: "CUDA", deviceName: "RTX", driver: "560.35" }, checks: [{ id: "arithmetic", passed: true, required: true, skipped: null }],
       verdict: "ok", fallback: null, message: null });
     expect(JSON.stringify(a)).not.toContain("never-echo");
   });
@@ -313,6 +313,15 @@ describe("potluck models test", () => {
   it("says a stored result was reused, and how to run it again", async () => {
     engine.acceptance = accept({ from_proof: true });
     expect((await exec(["models", "test"])).stdout).toContain("Reused an earlier result from 2026-10-09; nothing ran now. Add --force to run it again.\n");
+  });
+  it("prints a check that did not apply as skipped, with the reason, and never as failed", async () => {
+    engine.acceptance = accept({ checks: [{ id: "arithmetic", passed: true, required: true },
+      { id: "reasoning", passed: true, required: false, skipped: "not a thinking model" }] });
+    const { code, stdout } = await exec(["models", "test"]);
+    expect(code).toBe(0);
+    expect(stdout).toContain("  arithmetic: passed, required\n");
+    expect(stdout).toContain("  reasoning: skipped (not a thinking model), not required\n");
+    expect(stdout).not.toContain("reasoning: passed");
   });
   it("passes after a fallback to the CPU and shows the engine's sentence", async () => {
     engine.acceptance = fellBack();

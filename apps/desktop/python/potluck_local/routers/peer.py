@@ -64,8 +64,9 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from potluck_local.services import inference_errors
+from potluck_local.services import gateway_request, inference_errors
 from potluck_local.services.hardware_detect import detect_hardware
+from potluck_local.services.model_traits import traits_of_runtime
 from potluck_local.services.runtime import get_runtime
 from potluck_local.services.model_identity import ModelIdentityError, lock_headers
 from potluck_local.services.settings_manager import get_settings
@@ -191,6 +192,12 @@ class PeerCapabilities(BaseModel):
     # requests are refused when this is not true; household peers are served either way.
     answers_verified: bool | None = None
 
+    # Whether this node's loaded model can take `tools` / `tool_choice` on
+    # POST /peer/chat/completions (additive; older nodes omit it, and a requester
+    # must read a missing value as false). A requester never sends tools to a node
+    # that does not say true.
+    supports_tools: bool = False
+
 
 # Cache the hardware detect — it shells out to system tools (lspci, system_profiler,
 # GPUtil) on first call. Hardware doesn't change at runtime, so we re-detect once
@@ -299,6 +306,7 @@ async def peer_capabilities() -> PeerCapabilities:
         available_for_pipeline=available_for_pipeline,
         link_type=link_type,
         answers_verified=runtime.answers_verified() if loaded else None,
+        supports_tools=bool(loaded and getattr(traits_of_runtime(runtime), "supports_tools", False)),
     )
 
 
@@ -400,8 +408,12 @@ async def pipeline_stage_stop() -> dict:
 
 
 class PeerChatMessage(BaseModel):
-    role: Literal["system", "user", "assistant"]
+    role: Literal["system", "user", "assistant", "tool"]
     content: str
+    # Only on tool conversations (see PeerChatRequest.tools).
+    tool_calls: list[dict] | None = None
+    tool_call_id: str | None = None
+    name: str | None = None
 
 
 class PeerChatRequest(BaseModel):
@@ -418,6 +430,12 @@ class PeerChatRequest(BaseModel):
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(default=2048, ge=1, le=131072)
     stop: list[str] | None = None
+    # Tool calls: the model sees `tools` through its chat template and its reply
+    # text is streamed back as it is. The requesting machine reads the calls out
+    # of that text. Only sent to a node whose /peer/capabilities says
+    # supports_tools; anything else is refused here too.
+    tools: list[dict] | None = None
+    tool_choice: str | dict | None = None
 
 
 @router.post("/chat/completions")
@@ -466,7 +484,8 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
         except ModelIdentityError as exc:
             raise HTTPException(409, str(exc)) from exc
     identity = {"expected_model": request.model or runtime.current_model_id(), "expected_sha256": digest}
-    messages_for_runtime = [m.model_dump() for m in request.messages]
+    messages_for_runtime = [m.model_dump(exclude_none=True) for m in request.messages]
+    tool_kwargs = _peer_tool_kwargs(request, runtime, messages_for_runtime)
 
     logger.info(
         "peer_chat_request model=%s message_count=%d stream=%s",
@@ -504,6 +523,7 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
             max_tokens=request.max_tokens,
             stop=request.stop,
             **identity,
+            **tool_kwargs,
         )
         # Pass through unmodified — no memory accumulation, no extraction. The
         # only thing recorded is a metadata-only usage COUNT (tokens + duration,
@@ -529,6 +549,7 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
             max_tokens=request.max_tokens,
             stop=request.stop,
             **identity,
+            **tool_kwargs,
         ):
             chunks.append(_fixed_error_event(chunk))
     except ModelIdentityError as exc:
@@ -539,6 +560,39 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
     # endpoint would emit. The runtime's chat() helper would do this
     # for us in a future refactor; for now we just stitch the stream.
     return JSONResponse({"raw_chunks": chunks}, headers=lock_headers(digest))
+
+
+# Fixed text, chosen here and never built from the request or the model: it goes
+# to another machine.
+_TOOLS_REFUSED = "This machine's model does not support tool calls."
+_TOOLS_BAD = "The tool request was not valid."
+
+
+def _peer_tool_kwargs(request: PeerChatRequest, runtime, messages: list[dict]) -> dict:
+    """Check a tools request from another machine and return the runtime arguments.
+
+    No tools and no tool messages: nothing changes. Otherwise this node must say
+    it supports them, the request must pass the same checks the gateway applies,
+    and a batch request cannot carry tools.
+    """
+    uses_tools = bool(request.tools) or gateway_request.has_tool_history(messages)
+    if not uses_tools:
+        return {}
+    traits = traits_of_runtime(runtime)
+    if not (traits and traits.supports_tools) or request.potluck_batch:
+        raise HTTPException(status_code=400, detail=_TOOLS_REFUSED)
+    try:
+        messages[:] = [
+            gateway_request.normalise_message(
+                m["role"], m["content"], tool_calls_=m.get("tool_calls"),
+                tool_call_id=m.get("tool_call_id"), name=m.get("name"),
+            )
+            for m in messages
+        ]
+        prepared = gateway_request.prepare(messages, request.tools, request.tool_choice)
+    except gateway_request.RequestError:
+        raise HTTPException(status_code=400, detail=_TOOLS_BAD) from None
+    return prepared.runtime_kwargs()
 
 
 def _fixed_error_event(chunk: str) -> str:
