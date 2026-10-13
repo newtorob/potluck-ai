@@ -298,7 +298,7 @@ export function parseArgs(argv: string[]): CliArgs {
     throw new UsageError("--source and --lines require logs.");
   }
   if (out.scope && out.command && !["status", "doctor", "launch", "run", "batch", "benchmark"].includes(out.command)) {
-    throw new UsageError("--scope is supported by status, doctor, benchmark, and the coding agent.");
+    throw new UsageError("--scope is supported by status, doctor, benchmark, run, batch, launch, and the coding agent.");
   }
   // A single prompt can go to a trusted circle. Everything else that takes a
   // scope stays on the member's own machines.

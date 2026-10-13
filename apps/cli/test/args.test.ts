@@ -25,6 +25,11 @@ describe("command dispatch", () => {
   ])("rejects invalid invocation %j", (...args) => {
     expect(() => parseArgs(args)).toThrow();
   });
+  it("names every command that takes --scope when one that does not is given it", () => {
+    for (const command of ["run", "batch", "launch", "status", "doctor", "benchmark"]) {
+      expect(() => parseArgs(["logs", "--scope", "local"])).toThrow(command);
+    }
+  });
   it("parses explicit setup and account options", () => {
     expect(parseArgs(["setup", "--no-input", "--enable-gateway", "--connect", "--name", "Server"]))
       .toMatchObject({ noInput: true, enableGateway: true, connect: true, name: "Server" });
