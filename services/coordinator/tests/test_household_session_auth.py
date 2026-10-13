@@ -28,6 +28,7 @@ test_mesh_peers_auth.py, so a future refactor that re-adds the dependency
 from __future__ import annotations
 
 import hashlib
+import os
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
@@ -44,7 +45,11 @@ from coordinator.db.database import get_db
 from coordinator.routers.mesh import router
 
 _COORDINATOR_TOKEN = "s3cret-coordinator-token"
-_TEST_DB_URL = "postgresql+asyncpg://potluck:potluck@localhost:5432/potluck"
+# Same database the shared fixtures in conftest.py use: the dev stack by
+# default, or a throwaway one named by DATABASE_URL.
+_TEST_DB_URL = os.environ.get(
+    "DATABASE_URL", "postgresql+asyncpg://potluck:potluck@localhost:5432/potluck"
+)
 
 
 def _make_app() -> FastAPI:

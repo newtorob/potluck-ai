@@ -31,6 +31,7 @@ peer_heartbeats).
 from __future__ import annotations
 
 import base64
+import os
 import secrets
 import uuid
 from contextlib import asynccontextmanager
@@ -45,7 +46,11 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from coordinator.services.peer_registry import complete_job, get_job, register_job
 
-_TEST_DB_URL = "postgresql+asyncpg://potluck:potluck@localhost:5432/potluck"
+# Same database the shared fixtures in conftest.py use: the dev stack by
+# default, or a throwaway one named by DATABASE_URL.
+_TEST_DB_URL = os.environ.get(
+    "DATABASE_URL", "postgresql+asyncpg://potluck:potluck@localhost:5432/potluck"
+)
 
 
 def _b64url(raw: bytes) -> str:
