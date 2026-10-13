@@ -19,9 +19,12 @@ Enforces the privacy rules of the contributor network at CI time:
         like func.count(Peer.peer_id) above the return are unaffected).
 
   #21 - Contributor-side: prompt content and generated tokens MUST NOT
-        be written to disk, logs, or telemetry. The contributor sidecar
-        (`apps/desktop/python/potluck_local/contributor/`) is the
-        enforcement zone.
+        be written to disk, logs, or telemetry. Two places are enforced:
+          * the contributor sidecar
+            (`apps/desktop/python/potluck_local/contributor/`)
+          * services/contributor_service.py: the in-process contributor,
+            which serves open-pool, circle and household jobs from outside
+            that tree
 
   #22 - Peer/pool-facing relay code MUST NOT write the strangers' prompt
         or response content to disk, logs, or telemetry. These are the
@@ -30,12 +33,24 @@ Enforces the privacy rules of the contributor network at CI time:
           * routers/peer.py - peer_chat_completions / peer_memory_search
           * services/pool_routing.py - stream/complete_pool_openai
           * services/gateway_routing.py - stream/complete_peer_openai
+          * services/remote_stream.py: parses the SSE streams those
+            callers relay
           * routers/circle_link.py: the circle listener (lender side of a
             direct circle link)
           * services/circle_link.py: borrowing over a direct circle link
           * routers/chat_circle.py: the app's circle chat through the engine
+          * services/batch_jobs.py: sends the user's documents to household
+            machines and takes the results back
+          * services/split_manager.py: carries activation frames between
+            household machines; `data`, the name those frames go by, counts
+            as content in this file
         Same content-leak heuristic as #21 (sensitive name inside a
-        logger / dump / open-write context, unless metadata-wrapped).
+        logger / dump / open-write context, unless metadata-wrapped). It
+        does not match SQL writes or helper calls such as write_event().
+
+  Not scanned: services/managed_agents.py holds only the local user's own
+  coding-agent session, in memory, and Potluck never relays it to another
+  machine.
 
 Scope is deliberately tight. The lints have whitelists for files that
 have a legitimate reason to violate the heuristic (keys.py writes Ed25519
@@ -441,16 +456,33 @@ def _scan_content_leaks(
     return errors
 
 
+# Contributor code that lives outside the contributor tree. The in-process
+# contributor serves other members' jobs through the sidecar runtime, so it
+# is held to the same rule as the tree.
+CONTRIBUTOR_SERVICE_FILES = (
+    "apps/desktop/python/potluck_local/services/contributor_service.py",
+)
+
+
 def lint_contributor() -> list[str]:
     errors: list[str] = []
     contributor_root = (
         REPO_ROOT / "apps" / "desktop" / "python" / "potluck_local" / "contributor"
     )
     if not contributor_root.is_dir():
-        return [f"{contributor_root}: directory to scan is missing, so nothing was checked"]
-    for path in sorted(contributor_root.rglob("*.py")):
-        rel = path.relative_to(REPO_ROOT).as_posix()
-        if rel in CONTRIBUTOR_LINT_WHITELIST:
+        errors.append(f"{contributor_root}: directory to scan is missing, so nothing was checked")
+    else:
+        for path in sorted(contributor_root.rglob("*.py")):
+            rel = path.relative_to(REPO_ROOT).as_posix()
+            if rel in CONTRIBUTOR_LINT_WHITELIST:
+                continue
+            errors.extend(
+                _scan_content_leaks(path, "contributor-leak", SENSITIVE_VAR_TOKENS)
+            )
+    for relpath in CONTRIBUTOR_SERVICE_FILES:
+        path = REPO_ROOT / relpath
+        if not path.is_file():
+            errors.append(f"{relpath}: listed file is missing, so it was not checked")
             continue
         errors.extend(
             _scan_content_leaks(path, "contributor-leak", SENSITIVE_VAR_TOKENS)
@@ -469,18 +501,34 @@ PEER_RELAY_FILES = (
     "apps/desktop/python/potluck_local/routers/peer.py",
     "apps/desktop/python/potluck_local/services/pool_routing.py",
     "apps/desktop/python/potluck_local/services/gateway_routing.py",
+    # Parses the SSE streams that pool_routing and gateway_routing relay, so a
+    # peer's reply text passes through it.
+    "apps/desktop/python/potluck_local/services/remote_stream.py",
     # Direct circle links: the lender's listener receives circle members'
     # prompts, and the borrower's side and the app's /chat/circle route send
     # this user's prompts to a circle member's machine.
     "apps/desktop/python/potluck_local/routers/circle_link.py",
     "apps/desktop/python/potluck_local/services/circle_link.py",
     "apps/desktop/python/potluck_local/routers/chat_circle.py",
+    # Batch jobs send the user's own documents to household machines and take
+    # the summaries back. Its SQLite store of those results is the user's own
+    # data and is not a sink this scan matches.
+    "apps/desktop/python/potluck_local/services/batch_jobs.py",
+    # The split worker pipes a household head's activation frames to its local
+    # RPC server and back. The frames derive from the head's prompt.
+    "apps/desktop/python/potluck_local/services/split_manager.py",
 )
 
 # Sensitive names for the relay surfaces: the contributor set plus the
 # request-field names these surfaces actually carry (the latest user
 # message and the memory-search query).
 PEER_RELAY_SENSITIVE_TOKENS = SENSITIVE_VAR_TOKENS | {"messages", "query"}
+
+# Names that count as content in one file only. Adding `data` to the shared
+# set would flag every unrelated `data` in the other relay files.
+PEER_RELAY_EXTRA_TOKENS = {
+    "apps/desktop/python/potluck_local/services/split_manager.py": {"data"},
+}
 
 
 def lint_peer_relay() -> list[str]:
@@ -490,9 +538,8 @@ def lint_peer_relay() -> list[str]:
         if not path.is_file():
             errors.append(f"{relpath}: listed file is missing, so it was not checked")
             continue
-        errors.extend(
-            _scan_content_leaks(path, "relay-leak", PEER_RELAY_SENSITIVE_TOKENS)
-        )
+        tokens = PEER_RELAY_SENSITIVE_TOKENS | PEER_RELAY_EXTRA_TOKENS.get(relpath, set())
+        errors.extend(_scan_content_leaks(path, "relay-leak", tokens))
     return errors
 
 
