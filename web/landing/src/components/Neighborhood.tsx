@@ -194,7 +194,6 @@ export function Neighborhood() {
             <span className="hood-release-dot" /> Linux GPU support is
             here <Arrow />
           </Link>
-          <p className="hood-eyebrow">Local AI. A little more together.</p>
           <h1 id="home-title">
             Good machines.
             <br />
@@ -211,12 +210,11 @@ export function Neighborhood() {
           </p>
           <div className="hood-actions">
             <Link href="/install" className="hood-download">
-              Get Potluck <Arrow direction="up" />
+              Download Potluck <Arrow />
             </Link>
-            <a href="#film" className="hood-film-link">
-              <span aria-hidden="true">▷</span> Meet Potluck{" "}
-              <span className="hood-film-duration">0:30</span>
-            </a>
+            <Link href="/blog/run-a-local-llm-on-another-computer" className="hood-film-link">
+              Set up a second computer <Arrow />
+            </Link>
           </div>
           <p className="hood-availability">
             Free to run locally. Sign-in required.
@@ -289,6 +287,7 @@ export function Neighborhood() {
               height={1024}
               sizes="(max-width: 700px) 100vw, (max-width: 1100px) 85vw, 900px"
               priority
+              fetchPriority="high"
               quality={85}
               onError={() => setArtFailed(true)}
             />

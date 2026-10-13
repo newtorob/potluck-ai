@@ -124,15 +124,14 @@ export default function CareersPage() {
       <div className="careers-shell">
         <section className="careers-hero" aria-labelledby="careers-title">
           <div>
-            <p className="careers-eyebrow">Careers at Potluck</p>
             <h1 id="careers-title">
               Good work.
               <br />
               <em>Better together.</em>
             </h1>
             <p className="careers-lead">
-              AI should feel closer to the people who use it. Help us build what
-              comes next.
+              Join us at Potluck. AI should feel closer to the people who use it.
+              Help us build what comes next.
             </p>
             <div className="careers-actions">
               <a className="careers-button" href="#roles">
@@ -167,7 +166,6 @@ export default function CareersPage() {
           aria-labelledby="careers-mission-title"
         >
           <div>
-            <p className="careers-eyebrow">Something worth building</p>
             <h2 id="careers-mission-title">
               Small machines.
               <br />
@@ -198,7 +196,6 @@ export default function CareersPage() {
         >
           <div className="careers-section-heading">
             <div>
-              <p className="careers-eyebrow">Career opportunities</p>
               <h2 id="careers-roles-title">The team we’re building.</h2>
             </div>
             <p>
@@ -214,7 +211,7 @@ export default function CareersPage() {
               </a>
             ))}
           </nav>
-          {TEAMS.map((team, index) => (
+          {TEAMS.map((team) => (
             <section
               className="careers-team"
               key={team.id}
@@ -222,9 +219,6 @@ export default function CareersPage() {
               aria-labelledby={`${team.id}-title`}
             >
               <div className="careers-team-intro">
-                <span className="careers-team-number" aria-hidden="true">
-                  0{index + 1}
-                </span>
                 <h3 id={`${team.id}-title`}>{team.name}</h3>
                 <p>{team.description}</p>
               </div>
@@ -262,7 +256,6 @@ export default function CareersPage() {
 
         <section className="careers-principles" aria-label="What matters to us">
           <div>
-            <span>01 / CARE</span>
             <h2>Useful beats impressive.</h2>
             <p>
               Start with something that makes a person’s day better. Make the
@@ -270,7 +263,6 @@ export default function CareersPage() {
             </p>
           </div>
           <div>
-            <span>02 / CURIOSITY</span>
             <h2>Leave room for a better idea.</h2>
             <p>
               Ask good questions. Test assumptions. Let what you learn change
@@ -278,7 +270,6 @@ export default function CareersPage() {
             </p>
           </div>
           <div>
-            <span>03 / OWNERSHIP</span>
             <h2>Keep people in control.</h2>
             <p>
               Respect the person, their hardware, and their choices. Build trust
@@ -292,7 +283,6 @@ export default function CareersPage() {
           id="say-hello"
           aria-labelledby="careers-contact-title"
         >
-          <p className="careers-eyebrow">Let’s get to know each other</p>
           <h2 id="careers-contact-title">
             Your kind of thing?
             <br />

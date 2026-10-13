@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated: September 16, 2026**
+**Last updated: October 6, 2026**
 
 Coshippr Inc., doing business as Potluck ("Potluck," "we," "us") builds local-first AI software. This policy explains what we collect, why, and what we do not. We wrote it to be read, not to hide behind.
 
@@ -26,7 +26,7 @@ Potluck is early software under active development. Practices may change as the 
 
 **Community.** If you use our community forum, that account and your posts are handled there (see Section 6).
 
-**Website.** The website uses privacy-respecting, cookieless analytics that do not track you across sites or build an advertising profile. Download links record the selected platform and a timestamp to count downloads. Account sign-in begins in the desktop app.
+**Website.** The website uses privacy-respecting, cookieless analytics that do not track you across sites or build an advertising profile. Download links record the selected platform, a timestamp, a broad traffic-source category (such as Google, a social site, or direct), and the most recently visited published article. The source and article are kept in this browser tab for up to 30 minutes and passed to our download counter when you request an installer. They contain no personal or unique visitor identifier. Our counter does not record raw referral URLs, search terms, or campaign values. Website analytics omit sign-in pages and strip URL query strings and fragments. A download request does not tell us whether installation finished. Account sign-in begins in the desktop app.
 
 ## 3. What we do NOT collect
 

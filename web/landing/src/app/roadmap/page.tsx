@@ -1,18 +1,22 @@
 import type { Metadata } from 'next';
+import { SOURCE_URL, LICENSE_URL } from '@/lib/openSource';
+import { PageIntro } from '@/components/PageIntro';
 import Link from 'next/link';
 import { RELEASE_VERSION, LINUX_RELEASE_VERSION, WINDOWS_RELEASE_VERSION } from '@/lib/downloads';
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/roadmap" },
   title: 'Roadmap',
   description:
-    'What you can use in Potluck today, what is being tested, and what is still planned. Updated October 6, 2026.',
+    'What you can use in Potluck today, what is being tested, and what is still planned. Updated October 13, 2026.',
 };
 const GROUPS = [
   {
     id: 'available',
     title: 'Available today',
-    description: 'Included in the public desktop releases.',
+    description: 'Released software and public project resources.',
     items: [
+      ['Open-source code', <>The <a href={SOURCE_URL}>Potluck repository</a> is public under the <a href={LICENSE_URL}>MIT license</a>. Read, modify, or contribute to the code. Model weights and third-party components retain their own licenses.</>],
       [
         'Local AI on your hardware',
         'Sign in, download a model, load it on your CPU or GPU, and chat locally. After setup, local inference can work offline.',
@@ -26,12 +30,12 @@ const GROUPS = [
         'A local memory browser and MCP server for compatible agents, with pinned context and optional read-only memory search across your paired machines.',
       ],
       [
-        'Desktop 0.1.7',
+        `Desktop ${RELEASE_VERSION}`,
         'The app and the Potluck CLI share one engine and sign-in on Mac and Linux. An interrupted answer from one of your computers can restart on another, and the last model you loaded comes back when the engine starts.',
       ],
       [
-        'Linux GPU acceleration in 0.1.8',
-        'The Linux desktop 0.1.8 and CLI 0.1.7 onward include Vulkan GPU acceleration for local models, with automatic CPU fallback. Validated on NVIDIA RTX 2080 Ti and Intel integrated graphics. AMD hardware validation is pending.',
+        `Linux GPU acceleration in ${LINUX_RELEASE_VERSION}`,
+        'The Linux desktop and CLI 0.1.7 include Vulkan GPU acceleration for local models, with automatic CPU fallback. Validated on NVIDIA RTX 2080 Ti and Intel integrated graphics. AMD hardware validation is pending.',
       ],
       [
         'Public installers and updates',
@@ -88,10 +92,6 @@ const GROUPS = [
         'Project-level memory access rules and better retrieval across multiple opted-in machines.',
       ],
       [
-        'Source publication',
-        'Publish application source and licensing details. The app repository is currently private; the downloadable models have their own licenses.',
-      ],
-      [
         'Larger models across machines',
         'Continue evaluating experimental split-model execution, with hardware, bandwidth, and latency limits stated plainly. It is not a general pooled-GPU guarantee.',
       ],
@@ -102,18 +102,14 @@ const GROUPS = [
 export default function RoadmapPage() {
   return (
     <article className="docs-page">
-      <header className="docs-intro">
-        <p className="eyebrow-mono">Build notes · Updated October 6, 2026</p>
-        <h1>
+      <PageIntro title={<>
           What is real.
           <br />
           What comes next.
-        </h1>
-        <p>
+        </>} detail={<>Build notes · Updated October 13, 2026</>}>
           Local AI and your own machine network are available now. The shared network is being built
           on that foundation. We keep the two separate here.
-        </p>
-      </header>
+        </PageIntro>
       <nav className="docs-contents" aria-label="Roadmap sections">
         {GROUPS.map((group) => (
           <a key={group.id} href={`#${group.id}`}>

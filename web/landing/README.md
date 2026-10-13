@@ -26,16 +26,27 @@ pnpm build       # production build
 pnpm start       # preview production build locally
 pnpm test        # vitest
 pnpm typecheck   # tsc --noEmit
-pnpm lint        # next lint
+pnpm lint        # eslint
 ```
 
 From the repo root, `make test-landing` runs the vitest suite, the typecheck and a production build (`LANDING_BUILD=0` skips the build).
+
+## Blog
+
+Articles live in `src/content/blog/` as Markdown with JSON front matter. Set
+`draft: false` to publish. Each article gets a canonical URL, BlogPosting schema,
+a share image and a sitemap entry. Use `diagram: "open-source"` for the source
+announcement artwork and GitHub action. Source links live in `src/lib/openSource.ts`.
+
+Run `pnpm seo:check https://trypotluck.ai` after a production deployment to check
+page status, canonical URLs, headings, indexing directives, metadata and share
+images. Production deployments are manual.
 
 ## Pages
 
 | Route | File | Purpose |
 |---|---|---|
-| `/` | `src/app/page.tsx` | Home page: product film, the neighborhood demo, how the network grows from your own machines, benchmark evidence, FAQ and the download buttons |
+| `/` | `src/app/page.tsx` | Home page: model splitting, measured configurations, product film, blog, open-source announcement and downloads |
 | `/how-it-works` | `src/app/how-it-works/page.tsx` | How Potluck runs local models, connects your machines and gives agents memory, with current limits |
 | `/install` | `src/app/install/page.tsx` | Downloads, checksums and install steps |
 | `/benchmarks` | `src/app/benchmarks/page.tsx` | Memory retrieval and local inference results |

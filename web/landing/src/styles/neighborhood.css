@@ -1,29 +1,13 @@
 /* The neighborhood is Common Room paper; the rest of the site keeps Hearth.
    Illustration colors represent physical materials, not product status tokens. */
-.neighborhood-header,
 .neighborhood {
-  --hood-paper: #f2ebde;
-  --hood-ink: #32392d;
-  --hood-muted: #696954;
-  --hood-rust: #9e482e;
-  --hood-line: #cfc8b5;
-  --background: 39 43% 91%;
-  --foreground: 92 12% 20%;
-  --muted-foreground: 60 11% 34%;
-  --primary: 14 55% 40%;
-  --primary-foreground: 39 43% 96%;
-  --accent: 39 32% 84%;
-  --border: 46 20% 74%;
-  --ring: 14 55% 40%;
+  --hood-paper: hsl(var(--background));
+  --hood-ink: hsl(var(--foreground));
+  --hood-muted: hsl(var(--muted-foreground));
+  --hood-rust: hsl(var(--primary));
+  --hood-line: hsl(var(--border));
   background: var(--hood-paper);
   color: var(--hood-ink);
-}
-.neighborhood-header {
-  border-bottom-color: #cfc8b566;
-}
-.neighborhood-header > div {
-  max-width: 1512px;
-  padding-inline: clamp(24px, 4.5vw, 80px);
 }
 .neighborhood {
   position: relative;
@@ -81,7 +65,7 @@
   font-size: clamp(60px, 5.6vw, 89px);
   font-weight: 400;
   line-height: 1;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.035em;
   margin: 0 0 28px;
   white-space: nowrap;
 }

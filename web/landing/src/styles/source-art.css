@@ -1,0 +1,9 @@
+/* Open-source editorial artwork, using the public site's existing tokens. */
+.source-art { width: 100%; min-height: 290px; padding: clamp(24px, 4vw, 40px); background: hsl(var(--foreground)); color: hsl(var(--background)); border-radius: 8px; display: flex; flex-direction: column; justify-content: space-between; gap: 30px; }
+.source-art-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; font-size: 13px; }
+.source-art-top > span:first-child { font-family: var(--font-display), sans-serif; font-size: 22px; font-weight: 600; }
+.source-art-top > span:last-child { color: hsl(var(--brand-orange)); }
+.source-art-title { font-family: var(--font-display), sans-serif; font-size: clamp(30px, 3.5vw, 46px); line-height: 1.12; letter-spacing: -.03em; }
+.source-art-title span { color: hsl(var(--brand-orange)); }
+.source-art-repo { font-size: 13px; overflow-wrap: anywhere; }
+.article-diagram.article-diagram-source { padding: 0; border: 0; background: transparent; }

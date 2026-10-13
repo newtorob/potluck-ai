@@ -4,6 +4,7 @@ import path from 'path';
 import { LegalDocument } from '@/components/LegalDocument';
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/privacy" },
   title: 'Privacy Policy',
   description:
     'What Potluck collects, what stays on your device, and what changes when you choose remote inference or optional memory sharing.',

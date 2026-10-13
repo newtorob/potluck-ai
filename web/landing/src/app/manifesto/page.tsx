@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Reveal } from '@/components/motion';
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/manifesto" },
   title: 'Manifesto',
   description:
     'Everyone brings what they can. Nobody goes hungry. The founding document for Potluck AI.',
@@ -15,13 +16,13 @@ export const metadata: Metadata = {
 
 export default function ManifestoPage() {
   return (
-    <article className="mx-auto w-full max-w-[1160px] px-6 md:px-10 py-16">
+    <article className="site-page">
       <div className="reading-width mx-auto">
         {/* Masthead: eyebrow-mono label, serif h1, italic epigraph, rail-rule close. */}
         <Reveal>
           <p className="eyebrow-mono mb-6">Founding document · MMXXVI</p>
 
-          <h1 className="font-serif text-4xl font-light leading-[1.1] tracking-[-0.02em] text-foreground md:text-5xl">
+          <h1 className="site-reading-title">
             Potluck AI
           </h1>
           <p className="mt-3 font-serif text-xl font-light italic text-muted-foreground">

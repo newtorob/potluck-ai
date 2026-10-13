@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
+import { PageIntro } from '@/components/PageIntro';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/governance" },
   title: 'Governance',
   description:
     'Potluck is built by a founder-owned company. Member governance of the future compute network is a separate, staged ambition, not ownership of the company.',
@@ -10,17 +12,13 @@ export const metadata: Metadata = {
 export default function GovernancePage() {
   return (
     <article className="docs-page">
-      <header className="docs-intro">
-        <p className="eyebrow-mono">Governance · Who is responsible for what</p>
-        <h1>
+      <PageIntro title={<>
           A company that builds.
           <br />A network people help shape.
-        </h1>
-        <p>
+        </>} detail={<>Governance · Who is responsible for what</>}>
           Potluck is a founder-owned company building toward a member-operated compute network.
           Those are different things, and the distinction matters.
-        </p>
-      </header>
+        </PageIntro>
       <section className="docs-section">
         <span className="docs-section-number">01</span>
         <div>

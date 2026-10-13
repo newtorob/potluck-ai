@@ -2,6 +2,12 @@
 const nextConfig = {
   pageExtensions: ['ts', 'tsx'],
   images: { qualities: [75, 85] },
+  // Dynamic article share images read the same repository Markdown as pages.
+  // Include it explicitly in serverless output, where the source tree is absent.
+  outputFileTracingIncludes: {
+    '/blog/**': ['./src/content/blog/**/*.md', './public/fonts/*-share.ttf'],
+    '/dl/**': ['./src/content/blog/**/*.md'],
+  },
   // No external analytics scripts — privacy is the brand.
   // Use Vercel's built-in Edge Analytics (no third-party JS) if you want stats.
   //

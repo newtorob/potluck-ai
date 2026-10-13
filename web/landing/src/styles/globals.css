@@ -5,61 +5,50 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
-  Potluck "Commons" theme — Direction A: digital commons / civic zine.
-  Light mode primary (off-white paper). Dark mode is opt-in, not default.
-  Inria Serif as the identity face; Source Sans 3 as the body workhorse.
-  Palette: warm paper whites, muted ink, a single restrained rust/ember accent.
-*/
+/* The public-site palette pairs warm white, neutral charcoal, and orange.
+   Runtime tokens live here; typography comes from the bundled fonts.css. */
 
 @layer base {
   :root {
-    /* LIGHT — "Common Room" paper — this is the default */
-    --background: 38 30% 94%;
-    --foreground: 28 28% 12%;
-    --card: 38 28% 97%;
-    --card-foreground: 28 28% 12%;
-    --primary: 16 55% 46%;
-    --primary-foreground: 38 30% 97%;
-    --secondary: 35 20% 86%;
-    --secondary-foreground: 28 22% 18%;
-    --muted: 36 16% 88%;
-    --muted-foreground: 28 12% 38%;
-    --accent: 35 18% 88%;
-    --accent-foreground: 28 22% 18%;
-    --border: 32 16% 80%;
-    --ring: 16 55% 46%;
-    --surface-1: 38 30% 94%;
-    --surface-2: 38 28% 97%;
-    --sage: 138 22% 34%;
-    --sage-foreground: 38 30% 97%;
-    --destructive: 8 64% 48%;
-    --destructive-foreground: 38 30% 97%;
-    --radius: 0.25rem;
-  }
-
-  .dark {
-    /* DARK — "Hearth" warm charcoal — opt-in only */
-    --background: 28 12% 9%;
-    --foreground: 36 30% 94%;
-    --card: 28 11% 12%;
-    --card-foreground: 36 30% 94%;
-    --primary: 16 60% 66%;
-    --primary-foreground: 28 22% 11%;
-    --secondary: 28 9% 17%;
-    --secondary-foreground: 36 30% 94%;
-    --muted: 28 9% 17%;
-    --muted-foreground: 32 14% 66%;
-    --accent: 28 11% 18%;
-    --accent-foreground: 36 30% 94%;
-    --border: 28 9% 22%;
-    --ring: 16 67% 61%;
-    --surface-1: 28 12% 9%;
-    --surface-2: 28 11% 12%;
-    --sage: 138 14% 56%;
-    --sage-foreground: 28 22% 11%;
-    --destructive: 8 58% 52%;
-    --destructive-foreground: 38 30% 97%;
+    color-scheme: light;
+    --background: 30 20% 98%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --primary: 15 86% 38%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 12% 93%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 30 10% 93%;
+    --muted-foreground: 0 0% 36%;
+    --accent: 18 100% 95%;
+    --accent-foreground: 0 0% 10%;
+    --border: 30 5% 78%;
+    --ring: 15 86% 38%;
+    --surface-1: 30 20% 98%;
+    --surface-2: 0 0% 100%;
+    --sage: 160 40% 29%;
+    --sage-foreground: 0 0% 100%;
+    --destructive: 8 64% 38%;
+    --destructive-foreground: 0 0% 100%;
+    --room-air: 24 24% 95%;
+    --room-peach: 21 78% 82%;
+    --room-persimmon: 15 86% 38%;
+    --room-soft-blue: 16 100% 65%;
+    --brand-orange: 16 100% 65%;
+    --slate: 216 16% 39%;
+    --sky: 201 66% 70%;
+    --radius: 0.5rem;
+    --site-width: 1320px;
+    --site-gutter: clamp(24px, 4vw, 56px);
+    --section-space: clamp(64px, 8vw, 112px);
+    --title-size: clamp(42px, 5vw, 64px);
+    --scroll-thumb: hsl(0 0% 52%);
+    --scroll-thumb-hover: hsl(0 0% 30%);
+    --scroll-thumb-active: hsl(var(--primary));
+    --scroll-track: hsl(var(--background));
+    --home-serif: var(--font-newsreader), Georgia, serif;
+    --home-mono: var(--font-spline-mono), monospace;
   }
 
   * {
@@ -69,11 +58,14 @@
 
   html {
     scroll-behavior: smooth;
+    scroll-padding-top: 88px;
+    scrollbar-gutter: stable;
     -webkit-text-size-adjust: 100%;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: var(--font-body), system-ui, sans-serif;
     font-feature-settings:
       'rlig' 1,
       'calt' 1,
@@ -1271,7 +1263,7 @@
   width: min(1160px, 100%);
   margin-inline: auto;
   padding: 68px 40px 20px;
-  font-family: var(--font-familjen-grotesk), sans-serif;
+  font-family: var(--font-body), sans-serif;
 }
 .docs-intro {
   max-width: 780px;

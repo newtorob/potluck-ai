@@ -1,28 +1,28 @@
 import type { Metadata, Viewport } from 'next';
-import { Analytics } from '@vercel/analytics/react';
+import { SiteAnalytics } from '@/components/SiteAnalytics';
+import { getAllPosts } from '@/lib/blog';
 import '@/styles/fonts.css';
 import '@/styles/globals.css';
+import '@/styles/site.css';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 
-// Pin the same self-hosted font files used by the approved design. Production
-// builds must not depend on Google Fonts returning a particular URL format.
+// Preload only the shared shell and homepage faces. Editorial and code fonts
+// load from our own origin when a page uses them; builds need no font downloads.
 const PRELOADED_FONTS = [
-  'newsreader-normal-latin.woff2',
-  'newsreader-italic-latin.woff2',
-  'familjen-grotesk-normal-latin.woff2',
-  'spline-sans-mono-normal-latin.woff2',
+  'bricolage-grotesque-normal-latin.woff2',
+  'instrument-sans-normal-latin.woff2',
 ];
 
 // ─── Metadata ─────────────────────────────────────────────────────────────────
 
 export const metadata: Metadata = {
   title: {
-    default: 'Potluck | Local AI, connected by you',
+    default: 'Potluck | Bigger models. Same computers.',
     template: '%s | Potluck',
   },
   description:
-    'Run open models on your hardware. Connect your own machines with Potluck, a local-first desktop app building toward a member-operated compute network.',
+    'Potluck is open-source AI for the computers you already own. Explore model splitting, local inference, and a member-operated compute network. MIT licensed.',
   metadataBase: new URL(
     process.env['NEXT_PUBLIC_SITE_URL']?.trim().replace(/\/$/, '') ?? 'https://trypotluck.ai',
   ),
@@ -30,15 +30,15 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
     siteName: 'Potluck',
-    title: 'Potluck | Local AI, connected by you',
+    title: 'Potluck | Bigger models. Same computers.',
     description:
-      'Run open models locally and connect your own machines. A member-operated compute network is the next chapter.',
+      'Open-source AI on your own machines. Explore Potluck’s model-splitting work and local AI app. MIT licensed.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Potluck | Local AI, connected by you',
+    title: 'Potluck | Bigger models. Same computers.',
     description:
-      'Run open models locally and connect your own machines. A member-operated compute network is the next chapter.',
+      'Open-source AI on your own machines. Explore Potluck’s model-splitting work and local AI app. MIT licensed.',
   },
   robots: {
     index: true,
@@ -47,22 +47,14 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  // Hearth charcoal matches the site-wide dark theme so the browser chrome
-  // blends in on mobile.
-  themeColor: '#1A1714',
+  themeColor: '#fbfaf9',
 };
 
 // ─── Root layout ──────────────────────────────────────────────────────────────
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en"
-      // 'dark' switches every token-based page onto the Hearth charcoal
-      // block in globals.css — the whole site runs dark, matching the
-      // desktop app and the Living Mesh landing page.
-      className="dark"
-    >
+    <html lang="en">
       <head>
         {PRELOADED_FONTS.map((font) => (
           <link key={font} rel="preload" href={`/fonts/${font}`} as="font" type="font/woff2" crossOrigin="anonymous" />
@@ -75,12 +67,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
         <div className="flex min-h-dvh flex-col">
           <Header />
-          <main id="main-content" className="flex-1">
+          <main id="main-content" className="flex-1" tabIndex={-1}>
             {children}
           </main>
           <Footer />
         </div>
-        <Analytics />
+        <SiteAnalytics publishedArticles={getAllPosts().map((post) => post.slug)} />
       </body>
     </html>
   );

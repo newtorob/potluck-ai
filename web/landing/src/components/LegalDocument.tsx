@@ -15,7 +15,7 @@ type MdProps<T extends keyof JSX.IntrinsicElements> = ComponentPropsWithoutRef<T
 
 const components = {
   h1: ({ children }: MdProps<'h1'>) => (
-    <h1 className="font-serif text-4xl font-light leading-[1.1] tracking-[-0.02em] text-foreground md:text-5xl">
+    <h1 className="site-reading-title">
       {children}
     </h1>
   ),
@@ -67,7 +67,7 @@ const components = {
 
 export function LegalDocument({ eyebrow, markdown }: { eyebrow: string; markdown: string }) {
   return (
-    <article className="mx-auto w-full max-w-[1160px] px-6 py-16 md:px-10">
+    <article className="site-page">
       <div className="reading-width mx-auto">
         <p className="eyebrow-mono mb-6">{eyebrow}</p>
         <div className="rail-rule mb-12" />

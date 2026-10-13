@@ -1,16 +1,19 @@
 import type { Metadata } from 'next';
+import { SOURCE_URL } from '@/lib/openSource';
+import { PageIntro } from '@/components/PageIntro';
 import Link from 'next/link';
 import { Reveal, CountUp } from '@/components/motion';
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/benchmarks" },
   title: 'Benchmarks',
   description:
-    'Honest numbers across memory retrieval and local LLM inference, on Mac Metal, Linux CUDA, and Windows Vulkan, including the unfavorable ones.',
+    'A measured 32B model split across Linux and Mac, with actual weight placement and test limits. Plus historical memory retrieval and local inference results.',
   openGraph: {
     title:
-      'Potluck benchmarks: memory retrieval + local inference, including the unfavorable numbers',
+      'Potluck benchmarks: one 32B model across two computers',
     description:
-      'LongMemEval oracle results, inference throughput across four models and three platforms, the 70B local-only ceiling, and the known limits we are not hiding.',
+      'The tested Linux GPU and Mac configuration, verified model-weight placement, and what the result establishes. Historical retrieval and inference results are retained below.',
   },
 };
 
@@ -158,25 +161,38 @@ const INFERENCE_HARDWARE = [
 ] as const;
 
 const INFERENCE_RESULTS = [
-  { model: 'Phi-3-mini 3.8B Q4_K_M', mac: '19.1', linux: '69.2', windows: '16.2', note: '' },
-  { model: 'Qwen 2.5 7B Q4_K_M', mac: '12.4', linux: '45.9', windows: '15.9', note: '' },
+  {
+    model: 'Phi-3-mini 3.8B Q4_K_M',
+    mac: '≈ 42',
+    linux: '146.2',
+    windows: '34.5',
+    note: 'Published in June as 19.1, 69.2 and 16.2.',
+  },
+  {
+    model: 'Qwen 2.5 7B Q4_K_M',
+    mac: '≈ 27',
+    linux: '96.8',
+    windows: '48.8',
+    note: 'Published in June as 12.4, 45.9 and 15.9.',
+  },
   {
     model: 'Llama 3.1 8B Q4_K_M',
-    mac: '11.6',
-    linux: '43.0',
-    windows: '2.1',
-    note: 'Windows: the 8B exceeds the 6600 XT 8 GB VRAM at 8K context and spills to CPU.',
+    mac: '≈ 25',
+    linux: '89.9',
+    windows: '44.9',
+    note: 'Published in June as 11.6, 43.0 and 2.1. In June the 8B spilled to CPU on the 6600 XT at 8K context. In October it fits the card’s 8 GB.',
   },
   {
     model: 'Llama 3.1 70B Q3_K_S',
     mac: 'won’t fit',
     linux: '2.4',
     windows: 'won’t fit',
-    note: 'Linux runs with about 20 of 80 layers on GPU, the rest on CPU, at a 2,048-token context. Unusable for chat.',
+    note: 'Linux runs with about 20 of 80 layers on GPU, the rest on CPU, at a 2,048-token context. Unusable for chat. A single-prompt measure from June, outside the suite, left as published.',
   },
 ] as const;
 
 const GAPS = [
+  'Rerun the Mac column of the inference table with the fixed harness. Linux and Windows were rerun 2026-10-10.',
   'MCP latency bench: p50 / p95 from memory_search tool-call to result, against a 500-memory store.',
   'NVIDIA on Linux via CUDA, enabled 2026-06-01 (driver 580 / CUDA 13.0 on the RTX 2080 Ti). Real but modest: p50 22.2 → 17.8 ms (~20%), p95 34.6 → 20.8 ms (~40%). Not the order-of-magnitude win, same dispatch-bound dynamic as AMD, but less severe since CUDA dispatch overhead is lower. Wall time actually went up (35.6 → 64.6 s) because of GPU init / context setup cost amortized across cold per-instance runs; that overhead disappears in a long-lived production sidecar.',
   'AMD on Windows via DirectML, investigated 2026-06-01 (RX 6600 XT). torch-directml runs the bge-small embedder on the GPU with full recall preserved, but p50 is break-even with CPU (17.9 ms vs 18.9 ms). The 33M-parameter model at batch=1 is dispatch-bound, not compute-bound: per-call kernel-dispatch and host↔device transfer roughly equal the CPU forward pass. ROCm/HIP is N/A; gfx1032 is dropped from the current HIP SDK. AMD will become useful again at the inference benchmark, where 7-8B-param models are compute-bound.',
@@ -235,25 +251,86 @@ function Figure({
 
 export default function BenchmarksPage() {
   return (
-    <article className="mx-auto w-full max-w-[1160px] px-6 md:px-10 py-16">
-      {/* Page header */}
-      <Reveal>
-        <div className="mb-10">
-          <p className="eyebrow-mono mb-5">Lab report · May–June 2026 measurements</p>
-          <h1 className="font-serif text-4xl font-light leading-[1.12] tracking-[-0.02em] text-foreground text-balance max-w-[32ch] md:text-[2.75rem]">
-            Honest numbers, including the unfavorable ones.
-          </h1>
-          <p className="mt-5 max-w-[54ch] font-sans text-base leading-[1.72] text-muted-foreground">
-            Publishing numbers is better than not publishing them, even when some are below state of
-            the art. This page is the current published run. It is honest about what we measure,
-            what we don&apos;t, and where the comparisons are and aren&apos;t fair.
+    <article className="site-page">
+      <PageIntro title={<>One model across two computers. Here is what ran.</>} detail="Model splitting · September 2026 · Earlier measurements below">
+        We tested a 32B model split across a Linux computer and a Mac. The configuration and
+        verified placement are below, followed by earlier memory retrieval and local inference
+        measurements. Each result belongs to its recorded hardware, software, and date.
+      </PageIntro>
+
+      <section className="mb-14 pt-8 border-t border-border" id="model-splitting">
+        <h2 className="font-serif text-xl font-light text-foreground mb-3">
+          A 32B model, split across Linux and Mac
+        </h2>
+        <div className="max-w-[68ch] mb-6 font-sans text-sm leading-[1.72] text-muted-foreground space-y-3">
+          <p>
+            On September 29, 2026, Qwen2.5-Coder-32B-Instruct Q3_K_M ran across two owned
+            computers with an 8,192-token context. The main computer used an NVIDIA RTX 2080 Ti
+            with 11 GiB VRAM and 64 GiB system RAM. The worker was an M2 Pro Mac with 16 GiB
+            unified memory. Linux used Ethernet; the Mac used Wi-Fi.
+          </p>
+          <p>
+            The run used the exact 15,935,048,672-byte model file and development builds of
+            Potluck on both computers. Its native engine was pinned to commit{' '}
+            <code className="font-mono text-xs">5a32f7b</code>. Potluck verified model weights
+            on the selected worker before reporting the split ready.
           </p>
         </div>
-      </Reveal>
+        <Figure
+          title="Verified model-weight placement"
+          date="Measured · 2026-09-29"
+          label="32B model weights placed across the Linux head and Mac worker"
+          className="mb-6"
+          foot="Placement from the final run with actual available memory and the default batch settings. These figures describe model weights, not total application memory use."
+        >
+          <table className="fact-table w-full">
+            <caption className="sr-only">Verified placement of the split 32B model</caption>
+            <thead>
+              <tr>
+                <th scope="col">Where the weights ran</th>
+                <th scope="col">Model weights</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row" className="font-sans text-sm font-medium text-foreground">Linux CPU</th>
+                <td className="font-mono text-sm text-foreground">6.23 GiB</td>
+              </tr>
+              <tr>
+                <th scope="row" className="font-sans text-sm font-medium text-foreground">Linux GPU · CUDA</th>
+                <td className="font-mono text-sm text-foreground">7.58 GiB</td>
+              </tr>
+              <tr>
+                <th scope="row" className="font-sans text-sm font-medium text-foreground">Remote Mac worker</th>
+                <td className="font-mono text-sm text-foreground">1.03 GiB</td>
+              </tr>
+            </tbody>
+          </table>
+        </Figure>
+        <div className="max-w-[68ch] font-sans text-sm leading-[1.72] text-muted-foreground space-y-3">
+          <p>
+            Two generation requests completed, each returning 128 native completion tokens with
+            the expected model hash. This confirms that the two computers ran parts of the same
+            model and completed inference together.
+          </p>
+          <p>
+            This was a bounded generation test. It does not establish better coding quality, a
+            speed improvement, or that the model could not run on either computer alone. Part of
+            the model remained on the Linux CPU. A fully wired comparison and the 32B coding-task
+            acceptance run remain outstanding.
+          </p>
+          <p>
+            <strong className="font-semibold text-foreground">Download status:</strong> this
+            Linux GPU + Mac setup used development builds. Linux CLI 0.1.7 includes a CPU split
+            engine; Mac CLI 0.1.6 does not include one, and desktop split setup is not yet enabled.{' '}
+            <Link href="/how-it-works#model-splitting">Read how model splitting works.</Link>
+          </p>
+        </div>
+      </section>
 
       <p className="docs-note">
-        <strong>Historical measurements.</strong> These runs were recorded in May and June 2026 on
-        the hardware below. They have not been rerun for desktop 0.1.6. They describe those runs,
+        <strong>Earlier measurements below.</strong> The following runs were recorded in May and June 2026 on
+        the hardware below. They have not been rerun for the current desktop release. They describe those runs,
         not a guarantee for your hardware or current model catalog.
       </p>
 
@@ -948,6 +1025,28 @@ export default function BenchmarksPage() {
         </section>
       </Reveal>
 
+      {/* Inference correction, 2026-10-10 */}
+      <Reveal>
+        <section className="mt-10">
+          <div className="max-w-[68ch] font-sans text-sm leading-[1.72] text-muted-foreground space-y-3 border-l-2 border-primary pl-4">
+            <p className="font-semibold text-foreground">Correction, October 10, 2026</p>
+            <p>
+              The generation figures on this page from June were about half the true rate. The
+              benchmark harness generated each answer twice, once to time the first token and once
+              to count tokens, and then divided one answer’s tokens by the time of both. Every
+              platform was low by about the same factor, so the ratios between machines mostly
+              stood. The absolute numbers did not.
+            </p>
+            <p>
+              The harness now times one pass and reads llama.cpp’s own counters. Linux and Windows
+              have been rerun with it. The Mac column is re-derived from the timings stored with
+              the June run, and the same arithmetic lands within 3% of the measured figures on the
+              other two machines. Time to first token was not affected.
+            </p>
+          </div>
+        </section>
+      </Reveal>
+
       {/* Inference run context */}
       <Reveal>
         <section className="mt-12 pt-10 border-t border-border">
@@ -955,8 +1054,8 @@ export default function BenchmarksPage() {
           <dl className="grid grid-cols-1 gap-y-3 sm:grid-cols-[12rem_1fr] font-sans text-sm">
             <dt className="text-muted-foreground">Runtime</dt>
             <dd className="text-foreground">
-              <code className="font-mono text-xs">llama-cpp-python</code> 0.3.23 / 0.3.24 (built
-              from source on Linux + Windows for CUDA / Vulkan)
+              <code className="font-mono text-xs">llama-cpp-python</code> 0.3.23 on the Mac
+              (June), 0.3.25 on Linux and 0.3.35 on Windows (October)
             </dd>
 
             <dt className="text-muted-foreground">Models</dt>
@@ -977,7 +1076,9 @@ export default function BenchmarksPage() {
             </dd>
 
             <dt className="text-muted-foreground">Date</dt>
-            <dd className="text-foreground">2026-06-01</dd>
+            <dd className="text-foreground">
+              June 2026 (Mac). 2026-10-10 (Linux and Windows reruns, and the correction).
+            </dd>
           </dl>
         </section>
       </Reveal>
@@ -1004,17 +1105,22 @@ export default function BenchmarksPage() {
             Generation throughput: tokens per second
           </h2>
           <p className="max-w-[60ch] mb-6 font-sans text-sm leading-[1.72] text-muted-foreground">
-            Median across the 10-prompt suite. Higher is better. The story changes from row to row
-            and column to column, that is the finding.
+            Median across the 10-prompt suite. Higher is better. Linux and Windows are measured
+            with the fixed harness. The Mac is re-derived from June and marked ≈.
           </p>
         </Reveal>
         <Reveal delay={100}>
           <Figure
             title="Table XI · Generation throughput, tokens/sec"
-            date="Measured · 2026-06-01"
+            date="Corrected · 2026-10-10"
             label="Generation throughput in tokens per second"
             foot={
               <>
+                Mac: re-derived from the stored timings of the June run, llama-cpp-python 0.3.23.
+                Linux: measured 2026-10-10 on the same llama-cpp-python 0.3.25 CUDA build as June.
+                Windows: measured 2026-10-10 on a fresh Windows 11 install with AMD’s August 2026
+                driver and llama-cpp-python 0.3.35. The Mac column is months and versions behind
+                the other two, so the size of a gap to it is soft.{' '}
                 Adapter footnote: llama-cpp-python prefix-matches the KV cache across calls. Without
                 an explicit model.reset() between runs, TTFT on run 2+ measures cache hits, not cold
                 prompt evaluation. Not in the upstream API docs, a real footgun for benchmark
@@ -1062,7 +1168,7 @@ export default function BenchmarksPage() {
       <section className="mt-12 pt-10 border-t border-border">
         <Reveal>
           <h2 className="font-serif text-xl font-light text-foreground mb-3">
-            Three findings worth surfacing
+            Four findings worth surfacing
           </h2>
         </Reveal>
         <div className="max-w-[72ch] font-sans text-sm leading-[1.72] text-muted-foreground space-y-6">
@@ -1070,13 +1176,11 @@ export default function BenchmarksPage() {
             <div>
               <p className="font-semibold text-foreground mb-1">1. There is no universal winner.</p>
               <p>
-                The RX 6600 XT <em>edges</em> the Mac M2 Pro on Qwen 7B (15.9 vs 12.4 tok/s, ~28%
-                faster),
-                <em> trails</em> it on the smaller Phi-3 mini 3.8B (16.2 vs 19.1), and{' '}
-                <em>collapses</em> on Llama 8B (2.1 vs 11.6) once the model no longer fits the
-                card’s 8 GB of VRAM and spills to CPU. Apple’s unified-memory cache wins the small
-                model, the AMD card wins the 7B that fits its VRAM, and neither wins the 8B the same
-                way. The right hardware depends on whether the model fits the card, not the brand.
+                The M2 Pro leads on the small Phi-3 mini (about 42 against 34.5 tok/s). The RX 6600
+                XT leads on the 7B and the 8B (48.8 and 44.9 against about 27 and 25). The Mac
+                figures are re-derived from June and the Windows figures were measured in October on
+                a newer llama.cpp, so the size of each gap is soft. The direction is the one the
+                June runs showed for the models that fit the card.
               </p>
             </div>
           </Reveal>
@@ -1084,15 +1188,17 @@ export default function BenchmarksPage() {
           <Reveal delay={160}>
             <div>
               <p className="font-semibold text-foreground mb-1">
-                2. AMD/Vulkan is viable up to its VRAM ceiling.
+                2. An 8 GB AMD card now runs the 8B model at 8K context.
               </p>
               <p>
-                On Qwen 7B, the model both cards run cleanly, the RTX 2080 Ti delivers ~2.9× the
-                throughput of the RX 6600 XT (45.9 vs 15.9 tok/s) for roughly 2× the used-market
-                price, so cost per token is in the same range. The catch is capacity: the 2080 Ti’s
-                11 GB holds the 8B model, the 6600 XT’s 8 GB does not. The “you need NVIDIA for
-                local inference” reflex is a generation out of date for models that fit, and VRAM
-                size, not vendor, decides which models those are.
+                In June the 8B spilled to CPU on the RX 6600 XT, and this page said an 8 GB card
+                could not hold it. In October the same card runs it fully on the GPU at 44.9 tok/s,
+                with about 6.3 GB in use. Between the two runs the machine got a fresh Windows
+                install, AMD’s August 2026 driver and a newer llama.cpp, and we did not isolate
+                which of them did it. Measured the same day, the RTX 2080 Ti is about 2× the 6600
+                XT on the 7B (96.8 against 48.8 tok/s) and on the 8B (89.9 against 44.9). In June
+                the ratio on the 7B was 2.9×. The AMD figure has risen since then, and the NVIDIA
+                figure has not moved.
               </p>
             </div>
           </Reveal>
@@ -1100,7 +1206,22 @@ export default function BenchmarksPage() {
           <Reveal delay={230}>
             <div>
               <p className="font-semibold text-foreground mb-1">
-                3. 70B is the local-only ceiling on this hardware tier.
+                3. A stale GPU driver produced wrong text at full speed.
+              </p>
+              <p>
+                On the driver Windows installs by itself for this card, dated July 2021, the Vulkan
+                backend repeated words in every reply while the CPU gave correct text. Nothing
+                failed and the speed looked normal. Updating AMD’s driver fixed it. A throughput
+                benchmark alone would not have caught this, and Potluck does not yet check that a
+                GPU backend returns correct text before using it.
+              </p>
+            </div>
+          </Reveal>
+
+          <Reveal delay={300}>
+            <div>
+              <p className="font-semibold text-foreground mb-1">
+                4. 70B is the local-only ceiling on this hardware tier.
               </p>
               <p>
                 Llama 3.1 70B at Q3_K_S won’t load in 16 GB Mac unified memory or 8 GB AMD VRAM. On
@@ -1194,13 +1315,12 @@ export default function BenchmarksPage() {
           </h2>
           <div className="max-w-[68ch] font-sans text-sm leading-[1.72] text-muted-foreground space-y-3">
             <p>
-              The application repository and benchmark harness are not public yet, so these are
-              first-party measurements, not independently reproduced results.{' '}
+              The <a href={SOURCE_URL}>application source and benchmark harness</a> are public.
+              These remain first-party measurements; publishing the code does not make them independently reproduced results.{' '}
               <a href="/benchmarks/longmemeval-s-2026-06-02.txt">
                 Read the recorded LongMemEval-S summary
               </a>
-              . The internal commands below document how the runs were made; source publication is
-              still on the roadmap.
+              . The commands below document how the runs were made.
             </p>
             <p>
               <code className="font-mono text-xs">make bench</code> from the repo root runs the full
@@ -1245,8 +1365,9 @@ export default function BenchmarksPage() {
           <h2 className="font-serif text-xl font-light text-foreground mb-3">Refresh cadence</h2>
           <p className="max-w-[68ch] font-sans text-sm leading-[1.72] text-muted-foreground">
             We update the measurement dates when new runs are reviewed. A desktop release does not
-            automatically mean these benchmarks have been rerun. The results on this page remain the
-            May–June 2026 runs.
+            automatically mean these benchmarks have been rerun. The model-splitting result is
+            from September 29, 2026. The memory retrieval and local inference results retain their
+            May–June 2026 dates.
           </p>
         </section>
       </Reveal>

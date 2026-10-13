@@ -1,6 +1,6 @@
 # Terms of Service
 
-**Last updated: September 16, 2026**
+**Last updated: October 13, 2026**
 
 These Terms are a contract between you and Coshippr Inc., doing business as Potluck ("Potluck," "we," "us"), a Delaware corporation. They govern your use of the Potluck desktop application, the website at trypotluck.ai, and our account, membership, and network services (together, the "Service"). By using the Service you agree to these Terms. If you do not agree, do not use the Service.
 
@@ -18,7 +18,7 @@ You sign in with a passwordless email link. You are responsible for the email ac
 
 ## 3. The software and your license
 
-The Potluck desktop application is licensed to you, not sold, under these Terms. Subject to these Terms, we grant you a personal, non-exclusive, non-transferable, revocable license to install and use the application for its intended purpose. You may not remove notices, or reverse-engineer, resell, or redistribute the Service except as its license or applicable law allows.
+Potluck source code published in the [public repository](https://github.com/newtorob/potluck-ai) is available under the [MIT license](https://github.com/newtorob/potluck-ai/blob/main/LICENSE). That license governs your use, modification and distribution of the covered code; these Terms do not limit the rights it grants. Third-party components and model weights remain subject to their own licenses. These Terms continue to govern use of our website, accounts and hosted network services.
 
 Your local data (your prompts, chats, memory, and files) is yours. You retain all rights to it. We claim only the limited, temporary rights needed to operate features you use (for example, transmitting a request you route to another machine so it can generate a reply).
 

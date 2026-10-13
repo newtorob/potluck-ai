@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { PageIntro } from '@/components/PageIntro';
 import Link from 'next/link';
 import { Reveal } from '@/components/motion';
 import {
@@ -11,6 +12,7 @@ import {
 } from '@/lib/downloads';
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/install" },
   title: 'Install',
   description:
     'Install the Potluck desktop app: local AI on your own machines, persistent memory for your coding agents, and an embedded mesh that joins your machines into one private network.',
@@ -179,23 +181,12 @@ const HONEST_LIMITS = [
 
 export default function InstallPage() {
   return (
-    <article className="mx-auto w-full max-w-[1160px] px-6 md:px-10 py-16">
-      {/* Page header */}
-      <Reveal>
-        <div className="mb-14">
-          <p className="eyebrow-mono mb-6">Field bulletin · Install Potluck</p>
-          <h1 className="font-serif text-4xl font-light leading-[1.12] tracking-[-0.02em] text-foreground text-balance max-w-[32ch] md:text-[2.75rem]">
-            Install on one machine. Or all of them.
-          </h1>
-          <p className="mt-5 max-w-[54ch] font-sans text-base leading-[1.72] text-muted-foreground">
-            Potluck is a desktop app that runs open models on hardware you own. Chat with them, give
+    <article className="site-page">
+      <PageIntro title={<>Install on one machine. Or all of them.</>} detail="Desktop downloads and setup">Potluck is a desktop app that runs open models on hardware you own. Chat with them, give
             your coding agents a persistent memory over MCP, and join your machines into one private
             network with the WireGuard mesh built into the app. Choose local inference or route a
             request to your own paired machines. Trusted-circle inference and the open contributor
-            pool are still in development.
-          </p>
-        </div>
-      </Reveal>
+            pool are still in development.</PageIntro>
 
       {/* Prereqs */}
       <p className="docs-note">
@@ -429,6 +420,8 @@ export default function InstallPage() {
           </div>
         </Reveal>
       </section>
+
+      <aside className="docs-note">Connecting another computer? Follow the <Link href="/blog/run-a-local-llm-on-another-computer">two-machine setup guide</Link>, including model loading, serving, and connection checks.</aside>
 
       {/* Cross-machine */}
       <section className="mt-12 pt-10 border-t border-border">

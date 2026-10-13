@@ -1,37 +1,81 @@
 import type { Metadata } from 'next';
+import { PageIntro } from '@/components/PageIntro';
 import Link from 'next/link';
 import { RELEASE_VERSION } from '@/lib/downloads';
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/how-it-works" },
   title: 'How it works',
   description:
-    'How Potluck runs open models locally, connects your own machines over WireGuard, and gives compatible agents persistent memory. Current capabilities and limits.',
+    'How Potluck splits one model across computers you own, with verified placement and explicit worker choice. Learn what is tested and what current downloads support.',
 };
 
 export default function HowItWorksPage() {
   return (
     <article className="docs-page">
-      <header className="docs-intro">
-        <p className="eyebrow-mono">Inside Potluck · Desktop {RELEASE_VERSION}</p>
-        <h1>
-          One app.
+      <PageIntro title={<>
+          One model.
           <br />
-          Your machines, connected.
-        </h1>
-        <p>
-          Potluck brings local inference, a private machine network, and persistent context into one
-          desktop app. Here is what happens when you use it.
-        </p>
-      </header>
+          Your machines, working together.
+        </>} detail={<>Inside Potluck · Desktop {RELEASE_VERSION}</>}>
+          Potluck is built to spread one model across computers you own, letting them contribute
+          memory and compute to the same answer. Here is how splitting works, what we have tested,
+          and what the current downloads support.
+        </PageIntro>
       <nav className="docs-contents" aria-label="On this page">
+        <a href="#model-splitting">One model, several machines</a>
         <a href="#local">Local inference</a>
-        <a href="#mesh">Your machines</a>
+        <a href="#mesh">Route to one machine</a>
         <a href="#memory">Memory &amp; tools</a>
         <a href="#network">Shared network</a>
       </nav>
 
-      <section className="docs-section" id="local">
+      <section className="docs-section" id="model-splitting">
         <span className="docs-section-number">01</span>
+        <div>
+          <h2>Several computers run parts of the same model.</h2>
+          <p>
+            A larger model needs room for its weights: the data it uses to generate an answer.
+            Potluck can place parts of those weights on different computers and connect their
+            work over your private machine network. Each selected computer contributes to the
+            same inference.
+          </p>
+          <ol>
+            <li>
+              Choose the main computer, called the head. It keeps the complete model file and
+              handles your requests.
+            </li>
+            <li>
+              Choose one to three other computers you own as workers. Enable sharing on each;
+              they receive their assigned weights without downloading a separate model file.
+            </li>
+            <li>
+              Check the available memory, then start the split. Potluck verifies that every
+              selected worker received model weights before marking the model ready.
+            </li>
+          </ol>
+          <p>
+            The computers need compatible split engines and must stay connected. Free memory,
+            model size, and context length determine placement. Some weights may stay on the
+            main computer&rsquo;s CPU. Splitting adds capacity; response speed still depends on
+            the hardware and network. If a worker disconnects, restore it and start the split again.
+          </p>
+          <aside className="docs-note">
+            <strong>What you can use today.</strong> Linux CLI 0.1.7 includes a CPU split engine.
+            Our tested 32B model across a Linux GPU and a Mac used development builds. Mac CLI
+            0.1.6 does not include the split engine, and split setup is not yet enabled in the
+            desktop app. The current Linux GPU download accelerates models running on one
+            computer; its split engine still uses the CPU.
+          </aside>
+          <p>
+            <Link href="/benchmarks#model-splitting">See the measured two-computer configuration</Link>,
+            including exactly where the model weights ran.
+          </p>
+        </div>
+      </section>
+
+      <section className="docs-section" id="local">
+        <span className="docs-section-number">02</span>
         <div>
           <h2>A model runs on your computer.</h2>
           <p>
@@ -53,13 +97,14 @@ export default function HowItWorksPage() {
       </section>
 
       <section className="docs-section" id="mesh">
-        <span className="docs-section-number">02</span>
+        <span className="docs-section-number">03</span>
         <div>
-          <h2>The other computer can do the work.</h2>
+          <h2>You can also send a request to one computer.</h2>
           <p>
-            Pair computers you own inside the app. Potluck includes a WireGuard mesh: an encrypted
-            connection between those machines, with connection setup and diagnostics built in. You
-            do not need a separate VPN account.
+            The desktop app also supports a simpler workflow: one paired computer runs the entire
+            model and answers a request from another. Potluck includes a WireGuard mesh: an
+            encrypted connection between those machines, with connection setup and diagnostics
+            built in. You do not need a separate VPN account.
           </p>
           <ol>
             <li>Install Potluck on each machine and pair them using the in-app pairing flow.</li>
@@ -74,8 +119,8 @@ export default function HowItWorksPage() {
           </ol>
           <p>
             The request can be served by an eligible paired machine with the requested model loaded.
-            The model runs on the serving machine; ordinary routing does not merge the memory of
-            every GPU into one pool.
+            This routing workflow uses one serving machine. To spread the same model across
+            machines, use the separate splitting workflow described above.
           </p>
           <aside className="docs-note">
             <strong>Setup needs system permission.</strong> The mesh uses a background service and
@@ -84,6 +129,9 @@ export default function HowItWorksPage() {
             unavailable. Restrictive networks can still need troubleshooting.
           </aside>
           <p>
+            <Link href="/blog/run-a-local-llm-on-another-computer">Follow the two-machine setup guide</Link> for the complete walkthrough.
+          </p>
+          <p>
             WireGuard protects traffic between the machines. The computer generating the answer
             necessarily processes the prompt in plaintext. Only pair machines you control and trust.
           </p>
@@ -91,7 +139,7 @@ export default function HowItWorksPage() {
       </section>
 
       <section className="docs-section" id="memory">
-        <span className="docs-section-number">03</span>
+        <span className="docs-section-number">04</span>
         <div>
           <h2>Your context survives the session.</h2>
           <p>
@@ -123,7 +171,7 @@ export default function HowItWorksPage() {
       </section>
 
       <section className="docs-section" id="network">
-        <span className="docs-section-number">04</span>
+        <span className="docs-section-number">05</span>
         <div>
           <h2>A wider network is the next step.</h2>
           <p>

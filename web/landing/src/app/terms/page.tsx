@@ -4,6 +4,7 @@ import path from 'path';
 import { LegalDocument } from '@/components/LegalDocument';
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/terms" },
   title: 'Terms of Service',
   description:
     'The contract between you and Potluck AI: your account, membership, and use of the desktop app and network services.',
