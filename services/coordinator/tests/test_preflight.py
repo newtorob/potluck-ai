@@ -102,7 +102,7 @@ def test_advisories_warn_in_prod_not_block(monkeypatch):
     # These advisories are non-blocking so they never refuse startup.
     for n in ("cors_dev_origins", "error_reporting", "verification_probe"):
         assert names[n].blocking is False
-    # database_tls is NOT an advisory any more — it is fail-closed (see the
+    # database_tls is not an advisory - it is fail-closed (see the
     # dedicated db-tls tests). _PROD_DB requests ssl=require, so it's ok here.
     assert names["database_tls"].status == "ok"
     assert names["database_tls"].blocking is True
@@ -146,7 +146,7 @@ def test_resolve_cors_origins_env_gating():
 
 
 def test_member_auth_is_warn_not_blocking(monkeypatch):
-    """The stub-member-auth gap must stay a non-blocking WARN — blocking it would
+    """The stub-member-auth gap must stay a non-blocking WARN - blocking it would
     make staging/production unstartable with no config remedy."""
     monkeypatch.delenv("POTLUCK_SESSION_AUTH_ENABLED", raising=False)
     check = _by_name(run_preflight(_remediated("production")))["member_session_auth"]
@@ -207,7 +207,7 @@ def test_db_tls_ok_with_network_encryption_ack(monkeypatch):
 
 def test_db_tls_sslmode_is_a_trap_not_tls(monkeypatch):
     # asyncpg ignores libpq's sslmode=; a URL carrying only sslmode=require is
-    # NOT encrypted and must still fail — with a message that names the trap.
+    # not encrypted and must still fail - with a message that names the trap.
     monkeypatch.setenv("POTLUCK_COORDINATOR_TOKEN", _STRONG_TOKEN)
     monkeypatch.delenv("POTLUCK_DB_LINK_ENCRYPTED", raising=False)
     s = _settings("production", registered_keys=True, db_url=_PROD_DB_NO_TLS + "?sslmode=require")

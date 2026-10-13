@@ -1,10 +1,8 @@
 /**
- * Task store — single source of truth for agent task state.
+ * Task store - single source of truth for agent task state.
  *
  * Optimistic updates for status changes with rollback on failure.
- * The store does not auto-fetch — that is the responsibility of useTasks.
- *
- * See guide §9.5.
+ * The store does not auto-fetch - that is the responsibility of useTasks.
  */
 
 import { create } from 'zustand';

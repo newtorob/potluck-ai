@@ -1,5 +1,5 @@
 /**
- * CooperativeConnectionPanel — coordinator URL configuration.
+ * CooperativeConnectionPanel - coordinator URL configuration.
  *
  * Lives in Settings -> Advanced. The coordinator URL is the address of
  * the Phase G control plane (peer registry, mesh enrollment, blinded
@@ -16,7 +16,7 @@
  * override that differs from what the sidecar reports, a brief note
  * makes that visible so drift is never silent.
  *
- * Changes take effect immediately — the next API call uses the new URL,
+ * Changes take effect immediately - the next API call uses the new URL,
  * and the coordinator-health probe re-runs.
  */
 
@@ -124,7 +124,7 @@ export function CooperativeConnectionPanel() {
                 'text-muted-foreground hover:text-foreground hover:border-border',
                 'focus:outline-none focus:ring-2 focus:ring-ring',
               )}
-              title="Clear override — follow the sidecar's coordinator"
+              title="Clear override and follow the sidecar's coordinator"
             >
               Reset
             </button>
@@ -145,7 +145,7 @@ export function CooperativeConnectionPanel() {
           </div>
         )}
 
-        {/* Reachability indicator — hidden until the first probe settles */}
+        {/* Reachability indicator - hidden until the first probe settles */}
         <div className="flex items-center gap-1.5 text-xs">
           {lastCheckedAt === null ? (
             <span className="text-muted-foreground/50">Checking...</span>

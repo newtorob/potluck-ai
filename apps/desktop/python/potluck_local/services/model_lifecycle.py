@@ -42,7 +42,7 @@ class ModelLifecycle:
 
     @staticmethod
     def remember(slug: str | None) -> None:
-        # Re-read AFTER the potentially long load; don't overwrite settings
+        # Re-read after the potentially long load; don't overwrite settings
         # changed during it. Copy the cached model so a failed save is not cached.
         settings = get_settings().model_copy(deep=True)
         if settings.runtime.startup_model_id != slug:

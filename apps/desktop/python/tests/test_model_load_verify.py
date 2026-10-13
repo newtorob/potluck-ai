@@ -2,7 +2,7 @@
 
 The opt-in POTLUCK_VERIFY_MODEL_ON_LOAD re-check exists to catch a tampered
 model.gguf. Its whole value hinges on the reference hash coming from a source the
-tamperer can NOT also rewrite. The catalog (models.json) ships read-only inside
+tamperer cannot also rewrite. The catalog (models.json) ships read-only inside
 the code-signed app bundle; the model.gguf.sha256 sidecar lives in the
 user-writable ~/.potluck/models dir. So the reference must prefer the catalog and
 treat the sidecar as a corruption-only fallback for non-catalog models.
@@ -24,7 +24,7 @@ def _write_sidecar(model_dir, value: str) -> None:
 
 
 def test_prefers_catalog_over_sidecar(tmp_path):
-    # THE security case: a catalog model whose on-disk sidecar has been rewritten
+    # The security case: a catalog model whose on-disk sidecar has been rewritten
     # to a tampered hash. We must still check against the bundled catalog hash.
     _write_sidecar(tmp_path, TAMPERED)
     manifest = {"slug": "qwen", "sha256": CATALOG}

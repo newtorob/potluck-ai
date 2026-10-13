@@ -1,10 +1,10 @@
 /**
- * useCoordinatorHealth — lightweight reachability probe for the Phase G
+ * useCoordinatorHealth - lightweight reachability probe for the Phase G
  * coordinator. Polls `localApi.network.health()` on an interval and
  * returns whether the coordinator answered a 2xx within the timeout.
  *
  * Used to gate UI affordances that only make sense when the coordinator
- * is up — primarily the chat composer's "Network mode" toggle. The
+ * is up - primarily the chat composer's "Network mode" toggle. The
  * coordinator running in Docker (`make up`) is the dev assumption; in
  * production the coordinator is hosted by the cooperative and should be
  * reachable nearly always, but transient outages or the user being
@@ -60,7 +60,7 @@ export function useCoordinatorHealth(intervalMs: number = DEFAULT_INTERVAL_MS): 
 
     const check = async () => {
       if (cancelled) return;
-      // Pause when tab is hidden — no point burning probes while invisible.
+      // Pause when tab is hidden - no point burning probes while invisible.
       if (typeof document !== 'undefined' && document.hidden) {
         scheduleNext(intervalMs);
         return;
@@ -69,7 +69,7 @@ export function useCoordinatorHealth(intervalMs: number = DEFAULT_INTERVAL_MS): 
       if (cancelled) return;
       // On reachable → unreachable transition, kick off the fast-retry budget
       // so we notice when the coordinator comes back without waiting a full
-      // interval. Reading from the ref gives us the live current value — the
+      // interval. Reading from the ref gives us the live current value - the
       // stale closure over `state` would always see the initial false, and
       // the updater-callback form of setState runs asynchronously after this
       // synchronous code, so by the time the updater ran, this check would

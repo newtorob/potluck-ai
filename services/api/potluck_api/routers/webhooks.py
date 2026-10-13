@@ -39,14 +39,14 @@ async def stripe_webhook(
     - customer.subscription.deleted
 
     Response contract (aligned with Stripe retry semantics):
-    - 400 on a bad/missing signature — a forged or misconfigured event; retrying
+    - 400 on a bad/missing signature - a forged or misconfigured event; retrying
       it would never succeed, so we tell Stripe not to.
     - 200 once the event is processed (or safely deduped / ignored).
-    - 500 on an unexpected internal error — processing is atomic and events are
+    - 500 on an unexpected internal error - processing is atomic and events are
       idempotent (deduped by id), so letting Stripe retry is the durable choice
       rather than swallowing the failure.
     """
-    # Read raw body now — once consumed it cannot be re-read by a JSON parser.
+    # Read raw body now - once consumed it cannot be re-read by a JSON parser.
     raw_body: bytes = await request.body()
     stripe_signature = request.headers.get("stripe-signature", "")
 

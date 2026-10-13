@@ -1,9 +1,9 @@
 """Job dispatch endpoints.
 
 Two consumer paths:
-- POST /jobs        — synchronous; returns full collected response when
+- POST /jobs - synchronous; returns full collected response when
                       inference completes. Used by curl smoke + tests.
-- POST /jobs/stream — Server-Sent Events; emits OpenAI-compatible delta
+- POST /jobs/stream - Server-Sent Events; emits OpenAI-compatible delta
                       chunks (`data: {"choices":[{"delta":{"content":"…"}}]}`)
                       as tokens arrive. Used by the desktop chat composer
                       when the user toggles "Use contributor network."
@@ -11,12 +11,13 @@ Two consumer paths:
 The SSE shape mirrors the local sidecar's /chat endpoint so the frontend
 chat-stream parser is reused without modification.
 
-Privacy invariant (memory 42a7e671):
+Privacy invariant:
     JobAssignedMessage MUST NOT carry member_id, conversation_id, or any
     other identifier that links the prompt back to its requester. The
-    schema for JobAssignedMessage doesn't even have a member_id field —
+    schema for JobAssignedMessage doesn't even have a member_id field -
     that's the architectural enforcement. Any future change that adds an
-    identifying field to JobAssignedMessage is a manifesto-level bug.
+    identifying field to JobAssignedMessage breaks the blinded-routing
+    guarantee.
 """
 from __future__ import annotations
 
@@ -69,12 +70,12 @@ JOB_TIMEOUT_S = 120.0
 # ---- Active first-token failover (streaming endpoint only) ---------------
 #
 # How long we'll wait, per dispatch attempt, for a peer to either produce
-# its FIRST token or signal completion (JobCompleteMessage with zero
+# its first token or signal completion (JobCompleteMessage with zero
 # tokens is a valid empty completion, not a failure). A peer that clears
 # neither bar within this window is presumed dead-on-arrival (hung,
 # black-holed, crashed mid-load) and we fail over to the next-best peer
-# BEFORE any bytes have reached the client -- see `_dispatch_stream_with_failover`.
-# This is a FLOOR, not the whole budget: see `_first_token_deadline`, which
+# before any bytes have reached the client -- see `_dispatch_stream_with_failover`.
+# This is a floor, not the whole budget: see `_first_token_deadline`, which
 # adds an estimate of this request's prompt-processing time on this peer.
 FIRST_TOKEN_DEADLINE_S = 5.0
 
@@ -93,8 +94,8 @@ _TIER_PP_TOKENS_PER_SECOND = 25.0
 _CHARS_PER_TOKEN = 4.0
 
 # Hard ceiling on how many peers we'll try for a single streaming request
-# before giving up and returning 503. Bounds worst-case PRE-STREAM latency to
-# roughly MAX_DISPATCH_ATTEMPTS * the DERIVED per-attempt deadline (see
+# before giving up and returning 503. Bounds worst-case pre-stream latency to
+# roughly MAX_DISPATCH_ATTEMPTS * the derived per-attempt deadline (see
 # `_first_token_deadline`), i.e. 3 * 5s for a short prompt and 3 * 90s in the
 # pathological case of a very long prompt on a very slow peer. Nothing has
 # reached the client at that point, so the cost is latency, not a broken
@@ -151,7 +152,7 @@ class PeerDispatchFailed(HTTPException):
     next dispatch attempt: a socket that died between selection and send must
     not reach the client as a 502 while retries remain.
 
-    The Job row for the failed attempt is ALREADY finalized (DISPATCH_FAILED)
+    The Job row for the failed attempt is already finalized (DISPATCH_FAILED)
     before this is raised, so no handler has to settle it.
     """
 
@@ -165,7 +166,7 @@ class PeerDispatchFailed(HTTPException):
 
 # Widest routing tier the requester will accept. The coordinator always tries
 # the closest/most-trusted tier first and widens outward only up to this limit.
-# "local" is never a coordinator scope — a local-served prompt never produces a
+# "local" is never a coordinator scope - a local-served prompt never produces a
 # coordinator job at all.
 RoutingScope = Literal["mine", "circle", "pool"]
 
@@ -174,12 +175,12 @@ class JobRequest(BaseModel):
     prompt: str
     # Optional multi-turn history. When present, the peer uses messages as
     # conversation context instead of (or in addition to) prompt. The
-    # coordinator relays whatever the sidecar sends — policy (circle always
+    # coordinator relays whatever the sidecar sends - policy (circle always
     # sends messages; pool sends messages only on opt-in) is enforced on the
     # sidecar side. ChatMessage carries role + content only; no requester
     # identity ever crosses to the peer.
     messages: list[ChatMessage] | None = None
-    model_slug: str = "stub-echo"  # m3 stub default; real models when llama-cpp lands
+    model_slug: str = "stub-echo"  # stub default (echo model)
     sampling: SamplingParams = Field(default_factory=SamplingParams)
     # "mine"   -> only machines this member owns (503 if none online)
     # "circle" -> only machines whose member is in the named circle (503 if none online)
@@ -204,10 +205,10 @@ class JobResponse(BaseModel):
     output_tokens: int
     duration_ms: int
     finish_reason: str
-    # Which tier actually served the job ("mine" / "pool"). A tier label only —
+    # Which tier actually served the job ("mine" / "pool"). A tier label only -
     # never a peer_id. peer_id is intentionally omitted from the response:
     # exposing it would let a requester shop for a specific peer, which breaks
-    # the anonymity guarantee the manifesto promises.
+    # the anonymity guarantee.
     served_scope: RoutingScope
 
 
@@ -245,7 +246,7 @@ class _GuardedStream:
       * ASGI. Starlette cancels `stream_response` before its first
         `async for` when the client is already gone. That door is covered by
         the response's BackgroundTask, which starlette awaits after its task
-        group exits on BOTH normal completion and disconnect.
+        group exits on both normal completion and disconnect.
       * A caller that closes `response.body_iterator` directly. Closing an
         async generator that has never started runs none of its body, so no
         `finally:` fires. That door is covered by `aclose` below.
@@ -296,11 +297,11 @@ async def _dispatch_to_peer(
 
     `exclude_peer_ids`, when given, is forwarded to `select_peer_for_request`
     so a peer that already proved dead-on-arrival on an earlier attempt of
-    THIS request (see `_dispatch_stream_with_failover`) is never re-picked.
+    this request (see `_dispatch_stream_with_failover`) is never re-picked.
     Default None preserves current behavior for every existing caller
     (including the sync `dispatch_job` endpoint, which does not retry).
 
-    CRITICAL PRIVACY POINT: JobAssignedMessage carries ONLY job_id + model_slug
+    Privacy: JobAssignedMessage carries only job_id + model_slug
     + prompt + sampling. Adding member_id or any identifying field here is a
     blinded-routing violation (the schema has no member_id field, so it's also
     a type error, but the rule deserves the comment).
@@ -425,8 +426,8 @@ async def dispatch_job(
     response when it completes.
 
     Synchronous: this endpoint blocks until the peer finishes (or
-    JOB_TIMEOUT_S elapses). Good enough for the m3 stub smoke test.
-    Streaming endpoints come in a follow-up.
+    JOB_TIMEOUT_S elapses). Good enough for smoke tests; POST /jobs/stream
+    is the streaming variant.
     """
     # ---- 1-3. Pick peer, create job, deliver (shared with the stream endpoint) ---- #
     peer_conn, job, buf, served_scope = await _dispatch_to_peer(db, req, member_id)
@@ -434,9 +435,9 @@ async def dispatch_job(
     logger.info(
         "job_dispatched",
         job_id=str(job_id),
-        # Note: NO member_id in this log line. Coordinator-side logs are
+        # Note: no member_id in this log line. Coordinator-side logs are
         # internal, but we keep peer-bound observability consistent with
-        # what crosses the wire — easier to reason about + safer if logs
+        # what crosses the wire - easier to reason about + safer if logs
         # ever ship somewhere we don't fully control.
         peer_id=str(peer_conn.peer_id),
         model_slug=req.model_slug,
@@ -449,8 +450,8 @@ async def dispatch_job(
     except asyncio.TimeoutError:
         await complete_job(job_id)
         logger.warning("job_timeout", job_id=str(job_id), peer_id=str(peer_conn.peer_id))
-        # Settle the row BEFORE raising. Raising straight through left the
-        # job at 'dispatched' forever, which no later code path ever cleaned
+        # Settle the row before raising. Raising straight through would leave
+        # the job at 'dispatched' forever, which no later code path ever cleans
         # up (there is no reaper for job rows, only for peers).
         await _finalize_job_in_db(
             job_id=job_id,
@@ -490,7 +491,7 @@ async def dispatch_job(
     response_text = "".join(buf.tokens)
 
     # Success. Written inline on the request session rather than through
-    # `_finalize_job_in_db` ON PURPOSE: this endpoint has never minted
+    # `_finalize_job_in_db` on purpose: this endpoint does not mint
     # credits, and routing it through the finalizer would start. The row
     # still records the same terminal outcome the streaming path records.
     job.status = "completed"
@@ -534,11 +535,11 @@ def _sse_meta(
 ) -> str:
     """Encode a job-completion summary as an SSE chunk.
 
-    The frontend uses this to badge the response — `served_scope` ("mine" /
+    The frontend uses this to badge the response - `served_scope` ("mine" /
     "pool") lets it show "ran on your machine" vs "served by the network"
     without exposing peer identity. `served_by` + `served_scope` are tier
     labels only; peer_id, hostname, and any other identifying fields are
-    deliberately absent per the blinded-routing invariant (memory 42a7e671).
+    deliberately absent per the blinded-routing invariant.
     """
     payload = {
         "meta": {
@@ -625,8 +626,8 @@ async def my_job_stats(
     Filters by the caller's session member_id (the dev fixture STUB_MEMBER_ID
     until POTLUCK_SESSION_AUTH_ENABLED is set).
 
-    Returns counts + token totals + a coarse latency band (p50). NO
-    peer_id, NO per-job records — aggregate-only, in keeping with the
+    Returns counts + token totals + a coarse latency band (p50). No
+    peer_id, no per-job records - aggregate-only, in keeping with the
     blinded-routing rule. The frontend's "Your usage" card on /network
     consumes this directly.
     """
@@ -681,16 +682,15 @@ async def _finalize_job_in_db(
     output_tokens: int,
     duration_ms: int,
 ) -> None:
-    """Apply the ONE terminal outcome for a job and persist it.
+    """Apply the one terminal outcome for a job and persist it.
 
     `terminal` is the authority and is required: it decides the row's status
     and whether credits mint. `error_category` / `error_message` are
-    descriptive only, carried alongside for diagnostics. This split is the
-    whole fix. Previously this function inferred success from
-    `error_category is None`, so every exit that failed WITHOUT setting a
-    category (a stream timeout, a client disconnect) was recorded as a
-    completed job and minted consumption credits for work that never
-    finished.
+    descriptive only, carried alongside for diagnostics. Success is never
+    inferred from `error_category is None`: an exit that fails without
+    setting a category (a stream timeout, a client disconnect) would
+    otherwise be recorded as a completed job and mint consumption credits
+    for work that never finished.
 
     Policy table:
       COMPLETED       -> status "completed"; output_tokens + duration_ms
@@ -709,12 +709,12 @@ async def _finalize_job_in_db(
     terminal state and, via the UNIQUE (job_id, direction) constraint from
     migration 0003, writes the ledger rows at most once.
 
-    Terminal-state lock: once a row has reached a terminal status the FIRST
-    outcome wins and a CONFLICTING later one is ignored and logged. Without
+    Terminal-state lock: once a row has reached a terminal status the first
+    outcome wins and a conflicting later one is ignored and logged. Without
     this, two finalize sites racing the same row could relabel a completed,
     paid job as cancelled (leaving the row claiming it never finished while
     the ledger says it was paid) or promote a settled failure back to
-    completed and mint for it. There is more than one finalize site now (the
+    completed and mint for it. There is more than one finalize site (the
     generator's `finally:`, and the settle-on-disconnect background task for
     a body that never ran), so the lock is what makes them safe to have.
 
@@ -745,7 +745,7 @@ async def _finalize_job_in_db(
                 return
 
             # Terminal-state lock. A row that has already settled does not
-            # move. Re-applying the SAME outcome still falls through (it is
+            # move. Re-applying the same outcome still falls through (it is
             # idempotent, and it lets a retry finish a ledger write that
             # failed the first time); a different one is refused.
             if db_job.status in _TERMINAL_STATUSES and db_job.terminal_reason not in (
@@ -794,7 +794,7 @@ async def _finalize_job_in_db(
                     peer = await fresh_db.get(Peer, db_job.peer_id)
                     if peer is not None and peer.member_id == db_job.member_id:
                         # Self-served (My Machines / household): running on your
-                        # own hardware is free — no spent/earned rows. Skipping
+                        # own hardware is free - no spent/earned rows. Skipping
                         # the ledger also closes the credit-printing path the
                         # contribution bonus would open once My Machines is the
                         # default-preferred route (requester == owner would
@@ -828,12 +828,12 @@ async def _finalize_job_in_db(
 async def _first_token_deadline(
     db: AsyncSession, req: JobRequest, peer_conn: PeerConnection
 ) -> float:
-    """How long THIS peer gets to produce a first token for THIS request.
+    """How long this peer gets to produce a first token for this request.
 
-    A flat deadline is a prompt-processing bug the moment prompts get long.
-    A split 32B model measured ~22s to first token on a 2048-token prompt, so
-    under the old flat 5s every such request burned all MAX_DISPATCH_ATTEMPTS
-    and returned 503 while every peer involved was perfectly healthy.
+    A flat deadline fails long prompts: a split 32B model takes ~22s to first
+    token on a 2048-token prompt, so a flat 5s would burn all
+    MAX_DISPATCH_ATTEMPTS and return 503 while every peer involved was
+    perfectly healthy.
 
     Estimate:
         est_prompt_tokens = (len(prompt) + sum(len(m.content) for messages))
@@ -911,10 +911,10 @@ async def _first_token_deadline(
 async def _race_first_token(
     buf: JobBuffer, deadline_s: float
 ) -> tuple[str | None, bool]:
-    """Wait for the FIRST of three outcomes on one dispatch attempt's buffer:
+    """Wait for the first of three outcomes on one dispatch attempt's buffer:
 
       1. A token lands on `buf.token_stream`      -> (token, False)
-      2. `buf.done` fires with NO token yet        -> (None, True)
+      2. `buf.done` fires with no token yet        -> (None, True)
       3. `deadline_s` elapses with neither          -> (None, False)
 
     Implementation: two tasks (`buf.token_stream.get()` and `buf.done.wait()`)
@@ -924,16 +924,16 @@ async def _race_first_token(
     returns is `.cancel()`-ed and awaited (swallowing the resulting
     CancelledError) so nothing is left dangling. This is safe for the
     queue getter specifically because `asyncio.Queue.get()` only pops an
-    item off the internal deque as the LAST step of its own coroutine body,
-    after its waiter future has already resolved — so `task.done() is False`
+    item off the internal deque as the last step of its own coroutine body,
+    after its waiter future has already resolved - so `task.done() is False`
     is a hard guarantee that no item was silently consumed out from under a
     cancelled getter. Put differently: a token is only ever "spent" by
     actually returning it from this function.
 
-    If BOTH tasks happen to be complete at the same time (e.g. the peer's
+    If both tasks happen to be complete at the same time (e.g. the peer's
     JobCompleteMessage handler both enqueues nothing and sets `done` in the
-    same event-loop tick), the token wins — outcome 1 is checked first,
-    matching the "token arrived -> SUCCESS" priority in the spec.
+    same event-loop tick), the token wins - outcome 1 is checked first,
+    matching the "token arrived -> success" priority.
     """
     get_task = asyncio.create_task(buf.token_stream.get())
     done_task = asyncio.create_task(buf.done.wait())
@@ -962,17 +962,17 @@ async def _finalize_abandoned_attempt(
     job: Job, buf: JobBuffer, deadline_s: float
 ) -> None:
     """Finalize an EARLIER dispatch attempt's Job row after failover moved on
-    to a different peer — invariant #6 (no leaked 'dispatched' rows).
+    to a different peer - invariant #6 (no leaked 'dispatched' rows).
 
     Reuses `_finalize_job_in_db` with a non-COMPLETED terminal outcome, so:
       - the `jobs` row settles into `status='failed'` (not left dangling at
         'dispatched' forever), and
       - the credit-ledger write is gated OFF (invariant #2: a peer that never
-        produced output earns no credit) — same code path a genuine
+        produced output earns no credit) - same code path a genuine
         peer-reported error takes.
 
     Awaited inline (not spawned as a detached background task) because this
-    runs BEFORE the StreamingResponse is returned — we're still holding the
+    runs before the StreamingResponse is returned - we're still holding the
     request coroutine, so there's no cancellation hazard to design around
     (unlike the committed job's finalize in `dispatch_job_stream`'s
     `finally:`, which spawns detached because the client can disconnect the
@@ -984,7 +984,7 @@ async def _finalize_abandoned_attempt(
     else:
         terminal = Outcome.TIMEOUT
         error_category = "first_token_timeout"
-    # `deadline_s` is the DERIVED per-attempt budget this peer actually got
+    # `deadline_s` is the derived per-attempt budget this peer actually got
     # (see `_first_token_deadline`), not the flat floor. Reporting the floor
     # here would misdescribe every long-prompt failover.
     error_message = buf.error_message or (
@@ -1005,11 +1005,11 @@ async def _dispatch_stream_with_failover(
     db: AsyncSession, req: JobRequest, member_id: uuid.UUID
 ) -> tuple[PeerConnection, Job, JobBuffer, RoutingScope, str | None]:
     """Resolve a peer that has actually produced a first token (or an
-    empty-but-complete result) BEFORE the caller returns a StreamingResponse.
+    empty-but-complete result) before the caller returns a StreamingResponse.
 
-    HARD INVARIANT: this function must return (or raise) before a single
+    Hard invariant: this function must return (or raise) before a single
     byte reaches the client. Once it returns, the caller yields the stashed
-    `first_token` and is COMMITTED to that peer — there is no failover once
+    `first_token` and is committed to that peer - there is no failover once
     streaming has started, ever. See `dispatch_job_stream`.
 
     Loop up to MAX_DISPATCH_ATTEMPTS times, growing an `excluded` set of
@@ -1019,7 +1019,7 @@ async def _dispatch_stream_with_failover(
     silent peer that misses its deadline, and a socket that was already dead
     when we tried to send it the assignment (`PeerDispatchFailed`).
 
-    Worst-case pre-stream latency is MAX_DISPATCH_ATTEMPTS times the DERIVED
+    Worst-case pre-stream latency is MAX_DISPATCH_ATTEMPTS times the derived
     per-attempt deadline from `_first_token_deadline` (so 3 * 5s for a short
     prompt, up to 3 * FIRST_TOKEN_MAX_S for a very long prompt on a very slow
     peer). Nothing has reached the client while this runs, so the cost is
@@ -1058,18 +1058,18 @@ async def _dispatch_stream_with_failover(
         token, fired_done_first = await _race_first_token(buf, deadline_s)
 
         if token is not None:
-            # SUCCESS. `token` has been consumed off `buf.token_stream` —
+            # Success. `token` has been consumed off `buf.token_stream` -
             # the caller MUST yield it before draining the rest of the queue.
             return peer_conn, job, buf, served_scope, token
 
         if fired_done_first and buf.error_category is None:
             # The peer completed with zero output tokens. An empty-but-valid
-            # completion is a SUCCESS, not a failover trigger (invariant: do
-            # NOT failover an empty-but-valid completion).
+            # completion is a success, not a failover trigger (invariant: do
+            # not failover an empty-but-valid completion).
             return peer_conn, job, buf, served_scope, None
 
         # Dead on arrival: either the peer reported an error before any
-        # token, or its DERIVED deadline elapsed with nothing at all.
+        # token, or its derived deadline elapsed with nothing at all.
         last_reason = "peer_error" if buf.error_category is not None else "first_token_timeout"
         logger.warning(
             "job_dispatch_first_token_failover",
@@ -1079,7 +1079,7 @@ async def _dispatch_stream_with_failover(
             max_attempts=MAX_DISPATCH_ATTEMPTS,
             reason=last_reason,
         )
-        # Free the in-flight slot immediately (idempotent — a no-op if the
+        # Free the in-flight slot immediately (idempotent - a no-op if the
         # peer-error path already called this) so scoring for OTHER
         # concurrent requests doesn't see a phantom job on this peer while
         # we retry.
@@ -1112,14 +1112,14 @@ async def dispatch_job_stream(
     Active first-token failover: dispatch doesn't commit to a peer until
     that peer has actually produced its first token (or completed empty).
     A peer that hangs, black-holes, or errors before its first token never
-    gets a byte in front of the client — `_dispatch_stream_with_failover`
+    gets a byte in front of the client - `_dispatch_stream_with_failover`
     retries a different peer instead, up to MAX_DISPATCH_ATTEMPTS. Once
-    ANY token has been yielded below, we are committed: no retry, ever.
+    any token has been yielded below, we are committed: no retry, ever.
     """
     # ---- 1-3. Pick peer, create job, deliver, AND wait for the first token
     # (or empty-complete) before this function returns anything to ASGI. If
     # every attempt dies before producing output, this raises HTTPException
-    # (still works as a normal error response — no StreamingResponse exists
+    # (still works as a normal error response - no StreamingResponse exists
     # yet). ---- #
     peer_conn, job, buf, served_scope, first_token = await _dispatch_stream_with_failover(
         db, req, member_id
@@ -1140,18 +1140,18 @@ async def dispatch_job_stream(
     stream_start = _StreamStart()
 
     async def _generate() -> AsyncGenerator[str, None]:
-        # FIRST statement, above every await and every yield: from here on the
+        # First statement, above every await and every yield: from here on the
         # `finally:` at the bottom is guaranteed to run and owns settlement,
         # so `_settle_if_never_started` must stand down.
         stream_start.started = True
 
         deadline = asyncio.get_running_loop().time() + JOB_TIMEOUT_S
-        # The ONE terminal outcome for this job. Defaults to COMPLETED and is
+        # The one terminal outcome for this job. Defaults to COMPLETED and is
         # narrowed by whichever exit the stream actually takes; exactly this
         # value reaches `_finalize_job_in_db` below.
         outcome = Outcome.COMPLETED
         # True once the wire has carried its terminal envelope. A client that
-        # hangs up AFTER that point already has its whole answer, so a late
+        # hangs up after that point already has its whole answer, so a late
         # GeneratorExit must not rewrite a finished job as CANCELLED.
         terminal_wire_sent = False
         try:
@@ -1219,16 +1219,16 @@ async def dispatch_job_stream(
                 # Wire contract: an error envelope is authoritative and is
                 # never followed by meta. A meta envelope after an error reads
                 # to a naive client as a successful completion, which is
-                # exactly how a timed-out job used to look on the wire. Both
+                # exactly how a timed-out job would look on the wire. Both
                 # failure envelopes are still followed by [DONE] so a client
                 # that only knows how to watch for [DONE] terminates.
-                # `terminal_wire_sent` is set BEFORE each of these yields,
-                # not after. The generator parks ON a yield, so setting it
-                # afterwards left one suspension point (the meta yield) at
-                # which the client already had every token AND the completion
-                # summary while the guard below still read the close as a
-                # mid-stream abort and rewrote a delivered, finished job as
-                # cancelled with no credit.
+                # `terminal_wire_sent` is set before each of these yields,
+                # not after. The generator parks on a yield, so setting it
+                # afterwards would leave one suspension point (the meta yield)
+                # at which the client already has every token and the
+                # completion summary while the guard below still reads the
+                # close as a mid-stream abort and rewrites a delivered,
+                # finished job as cancelled with no credit.
                 if outcome is Outcome.TIMEOUT:
                     terminal_wire_sent = True
                     yield _sse_error(
@@ -1253,16 +1253,16 @@ async def dispatch_job_stream(
             except (asyncio.CancelledError, GeneratorExit):
                 # The client went away mid-stream: uvicorn cancels the
                 # response task, starlette aclose()s the generator. The job
-                # did NOT complete, so it must not be recorded as if it had.
+                # did not complete, so it must not be recorded as if it had.
                 # Only claim the cancellation when the stream had not already
                 # reached a terminal state of its own.
                 if not terminal_wire_sent and outcome is Outcome.COMPLETED:
                     outcome = Outcome.CANCELLED
                 raise
         finally:
-            # ---- Finalize FIRST, await SECOND ---- #
+            # ---- Finalize first, await second ---- #
             #
-            # Capture the buffer's fields and spawn the finalize task BEFORE
+            # Capture the buffer's fields and spawn the finalize task before
             # any await in this block. Under cancellation every await here is
             # a potential raise point (a contended lock inside complete_job()
             # is exactly such a point), and a raise above the create_task

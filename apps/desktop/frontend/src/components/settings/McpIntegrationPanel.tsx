@@ -1,5 +1,5 @@
 /**
- * McpIntegrationPanel — "External agents (MCP)" section in Settings → Advanced.
+ * McpIntegrationPanel - "External agents (MCP)" section in Settings → Advanced.
  *
  * Shows per-editor JSON snippets that let Claude Code, Cursor, Zed, and Windsurf
  * connect to Potluck's MCP server.
@@ -10,9 +10,9 @@
  *   Uses `{REPO_ROOT}/.venv/bin/python -m potluck_local.mcp --stdio`.
  *   This works the moment `pip install -r requirements.txt` completes, without
  *   requiring the optional `pip install -e .` that registers the `potluck-mcp`
- *   entry-point script. The repo root is read from VITE_POTLUCK_REPO_ROOT,
- *   falling back to the known dev machine path `/Users/sam/Documents/potluckai`.
- *   This fallback is intentionally hardcoded for dev — only ever runs locally.
+ *   entry-point script. The repo root is read from VITE_POTLUCK_REPO_ROOT
+ *   (set it in `.env.development.local`); without it the snippet shows a
+ *   placeholder path for the developer to replace.
  *
  * PACKAGED (`!import.meta.env.DEV`):
  *   Uses the bundled binary at `/Applications/Potluck AI.app/Contents/Resources/python/potluck-mcp`.
@@ -28,10 +28,9 @@ import { cn } from '@/components/ui/cn';
 // Binary path resolution
 // ---------------------------------------------------------------------------
 
-// DEV: fallback repo root is hardcoded to the known local machine.
-// This is intentional — `import.meta.env.DEV` is always false in production.
+// DEV only: `import.meta.env.DEV` is always false in production builds.
 const REPO_ROOT: string = import.meta.env['VITE_POTLUCK_REPO_ROOT'] as string | undefined
-  ?? '/Users/sam/Documents/potluckai';
+  ?? '/path/to/potluckai';
 
 const VENV_PYTHON = `${REPO_ROOT}/apps/desktop/python/.venv/bin/python`;
 const BUNDLED_BINARY =
@@ -58,7 +57,7 @@ function resolveBinaryConfig(): BinaryConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Snippet generators — one per editor
+// Snippet generators - one per editor
 // ---------------------------------------------------------------------------
 
 type EditorId = 'claude-code' | 'cursor' | 'zed' | 'windsurf';
@@ -152,7 +151,7 @@ const MCP_TOOLS: McpTool[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// CopyButton — isolated so copied state is per-snippet, not per-panel
+// CopyButton - isolated so copied state is per-snippet, not per-panel
 // ---------------------------------------------------------------------------
 
 interface CopyButtonProps {
@@ -172,7 +171,7 @@ function CopyButton({ snippet, editorLabel }: CopyButtonProps) {
         timeoutRef.current = setTimeout(() => setCopied(false), 1000);
       },
       () => {
-        // Clipboard write failed silently — no console.log per spec
+        // Clipboard write failed silently - no console.log per spec
       },
     );
   }, [snippet]);
@@ -210,7 +209,7 @@ function CopyButton({ snippet, editorLabel }: CopyButtonProps) {
 }
 
 // ---------------------------------------------------------------------------
-// SnippetBlock — code block + copy button + path note
+// SnippetBlock - code block + copy button + path note
 // ---------------------------------------------------------------------------
 
 interface SnippetBlockProps {
@@ -257,7 +256,7 @@ function SnippetBlock({ editor, binaryConfig }: SnippetBlockProps) {
 }
 
 // ---------------------------------------------------------------------------
-// AvailableTools — collapsed details / summary
+// AvailableTools - collapsed details / summary
 // ---------------------------------------------------------------------------
 
 function AvailableTools() {
@@ -318,7 +317,7 @@ function ToolRow({ tool }: { tool: McpTool }) {
 }
 
 // ---------------------------------------------------------------------------
-// McpIntegrationPanel — main export
+// McpIntegrationPanel - main export
 // ---------------------------------------------------------------------------
 
 export function McpIntegrationPanel() {

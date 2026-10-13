@@ -1,5 +1,5 @@
 /**
- * MembershipCard — signed-in state: identity, plan, founding badge, and the
+ * MembershipCard - signed-in state: identity, plan, founding badge, and the
  * account actions. With an active plan it offers "Manage billing" (Stripe
  * portal); without one it offers "Become a founding member" (Stripe checkout).
  * Both open Stripe in the external browser. Until a live Stripe key is set the

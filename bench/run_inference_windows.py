@@ -1,6 +1,6 @@
 """Windows/Vulkan shim for the inference benchmark runner.
 
-Phase 3 — Windows / AMD Vulkan (RX 6600 XT via gfx1032).
+Windows / AMD Vulkan (RX 6600 XT via gfx1032).
 
 Usage (from repo root, with .venv-vulkan active):
     python bench/run_inference_windows.py \
@@ -11,19 +11,19 @@ Usage (from repo root, with .venv-vulkan active):
         [--n-gpu-layers -1] \
         [--out bench/results/<tag>/]
 
-This file patches two things that run_inference.py has hardcoded for Phase 1/2:
+This file patches things that run_inference.py has hardcoded for macOS and Linux:
   1. The platform guard that rejects Windows.
   2. The phase label string in the console header (changes "Phase 2 (Linux/CUDA)"
      to "Phase 3 (Windows/Vulkan)").
-  3. The OS version collector, which falls back to /etc/os-release on non-Mac —
+  3. The OS version collector, which falls back to /etc/os-release on non-Mac -
      that path doesn't exist on Windows, so we read the Windows version directly.
-  4. The GPU/accel summary line, which shows "CUDA — <gpu>" on non-Mac; we patch
-     it to show "Vulkan — <gpu>" when the build has GGML_VULKAN enabled.
+  4. The GPU/accel summary line, which shows "CUDA - <gpu>" on non-Mac; we patch
+     it to show "Vulkan - <gpu>" when the build has GGML_VULKAN enabled.
 
 Everything else (timing, metric collection, KV-cache reset, streaming TTFT) is
-unchanged — same adapter, same prompts, same result schema.
+unchanged - same adapter, same prompts, same result schema.
 
-To compare results against Phase 1 (Mac/Metal) and Phase 2 (Linux/CUDA):
+To compare results against the Mac/Metal and Linux/CUDA runs:
   bench/results/<timestamp>/inference_summary.txt
 """
 
@@ -86,7 +86,7 @@ def _detect_vulkan_gpu() -> dict:
             if "deviceName" in line and "=" in line:
                 name = line.split("=", 1)[1].strip()
                 result["gpu_name"] = name
-            # Parse VRAM from deviceLocalHeapSize if available — approximate
+            # Parse VRAM from deviceLocalHeapSize if available - approximate
             # For RX 6600 XT: 8 GB VRAM. We check vulkaninfo for this field.
             if "heapSize" in line and "=" in line:
                 try:
@@ -135,10 +135,10 @@ def _patched_format(results: dict) -> str:
     text = _original_format(results)
     # "Phase 2 (Linux/CUDA)" → "Phase 3 (Windows/Vulkan)"
     text = text.replace("Phase 2 (Linux/CUDA)", "Phase 3 (Windows/Vulkan)")
-    # CUDA line: "GPU/Accel:    CUDA — <gpu>" → "GPU/Accel:    Vulkan — <gpu>"
+    # CUDA line: "GPU/Accel:    CUDA - <gpu>" → "GPU/Accel:    Vulkan - <gpu>"
     text = text.replace("GPU/Accel:    CUDA", "GPU/Accel:    Vulkan")
     # CPU-only fallback when gpu_name is set via Vulkan detection but n_gpu_layers=-1
-    # The original formatter emits "CPU-only" when gpu_name is falsy — but we now
+    # The original formatter emits "CPU-only" when gpu_name is falsy - but we now
     # inject gpu_name from vulkaninfo, so the CUDA branch triggers. Nothing extra needed.
     return text
 

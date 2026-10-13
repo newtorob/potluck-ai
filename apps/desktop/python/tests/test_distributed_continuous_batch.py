@@ -1,33 +1,33 @@
-"""Distributed continuous batching tests — Phase 2.
+"""Distributed continuous batching tests.
 
 DistributedContinuousBatcher drives a pipeline chain (head + tail) with the same
 dynamic admit/evict scheduler as the single-node ContinuousBatcher, but uses one
 chain round-trip per decode step rather than a local model forward.
 
-Tested via a 2-node LOOPBACK: the head block (layers[0:SPLIT]) runs in the test
+Tested via a 2-node loopback: the head block (layers[0:SPLIT]) runs in the test
 thread via a PipelineParallelEngine, and serve_tail (layers[SPLIT:]) runs in a
-background thread over a localhost socket — exactly the loopback harness from
+background thread over a localhost socket - exactly the loopback harness from
 test_pipeline_speculative.py. Both ends share a test PSK.
 
-This loopback validates correctness IN-PROCESS. Full multi-machine validation is
-pending the wired fleet.
+This loopback validates correctness in-process. TODO: validate across multiple
+machines.
 
 Three properties are covered:
 
-1. CORRECTNESS GATE (the bar): 3 concurrent requests with DIFFERENT prompts and
-   DIFFERENT max_new lengths, with STAGGERED admission. Each request's output must
-   be token-for-token identical to that request decoded SINGLE-STREAM through the
+1. Correctness gate (the bar): 3 concurrent requests with different prompts and
+   different max_new lengths, with staggered admission. Each request's output must
+   be token-for-token identical to that request decoded single-stream through the
    same 2-node chain (PipelineParallelEngine.stream_tokens). Batching + admit/evict
    timing must not change any output.
 
-2. EVICT CORRECTNESS: a short request finishes mid-run; the surviving longer requests
+2. Evict correctness: a short request finishes mid-run; the surviving longer requests
    must produce the correct output. Covered by the staggered mixed-length test
    above and verified explicitly by a short+long pair.
 
-3. EFFICIENCY: N concurrent requests use FEWER chain round-trips than N serial single-
+3. Efficiency: N concurrent requests use fewer chain round-trips than N serial single-
    stream runs (assert via stats). Max batch > 1.
 
-All tests run on cpu/fp32, small model (Qwen2.5-0.5B-Instruct), FAST. No GPU required.
+All tests run on cpu/fp32, small model (Qwen2.5-0.5B-Instruct), fast. No GPU required.
 """
 
 from __future__ import annotations
@@ -83,9 +83,9 @@ def _free_port() -> int:
 
 
 class _LoopbackTail:
-    """Run serve_tail with the Phase 2 cb_prefill/cb_step dispatch on a background
-    thread. Both the old greedy paths and the new cb ops hit the SAME serve_tail so
-    the Phase 2 tail is backward-compatible."""
+    """Run serve_tail with the cb_prefill/cb_step dispatch on a background
+    thread. Both the greedy paths and the cb ops hit the same serve_tail so
+    the tail stays backward-compatible."""
 
     def __init__(self, model_id, split):
         self.parts = pp.load_parts(model_id, split, "tail", device="cpu",
@@ -159,7 +159,7 @@ def _collect(gen) -> str:
 # ---------------------------------------------------------------------------
 
 def test_distributed_correctness_staggered_admission() -> None:
-    """THE GATE.
+    """The correctness gate.
 
     3 concurrent requests with different prompts and different max_new lengths,
     admitted with staggered timing so req 0 has already decoded a few tokens before
@@ -215,7 +215,7 @@ def test_distributed_correctness_staggered_admission() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 2: EVICT CORRECTNESS — explicit short + long pair
+# Test 2: EVICT CORRECTNESS - explicit short + long pair
 # ---------------------------------------------------------------------------
 
 def test_distributed_eviction_short_does_not_corrupt_long() -> None:
@@ -253,7 +253,7 @@ def test_distributed_eviction_short_does_not_corrupt_long() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 3: EFFICIENCY — fewer round-trips than serial, max_batch > 1
+# Test 3: EFFICIENCY - fewer round-trips than serial, max_batch > 1
 # ---------------------------------------------------------------------------
 
 def test_distributed_fewer_round_trips_than_serial() -> None:
@@ -304,7 +304,7 @@ def test_distributed_fewer_round_trips_than_serial() -> None:
             rt.unload_model()
 
     assert st["max_batch_size"] > 1, (
-        f"max_batch_size={st['max_batch_size']} — batch never grew beyond 1; "
+        f"max_batch_size={st['max_batch_size']}: batch never grew beyond 1; "
         "requests may have serialised"
     )
     assert st["n_round_trips"] < serial_bound, (

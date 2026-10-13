@@ -2,16 +2,16 @@
 
 Owns the on-the-wire shapes for:
 
-  * POST /mesh/enroll              — peer redeems a pairing token, gets
+  * POST /mesh/enroll - peer redeems a pairing token, gets
                                      its mesh IP + initial peer roster.
-  * GET  /mesh/peers               — current household roster.
-  * POST /mesh/heartbeat           — node alive + last-endpoint update.
+  * GET  /mesh/peers - current household roster.
+  * POST /mesh/heartbeat - node alive + last-endpoint update.
 
 Privacy notes:
 
   * The mesh-layer protocol is allowed to know household membership +
-    member identity — that's the entire point of household scoping.
-  * The mesh layer is NEVER the place where blinded inference dispatch
+    member identity - that's the entire point of household scoping.
+  * The mesh layer is never the place where blinded inference dispatch
     happens. That stays in `routers/jobs.py` and is enforced by the
     `JobAssignedMessage` schema (which lives in `schemas/peer.py`).
 """
@@ -42,7 +42,7 @@ def _parse_ip_port(value: str) -> tuple[str, int] | None:
     reach the sidecar's UAPI config as an unvalidated string. Any embedded
     whitespace/newline fails immediately (before any parsing), so a payload
     can't smuggle extra UAPI lines through a value that "looks like" a valid
-    endpoint at a glance. Returns (ip, port) on success, None otherwise —
+    endpoint at a glance. Returns (ip, port) on success, None otherwise -
     never raises.
     """
     if not isinstance(value, str) or not value:
@@ -78,7 +78,7 @@ def _is_private_lan_endpoint(value: str) -> bool:
     Returns True only when `value` is "<ip>:<port>" where ip is an IPv4 RFC1918
     address (10/8, 172.16/12, 192.168/16) and port is 1..65535. Loopback,
     link-local, and the tailnet/CGNAT range (100.64.0.0/10) are rejected so a
-    Tailscale address can never be redistributed as a physical-LAN endpoint —
+    Tailscale address can never be redistributed as a physical-LAN endpoint -
     even if a malicious or buggy client claims one.
     """
     parsed = _parse_ip_port(value)
@@ -90,7 +90,7 @@ def _is_private_lan_endpoint(value: str) -> bool:
         return False
     if ip.is_loopback or ip.is_link_local:
         return False
-    # 100.64.0.0/10 — tailnet / CGNAT. is_private would say True, so check first.
+    # 100.64.0.0/10 - tailnet / CGNAT. is_private would say True, so check first.
     if ip in ipaddress.ip_network("100.64.0.0/10"):
         return False
     return ip.is_private
@@ -98,9 +98,9 @@ def _is_private_lan_endpoint(value: str) -> bool:
 
 def safe_endpoint_or_none(value: str | None) -> str | None:
     """Coerce a DB-stored endpoint value (e.g. MeshNode.last_endpoint) to
-    None if it isn't well-formed ip:port. Rows written before this
-    validation shipped could in principle hold a legacy malformed value;
-    rather than let SignalPunchCoord's field_validator raise (which would
+    None if it isn't well-formed ip:port. A stored row could in principle
+    hold a malformed value; rather than let SignalPunchCoord's
+    field_validator raise (which would
     kill the whole signaling connection over one peer's stale row), callers
     that relay a stored endpoint onward should pass it through this first."""
     if value is None or not _is_well_formed_endpoint(value):
@@ -109,9 +109,9 @@ def safe_endpoint_or_none(value: str | None) -> str | None:
 
 
 def _is_well_formed_endpoint(value: str) -> bool:
-    """Format-only check for endpoint fields that carry PUBLIC (or NAT'd)
-    addresses — external_endpoint / peer_endpoint. Unlike
-    `_is_private_lan_endpoint`, this does NOT filter by address scope (a
+    """Format-only check for endpoint fields that carry public (or NAT'd)
+    addresses - external_endpoint / peer_endpoint. Unlike
+    `_is_private_lan_endpoint`, this does not filter by address scope (a
     public IP is exactly what's expected here); it only rejects malformed
     shapes, embedded whitespace/newlines, and out-of-range ports. That's
     enough to stop wire-protocol injection into the sidecar's WireGuard UAPI
@@ -122,7 +122,7 @@ def _is_well_formed_endpoint(value: str) -> bool:
 def _validate_endpoint_field(v: object) -> str | None:
     """Shared field_validator body for optional "ip:port" endpoint fields.
     None is always allowed (endpoint not yet known). Anything else must be a
-    well-formed ip:port string, or Pydantic rejects the request — this is
+    well-formed ip:port string, or Pydantic rejects the request - this is
     intentionally a hard validation error, not a silent truncation/drop, so a
     malformed value never quietly flows through to a peer."""
     if v is None:
@@ -172,7 +172,7 @@ class EnrollRequest(BaseModel):
     fields. The coordinator verifies the token, allocates a mesh IP
     from the household's CIDR, and returns the roster.
 
-    The WG private key NEVER leaves the node. Identity rotation is
+    The WG private key never leaves the node. Identity rotation is
     handled by a separate endpoint (post-launch).
     """
 
@@ -180,11 +180,11 @@ class EnrollRequest(BaseModel):
     wg_public_key: str = Field(..., min_length=32, max_length=128)
     node_name: str = Field(..., min_length=1, max_length=128)
     platform: str | None = Field(default=None, max_length=32)
-    # OPTIONAL Ed25519 public key (base64url, no padding) used ONLY for the
-    # DERP-token proof-of-possession challenge (POST /mesh/derp-token) — see
-    # `MeshNode.signing_public_key`. Absent for any mesh client that hasn't
-    # picked up PoP support yet (back-compat: old clients omit this field and
-    # enroll exactly as before). Format-validated only where it's actually
+    # Optional Ed25519 public key (base64url, no padding) used only for the
+    # DERP-token proof-of-possession challenge (POST /mesh/derp-token) - see
+    # `MeshNode.signing_public_key`. Absent for any mesh client that doesn't
+    # support PoP (back-compat: such clients omit this field and still
+    # enroll). Format-validated only where it's actually
     # used (issue_derp_token), not here, so a malformed value never blocks
     # enrollment itself.
     signing_public_key: str | None = Field(default=None, min_length=32, max_length=64)
@@ -195,9 +195,9 @@ class EnrolledPeer(BaseModel):
 
     `local_endpoints` carries the peer's private-LAN "ip:port" candidates
     (RFC1918 only) so same-LAN peers can later attempt a direct connection
-    instead of relaying through DERP. Phase 0/1 distributes the list but no
+    instead of relaying through DERP. The list is distributed but no
     routing decision uses it yet. The list is held in-memory only (last value
-    reported over the signal WS); it is NOT persisted to the DB.
+    reported over the signal WS); it is not persisted to the DB.
     """
 
     node_id: uuid.UUID
@@ -214,20 +214,20 @@ class EnrollResponse(BaseModel):
     """What the coordinator returns from a successful enrollment.
 
     Carries the newly-allocated mesh IP for the calling node + the
-    roster of all OTHER nodes in the household so the new node can
+    roster of all other nodes in the household so the new node can
     configure its WG peers immediately.
 
-    `node_token` (ADDITIVE) is a fresh, high-entropy per-node bearer
-    credential — urlsafe-base64, 32 raw bytes (256 bits). The coordinator
+    `node_token` (additive) is a fresh, high-entropy per-node bearer
+    credential - urlsafe-base64, 32 raw bytes (256 bits). The coordinator
     stores only its SHA-256 hash (`MeshNode.node_token_hash`); this is the
-    ONLY time the raw value is exposed, exactly like `pairing_token` in
+    only time the raw value is exposed, exactly like `pairing_token` in
     `PairingTokenIssueResponse`. Present it as `Authorization: Bearer
     <node_token>` on every subsequent machine call (POST /mesh/heartbeat,
     GET /mesh/peers, POST /mesh/derp-token, DELETE /mesh/nodes/{id}, and the
     `/mesh/signal` WS upgrade) instead of the machine-wide
-    `X-Potluck-Coordinator-Token`. Old mesh clients that don't read this
-    field are unaffected — they keep using the coordinator token exactly as
-    before (back-compat; see `middleware/node_auth.py`).
+    `X-Potluck-Coordinator-Token`. Mesh clients that don't read this
+    field keep using the coordinator token (back-compat; see
+    `middleware/node_auth.py`).
     """
 
     node_id: uuid.UUID
@@ -275,7 +275,7 @@ class HouseholdCreateRequest(BaseModel):
 
     v0/dev: name is the only client-supplied field. Household is bound
     to the authenticated member (stub-id in v0). Mesh CIDR is allocated
-    by the coordinator from the global pool — clients don't pick it.
+    by the coordinator from the global pool - clients don't pick it.
     """
 
     name: str = Field(default="My household", min_length=1, max_length=128)
@@ -294,7 +294,7 @@ class HouseholdMachine(BaseModel):
     GET /mesh/households/current so the desktop app can offer a one-tap "join
     your household" instead of a pairing code. These are the member's own
     machines (session-authed), so exposing name/platform/mesh_ip here is not a
-    peer-identity leak — it's the owner seeing their own devices."""
+    peer-identity leak - it's the owner seeing their own devices."""
 
     node_id: uuid.UUID
     node_name: str
@@ -331,7 +331,7 @@ class PairingTokenIssueResponse(BaseModel):
 #
 # All signal messages use a tagged-union shape: the `type` field carries
 # the discriminator, and Pydantic parses into the appropriate variant.
-# The contract is bidirectional — server and client both send + receive.
+# The contract is bidirectional - server and client both send + receive.
 #
 # Client → Server messages: SignalHello, SignalEndpointUpdate,
 #                            SignalRequestPunch, SignalPing,
@@ -401,7 +401,7 @@ class SignalEndpointUpdate(BaseModel):
     @classmethod
     def _validate_external_endpoint(cls, v: str) -> str:
         # external_endpoint is required (not Optional) here, but reuse the
-        # shared None-tolerant validator — a non-string/malformed value still
+        # shared None-tolerant validator - a non-string/malformed value still
         # raises, `None` simply can't occur once Pydantic's own required-field
         # check has passed.
         validated = _validate_endpoint_field(v)
@@ -477,10 +477,10 @@ class SignalPunchCoord(BaseModel):
     type: Literal["punch_coord"] = "punch_coord"
     peer_node_id: uuid.UUID
     peer_wg_public_key: str
-    # Previously had NO length cap and no format validation at all (this field
-    # is server-constructed FROM a stored `last_endpoint`, but that value
-    # originated as untrusted peer input via heartbeat/endpoint_update — so it
-    # needs the same ip:port validation at the point it's relayed onward).
+    # Length-capped and validated as ip:port (this field is server-constructed
+    # from a stored `last_endpoint`, but that value originated as untrusted
+    # peer input via heartbeat/endpoint_update - so it needs the same ip:port
+    # validation at the point it's relayed onward).
     peer_endpoint: str | None = Field(default=None, max_length=64)
     role: Literal["initiator", "responder"]
 
@@ -525,7 +525,7 @@ class SignalCirclePeerAdd(BaseModel):
     """Server → one sidecar: add the other machine of a circle link as a
     restricted WireGuard peer.
 
-    Sent to both ends of the link; `role` is the RECEIVING sidecar's role.
+    Sent to both ends of the link; `role` is the receiving sidecar's role.
     Privacy: a link reaches two households that are not each other's. The
     message names the other machine only by what the tunnel needs (key, mesh
     address, port, token hash, optional endpoints). It carries no member id,
@@ -641,7 +641,7 @@ class SignalError(BaseModel):
 #
 # Privacy notes:
 #   * JWT claims carry wg_pubkey + region + exp/iat only.
-#   * No member_id, no household_id, no node_id in the JWT — the relay
+#   * No member_id, no household_id, no node_id in the JWT - the relay
 #     should never know "who" the user is, only "which WG key".
 #   * The coordinator logs the truncated pubkey (first 8 chars), not the
 #     full token or claims.
@@ -654,18 +654,18 @@ class DERPTokenRequest(BaseModel):
     Caller identifies itself by its WG public key. The coordinator looks
     up the corresponding mesh_node to confirm it is enrolled.
 
-    v0 auth model: possession of the WG pubkey is the ONLY credential
-    (`wg_public_key` is not secret — it's exchanged with peers anyway — so
+    v0 auth model: possession of the WG pubkey is the only credential
+    (`wg_public_key` is not secret - it's exchanged with peers anyway - so
     this alone lets anyone who has observed a node's pubkey mint a token
-    AS that node and hijack its DERP session).
+    as that node and hijack its DERP session).
 
-    v0.5 OPTIONAL proof-of-possession hardening (back-compat, additive):
+    Optional proof-of-possession hardening (back-compat, additive):
     `nonce` + `signature` let the caller prove it holds the private key for
     a separately-registered `MeshNode.signing_public_key` (an Ed25519 key;
     WG keys are Curve25519 and are not directly usable for signature
-    verification — see `models/mesh_node.py`). Both fields are OPTIONAL and
-    default to None so existing mesh clients (incl. the current Go
-    `coordapi` client) that don't send them keep working exactly as before;
+    verification - see `models/mesh_node.py`). Both fields are optional and
+    default to None so mesh clients (incl. the current Go
+    `coordapi` client) that don't send them keep working;
     the coordinator only verifies when both are present, and logs a warning
     when they're absent. See `routers/mesh.py::issue_derp_token` for the
     verification + the `POTLUCK_DERP_POP_REQUIRED` flag that will eventually
@@ -679,7 +679,7 @@ class DERPTokenRequest(BaseModel):
     `f"derp-token:{wg_public_key}:{region}:{nonce}"` (UTF-8 encoded),
     produced with the private key matching `MeshNode.signing_public_key`.
 
-    No member_id or node_id in this schema — the relay must never learn
+    No member_id or node_id in this schema - the relay must never learn
     the calling user's identity, only their WG pubkey and requested region.
     """
 
@@ -693,7 +693,7 @@ class DERPTokenResponse(BaseModel):
     """Returned by a successful POST /mesh/derp-token.
 
     `token` is a compact HS256 JWT. The relay validates this on connect.
-    The `expires_at` is ISO 8601 — the client SHOULD refresh before this
+    The `expires_at` is ISO 8601 - the client SHOULD refresh before this
     time (the DERP client refreshes every 50 minutes for a 1-hour token).
 
     No inference-layer identity in this response.

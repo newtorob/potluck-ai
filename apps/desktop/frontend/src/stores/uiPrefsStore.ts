@@ -1,5 +1,5 @@
 /**
- * UI preferences store — durable, cross-surface state for the three prefs
+ * UI preferences store - durable, cross-surface state for the three prefs
  * that require live React updates when hydrated from the sidecar config.
  *
  * Why Zustand here instead of useState:
@@ -107,7 +107,7 @@ interface UiPrefsState {
   setOnboardingCompleted: (v: boolean) => void;
 }
 
-// Apply the stored theme immediately at module load — before any React render —
+// Apply the stored theme immediately at module load - before any React render -
 // so there is no flash of the wrong theme on startup.
 const _initialTheme = readStoredTheme();
 applyTheme(_initialTheme);

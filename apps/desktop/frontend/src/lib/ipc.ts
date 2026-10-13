@@ -1,5 +1,5 @@
 /**
- * Typed wrapper around window.potluck — the context bridge exposed by
+ * Typed wrapper around window.potluck - the context bridge exposed by
  * apps/desktop/electron/preload.js.
  *
  * All methods are safe to call when running outside Electron (e.g. plain
@@ -11,7 +11,7 @@
  */
 
 /**
- * window.potluck.updater — the renderer-driven auto-update bridge. All
+ * window.potluck.updater - the renderer-driven auto-update bridge. All
  * methods/events are optional at the type level: main/preload may not have
  * shipped this yet (or a given platform/build may omit it), and every
  * consumer below degrades to a safe no-op when it's absent.
@@ -28,7 +28,7 @@ interface UpdaterBridge {
 }
 
 /** Shape written by the Electron main process at build time, if present.
- *  Read defensively everywhere — this may not exist yet. `version` is the
+ *  Read defensively everywhere - this may not exist yet. `version` is the
  *  running app's semver, e.g. "0.1.0". */
 export interface BuildInfo {
   version: string;
@@ -58,7 +58,7 @@ interface PotluckBridge {
  * Bundled fallback for the running app's version, used only when
  * window.potluck.app.buildInfo is absent (a preload that predates
  * buildInfo, or a plain browser dev session). Keep in sync with
- * package.json's "version" — this is a last-resort fallback, never the
+ * package.json's "version" - this is a last-resort fallback, never the
  * source of truth.
  */
 const BUNDLED_VERSION_FALLBACK = '0.1.0';
@@ -130,7 +130,7 @@ export const ipc = {
 
   // ── Auto-update (renderer-driven check/download/install) ──────────────────
   // All no-op safely outside Electron, or when main/preload hasn't shipped
-  // window.potluck.updater yet — so the update UI never throws, it just
+  // window.potluck.updater yet - so the update UI never throws, it just
   // never has anything to show.
 
   /** The build stamp written by the main process, if present. */
@@ -138,7 +138,7 @@ export const ipc = {
     return getBridge()?.app?.buildInfo;
   },
 
-  /** The running app's semver — buildInfo.version, or the bundled fallback. */
+  /** The running app's semver - buildInfo.version, or the bundled fallback. */
   get runningVersion(): string {
     return getBridge()?.app?.buildInfo?.version ?? BUNDLED_VERSION_FALLBACK;
   },

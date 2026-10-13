@@ -12,8 +12,8 @@ import (
 
 // TestMain moves the whole package off the production port. The desktop
 // app's own potluck-mesh sidecar binds 0.0.0.0:48653 whenever Potluck is
-// running, so a fixed port made `go test` fail on any machine that dogfoods
-// the app. groupPort is a var rather than a const so tests can pick a free
+// running, so a fixed port would make `go test` fail on any machine that is
+// running the app. groupPort is a var rather than a const so tests can pick a free
 // one; every listener, unicast and broadcast path reads it at call time.
 func TestMain(m *testing.M) {
 	if c, err := net.ListenPacket("udp4", "0.0.0.0:0"); err == nil {
@@ -38,7 +38,7 @@ func multicastAvailable(t *testing.T) {
 }
 
 // startListener runs s.RunListener in the background and returns a stop func
-// that cancels it and BLOCKS until the listener goroutine has actually
+// that cancels it and blocks until the listener goroutine has actually
 // returned (and so has released its fixed-port socket). RunListener binds a
 // single well-known UDP port; tests run sequentially in this package, and
 // without this synchronization the next test's ListenPacket call can race
@@ -83,7 +83,7 @@ func TestBroadcastRoundtrip(t *testing.T) {
 	}
 }
 
-// TestBroadcastNeverCarriesRawToken proves the core fix: the wire payload the
+// TestBroadcastNeverCarriesRawToken proves the core property: the wire payload the
 // inviter actually sends never contains the plaintext pairing token, only its
 // one-way fingerprint. A passive LAN listener that captures this payload gets
 // nothing redeemable.
@@ -129,13 +129,13 @@ func TestSweepableClassification(t *testing.T) {
 		ip   string
 		want bool
 	}{
-		{"192.168.4.86", true},    // RFC1918
+		{"192.168.4.86", true},     // RFC1918
 		{"10.0.0.5", true},         // RFC1918
 		{"172.16.4.4", true},       // RFC1918 low edge
 		{"172.31.255.1", true},     // RFC1918 high edge
 		{"172.15.0.1", false},      // just outside 172.16/12
 		{"172.32.0.1", false},      // just outside 172.16/12
-		{"100.101.102.103", false},   // Tailscale/CGNAT 100.64/10 mid-range
+		{"100.101.102.103", false}, // Tailscale/CGNAT 100.64/10 mid-range
 		{"100.64.0.0", false},      // CGNAT low boundary
 		{"100.127.255.255", false}, // CGNAT high boundary
 		{"100.63.255.255", false},  // just below CGNAT (not RFC1918 either)
@@ -158,7 +158,7 @@ func TestDirectedBroadcast(t *testing.T) {
 		bits int
 		want string
 	}{
-		{"192.168.4.86", 22, "192.168.7.255"}, // the bench network's /22
+		{"192.168.4.86", 22, "192.168.7.255"}, // a /22
 		{"192.168.1.50", 24, "192.168.1.255"},
 		{"10.0.0.5", 8, "10.255.255.255"},
 		{"172.16.4.4", 12, "172.31.255.255"},
@@ -225,11 +225,11 @@ func TestUnicastReceive(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// OOB PIN-reveal tests — the actual fix under audit.
+// OOB PIN-reveal tests.
 //
 // A real inviter and joiner run as two independent processes on two
 // machines, each binding its own 0.0.0.0:groupPort. Two Service instances in
-// the SAME test process can't both bind that fixed port, so these tests play
+// the same test process can't both bind that fixed port, so these tests play
 // both roles with a single Service and multicast loopback (SetMulticastLoopback,
 // already enabled by RunListener): the service hears its own announce, and a
 // reveal request it sends to its own recorded address is answered by its own
@@ -258,7 +258,7 @@ func mustDiscover(t *testing.T, s *Service) string {
 }
 
 // TestRevealWithCorrectPIN proves the intended happy path: once a fingerprint
-// has been discovered over the LAN AND a human has supplied the correct
+// has been discovered over the LAN and a human has supplied the correct
 // out-of-band PIN, RequestReveal returns the real token.
 func TestRevealWithCorrectPIN(t *testing.T) {
 	multicastAvailable(t)
@@ -302,8 +302,8 @@ func TestRevealWithWrongPIN(t *testing.T) {
 	}
 }
 
-// TestRevealWithoutMatchingFingerprintFails is the core assertion the audit
-// asked for: a broadcast payload alone (fingerprint + hostname — everything a
+// TestRevealWithoutMatchingFingerprintFails is the core assertion: a broadcast
+// payload alone (fingerprint + hostname - everything a
 // passive LAN listener could ever capture, now that the raw token is never
 // sent) is not sufficient to redeem. A guess at an unrelated / unheard
 // fingerprint (no PIN in hand, no session to answer it) must fail closed.
@@ -321,8 +321,8 @@ func TestRevealWithoutMatchingFingerprintFails(t *testing.T) {
 	}
 
 	// Even with an active, unrelated broadcast running (and its own
-	// fingerprint discovered), guessing at some OTHER, never-discovered
-	// fingerprint must still fail closed — a real fingerprint is required
+	// fingerprint discovered), guessing at some other, never-discovered
+	// fingerprint must still fail closed - a real fingerprint is required
 	// before there's even anywhere to send a guess.
 	const token = "UNRELATED-TOKEN"
 	pin := s.StartBroadcast(token, "inviter-host", 5*time.Second)
@@ -359,7 +359,7 @@ func TestRevealAttemptsAreCapped(t *testing.T) {
 		}
 	}
 
-	// The session must now be burned: even the CORRECT PIN must no longer
+	// The session must now be burned: even the correct PIN must no longer
 	// work.
 	if _, err := s.RequestReveal(fp, realPin, 2*time.Second); err == nil {
 		t.Fatal("reveal must be refused once the attempt cap is exhausted, even with the correct PIN")
@@ -375,7 +375,7 @@ func otherPin(pin string) string {
 
 // TestHandleRevealRequestSessionMismatch is a lower-level unit test of
 // handleRevealRequest directly: a reveal request addressed to a fingerprint
-// that isn't this host's active session must be ignored outright — no
+// that isn't this host's active session must be ignored outright - no
 // attempt is spent and the real session's PIN is never at risk of being
 // probed via a mismatched fingerprint.
 func TestHandleRevealRequestSessionMismatch(t *testing.T) {

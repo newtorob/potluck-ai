@@ -13,7 +13,7 @@ CLIENT_VERSION_HEADER = "x-potluck-client-version"
 class ClientVersionMiddleware(BaseHTTPMiddleware):
     """Reads the optional ``X-Potluck-Client-Version`` header off every request.
 
-    Observability only — no enforcement. The desktop app self-blocks against
+    Observability only - no enforcement. The desktop app self-blocks against
     GET /client/version when it's too old; the server never rejects a request
     for having a missing, malformed, or stale version here. When the header
     is present we bind it into structlog's contextvars for the life of the

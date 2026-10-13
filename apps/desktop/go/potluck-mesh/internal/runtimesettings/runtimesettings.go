@@ -1,5 +1,5 @@
 // Package runtimesettings persists a small set of user-overridable runtime
-// settings for the mesh sidecar — currently just the coordinator URL — to a
+// settings for the mesh sidecar - currently just the coordinator URL - to a
 // JSON file sited next to the WG private key. Storage mirrors
 // internal/nodetoken's and internal/signingkey's convention exactly: mode
 // 0600, parent directory created at 0700, same directory as wg.key.
@@ -11,7 +11,7 @@
 // point at a LAN coordinator has no flag to change post-install. PATCH
 // /settings on the local IPC socket (see internal/localapi's
 // handleSettingsPatch) lets Electron write an override here; main.go loads
-// it at startup — before constructing anything coordinator-facing — so a
+// it at startup - before constructing anything coordinator-facing - so a
 // saved override always wins over the flag/env default and survives daemon
 // restarts.
 //
@@ -31,11 +31,11 @@ import (
 const fileName = "settings.json"
 
 // Settings is the full set of user-overridable runtime settings persisted by
-// this package. An empty field means "no override" — the caller's flag/env
+// this package. An empty field means "no override" - the caller's flag/env
 // default applies.
 type Settings struct {
 	// CoordinatorURL overrides config.Config.CoordinatorURL when non-empty.
-	// Always normalized (no trailing slash) before being stored here — see
+	// Always normalized (no trailing slash) before being stored here - see
 	// the validation performed by internal/localapi's handleSettingsPatch.
 	CoordinatorURL string `json:"coordinator_url,omitempty"`
 }
@@ -47,9 +47,9 @@ func Path(wgPrivKeyPath string) string {
 	return filepath.Join(filepath.Dir(wgPrivKeyPath), fileName)
 }
 
-// Load reads persisted settings from path. A missing file is NOT an error —
+// Load reads persisted settings from path. A missing file is NOT an error -
 // it just means no override has ever been saved; returns the zero value
-// (every field "no override"). A corrupt file (rare — nothing else should
+// (every field "no override"). A corrupt file (rare - nothing else should
 // ever write here) IS surfaced as an error so main.go can log it clearly
 // rather than silently ignoring a stuck bad override.
 func Load(path string) (Settings, error) {
@@ -68,7 +68,7 @@ func Load(path string) (Settings, error) {
 }
 
 // Save persists settings to path at mode 0600 (parent directory created at
-// 0700 if it doesn't already exist — it normally does, since the WG key
+// 0700 if it doesn't already exist - it normally does, since the WG key
 // lives there too). Overwrites any previous contents; callers wanting to
 // change just one field should Load first, mutate, then Save the whole
 // struct (mirrors internal/localapi's handleSettingsPatch, which currently

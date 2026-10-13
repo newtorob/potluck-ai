@@ -1,19 +1,19 @@
-"""Whole-model local-load tests — the auto-pipeline planner's mode=="whole" fallback.
+"""Whole-model local-load tests - the auto-pipeline planner's mode=="whole" fallback.
 
 When the topology-aware planner finds a model fits on the head's own VRAM, it returns
-mode="whole" and no pipeline is built. This path must actually LOAD + SERVE the full
-model locally (it previously just signalled "load it elsewhere" and loaded nothing).
+mode="whole" and no pipeline is built. This path must actually load and serve the full
+model locally.
 
 Three properties are covered:
   1. A real local smoke: load a tiny instruct model via WholeModelEngine on cpu/fp32,
      stream a short completion, and assert non-empty coherent text comes back.
-  2. describe() shape — the /health + Models-page contract (mirrors the pipeline engine).
+  2. describe() shape - the /health + Models-page contract (mirrors the pipeline engine).
   3. The runtime slot + /health: load_whole_model occupies the same slot the pipeline
      engine does, so is_loaded() flips true and /health's loaded_pipeline reflects it
      with strategy=="whole-model".
 
 The whole file imports torch (the engine top-imports it via pipeline_parallel) and loads
-a model, so it is gated on `pytest.importorskip("torch")` — in a torch-free base env the
+a model, so it is gated on `pytest.importorskip("torch")` - in a torch-free base env the
 suite still passes (these simply skip). The model (Qwen2.5-0.5B-Instruct) is expected in
 the local HF cache; the load is offline-friendly and small (~1GB fp32).
 """
@@ -38,7 +38,7 @@ MODEL_ID = "Qwen/Qwen2.5-0.5B-Instruct"
 
 @pytest.fixture
 def whole_engine():
-    """A WholeModelEngine on cpu/fp32 — deterministic, no GPU, in the HF cache."""
+    """A WholeModelEngine on cpu/fp32 - deterministic, no GPU, in the HF cache."""
     import torch
 
     return WholeModelEngine(MODEL_ID, device="cpu", dtype=torch.float32)
@@ -46,7 +46,7 @@ def whole_engine():
 
 def test_whole_model_describe_shape(whole_engine) -> None:
     """describe() returns the /health contract: model_id, strategy, n_layers, device,
-    dtype — same shape family as PipelineParallelEngine.describe() so /health is uniform."""
+    dtype - same shape family as PipelineParallelEngine.describe() so /health is uniform."""
     d = whole_engine.describe()
     assert d["model_id"] == MODEL_ID
     assert d["strategy"] == "whole-model"
@@ -58,9 +58,9 @@ def test_whole_model_describe_shape(whole_engine) -> None:
 def test_whole_model_stream_smoke(whole_engine) -> None:
     """Load locally, stream a short completion, assert non-empty coherent text.
 
-    stream_tokens is a BLOCKING GENERATOR of text deltas (the same interface the runtime
+    stream_tokens is a blocking generator of text deltas (the same interface the runtime
     serves for the pipeline engine). We greedily decode a tiny answerable prompt and check
-    real text — not whitespace, not control tokens — comes back, suffix by suffix."""
+    real text - not whitespace, not control tokens - comes back, suffix by suffix."""
     messages = [{"role": "user", "content": "Reply with the single word: hello"}]
     deltas = list(whole_engine.stream_tokens(messages, max_new=16))
 

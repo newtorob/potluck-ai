@@ -1,15 +1,15 @@
 'use strict';
 
 /**
- * notarize.js — electron-builder afterSign hook for macOS notarization.
+ * notarize.js - electron-builder afterSign hook for macOS notarization.
  *
  * Invoked automatically by electron-builder after the .app is signed.
  * Set in package.json build config: "afterSign": "scripts/notarize.js"
  *
  * Required env vars for a real notarized build:
- *   APPLE_ID                  — your Apple ID (email)
- *   APPLE_APP_SPECIFIC_PASSWORD — app-specific password from appleid.apple.com
- *   APPLE_TEAM_ID             — your 10-char Developer Team ID
+ *   APPLE_ID - your Apple ID (email)
+ *   APPLE_APP_SPECIFIC_PASSWORD - app-specific password from appleid.apple.com
+ *   APPLE_TEAM_ID - your 10-char Developer Team ID
  *
  * If any of these are absent, notarization is skipped and the build succeeds.
  * This allows local ad-hoc builds to work without Apple credentials.
@@ -40,7 +40,7 @@ module.exports = async function notarize(context) {
       !teamId && 'APPLE_TEAM_ID',
     ].filter(Boolean);
     console.log(
-      `[notarize] Skipping notarization — missing env vars: ${missing.join(', ')}. ` +
+      `[notarize] Skipping notarization, missing env vars: ${missing.join(', ')}. ` +
       'Ad-hoc build assumed.'
     );
     return;
@@ -49,7 +49,7 @@ module.exports = async function notarize(context) {
   const appName = packager.appInfo.productFilename;
   const appPath = path.join(appOutDir, `${appName}.app`);
 
-  // notarytool requires .zip / .pkg / .dmg — wrap the .app in a temp .zip.
+  // notarytool requires .zip / .pkg / .dmg - wrap the .app in a temp .zip.
   // Stapling later targets the original .app; the staple carries through
   // when electron-builder packages the .app into the final .dmg.
   const zipPath = path.join(os.tmpdir(), `${appName}-${process.pid}-notarize.zip`);
@@ -140,7 +140,7 @@ module.exports = async function notarize(context) {
       `--apple-id "${appleId}" --password "<app-specific-password>" ` +
       `--team-id "${teamId}"`
     );
-    throw new Error(`Notarization rejected — status: ${status}`);
+    throw new Error(`Notarization rejected, status: ${status}`);
   }
 
   // Staple the notarization ticket to the .app so it travels with the bundle.

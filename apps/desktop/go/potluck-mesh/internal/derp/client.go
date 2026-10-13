@@ -2,7 +2,7 @@
 //
 // The DERP relay is a fallback path for WireGuard packets when direct
 // UDP hole-punch fails (symmetric NAT, restrictive corporate firewalls).
-// See docs/phase-g/mesh-design.md §"DERP relay (fallback for symmetric NAT)".
+// See "Path selection" in docs/phase-g/mesh-design.md.
 //
 // Wire format (relay → client delivery):
 //
@@ -20,7 +20,7 @@
 //   - sendCh is an atomic.Pointer[chan sendItem]; runOnce Stores a fresh
 //     channel after auth, and Stores nil only AFTER its read/write loop
 //     goroutines have exited (sync.WaitGroup). Callers (Send) Load the
-//     pointer — a nil load means "no active connection, drop." Senders
+//     pointer - a nil load means "no active connection, drop." Senders
 //     use select-default so a full buffer never blocks; sending to an
 //     orphaned channel is safe because nothing close()s it.
 //   - One read-loop goroutine; it calls onPacketRx for each inbound frame.
@@ -60,7 +60,7 @@ const (
 	maxPayloadLen = 65535
 
 	// sendChanCap is the outbound send channel buffer size.
-	// Match signal/client.go — deep enough to absorb bursts.
+	// Match signal/client.go - deep enough to absorb bursts.
 	sendChanCap = 16
 
 	// authTimeout is how long we wait for the relay's auth_ok response.
@@ -80,7 +80,7 @@ const (
 )
 
 // PacketRxHandler is called (on the read-loop goroutine) for every inbound
-// packet delivered by the relay. Implementations must not block — dispatch
+// packet delivered by the relay. Implementations must not block - dispatch
 // to a channel or goroutine if non-trivial work is needed.
 type PacketRxHandler func(sourcePubkey [pubkeyLen]byte, payload []byte)
 
@@ -98,12 +98,12 @@ type sendItem struct {
 // It reconnects automatically with exponential backoff on any failure.
 //
 // Create with New and call Run(ctx) to start. Remains usable through
-// reconnects — Send() queues to the channel and the writer handles timing.
+// reconnects - Send() queues to the channel and the writer handles timing.
 type Client struct {
-	relayURL    string
-	jwtFetcher  JWTFetcher
-	ourPubkey   [pubkeyLen]byte
-	onPacketRx  PacketRxHandler
+	relayURL   string
+	jwtFetcher JWTFetcher
+	ourPubkey  [pubkeyLen]byte
+	onPacketRx PacketRxHandler
 
 	// sendCh is the outbound queue. Stored as an atomic.Pointer so concurrent
 	// Send() callers can Load it without racing against runOnce installing a
@@ -171,7 +171,7 @@ func (c *Client) Send(destPubkey [pubkeyLen]byte, payload []byte) error {
 //
 // Blocks until ctx is cancelled. Returns ctx.Err() when done.
 func (c *Client) Run(ctx context.Context) error {
-	// Background JWT refresh — keeps the token fresh so each reconnect
+	// Background JWT refresh - keeps the token fresh so each reconnect
 	// immediately gets a valid token rather than having to wait for fetch.
 	go c.jwtRefreshLoop(ctx)
 
@@ -260,8 +260,8 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 		return false, fmt.Errorf("derp: set deadline: %w", err)
 	}
 	// Use bufio.Reader (NOT bufio.Scanner) so any bytes buffered past the
-	// auth_ok newline — typically the first binary delivery frame, which
-	// the relay can write immediately after auth_ok — are preserved and
+	// auth_ok newline - typically the first binary delivery frame, which
+	// the relay can write immediately after auth_ok - are preserved and
 	// readable by the binary readLoop below. Scanner.Bytes() returns the
 	// line but the underlying scan-buffer state is opaque and over-reads;
 	// a shared bufio.Reader keeps everything in one place.
@@ -296,7 +296,7 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 	}()
 
 	// ---- run read + write loops ---- //
-	// loopCtx is cancelled when either loop exits or ctx is cancelled — this
+	// loopCtx is cancelled when either loop exits or ctx is cancelled - this
 	// is how we unblock writeLoop, which would otherwise wait forever on
 	// sendCh after the underlying connection dies. The WaitGroup guarantees
 	// runOnce does not return until both loops have exited, which in turn
@@ -380,7 +380,7 @@ func (c *Client) readLoop(ctx context.Context, r io.Reader) error {
 			return err
 		}
 
-		// Dispatch — must not block.
+		// Dispatch - must not block.
 		// Privacy: never log payload.
 		slog.Debug("derp: received packet",
 			"src_prefix", util.TruncatePubkeyBytes(srcBuf),
@@ -423,9 +423,9 @@ func (c *Client) writeFrame(conn net.Conn, destPubkey [pubkeyLen]byte, payload [
 }
 
 // dial opens a TCP connection to the relay. URL scheme controls TLS:
-//   - "tcp+tls://host:port"        — TLS (production)
-//   - "tcp+insecure://host:port"   — plain TCP, no TLS (dev / localhost)
-//   - "tcp://host:port"            — alias for tcp+insecure
+//   - "tcp+tls://host:port" - TLS (production)
+//   - "tcp+insecure://host:port" - plain TCP, no TLS (dev / localhost)
+//   - "tcp://host:port" - alias for tcp+insecure
 func (c *Client) dial(ctx context.Context) (net.Conn, error) {
 	url := c.relayURL
 	useTLS := false
@@ -482,4 +482,3 @@ func (c *Client) jwtRefreshLoop(ctx context.Context) {
 		}
 	}
 }
-

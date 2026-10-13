@@ -483,14 +483,14 @@ describe("--scope mine", () => {
   });
   it("names the machine when only one offers the model, and lists them when several do", async () => {
     engine.available = { schemaVersion: 1, scope: "mine", checkedAt: 1, local: { model: "big", sha256: null }, machines: [],
-      models: [row("solo", false, ["newtorob"]), row("pair", false, ["a", "b"]), row("unnamed", false, ["\x1b[0m"])] };
+      models: [row("solo", false, ["studio"]), row("pair", false, ["a", "b"]), row("unnamed", false, ["\x1b[0m"])] };
     const report = await run(["--scope", "mine", "--runs", "1"], piped().io);
     const text = formatReport(report);
-    expect(text).toContain("solo, 1 run: 10.0 tokens/s after the first token, first token 100 ms\n  On newtorob, the only other machine of yours offering this model.");
+    expect(text).toContain("solo, 1 run: 10.0 tokens/s after the first token, first token 100 ms\n  On studio, the only other machine of yours offering this model.");
     expect(text).toContain("pair, 1 run: 10.0 tokens/s after the first token, first token 100 ms\n  Answered by one of: a, b. The engine does not say which.");
     expect(text).toContain("unnamed, 1 run: 10.0 tokens/s after the first token, first token 100 ms\n  The machine that answered is not known.");
     expect(text).not.toContain("Offered by");
-    expect(report.mine!.rows.map(r => r.offeredBy)).toEqual([["newtorob"], ["a", "b"], []]);
+    expect(report.mine!.rows.map(r => r.offeredBy)).toEqual([["studio"], ["a", "b"], []]);
   });
   it("skips a model that is also loaded here, and says why", async () => {
     peers();

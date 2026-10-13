@@ -1,5 +1,5 @@
 /**
- * AdminView — /admin route. Member operations for Potluck administrators.
+ * AdminView - /admin route. Member operations for Potluck administrators.
  *
  * Today this is the member roster with grant/revoke founding-member status.
  * Every mutation is written to the audit_log server-side (see routers/admin.py).

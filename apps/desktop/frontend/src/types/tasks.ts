@@ -1,5 +1,5 @@
 /**
- * Task domain types — mirrors the Python sidecar TaskState model.
+ * Task domain types - mirrors the Python sidecar TaskState model.
  *
  * Single source of truth for task shapes across the frontend.
  * All task-related components, stores, and hooks import from here.

@@ -13,12 +13,12 @@ as the underlying retriever does locally. Two probes:
      scaling envelope.
 
 Population uses SSH port-forwarding so the peer's loopback-only /memory/save
-remains loopback-only — we tunnel Mac:<local_port> → Peer:8321 and POST
+remains loopback-only - we tunnel Mac:<local_port> → Peer:8321 and POST
 through the tunnel. Cleanup deletes the test memories from the peer.
 
 Usage:
     python bench/run_peer_retrieval.py \\
-        --peer-ssh-user rob \\
+        --peer-ssh-user <user> \\
         --peer-mesh-ip 100.64.0.1 \\
         --peer-name linux
 """
@@ -46,7 +46,7 @@ _RUN_PROJECT = f"bench_peer_retrieval_{int(time.time())}"
 
 
 # ---------------------------------------------------------------------------
-# Test memory content — synthetic, semantically distinct, allows verifying
+# Test memory content - synthetic, semantically distinct, allows verifying
 # that the right memory comes back for each query.
 # ---------------------------------------------------------------------------
 TEST_MEMORIES: list[dict[str, str]] = [
@@ -208,7 +208,7 @@ def probe_correctness(peer_ip: str, ssh_user: str) -> dict[str, Any]:
     expected memory), measure recall@1 (top hit matches expected) and
     recall@3 (expected memory is in top 3).
     """
-    print(f"[probe 1/2] correctness — populate {len(TEST_MEMORIES)} memories on peer, query, verify recall")
+    print(f"[probe 1/2] correctness - populate {len(TEST_MEMORIES)} memories on peer, query, verify recall")
 
     with SSHTunnel(ssh_user, peer_ip) as tunnel:
         created = populate_peer(tunnel.local_port, TEST_MEMORIES)
@@ -281,7 +281,7 @@ def probe_latency_at_scale(
     memories, then issue 30 warm queries from this machine and report
     p50/p95 latency. Cleanup between sizes.
     """
-    print(f"[probe 2/2] latency at scale — sizes {sizes}")
+    print(f"[probe 2/2] latency at scale - sizes {sizes}")
     results = []
 
     # Generate a pool of synthetic memories large enough for the biggest size.
@@ -395,7 +395,7 @@ def main():
     # Print summary
     print()
     print("=" * 72)
-    print(f"SUMMARY — Cross-machine peer retrieval to {args.peer_name}")
+    print(f"SUMMARY - Cross-machine peer retrieval to {args.peer_name}")
     print("=" * 72)
     print(f"  Correctness: recall@1={correctness['recall_at_1']:.2f}  "
           f"recall@3={correctness['recall_at_3']:.2f}  "
@@ -407,7 +407,7 @@ def main():
             if "p50_ms" in r:
                 print(f"    {r['store_size']:5d} memories: p50={r['p50_ms']}ms  p95={r['p95_ms']}ms")
             else:
-                print(f"    {r['store_size']:5d} memories: ERROR — {r.get('error')}")
+                print(f"    {r['store_size']:5d} memories: ERROR - {r.get('error')}")
     print(f"  Wall time: {wall_s:.1f}s")
     print(f"  Results: {out_dir / 'results.json'}")
     print("=" * 72)

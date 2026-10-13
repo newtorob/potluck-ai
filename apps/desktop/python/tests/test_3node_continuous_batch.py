@@ -1,8 +1,8 @@
 """3-node distributed continuous batching tests.
 
-Extends Phase 2 to a 3-node chain: head -> mid -> tail.  The mid node now relays
-op="cb_prefill" and op="cb_step" through its OWN layer-block KV cache, exactly like
-the tail does for its layers.
+Extends the 2-node distributed batcher to a 3-node chain: head -> mid -> tail.  The
+mid node relays op="cb_prefill" and op="cb_step" through its own layer-block KV
+cache, exactly like the tail does for its layers.
 
 Topology (all in-process over localhost sockets, cpu/fp32):
     head  = layers[0:SPLIT_A]         (drives generation, holds DistributedContinuousBatcher)
@@ -11,14 +11,14 @@ Topology (all in-process over localhost sockets, cpu/fp32):
 
 The same correctness invariant as the 2-node tests:
     Each request's output must be token-for-token identical to single-stream decode
-    through the SAME 3-node loopback (PipelineParallelEngine.stream_tokens).
+    through the same 3-node loopback (PipelineParallelEngine.stream_tokens).
 
 Three tests:
-  1. CORRECTNESS GATE — 3 concurrent requests, different prompts, different max_new,
+  1. Correctness gate - 3 concurrent requests, different prompts, different max_new,
      staggered admission.  Each must match the 3-node single-stream oracle.
-  2. EVICTION SAFETY — a short request (max_new=3) evicts mid-run; the surviving
+  2. Eviction safety - a short request (max_new=3) evicts mid-run; the surviving
      longer request must produce the correct output.
-  3. EFFICIENCY — N concurrent requests use fewer chain round-trips than N serial
+  3. Efficiency - N concurrent requests use fewer chain round-trips than N serial
      single-stream runs, and max_batch > 1 at least once.
 
 All tests are gated on torch + transformers (pytest.importorskip).  cpu/fp32, small
@@ -189,12 +189,12 @@ def _collect(gen) -> str:
 # ---------------------------------------------------------------------------
 
 def test_3node_correctness_staggered_admission() -> None:
-    """THE GATE.
+    """The correctness gate.
 
     3 concurrent requests with different prompts and different max_new, admitted
     with staggered timing, over a 3-node loopback (head -> mid -> tail). Each
     request's output must be token-for-token identical to single-stream decode
-    through the SAME 3-node chain.
+    through the same 3-node chain.
 
     Validates:
     - The mid correctly maintains its own per-row cb_cache and relays cb ops.
@@ -316,7 +316,7 @@ def test_3node_fewer_round_trips_than_serial() -> None:
         st = batcher.stats()
 
     assert st["max_batch_size"] > 1, (
-        f"max_batch_size={st['max_batch_size']} — batch never grew above 1; "
+        f"max_batch_size={st['max_batch_size']}: batch never grew above 1; "
         "requests may have serialized"
     )
     assert st["n_round_trips"] < serial_bound, (

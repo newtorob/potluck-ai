@@ -1,74 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Potluck mesh sidecar — macOS ROOT LaunchDaemon.
+  Potluck mesh sidecar - macOS root LaunchDaemon.
 
-  This file is embedded STATICALLY, at build time, inside the signed
+  This file is embedded statically, at build time, inside the signed
   Potluck AI.app bundle at Contents/Library/LaunchDaemons/ai.trypotluck.mesh.plist
-  (electron-builder's mac.extraFiles — see apps/desktop/electron/package.json).
-  It is registered/unregistered at RUNTIME by the mesh-helper Swift CLI
+  (electron-builder's mac.extraFiles - see apps/desktop/electron/package.json).
+  It is registered/unregistered at runtime by the mesh-helper Swift CLI
   (apps/desktop/electron/native/mesh-helper/) via
   SMAppService.daemon(plistName: "ai.trypotluck.mesh.plist"), which main.js's
   mesh:enable IPC handler shells out to. See docs/phase-g/local-ipc.md for the
   IPC surface the daemon itself exposes once running.
 
-  WHY THIS FILE CANNOT CONTAIN INSTALL-TIME TOKENS
+  Why this file cannot contain install-time tokens
   --------------------------------------------------
   SMAppService requires the embedded plist to be present, unmodified, inside
-  the app's code signature at the moment the app is built and signed — it
-  canNOT be rewritten, templated, or regenerated after install (unlike the
-  old .pkg-postinstall-rendered template this file replaces, which is now
-  dead). Anything that needs to vary per-install (a self-hosted or LAN
-  coordinator URL) is handled by a LIVE runtime override instead: a
+  the app's code signature at the moment the app is built and signed - it
+  cannot be rewritten, templated, or regenerated after install. Anything
+  that needs to vary per-install (a self-hosted or LAN
+  coordinator URL) is handled by a live runtime override instead: a
   PATCH /settings call on the sidecar's local IPC socket persists the
   override to settings.json next to the WireGuard private key (see
   internal/runtimesettings), and the sidecar applies it on every subsequent
-  launch BEFORE connecting to any coordinator-facing endpoint. This plist
-  only ever carries the PRODUCTION default.
+  launch before connecting to any coordinator-facing endpoint. This plist
+  only ever carries the production default.
 
-  WHY ROOT (no UserName/GroupName key)
+  Why root (no UserName/GroupName key)
   -------------------------------------
   The WireGuard mesh needs a utun device, which requires root on macOS. We
   deliberately run as a root LaunchDaemon (the same model tailscaled uses)
   rather than requesting the paid Network Extension entitlement, and rather
-  than ever prompting the end user for `sudo` — the whole point of the
+  than ever prompting the end user for `sudo` - the whole point of the
   SMAppService mechanism is that the user never runs a binary or types a
   password beyond the one-time System Settings > Login Items & Extensions
   approval click.
 
-  The sidecar no longer needs a coordinator token in its environment: a
+  The sidecar does not need a coordinator token in its environment: a
   pairing token (entered once, in the app's "Add this machine" flow) both
   authorizes enrollment and has the sidecar mint + persist its own per-node
   bearer token on disk (internal/nodetoken) for every later coordinator call.
-  Do NOT add POTLUCK_COORDINATOR_TOKEN here.
+  Do not add POTLUCK_COORDINATOR_TOKEN here.
 
   --derp-url is the production DERP relay fallback (services/derp,
   fly.toml app=potluck-derp, custom domain derp.trypotluck.ai with its own
-  Let's Encrypt cert — Fly terminates TLS on 443 and forwards cleartext to
+  Let's Encrypt cert - Fly terminates TLS on 443 and forwards cleartext to
   the relay binary on 8443, so the client-facing scheme is tcp+tls per
   internal/derp/client.go). Without this flag DERPRelayURL defaults to ""
   (disabled) and cross-network peers with no direct UDP path simply cannot
   connect. Because this flag is passed explicitly here, POTLUCK_DERP_URL
-  would NOT override it at runtime (an explicit CLI flag always wins over
-  its own env fallback) — an install-specific relay override, if ever
+  would not override it at runtime (an explicit CLI flag always wins over
+  its own env fallback) - an install-specific relay override, if ever
   needed, has to go through the same runtime-settings PATCH /settings
   mechanism described above, not an environment variable.
 
-  KNOWN CONSTRAINT — /Applications only
+  Known constraint: /Applications only
   ---------------------------------------
   ProgramArguments hardcodes the /Applications install path. Because this
   plist is static, the daemon can only find its own binary if the app is
   installed at the conventional /Applications/Potluck AI.app location (the
   standard outcome of the DMG's drag-to-Applications flow). This is a known,
   shared limitation of every macOS app that ships a privileged LaunchDaemon
-  via SMAppService this way — there is no supported way to make an
+  via SMAppService this way - there is no supported way to make an
   SMAppService daemon plist location-independent. If the app is run from
   anywhere else (~/Downloads, a different Applications folder, etc.),
   registration will succeed but launchd will fail to spawn the daemon
-  (binary not found at the hardcoded path). Needs an on-device check: see the
-  deliverable report for the exact verification steps.
+  (binary not found at the hardcoded path).
 
-  WG key / signing key / IPC socket paths are intentionally NOT set here —
+  WG key / signing key / IPC socket paths are intentionally not set here -
   the binary's built-in platform defaults apply (internal/config/config.go):
   socket at /tmp/potluck-mesh.sock, keys under
   /var/lib/potluck/mesh/ or $HOME/Library/Application Support/Potluck/mesh/
@@ -97,7 +95,7 @@
       <string>json</string>
     </array>
 
-    <!-- Start immediately once registered/approved, and keep it running —
+    <!-- Start immediately once registered/approved, and keep it running -
          the mesh daemon must outlive the Electron app entirely (it's a
          member-operated compute network node, not a per-session process). -->
     <key>RunAtLoad</key>

@@ -1,26 +1,26 @@
 /**
- * meshDiagnostics — connectivity diagnostics for the mesh (VPN-resilience Pillar #1).
+ * meshDiagnostics - connectivity diagnostics for the mesh.
  *
- * Replaces the single "offline" boolean with a NAMED, root-cause-suppressed
+ * Instead of a single "offline" boolean, this is a named, root-cause-suppressed
  * model in the spirit of Tailscale's `health.Warnable`: every condition has a
  * code, a layer, a severity, a human title + detail, and (where we know it) a
- * one-line fix. The point is that a peer is never just "offline" — it's
+ * one-line fix. The point is that a peer is never just "offline" - it's
  * "their machine is off" vs "no encrypted tunnel (firewall/VPN?)" vs "we can't
  * even reach the coordinator", and those are four different fixes with four
  * different owners.
  *
- * This first slice derives everything from data we ALREADY have (the Go mesh
+ * This first slice derives everything from data we already have (the Go mesh
  * sidecar's GET /status + GET /peers, plus the renderer↔sidecar bridge state).
  * Richer signals (explicit handshake age, clock skew, key drift, NAT type) get
- * added to /peers later and feed the same model — the shapes below are the
+ * added to /peers later and feed the same model - the shapes below are the
  * contract.
  *
  * Root-cause suppression is structural: we evaluate layers outward (local →
- * coordinator → per-peer) and STOP emitting downstream diagnostics once a
+ * coordinator → per-peer) and stop emitting downstream diagnostics once a
  * blocking upstream cause is found, so the UI shows the one thing to fix, not a
  * cascade of derivative symptoms.
  *
- * Privacy invariant: diagnostics are metadata-only — interface/handshake state,
+ * Privacy invariant: diagnostics are metadata-only - interface/handshake state,
  * never prompt or inference content. Peer name/id are already shown in the UI.
  */
 
@@ -57,13 +57,13 @@ export type PeerState =
   | 'connecting' // known to coordinator, tunnel still coming up
   | 'no_data_plane' // coordinator sees them, but no encrypted tunnel (firewall/VPN/NAT)
   | 'key_drift' // this peer's key isn't provisioned on our tunnel (stale key / re-pair)
-  | 'status_unknown'; // we can't say — an upstream cause (e.g. coordinator down) suppresses this
+  | 'status_unknown'; // we can't say - an upstream cause (e.g. coordinator down) suppresses this
 
 export interface PeerDiagnostic {
   peerId: string;
   state: PeerState;
   severity: DiagSeverity;
-  /** Pill text, e.g. "Relayed", "Blocked — no tunnel". */
+  /** Pill text, e.g. "Relayed", "Blocked - no tunnel". */
   label: string;
   detail: string;
   fix?: string;
@@ -105,7 +105,7 @@ export function worstSeverity(a: DiagSeverity, b: DiagSeverity): DiagSeverity {
   return SEVERITY_RANK[a] >= SEVERITY_RANK[b] ? a : b;
 }
 
-/** A peer just joined and its tunnel may still be coming up — don't alarm yet. */
+/** A peer just joined and its tunnel may still be coming up - don't alarm yet. */
 const CONNECTING_GRACE_MS = 15_000;
 
 // ---------------------------------------------------------------------------
@@ -136,7 +136,7 @@ export function deriveDiagnostics(input: DiagnosticsInput, now: number = Date.no
     }], {}, title);
   }
 
-  // --- L0: local — is the mesh sidecar even reachable from the UI? -----------
+  // --- L0: local - is the mesh sidecar even reachable from the UI? -----------
   if (bridge === 'bridge_missing') {
     // Running outside Electron (plain browser). Not an error the user can fix;
     // it just means there's no mesh here. Suppress everything downstream.
@@ -156,7 +156,7 @@ export function deriveDiagnostics(input: DiagnosticsInput, now: number = Date.no
   }
 
   if (bridge === 'sidecar_offline') {
-    // The local mesh service isn't answering. ROOT CAUSE — we know nothing
+    // The local mesh service isn't answering. Root cause - we know nothing
     // downstream, so suppress coordinator + per-peer checks entirely.
     return report(
       [
@@ -175,12 +175,12 @@ export function deriveDiagnostics(input: DiagnosticsInput, now: number = Date.no
   }
 
   // bridge === 'unknown' (first tick) or 'reachable'. Without a status payload
-  // yet, we can't assess — stay quiet rather than flash a false error.
+  // yet, we can't assess - stay quiet rather than flash a false error.
   if (!status || bridge === 'unknown') {
     return report([], {}, 'Checking mesh…');
   }
 
-  // --- L0: local — mesh sidecar state ---------------------------------------
+  // --- L0: local - mesh sidecar state ---------------------------------------
   switch (status.mesh_status) {
     case 'starting':
       // Transient; suppress downstream so we don't alarm during bring-up.
@@ -231,7 +231,7 @@ export function deriveDiagnostics(input: DiagnosticsInput, now: number = Date.no
       );
     case 'running':
     default:
-      break; // healthy — continue to coordinator + peers
+      break; // healthy - continue to coordinator + peers
   }
 
   if (!status.node_id) return report([], {}, 'Mesh not set up');
@@ -239,7 +239,7 @@ export function deriveDiagnostics(input: DiagnosticsInput, now: number = Date.no
   // --- L1: coordinator (control plane) --------------------------------------
   // The data plane (WireGuard) is independent of the coordinator, so a peer
   // with a fresh handshake is genuinely connected even if the coordinator is
-  // down. But peer *presence* (the roster) comes from the coordinator — so when
+  // down. But peer *presence* (the roster) comes from the coordinator - so when
   // it's unreachable we can't trust "this peer is offline", only "this peer is
   // (still) connected". We reflect that in the per-peer pass below.
   let coordinatorTrustworthy = true;
@@ -293,7 +293,7 @@ function derivePeer(peer: MeshPeer, coordinatorTrustworthy: boolean, now: number
       return {
         peerId: peer.node_id,
         state: 'relayed',
-        severity: 'ok', // connected & working — the relay nuance lives on the peer pill, not the global banner
+        severity: 'ok', // connected & working - the relay nuance lives on the peer pill, not the global banner
         label: 'Relayed',
         detail:
           'Connected, but through a relay (slower). A direct peer-to-peer link hasn’t formed yet, usually because of a VPN or strict NAT on one side.',
@@ -322,7 +322,7 @@ function derivePeer(peer: MeshPeer, coordinatorTrustworthy: boolean, now: number
 
   // Key not provisioned on our tunnel → a stale/drifted key (e.g. the peer
   // re-paired) or config that never applied. Different fix (re-sync) than a
-  // firewall block. `key_configured` is absent on older sidecars — only act on
+  // firewall block. `key_configured` is absent on older sidecars - only act on
   // an explicit false.
   if (peer.key_configured === false) {
     return {
@@ -351,7 +351,7 @@ function derivePeer(peer: MeshPeer, coordinatorTrustworthy: boolean, now: number
   }
 
   // No tunnel. Split "dropped recently" (a handshake existed, now stale) from
-  // "never formed" (no handshake ever) — usually a different story. Falls back
+  // "never formed" (no handshake ever) - usually a different story. Falls back
   // to the "never" copy when the sidecar doesn't report handshake age.
   const hadHandshake = typeof peer.handshake_age_seconds === 'number';
   return {

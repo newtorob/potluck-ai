@@ -69,7 +69,7 @@ function legacyCircle(): FakeCircle {
 function ownedCircle(): FakeCircle {
   return {
     id: '22222222-2222-4222-8222-222222222222', name: 'Home lab', created_at: '2026-10-01T12:00:00Z', role: 'owner',
-    people: [person('p-rob', 'Rob', 'owner', true), person('p-ada', 'Ada'), person('p-grace', 'Grace')],
+    people: [person('p-sam', 'Sam', 'owner', true), person('p-ada', 'Ada'), person('p-grace', 'Grace')],
     members: [],
   };
 }
@@ -77,7 +77,7 @@ function ownedCircle(): FakeCircle {
 function memberCircle(): FakeCircle {
   return {
     id: '33333333-3333-4333-8333-333333333333', name: 'Potluck Lab', created_at: '2026-09-20T12:00:00Z', role: 'member',
-    people: [person('p-ada', 'Ada', 'owner'), person('p-rob', 'Rob', 'member', true), person('p-lin', 'Lin')],
+    people: [person('p-ada', 'Ada', 'owner'), person('p-sam', 'Sam', 'member', true), person('p-lin', 'Lin')],
     members: [],
   };
 }
@@ -89,7 +89,7 @@ function normalizeCode(raw: unknown): string | null {
 
 /**
  * In-memory stand-in for the coordinator's circle routes. `circles` is what
- * GET /me/circles returns for the signed-in member (named Rob); `calls` logs
+ * GET /me/circles returns for the signed-in member; `calls` logs
  * every request so a test can say what was and was not sent.
  */
 function fakeCoordinator(init: { circles?: FakeCircle[]; joinable?: Record<string, Joinable> } = {}) {
@@ -119,7 +119,7 @@ function fakeCoordinator(init: { circles?: FakeCircle[]; joinable?: Record<strin
     if (path === '/me/circles' && method === 'POST') {
       const created: FakeCircle = {
         id: nextId(), name: String(body['name']), created_at: new Date().toISOString(), role: 'owner',
-        people: [person(nextId(), 'Rob', 'owner', true)], members: [],
+        people: [person(nextId(), 'Sam', 'owner', true)], members: [],
       };
       state.circles.push(created);
       return { status: 201, json: created };
@@ -137,7 +137,7 @@ function fakeCoordinator(init: { circles?: FakeCircle[]; joinable?: Record<strin
       }
       if (entry.full) return { status: 409, json: { detail: 'This circle is full.' } };
       if (!already) {
-        state.circles.push({ ...entry.circle, role: 'member', people: [...(entry.circle.people ?? []), person('p-rob', 'Rob', 'member', true)] });
+        state.circles.push({ ...entry.circle, role: 'member', people: [...(entry.circle.people ?? []), person('p-sam', 'Sam', 'member', true)] });
       }
       return { status: 200, json: view(find(entry.circle.id)!) };
     }
@@ -482,10 +482,10 @@ test('an owner makes an invite, sees the code once, and can withdraw it', async 
   // Everyone in the circle is listed. The owner can remove anyone but themselves.
   const people = card.getByRole('list', { name: 'People in this circle' });
   await expect(people.getByRole('listitem')).toHaveCount(3);
-  await expect(people.getByRole('listitem').nth(0)).toContainText('Rob');
+  await expect(people.getByRole('listitem').nth(0)).toContainText('Sam');
   await expect(people.getByRole('listitem').nth(0)).toContainText('(you)');
   await expect(people.getByRole('listitem').nth(0)).toContainText('Owner');
-  await expect(card.getByRole('button', { name: 'Remove Rob' })).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Remove Sam' })).toHaveCount(0);
   await expect(card.getByRole('button', { name: 'Remove Ada' })).toBeVisible();
   await expect(card.getByText('No open invites.')).toBeVisible();
 
@@ -580,7 +580,7 @@ test('a member pastes an invite link, reads what joining means, and joins', asyn
   const people = card.getByRole('list', { name: 'People in this circle' });
   await expect(people.getByRole('listitem')).toHaveCount(3);
   await expect(people.getByRole('listitem').nth(0)).toContainText('Owner');
-  await expect(people).toContainText('Rob');
+  await expect(people).toContainText('Sam');
   await expect(card.getByRole('button', { name: /^Remove/ })).toHaveCount(0);
   await expect(card.getByRole('button', { name: 'Invite someone' })).toHaveCount(0);
   await capture(page, 'circles-member-card');

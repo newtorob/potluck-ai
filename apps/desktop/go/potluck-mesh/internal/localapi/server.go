@@ -8,21 +8,21 @@
 //
 // Endpoints (all return JSON):
 //
-//	GET   /status    — current sidecar state
-//	GET   /peers     — household roster with reachability
-//	POST  /pair      — enroll this node using a pairing token
-//	POST  /unpair    — wipe local keys + stop tunnel
-//	PATCH /settings  — runtime settings override (currently: coordinator_url)
+//	GET   /status - current sidecar state
+//	GET   /peers - household roster with reachability
+//	POST  /pair - enroll this node using a pairing token
+//	POST  /unpair - wipe local keys + stop tunnel
+//	PATCH /settings - runtime settings override (currently: coordinator_url)
 //	POST  /restart   shut down gracefully and exit 75 so the service manager starts the process again
-//	WS    /events    — subscribe to the event bus
+//	WS    /events - subscribe to the event bus
 //
 // Every response includes X-Potluck-Protocol-Version: 1 per the spec.
 //
-// Auth model: filesystem ACLs only — the socket is 0600 (Unix) or user-DACL
+// Auth model: filesystem ACLs only - the socket is 0600 (Unix) or user-DACL
 // (Windows). No bearer tokens or per-request signatures.
 //
 // Privacy: never logs WG private keys, pairing tokens, or inference content.
-// Peer metadata (mesh IPs, pubkey prefixes, hostnames) is fine — it is
+// Peer metadata (mesh IPs, pubkey prefixes, hostnames) is fine - it is
 // mesh-layer information.
 package localapi
 
@@ -75,10 +75,10 @@ const (
 	ReachDERP   ReachabilityMode = "derp"
 	// ReachConnecting reports a peer that this node has flipped to DERP
 	// routing (SetPeerRouting(pubkey, true) on the local DerpBind) but for
-	// which no WireGuard handshake has completed yet — either the handshake
+	// which no WireGuard handshake has completed yet - either the handshake
 	// is still in flight over the relay, or the relay itself is unreachable.
 	// Without this value, that state was indistinguishable from "never tried
-	// direct yet": both read as reachability_mode: null. New enum value —
+	// direct yet": both read as reachability_mode: null. New enum value -
 	// additive, existing "direct"/"derp"/null consumers are unaffected.
 	ReachConnecting ReachabilityMode = "connecting"
 )
@@ -92,7 +92,7 @@ type PeerReachabilityFunc func(pubkeyBase64 string) (lastHandshake time.Time, rx
 type IsDERPRoutedFunc func(pubkeyBase64 string) bool
 
 // IsPeerConfiguredFunc reports whether the WG device has the given peer's key
-// configured — used to tell a drifted/unprovisioned key from a firewall block.
+// configured - used to tell a drifted/unprovisioned key from a firewall block.
 type IsPeerConfiguredFunc func(pubkeyBase64 string) bool
 
 // SignalRestartFunc is called after /pair to re-connect the signal client with
@@ -163,7 +163,7 @@ func (s *State) SetExternalEndpoint(ep string) {
 }
 
 // SetLocalEndpoints records this node's discovered private-LAN candidates
-// ("ip:port") for observability via GET /status. Observability only — no
+// ("ip:port") for observability via GET /status. Observability only - no
 // routing effect in this phase. The slice is copied so the caller may reuse it.
 func (s *State) SetLocalEndpoints(eps []string) {
 	cp := append([]string(nil), eps...)
@@ -260,7 +260,7 @@ func (s *State) SetWGPublicKey(pubkey string) {
 // ClearEnrollment wipes the in-memory enrollment identity (node_id,
 // household_id, mesh_ip, wg_public_key, external_endpoint) and moves
 // the status back to Stopped. Called from handleUnpair so the next
-// GET /status reflects an actually-unpaired node — otherwise the
+// GET /status reflects an actually-unpaired node - otherwise the
 // frontend sees stale node_id + mesh_ip and concludes the node is
 // still paired.
 func (s *State) ClearEnrollment() {
@@ -293,7 +293,7 @@ func (s *State) MeshIP() string {
 // ExternalEndpoint returns this node's last STUN-discovered public endpoint
 // ("ip:port"), or "" if none has resolved yet. Used to re-announce our own
 // current endpoint on every fresh signal connection (see
-// cmd/potluck-mesh/main.go's rosterHandler.OnWelcome) — closing the race
+// cmd/potluck-mesh/main.go's rosterHandler.OnWelcome) - closing the race
 // where the initial SendEndpointUpdate fires before the signal WS has
 // finished connecting and is silently dropped ("no active connection").
 func (s *State) ExternalEndpoint() string {
@@ -365,18 +365,18 @@ func (s *State) snapshot(peerCount int) statusResponse {
 	}
 	s.mu.RUnlock()
 
-	// Readiness probes — computed after releasing the lock (no network calls
+	// Readiness probes - computed after releasing the lock (no network calls
 	// under a lock; these are cheap stdlib operations only).
 
 	// VPN conflict probe: enumerate interfaces for known third-party VPN
-	// names. Conflict is only flagged when the VPN is up AND the coordinator
+	// names. Conflict is only flagged when the VPN is up and the coordinator
 	// is not connected (the Mullvad kill-switch failure pattern).
 	vpn := checkVPNConflict(coordConnState)
 	resp.VPNConflict = vpn.Conflict
 	resp.VPNDetail = vpn.Detail
 
 	// WireGuard port probe: is our UDP transport socket actually bound?
-	// When wgPort is 0 (SetWGPort not yet called — tunnel not yet up),
+	// When wgPort is 0 (SetWGPort not yet called - tunnel not yet up),
 	// report false rather than probing port 0.
 	if wgPort > 0 {
 		resp.WGPortListening = checkWGPortListening(wgPort)
@@ -411,16 +411,16 @@ type Config struct {
 	Circle CircleSource
 
 	// SettingsPath is where PATCH /settings persists a runtime coordinator-URL
-	// override (internal/runtimesettings). "" disables persistence (tests) —
+	// override (internal/runtimesettings). "" disables persistence (tests) -
 	// the live update via ApplyCoordinatorURLFn still happens, it just won't
 	// survive a restart.
 	SettingsPath string
 	// ApplyCoordinatorURLFn is called after a validated, persisted PATCH
-	// /settings coordinator_url update to install the new value as the LIVE
+	// /settings coordinator_url update to install the new value as the live
 	// coordinator URL across coordClient, the signal client, and ipcState
 	// (see cmd/potluck-mesh/main.go's applyCoordinatorURL). nil is
 	// tolerated (tests, or a caller that only wants the value reflected in
-	// State without any live side effects) — handleSettingsPatch falls back
+	// State without any live side effects) - handleSettingsPatch falls back
 	// to State.SetCoordinatorURL alone in that case.
 	ApplyCoordinatorURLFn func(url string)
 }
@@ -528,20 +528,20 @@ func (s *Server) Serve(ctx context.Context) error {
 		"platform", runtime.GOOS,
 	)
 
-	// Determine "enrolled" at startup. A WG keypair existing on disk is NOT
+	// Determine "enrolled" at startup. A WG keypair existing on disk is not
 	// proof of enrollment: ensureKeypair generates one unconditionally the
 	// first time the tunnel needs it (bring-up happens before /pair is ever
-	// called), so a freshly-installed, never-paired machine ALREADY has a
-	// wg.key file by the time this runs — the old `os.Stat(wgPrivKeyPath)`
-	// check alone treated that as "enrolled" and made POST /pair 409 with
-	// already_enrolled before ever contacting the coordinator (in-app "Add a
-	// machine" would 409 on a fresh machine). The persisted node_token
-	// (internal/nodetoken) is the authoritative signal instead: it is minted
-	// ONLY by a successful POST /mesh/enroll (see handlePair below) and
+	// called), so a freshly-installed, never-paired machine already has a
+	// wg.key file by the time this runs. Treating that as "enrolled" would
+	// make POST /pair 409 with already_enrolled before ever contacting the
+	// coordinator (in-app "Add a machine" would 409 on a fresh machine). The
+	// persisted node_token (internal/nodetoken) is the authoritative signal
+	// instead: it is minted only by a successful POST /mesh/enroll (see
+	// handlePair below) and
 	// cleared on /unpair, so its presence is a true enrollment record rather
 	// than a side effect of key generation.
 	//
-	// When node_token persistence isn't configured (nodeTokenPath == "" —
+	// When node_token persistence isn't configured (nodeTokenPath == "" -
 	// tests, or a build predating node-token support), fall back to the
 	// legacy wg-key-exists heuristic so behaviour is unchanged there.
 	if s.nodeTokenPath != "" {
@@ -603,9 +603,9 @@ type statusResponse struct {
 	// Readiness probes (added for netcheck view).
 
 	// VPNConflict is true when a known third-party VPN interface (e.g. Mullvad)
-	// is detected AND the coordinator connection is not "connected". This
-	// combination is the Mullvad kill-switch failure pattern that took down the
-	// mesh in a real incident. False when the VPN is up but the mesh is still
+	// is detected and the coordinator connection is not "connected". This
+	// combination is the Mullvad kill-switch failure pattern that takes down
+	// the mesh. False when the VPN is up but the mesh is still
 	// connected (low-severity; surfaced in VPNDetail only).
 	VPNConflict bool `json:"vpn_conflict"`
 	// VPNDetail is a human-readable sentence describing what was found.
@@ -614,13 +614,13 @@ type statusResponse struct {
 
 	// WGPortListening is true when the WireGuard UDP transport port (51820 by
 	// default) is observed as bound on the local machine. A false value means
-	// the tunnel socket is not up — either the WireGuard device failed to start
+	// the tunnel socket is not up - either the WireGuard device failed to start
 	// or the port was stolen by another process.
 	WGPortListening bool `json:"wg_port_listening"`
 
 	// PeersConnectingCount is the number of roster peers this node has
 	// flipped to DERP routing (see peerResponse.DERPFlipped) that have not
-	// yet completed a WireGuard handshake — i.e. reachability_mode
+	// yet completed a WireGuard handshake - i.e. reachability_mode
 	// "connecting" in GET /peers. A whole-node summary so a systray/global
 	// indicator doesn't need to walk the peer list itself. Additive field.
 	PeersConnectingCount int `json:"peers_connecting_count"`
@@ -660,11 +660,11 @@ type peerResponse struct {
 	// DERPFlipped reports whether this node currently has this peer marked as
 	// DERP-routed (DerpBind.SetPeerRouting flip via IsPeerDERPRouted),
 	// independent of whether a WireGuard handshake has completed over that
-	// route yet. Additive field — safe for older frontends to ignore. Lets
+	// route yet. Additive field - safe for older frontends to ignore. Lets
 	// the UI (and debugging) distinguish "flipped to DERP, handshake pending
 	// or relay unreachable" (reachability_mode: "connecting") from "never
 	// flipped, still trying direct" (reachability_mode: null, derp_flipped:
-	// false) — both previously reported as an indistinguishable null.
+	// false) - both would otherwise report an indistinguishable null.
 	DERPFlipped bool `json:"derp_flipped"`
 	// HandshakeAgeSeconds is the age of the last WireGuard handshake. nil when
 	// no handshake has ever completed (lets the UI tell "stale" from "never").
@@ -705,7 +705,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 // countPeersConnecting mirrors the reachability_mode computation in
 // handlePeers, but only tallies peers in the "connecting" state (DERP-flipped
-// on this node, handshake not yet complete) — see peerResponse.DERPFlipped
+// on this node, handshake not yet complete) - see peerResponse.DERPFlipped
 // and ReachConnecting for why that state needs to be observable at all.
 func (s *Server) countPeersConnecting(roster []signal.RosterPeer) int {
 	if s.isDERPRoutedFn == nil {
@@ -775,13 +775,13 @@ func (s *Server) handlePeers(w http.ResponseWriter, r *http.Request) {
 
 		// Reachability mode: DERP vs direct vs connecting.
 		//
-		// derp_flipped is independent of the handshake state — it reflects
+		// derp_flipped is independent of the handshake state - it reflects
 		// this node's local DerpBind routing decision, which can be true well
 		// before (or even without) a completed handshake: the relay may still
 		// be unreachable, or the responder's side of the handshake may not
 		// have converged yet (see internal/derp.DerpBind.Send's doc comment
 		// for the wg-go endpoint-roaming race this exposes). Surfacing it
-		// separately from reachability_mode turns that previously-invisible
+		// separately from reachability_mode turns that otherwise invisible
 		// window into an observable "connecting" state instead of a null
 		// that's indistinguishable from "hasn't tried DERP at all".
 		derpFlipped := s.isDERPRoutedFn != nil && s.isDERPRoutedFn(p.WGPublicKey)
@@ -799,7 +799,7 @@ func (s *Server) handlePeers(w http.ResponseWriter, r *http.Request) {
 			pr.ReachabilityMode = &mode
 		}
 		// Neither reachable nor flipped: ReachabilityMode stays nil (JSON
-		// null) — still trying direct, unchanged from prior behavior.
+		// null) - still trying direct, unchanged from prior behavior.
 
 		out = append(out, pr)
 	}
@@ -859,9 +859,9 @@ func (s *Server) handlePair(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate (or load) this node's Ed25519 signing keypair — DISTINCT from
+	// Generate (or load) this node's Ed25519 signing keypair - distinct from
 	// the WG keypair above, used only for the DERP-token PoP challenge. A
-	// failure here is logged but does NOT fail pairing: signing_public_key is
+	// failure here is logged but does not fail pairing: signing_public_key is
 	// optional on the wire (coordinator/schemas/mesh.py), so a node that
 	// can't produce one simply enrolls without it and falls back to the
 	// legacy DERP-token auth path forever (safe, just unhardened for that
@@ -907,17 +907,17 @@ func (s *Server) handlePair(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The coordinator accepted this enrollment — if we sent a
-	// signing_public_key, it is now registered there. This is the ONLY point
+	// The coordinator accepted this enrollment - if we sent a
+	// signing_public_key, it is now registered there. This is the only point
 	// in the node's lifecycle where that becomes true; record it locally so
 	// the DERP-token fetcher knows it's safe to start signing (see
 	// internal/signingkey's package doc for why this ordering matters).
 	if signingPubKey != nil {
 		if mErr := signingkey.MarkRegistered(s.signingKeyPath, *signingPubKey); mErr != nil {
-			// Non-fatal: the coordinator DOES have the key registered now, we
+			// Non-fatal: the coordinator does have the key registered now, we
 			// just failed to record that fact locally. Worst case this node
 			// stays on the legacy (unsigned) DERP-token path until the marker
-			// write can succeed on a future pairing — never a false-positive
+			// write can succeed on a future pairing - never a false-positive
 			// "registered" that could trigger an unregistered-signature 401.
 			slog.Warn("localapi: pair: failed to persist signing-key registration marker",
 				"err", mErr)
@@ -925,17 +925,17 @@ func (s *Server) handlePair(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Persist the freshly-minted per-node bearer credential (shown exactly
-	// ONCE in this response — see coordapi.EnrollResponse.NodeToken / the
+	// once in this response - see coordapi.EnrollResponse.NodeToken / the
 	// coordinator's EnrollResponse docstring) to disk, mode 0600, the same
-	// directory as the WG key. Then make it the LIVE credential on the
+	// directory as the WG key. Then make it the live credential on the
 	// shared coordapi.Client: every subsequent heartbeat/peers/derp-token
 	// call and the signal WS's next reconnect all read it from there (see
-	// cmd/potluck-mesh/main.go's wiring — coordClient.NodeToken is passed as
+	// cmd/potluck-mesh/main.go's wiring - coordClient.NodeToken is passed as
 	// a live getter to both), so this one call is the only propagation this
 	// handler needs to do.
 	if s.nodeTokenPath != "" {
 		if err := nodetoken.Save(s.nodeTokenPath, enrollResp.NodeToken); err != nil {
-			// Non-fatal: the coordinator DID mint + hash-store this token —
+			// Non-fatal: the coordinator did mint + hash-store this token -
 			// we only failed to persist our own copy. Worst case this node
 			// keeps using the legacy coordinator-token fallback (if
 			// configured) until a future re-pair succeeds in writing the
@@ -983,11 +983,11 @@ func (s *Server) handleUnpair(w http.ResponseWriter, r *http.Request) {
 
 	// Wipe the signing keypair + its registration marker too, so a
 	// subsequent /pair generates a fresh Ed25519 identity and starts from a
-	// clean (unregistered) state — it only starts signing DERP-token
+	// clean (unregistered) state - it only starts signing DERP-token
 	// requests again once that fresh /pair actually confirms registration.
 	// Best-effort: a failure here doesn't block unpair (the WG key removal
 	// above is what actually severs the node from the household), but it
-	// does mean a stale signing key could linger — log so it's visible.
+	// does mean a stale signing key could linger - log so it's visible.
 	if s.signingKeyPath != "" {
 		if err := os.Remove(s.signingKeyPath); err != nil && !os.IsNotExist(err) {
 			slog.Warn("localapi: unpair: remove signing key failed", "err", err)
@@ -999,10 +999,10 @@ func (s *Server) handleUnpair(w http.ResponseWriter, r *http.Request) {
 
 	// Wipe the persisted node_token too, so a subsequent /pair mints (and
 	// this sidecar persists) a completely fresh one rather than a stale
-	// credential left over from this enrollment. Also clear the LIVE value
+	// credential left over from this enrollment. Also clear the live value
 	// on the shared coordapi.Client so no in-flight or newly-dialed request
 	// keeps presenting a token for a node the coordinator no longer
-	// considers ours — the legacy coordinator token (if configured) is the
+	// considers ours - the legacy coordinator token (if configured) is the
 	// only credential in play again until the next successful /pair.
 	if s.nodeTokenPath != "" {
 		if err := nodetoken.Clear(s.nodeTokenPath); err != nil {
@@ -1021,7 +1021,7 @@ func (s *Server) handleUnpair(w http.ResponseWriter, r *http.Request) {
 	}
 	s.bus.Publish(events.NewStatusChanged(string(StatusStopped)))
 
-	// TODO(week7): call coordinator DELETE /mesh/nodes/{id} to deregister.
+	// TODO: call coordinator DELETE /mesh/nodes/{id} to deregister.
 	// Until that endpoint exists, the coordinator GC's stale nodes automatically.
 	// Signal client teardown is handled by the signalRestart mechanism in main.go.
 	slog.Info("localapi: node unpaired, WG private key wiped")
@@ -1032,7 +1032,7 @@ func (s *Server) handleUnpair(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		// Electron renders from file:// or localhost:5173 — skip origin check.
+		// Electron renders from file:// or localhost:5173 - skip origin check.
 		InsecureSkipVerify: true,
 	})
 	if err != nil {
@@ -1055,7 +1055,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 		case evt, ok := <-ch:
 			if !ok {
-				// Bus closed — the sidecar is shutting down.
+				// Bus closed - the sidecar is shutting down.
 				// Best-effort: send a final status event before closing. Error ignored
 				// because we're closing immediately after regardless.
 				_ = wsjson.Write(ctx, conn, events.NewStatusChanged(string(StatusStopped)))
@@ -1091,7 +1091,7 @@ const (
 // unenrolled machine has no token to share.
 //
 // The LAN announce itself never carries the raw, redeemable token (see
-// internal/lanpair's package doc) — only a one-way fingerprint of it. The
+// internal/lanpair's package doc) - only a one-way fingerprint of it. The
 // response here additively includes a freshly generated confirmation_pin:
 // the caller is expected to display it locally (e.g. on the inviter's
 // screen) so a human can read it aloud/over-the-shoulder to whoever is
@@ -1131,8 +1131,8 @@ func (s *Server) handlePairingBroadcast(w http.ResponseWriter, r *http.Request) 
 // meaningful on an unenrolled machine that is looking to join; an enrolled
 // machine never acts on a discovered invite.
 //
-// This intentionally no longer returns a redeemable token (it never learned
-// one — the LAN announce doesn't carry it). It returns a fingerprint the
+// This intentionally does not return a redeemable token (the LAN announce
+// doesn't carry one). It returns a fingerprint the
 // caller can use with POST /pairing/reveal once a human has supplied the
 // inviter's confirmation PIN.
 func (s *Server) handlePairingDiscovered(w http.ResponseWriter, r *http.Request) {
@@ -1161,7 +1161,7 @@ type pairingRevealRequest struct {
 // handlePairingReveal exchanges a human-confirmed PIN for the actual pairing
 // token held by the inviter's sidecar. The PIN is read by a human off the
 // inviter's screen (returned from POST /pairing/broadcast as
-// confirmation_pin) — it was never itself broadcast on the LAN. A passive
+// confirmation_pin) - it was never itself broadcast on the LAN. A passive
 // listener that only captured the announce's fingerprint cannot complete
 // this exchange: it needs the PIN, and the inviter rate-limits + burns the
 // broadcast session after a small number of wrong guesses (see
@@ -1196,11 +1196,11 @@ func (s *Server) handlePairingReveal(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---------------------------------------------------------------------------
-// PATCH /settings — runtime settings override
+// PATCH /settings - runtime settings override
 // ---------------------------------------------------------------------------
 
 // settingsPatchRequest is the PATCH /settings body. Every field is a
-// pointer so a request can update a subset of settings — an omitted field
+// pointer so a request can update a subset of settings - an omitted field
 // (nil) leaves that setting untouched, mirroring the Python sidecar's
 // merge-update PATCH /settings semantics (apps/desktop/python/potluck_local/
 // routers/settings.py). Only coordinator_url exists today; add more pointer
@@ -1210,7 +1210,7 @@ type settingsPatchRequest struct {
 }
 
 // settingsResponse is returned by PATCH /settings, reflecting the settings
-// state AFTER applying the patch (updated fields plus anything left
+// state after applying the patch (updated fields plus anything left
 // untouched).
 type settingsResponse struct {
 	CoordinatorURL string `json:"coordinator_url"`
@@ -1219,18 +1219,18 @@ type settingsResponse struct {
 // handleSettingsPatch applies a runtime settings override. Currently
 // supports coordinator_url only: validates it's a well-formed http/https
 // URL, persists it to runtimesettings' settings.json (sited next to the WG
-// key — see Config.SettingsPath), and installs it as the LIVE coordinator
+// key - see Config.SettingsPath), and installs it as the live coordinator
 // URL via ApplyCoordinatorURLFn (wired from cmd/potluck-mesh/main.go to
 // update coordClient, the signal client, and ipcState, then prod a
 // reconnect).
 //
 // Loopback/socket-only by construction: this handler, like every other
 // localapi route, is only ever reachable via the Unix socket / named pipe
-// this server listens on (see platformListen's same-user ACL) — there is no
+// this server listens on (see platformListen's same-user ACL) - there is no
 // separate auth check needed here.
 //
 // A request with coordinator_url omitted (nil) is a no-op that just echoes
-// the current value — lets a caller probe the endpoint's shape without
+// the current value - lets a caller probe the endpoint's shape without
 // requiring a full "settings object" round-trip, and leaves room for future
 // settings keys to be patched independently.
 func (s *Server) handleSettingsPatch(w http.ResponseWriter, r *http.Request) {
@@ -1337,7 +1337,7 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 }
 
 // shortID returns a 3-hex-char suffix derived from the low bits of the current
-// millisecond timestamp — low collision rate for single-machine use cases.
+// millisecond timestamp - low collision rate for single-machine use cases.
 func shortID() string {
 	return fmt.Sprintf("%03x", time.Now().UnixMilli()&0xFFF)
 }

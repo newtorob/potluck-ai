@@ -171,7 +171,7 @@ func TestSignVerify_RoundTrip(t *testing.T) {
 	// Tampering with any one field must invalidate the signature.
 	tampered := DERPTokenMessage("wgpubkeyABC=", "ord", "1700000001")
 	if ed25519.Verify(pubBytes, tampered, sigBytes) {
-		t.Error("signature verified against a tampered message — should not")
+		t.Error("signature verified against a tampered message, should not")
 	}
 }
 
@@ -179,7 +179,7 @@ func TestSignVerify_RoundTrip(t *testing.T) {
 // coordinator/crypto.py's b64url_decode + verify_ed25519_signature decode
 // convention byte-for-byte in Go (pad the unpadded base64url string to a
 // multiple of 4 with '=', then standard base64.URLEncoding decode) and
-// proves it produces IDENTICAL bytes to Go's own RawURLEncoding decode, then
+// proves it produces identical bytes to Go's own RawURLEncoding decode, then
 // runs the same ed25519 verification the coordinator would. This is the
 // end-to-end proof that the Go client's wire encoding matches what
 // coordinator/routers/mesh.py::_verify_derp_pop actually decodes.
@@ -205,7 +205,7 @@ func TestCrossCheck_MirrorsCoordinatorDecode(t *testing.T) {
 		t.Fatalf("decoded pubkey wrong length: got %d want %d", len(pubBytes), ed25519.PublicKeySize)
 	}
 	// Must be byte-identical to Go's own RawURLEncoding decode of the same
-	// string — proves the two decode conventions agree exactly.
+	// string - proves the two decode conventions agree exactly.
 	rawDecoded, err := base64.RawURLEncoding.DecodeString(kp.PublicKeyB64)
 	if err != nil {
 		t.Fatalf("RawURLEncoding decode: %v", err)
@@ -227,7 +227,7 @@ func TestCrossCheck_MirrorsCoordinatorDecode(t *testing.T) {
 	coordinatorMsg := "derp-token:" + wgPubKey + ":" + region + ":" + nonce
 
 	if !ed25519.Verify(pubBytes, []byte(coordinatorMsg), sigBytes) {
-		t.Fatal("signature does not verify under the coordinator's own decode convention — wire encoding mismatch")
+		t.Fatal("signature does not verify under the coordinator's own decode convention: wire encoding mismatch")
 	}
 }
 
@@ -305,7 +305,7 @@ func TestRegistration_MismatchedKeyIsNotRegistered(t *testing.T) {
 	}
 
 	// Simulate the key file being regenerated without a fresh enroll (e.g.
-	// manual deletion of just the key, not the marker): a DIFFERENT pubkey
+	// manual deletion of just the key, not the marker): a different pubkey
 	// must never be treated as registered just because *some* marker exists.
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)

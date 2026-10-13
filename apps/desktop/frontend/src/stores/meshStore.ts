@@ -1,7 +1,7 @@
 /**
- * Mesh store — live state for the /household view.
+ * Mesh store - live state for the /household view.
  *
- * Polling cadence (matches the precedent set by /agents — memory a8909d48):
+ * Polling cadence (same approach as the /agents view):
  *   - status: every 2s
  *   - peers:  every 5s
  *   - both pause when document.hidden
@@ -13,10 +13,10 @@
  * separate WS subscription path through the bridge.
  *
  * Lifecycle:
- *   - `start()` is idempotent — call from a top-level provider or the
+ *   - `start()` is idempotent - call from a top-level provider or the
  *     HouseholdView itself on mount.
  *   - `stop()` clears the timers but keeps the last fetched values so
- *     other components (e.g. the StatusBar mesh pill in task 799939d7)
+ *     other components (e.g. the StatusBar mesh pill)
  *     can still read them.
  */
 
@@ -41,13 +41,13 @@ const PEERS_POLL_MS = 5_000;
 const SERVICE_VERSION_PROBE_MS = 30_000;
 
 // `reachability` lives on the connection between the renderer and the
-// sidecar — distinct from the WG-level peer reachability already on each
+// sidecar - distinct from the WG-level peer reachability already on each
 // MeshPeer row.
 //
 // The daemon_* values fold in the "app brings up the mesh" supervision layer
 // (main.js's mesh:daemon-status bridge, macOS SMAppService today): they only
-// ever get set as a REFINEMENT of sidecar_offline (see
-// refineBridgeOnUnreachable below) — once the socket actually answers, the
+// ever get set as a refinement of sidecar_offline (see
+// refineBridgeOnUnreachable below) - once the socket actually answers, the
 // bridge always goes straight to 'reachable' regardless of daemon state.
 export type BridgeReachability =
   | 'unknown'
@@ -64,7 +64,7 @@ interface MeshState {
   status: MeshStatus | null;
   peers: MeshPeer[];
   bridge: BridgeReachability;
-  /** Raw daemon-supervision status behind the daemon_* bridge values above —
+  /** Raw daemon-supervision status behind the daemon_* bridge values above -
    *  carries `detail` for surfacing in the UI. Cleared once bridge is
    *  anything other than a daemon_* value. */
   daemonStatus: MeshDaemonStatus | null;
@@ -135,7 +135,7 @@ export const useMeshStore = create<MeshState>()((set, get) => ({
 
     set({ isStarted: true });
 
-    // Initial fetches — pull both in parallel.
+    // Initial fetches - pull both in parallel.
     void get().refresh();
 
     const scheduleStatus = () => {
@@ -149,7 +149,7 @@ export const useMeshStore = create<MeshState>()((set, get) => ({
               void probeServiceVersion(get, set);
             } catch (err) {
               // Awaited (not fire-and-forget) so the daemon-status probe this
-              // triggers finishes — and any set() it does lands — before the
+              // triggers finishes - and any set() it does lands - before the
               // reschedule below arms the next tick. Keeps daemon polling on
               // exactly this same 2s cadence rather than a second timer.
               await handleStatusError(err, set);
@@ -206,9 +206,9 @@ export const useMeshStore = create<MeshState>()((set, get) => ({
 
 /** Maps a daemon-supervision state to the bridge value HouseholdView reads.
  *  'running' is deliberately mapped to the generic offline fallback: we only
- *  ever get here because the socket probe THAT TRIGGERED this check just
+ *  ever get here because the socket probe that triggered this check just
  *  failed, so "daemon says running" is a stale/racy read (the daemon likely
- *  just came up) rather than something to show the user as fact — the next
+ *  just came up) rather than something to show the user as fact - the next
  *  status poll (2s later) will pick up 'reachable' once it's really up. */
 function daemonStateToBridge(state: MeshDaemonState): BridgeReachability {
   switch (state) {
@@ -228,7 +228,7 @@ function daemonStateToBridge(state: MeshDaemonState): BridgeReachability {
   }
 }
 
-/** Best-effort daemon-status probe. Never throws — a missing bridge or a
+/** Best-effort daemon-status probe. Never throws - a missing bridge or a
  *  failed IPC call just means "no daemon info available," not a hard error. */
 async function probeDaemonStatus(): Promise<MeshDaemonStatus | null> {
   if (!isMeshDaemonBridgeAvailable()) return null;
@@ -265,7 +265,7 @@ async function probeServiceVersion(
  * today), falling back to the old generic 'sidecar_offline' otherwise (dev
  * mode without the bridge, non-macOS, or the probe itself failing).
  *
- * This is the ONLY place that queries the daemon bridge — it rides on the
+ * This is the only place that queries the daemon bridge - it rides on the
  * status poll's existing 2s cadence (see scheduleStatus's catch block and
  * refresh() above) rather than running its own timer.
  */
@@ -285,7 +285,7 @@ async function refineBridgeOnUnreachable(
   }
 }
 
-/** Error handler for the status-poll cadence (refresh() + scheduleStatus) —
+/** Error handler for the status-poll cadence (refresh() + scheduleStatus) -
  *  the one place `bridge` gets decided when the socket isn't reachable. */
 async function handleStatusError(
   err: unknown,
@@ -308,7 +308,7 @@ async function handleStatusError(
 
 /**
  * Error handler for the peers-poll cadence (5s, schedulePeers). Deliberately
- * does NOT touch `bridge` on a sidecar-unreachable error: the status poll
+ * does not touch `bridge` on a sidecar-unreachable error: the status poll
  * (2s, more frequent, and the one that runs the daemon-status refinement
  * above) already owns `bridge` as the single source of truth. Letting this
  * slower poll also write a generic 'sidecar_offline' here would stomp a more

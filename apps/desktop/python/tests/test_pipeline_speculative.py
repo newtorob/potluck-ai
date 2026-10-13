@@ -1,18 +1,18 @@
 """Speculative-decoding tests for the pipeline-parallel engine.
 
-Speculative decoding amortizes the pipeline's per-token chain round-trip: a small DRAFT
-model proposes K tokens locally on the head, the TARGET (the pipeline chain) verifies all
-K+1 candidate positions in ONE forward pass (one round-trip), and the longest matching
-prefix is accepted. Crucially it is EXACT, not approximate -- the committed tokens are
-exactly those plain greedy decode would have emitted. That identity is the correctness
-gate here.
+Speculative decoding amortizes the pipeline's per-token chain round-trip: a small draft
+model proposes K tokens locally on the head, the target (the pipeline chain) verifies all
+K+1 candidate positions in one forward pass (one round-trip), and the longest matching
+prefix is accepted. The result is exact rather than approximate -- the committed tokens
+are exactly those plain greedy decode would have emitted. That identity is the
+correctness gate here.
 
 Three properties are covered:
   1. accept_prefix unit logic -- the pure greedy-acceptance rule, no model/network.
-  2. CORRECTNESS (the gate): over a 2-node LOOPBACK (head + serve_tail in a thread, like
+  2. Correctness (the gate): over a 2-node loopback (head + serve_tail in a thread, like
      the existing smokes), speculative decode with draft == the same target model produces
-     the EXACT same token sequence as the plain greedy path, for several prompts.
-  3. EFFICIENCY: the speculative run uses FEWER chain round-trips than greedy for the same
+     the exact same token sequence as the plain greedy path, for several prompts.
+  3. Efficiency: the speculative run uses fewer chain round-trips than greedy for the same
      output length (round-trips counted directly from each path).
 
 The whole file imports torch + transformers and loads a real (small) model, so it is gated
@@ -54,7 +54,7 @@ def test_accept_prefix_full_accept() -> None:
 
 
 def test_accept_prefix_first_mismatch() -> None:
-    """A mismatch at position j stops acceptance: commit the accepted prefix + the TARGET's
+    """A mismatch at position j stops acceptance: commit the accepted prefix + the target's
     token at j (the correction), and discard the rest of the speculation."""
     drafts = [10, 20, 30]
     targets = [10, 99, 30, 40]  # diverges at index 1; target says 99, not the drafted 20
@@ -105,7 +105,7 @@ def _free_port() -> int:
 
 class _LoopbackTail:
     """Run serve_tail on a background thread on 127.0.0.1, holding the tail block of the
-    2-node split. Both the greedy and speculative heads dial the SAME tail -- the tail
+    2-node split. Both the greedy and speculative heads dial the same tail -- the tail
     dispatches on message shape, so one server serves both paths."""
 
     def __init__(self, model_id, split):
@@ -152,7 +152,7 @@ def _spec_engine(tail_port, k=4):
 
 def _greedy_round_trips(engine, messages, max_new):
     """Run the greedy stream and count chain round-trips. Greedy spends exactly one
-    round-trip on prefill plus one per emitted token, so we count tokens + 1; we ALSO
+    round-trip on prefill plus one per emitted token, so we count tokens + 1; we also
     return the produced text via the engine's own stream so the comparison is end to end."""
     text = "".join(engine.stream_tokens(messages, max_new=max_new))
     # greedy: 1 prefill round-trip + 1 per decode step (== per emitted token)
@@ -171,8 +171,8 @@ PROMPTS = [
 
 
 def test_speculative_matches_greedy_token_for_token() -> None:
-    """THE GATE. For several prompts, speculative decode (draft == target) must produce the
-    EXACT same token ids as plain greedy decode over the same 2-node chain. We compare token
+    """The gate. For several prompts, speculative decode (draft == target) must produce the
+    exact same token ids as plain greedy decode over the same 2-node chain. We compare token
     ids (not just text) so the equality is byte-exact, the defining invariant of speculative
     decoding."""
     with _LoopbackTail(MODEL_ID, SPLIT) as tail:
@@ -193,7 +193,7 @@ def test_speculative_matches_greedy_token_for_token() -> None:
 
 
 def test_speculative_uses_fewer_round_trips_than_greedy() -> None:
-    """EFFICIENCY. For the same output, the speculative path must take FEWER chain
+    """Efficiency. For the same output, the speculative path must take fewer chain
     round-trips than greedy. Greedy spends one round-trip per emitted token (+1 prefill);
     speculative commits multiple tokens per round-trip whenever the draft is accepted. With
     draft == target, acceptance is high, so round-trips drop well below the token count."""

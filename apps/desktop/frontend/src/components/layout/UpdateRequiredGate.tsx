@@ -1,9 +1,9 @@
 /**
- * UpdateRequiredGate — blocking full-screen "update required" screen.
+ * UpdateRequiredGate - blocking full-screen "update required" screen.
  *
  * Rendered from App.tsx, above AuthGate/the whole app shell, whenever
  * updateStore.blocked is true (the running version is below `minimum` from
- * the GET /client/version handshake — see App.tsx's startup effect and
+ * the GET /client/version handshake - see App.tsx's startup effect and
  * updateStore.checkVersionHandshake). This is the universal backstop:
  * whatever changed on the backend, an old client shows this one clear
  * screen instead of cryptic downstream failures.
@@ -11,7 +11,7 @@
  * Shares updateStore's phase machine with UpdateBanner, so a download
  * already in flight (started from the banner before the gate could even
  * mount, or from a prior session) carries straight through here. On mount
- * it also kicks off its own check() — the gate can appear before
+ * it also kicks off its own check() - the gate can appear before
  * UpdateBanner ever gets a chance to (it replaces the whole app shell,
  * UpdateBanner included), so it can't rely on the banner having started one.
  */
@@ -59,7 +59,7 @@ export function UpdateRequiredGate() {
         <p className="font-serif text-xl font-light text-foreground">Update required</p>
         <p className="font-sans text-sm leading-relaxed text-muted-foreground">
           This version of Potluck is too old to keep working with the network
-          {latestVersion ? ` — the current version is ${latestVersion}` : ''}. Update to
+          {latestVersion ? ` (the current version is ${latestVersion})` : ''}. Update to
           keep going.
         </p>
         {phase === 'error' && errorMessage && (

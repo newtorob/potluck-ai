@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Preload script — runs in the renderer process before any page JS loads.
+ * Preload script - runs in the renderer process before any page JS loads.
  *
  * Rules:
  *   - contextIsolation: true  (enforced in main.js webPreferences)
@@ -25,11 +25,11 @@ contextBridge.exposeInMainWorld('potluck', {
 
   // ── Build stamp (staleness detection) ──────────────────────────────────────
   //
-  // Static value, not a function — computed once in main.js at startup (see
+  // Static value, not a function - computed once in main.js at startup (see
   // main.js's loadBuildInfo()) and read here via a synchronous IPC call so it
   // is available immediately, with no await, for a "you're running build X"
   // badge. Shape: { version, sha, builtAt, packaged, dirty? }. `version` is
-  // app.getVersion() (e.g. "0.1.0") — for comparing against the server's
+  // app.getVersion() (e.g. "0.1.0") - for comparing against the server's
   // minimum/latest version to detect a stale client.
   app: {
     buildInfo: ipcRenderer.sendSync('app:get-build-info-sync'),
@@ -121,7 +121,7 @@ contextBridge.exposeInMainWorld('potluck', {
   // ── Updater (namespaced) ────────────────────────────────────────────────────
   //
   // Same underlying electron-updater flow as the flat onUpdate*/downloadUpdate/
-  // quitAndInstall members above (kept for back-compat) — this is the
+  // quitAndInstall members above (kept for back-compat) - this is the
   // updater-focused surface: window.potluck.updater.{check,download,install}
   // plus on*() subscriptions that mirror the update:* / update-* IPC channels
   // main.js registers. autoDownload is off in main.js, so check() only ever
@@ -131,7 +131,7 @@ contextBridge.exposeInMainWorld('potluck', {
   updater: {
     /**
      * Ask main to check the update feed now. In dev (unpackaged) this
-     * resolves { status: 'dev' } rather than throwing — there is no
+     * resolves { status: 'dev' } rather than throwing - there is no
      * published release to diff against outside a packaged build.
      * @returns {Promise<{ status: 'ok' | 'dev' | 'error', message?: string }>}
      */
@@ -253,7 +253,7 @@ contextBridge.exposeInMainWorld('potluck', {
      * Proxy a session-authenticated call to the (user-configured) coordinator.
      * Attaches the same bearer token as `request` above, but against a
      * caller-supplied coordinator origin rather than the fixed cloud API host
-     * — main.js allowlists the exact paths this may target. Returns
+     * - main.js allowlists the exact paths this may target. Returns
      * { status, body }.
      * @param {string} baseUrl  Coordinator origin, e.g. from connectionStore.
      * @param {'POST'} method
@@ -265,7 +265,7 @@ contextBridge.exposeInMainWorld('potluck', {
      * Tells main which coordinator origin the renderer is currently pointed
      * at (connectionStore.ts's coordinatorUrl), so main's
      * onBeforeSendHeaders injector can attach the member session bearer to
-     * renderer→coordinator requests that never go through an IPC bridge —
+     * renderer→coordinator requests that never go through an IPC bridge -
      * e.g. streamNetworkJob's SSE POST to /jobs/stream, which can't be
      * buffered through coordinatorRequest above (that reads the whole
      * response body; a live stream can't cross that boundary). Call once at
@@ -314,13 +314,13 @@ contextBridge.exposeInMainWorld('potluck', {
     // a root systemd unit installed via a polkit/pkexec helper. Windows: a
     // SYSTEM-run Scheduled Task installed via a single UAC elevation prompt
     // (Start-Process -Verb RunAs against a fixed, app-shipped PowerShell
-    // helper) — see main.js's mesh-daemon-supervision sections for each
+    // helper) - see main.js's mesh-daemon-supervision sections for each
     // platform's exact mechanism.
     //
     // `state` values: 'not_installed' | 'requires_approval' | 'starting' |
     // 'running' | 'outdated' | 'failed' | 'unsupported'. Not every platform can produce
     // every value (e.g. only macOS reports 'requires_approval'; Windows and
-    // Linux never do — see main.js for which states each platform's
+    // Linux never do - see main.js for which states each platform's
     // compute*DaemonStatus() can return).
     //
     // 'outdated' means the service is up but is not the sidecar binary this
@@ -329,7 +329,7 @@ contextBridge.exposeInMainWorld('potluck', {
 
     /**
      * Current mesh daemon status. Safe to poll (e.g. every 2-5s from a
-     * settings/status view) — each call is one short helper subprocess plus,
+     * settings/status view) - each call is one short helper subprocess plus,
      * on macOS when the daemon reports enabled, one local socket probe.
      * @returns {Promise<{ platform: string, state: string, detail?: string }>}
      */
@@ -337,7 +337,7 @@ contextBridge.exposeInMainWorld('potluck', {
 
     /**
      * Registers (or re-registers) the mesh daemon. May resolve with
-     * state: 'requires_approval' — that is a SUCCESSFUL outcome, not an
+     * state: 'requires_approval' - that is a SUCCESSFUL outcome, not an
      * error: the daemon is registered but the user must approve it in
      * System Settings > Login Items & Extensions before it starts. Follow up
      * with openLoginItems() to take them straight there.

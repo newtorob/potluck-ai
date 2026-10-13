@@ -1,5 +1,5 @@
 /**
- * MemoryView — /memory route.
+ * MemoryView - /memory route.
  *
  * Layout:
  *   - Header: "Memory" title + count + "+ New" + "View as map" link
@@ -8,7 +8,7 @@
  *   - Tag cloud (collapsible, defaults expanded)
  *   - Body: flat search results when query is set; grouped accordion view when empty
  *
- * Keyboard shortcuts (only active when /memory is mounted, and NOT when focus
+ * Keyboard shortcuts (only active when /memory is mounted, and not when focus
  * is in a text input or textarea):
  *   /      → focus search bar
  *   Esc    → clear query + return focus to search bar (then Esc again closes if no query)
@@ -118,7 +118,7 @@ export function MemoryView() {
   const memoryItemRefs = useRef<Map<string, HTMLElement>>(new Map());
 
   // ---------------------------------------------------------------------------
-  // ?focus={id} URL param — set by MemoryGraph when a node is clicked.
+  // ?focus={id} URL param - set by MemoryGraph when a node is clicked.
   // Opens the related-memories drawer for the target memory and scrolls its
   // card into view. If the memory isn't in the current filtered list (e.g.
   // user clicked a graph node from a different project scope), fetch it by id
@@ -146,7 +146,7 @@ export function MemoryView() {
         });
       });
     } else {
-      // Memory exists but lives outside the current project filter — fetch it
+      // Memory exists but lives outside the current project filter - fetch it
       // directly so the drawer still opens. Failure is silent; the click-from-
       // graph isn't critical enough to surface an error toast.
       void localApi.memory.get(focusId).then(setDrawerMemory).catch(() => {
@@ -168,7 +168,7 @@ export function MemoryView() {
   // ---------------------------------------------------------------------------
   // Memory enabled detection
   // ---------------------------------------------------------------------------
-  // PrivacySettings.memory_enabled is typed — no cast needed.
+  // PrivacySettings.memory_enabled is typed - no cast needed.
   // Default to true when settings haven't loaded yet so the banner
   // doesn't flash on startup.
   const memoryEnabled = settings?.privacy.memory_enabled ?? true;
@@ -199,7 +199,7 @@ export function MemoryView() {
   }, [clearSearch]);
 
   // ---------------------------------------------------------------------------
-  // Tag cloud keyword click — sets query and forces exact mode
+  // Tag cloud keyword click - sets query and forces exact mode
   // ---------------------------------------------------------------------------
 
   const handleKeywordClick = useCallback(
@@ -343,13 +343,13 @@ export function MemoryView() {
   // Render
   // ---------------------------------------------------------------------------
 
-  // TagCloud accepts string | undefined — coerce null (global) to undefined
+  // TagCloud accepts string | undefined - coerce null (global) to undefined
   const tagCloudProject = resolvedProject ?? undefined;
 
   return (
     <div className="flex h-full flex-col">
       {/* ------------------------------------------------------------------ */}
-      {/* Unified header — title + count + actions + project subnav          */}
+      {/* Unified header - title + count + actions + project subnav          */}
       {/* ------------------------------------------------------------------ */}
       <ViewHeader
         title="Memory"
@@ -398,7 +398,7 @@ export function MemoryView() {
       {/* ------------------------------------------------------------------ */}
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-2xl px-6 py-5 space-y-4">
-          {/* Privacy disabled banner — Hearth-coherent (ember tint, not generic amber) */}
+          {/* Privacy disabled banner - Hearth-coherent (ember tint, not generic amber) */}
           {!memoryEnabled && (
             <div
               className={cn(
@@ -459,7 +459,7 @@ export function MemoryView() {
                 aria-hidden="true"
               />
 
-              {/* Input — Hearth shadow at rest, ember ring on focus */}
+              {/* Input - Hearth shadow at rest, ember ring on focus */}
               <input
                 ref={searchInputRef}
                 data-testid="memory-search-input"
@@ -728,7 +728,7 @@ export function MemoryView() {
             </>
           )}
 
-          {/* Grouped accordion view (default — no search, no filters) */}
+          {/* Grouped accordion view (default - no search, no filters) */}
           {!isFetching && !isFiltered && grouped.size > 0 && (
             <div className="space-y-3">
               {CATEGORY_ORDER.filter((cat) => grouped.has(cat)).map((cat) => (
@@ -809,7 +809,7 @@ function ModeToggleButton({ active, onClick, label, 'data-testid': testId }: Mod
 }
 
 // ---------------------------------------------------------------------------
-// MemoryCardWrapper — makes a card keyboard-navigable and opens drawer on click
+// MemoryCardWrapper - makes a card keyboard-navigable and opens drawer on click
 // ---------------------------------------------------------------------------
 
 interface MemoryCardWrapperProps {
@@ -821,7 +821,7 @@ interface MemoryCardWrapperProps {
 
 function MemoryCardWrapper({ memory, index, onOpen, registerRef }: MemoryCardWrapperProps) {
   // Stagger fade-in across the first ~12 cards so the list lands in a wave
-  // rather than a sudden snap. After that we cap it — too long a stagger
+  // rather than a sudden snap. After that we cap it - too long a stagger
   // would feel sluggish.
   const delay = Math.min(index, 12) * 24;
   return (
@@ -851,7 +851,7 @@ function MemoryCardWrapper({ memory, index, onOpen, registerRef }: MemoryCardWra
 }
 
 // ---------------------------------------------------------------------------
-// MemoryCategorySectionWrapper — makes grouped items open the drawer
+// MemoryCategorySectionWrapper - makes grouped items open the drawer
 // ---------------------------------------------------------------------------
 
 interface MemoryCategorySectionWrapperProps {

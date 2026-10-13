@@ -50,12 +50,12 @@ for (const [name, view, theme, width, height] of previews) {
   const ansi = renderUsage({ view, window: 7, direction: "consumed", theme, paused: false, offset: 0,
     report: usageFixture(), error: false, refreshing: false }, { width, height, color: true, unicode: true, interactive: false });
   const light = theme === "light";
-  const markup = `<!doctype html><html lang="en"><meta charset="utf-8"><title>Potluck CLI preview — sample data</title>
+  const markup = `<!doctype html><html lang="en"><meta charset="utf-8"><title>Potluck CLI preview: sample data</title>
 <style>*{box-sizing:border-box}body{margin:0;padding:24px;background:${light ? "#ede6da" : "#15120f"};color:${light ? "#635440" : "#b4a999"};font:12px Menlo,monospace}
 .frame{display:inline-block;border:1px solid ${light ? "#cfc4b4" : "#493f36"};border-radius:12px;overflow:hidden}
 .bar{padding:14px 20px;background:${light ? "#e8e0d3" : "#241f1a"};letter-spacing:.04em}
 pre{font:14px/1.4 Menlo,monospace;margin:0;padding:16px;background:${light ? "#f6f3ed" : "#1a1714"}}</style>
-<div class="frame"><div class="bar">POTLUCK / CLI USAGE &nbsp; · &nbsp; SAMPLE DATA — VISUAL PREVIEW</div><pre>${ansiHtml(ansi, theme)}</pre></div></html>`;
+<div class="frame"><div class="bar">POTLUCK / CLI USAGE &nbsp; · &nbsp; SAMPLE DATA - VISUAL PREVIEW</div><pre>${ansiHtml(ansi, theme)}</pre></div></html>`;
   await writeFile(resolve(output, `${name}.ansi`), ansi);
   await writeFile(resolve(output, `${name}.html`), markup);
 }

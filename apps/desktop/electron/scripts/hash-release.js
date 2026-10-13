@@ -2,9 +2,8 @@
 /**
  * Emit a SHA256SUMS file next to the built installers.
  *
- * Windows ships UNSIGNED (Azure Trusted Signing was rejected on cost), so a
- * published hash is how a user verifies integrity without a code signature —
- * the install page tells them to match it. This runs after every
+ * Windows builds ship without a code signature, so a published hash is how a
+ * user verifies integrity - the install page tells them to match it. This runs after every
  * `electron-builder` build (chained into the build:* npm scripts) so the hash
  * is always current with the artifacts. Node's crypto keeps it cross-platform
  * (the same script runs on the mac, windows, and linux build hosts).
@@ -18,7 +17,7 @@ const path = require('path');
 // electron-builder `directories.output`
 const OUT_DIR = path.join(__dirname, '..', 'out');
 
-// User-facing distributables only — skip updater metadata (.yml/.blockmap) and
+// User-facing distributables only - skip updater metadata (.yml/.blockmap) and
 // the unpacked app directories.
 const ARTIFACT_EXTENSIONS = new Set([
   '.dmg',
@@ -41,7 +40,7 @@ function sha256(filePath) {
 
 async function main() {
   if (!fs.existsSync(OUT_DIR)) {
-    console.warn(`[hash-release] ${OUT_DIR} does not exist — nothing to hash.`);
+    console.warn(`[hash-release] ${OUT_DIR} does not exist, nothing to hash.`);
     return;
   }
 
@@ -53,7 +52,7 @@ async function main() {
     .sort();
 
   if (artifacts.length === 0) {
-    console.warn('[hash-release] No installer artifacts found in out/ — skipping.');
+    console.warn('[hash-release] No installer artifacts found in out/, skipping.');
     return;
   }
 

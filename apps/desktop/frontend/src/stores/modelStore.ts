@@ -1,20 +1,18 @@
 /**
- * Model store — single source of truth for the model catalog.
+ * Model store - single source of truth for the model catalog.
  *
  * The catalog is the raw list from GET /models, augmented with live
  * download_progress polled from GET /models/{slug}/download-progress.
  *
  * Shape mirrors the Python sidecar response so we avoid a translation
  * layer and can pass objects straight to components.
- *
- * See guide §4.2.
  */
 
 import { create } from 'zustand';
 import { localApi } from '@/lib/localApi';
 import { useAcceptanceStore } from '@/stores/acceptanceStore';
 
-// Sidecar base URL — mirrors the constant in localApi.ts.
+// Sidecar base URL - mirrors the constant in localApi.ts.
 // localApi encapsulates most calls, but the polling loop and
 // cancel/unload endpoints need raw fetch for stream-compatible access.
 const LOCAL_BASE =
@@ -51,7 +49,7 @@ export interface CatalogModel {
   /**
    * Slugs of installed models this entry supersedes. Non-empty means this
    * catalog entry is a newer model than something the user already has
-   * installed. Optional — older sidecar builds / offline won't send it.
+   * installed. Optional - older sidecar builds / offline won't send it.
    */
   upgrade_from?: string[];
   /** Last measured benchmark for this model, if one has been run. */
@@ -62,7 +60,7 @@ export interface CatalogModel {
     duration_ms: number;
     model_id: string | null;
   };
-  /** Populated by the polling loop — not present in the GET /models response */
+  /** Populated by the polling loop - not present in the GET /models response */
   download_progress?: DownloadProgressRecord;
 }
 
@@ -194,7 +192,7 @@ export const useModelStore = create<ModelState>()((set, get) => ({
         method: 'POST',
       });
     } catch {
-      // Best-effort cancel — ignore network errors
+      // Best-effort cancel - ignore network errors
     }
     get()._clearProgress(slug);
     get()._setInstalling(slug, false);
@@ -267,7 +265,7 @@ export const useModelStore = create<ModelState>()((set, get) => ({
       fetch(`${LOCAL_BASE}/models/${encodeURIComponent(slug)}/download-progress`)
         .then(async (res) => {
           if (res.status === 404) {
-            // No record — download may not have started yet; keep polling briefly
+            // No record - download may not have started yet; keep polling briefly
             return;
           }
           if (!res.ok) return;
@@ -287,7 +285,7 @@ export const useModelStore = create<ModelState>()((set, get) => ({
           }
         })
         .catch(() => {
-          // Transient network error — keep polling
+          // Transient network error - keep polling
         });
     }, 1000);
 

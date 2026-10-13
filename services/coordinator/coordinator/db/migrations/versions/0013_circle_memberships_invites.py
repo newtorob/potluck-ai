@@ -1,8 +1,8 @@
-"""0013 — circle memberships and invites.
+"""0013 - circle memberships and invites.
 
-A trusted circle was a list of machine keys its owner pasted in. The person
-behind a key was never asked, could not see the circle, could not leave it,
-and could not borrow from it: only the owner could send requests.
+A trusted circle starts as a list of machine keys its owner pasted in. The
+person behind a key is never asked, cannot see the circle, cannot leave it,
+and cannot borrow from it: only the owner can send requests.
 
 circle_memberships makes membership a thing a member holds. The owner has
 one from the start, and anyone who accepts an invite gets one. Every member

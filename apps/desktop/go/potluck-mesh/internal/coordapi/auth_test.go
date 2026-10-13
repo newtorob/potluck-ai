@@ -25,7 +25,7 @@ func capturingHandler(t *testing.T, status int, body string) (http.HandlerFunc, 
 
 // TestEnroll_AttachesBearerAndLegacyHeaders pins the wire contract: POST
 // /mesh/enroll carries BOTH Authorization: Bearer <node_token> (whenever one
-// is loaded) AND X-Potluck-Coordinator-Token (whenever configured) —
+// is loaded) AND X-Potluck-Coordinator-Token (whenever configured) -
 // matching coordinator/routers/mesh.py::enroll, which accepts a valid
 // pairing_token in the body OR the coordinator token OR (for a re-pair after
 // node_token support shipped, not the normal case) a bearer, so sending
@@ -59,7 +59,7 @@ func TestEnroll_AttachesBearerAndLegacyHeaders(t *testing.T) {
 
 // TestEnroll_NoTokensAtAll_SendsNeitherHeader pins the primary distributed-app
 // path: a fresh install enrolls with nothing but the pairing token in the
-// body — no coordinator token configured, no node_token minted yet — and
+// body - no coordinator token configured, no node_token minted yet - and
 // this client must not send either auth header (the coordinator's enroll()
 // treats a valid pairing_token in the body as sufficient on its own).
 func TestEnroll_NoTokensAtAll_SendsNeitherHeader(t *testing.T) {
@@ -88,7 +88,7 @@ func TestEnroll_NoTokensAtAll_SendsNeitherHeader(t *testing.T) {
 }
 
 // TestEnroll_ParsesNodeToken pins that EnrollResponse.NodeToken round-trips
-// through this client's JSON decoding untouched — the caller (localapi's
+// through this client's JSON decoding untouched - the caller (localapi's
 // handlePair) persists this value verbatim.
 func TestEnroll_ParsesNodeToken(t *testing.T) {
 	h, _ := capturingHandler(t, http.StatusCreated, `{"node_id":"n1","household_id":"h1","mesh_ip":"100.64.0.6","mesh_cidr":"100.64.0.0/24","peers":[],"node_token":"minted-tok-xyz"}`)
@@ -110,7 +110,7 @@ func TestEnroll_ParsesNodeToken(t *testing.T) {
 }
 
 // TestListPeers_AttachesBearerAndLegacyHeaders mirrors the Enroll case for
-// GET /mesh/peers — gated by resolve_node_from_token server-side.
+// GET /mesh/peers - gated by resolve_node_from_token server-side.
 func TestListPeers_AttachesBearerAndLegacyHeaders(t *testing.T) {
 	h, headers := capturingHandler(t, http.StatusOK, `[]`)
 	srv := httptest.NewServer(h)
@@ -156,7 +156,7 @@ func TestListPeers_NoNodeToken_OmitsBearer(t *testing.T) {
 }
 
 // TestSetNodeToken_UpdatesLiveValue pins that SetNodeToken takes effect on
-// the VERY NEXT call — the mechanism internal/localapi's handlePair relies
+// the VERY NEXT call - the mechanism internal/localapi's handlePair relies
 // on to make a freshly-minted token immediately usable.
 func TestSetNodeToken_UpdatesLiveValue(t *testing.T) {
 	h, headers := capturingHandler(t, http.StatusOK, `[]`)

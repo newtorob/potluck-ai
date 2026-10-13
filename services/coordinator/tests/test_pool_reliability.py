@@ -1,14 +1,14 @@
 """Pool-reliability spine: live in-flight counter, heartbeat-TTL liveness
 (read-side filter + reaper), and per-peer capacity hard-exclude.
 
-Scope: load/liveness/capacity only. Does NOT touch active failover/re-dispatch
-(follow-on) or the open-pool trust items (canary/k_min/escrow — covered by
+Scope: load/liveness/capacity only. Does not touch active failover/re-dispatch
+or the open-pool trust items (canary/k_min/escrow - covered by
 test_verification.py / test_credit_escrow.py).
 
 Conventions match the sibling routing/drain test files:
   - test_compute_aware_routing.py's `_mk_peer` helper + registration-order
-    trick (the peer that SHOULD win is registered FIRST, so it would LOSE
-    the old most-recent-first tiebreak, proving the new signal is what
+    trick (the peer that should win is registered first, so it would lose
+    a most-recent-first tiebreak, proving the signal under test is what
     actually decided the outcome).
   - test_job_drain_on_disconnect.py's direct peer_registry manipulation
     (module-global in-memory state; register/unregister in try/finally).
@@ -43,7 +43,7 @@ _MODEL = "qwen3:4b-pool-reliability-test"
 
 
 class _WS:
-    """Stub WebSocket — never actually sent to in these tests."""
+    """Stub WebSocket - never actually sent to in these tests."""
 
 
 async def _mk_peer(
@@ -93,7 +93,7 @@ async def _mk_peer(
 
 
 # ---------------------------------------------------------------------------
-# 1. Live in-flight counter — basic correctness + all terminal paths.
+# 1. Live in-flight counter - basic correctness + all terminal paths.
 # ---------------------------------------------------------------------------
 
 
@@ -175,7 +175,7 @@ async def test_live_in_flight_counts_batch_form() -> None:
 
 
 # ---------------------------------------------------------------------------
-# 2. Herd fix — the live counter (not the up-to-30s-stale heartbeat) drives
+# 2. Herd fix - the live counter (not the up-to-30s-stale heartbeat) drives
 #    scoring, so two near-simultaneous dispatches don't both pile onto the
 #    same peer.
 # ---------------------------------------------------------------------------
@@ -186,13 +186,13 @@ async def test_live_counter_deprioritizes_peer_with_stale_zero_heartbeat(
     db_session: AsyncSession,
 ) -> None:
     """Both peers report current_jobs=0 in their (not-yet-refreshed)
-    heartbeat row -- the exact staleness window this fix closes. One of
+    heartbeat row -- the staleness window the live counter closes. One of
     them has a job registered in-flight via register_job (as
-    _dispatch_to_peer does at dispatch time) with NO corresponding
+    _dispatch_to_peer does at dispatch time) with no corresponding
     heartbeat update (heartbeats land up to 30s later). Without consulting
     the live counter, both would tie at current_jobs=0 and the
     most-recently-connected peer would win the tiebreak -- so `busy` is
-    registered SECOND (most recent) to prove the live counter, not
+    registered second (most recent) to prove the live counter, not
     recency, is what deprioritizes it.
     """
     member = uuid.uuid4()
@@ -242,7 +242,7 @@ async def test_two_concurrent_dispatches_split_across_peers(
         assert second is not None
         assert second.peer_id != first.peer_id, (
             "second dispatch piled onto the same peer as the first -- "
-            "the dispatch herd this fix exists to close."
+            "the dispatch herd the live counter exists to prevent."
         )
         assert {first.peer_id, second.peer_id} == {peer_a, peer_b}
     finally:
@@ -284,7 +284,7 @@ async def test_stale_heartbeat_peer_excluded_from_eligibility(
 @pytest.mark.asyncio
 async def test_no_heartbeat_peer_kept_eligible(db_session: AsyncSession) -> None:
     """A peer with NO heartbeat row yet (just connected) is exempt from the
-    TTL exclude — same grace period _score_peers already gives it."""
+    TTL exclude - same grace period _score_peers already gives it."""
     member = uuid.uuid4()
     no_hb = await _mk_peer(db_session, member, tps=10.0, add_heartbeat=False)
     try:
@@ -312,7 +312,7 @@ async def test_fresh_heartbeat_peer_stays_eligible(db_session: AsyncSession) -> 
 
 
 # ---------------------------------------------------------------------------
-# 4. Reaper — the write-side half of the liveness backstop.
+# 4. Reaper - the write-side half of the liveness backstop.
 # ---------------------------------------------------------------------------
 
 

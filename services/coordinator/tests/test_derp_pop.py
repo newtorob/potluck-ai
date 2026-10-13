@@ -1,15 +1,16 @@
 """Tests for the DERP-token proof-of-possession (PoP) hardening.
 
-Background (HIGH-severity audit finding): POST /mesh/derp-token previously
-accepted possession of a registered (non-secret) `wg_public_key` as the ONLY
-credential — anyone who observed a node's WG pubkey could mint a DERP-relay
-token AS that node and hijack its relay session.
+Background: POST /mesh/derp-token accepts possession of a registered
+(non-secret) `wg_public_key` as the only credential unless proof of
+possession is supplied - anyone who observed a node's WG pubkey could mint a
+DERP-relay token as that node and hijack its relay session.
 
-Fix (back-compat, additive): `DERPTokenRequest` gained OPTIONAL `nonce` +
-`signature` fields. When both are present, the coordinator verifies the
-signature against a separately-registered `MeshNode.signing_public_key`
-(Ed25519 — distinct from the WG/Curve25519 key). When absent, legacy
-behaviour is preserved (a warning is logged) unless `derp_pop_required=True`.
+Hardening (back-compat, additive): `DERPTokenRequest` carries optional
+`nonce` + `signature` fields. When both are present, the coordinator
+verifies the signature against a separately-registered
+`MeshNode.signing_public_key` (Ed25519 - distinct from the WG/Curve25519
+key). When absent, legacy behaviour is preserved (a warning is logged)
+unless `derp_pop_required=True`.
 
 Coverage:
   - legacy path unaffected when signature/nonce are both absent.
@@ -45,7 +46,7 @@ def _b64url(raw: bytes) -> str:
 
 
 def _fresh_wg_pubkey() -> str:
-    # WG pubkeys aren't Ed25519-validated by the schema/router — any
+    # WG pubkeys aren't Ed25519-validated by the schema/router - any
     # sufficiently long opaque string is accepted, matching production
     # (wg genkey output is base64-standard with padding).
     return base64.b64encode(secrets.token_bytes(32)).decode("ascii")
@@ -97,7 +98,7 @@ def _reset_derp_pop_flag(monkeypatch: pytest.MonkeyPatch):
     get_settings.cache_clear()
 
 
-# ─── legacy path (no signature) — unaffected by default ─────────────────────
+# ─── legacy path (no signature) - unaffected by default ─────────────────────
 
 
 @pytest.mark.asyncio
@@ -190,7 +191,7 @@ async def test_forged_signature_rejected(db_session) -> None:
 @pytest.mark.asyncio
 async def test_signature_over_wrong_message_rejected(db_session) -> None:
     """A signature valid for a DIFFERENT wg_public_key/region/nonce triple
-    must not verify — proves the message is actually bound, not just any
+    must not verify - proves the message is actually bound, not just any
     signature from the right key."""
     priv = Ed25519PrivateKey.generate()
     signing_pub = _b64url(priv.public_key().public_bytes_raw())
@@ -402,7 +403,7 @@ async def test_enroll_rejects_malformed_signing_key(session_factory) -> None:
                         wg_public_key=_fresh_wg_pubkey(),
                         node_name="bad-pop-node",
                         # Valid base64url but decodes to 30 bytes, not the
-                        # required 32 — trips the Ed25519 length check.
+                        # required 32 - trips the Ed25519 length check.
                         signing_public_key="A" * 40,
                     ),
                     db=db,

@@ -1,11 +1,11 @@
 /**
- * Auth store — session and member profile.
+ * Auth store - session and member profile.
  *
  * Session is null until the user signs in via magic link.
  * Populated by useAuth hook which calls cloudApi.getMe() on mount.
  *
  * NOTE: The session token itself lives in an httpOnly cookie managed by
- * the cloud API — this store holds only the metadata for UI rendering.
+ * the cloud API - this store holds only the metadata for UI rendering.
  */
 
 import { create } from 'zustand';
@@ -19,13 +19,13 @@ interface AuthState {
   /**
    * A session that has been exchanged (verifyMagicLink resolved) but not yet
    * confirmed by the user. Non-null here is what drives the "Sign in as
-   * <email>?" prompt — see useAuth.confirmSignIn/cancelSignIn. Nothing reads
+   * <email>?" prompt - see useAuth.confirmSignIn/cancelSignIn. Nothing reads
    * or trusts this as an active session; only `session` above is.
    */
   pendingSession: Session | null;
 
   /**
-   * Whether a cloud session token is persisted (packaged app only — see
+   * Whether a cloud session token is persisted (packaged app only - see
    * cloudApi.hasToken). `null` means "unknown/not applicable", which is the
    * permanent state on the dev/browser cookie transport. Set once by the
    * silent rehydration probe in useAuth.
@@ -35,7 +35,7 @@ interface AuthState {
   /**
    * Why the last rehydration probe (getMe()) failed to produce a session,
    * when it did. `'network'` = couldn't reach the cloud API (offline, DNS,
-   * 5xx, timeout) — the token itself may still be good. `'auth'` = the API
+   * 5xx, timeout) - the token itself may still be good. `'auth'` = the API
    * was reached and said the token is invalid/expired (401/403). `null` =
    * no failure recorded yet (still loading, or the probe succeeded).
    */

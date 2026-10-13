@@ -1,14 +1,13 @@
-"""Regression test — 2026-07-31 P1 security audit, finding #3.
+"""POST /memory/wipe must clear memories without touching other data.
 
-POST /memory/wipe called reset_memory_db(), which deletes the ENTIRE SQLite
-file backing memory.db — including task_states (tasks), conversations +
-messages (chat history), vault_files (vault), and mcp_sessions/
-mcp_tool_calls (agent observability). The auditor confirmed a task and a
-conversation disappeared after wiping memories.
+reset_memory_db() deletes the entire SQLite file backing memory.db - including
+task_states (tasks), conversations + messages (chat history), vault_files
+(vault), and mcp_sessions/mcp_tool_calls (agent observability). A memory wipe
+must not take those with it.
 
-The fix: wipe_memory_tables() deletes ONLY memories, memory_embeddings, and
+wipe_memory_tables() deletes only memories, memory_embeddings, and
 memory_access_log, in one transaction, leaving every other table intact.
-/memory/wipe now calls that instead of reset_memory_db().
+/memory/wipe calls that instead of reset_memory_db().
 
 Isolated via POTLUCK_MEMORY_DB_PATH so this test can never touch a real
 ~/.potluck/data/memory.db.
@@ -32,8 +31,8 @@ def _run(coro):
 
 
 async def _seed(db_path) -> None:
-    """One row in every table a memory wipe must NOT touch, plus rows in the
-    tables it MUST clear."""
+    """One row in every table a memory wipe must not touch, plus rows in the
+    tables it must clear."""
     now = now_iso()
     async with aiosqlite.connect(db_path) as db:
         await db.execute("PRAGMA foreign_keys=ON")
@@ -158,7 +157,7 @@ def test_wipe_memory_tables_clears_only_memory_data(seeded_db):
 
 
 # ---------------------------------------------------------------------------
-# Route-level: POST /memory/wipe — the auditor's actual repro path.
+# Route-level: POST /memory/wipe.
 # ---------------------------------------------------------------------------
 
 
@@ -171,8 +170,7 @@ def test_memory_wipe_route_preserves_tasks_and_chat_history(seeded_db):
 
     after = _run(_counts(seeded_db))
     assert after["memories"] == 0
-    # LAUNCH-BLOCKER regression guard: the task and the conversation the
-    # auditor found missing must both still be there.
+    # The task and the conversation must both still be there.
     assert after["task_states"] == 1
     assert after["conversations"] == 1
     assert after["messages"] == 1

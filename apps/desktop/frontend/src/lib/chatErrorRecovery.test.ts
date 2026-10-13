@@ -3,9 +3,9 @@ import { describe, it, expect } from 'vitest';
 import { classifyChatError } from './chatErrorRecovery';
 
 /**
- * The bug this covers: the chat bubble matched on the substring "503" and
- * offered "Load a model" for every failure that shared the status code,
- * including routing failures that loading a model cannot fix.
+ * The chat bubble must not match on the substring "503" and offer "Load a
+ * model" for every failure that shares the status code, including routing
+ * failures that loading a model cannot fix.
  */
 describe('classifyChatError', () => {
   describe('local model problems send you to the library', () => {
@@ -49,7 +49,7 @@ describe('classifyChatError', () => {
   });
 
   it('does not treat a remote model problem as a local one', () => {
-    // "did not have this model loaded" used to match the old "not loaded"
+    // "did not have this model loaded" must not match a bare "not loaded"
     // substring and point at the local model library.
     const recovery = classifyChatError('The contributor did not have this model loaded.');
     expect(recovery.action).toBe('check-network');

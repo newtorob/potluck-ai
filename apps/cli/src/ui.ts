@@ -75,7 +75,7 @@ export function oneShotConfirm(
       return true;
     }
     emit(
-      `${c.yellow(`✗ refusing ${ctx.tool}`)} ${c.dim(ctx.subject)} — ` +
+      `${c.yellow(`✗ refusing ${ctx.tool}`)} ${c.dim(ctx.subject)} - ` +
         `re-run with ${c.bold("--yes")} to allow writes and commands in -p mode`,
     );
     return false;

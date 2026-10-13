@@ -3,8 +3,8 @@
  * apps/desktop/go/potluck-mesh/internal/localapi/server.go's
  * POST /pairing/reveal for the sidecar side of this contract).
  *
- * The panel no longer one-click-joins off a discovered LAN invite — the
- * invite only carries a fingerprint now, never a redeemable token. The user
+ * The panel does not one-click-join off a discovered LAN invite: the
+ * invite only carries a fingerprint, never a redeemable token. The user
  * must enter the PIN shown on the inviter's screen; the panel exchanges it
  * for the real token via /pairing/reveal, then feeds that token into the
  * existing /pair flow.
@@ -34,7 +34,7 @@ vi.mock('@/lib/meshClient', async (importOriginal) => {
 import { JoinExistingPanel } from './HouseholdView';
 import { MeshApiError } from '@/lib/meshClient';
 
-describe('JoinExistingPanel — PIN reveal flow', () => {
+describe('JoinExistingPanel: PIN reveal flow', () => {
   beforeEach(() => {
     mocks.discoveredPairing.mockReset();
     mocks.revealPairing.mockReset();

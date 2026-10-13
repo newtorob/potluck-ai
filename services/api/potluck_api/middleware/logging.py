@@ -21,7 +21,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Structured request logging middleware.
 
     Logs method, path, status code, and duration.
-    Never logs raw email addresses or session tokens — any email value
+    Never logs raw email addresses or session tokens - any email value
     encountered is SHA-256 hashed before emission.
     """
 
@@ -42,7 +42,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             path=request.url.path,
             status=response.status_code,
             duration_ms=duration_ms,
-            # client IP — acceptable for rate-limit debugging, no PII
+            # client IP - acceptable for rate-limit debugging, no PII
             client=request.client.host if request.client else "unknown",
         )
 

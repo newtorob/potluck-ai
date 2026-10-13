@@ -23,7 +23,7 @@ class PeerQualityScore(Base):
 
     Privacy: contains only routing metadata (peer_id, model_slug,
     signal_type) plus a scalar score.  No prompt, no completion, no
-    requester identity — ever.
+    requester identity - ever.
     """
 
     __tablename__ = "peer_quality_scores"

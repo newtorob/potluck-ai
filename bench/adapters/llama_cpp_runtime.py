@@ -65,7 +65,7 @@ class RSSPoller:
     """Samples process RSS in a background thread.
 
     Polls every `interval_s` seconds and records the maximum observed value.
-    Lightweight — just a psutil call in a daemon thread.
+    Lightweight - just a psutil call in a daemon thread.
     """
 
     def __init__(self, pid: int | None = None, interval_s: float = 0.1) -> None:
@@ -185,7 +185,7 @@ class LlamaCppRuntime:
         """Run one inference call, capturing all benchmark metrics.
 
         Resets the KV cache before every call so each run is a cold prompt
-        evaluation — no prefix-match acceleration. This makes TTFT and
+        evaluation - no prefix-match acceleration. This makes TTFT and
         prompt_eval_toks_per_s reproducible across runs.
 
         Metric capture strategy:
@@ -352,7 +352,7 @@ class LlamaCppRuntime:
             if content and not got_first:
                 ttft = time.monotonic() - t0
                 got_first = True
-                break  # stop after first token — exhaust below
+                break  # stop after first token - exhaust below
 
         # Drain the generator to clean up internal llama.cpp state
         try:

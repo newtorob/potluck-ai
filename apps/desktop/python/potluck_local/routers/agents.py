@@ -348,10 +348,10 @@ def _deserialize_session(row: dict[str, Any]) -> dict[str, Any]:
 
 def _liveness(row: dict[str, Any]) -> str:
     """Bucket the row into one of four liveness tiers:
-        - 'disconnected' — disconnected_at is set
-        - 'live'         — last_seen_at within last 60 seconds (heartbeating)
-        - 'idle'         — last_seen_at within 5 min (connected, quiet)
-        - 'stale'        — last_seen_at older than 5 min, but not yet swept
+        - 'disconnected' - disconnected_at is set
+        - 'live' - last_seen_at within last 60 seconds (heartbeating)
+        - 'idle' - last_seen_at within 5 min (connected, quiet)
+        - 'stale' - last_seen_at older than 5 min, but not yet swept
     Computing this server-side keeps the AgentsView render simple and
     avoids client/server clock-skew weirdness on the boundaries."""
     if row.get("disconnected_at") is not None:
@@ -376,8 +376,9 @@ def _liveness(row: dict[str, Any]) -> str:
 
 def _deserialize_tool_call(row: dict[str, Any]) -> dict[str, Any]:
     """Convert args_summary and memory_ids_touched from JSON strings to
-    in-memory shapes. Both columns are nullable; pre-2026-05-20 rows have
-    NULL memory_ids_touched and that propagates as null in the response.
+    in-memory shapes. Both columns are nullable; rows written before
+    memory_ids_touched existed have NULL there and that propagates as null in
+    the response.
     """
     if isinstance(row.get("args_summary"), str):
         try:
@@ -443,7 +444,7 @@ async def export_session_trace(
 
     session = _deserialize_session(row)
 
-    # No 200-row cap on exports — the user is asking for the whole picture.
+    # No 200-row cap on exports - the user is asking for the whole picture.
     try:
         calls = await session_tool_calls(session_id, limit=10_000)
     except Exception as exc:
@@ -668,7 +669,7 @@ async def memory_previews(req: MemoryPreviewRequest) -> list[dict]:
     (the debugger renders that as 'memory deleted since this call'). Each
     row includes only what the panel renders: id, a truncated content
     preview, category, project, created_at, is_active. Full content is
-    never broadcast — the privacy invariant on agent observability holds.
+    never broadcast - the privacy invariant on agent observability holds.
     """
     ids = [i for i in req.ids if i]  # drop empty strings
     if not ids:

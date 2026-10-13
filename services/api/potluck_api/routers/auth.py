@@ -1,4 +1,4 @@
-# NOTE: intentionally NOT using `from __future__ import annotations` here.
+# NOTE: intentionally not using `from __future__ import annotations` here.
 # slowapi's @limiter.limit wraps the endpoint with functools.wraps, which copies
 # the stringized annotations but not this module's globals. With deferred
 # annotations FastAPI then can't resolve `MagicLinkRequest` to a body model and
@@ -29,7 +29,7 @@ from potluck_api.services.email_service import EmailService
 
 router = APIRouter(tags=["auth"])
 
-# Per-recipient cap for POST /auth/request-link — see the endpoint docstring.
+# Per-recipient cap for POST /auth/request-link - see the endpoint docstring.
 # Checked manually (not via @limiter.limit) because slowapi's key_func only
 # ever receives the raw Request, not the parsed+normalized request body.
 _RECIPIENT_LIMIT = parse_rate_limit("3/hour")
@@ -43,7 +43,7 @@ class MagicLinkRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def _normalize_email(cls, v: str) -> str:
-        """Normalize to strip().lower() — allowlist checks and member lookup
+        """Normalize to strip().lower() - allowlist checks and member lookup
         are both case-insensitive-by-lowercasing, so the email that ends up
         signed into the magic-link JWT must already be normalized."""
         return v.strip().lower()
@@ -55,7 +55,7 @@ class MagicLinkRequest(BaseModel):
 
 
 @router.post("/request-link", status_code=status.HTTP_202_ACCEPTED)
-@limiter.limit("10/minute")  # per caller IP — cheap to defeat via IP rotation
+@limiter.limit("10/minute")  # per caller IP - cheap to defeat via IP rotation
 @limiter.limit("500/hour", key_func=lambda: "request-link:global")  # coarse breaker
 async def request_magic_link(
     request: Request,  # required by slowapi
@@ -67,7 +67,7 @@ async def request_magic_link(
     Rate-limited three independent ways:
       - 10/minute per caller IP (the original guard; cheap to defeat by
         rotating IPs).
-      - 3/hour per RECIPIENT email address — protects a specific victim's
+      - 3/hour per RECIPIENT email address - protects a specific victim's
         inbox and our sender reputation regardless of how many IPs the
         caller has, since the attacker doesn't control the address.
       - 500/hour globally, as a coarse circuit breaker if the above are
@@ -75,11 +75,11 @@ async def request_magic_link(
 
     The per-recipient limit is enforced here directly against the limiter's
     storage rather than via a `@limiter.limit(key_func=...)` decorator,
-    because slowapi calls key_func with only the raw `Request` — it never
+    because slowapi calls key_func with only the raw `Request` - it never
     sees the parsed+normalized `body.email` that FastAPI resolves for us.
 
     Always returns 202 regardless of whether the address maps to an existing
-    member — we do not leak account existence.
+    member - we do not leak account existence.
     """
     if limiter.enabled and not limiter.limiter.hit(_RECIPIENT_LIMIT, "email", body.email):
         raise HTTPException(
@@ -106,7 +106,7 @@ async def magic_link_callback(
 
     Sets the HTTP-only session cookie and returns the session metadata
     (matching the frontend ``Session`` type: token / expiresAt / memberId),
-    plus the member's ``email`` — additive, for the desktop app's
+    plus the member's ``email`` - additive, for the desktop app's
     confirm-before-sign-in step (shows which account a deep link is about to
     sign into, closing the deep-link login-CSRF leg).
     """

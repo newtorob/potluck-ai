@@ -6,21 +6,20 @@ answer isn't scattered across middleware warnings and tribal knowledge.
 
 Behaviour:
   * Always runs at startup and logs the full checklist (ok / warn / fail).
-  * In `development`, it's advisory only — never blocks the process.
+  * In `development`, it's advisory only - never blocks the process.
   * In `staging` / `production`, a FAIL on any operator-fixable check makes the
     coordinator refuse to start (fail-fast). The operator controls these via
     env / config, so blocking is actionable, not a footgun.
 
 FAIL vs WARN:
-  * FAIL  — an insecure default the operator can fix right now (no auth token,
+  * FAIL - an insecure default the operator can fix right now (no auth token,
             trust-on-first-use keys, default DB credentials). Blocks prod boot.
-  * WARN  — a known roadmap gap with no config remedy yet (member identity is
+  * WARN - a known roadmap gap with no config remedy yet (member identity is
             still the dev stub; per-session auth is v0.5). Surfaced loudly on
-            every boot but does NOT block, because there is nothing to flip.
+            every boot but does not block, because there is nothing to flip.
 
 Scope: the network-facing coordinator only. Desktop-side readiness (sidecar
-token, code-signed sidecar binaries, gateway exposure) is a separate surface
-and a tracked follow-on.
+token, code-signed sidecar binaries, gateway exposure) is a separate surface.
 """
 from __future__ import annotations
 
@@ -42,7 +41,7 @@ Status = Literal["ok", "warn", "fail"]
 _DEFAULT_DB_CREDENTIALS = "potluck:potluck@localhost"
 
 # Minimum length for the coordinator shared secret to count as "strong". Below
-# this it's set (so it doesn't block) but flagged — the remedy text promises a
+# this it's set (so it doesn't block) but flagged - the remedy text promises a
 # strong secret, so a 1-char token shouldn't read as fully ok.
 _MIN_TOKEN_LEN = 16
 
@@ -78,7 +77,7 @@ def run_preflight(settings: Settings) -> list[Check]:
     if not token:
         token_status: Status = "fail"
         token_detail = (
-            "POTLUCK_COORDINATOR_TOKEN is unset — the coordinator is OPEN "
+            "POTLUCK_COORDINATOR_TOKEN is unset - the coordinator is OPEN "
             "(any caller can submit jobs and connect peers)."
         )
     elif len(token) < _MIN_TOKEN_LEN:
@@ -107,7 +106,7 @@ def run_preflight(settings: Settings) -> list[Check]:
             detail=(
                 "Device keys must be pre-registered to attest."
                 if settings.require_registered_keys
-                else "require_registered_keys is off — an unregistered key is "
+                else "require_registered_keys is off - an unregistered key is "
                 "trust-on-first-use bound to whatever member_id it claims."
             ),
             remedy="Set require_registered_keys=true (REQUIRE_REGISTERED_KEYS=true).",
@@ -122,7 +121,7 @@ def run_preflight(settings: Settings) -> list[Check]:
             detail=(
                 "Unknown binary_hash values are rejected at attestation."
                 if settings.require_registered_release
-                else "require_registered_release is off — a peer with an "
+                else "require_registered_release is off - a peer with an "
                 "unregistered binary_hash is accepted and logged "
                 "(peer_release_unregistered). Expected until releases are signed."
             ),
@@ -155,14 +154,14 @@ def run_preflight(settings: Settings) -> list[Check]:
     # link must be encrypted. Fail-closed: in staging/production, block unless
     # either the URL requests TLS OR the operator explicitly acknowledges that
     # the transport is already encrypted at the network layer (private network /
-    # VPN / WireGuard, e.g. Fly .internal) via POTLUCK_DB_LINK_ENCRYPTED=1 — we
+    # VPN / WireGuard, e.g. Fly .internal) via POTLUCK_DB_LINK_ENCRYPTED=1 - we
     # can't detect that from the URL, so we require an auditable acknowledgement
     # rather than silently accepting a plaintext link.
     #
     # Detection is asyncpg-accurate: this dialect (postgresql+asyncpg) honors the
-    # `ssl=` query arg, NOT libpq's `sslmode=`. A URL carrying only `sslmode=` is
-    # a trap — the operator thinks TLS is on but asyncpg ignores it — so it does
-    # NOT count as TLS and gets a pointed message.
+    # `ssl=` query arg, not libpq's `sslmode=`. A URL carrying only `sslmode=` is
+    # a trap - the operator thinks TLS is on but asyncpg ignores it - so it does
+    # not count as TLS and gets a pointed message.
     db_url_l = settings.database_url.lower()
     tls_requested = any(
         t in db_url_l
@@ -182,7 +181,7 @@ def run_preflight(settings: Settings) -> list[Check]:
             "network layer."
         )
     elif not prod:
-        # Advisory only in development — keep local logs clean (nobody runs a
+        # Advisory only in development - keep local logs clean (nobody runs a
         # local dev Postgres over TLS).
         db_tls_status = "ok"
         db_tls_detail = "Local development DB link; TLS not required in this env."
@@ -192,7 +191,7 @@ def run_preflight(settings: Settings) -> list[Check]:
             "DATABASE_URL sets sslmode= but this coordinator uses asyncpg, which "
             "ignores sslmode (use ssl=require). The DB link is NOT encrypted."
             if sslmode_trap
-            else "DATABASE_URL does not request TLS (no ssl=require) — the credit "
+            else "DATABASE_URL does not request TLS (no ssl=require) - the credit "
             "ledger and member keys would travel unencrypted."
         )
     checks.append(
@@ -242,7 +241,7 @@ def run_preflight(settings: Settings) -> list[Check]:
             detail=(
                 "Sentry DSN configured; crashes are reported."
                 if settings.sentry_dsn
-                else "No Sentry DSN — a network deployment has no crash/error visibility."
+                else "No Sentry DSN - a network deployment has no crash/error visibility."
             ),
             remedy="Set SENTRY_DSN for staging/production observability.",
             blocking=False,
@@ -257,7 +256,7 @@ def run_preflight(settings: Settings) -> list[Check]:
             detail=(
                 "Credit-verification probe loop is enabled."
                 if settings.verification_probe_enabled
-                else "verification_probe_enabled is off — escrowed credits are never "
+                else "verification_probe_enabled is off - escrowed credits are never "
                 "released (canary -> reputation -> escrow loop is not running)."
             ),
             remedy="Set verification_probe_enabled=true in staging/production.",
@@ -294,7 +293,7 @@ def run_preflight(settings: Settings) -> list[Check]:
             detail=(
                 "Per-session member authentication is enabled."
                 if session_auth
-                else "Member identity is the dev STUB_MEMBER_ID — there is no "
+                else "Member identity is the dev STUB_MEMBER_ID - there is no "
                 "per-session auth, so credits and jobs are not bound to real members."
             ),
             remedy="Set POTLUCK_SESSION_AUTH_ENABLED=1 (needs DATABASE_URL "

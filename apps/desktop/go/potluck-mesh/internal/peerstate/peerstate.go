@@ -5,7 +5,7 @@
 //
 // Privacy: the cache holds only mesh-layer metadata (node_id, mesh_ip,
 // wg_public_key, last_endpoint). No inference content, no member_id.
-// Nothing is written to disk — the cache is rebuilt from the welcome roster
+// Nothing is written to disk - the cache is rebuilt from the welcome roster
 // on every fresh signaling connection.
 //
 // The store is also the gate for roster entries. Reset and Merge (and Upsert,

@@ -1,4 +1,4 @@
-"""Escrow + verification tests for the credit ledger (P0-2).
+"""Escrow + verification tests for the credit ledger.
 
 Cross-member (public-pool) earned credits are escrowed until a verification
 result releases them; self-served / household credits are never escrowed.
@@ -109,7 +109,7 @@ async def test_verification_fail_keeps_escrow(db_session: AsyncSession) -> None:
     released = await apply_verification_result(db_session, job_id=job_id, passed=False)
     assert released is False
     assert (await _earned_row(db_session, job_id)).escrowed is True, (
-        "a failed verification forfeits credits — they stay escrowed forever"
+        "a failed verification forfeits credits - they stay escrowed forever"
     )
 
 

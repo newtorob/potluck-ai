@@ -1,5 +1,5 @@
 /**
- * MemoryCard — displays a single memory with inline edit capability.
+ * MemoryCard - displays a single memory with inline edit capability.
  *
  * Hover actions (top-right): Edit, Boost confidence, Demote confidence, Delete.
  * Edit mode renders a form with textarea + category dropdown + confidence slider.
@@ -154,7 +154,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
       className={cn(
         'group relative rounded-xl border border-border/60 bg-card px-4 py-3.5',
         // Hearth elevation: hairline gets warmer + soft shadow on hover
-        // (and a subtle top-line lift, NOT a stacked shadow). Lifts ~1px to
+        // (and a subtle top-line lift, not a stacked shadow). Lifts ~1px to
         // signal "interactive without being loud."
         'transition-all duration-fast',
         'hover:border-border hover:shadow-hearth-sm',
@@ -162,7 +162,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
       )}
       aria-label={`Memory: ${memory.content.slice(0, 60)}`}
     >
-      {/* Hover action buttons — top right. Also revealed on focus-within
+      {/* Hover action buttons - top right. Also revealed on focus-within
           so keyboard users (Tab into the card) see the same affordances. */}
       {!editing && (
         <div
@@ -380,13 +380,13 @@ export function MemoryCard({ memory }: MemoryCardProps) {
             )}
           </div>
 
-          {/* Content — dark:prose-invert (was hard-coded prose-invert which
+          {/* Content - dark:prose-invert (was hard-coded prose-invert which
               bleached the light theme). Inline-only renderers preserve the
               "memory as one note" reading rhythm. */}
           <div className="prose prose-sm dark:prose-invert max-w-none text-[14px] leading-relaxed text-foreground">
             <ReactMarkdown
               components={{
-                // Keep inline-only — no block elements needed for memory content
+                // Keep inline-only - no block elements needed for memory content
                 p: ({ children }) => <span className="block">{children}</span>,
                 strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
                 em: ({ children }) => <em className="italic">{children}</em>,
@@ -437,7 +437,7 @@ export function MemoryCard({ memory }: MemoryCardProps) {
 }
 
 // ---------------------------------------------------------------------------
-// ActionButton — small icon button used in hover actions
+// ActionButton - small icon button used in hover actions
 // ---------------------------------------------------------------------------
 
 interface ActionButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {

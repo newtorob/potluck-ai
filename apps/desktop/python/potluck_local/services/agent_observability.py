@@ -1,4 +1,4 @@
-"""Agent observability — session lifecycle and tool-call logging.
+"""Agent observability - session lifecycle and tool-call logging.
 
 All MCP processes and the FastAPI sidecar write through AgentObserver, which
 persists rows to mcp_sessions and mcp_tool_calls in the shared SQLite DB.
@@ -6,7 +6,7 @@ persists rows to mcp_sessions and mcp_tool_calls in the shared SQLite DB.
 Privacy invariant: _summarize_args() is a whitelist function.  Only the keys
 listed in _SAFE_ARG_KEYS are retained; all others (including prompt content,
 query text, and memory content) are silently dropped.  This is the single
-chokepoint — all callers route through it.
+chokepoint - all callers route through it.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Small word lists for stable per-session nicknames. Two-syllable friendly
-# words only — readable at a glance in card chips, no profanity, no slurs,
+# words only - readable at a glance in card chips, no profanity, no slurs,
 # no ambiguous proper nouns. ~50 of each gives 2500 unique combinations,
 # enough that collisions across the dozen-or-so sessions a user accumulates
 # are vanishingly rare.
@@ -55,15 +55,15 @@ _ANIMALS = (
 
 def generate_friendly_name() -> str:
     """Generate a single 'adjective-animal' nickname. Uses cryptographically
-    weak random — collisions are tolerable (the session_id UUID is the
+    weak random - collisions are tolerable (the session_id UUID is the
     actual primary key) so we don't need secrets-quality entropy here."""
     return f"{random.choice(_ADJECTIVES)}-{random.choice(_ANIMALS)}"
 
 # ---------------------------------------------------------------------------
-# Privacy gate — whitelist only metadata fields
+# Privacy gate - whitelist only metadata fields
 # ---------------------------------------------------------------------------
 
-# Keys that are safe to record — pure metadata, no user content.
+# Keys that are safe to record - pure metadata, no user content.
 # All other keys are stripped before the row is persisted.
 _SAFE_ARG_KEYS: frozenset[str] = frozenset(
     {
@@ -78,7 +78,7 @@ _SAFE_ARG_KEYS: frozenset[str] = frozenset(
         "include_all",
         "status",
         "task_id",
-        # NOTE: "name" was removed — it matched task_create's `name` kwarg which
+        # NOTE: "name" is left out - it matches task_create's `name` kwarg which
         # holds the user-supplied task title (user content, not metadata).
         # task_update passes its mutable fields inside a nested `patch` dict,
         # which is never serialized by _summarize_args regardless.
@@ -95,7 +95,7 @@ _ALL_ARGS_SAFE_TOOLS: frozenset[str] = frozenset(
 
 # Tools where it makes sense to record which memory ids were read or
 # written, for the debugger's memory-overlay view. Anything outside this
-# set has its memory_ids_touched silently dropped — same defense-in-depth
+# set has its memory_ids_touched silently dropped - same defense-in-depth
 # pattern as the args_summary whitelist.
 _MEMORY_TOOL_NAMES: frozenset[str] = frozenset(
     {
@@ -123,10 +123,10 @@ def _summarize_args(tool_name: str, args: dict[str, Any] | None) -> dict[str, An
 
 
 # ---------------------------------------------------------------------------
-# SQL update dispatch table — pre-verified column literals for update_session.
+# SQL update dispatch table - pre-verified column literals for update_session.
 # Keys are the accepted patch parameter names; values are the exact SQL column
 # names to use in SET clauses.  Neither the key nor the value ever comes from
-# external input — this module owns both sides of the mapping.
+# external input - this module owns both sides of the mapping.
 # ---------------------------------------------------------------------------
 
 _ALLOWED_SESSION_UPDATES: dict[str, str] = {
@@ -264,8 +264,8 @@ class AgentObserver:
            without sending a clean close (crash, kill, network drop).
 
         2. **Auto-delete worthless sessions**: any row that has no
-           `client_name`, no tool calls, AND is older than 30 minutes gets
-           DELETED outright (no need to dirty the AgentsView with a row
+           `client_name`, no tool calls, and is older than 30 minutes gets
+           deleted outright (no need to dirty the AgentsView with a row
            that represents zero work and zero identity). These are
            MCP-handshake-then-dead rows: the client opened the transport,
            never identified itself, never invoked a tool, then went away.
@@ -276,7 +276,7 @@ class AgentObserver:
         from datetime import datetime, timedelta, timezone
         path = get_memory_db_path()
         # SQLite stores timestamps as ISO-8601 strings. Compute the cutoff in
-        # Python and do string comparison — works because the format
+        # Python and do string comparison - works because the format
         # _now_iso() produces (`.isoformat()` on a tz-aware UTC datetime)
         # sorts lexicographically the same as chronologically.
         now = datetime.now(timezone.utc)
@@ -346,9 +346,9 @@ class AgentObserver:
 
         memory_ids_touched: optional list of memory ids this call read or
         wrote. Stored JSON-encoded so the debugger can join back to the
-        `memories` table and render previews. Pure ids — already
+        `memories` table and render previews. Pure ids - already
         privacy-safe (we never log content here). Whitelist of memory
-        tools is enforced via _MEMORY_TOOL_NAMES — pass None for any
+        tools is enforced via _MEMORY_TOOL_NAMES - pass None for any
         other tool.
         """
         from potluck_local.services.ai_contracts import MCP_TOOL_SCHEMA_VERSION

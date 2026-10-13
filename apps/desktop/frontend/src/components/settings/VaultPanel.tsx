@@ -1,12 +1,12 @@
 /**
- * VaultPanel — point Potluck at a folder of markdown notes and ingest them
+ * VaultPanel - point Potluck at a folder of markdown notes and ingest them
  * as 'reference' memories.
  *
  * UI:
  *   - Folder path text input + Save button (persists settings.vault.folder).
  *   - Rescan button (disabled while a scan is running).
  *   - Status card: file count, chunk count, last scan time.
- *   - Disconnect button — wipes all vault content + clears config.
+ *   - Disconnect button - wipes all vault content + clears config.
  *
  * Note: a native folder picker would be nicer but requires Electron IPC
  * plumbing. Text input is the v0 path; users can paste an absolute path.

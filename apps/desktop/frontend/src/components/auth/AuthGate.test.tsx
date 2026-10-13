@@ -1,5 +1,5 @@
 /**
- * AuthGate — required sign-in wall coverage.
+ * AuthGate - required sign-in wall coverage.
  *
  * Exercises the three states described in AuthGate's docstring, with a
  * particular focus on the offline case: a cached account (persisted token,
@@ -51,7 +51,7 @@ describe('AuthGate', () => {
     h.hasCachedAccount = false;
   });
 
-  it('shows a neutral loading state while the probe is in flight — never the wall or the app', () => {
+  it('shows a neutral loading state while the probe is in flight, never the wall or the app', () => {
     h.isAuthLoading = true;
     renderGate();
     expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument();

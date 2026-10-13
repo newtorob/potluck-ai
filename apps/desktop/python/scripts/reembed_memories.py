@@ -1,21 +1,21 @@
 """Re-embed all memories with the currently-configured embedder.
 
 Needed when the embedding model changes (e.g. all-MiniLM-L6-v2 -> bge-small):
-stored vectors are model-specific, and semantic search does NOT filter by model,
+stored vectors are model-specific, and semantic search does not filter by model,
 so a mix of old + new vectors silently corrupts ranking. This re-embeds every
-memory that is active OR already has an embedding row, overwriting in place
+memory that is active or already has an embedding row, overwriting in place
 (save_embedding uses INSERT OR REPLACE).
 
-SAFETY: run this only when no sidecar is serving searches with a DIFFERENT
+SAFETY: run this only when no sidecar is serving searches with a different
 model than the one used here. Concretely, for a MiniLM -> bge migration:
   1. Quit the Potluck desktop app (its running sidecar still embeds queries
-     with the OLD model until relaunched).
-  2. Run this with the NEW model active, e.g.:
+     with the old model until relaunched).
+  2. Run this with the new model active, e.g.:
        POTLUCK_EMBED_MODEL=BAAI/bge-small-en-v1.5 \
          .venv/bin/python -m scripts.reembed_memories
      (POTLUCK_EMBED_MODEL is optional once it's the source default, but passing
       it explicitly makes the migration unambiguous.)
-  3. Relaunch the app with the SAME model (set POTLUCK_EMBED_MODEL in its
+  3. Relaunch the app with the same model (set POTLUCK_EMBED_MODEL in its
      environment, or use a build whose default is the new model).
 
 Idempotent: safe to run repeatedly. Verifies the model_used column is uniform
@@ -47,7 +47,7 @@ async def _model_distribution(db_path: str) -> dict[str, int]:
 
 
 async def _targets(db_path: str) -> list[tuple[str, str]]:
-    """(id, content) for every memory that is active OR already has an embedding."""
+    """(id, content) for every memory that is active or already has an embedding."""
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
         rows = await (
@@ -68,7 +68,7 @@ async def main() -> int:
     embedder = get_embedder()
 
     if not await embedder._ensure_loaded():
-        print("ERROR: embedder model could not be loaded — aborting.", file=sys.stderr)
+        print("ERROR: embedder model could not be loaded, aborting.", file=sys.stderr)
         return 2
 
     model = embedder.MODEL_NAME
@@ -87,7 +87,7 @@ async def main() -> int:
         texts = [content for _, content in batch]
         vectors = await embedder.embed_many(texts)
         if vectors is None:
-            print("ERROR: embedder returned no vectors — aborting.", file=sys.stderr)
+            print("ERROR: embedder returned no vectors, aborting.", file=sys.stderr)
             return 2
         for mid, vec in zip(ids, vectors):
             await save_embedding(mid, vec, model, db_path=db_path)
@@ -100,7 +100,7 @@ async def main() -> int:
     if stale:
         print(f"WARNING: stale embeddings from other models remain: {stale}", file=sys.stderr)
         return 1
-    print(f"Done — all {n_done} embeddings are now {model}.")
+    print(f"Done: all {n_done} embeddings are now {model}.")
     return 0
 
 

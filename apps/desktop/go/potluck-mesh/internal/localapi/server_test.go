@@ -430,10 +430,10 @@ func TestHandlePeers_Empty(t *testing.T) {
 	}
 }
 
-// TestHandlePeers_DERPFlippedNotYetReachable_ReportsConnecting verifies the
-// observability fix: a peer that this node has flipped to DERP routing but
+// TestHandlePeers_DERPFlippedNotYetReachable_ReportsConnecting verifies that
+// a peer that this node has flipped to DERP routing but
 // that has not yet completed a WireGuard handshake must report
-// reachability_mode "connecting" and derp_flipped: true — not a null
+// reachability_mode "connecting" and derp_flipped: true - not a null
 // reachability_mode indistinguishable from "never tried DERP".
 func TestHandlePeers_DERPFlippedNotYetReachable_ReportsConnecting(t *testing.T) {
 	cfg := defaultCfg(t)
@@ -480,7 +480,7 @@ func TestHandlePeers_DERPFlippedNotYetReachable_ReportsConnecting(t *testing.T) 
 
 // TestHandlePeers_NotFlippedNotReachable_ReportsNullMode is the control case:
 // a peer that was never DERP-flipped and has no handshake still reports
-// reachability_mode: null and derp_flipped: false — unchanged from prior
+// reachability_mode: null and derp_flipped: false - unchanged from prior
 // behavior, so the new "connecting" state doesn't leak onto peers that are
 // simply still trying direct.
 func TestHandlePeers_NotFlippedNotReachable_ReportsNullMode(t *testing.T) {
@@ -694,7 +694,7 @@ func TestHandleStatus_PeersConnectingCount(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// POST /pair — coordinator error path
+// POST /pair - coordinator error path
 // ---------------------------------------------------------------------------
 
 func TestHandlePair_CoordinatorError(t *testing.T) {
@@ -747,7 +747,7 @@ func TestHandlePair_AlreadyEnrolled(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(keyPath), 0700); err != nil {
 		t.Fatal(err)
 	}
-	// Write a dummy base64 value (not a real WG key — just to trigger the file-exists check).
+	// Write a dummy base64 value (not a real WG key - just to trigger the file-exists check).
 	if err := os.WriteFile(keyPath, []byte("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -775,14 +775,14 @@ func TestHandlePair_AlreadyEnrolled(t *testing.T) {
 	}
 }
 
-// TestHandlePair_FreshKeyAloneIsNotEnrolled is the regression test for the
-// "fresh machine 409s on its first /pair" bug: ensureKeypair generates a
-// wg.key unconditionally at tunnel bring-up, BEFORE /pair is ever called, so
+// TestHandlePair_FreshKeyAloneIsNotEnrolled covers the "fresh machine 409s on
+// its first /pair" case: ensureKeypair generates a
+// wg.key unconditionally at tunnel bring-up, before /pair is ever called, so
 // a never-paired machine already has a key file on disk. When NodeTokenPath
-// is configured (the production wiring — see main.go), enrolled-detection
+// is configured (the production wiring - see main.go), enrolled-detection
 // must key off the persisted node_token, not mere key-file existence, or
 // POST /pair 409s with already_enrolled on a machine that has never actually
-// enrolled — the in-app "Add a machine" flow would never get past the first
+// enrolled - the in-app "Add a machine" flow would never get past the first
 // attempt.
 func TestHandlePair_FreshKeyAloneIsNotEnrolled(t *testing.T) {
 	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -809,7 +809,7 @@ func TestHandlePair_FreshKeyAloneIsNotEnrolled(t *testing.T) {
 
 	// Simulate a fresh, never-paired machine whose tunnel bring-up already
 	// generated a wg.key (as ensureKeypair/tunnel.New always do) but that has
-	// NO node.token on disk — the true "never enrolled" state.
+	// NO node.token on disk - the true "never enrolled" state.
 	keyPath := cfg.WGPrivKeyPath
 	if err := os.MkdirAll(filepath.Dir(keyPath), 0700); err != nil {
 		t.Fatal(err)
@@ -827,7 +827,7 @@ func TestHandlePair_FreshKeyAloneIsNotEnrolled(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	// Must reach the coordinator and succeed — NOT a local 409 short-circuit.
+	// Must reach the coordinator and succeed - not a local 409 short-circuit.
 	if resp.StatusCode != http.StatusCreated {
 		b, _ := io.ReadAll(resp.Body)
 		t.Fatalf("expected 201 (pairing should proceed to the coordinator), got %d: %s", resp.StatusCode, b)
@@ -877,7 +877,7 @@ func TestHandleUnpair(t *testing.T) {
 func TestHandleEvents_ReceivesPublishedEvent(t *testing.T) {
 	cfg := defaultCfg(t)
 	bus := cfg.Bus
-	// Same /tmp socket-path scheme as testServer — t.TempDir produces paths
+	// Same /tmp socket-path scheme as testServer - t.TempDir produces paths
 	// longer than the macOS sun_path 104-byte limit for some test names.
 	tmp := fmt.Sprintf("/tmp/potluck-test-%d.sock", time.Now().UnixNano())
 	t.Cleanup(func() { _ = os.Remove(tmp) })
@@ -981,14 +981,14 @@ func TestHandlePair_CoordinatorServerError_MappedTo502(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// POST /pair — Ed25519 signing-key registration (DERP-token PoP)
+// POST /pair - Ed25519 signing-key registration (DERP-token PoP)
 // ---------------------------------------------------------------------------
 
 // TestHandlePair_Success_RegistersSigningKey exercises the full happy path:
 // a successful /pair must (1) attach signing_public_key to the coordinator's
 // EnrollRequest, using the same key this node loads/generates locally, and
-// (2) mark that exact key as registered locally ONLY after the coordinator
-// actually accepted it — this is the ordering guard from
+// (2) mark that exact key as registered locally only after the coordinator
+// actually accepted it - this is the ordering guard from
 // internal/signingkey's package doc, verified end-to-end through the real
 // HTTP handler rather than just the helper function.
 func TestHandlePair_Success_RegistersSigningKey(t *testing.T) {
@@ -1056,8 +1056,8 @@ func TestHandlePair_Success_RegistersSigningKey(t *testing.T) {
 }
 
 // TestHandlePair_CoordinatorError_DoesNotRegisterSigningKey is the negative
-// half of the ordering guard: if the coordinator REJECTS the enroll call, the
-// signing key must NOT be marked registered — signing before confirmed
+// half of the ordering guard: if the coordinator rejects the enroll call, the
+// signing key must not be marked registered - signing before confirmed
 // registration is exactly the footgun this feature exists to avoid (a
 // signed-but-unregistered DERP-token request 401s outright).
 func TestHandlePair_CoordinatorError_DoesNotRegisterSigningKey(t *testing.T) {
@@ -1097,7 +1097,7 @@ func TestHandlePair_CoordinatorError_DoesNotRegisterSigningKey(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// POST /unpair — signing-key + marker cleanup
+// POST /unpair - signing-key + marker cleanup
 // ---------------------------------------------------------------------------
 
 func TestHandleUnpair_ClearsSigningKeyAndMarker(t *testing.T) {
@@ -1133,14 +1133,14 @@ func TestHandleUnpair_ClearsSigningKeyAndMarker(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// POST /pair / POST /unpair — node_token persistence (per-node bearer
-// credential; matches coordinator commit 10dd5a4's EnrollResponse.node_token)
+// POST /pair / POST /unpair - node_token persistence (per-node bearer
+// credential; matches the coordinator's EnrollResponse.node_token)
 // ---------------------------------------------------------------------------
 
-// TestHandlePair_Success_PersistsNodeToken exercises the primary new
+// TestHandlePair_Success_PersistsNodeToken exercises the primary
 // behaviour: a successful /pair must (1) persist the coordinator's freshly
 // minted node_token to disk at NodeTokenPath, mode 0600, and (2) install it
-// as the LIVE credential on the shared coordapi.Client so the very next
+// as the live credential on the shared coordapi.Client so the very next
 // coordinator call (e.g. the roster-reconcile loop's ListPeers) presents it.
 func TestHandlePair_Success_PersistsNodeToken(t *testing.T) {
 	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1235,7 +1235,7 @@ func TestHandlePair_CoordinatorError_DoesNotPersistNodeToken(t *testing.T) {
 
 // TestHandleUnpair_ClearsNodeToken mirrors the signing-key cleanup test: a
 // stale node_token must not survive /unpair, on disk or in the shared
-// client's live value — a fresh /pair afterwards mints and persists a
+// client's live value - a fresh /pair afterwards mints and persists a
 // completely new one.
 func TestHandleUnpair_ClearsNodeToken(t *testing.T) {
 	cfg := defaultCfg(t)
@@ -1270,7 +1270,7 @@ func TestHandleUnpair_ClearsNodeToken(t *testing.T) {
 
 // TestHandleUnpair_NilCoordClient_DoesNotPanic pins that /unpair works even
 // when no CoordClient was wired (mirrors TestHandleUnpair's defaultCfg,
-// which never sets one) — the node-token live-clear step must be a guarded
+// which never sets one) - the node-token live-clear step must be a guarded
 // no-op, not a nil-pointer panic, for any caller that hasn't wired
 // node-token support at all.
 func TestHandleUnpair_NilCoordClient_DoesNotPanic(t *testing.T) {
@@ -1471,7 +1471,7 @@ func TestHandleSettingsPatch_NilApplyFn_FallsBackToStateOnly(t *testing.T) {
 }
 
 // TestHandleSettingsPatch_NoSettingsPath_StillAppliesLive pins that
-// SettingsPath == "" (disables persistence — the documented test-only
+// SettingsPath == "" (disables persistence - the documented test-only
 // escape hatch) still applies the live update; it just won't survive a
 // restart.
 func TestHandleSettingsPatch_NoSettingsPath_StillAppliesLive(t *testing.T) {
@@ -1493,9 +1493,9 @@ func TestHandleSettingsPatch_NoSettingsPath_StillAppliesLive(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// GET (startup) — persisted override reload-on-startup lives in main.go, not
+// GET (startup) - persisted override reload-on-startup lives in main.go, not
 // this package; internal/runtimesettings has its own Load/Save round-trip
 // tests. This package's tests stop at "handleSettingsPatch persists +
-// applies correctly" — see internal/runtimesettings/runtimesettings_test.go
+// applies correctly" - see internal/runtimesettings/runtimesettings_test.go
 // for the storage layer and cmd/potluck-mesh for the startup-load wiring.
 // ---------------------------------------------------------------------------

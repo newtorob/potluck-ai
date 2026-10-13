@@ -1,4 +1,4 @@
-"""004 — models_registry
+"""004 - models_registry
 
 Revision ID: 0004_models
 Revises: 0003_billing

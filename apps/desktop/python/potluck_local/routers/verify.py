@@ -1,11 +1,11 @@
-"""Verification endpoints — sequence scoring for model-substitution detection.
+"""Verification endpoints - sequence scoring for model-substitution detection.
 
 POST /verify/score returns the teacher-forced log-probability the currently
 loaded model assigns to a sequence. A verifier (anchor) and a peer-under-test
-each score the SAME sequence O; if the peer claims model X but runs a cheaper
+each score the same sequence O; if the peer claims model X but runs a cheaper
 model Y, its logprob(O) won't match the anchor's (the "scoring challenge").
 
-This endpoint is OBSERVE-ONLY infrastructure: it only computes a number. It
+This endpoint is observe-only infrastructure: it only computes a number. It
 does not touch credits, escrow, or reputation, and nothing calls it
 automatically. The accumulating detector that consumes these scores lives
 coordinator-side and is gated behind calibration before it ever affects payout.
@@ -56,7 +56,7 @@ async def score(req: ScoreRequest) -> ScoreResponse:
         result = await runtime.score_sequence(
             req.text, prefix=req.prefix, max_tokens=req.max_tokens
         )
-    except Exception as exc:  # noqa: BLE001 — surface as 500 with a short reason
+    except Exception as exc:  # noqa: BLE001 - surface as 500 with a short reason
         logger.exception("score_failed")
         raise HTTPException(status_code=500, detail=f"score failed: {type(exc).__name__}")
     return ScoreResponse(**result)

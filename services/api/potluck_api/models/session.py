@@ -13,7 +13,7 @@ from potluck_api.db.base import Base
 class Session(Base):
     """A persistent login session for a member.
 
-    The token stored here is never the raw token — it is
+    The token stored here is never the raw token - it is
     SHA-256(raw_token).  The raw token lives only in the HTTP-only cookie
     on the client.  This way a database breach does not yield usable session
     tokens.

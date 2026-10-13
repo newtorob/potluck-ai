@@ -1,6 +1,6 @@
 """Unit tests for the topology-aware pipeline planner (pure logic, no mesh).
 
-These pin the placement DECISION RULES the AUTO orchestrator depends on:
+These pin the placement decision rules the auto orchestrator depends on:
   - fits-on-one-box -> whole-model (skip the pipeline entirely)
   - a too-big model -> a split across the fewest, nearest peers
   - the higher-VRAM node holds more layers
@@ -122,7 +122,7 @@ def test_lower_rtt_peer_ordered_first():
     head = _node("this", vram_gb=4.0, tier="low")
     far = _node("far", vram_gb=8.0, tier="mid", rtt_ms=120.0)
     near = _node("near", vram_gb=8.0, tier="mid", rtt_ms=3.0)
-    # model needs all three nodes; check the chosen ORDER puts near before far.
+    # model needs all three nodes; check the chosen order puts near before far.
     placement = plan_pipeline_placement(48, model_bytes=18 * GB, nodes=[head, far, near])
     assert placement["mode"] == "pipeline"
     order_ids = [n["id"] for n in placement["order"]]
@@ -131,8 +131,8 @@ def test_lower_rtt_peer_ordered_first():
 
 
 def test_fewest_hops_picks_the_nearest_sufficient_peer():
-    # Head can't fit; ONE 16GB peer is enough. Two peers offered; pick the nearer one
-    # and DON'T add the second (fewest hops).
+    # Head can't fit; one 16GB peer is enough. Two peers offered; pick the nearer one
+    # and don't add the second (fewest hops).
     head = _node("this", vram_gb=4.0, tier="low")
     near_big = _node("near", vram_gb=16.0, tier="large", rtt_ms=2.0)
     far_big = _node("far", vram_gb=16.0, tier="large", rtt_ms=90.0)
@@ -163,7 +163,7 @@ def test_link_cost_back_compat_legacy_rtt_key():
 
 def test_wired_beats_wifi_at_equal_rtt():
     # Two peers, identical RTT + jitter, differ only by link type. The wired one is
-    # ordered first AND chosen first; both are needed to fit so both appear.
+    # ordered first and chosen first; both are needed to fit so both appear.
     head = _node("this", vram_gb=4.0, tier="low", link_type="wired")
     wifi = _node("wifi-peer", vram_gb=8.0, tier="mid", rtt_ms=5.0, link_type="wifi")
     wired = _node("wired-peer", vram_gb=8.0, tier="mid", rtt_ms=5.0, link_type="wired")
@@ -185,7 +185,7 @@ def test_high_jitter_peer_is_deprioritized():
 
 
 def test_wired_peer_chosen_over_wifi_when_either_alone_fits():
-    # Head can't fit; ONE peer is enough. A wired and a wifi peer both suffice -> the
+    # Head can't fit; one peer is enough. A wired and a wifi peer both suffice -> the
     # wired one is selected and the wifi one is left out (link cost drives selection,
     # not just ordering).
     head = _node("this", vram_gb=4.0, tier="low", link_type="wired")
@@ -199,7 +199,7 @@ def test_wired_peer_chosen_over_wifi_when_either_alone_fits():
 
 
 def test_wifi_peer_still_used_when_only_way_to_fit():
-    # Head + a wifi peer are the ONLY nodes and the model needs both -> the wifi peer is
+    # Head + a wifi peer are the only nodes and the model needs both -> the wifi peer is
     # still admitted (conservative: deprioritize, never hard-exclude).
     head = _node("this", vram_gb=4.0, tier="low", link_type="wired")
     wifi = _node("wifi", vram_gb=16.0, tier="large", rtt_ms=5.0, link_type="wifi")

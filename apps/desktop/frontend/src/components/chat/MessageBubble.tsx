@@ -1,5 +1,5 @@
 /**
- * MessageBubble — renders a single chat message with markdown support.
+ * MessageBubble - renders a single chat message with markdown support.
  *
  * User messages: right-aligned, primary-tinted bubble.
  * Assistant messages: left-aligned, card bubble with markdown + code highlighting.
@@ -10,7 +10,7 @@
  *
  * Editorial reading flow:
  *   - Assistant prose body uses 15px / leading-relaxed for comfort
- *   - User bubble keeps tight rhythm — short messages typical
+ *   - User bubble keeps tight rhythm - short messages typical
  *   - Code blocks get a slightly raised muted surface, not the content bg
  *   - Inline code uses font-mono at 0.92em so the line height stays even
  */
@@ -69,18 +69,18 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <MarkdownContent content={message.content} isStreaming={isStreaming} />
         )}
 
-        {/* Copy button — visible on hover for non-empty messages. An errored
+        {/* Copy button - visible on hover for non-empty messages. An errored
             reply keeps whatever streamed in before it failed, and that text is
             as worth copying as a finished one. */}
         {message.content.length > 0 && <CopyButton text={message.content} isUser={isUser} />}
 
         {/* "What left my machine" receipt. Renders on every completed
             assistant message so silence is never the only signal that a
-            prompt stayed home — the affirmative "stayed on this machine"
+            prompt stayed home - the affirmative "stayed on this machine"
             line is the trust guarantee. Local messages carry no meta
             (the local /chat/completions path emits none), so an absent
             meta is itself the local case. Open-pool routing stays
-            identity-blind (manifesto blinded-routing rule): never a peer
+            identity-blind (blinded routing): never a peer
             name, only that it left the device. */}
         {!isUser && !isError && !isStreaming && message.content.length > 0 && (
           <RouteReceipt meta={message.meta} />
@@ -97,13 +97,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 }
 
 /** Honest privacy states for where a response was produced:
- *   local   — nothing left this machine (the local sidecar; no meta emitted).
- *   mine    — left this box but only to your own hardware over the private mesh
+ *   local - nothing left this machine (the local sidecar; no meta emitted).
+ *   mine - left this box but only to your own hardware over the private mesh
  *             (a household peer, or the coordinator routing to one of your peers).
- *   circle  — left this machine to a machine in a trusted circle you chose.
- *   pool    — left this machine to another member's machine in the open pool;
+ *   circle - left this machine to a machine in a trusted circle you chose.
+ *   pool - left this machine to another member's machine in the open pool;
  *             identity-blind, so never a peer name.
- *   network — answered by another machine, but which tier was not recorded
+ *   network - answered by another machine, but which tier was not recorded
  *             (history keeps served_by, not the scope). Claims nothing more. */
 type RoutePrivacy = 'local' | 'mine' | 'circle' | 'pool' | 'network';
 
@@ -121,7 +121,7 @@ function classifyRoute(meta: AppMessage['meta']): RoutePrivacy {
 }
 
 // ---------------------------------------------------------------------------
-// Receipt content per route — exact copy from spec, no embellishment.
+// Receipt content per route - exact copy from spec, no embellishment.
 // ---------------------------------------------------------------------------
 
 interface ReceiptContent {
@@ -236,7 +236,7 @@ function RouteReceipt({ meta }: { meta: AppMessage['meta'] }) {
 
   return (
     <div className="mt-3 border-t border-border/40 pt-2">
-      {/* Collapsed badge row — always visible */}
+      {/* Collapsed badge row - always visible */}
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
@@ -287,7 +287,7 @@ function RouteReceipt({ meta }: { meta: AppMessage['meta'] }) {
           <p className="mb-1 font-medium text-foreground/80">{title}</p>
           <p className="text-muted-foreground">{body}</p>
 
-          {/* Stats detail line — only when values exist */}
+          {/* Stats detail line - only when values exist */}
           {(parts.length > 0 || (meta?.finish_reason !== undefined && meta.finish_reason !== null)) && (
             <p className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 tabular-nums text-[10.5px] text-muted-foreground/60">
               {typeof meta?.output_tokens === 'number' && meta.output_tokens > 0 && (
@@ -344,7 +344,7 @@ function MarkdownContent({ content, isStreaming }: { content: string; isStreamin
         rehypePlugins={[rehypeHighlight]}
         components={{
           // Assistant replies can carry model-generated or pool-routed
-          // markdown — untrusted the same way memory content is. Only
+          // markdown - untrusted the same way memory content is. Only
           // fully-qualified http(s) links are clickable, and they only ever
           // open via window.open()/setWindowOpenHandler, never an in-window
           // navigation. See SafeExternalLink.
@@ -480,7 +480,7 @@ function CopyButton({ text, isUser }: { text: string; isUser: boolean }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // clipboard API not available — silently ignore
+      // clipboard API not available - silently ignore
     }
   }
 

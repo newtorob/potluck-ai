@@ -1,4 +1,4 @@
-"""Potluck AI — local-model inference benchmark runner.
+"""Potluck AI - local-model inference benchmark runner.
 
 Usage (from repo root via make bench-inference):
     apps/desktop/python/.venv/bin/python bench/run_inference.py \
@@ -11,13 +11,13 @@ Usage (from repo root via make bench-inference):
 
 Runs N times per (model x prompt) cell. Reports median across runs.
 Writes:
-    bench/results/<timestamp>/inference_results.json  — full per-run data
-    bench/results/<timestamp>/inference_summary.txt   — human-readable table
+    bench/results/<timestamp>/inference_results.json - full per-run data
+    bench/results/<timestamp>/inference_summary.txt - human-readable table
 
 The script does NOT auto-update docs/inference-benchmarks.md.
-Rob reviews numbers and updates the table manually.
+A maintainer reviews the numbers and updates the table manually.
 
-Platform: macOS (Phase 1), Linux/CUDA (Phase 2), Windows/Vulkan (Phase 3).
+Platforms: macOS (Metal), Linux (CUDA), Windows (Vulkan).
 n_gpu_layers defaults to -1 (full offload on Metal/CUDA). Pass --n-gpu-layers
 explicitly on Linux when partial offload is needed (e.g. 70B with 11 GB VRAM).
 """
@@ -411,18 +411,18 @@ def _format_summary(results: dict) -> str:
     n_gpu_layers = results.get("n_gpu_layers", -1)
 
     if is_apple:
-        gpu_line = f"  GPU/Accel:    Metal (Apple Silicon) — n_gpu_layers={n_gpu_layers}"
+        gpu_line = f"  GPU/Accel:    Metal (Apple Silicon) - n_gpu_layers={n_gpu_layers}"
     elif gpu_name:
         gpu_line = (
-            f"  GPU/Accel:    CUDA — {gpu_name}  {vram_total} GB VRAM"
-            f" — n_gpu_layers={n_gpu_layers}"
+            f"  GPU/Accel:    CUDA - {gpu_name}  {vram_total} GB VRAM"
+            f" - n_gpu_layers={n_gpu_layers}"
         )
     else:
-        gpu_line = f"  GPU/Accel:    CPU-only — n_gpu_layers=0"
+        gpu_line = f"  GPU/Accel:    CPU-only - n_gpu_layers=0"
 
     lines = [
         "=" * 72,
-        "Potluck AI — Inference Benchmark Results",
+        "Potluck AI - Inference Benchmark Results",
         "=" * 72,
         f"  Hardware:     {sys_info['cpu_chip']}  {sys_info['ram_gb']} GB RAM",
         f"  OS:           {sys_info['os_version']}  ({sys_info['arch']})",
@@ -458,11 +458,11 @@ def _format_summary(results: dict) -> str:
     lines.append("-" * 84)
     lines.append("")
     lines.append("Columns:")
-    lines.append("  GenTok/s  — generation tokens per second from llama.cpp's own counters (the headline number)")
-    lines.append("  WallTok/s — the same answer against the wall clock, including sampling and Python time")
-    lines.append("  PETok/s   — prompt eval tokens per second (context ingestion speed)")
-    lines.append("  TTFT(ms)  — time to first token in milliseconds")
-    lines.append("  PeakRSS   — peak resident set size in MB (approximate; sampled at 100ms)")
+    lines.append("  GenTok/s  - generation tokens per second from llama.cpp's own counters (the headline number)")
+    lines.append("  WallTok/s - the same answer against the wall clock, including sampling and Python time")
+    lines.append("  PETok/s   - prompt eval tokens per second (context ingestion speed)")
+    lines.append("  TTFT(ms)  - time to first token in milliseconds")
+    lines.append("  PeakRSS   - peak resident set size in MB (approximate; sampled at 100ms)")
     lines.append("")
     lines.append("All values are medians across 3 runs per (model x prompt) cell.")
     lines.append(
@@ -599,7 +599,7 @@ def main() -> int:
     gpu_name = sys_info.get("gpu_name", "CPU-only")
     vram = sys_info.get("vram_total_gb", 0)
 
-    print(f"Potluck Inference Benchmark — {phase}")
+    print(f"Potluck Inference Benchmark - {phase}")
     print(f"  Hardware: {sys_info['cpu_chip']}  {sys_info['ram_gb']} GB RAM")
     print(f"  OS: {sys_info['os_version']}")
     print(f"  GPU: {gpu_name}" + (f"  {vram} GB VRAM" if vram else ""))

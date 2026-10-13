@@ -2,9 +2,9 @@
 #
 # The Makefile's installer-bundle target drives the macOS and Linux builds
 # through pnpm's prepack chain, which is POSIX shell (rm -rf, mkdir -p, bash).
-# On Windows pnpm runs scripts through cmd.exe, so that chain does not work and
-# the Windows release was being assembled by hand. Hand assembly is how 0.1.3
-# shipped a CPU-only llama.cpp backend without anyone noticing: nothing checked.
+# On Windows pnpm runs scripts through cmd.exe, so that chain does not work.
+# Assembling the Windows release by hand can ship a CPU-only llama.cpp backend
+# without anyone noticing, because nothing checks.
 #
 # This script runs the same steps explicitly, in order, and fails loudly when
 # the GPU backend set is missing from the bundle.

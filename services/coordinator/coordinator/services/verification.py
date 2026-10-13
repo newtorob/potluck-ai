@@ -1,15 +1,15 @@
-"""Verification source for the credit-escrow primitive — canary probes.
+"""Verification source for the credit-escrow primitive - canary probes.
 
 Cross-member (public-pool) earned credits are escrowed until verified (see
 services/credit_ledger.py). This module is the *source* that verifies a peer:
-it sends the peer a coordinator-owned CANARY job — a known prompt with a known
-answer, at temperature 0 — and checks the response.
+it sends the peer a coordinator-owned canary job - a known prompt with a known
+answer, at temperature 0 - and checks the response.
 
 Why canaries (not naive re-execution comparison): a simple instruction or
 arithmetic canary is answered identically by any competent model regardless of
 GPU / quantization, so a junk-returner or dead peer fails it while honest peers
 pass. Re-execution comparison across heterogeneous consumer hardware false-fails
-honest peers on sampling nondeterminism (flagged in the design doc); canaries
+honest peers on sampling nondeterminism; canaries
 sidestep that, and the prompts are coordinator-owned so no user content is
 captured.
 
@@ -51,11 +51,11 @@ CANARY_TIMEOUT_S = 30.0
 # honestly while junking real jobs. temp stays 0 so grading is deterministic
 # (which also makes the seed cosmetic to the output, so randomizing it is free).
 # The token budget jitters within a range whose floor leaves headroom for the
-# answer PLUS a short preamble a chatty small model adds ("Sure, the code is
+# answer plus a short preamble a chatty small model adds ("Sure, the code is
 # ABCDEF"): too tight and an honest peer's correct answer is truncated and graded
-# WRONG, which hard-resets its reputation.
+# wrong, which hard-resets its reputation.
 # Remaining tells -- chiefly temp 0 (real jobs default to a higher temperature),
-# plus the probe-shaped PROMPT a peer could still classify -- need canaries drawn
+# plus the probe-shaped prompt a peer could still classify -- need canaries drawn
 # from a realistic prompt corpus, a deeper follow-up. temp 0 is the strongest
 # residual tell; randomizing the seed/budget does not touch it.
 CANARY_MIN_TOKENS = 32  # truncation-safe floor (answer + a short preamble)
@@ -135,8 +135,8 @@ def generate_canary(rng: random.Random | None = None) -> Canary:
     seeded Random is used otherwise.
 
     Scope: these catch a dead / junk / garbage-returning peer and cannot be
-    memorized (an unbounded generated space, vs the old fixed four). What they do
-    NOT catch -- same as the old fixed set -- is a peer that answers with a cheap
+    memorized (an unbounded generated space). What they do
+    not catch is a peer that answers with a cheap
     script instead of the advertised model (a calculator + echo passes both), or
     one serving a smaller model than advertised. That is the per-model-class /
     downgrade-spoofing follow-up, which needs per-model calibration to avoid
@@ -150,7 +150,7 @@ def generate_canary(rng: random.Random | None = None) -> Canary:
     #     incidentally by a rambling junk peer and would false-PASS.
     # The operand ranges below satisfy both: add 22..198, sub 10..88, mul 16..144.
     # Nonce echoes are weighted higher still: a 24**6 random code can't be matched
-    # incidentally at all, so nonce probes give the most reliable WRONG grade.
+    # incidentally at all, so nonce probes give the most reliable wrong grade.
     kind = r.choice(("nonce", "nonce", "nonce", "add", "sub", "mul"))
     if kind == "nonce":
         return _nonce_canary(r)
@@ -192,7 +192,7 @@ async def record_canary_result(
     peer's reputation, and release the peer's escrowed credits once reputation
     crosses RELEASE_REPUTATION_THRESHOLD.
 
-    Only a clean PASS can trigger a release — a wrong/infra outcome lowers (or
+    Only a clean PASS can trigger a release - a wrong/infra outcome lowers (or
     hard-resets) reputation and never releases. Returns the number of escrowed
     rows released (0 if none / threshold not yet reached).
     """
@@ -217,7 +217,7 @@ async def run_canary_probe(
 
     Returns True (passed), False (wrong answer / error / timeout), or None if
     the probe couldn't run (peer offline, or advertises no model). The canary
-    job is in-memory only — no DB Job row, no credit write.
+    job is in-memory only - no DB Job row, no credit write.
 
     Session lifetime is intentionally short: one session for the pre-wait read
     (model slug lookup), released before the network wait, then a fresh session
@@ -237,7 +237,7 @@ async def run_canary_probe(
     # --- Pre-wait read: fetch model slug, then release the connection. ---
     async with session_factory() as pre_db:
         model_slug = await _peer_model_slug(pre_db, peer_id)
-    # Connection returned to pool here — nothing held during the network wait.
+    # Connection returned to pool here - nothing held during the network wait.
 
     if model_slug is None:
         return None
@@ -259,13 +259,13 @@ async def run_canary_probe(
         await asyncio.wait_for(buf.done.wait(), timeout=CANARY_TIMEOUT_S)
         if buf.error_category is not None:
             # Peer reported it couldn't run the job (oom / declined / model not
-            # loaded / internal). It failed to do the work, but that is NOT a
-            # wrong-answer fabrication signal — grade it ambiguous.
+            # loaded / internal). It failed to do the work, but that is not a
+            # wrong-answer fabrication signal - grade it ambiguous.
             outcome = CANARY_INFRA
         elif evaluate_canary("".join(buf.tokens), canary):
             outcome = CANARY_PASS
         else:
-            # Clean completion with the wrong answer — the unambiguous junk /
+            # Clean completion with the wrong answer - the unambiguous junk /
             # fabrication signal that hard-resets reputation.
             outcome = CANARY_WRONG
     except Exception:
@@ -284,7 +284,7 @@ async def run_canary_probe(
 
 
 # --------------------------------------------------------------------------- #
-# Trigger — the background loop that decides WHEN to probe.
+# Trigger - the background loop that decides WHEN to probe.
 # --------------------------------------------------------------------------- #
 
 # How often the loop wakes, and how many peers it probes per cycle (bounded so a
@@ -303,7 +303,7 @@ PROBE_FLOOR = 0.1
 async def _peers_with_escrowed_credits(
     db: AsyncSession, online_ids: list[uuid.UUID]
 ) -> list[uuid.UUID]:
-    """Online peers that currently hold escrowed earned credits — the set worth
+    """Online peers that currently hold escrowed earned credits - the set worth
     probing (a passed canary releases their escrow once they cross the trust
     threshold). Peers with nothing escrowed are skipped."""
     if not online_ids:
@@ -327,7 +327,7 @@ async def _peers_with_escrowed_credits(
 async def _peers_below_reentry(
     db: AsyncSession, online_ids: list[uuid.UUID]
 ) -> list[uuid.UUID]:
-    """Online peers whose reputation has fallen below NEUTRAL — quarantined out
+    """Online peers whose reputation has fallen below NEUTRAL - quarantined out
     of the open pool by the routing hysteresis (peer_registry). Probing them is
     the rehabilitation path: clean canaries climb a fallen peer back to neutral
     and out of quarantine. Without this a sub-neutral peer that holds no escrowed
@@ -381,7 +381,7 @@ def select_due_peers(
 
     Escrowed peers (credits waiting on a release) take priority, BUT we reserve up
     to batch//4 slots for recovering (sub-neutral) peers so a large escrowed
-    cohort can't permanently starve rehabilitation — a starved quarantined peer
+    cohort can't permanently starve rehabilitation - a starved quarantined peer
     could never earn its way back into the pool. A peer in both sets is probed
     once, via its escrowed slot (the recovering list is filtered against it)."""
     escrowed = _dedup(escrowed)
@@ -410,11 +410,11 @@ def _select_reprobe(
 ) -> list[uuid.UUID]:
     """From online peers not otherwise due, pick which to floor-re-probe this
     cycle: each is drawn independently with _reprobe_probability(rep). If more
-    draw than `slots`, pick a RANDOM subset.
+    draw than `slots`, pick a random subset.
 
-    Deliberately NOT lowest-reputation-first: the draw probability already weights
+    Deliberately not lowest-reputation-first: the draw probability already weights
     suspicion (lower rep draws more), and a low-rep bias here would let a flood of
-    cheap neutral decoys crowd out re-probing of the HIGH-reputation peers that
+    cheap neutral decoys crowd out re-probing of the high-reputation peers that
     floor-reprobe exists to recheck (a trusted-then-bad peer sits at high rep
     until it is caught). Random truncation keeps a high-rep peer's slot odds fair
     instead of always last."""
@@ -436,10 +436,10 @@ async def probe_due_peers(
 ) -> int:
     """One verification cycle. Probes up to `batch` peers in priority order:
 
-      1. DUE peers — holding escrowed credits (a clean canary moves them toward
+      1. DUE peers - holding escrowed credits (a clean canary moves them toward
          release) or quarantined below neutral (toward pool re-entry). See
          select_due_peers for the escrow-priority-with-rehab-reserve policy.
-      2. FLOOR re-probe — any leftover batch capacity surprise-probes
+      2. FLOOR re-probe - any leftover batch capacity surprise-probes
          otherwise-not-due online peers so trust is never permanent (catch a peer
          that earned trust then went bad). Adaptive: lower-reputation peers are
          probed more, all flooring at PROBE_FLOOR (see _reprobe_probability).
@@ -472,7 +472,7 @@ async def probe_due_peers(
                 reps = await _reputations(db, others)
                 candidates = [(pid, reps.get(pid)) for pid in others]
                 due = due + _select_reprobe(candidates, spare, rng)
-    # Connection returned to pool here — all pre-probe reads done.
+    # Connection returned to pool here - all pre-probe reads done.
 
     probed = 0
     for peer_id in due:

@@ -1,4 +1,4 @@
-/* highlight.js theme — must be imported before Tailwind directives */
+/* highlight.js theme - must be imported before Tailwind directives */
 @import 'highlight.js/styles/github-dark.css';
 
 /* Bundled fonts (open-source, OFL/SIL). ~400KB total across all three. */
@@ -11,16 +11,15 @@
 @tailwind utilities;
 
 /*
-  Potluck "Hearth" theme — warm-charcoal dark with an ember accent.
-  Replaces the default-shadcn cold-violet palette. Tokens are HSL channels
-  (no hsl() wrapper) so Tailwind can compose opacity variants like
-  bg-primary/50 against the raw values.
+  Potluck "Hearth" theme - warm-charcoal dark with an ember accent.
+  Tokens are HSL channels (no hsl() wrapper) so Tailwind can compose
+  opacity variants like bg-primary/50 against the raw values.
 
   Design references: Things 3 (warmth via spacing), Oxide Computer
   (warm-charcoal + serif headlines), Mercury (warm-dark for serious
-  audiences), Anthropic clay accent. See potluck design brief 2026-05-08.
+  audiences), Anthropic clay accent.
 
-  Light theme is the "Common Room" paper layer — equally first-class.
+  Light theme is the "Common Room" paper layer - equally first-class.
   Both themes carry the same product chrome; the user picks via the
   theme toggle in the sidebar's chrome controls.
 */
@@ -28,7 +27,7 @@
 @layer base {
   :root {
     /* ---------------------------------------------------------------- */
-    /* LIGHT — "Common Room" paper. Cream surfaces, warm-on-warm.       */
+    /* LIGHT - "Common Room" paper. Cream surfaces, warm-on-warm.       */
     /* ---------------------------------------------------------------- */
 
     --background: 35 28% 95%;        /* #F7F3EC warm cream */
@@ -40,9 +39,8 @@
     --popover: 36 35% 98%;           /* #FCF9F3 floating paper */
     --popover-foreground: 28 22% 11%;
 
-    /* Ember accent — same in both themes. Slightly desaturated from
-       the brief's #E07856 to sit in "warm and present" instead of
-       "BUY NOW." */
+    /* Ember accent - same in both themes. Slightly desaturated from
+       #E07856 to sit in "warm and present" instead of "BUY NOW." */
     --primary: 16 60% 56%;
     --primary-foreground: 28 22% 7%; /* dark ink remains legible on ember */
     --primary-text: 16 60% 36%;      /* ember text on paper, separate from fills */
@@ -64,13 +62,13 @@
     --input: 32 18% 84%;
     --ring: 16 60% 42%;              /* visible ember focus on paper */
 
-    /* Layered surfaces — for elevation discipline. Light theme uses
+    /* Layered surfaces - for elevation discipline. Light theme uses
        progressively warmer cream tones; dark theme uses warmer charcoals.
        See "elevation" rule in the design system: surface tinting + a
-       hairline border, NOT stacked shadows. */
-    --surface-1: 35 28% 95%;         /* same as background — flat */
-    --surface-2: 36 33% 97%;         /* same as card — raised one step */
-    --surface-3: 36 35% 98%;         /* same as popover — floating */
+       hairline border, not stacked shadows. */
+    --surface-1: 35 28% 95%;         /* same as background - flat */
+    --surface-2: 36 33% 97%;         /* same as card - raised one step */
+    --surface-3: 36 35% 98%;         /* same as popover - floating */
 
     /* Custom Hearth tokens (cross-theme bridges + alive signals) */
     --sage: 138 22% 38%;             /* darker forest for AA on cream */
@@ -79,7 +77,7 @@
 
     --radius: 0.5rem;
 
-    /* Motion tokens — used by reusable utilities below */
+    /* Motion tokens - used by reusable utilities below */
     --duration-fast: 120ms;          /* state changes (hover, focus) */
     --duration-base: 180ms;          /* default UI transitions */
     --duration-slow: 280ms;          /* reveal / expand */
@@ -89,7 +87,7 @@
 
   .dark {
     /* ---------------------------------------------------------------- */
-    /* DARK — "Hearth". Warm charcoal, ember accent, sage success.     */
+    /* DARK - "Hearth". Warm charcoal, ember accent, sage success.     */
     /* Background never goes pure #000; the warm undertone is the      */
     /* defining character lever.                                       */
     /* ---------------------------------------------------------------- */
@@ -111,7 +109,7 @@
     --secondary-foreground: 36 30% 94%;
 
     --muted: 28 9% 17%;
-    --muted-foreground: 32 14% 66%;  /* warm gray, NOT cool blue-gray */
+    --muted-foreground: 32 14% 66%;  /* warm gray, not cool blue-gray */
 
     --accent: 28 11% 18%;            /* hover/selection states */
     --accent-foreground: 36 30% 94%;
@@ -124,12 +122,12 @@
     --input: 28 9% 19%;
     --ring: 16 67% 61%;              /* ember focus ring */
 
-    /* Layered surfaces (dark) — progressively warmer charcoals */
+    /* Layered surfaces (dark) - progressively warmer charcoals */
     --surface-1: 28 12% 9%;          /* background */
     --surface-2: 28 11% 12%;         /* card */
     --surface-3: 28 11% 14%;         /* popover */
 
-    /* Custom Hearth tokens — sage gets a brighter cut on dark */
+    /* Custom Hearth tokens - sage gets a brighter cut on dark */
     --sage: 138 14% 56%;             /* #7FA088 muted forest */
     --sage-foreground: 28 22% 11%;
     --paper: 35 28% 95%;             /* references the light theme's cream */
@@ -146,9 +144,9 @@
     font-feature-settings: 'rlig' 1, 'calt' 1, 'ss01' 1;
   }
 
-  /* Headlines use Instrument Serif by default — overridable per-element
+  /* Headlines use Instrument Serif by default - overridable per-element
      with .font-sans / .font-mono. The serif gives the editorial warmth
-     the design brief identified as the single biggest character lever. */
+     that most defines the app's character. */
   h1, h2, h3 {
     @apply font-serif;
     letter-spacing: -0.01em;
@@ -160,14 +158,14 @@
     user-select: none;
   }
 
-  /* Selection — ember-tinted in both themes. Default browser blue
+  /* Selection - ember-tinted in both themes. Default browser blue
      fights the warm palette badly. */
   ::selection {
     background-color: hsl(var(--primary) / 0.28);
     color: hsl(var(--foreground));
   }
 
-  /* Scrollbar — warm-tinted, minimal. Slightly higher contrast in light
+  /* Scrollbar - warm-tinted, minimal. Slightly higher contrast in light
      where the default thumb on cream was hard to see. */
   ::-webkit-scrollbar {
     width: 8px;
@@ -184,7 +182,7 @@
     background-color: hsl(var(--muted-foreground) / 0.5);
   }
 
-  /* Reduce motion — global guard for users who want it */
+  /* Reduce motion - global guard for users who want it */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -201,13 +199,13 @@
    Animations
    ================================================================= */
 
-/* Agent activity feed — new-row highlight, retuned to ember */
+/* Agent activity feed - new-row highlight, retuned to ember */
 @keyframes fadeHighlight {
   0%   { background-color: hsl(var(--primary) / 0.16); }
   100% { background-color: transparent; }
 }
 
-/* Generic reveal — fade in with a tiny upward drift */
+/* Generic reveal - fade in with a tiny upward drift */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -226,14 +224,14 @@
 }
 
 /* Pulse for "alive" indicators (sage online dots, streaming cursors).
-   Subtler than Tailwind's animate-pulse — never below 0.55 opacity so
+   Subtler than Tailwind's animate-pulse - never below 0.55 opacity so
    the dot is always legible. */
 @keyframes hearthPulse {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.55; }
 }
 
-/* Caret blink for streaming text — slightly slower than .animate-pulse */
+/* Caret blink for streaming text - slightly slower than .animate-pulse */
 @keyframes caretBlink {
   0%, 49%   { opacity: 1; }
   50%, 100% { opacity: 0.2; }
@@ -246,7 +244,7 @@
 @layer utilities {
   /* Faint film-grain noise via SVG data-URL. Apply via `class="grain"`
      on full-bleed surfaces (chat pane, memory canvas, /network view) for
-     workshop / leather-notebook tactility. ~1.5% opacity — felt, not seen.
+     workshop / leather-notebook tactility. ~1.5% opacity - felt, not seen.
      Applies to both themes; mix-blend-mode keeps it neutral on cream. */
   .grain::before {
     content: '';
@@ -259,19 +257,19 @@
     z-index: 0;
   }
 
-  /* Layered surface utilities — semantic elevation without shadow stacks.
+  /* Layered surface utilities - semantic elevation without shadow stacks.
      Use these instead of bg-card / bg-popover when you want the meaning
      to read as elevation rather than role. */
   .surface-1 { background-color: hsl(var(--surface-1)); }
   .surface-2 { background-color: hsl(var(--surface-2)); }
   .surface-3 { background-color: hsl(var(--surface-3)); }
 
-  /* Hairline — single-side warm-tinted divider. Cheaper than border
+  /* Hairline - single-side warm-tinted divider. Cheaper than border
      classes when you only want one edge. */
   .hairline-t { box-shadow: inset 0 1px 0 0 hsl(var(--border)); }
   .hairline-b { box-shadow: inset 0 -1px 0 0 hsl(var(--border)); }
 
-  /* Ember focus ring — slightly more visible than the default 2px.
+  /* Ember focus ring - slightly more visible than the default 2px.
      For destination CTAs that need stronger focus affordance. */
   .ring-ember-glow {
     box-shadow:
@@ -279,7 +277,7 @@
       0 0 0 4px hsl(var(--ring) / 0.55);
   }
 
-  /* Editorial reading width — caps prose at a comfortable measure
+  /* Editorial reading width - caps prose at a comfortable measure
      (~65ch), so chat answers and memory notes don't run line-long
      on wide displays. */
   .reading-measure { max-width: 65ch; }

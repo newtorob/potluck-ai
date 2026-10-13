@@ -1,5 +1,5 @@
 /**
- * SessionDetailDrawer — slide-in panel from the right showing full session metadata
+ * SessionDetailDrawer - slide-in panel from the right showing full session metadata
  * and chronological tool call timeline.
  *
  * - Width: 480px on desktop, pushes main content (flex layout)
@@ -50,7 +50,7 @@ function TimelineRow({ call, step }: TimelineRowProps) {
   const [previewsLoading, setPreviewsLoading] = useState(false);
   const [previewsError, setPreviewsError] = useState<string | null>(null);
   const hasError = call.error !== null;
-  // Filter to the metadata-only whitelist BEFORE deciding whether to show the
+  // Filter to the metadata-only whitelist before deciding whether to show the
   // section, so a row whose args_summary contains only non-whitelisted keys
   // renders the "stripped by the privacy whitelist" note rather than a header.
   const safeArgs = sanitizeArgsSummary(call.args_summary);
@@ -58,8 +58,8 @@ function TimelineRow({ call, step }: TimelineRowProps) {
   const hasVersion = call.tool_schema_version !== null;
   const memoryIds = useMemo(() => call.memory_ids_touched ?? [], [call.memory_ids_touched]);
 
-  // Lazy-load memory previews the first time the row is expanded AND it
-  // touched memories. No prefetch — the drawer can show 200 rows; eager
+  // Lazy-load memory previews the first time the row is expanded and it
+  // touched memories. No prefetch - the drawer can show 200 rows; eager
   // loading every preview would be wasteful.
   useEffect(() => {
     if (!expanded || memoryIds.length === 0 || previews !== null || previewsLoading) return;
@@ -78,7 +78,7 @@ function TimelineRow({ call, step }: TimelineRowProps) {
     <li
       className={cn(
         'border-b border-border/30 last:border-0',
-        // Red left-border + tint when the call errored — the "5-second screenshot"
+        // Red left-border + tint when the call errored - the "5-second screenshot"
         // moment: the debugger reader can see at a glance which row went wrong.
         hasError && 'border-l-2 border-l-destructive bg-destructive/5',
       )}
@@ -231,7 +231,7 @@ function TimelineRow({ call, step }: TimelineRowProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Export trace button — downloads a portable JSON for bug reports
+// Export trace button - downloads a portable JSON for bug reports
 // ---------------------------------------------------------------------------
 
 function ExportTraceButton({ sessionId }: { sessionId: string }) {
@@ -404,7 +404,7 @@ export function SessionDetailDrawer({ detail, onClose }: SessionDetailDrawerProp
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [detail, onClose]);
 
-  // Focus trap — keep Tab cycling within the drawer
+  // Focus trap - keep Tab cycling within the drawer
   useEffect(() => {
     if (detail === null || drawerRef.current === null) return;
 

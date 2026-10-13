@@ -15,9 +15,9 @@ import (
 // Linux: `ip addr add <ip>/32 dev <iface>`
 // macOS: `ifconfig <iface> inet <ip> <ip>` (point-to-point; dst = src)
 //
-// Shelling out is acceptable for v0. Netlink (Linux) and BSD socket ioctls
-// (macOS) are cleaner but more code; deferred to post-launch polish.
-// TODO(post-launch): replace with native netlink on Linux, syscall.IoctlX on macOS.
+// Shelling out is acceptable for now. Netlink (Linux) and BSD socket ioctls
+// (macOS) are cleaner but more code.
+// TODO: replace with native netlink on Linux, syscall.IoctlX on macOS.
 func assignInterfaceAddress(ifName, ip string) error {
 	var cmd *exec.Cmd
 
@@ -40,7 +40,7 @@ func assignInterfaceAddress(ifName, ip string) error {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		// On Linux, "file exists" (exit code 2) means the address is already
-		// assigned — treat it as success.
+		// assigned - treat it as success.
 		if runtime.GOOS == "linux" && strings.Contains(string(out), "File exists") {
 			slog.Debug("tunnel: interface address already assigned", "interface", ifName, "ip", ip)
 		} else {
@@ -48,9 +48,9 @@ func assignInterfaceAddress(ifName, ip string) error {
 		}
 	}
 
-	// Linux: explicitly bring the interface UP. `ip addr add` does NOT do this
+	// Linux: explicitly bring the interface up. `ip addr add` does not do this
 	// (unlike macOS ifconfig, which auto-ups the interface when an address is
-	// assigned). A DOWN interface can't accept route installations — `ip route
+	// assigned). A down interface can't accept route installations - `ip route
 	// add ... dev <iface>` fails with "Device for nexthop is not up".
 	if runtime.GOOS == "linux" {
 		upCmd := exec.Command("ip", "link", "set", ifName, "up")

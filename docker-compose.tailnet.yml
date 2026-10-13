@@ -7,16 +7,16 @@
 # and on any host interface that the OS will actually deliver inbound packets
 # to. On macOS with the Tailscale **cask** (the Network-Extension / "macsys"
 # build), inbound TCP to the host's tailnet IP (100.x) is dropped before it
-# reaches the published port, so tailnet peers (e.g. the Linux box "newtorob",
-# whose systemd unit is hardwired to http://100.101.102.103:8400 +
-# tcp+insecure://100.101.102.103:8443) see the coordinator/DERP as OFFLINE even
-# though `curl 127.0.0.1:8400/health` works on the Mac. See
-# docs/runbooks/tailnet-coordinator-reachability.md for the one-time admin step
-# that lifts that drop.
+# reaches the published port, so tailnet peers (e.g. a Linux box whose
+# systemd unit points at http://<tailnet-ip>:8400 +
+# tcp+insecure://<tailnet-ip>:8443) see the coordinator/DERP as offline even
+# though `curl 127.0.0.1:8400/health` works on the Mac. Lifting that drop is a
+# one-time admin step on the host (allow incoming connections for the
+# Tailscale network extension).
 #
 # This override makes the port publishing *explicit about the tailnet IP* so the
 # binding is self-documenting and so that, once the host-level inbound drop is
-# lifted, the services are reachable on the exact IP newtorob expects with no
+# lifted, the services are reachable on the exact IP those peers expect with no
 # further changes.
 #
 # Usage

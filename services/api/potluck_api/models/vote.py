@@ -13,7 +13,7 @@ from potluck_api.db.base import Base
 class Vote(Base):
     __tablename__ = "votes"
     __table_args__ = (
-        # One vote per member per proposal — upsert on conflict.
+        # One vote per member per proposal - upsert on conflict.
         UniqueConstraint("proposal_id", "member_id", name="uq_votes_proposal_member"),
         CheckConstraint(
             "choice IN ('yes', 'no', 'abstain')",

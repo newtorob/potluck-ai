@@ -1,4 +1,4 @@
-"""0005 — Add member_keys allowlist binding members to their device keys.
+"""0005 - Add member_keys allowlist binding members to their device keys.
 
 Closes the member_id self-assertion hole in peer attestation. The signed-nonce
 challenge already proves a peer holds the private key for its public_key; this
@@ -6,7 +6,7 @@ table lets the coordinator enforce that the key is bound to one member, so a
 peer can't freely claim an arbitrary member_id.
 
 Rows are created trust-on-first-use by default; when require_registered_keys is
-set, the key must already be present (pre-seeded, or via v0.5 authenticated
+set, the key must already be present (pre-seeded, or via authenticated
 registration). The binding is keyed by public_key (one device key, one member).
 
 Revision ID: 0005_member_keys

@@ -49,7 +49,7 @@ from coordinator.services.peer_registry import (
 _MODEL = "llama3:8b-circle-test"  # unique slug so live peers can't interfere
 
 
-class _WS:  # stub WebSocket — routing functions store but never call it
+class _WS:  # stub WebSocket - routing functions store but never call it
     pass
 
 
@@ -124,7 +124,7 @@ async def test_list_circles_shows_own_with_members(db_session: AsyncSession) -> 
 async def test_list_circles_excludes_other_members_circles(db_session: AsyncSession) -> None:
     tag = uuid.uuid4().hex[:8]
     other = uuid.uuid4()
-    # Circle owned by another member — must NOT appear in STUB_MEMBER_ID's list.
+    # Circle owned by another member - must not appear in STUB_MEMBER_ID's list.
     other_circle = await _seed_circle(db_session, owner=other, name=f"secret-{tag}")
 
     resp = await list_circles(db=db_session, member_id=STUB_MEMBER_ID)
@@ -148,7 +148,7 @@ async def test_delete_circle_removes_circle_and_members(session_factory) -> None
             await _seed_member(db, c, f"pk-{tag}")
             circle_id = c.id
 
-    # Call the endpoint with its own fresh session — it will commit internally.
+    # Call the endpoint with its own fresh session - it will commit internally.
     async with session_factory.factory() as db:
         await delete_circle(circle_id, db=db, member_id=STUB_MEMBER_ID)
 
@@ -294,9 +294,9 @@ async def test_remove_circle_member_idempotent(db_session: AsyncSession) -> None
     """Removing a pubkey that was never added returns 204 without error."""
     tag = uuid.uuid4().hex[:8]
     c = await _seed_circle(db_session, owner=STUB_MEMBER_ID, name=f"noop-{tag}")
-    # No exception raised — idempotent delete (no commit needed, no state to verify).
+    # No exception raised - idempotent delete (no commit needed, no state to verify).
     await db_session.flush()
-    # Call remove on a pubkey that doesn't exist — should not raise.
+    # Call remove on a pubkey that doesn't exist - should not raise.
     await db_session.execute(
         select(CircleMember).where(
             CircleMember.circle_id == c.id,
@@ -359,7 +359,7 @@ async def test_circle_routing_503_when_no_circle_member_online(
             peer_id = await _seed_peer_with_key(db, member_id, pubkey)
     session_factory.track_peer(peer_id)
 
-    # Peer is NOT registered in-memory (simulates offline).
+    # Peer is not registered in-memory (simulates offline).
     async with session_factory.factory() as db:
         peer, scope = await select_peer_for_request(
             db,
@@ -376,12 +376,12 @@ async def test_circle_routing_503_when_no_circle_member_online(
 async def test_circle_routing_excludes_non_circle_peer(
     session_factory,
 ) -> None:
-    """A peer online and serving the model but NOT in the circle is excluded."""
-    # Circle member — in the circle but offline.
+    """A peer online and serving the model but not in the circle is excluded."""
+    # Circle member - in the circle but offline.
     circle_member_id = uuid.uuid4()
     circle_pubkey = f"ck-incircle-{uuid.uuid4().hex}"
 
-    # Non-circle peer — online and serving the model.
+    # Non-circle peer - online and serving the model.
     outside_member_id = uuid.uuid4()
     outside_pubkey = f"ck-outside-{uuid.uuid4().hex}"
 
@@ -408,9 +408,9 @@ async def test_circle_routing_excludes_non_circle_peer(
                 model_slug=_MODEL,
                 requester_member_id=STUB_MEMBER_ID,
                 scope="circle",
-                circle_pubkeys={circle_pubkey},  # outside_pubkey NOT in the circle
+                circle_pubkeys={circle_pubkey},  # outside_pubkey not in the circle
             )
-        # Outside peer is online but not in the circle — should get nothing.
+        # Outside peer is online but not in the circle - should get nothing.
         assert peer is None
         assert scope is None
     finally:

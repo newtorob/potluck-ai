@@ -12,13 +12,13 @@ def client_ip(request: Request) -> str:
     returns) is Fly's edge IP, so every caller collapses to one key and the
     per-address limit becomes global. Fly sets ``Fly-Client-IP`` to the real
     client address and *overwrites* any client-supplied value, so it is
-    trustworthy on Fly. We deliberately do NOT trust ``X-Forwarded-For`` as a
-    fallback — it is client-spoofable, and letting a caller rotate the key would
+    trustworthy on Fly. We deliberately do not trust ``X-Forwarded-For`` as a
+    fallback - it is client-spoofable, and letting a caller rotate the key would
     defeat the abuse guard on the magic-link endpoint. Off-Fly (local/dev) we
     fall back to the socket peer.
 
     NOTE: the limiter storage is in-memory (per process), so the API must run as
-    a SINGLE machine at launch for the counts to be coherent. Scale-out needs a
+    a single machine at launch for the counts to be coherent. Scale-out needs a
     shared store (e.g. Redis) wired via ``storage_uri`` first.
     """
     fly_ip = request.headers.get("Fly-Client-IP")

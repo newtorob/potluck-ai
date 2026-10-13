@@ -25,7 +25,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 class TestLastUserPrompt:
-    """last_user_prompt is unchanged — returns the latest user content only."""
+    """last_user_prompt is unchanged - returns the latest user content only."""
 
     def test_returns_last_user_message(self) -> None:
         from potluck_local.services.pool_routing import last_user_prompt
@@ -91,7 +91,7 @@ class TestJobBodyPolicy:
         assert body["prompt"] == "follow-up"
 
     def test_pool_default_no_messages(self) -> None:
-        """scope=pool without opt-in: messages must NOT appear in the body."""
+        """scope=pool without opt-in: messages must not appear in the body."""
         body = self._call("pool", False)
         assert "messages" not in body, "pool default must not send messages"
 
@@ -218,7 +218,7 @@ class TestContributorSchemas:
 
 
 # ---------------------------------------------------------------------------
-# contributor/client — inference path dispatch
+# contributor/client - inference path dispatch
 # ---------------------------------------------------------------------------
 
 class TestClientDispatch:
@@ -261,9 +261,9 @@ class TestClientDispatch:
 
             async def stream_chat(self, messages, **kw):
                 calls["chat"].append(messages)
-                # Empty async generator — no tokens, job completes immediately.
+                # Empty async generator - no tokens, job completes immediately.
                 return
-                yield  # noqa: unreachable — marks this as an async generator
+                yield  # noqa: unreachable - marks this as an async generator
 
             async def stream_completion(self, prompt, **kw):
                 calls["completion"].append(prompt)
@@ -333,7 +333,7 @@ class TestClientDispatch:
 # ---------------------------------------------------------------------------
 
 class TestPrivacyLogging:
-    """Log records must not contain message content — only counts and char totals."""
+    """Log records must not contain message content - only counts and char totals."""
 
     def test_job_assigned_log_with_messages_no_content(self, caplog) -> None:
         """When a job arrives with messages, the log must not include content."""
@@ -378,7 +378,7 @@ class TestPrivacyLogging:
 
 
 # ---------------------------------------------------------------------------
-# gateway routing — circle scope sends messages; pool default does not
+# gateway routing - circle scope sends messages; pool default does not
 # ---------------------------------------------------------------------------
 
 _LOOPBACK = ("127.0.0.1", 50000)
@@ -501,7 +501,7 @@ class TestGatewayPoolScope:
         self, client, monkeypatch
     ) -> None:
         """Default pool routing passes messages to pool_routing, but _job_body
-        with multiturn=off will strip them — only prompt reaches the coordinator."""
+        with multiturn=off will strip them - only prompt reaches the coordinator."""
         from potluck_local.services import pool_routing as pr
 
         body_built: list[dict] = []
@@ -521,7 +521,7 @@ class TestGatewayPoolScope:
         monkeypatch.setattr("potluck_local.services.pool_routing._pool_multiturn_enabled", lambda: False)
         monkeypatch.setattr("potluck_local.services.pool_routing._job_body", _spy_job_body)
 
-        # We don't have a real coordinator so this will raise — catch at transport level.
+        # We don't have a real coordinator so this will raise - catch at transport level.
         # What matters is what _job_body received, not whether the HTTP call succeeded.
         try:
             client.post(

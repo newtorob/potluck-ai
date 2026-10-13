@@ -8,7 +8,7 @@ then assert:
   - only the member's own peers are counted (cross-member exclusion)
   - the `weeks` list is exactly `window_weeks` long and oldest-first
 
-Uses the `db_session` fixture (single-transaction rollback) — same pattern
+Uses the `db_session` fixture (single-transaction rollback) - same pattern
 as test_contributions.py.
 """
 from __future__ import annotations
@@ -27,7 +27,7 @@ from coordinator.models.peer import Peer
 from coordinator.routers.me import WeeklyContributionsResponse, my_contributions_weekly
 
 # ---------------------------------------------------------------------------
-# Helpers — duplicated from test_contributions.py intentionally (each test
+# Helpers - duplicated from test_contributions.py intentionally (each test
 # module is self-contained; shared helpers live in conftest when widely used).
 # ---------------------------------------------------------------------------
 
@@ -159,7 +159,7 @@ async def test_weekly_buckets_land_correctly(db_session: AsyncSession) -> None:
         created_at=w0_monday + timedelta(hours=1),
     )
 
-    # Dispatched job in week 2: must NOT be counted (not completed).
+    # Dispatched job in week 2: must not be counted (not completed).
     await _job(
         db_session,
         peer_id=peer,
@@ -210,7 +210,7 @@ async def test_weekly_buckets_land_correctly(db_session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_weekly_zero_fill_no_peers(db_session: AsyncSession) -> None:
     """A member with no peers at all gets exactly `weeks` zero-filled buckets."""
-    # Use a fresh member UUID that has no peers — guaranteed empty.
+    # Use a fresh member UUID that has no peers - guaranteed empty.
     phantom_member = uuid.uuid4()
 
     # The endpoint resolves member identity from its member_id dependency, so
@@ -229,7 +229,7 @@ async def test_weekly_zero_fill_no_peers(db_session: AsyncSession) -> None:
 
 @pytest.mark.asyncio
 async def test_weekly_excludes_other_members_peers(db_session: AsyncSession) -> None:
-    """Jobs on another member's peer MUST NOT appear in my weekly totals."""
+    """Jobs on another member's peer must not appear in my weekly totals."""
     tag = uuid.uuid4().hex[:8]
     other_member = uuid.uuid4()
 
@@ -246,7 +246,7 @@ async def test_weekly_excludes_other_members_peers(db_session: AsyncSession) -> 
         tokens=10,
         completed_at=w0_monday + timedelta(hours=2),
     )
-    # Other member's peer: 5 jobs, 5000 tokens — must not bleed into my total.
+    # Other member's peer: 5 jobs, 5000 tokens - must not bleed into my total.
     for _ in range(5):
         await _job(
             db_session,
@@ -275,7 +275,7 @@ async def test_weekly_default_and_range(db_session: AsyncSession) -> None:
     """Boundary values (1 and 26) return the right length.
 
     Note: the FastAPI Query() default is only resolved by FastAPI's DI layer,
-    not when calling the function directly in tests — so we always pass an
+    not when calling the function directly in tests - so we always pass an
     explicit int and verify boundary values rather than the default itself."""
     r_eight = await my_contributions_weekly(weeks=8, db=db_session, member_id=STUB_MEMBER_ID)
     assert len(r_eight.weeks) == 8

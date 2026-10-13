@@ -11,8 +11,8 @@ Exits 0 on success. Writes:
     bench/results/<timestamp>/longmemeval_results.json   -- full per-instance data
     bench/results/<timestamp>/longmemeval_summary.txt    -- human-readable summary
 
-The script does NOT auto-update docs/benchmarks.md. Rob reviews the numbers
-and updates the table manually before tagging a release.
+The script does NOT auto-update docs/benchmarks.md. A maintainer reviews the
+numbers and updates the table manually before tagging a release.
 """
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ _SPLIT_DESCRIPTIONS = {
 
 _SPLIT_NOTES = {
     "longmemeval_oracle": (
-        "The oracle split uses evidence sessions only — no filler noise. "
+        "The oracle split uses evidence sessions only - no filler noise. "
         "recall_any@10 is structurally bounded near 1.0; the meaningful "
         "ranking signal is recall_all@1."
     ),
@@ -92,7 +92,7 @@ _SPLIT_NOTES = {
         "and other systems benchmark on for comparable accuracy numbers."
     ),
     "longmemeval_m": (
-        "The M split uses ~500 sessions per question — extreme filler "
+        "The M split uses ~500 sessions per question - extreme filler "
         "noise. Tests retrieval at scale."
     ),
 }
@@ -117,12 +117,12 @@ def _format_summary(results: dict, wall_seconds: float, split: str) -> str:
 
     lines = [
         "=" * 72,
-        f"Potluck Memory Retriever — LongMemEval {title_label} Results",
+        f"Potluck Memory Retriever - LongMemEval {title_label} Results",
         "=" * 72,
         f"  Dataset:          {dataset_line}",
         f"  Instances run:    {n}",
         f"  Retrieval cutoff: k={k}",
-        f"  Embedder:         {'BAAI/bge-small-en-v1.5 (ok)' if embedder_ok else 'UNAVAILABLE — results are random baseline'}",
+        f"  Embedder:         {'BAAI/bge-small-en-v1.5 (ok)' if embedder_ok else 'UNAVAILABLE - results are random baseline'}",
         f"  Wall time:        {wall_seconds:.1f}s",
         "",
         "AGGREGATE",
@@ -176,7 +176,7 @@ async def main() -> int:
     split = _split_label(data_path)
     print(f"Output dir: {out_dir}")
     print(f"Running LongMemEval {split} (k={args.k}, n={args.max_instances or len(dataset)})...")
-    print("This embeds each session per instance — may take a few minutes on first run (model download).")
+    print("This embeds each session per instance - may take a few minutes on first run (model download).")
     print()
 
     wall_start = time.perf_counter()

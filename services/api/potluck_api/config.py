@@ -46,15 +46,15 @@ class Settings(BaseSettings):
     discourse_sso_secret: str = _DEFAULT_DISCOURSE_SSO_SECRET
     discourse_api_key: str = ""
 
-    # Admin — comma-separated list of email addresses
+    # Admin - comma-separated list of email addresses
     admin_emails: str = ""
 
-    # Sentry — empty string disables SDK init
+    # Sentry - empty string disables SDK init
     sentry_dsn: str = ""
 
-    # Client version handshake — GET /client/version. The desktop app polls
+    # Client version handshake - GET /client/version. The desktop app polls
     # this on launch and self-blocks with an "Update required" screen if its
-    # own version is below `client_minimum_version`. Defaults are today's
+    # own version is below `client_minimum_version`. Defaults match the
     # shipped build so a freshly-deployed API never falsely blocks it.
     client_latest_version: str = "0.1.0"
     client_minimum_version: str = "0.1.0"
@@ -99,14 +99,14 @@ class Settings(BaseSettings):
         """Return admin emails as a parsed, normalized list.
 
         Normalized to strip().lower() so the allowlist compares equal to the
-        normalized emails AuthService looks members up by — otherwise
-        ``ADMIN_EMAILS=Rob@x.com`` would silently never match the member row
+        normalized emails AuthService looks members up by - otherwise
+        ``ADMIN_EMAILS=Ada@x.com`` would silently never match the member row
         created from a lowercased sign-in email.
         """
         return [e.strip().lower() for e in self.admin_emails.split(",") if e.strip()]
 
     def cookie_secure(self) -> bool:
-        """Session cookie Secure flag — off in development so http localhost works."""
+        """Session cookie Secure flag - off in development so http localhost works."""
         return self.env != "development"
 
     def cookie_samesite(self) -> str:
@@ -114,7 +114,7 @@ class Settings(BaseSettings):
 
         The web client (trypotluck.ai) and the API (api.trypotluck.ai) are
         same-site, and the desktop app authenticates via a Bearer token, not
-        the cookie — so production has no legitimate cross-site cookie sender.
+        the cookie - so production has no legitimate cross-site cookie sender.
         SameSite=Lax keeps the cookie off cross-site requests (closes a CSRF
         vector on bodyless POSTs) while still attaching on top-level
         navigations, which is all the web client needs. Local http dev can't

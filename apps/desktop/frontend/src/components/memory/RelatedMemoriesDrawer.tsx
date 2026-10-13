@@ -1,12 +1,12 @@
 /**
- * RelatedMemoriesDrawer — right-side slide-in panel showing memories related
+ * RelatedMemoriesDrawer - right-side slide-in panel showing memories related
  * to a selected memory, ordered by embedding similarity.
  *
  * Navigation within the drawer replaces content in-place rather than closing
  * and reopening, so the user can explore the memory graph without losing context.
  *
  * Similarity coloring: green ≥ 0.7, amber 0.4-0.7, muted < 0.4.
- * Minimum threshold 0.35 — below this, memories are considered unrelated.
+ * Minimum threshold 0.35 - below this, memories are considered unrelated.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -43,7 +43,7 @@ function similarityLabel(s: number): string {
 // ---------------------------------------------------------------------------
 
 interface RelatedMemoriesDrawerProps {
-  /** The memory the user clicked — starts the related chain */
+  /** The memory the user clicked - starts the related chain */
   sourceMemory: Memory;
   onClose: () => void;
 }

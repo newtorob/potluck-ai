@@ -1,5 +1,5 @@
 /**
- * SignInWall — full-screen, blocking sign-in screen shown by AuthGate when
+ * SignInWall - full-screen, blocking sign-in screen shown by AuthGate when
  * there is no signed-in session and no cached account to fall back to.
  *
  * Reuses MagicLinkForm/VerifyingLink, the same pair MembershipView uses for

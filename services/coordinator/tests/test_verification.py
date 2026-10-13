@@ -94,7 +94,7 @@ def test_evaluate_canary_rejects_garbage() -> None:
 
 def test_evaluate_canary_boundary_rejects_embedded_answer() -> None:
     # The expected answer must land on a token boundary, so a wrong answer that
-    # merely embeds the expected one does NOT pass.
+    # merely embeds the expected one does not pass.
     c = Canary("What is 40 plus 45? Reply with only the number.", "85")
     assert evaluate_canary("85", c) is True
     assert evaluate_canary("The answer is 85.", c) is True  # wrapped still passes
@@ -157,8 +157,8 @@ def test_reprobe_probability() -> None:
 def test_select_reprobe_draws_and_caps() -> None:
     ids = [uuid.uuid4() for _ in range(5)]
     cands = [(ids[i], 0.9 - i * 0.1) for i in range(5)]  # reputations 0.9..0.5
-    # Always-fire rng: all 5 draw; capped to `slots` via a RANDOM subset (the
-    # stub's sample takes the first k). High-rep peers are NOT deprioritized.
+    # Always-fire rng: all 5 draw; capped to `slots` via a random subset (the
+    # stub's sample takes the first k). High-rep peers are not deprioritized.
     picked = _select_reprobe(cands, 2, _Rng(0.0))
     assert len(picked) == 2 and set(picked) <= set(ids)
     # Never-fire rng: none drawn.
@@ -187,7 +187,7 @@ def test_select_due_peers_policy() -> None:
     # No escrowed peers -> recovery takes the whole batch.
     assert select_due_peers([], rec, batch=8) == rec[:6]
 
-    # A peer in BOTH sets is probed once (via its escrowed slot), not twice.
+    # A peer in both sets is probed once (via its escrowed slot), not twice.
     dual = ids[0]
     due2 = select_due_peers([dual], [dual], batch=8)
     assert due2 == [dual]
@@ -279,7 +279,7 @@ async def test_canary_passes_build_reputation_then_release(
     assert hb.reputation == pytest.approx(0.5)
 
     # A fresh peer (neutral 0.5 prior) must show RELEASE_MIN_PASSES clean canaries
-    # before its escrow releases — the threshold is derived from the Sarmenta
+    # before its escrow releases - the threshold is derived from the Sarmenta
     # credibility curve, not a fixed two-pass gate.
     for _ in range(1, RELEASE_MIN_PASSES):  # passes 1 .. k*-1: still below threshold
         released = await record_canary_result(db_session, peer.id, CANARY_PASS)
@@ -315,7 +315,7 @@ async def test_canary_infra_soft_penalty_wrong_hard_resets(
     assert hb.reputation == pytest.approx(0.4)
     assert released == 0
 
-    # Climb back up, then a confirmed WRONG answer hard-resets reputation to 0.
+    # Climb back up, then a confirmed wrong answer hard-resets reputation to 0.
     await record_canary_result(db_session, peer.id, CANARY_PASS)  # 0.4 -> 0.5
     await record_canary_result(db_session, peer.id, CANARY_PASS)  # 0.5 -> 0.6
     await db_session.refresh(hb)
@@ -379,7 +379,7 @@ async def test_run_canary_probe_honest_peer_passes(session_factory: "FactoryFixt
                 binary_hash="h",
                 client_version="v",
             ))
-    # Committed — track for teardown cleanup.
+    # Committed - track for teardown cleanup.
     session_factory.track_peer(peer.id)
 
     conn = PeerConnection(
@@ -569,7 +569,7 @@ async def test_probe_due_peers_floor_reprobes_trusted_peer(
     session_factory: "FactoryFixture",
 ) -> None:
     # A trusted peer (reputation >= release threshold, no escrow, at/above
-    # neutral) is NOT otherwise due. Without the floor re-probe it would never be
+    # neutral) is not otherwise due. Without the floor re-probe it would never be
     # probed again, so a peer that earns trust then goes bad would never be
     # caught. The floor re-probe surprise-probes it.
     from coordinator.services.peer_registry import unregister_peer
@@ -604,6 +604,6 @@ async def test_probe_due_peers_floor_reprobes_trusted_peer(
         async with session_factory.factory() as read_db2:
             hb_unchanged = await read_db2.get(PeerHeartbeat, trusted.id)
         assert hb_unchanged is not None
-        assert hb_unchanged.reputation == pytest.approx(0.95), "rng suppressed — untouched"
+        assert hb_unchanged.reputation == pytest.approx(0.95), "rng suppressed - untouched"
     finally:
         await unregister_peer(trusted.id)

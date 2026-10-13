@@ -1,35 +1,35 @@
-// mesh-helper — tiny CLI wrapping SMAppService for the Potluck mesh
+// mesh-helper: tiny CLI wrapping SMAppService for the Potluck mesh
 // LaunchDaemon (Label "ai.trypotluck.mesh").
 //
-// WHY THIS BINARY EXISTS AND WHERE IT MUST LIVE
+// Why this binary exists and where it must live
 // ----------------------------------------------
 // SMAppService.daemon(plistName:) resolves the embedded LaunchDaemon plist at
-// Contents/Library/LaunchDaemons/<plistName> RELATIVE TO THE CALLING
-// PROCESS'S OWN MAIN BUNDLE (CFBundleGetMainBundle()). For a bare Mach-O
+// Contents/Library/LaunchDaemons/<plistName> relative to the calling
+// process's own main bundle (CFBundleGetMainBundle()). For a bare Mach-O
 // executable with no Info.plist of its own, that resolution only lands on
 // the enclosing .app when the executable sits at the canonical
-// <Something>.app/Contents/MacOS/<executable> location — which is why this
+// <Something>.app/Contents/MacOS/<executable> location, which is why this
 // binary is packaged (via electron-builder's mac.extraFiles, see
-// apps/desktop/electron/package.json) as a SIBLING of the main Electron
+// apps/desktop/electron/package.json) as a sibling of the main Electron
 // executable: Contents/MacOS/mesh-helper, next to Contents/MacOS/Potluck AI.
-// Placing it under Contents/Resources/ instead would NOT resolve correctly.
+// Placing it under Contents/Resources/ instead does not resolve correctly.
 //
 // main.js's mesh:daemon-status / mesh:enable / mesh:open-login-items IPC
 // handlers shell out to this binary (execFile) and parse stdout. See
 // getMeshHelperPath() in main.js for the exact path it is invoked at.
 //
-// CONTRACT (stdout / exit code — keep in sync with main.js's parsing):
+// Contract (stdout / exit code; keep in sync with main.js's parsing):
 //
 //   status
 //     Prints exactly one of: notRegistered | requiresApproval | enabled | notFound
-//     to stdout, exit 0. Never fails — even "no such daemon" is a normal,
+//     to stdout, exit 0. Never fails: even "no such daemon" is a normal,
 //     expected status (notRegistered / notFound), not an error.
 //
 //   register
-//     Calls SMAppService.register(). On success, prints the RESULTING status
+//     Calls SMAppService.register(). On success, prints the resulting status
 //     token (same vocabulary as `status`) to stdout, exit 0.
-//     IMPORTANT: requiresApproval is a SUCCESSFUL outcome here — the daemon
-//     IS registered, it just needs the user to flip it on in System
+//     requiresApproval counts as success here: the daemon is registered, it
+//     just needs the user to flip it on in System
 //     Settings > Login Items & Extensions. It is not treated as an error.
 //     On failure (e.g. code-signing / Team ID mismatch, plist validation
 //     error): message to stderr, exit 1.
@@ -49,7 +49,7 @@ import Foundation
 import ServiceManagement
 
 /// Must exactly match the plist file name (and its internal Label key)
-/// embedded at Contents/Library/LaunchDaemons/ — see
+/// embedded at Contents/Library/LaunchDaemons/. See
 /// packaging/daemons/ai.trypotluck.mesh.plist and the mac.extraFiles entry
 /// in apps/desktop/electron/package.json that places it there.
 let daemonPlistName = "ai.trypotluck.mesh.plist"
@@ -92,7 +92,7 @@ case "status":
 case "register":
     do {
         try service.register()
-        // register() can succeed while landing in .requiresApproval — that
+        // register() can succeed while landing in .requiresApproval. That
         // is expected, not an error. Report whatever status resulted.
         print(statusToken(service.status))
         exit(0)

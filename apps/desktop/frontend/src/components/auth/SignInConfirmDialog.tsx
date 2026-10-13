@@ -1,11 +1,11 @@
 /**
- * SignInConfirmDialog — "Sign in as <email>?" gate on the magic-link deep
+ * SignInConfirmDialog - "Sign in as <email>?" gate on the magic-link deep
  * link flow.
  *
- * SECURITY (login CSRF fix): useDeepLinkAuth exchanges a potluck://auth/
- * callback token unconditionally — a deep link is not proof the person who
+ * Security (login CSRF): useDeepLinkAuth exchanges a potluck://auth/
+ * callback token unconditionally - a deep link is not proof the person who
  * clicked it requested this app's sign-in (an attacker can request a magic
- * link to their OWN email, wrap the token as a deep link, and get a victim
+ * link to their own email, wrap the token as a deep link, and get a victim
  * to click it). The exchange result lands in `pendingSession`; this dialog
  * is the only place that turns it into an active, persisted session. Confirm
  * calls confirmSignIn() (persists via cloud.setToken + navigates); Cancel

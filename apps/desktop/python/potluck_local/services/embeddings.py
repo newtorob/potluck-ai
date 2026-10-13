@@ -1,6 +1,6 @@
-"""Embedding service — wraps sentence-transformers with lazy loading and async safety.
+"""Embedding service - wraps sentence-transformers with lazy loading and async safety.
 
-The SentenceTransformer model is intentionally NOT loaded at import time or app
+The SentenceTransformer model is intentionally not loaded at import time or app
 startup. It is downloaded the first time embed() is called. This keeps app startup
 fast and avoids blocking uvicorn startup on model download.
 
@@ -13,13 +13,13 @@ Model selection:
 
 Asymmetric embedding (BGE-style):
     Some models (notably BGE family) require a task instruction prepended to the
-    QUERY text only.  Document/memory texts are embedded without any prefix.
+    query text only.  Document/memory texts are embedded without any prefix.
     The query prefix is controlled by QUERY_PREFIX, which is set per model in
     _MODEL_CONFIGS.  For symmetric models (all-MiniLM, GTE) the prefix is "".
 
-    - embed_query(text)      — applies the model's query prefix before encoding
-    - embed(text)            — raw encode, no prefix (use for document/memory side)
-    - embed_many(texts)      — raw batch encode, no prefix (use for document/memory side)
+    - embed_query(text) - applies the model's query prefix before encoding
+    - embed(text) - raw encode, no prefix (use for document/memory side)
+    - embed_many(texts) - raw batch encode, no prefix (use for document/memory side)
 """
 
 from __future__ import annotations
@@ -46,22 +46,22 @@ class _ModelConfig(NamedTuple):
 # Per-model configuration.  Add entries here when adding new candidate models.
 # Keys must match the HuggingFace model ID (or the value of POTLUCK_EMBED_MODEL).
 _MODEL_CONFIGS: dict[str, _ModelConfig] = {
-    # Default — symmetric, no prefix needed
+    # Default - symmetric, no prefix needed
     "sentence-transformers/all-MiniLM-L6-v2": _ModelConfig(dim=384, query_prefix=""),
-    # BGE small — asymmetric: queries need the retrieval instruction prefix
+    # BGE small - asymmetric: queries need the retrieval instruction prefix
     "BAAI/bge-small-en-v1.5": _ModelConfig(
         dim=384,
         query_prefix="Represent this sentence for searching relevant passages: ",
     ),
-    # GTE small — symmetric, no prefix needed
+    # GTE small - symmetric, no prefix needed
     "thenlper/gte-small": _ModelConfig(dim=384, query_prefix=""),
-    # MPNet base — 768-dim (breaks DIM=384 storage assumption; flagged, not recommended)
+    # MPNet base - 768-dim (breaks DIM=384 storage assumption; flagged, not recommended)
     "sentence-transformers/all-mpnet-base-v2": _ModelConfig(dim=768, query_prefix=""),
 }
 
-# bge-small-en-v1.5 chosen 2026-05-28: same 384-dim storage as MiniLM (no schema
+# bge-small-en-v1.5 is the default: same 384-dim storage as MiniLM (no schema
 # change) and same Eval B recall@5 (0.72, no regression), but doubles precision@1
-# on hard close-distractor pairs (0.40 -> 0.80) — fixes cases like ranking
+# on hard close-distractor pairs (0.40 -> 0.80) - fixes cases like ranking
 # "Python linting" above "use pnpm" for a JS-package query. Asymmetric model:
 # embed_query() prepends the retrieval prefix (see _MODEL_CONFIGS). Switching the
 # default requires re-embedding existing memories (vectors are model-specific).
@@ -72,7 +72,7 @@ class EmbeddingService:
     """Lazy-loading wrapper around sentence-transformers.
 
     The active model is controlled by POTLUCK_EMBED_MODEL (read at instantiation).
-    Default: sentence-transformers/all-MiniLM-L6-v2
+    Default: BAAI/bge-small-en-v1.5
 
     Asymmetric models (BGE): use embed_query() for query-side encoding.
     Symmetric models (MiniLM, GTE): embed() and embed_query() are equivalent.
@@ -90,9 +90,9 @@ class EmbeddingService:
             self.DIM: int = cfg.dim
             self._query_prefix: str = cfg.query_prefix
         else:
-            # Unknown model — assume 384-dim, symmetric. Log a warning.
+            # Unknown model - assume 384-dim, symmetric. Log a warning.
             logger.warning(
-                "embedder_unknown_model model=%s — assuming dim=384 symmetric; "
+                "embedder_unknown_model model=%s, assuming dim=384 symmetric; "
                 "add it to _MODEL_CONFIGS for correct asymmetric handling",
                 self.MODEL_NAME,
             )
@@ -108,7 +108,7 @@ class EmbeddingService:
     # ------------------------------------------------------------------
 
     def _load_model_sync(self) -> None:
-        """Blocking model load — runs inside the thread pool."""
+        """Blocking model load - runs inside the thread pool."""
         from sentence_transformers import SentenceTransformer  # type: ignore[import]
         self._model = SentenceTransformer(self.MODEL_NAME)
         logger.info("embedder_loaded model=%s dim=%d", self.MODEL_NAME, self.DIM)
@@ -131,7 +131,7 @@ class EmbeddingService:
                 self._available = True
             except Exception as exc:
                 logger.error(
-                    "embedder_load_failed reason=%s — semantic search degraded",
+                    "embedder_load_failed reason=%s, semantic search degraded",
                     exc,
                 )
                 self._available = False
@@ -139,7 +139,7 @@ class EmbeddingService:
         return self._available is True
 
     def _encode_sync(self, texts: list[str]) -> np.ndarray:
-        """Blocking encode — runs inside the thread pool.
+        """Blocking encode - runs inside the thread pool.
 
         Returns float32 matrix of shape (n, DIM), each row L2-normalised so
         that cosine similarity equals a plain dot product.
@@ -157,7 +157,7 @@ class EmbeddingService:
         return self._available is True
 
     async def embed(self, text: str) -> np.ndarray | None:
-        """Embed a single string WITHOUT a query prefix.
+        """Embed a single string without a query prefix.
 
         Use this for document/memory-side encoding.
         Returns None if the model is unavailable.
@@ -187,7 +187,7 @@ class EmbeddingService:
         return result[0]  # shape (DIM,)
 
     async def embed_many(self, texts: list[str]) -> np.ndarray | None:
-        """Embed a batch of strings WITHOUT a query prefix (document/memory side).
+        """Embed a batch of strings without a query prefix (document/memory side).
 
         Returns None if the model is unavailable.
         Returns float32 array of shape (len(texts), DIM).
@@ -202,7 +202,7 @@ class EmbeddingService:
         )
 
 
-# Module-level singleton — reset when POTLUCK_EMBED_MODEL changes between runs
+# Module-level singleton - reset when POTLUCK_EMBED_MODEL changes between runs
 # by calling _reset_embedder() (used by the eval harness).
 _embedder: EmbeddingService | None = None
 
@@ -231,7 +231,7 @@ def schedule_embed_memory(memory_id: str, content: str) -> None:
     Shared by every write path that inserts or changes memory content
     (explicit save, extraction, import upsert, content edit) so they all
     regenerate + persist the vector and invalidate the cluster cache the same
-    way.  Safe to call from any async context — if the event loop isn't
+    way.  Safe to call from any async context - if the event loop isn't
     running (shouldn't happen in production) this is a no-op.  Any failure
     (model unavailable, etc.) is logged and swallowed: keyword search still
     works without a vector, and services.embedding_backfill.run_embedding_backfill

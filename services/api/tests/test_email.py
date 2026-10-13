@@ -7,7 +7,7 @@ from potluck_api.services.email_service import _mask_email
 
 
 async def test_mask_keeps_domain_hides_local():
-    assert _mask_email("admin@example.com") == "n***@protonmail.com"
+    assert _mask_email("member@example.com") == "m***@example.com"
 
 
 async def test_mask_handles_missing_at():

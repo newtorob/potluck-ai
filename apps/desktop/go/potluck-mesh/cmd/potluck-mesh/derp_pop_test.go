@@ -12,14 +12,14 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// buildDERPTokenRequestBody — the ordering guard
+// buildDERPTokenRequestBody - the ordering guard
 // ---------------------------------------------------------------------------
 
 // TestDERPTokenBody_UnregisteredKeyOmitsSignature is the ordering-guard test:
-// a node with a local signing key that has NOT been confirmed registered
-// with the coordinator (no MarkRegistered call ever happened for it — e.g.
+// a node with a local signing key that has not been confirmed registered
+// with the coordinator (no MarkRegistered call ever happened for it - e.g.
 // an already-enrolled pre-upgrade node, or one mid-pairing) must send a
-// request with NEITHER nonce NOR signature. Sending either without the other
+// request with neither nonce nor signature. Sending either without the other
 // (or a signature the coordinator can't verify) is a 400/401 per
 // routers/mesh.py::issue_derp_token.
 func TestDERPTokenBody_UnregisteredKeyOmitsSignature(t *testing.T) {
@@ -27,7 +27,7 @@ func TestDERPTokenBody_UnregisteredKeyOmitsSignature(t *testing.T) {
 	keyPath := filepath.Join(dir, "signing.key")
 
 	// Generating the key (as main.go does unconditionally at startup) but
-	// NEVER calling signingkey.MarkRegistered — this is the exact state of
+	// Never calling signingkey.MarkRegistered - this is the exact state of
 	// an upgraded-but-not-re-enrolled node.
 	if _, err := signingkey.LoadOrGenerate(keyPath); err != nil {
 		t.Fatalf("LoadOrGenerate: %v", err)
@@ -51,7 +51,7 @@ func TestDERPTokenBody_UnregisteredKeyOmitsSignature(t *testing.T) {
 
 // TestDERPTokenBody_NoKeyFileYetOmitsSignature covers the case where the
 // signing key file doesn't even exist yet at the configured path (e.g. an
-// unexpected filesystem issue) — LoadOrGenerate transparently creates one,
+// unexpected filesystem issue) - LoadOrGenerate transparently creates one,
 // but it's fresh and therefore unregistered, so the outcome must be
 // identical to the already-generated-but-unregistered case above.
 func TestDERPTokenBody_NoKeyFileYetOmitsSignature(t *testing.T) {
@@ -71,7 +71,7 @@ func TestDERPTokenBody_NoKeyFileYetOmitsSignature(t *testing.T) {
 // TestDERPTokenBody_RegisteredKeySignsRequest is the happy path: once
 // MarkRegistered has recorded this exact public key as accepted by the
 // coordinator, the request must carry a fresh unix-seconds nonce plus a
-// signature that verifies against the keypair's own public key over EXACTLY
+// signature that verifies against the keypair's own public key over exactly
 // derp-token:{wg_public_key}:{region}:{nonce}.
 func TestDERPTokenBody_RegisteredKeySignsRequest(t *testing.T) {
 	dir := t.TempDir()
@@ -106,7 +106,7 @@ func TestDERPTokenBody_RegisteredKeySignsRequest(t *testing.T) {
 		t.Errorf("nonce %d not within [%d,%d]", nonce, before, after)
 	}
 
-	// The signature must verify over the EXACT coordinator message format.
+	// The signature must verify over the exact coordinator message format.
 	msg := "derp-token:wgpubkey==:ord:" + nonceStr
 	pubBytes, err := base64.RawURLEncoding.DecodeString(kp.PublicKeyB64)
 	if err != nil {
@@ -122,9 +122,9 @@ func TestDERPTokenBody_RegisteredKeySignsRequest(t *testing.T) {
 }
 
 // TestDERPTokenBody_MismatchedRegisteredKeyOmitsSignature: if the marker
-// records a DIFFERENT public key than the one currently on disk (e.g. the
+// records a different public key than the one currently on disk (e.g. the
 // key file was replaced without a fresh enroll), the request must fall back
-// to unsigned — never sign with a key the coordinator doesn't actually have
+// to unsigned - never sign with a key the coordinator doesn't actually have
 // on file, which would 401.
 func TestDERPTokenBody_MismatchedRegisteredKeyOmitsSignature(t *testing.T) {
 	dir := t.TempDir()
@@ -133,7 +133,7 @@ func TestDERPTokenBody_MismatchedRegisteredKeyOmitsSignature(t *testing.T) {
 	if _, err := signingkey.LoadOrGenerate(keyPath); err != nil {
 		t.Fatalf("LoadOrGenerate: %v", err)
 	}
-	// Register a DIFFERENT (bogus) pubkey than the one actually on disk.
+	// Register a different (bogus) pubkey than the one actually on disk.
 	if err := signingkey.MarkRegistered(keyPath, "some-other-node-entirely"); err != nil {
 		t.Fatalf("MarkRegistered: %v", err)
 	}

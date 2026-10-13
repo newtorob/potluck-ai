@@ -1,4 +1,4 @@
-"""003 — billing_events
+"""003 - billing_events
 
 Revision ID: 0003_billing
 Revises: 0002_memberships
@@ -34,7 +34,7 @@ def upgrade() -> None:
             postgresql.UUID(as_uuid=True),
             nullable=True,
         ),
-        # Stripe event ID used as idempotency key — prevents double-processing retries.
+        # Stripe event ID used as idempotency key - prevents double-processing retries.
         sa.Column("stripe_event_id", sa.String(64), nullable=False),
         # e.g. 'checkout.session.completed', 'invoice.paid', 'customer.subscription.deleted'
         sa.Column("event_type", sa.String(64), nullable=False),

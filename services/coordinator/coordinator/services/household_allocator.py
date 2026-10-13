@@ -1,7 +1,7 @@
 """Household CIDR allocation.
 
 Carves a unique /24 out of the global mesh pool for each household.
-Pool is `100.64.0.0/10` — the Carrier-Grade NAT range — which gives us
+Pool is `100.64.0.0/10` - the Carrier-Grade NAT range - which gives us
 ~4M possible /24 slices and guaranteed non-collision with home/corp
 networks (10.0.0.0/8 and 192.168.0.0/16 are common; 100.64.0.0/10 is
 not). Matches the convention used by Tailscale + Headscale.

@@ -1,5 +1,5 @@
 /**
- * ActivityFeed — time-ordered list of recent tool calls with filter controls.
+ * ActivityFeed - time-ordered list of recent tool calls with filter controls.
  *
  * Each row shows: time-ago · client · tool · args (safe metadata keys) · results · duration · error
  *

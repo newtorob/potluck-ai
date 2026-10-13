@@ -5,10 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "potluck-coordinator"
 version = "0.1.0"
-description = "Potluck AI Phase G coordinator — peer registry, attestation, job routing, mesh control plane"
+description = "Potluck AI Phase G coordinator - peer registry, attestation, job routing, mesh control plane"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "AGPL-3.0" }
+license = { text = "MIT" }
 authors = [{ name = "Potluck AI", email = "hello@trypotluck.ai" }]
 
 [tool.setuptools.packages.find]

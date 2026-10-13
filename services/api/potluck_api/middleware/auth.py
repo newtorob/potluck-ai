@@ -15,7 +15,7 @@ def _extract_token(cookie_value: str | None, auth_header: str | None) -> str | N
 
     The cookie is the primary transport for the web client. The bearer fallback
     exists for the desktop app, where third-party cookies against
-    api.trypotluck.ai are awkward — it can present the raw token returned by
+    api.trypotluck.ai are awkward - it can present the raw token returned by
     /auth/callback as a bearer credential instead.
     """
     if cookie_value:
@@ -39,7 +39,7 @@ async def get_current_member(
     Cookie name: ``potluck_session``. Bearer fallback: ``Authorization: Bearer``.
 
     Raises:
-        HTTPException 401 — missing, expired, or invalid session.
+        HTTPException 401 - missing, expired, or invalid session.
     """
     token = _extract_token(potluck_session, authorization)
     if not token:

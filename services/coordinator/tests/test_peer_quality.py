@@ -1,4 +1,4 @@
-"""Peer quality scoring — data layer, dispatch integration, and feedback endpoint.
+"""Peer quality scoring - data layer, dispatch integration, and feedback endpoint.
 
 Coverage:
   Service layer (peer_quality.py):
@@ -10,7 +10,7 @@ Coverage:
     - Low-quality peer is deprioritised in scoring vs. neutral peer.
     - A peer with >= QUALITY_CONSECUTIVE_FAIL_THRESHOLD consecutive failures
       is hard-excluded from eligibility (returns None when it's the only peer).
-    - A single bad signal does NOT exclude (consecutive count < threshold).
+    - A single bad signal does not exclude (consecutive count < threshold).
 
   Feedback endpoint (POST /jobs/{job_id}/feedback):
     - 404 on unknown job_id.
@@ -55,7 +55,7 @@ _FEEDBACK_MODEL = "llama3:8b-feedback-endpoint-test"
 
 
 class _WS:
-    """Stub WebSocket — pick_peer_for_model stores but never calls it."""
+    """Stub WebSocket - pick_peer_for_model stores but never calls it."""
 
 
 # ---------------------------------------------------------------------------
@@ -293,7 +293,7 @@ async def test_dispatch_low_quality_peer_deprioritised(db_session: AsyncSession)
     """A peer with low quality score is deprioritised vs. a neutral-quality peer.
 
     Both peers have the same tps / jobs / reputation.  The low-quality peer is
-    registered SECOND (most-recently-connected → old code picks it); the new
+    registered second (most-recently-connected, which wins a tie); the
     quality-weighted score must pick the neutral peer instead.
 
     Scores with tps=20, jobs=0, rep=0.5:
@@ -305,7 +305,7 @@ async def test_dispatch_low_quality_peer_deprioritised(db_session: AsyncSession)
     good = await _mk_peer(db_session, member, tps=20.0, current_jobs=0, reputation=0.5)
     bad = await _mk_peer(db_session, member, tps=20.0, current_jobs=0, reputation=0.5)
     # Insert three consecutive failures (score=0.1) for `bad` so its quality ≈ 0.1
-    # (below the consecutive-fail threshold we want to test separately — use
+    # (below the consecutive-fail threshold we want to test separately - use
     # only two failures here so hard-exclude doesn't fire; test deprioritisation only).
     await _insert_quality_obs(db_session, bad, score=0.1, age_hours=2)
     await _insert_quality_obs(db_session, bad, score=0.1, age_hours=1)
@@ -348,7 +348,7 @@ async def test_dispatch_consecutive_failures_excludes_peer(db_session: AsyncSess
 async def test_dispatch_single_bad_signal_does_not_exclude(
     db_session: AsyncSession,
 ) -> None:
-    """A single failure observation (score=0.0) must NOT exclude the peer.
+    """A single failure observation (score=0.0) must not exclude the peer.
 
     Hard constraint: QUALITY_CONSECUTIVE_FAIL_THRESHOLD is 3; one bad signal
     is consecutive_failures=1, which is < 3.  The peer must remain eligible.

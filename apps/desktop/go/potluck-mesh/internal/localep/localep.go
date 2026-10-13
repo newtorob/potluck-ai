@@ -1,8 +1,8 @@
-// Package localep discovers this node's private-LAN WireGuard endpoints so a
-// later phase can use them for same-LAN direct connections instead of relaying
+// Package localep discovers this node's private-LAN WireGuard endpoints so
+// same-LAN peers can connect directly instead of relaying
 // every packet through DERP.
 //
-// Background: today the mesh only learns each node's STUN'd PUBLIC endpoint.
+// Background: the roster otherwise carries only each node's STUN'd public endpoint.
 // Two nodes behind one NAT therefore relay through DERP even when they sit on
 // the same LAN. LocalCandidates enumerates the host's own RFC1918 addresses
 // and formats them as "ip:<wgPort>" so they can ride along in the roster.
@@ -10,10 +10,10 @@
 // Privacy: only RFC1918 addresses are returned. The tailnet/CGNAT range
 // (100.64.0.0/10), loopback, and link-local are all excluded via the shared
 // util.PrivateLAN predicate, so a Tailscale IP is never advertised as a LAN
-// candidate. The result is metadata-only (ip:port) — never payload.
+// candidate. The result is metadata-only (ip:port) - never payload.
 //
-// Phase 0/1 is ADDITIVE PLUMBING: this package only discovers + reports
-// candidates. It performs no routing and changes no DERP behaviour.
+// This package only discovers + reports candidates. It performs no routing
+// and changes no DERP behaviour.
 package localep
 
 import (
@@ -27,7 +27,7 @@ import (
 
 // maxCandidates caps how many LAN endpoints we advertise. Multi-homed hosts
 // (e.g. a desktop with wired + WiFi + a couple of virtual bridges) can have
-// several RFC1918 addresses; a handful is plenty for a later phase to try and
+// several RFC1918 addresses; a handful is plenty for the direct-path trial and
 // keeps the roster payload bounded. Matches the server-side cap in the
 // coordinator's SignalEndpointUpdate validator.
 const maxCandidates = 4
@@ -35,8 +35,8 @@ const maxCandidates = 4
 // virtualInterfacePrefixes are interface-name prefixes for container/bridge/
 // virtualization adapters that hand out RFC1918-looking addresses (e.g.
 // Docker's default docker0 bridge at 172.17.0.1, a per-network br-xxxxxxxx,
-// libvirt's virbr0, Podman's podman0) but are NEVER a usable path to another
-// physical host on the LAN — the address is only reachable from the same
+// libvirt's virbr0, Podman's podman0) but are never a usable path to another
+// physical host on the LAN - the address is only reachable from the same
 // machine's own network namespace. util.PrivateLAN only filters by IP range
 // (RFC1918), which cannot tell a real LAN adapter apart from a virtual one
 // sharing the same address space, so we filter by interface name too.
@@ -49,8 +49,8 @@ const maxCandidates = 4
 //  2. maxCandidates caps the advertised list at 4. A host with several virtual
 //     bridges (docker0 + a couple of compose per-project networks + a VPN
 //     client's tun adapter) can fill the cap with unreachable addresses and
-//     push the one real LAN candidate out entirely — turning "noise" into an
-//     actual same-LAN direct-path regression.
+//     push the one real LAN candidate out entirely - turning "noise" into a
+//     lost same-LAN direct path.
 //
 // Deliberately name-prefix based (not exhaustive by design): this only needs
 // to catch the common container/VM engines that default to RFC1918 bridge
@@ -70,7 +70,7 @@ var virtualInterfacePrefixes = []string{
 }
 
 // isVirtualInterfaceName reports whether ifName matches a known container/
-// bridge/virtualization adapter prefix (case-insensitive — Windows adapter
+// bridge/virtualization adapter prefix (case-insensitive - Windows adapter
 // friendly names can vary in case).
 func isVirtualInterfaceName(ifName string) bool {
 	lower := strings.ToLower(ifName)
@@ -160,7 +160,7 @@ func LocalIPNets() []net.IPNet {
 			if ip4 == nil || !util.PrivateLAN(ip4) {
 				continue
 			}
-			// Normalise the mask to 4 bytes when the address is IPv4 — a
+			// Normalise the mask to 4 bytes when the address is IPv4 - a
 			// dual-stack interface can report a 16-byte mask alongside a
 			// 4-byte IP, which would break net.IP.Mask.
 			mask := ipnet.Mask

@@ -78,7 +78,7 @@ func TestBus_Unsubscribe(t *testing.T) {
 func TestBus_SlowSubscriberDropped(t *testing.T) {
 	b := events.NewBus()
 
-	// Subscribe but never drain — the channel will fill.
+	// Subscribe but never drain - the channel will fill.
 	_, unsub := b.Subscribe()
 	defer unsub()
 

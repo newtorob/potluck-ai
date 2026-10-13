@@ -7,11 +7,11 @@ import (
 	"github.com/potluck-ai/potluck-mesh/internal/derp"
 )
 
-// TestValidateEndpoint_TableAndInjection is the launch-blocker regression
-// test for the WireGuard UAPI config-injection bug: an endpoint string that
+// TestValidateEndpoint_TableAndInjection is the test for WireGuard UAPI
+// config injection: an endpoint string that
 // contains an embedded newline (as would arrive from a compromised/buggy
 // coordinator or peer) must never reach IpcSet, because wireguard-go's UAPI
-// parser treats "\n" as a directive separator — an unvalidated endpoint like
+// parser treats "\n" as a directive separator - an unvalidated endpoint like
 // "1.1.1.1:1\nallowed_ip=0.0.0.0/0\n" would inject an extra allowed_ip
 // directive and widen that peer's allowed-ips past its intended /32.
 func TestValidateEndpoint_TableAndInjection(t *testing.T) {
@@ -47,7 +47,7 @@ func TestValidateEndpoint_TableAndInjection(t *testing.T) {
 			wantValid: true,
 		},
 
-		// --- the actual injection payload from the bug report ---
+		// --- the injection payload ---
 		{
 			name:      "newline injection widening allowed_ip",
 			endpoint:  "1.1.1.1:1\nallowed_ip=0.0.0.0/0\n",
@@ -121,9 +121,8 @@ func TestValidateEndpoint_TableAndInjection(t *testing.T) {
 			wantValid: false,
 		},
 
-		// --- synthetic DERP endpoint carve-out (regression test for the
-		// f5fd5ef validateEndpoint rollout, which blanket-rejected this
-		// format and silently broke the entire DERP fallback path — see
+		// --- synthetic DERP endpoint carve-out (validateEndpoint must accept
+		// this format, or the entire DERP fallback path breaks - see
 		// validateEndpoint's doc comment) ---
 		{
 			name:      "valid synthetic DERP endpoint",
@@ -156,7 +155,7 @@ func TestValidateEndpoint_TableAndInjection(t *testing.T) {
 
 // TestAppendPeerConfig_RejectsInjectedEndpoint verifies that appendPeerConfig
 // (the function that actually builds the UAPI text handed to IpcSet) rejects
-// a malicious endpoint and — critically — writes NOTHING to the builder, so
+// a malicious endpoint and - critically - writes nothing to the builder, so
 // a caller that ignores the error can't accidentally emit a half-written or
 // injected stanza.
 func TestAppendPeerConfig_RejectsInjectedEndpoint(t *testing.T) {

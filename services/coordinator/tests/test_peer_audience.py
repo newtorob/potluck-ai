@@ -1,10 +1,9 @@
 """Who a contributor agreed to serve.
 
 A peer says at attestation whether it serves trusted circles, the open pool,
-or both. Before this, every connected peer was an open-pool candidate, so a
-member could not lend a machine to friends without lending it to everyone:
-in a live run a stranger's open-pool request was answered by a machine that
-was only meant to serve a circle.
+or both. Without this, every connected peer would be an open-pool candidate,
+so a member could not lend a machine to friends without lending it to
+everyone.
 """
 from __future__ import annotations
 

@@ -1,26 +1,24 @@
 /**
- * StatusBar — persistent bottom strip with "alive" indicators.
+ * StatusBar - persistent bottom strip with "alive" indicators.
  *
  * Sits below the main content, above the OS chrome. Communicates the
  * three pieces of state every Potluck user wants to glance-check:
  *
  *   1. Model loaded (sage dot pulsing when active)
  *   2. MCP server up (sage dot when external agents can connect)
- *   3. Network mode (Off / Per-session / Standby) — agent-neutral framing
+ *   3. Network mode (Off / Per-session / Standby) - agent-neutral framing
  *
- * Why this exists: the app previously had no persistent "alive" surface.
- * The whole --sage token was defined for "this is alive" affordances and
- * was used in exactly one placeholder. Now every view inherits a calm,
- * always-visible heartbeat without needing per-view chrome.
+ * Why this exists: the --sage token marks "this is alive" affordances, and
+ * the status bar gives every view a calm, always-visible heartbeat without
+ * needing per-view chrome.
  *
  * Design notes:
- *   - h-7 (28px) — small enough to not steal real estate, large enough
+ *   - h-7 (28px) - small enough to not steal real estate, large enough
  *     for 3:1 contrast text
- *   - text-xs — matches the editorial small-caps used elsewhere
+ *   - text-xs - matches the editorial small-caps used elsewhere
  *   - border-t hairline only; no shadow stack
  *   - All indicators are status-only; settings toggles live on /settings
- *   - Network mode pill is clickable and opens the per-session network
- *     modal (placeholder until task #18 lands /network)
+ *   - Network mode pill links to /chat, where the routing scope is changed
  *
  * Privacy note: never shows per-peer identity. Aggregate state only.
  */
@@ -41,13 +39,13 @@ export function StatusBar() {
   const { modelLoaded, activeModelId, sidecarUp } = useHealth();
   const { isSignedIn, hasCachedAccount } = useAuth();
 
-  // App version — fetched from Electron preload on mount
+  // App version - fetched from Electron preload on mount
   const [appVersion, setAppVersion] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     ipc.getAppVersion()
       .then((v) => { if (!cancelled) setAppVersion(v); })
-      .catch(() => { /* non-fatal — running outside Electron */ });
+      .catch(() => { /* non-fatal - running outside Electron */ });
     return () => { cancelled = true; };
   }, []);
 
@@ -115,7 +113,7 @@ export function StatusBar() {
 }
 
 // ---------------------------------------------------------------------------
-// StatusItem — sage dot + label, optionally a router link
+// StatusItem - sage dot + label, optionally a router link
 // ---------------------------------------------------------------------------
 
 interface StatusItemProps {
@@ -161,7 +159,7 @@ function StatusItem({ active, label, tooltip, href }: StatusItemProps) {
 }
 
 // ---------------------------------------------------------------------------
-// NetworkPill — agent-neutral framing per memory e555655d
+// NetworkPill - agent-neutral framing
 // ---------------------------------------------------------------------------
 
 function NetworkPill({ scope }: { scope: RoutingScope }) {
@@ -210,17 +208,17 @@ function NetworkPill({ scope }: { scope: RoutingScope }) {
 }
 
 // ---------------------------------------------------------------------------
-// MeshPill — aggregate mesh-health heartbeat, app-wide (VPN-resilience Pillar #1)
+// MeshPill - aggregate mesh-health heartbeat, app-wide
 // ---------------------------------------------------------------------------
 
 /**
  * Surfaces the overall mesh diagnostics (from deriveDiagnostics) as a single
- * status entry — calm sage when healthy, ember/amber/red when something needs
+ * status entry - calm sage when healthy, ember/amber/red when something needs
  * attention. Links to My Machines for the full per-peer breakdown.
  *
  * Privacy: aggregate-only. The headline + global diagnostics are count-based
  * and carry no per-peer identity (per-peer reasons live behind the click on
- * /household, never here). Hidden entirely until this machine is enrolled —
+ * /household, never here). Hidden entirely until this machine is enrolled -
  * an unpaired node has no mesh to report on.
  */
 function MeshPill() {
@@ -288,13 +286,13 @@ function Divider() {
 }
 
 // ---------------------------------------------------------------------------
-// DevBadge — non-prod build indicator (so a dev window is never mistaken for
+// DevBadge - non-prod build indicator (so a dev window is never mistaken for
 // packaged prod, and it's always clear which cloud API / coordinator a dev
 // session is actually talking to). Renders nothing in a packaged prod build.
 // ---------------------------------------------------------------------------
 
 /** Shape written by the Electron main process at build time, if present.
- *  Read defensively everywhere below — this may not exist yet. */
+ *  Read defensively everywhere below - this may not exist yet. */
 interface BuildInfo {
   sha?: string;
   builtAt?: string;

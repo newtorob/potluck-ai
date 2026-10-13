@@ -255,7 +255,7 @@ func TestSilentDropUnknownDest(t *testing.T) {
 	connA := dialAndAuth(t, addr, tokenA)
 	defer connA.Close()
 
-	// Send to a pubkey that is NOT connected.
+	// Send to a pubkey that is not connected.
 	var unknownDest [32]byte
 	for i := range unknownDest {
 		unknownDest[i] = 0xFF

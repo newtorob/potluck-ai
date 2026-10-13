@@ -1,14 +1,14 @@
 /**
- * ProjectPill — small badge showing the project a memory or task belongs to.
+ * ProjectPill - small badge showing the project a memory or task belongs to.
  *
  * Visual weight: deliberately quieter than CategoryPill. CategoryPill is
  * "what kind of memory is this" (essential to scanning the list),
  * ProjectPill is "scope" (helpful but secondary). They sit next to each
- * other inside MemoryCard, so they MUST read as different weights — not
+ * other inside MemoryCard, so they must read as different weights - not
  * just different colors. ProjectPill is a thin outlined pill in the warm
  * neutral palette; CategoryPill is a tinted-fill pill.
  *
- * "Global" reads even quieter (no border, no fill — just italic muted
+ * "Global" reads even quieter (no border, no fill - just italic muted
  * text) to stay out of the way when nearly every memory is global.
  */
 
@@ -22,7 +22,7 @@ interface ProjectPillProps {
 export function ProjectPill({ project, className }: ProjectPillProps) {
   const isGlobal = project == null;
 
-  // Global projects don't really need pill chrome — a tiny italic note
+  // Global projects don't really need pill chrome - a tiny italic note
   // is enough. This frees the visual budget for CategoryPill next to it.
   if (isGlobal) {
     return (
@@ -41,7 +41,7 @@ export function ProjectPill({ project, className }: ProjectPillProps) {
   return (
     <span
       className={cn(
-        // Outlined neutral pill — tagged feel, not category feel.
+        // Outlined neutral pill - tagged feel, not category feel.
         // Mono micro-caps to read as a "slug" / handle.
         'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium font-mono tracking-tight',
         'border-border bg-transparent text-muted-foreground',

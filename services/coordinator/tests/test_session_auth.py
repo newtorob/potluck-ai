@@ -1,6 +1,6 @@
 """Tests for per-session member-identity resolution (WS1 Layer C).
 
-Exercises ``resolve_session_member_id`` — the dependency that swaps the
+Exercises ``resolve_session_member_id`` - the dependency that swaps the
 dev-fixture ``STUB_MEMBER_ID`` for the member behind the caller's login
 session by reading the shared ``sessions`` table (owned by services/api).
 
@@ -60,7 +60,7 @@ def test_session_auth_enabled_reflects_env(monkeypatch) -> None:
     assert session_auth_enabled() is False
     monkeypatch.setenv("POTLUCK_SESSION_AUTH_ENABLED", "1")
     assert session_auth_enabled() is True
-    # Only exactly "1" enables it — a stray "true"/"0" stays off (fail-safe).
+    # Only exactly "1" enables it - a stray "true"/"0" stays off (fail-safe).
     monkeypatch.setenv("POTLUCK_SESSION_AUTH_ENABLED", "true")
     assert session_auth_enabled() is False
     monkeypatch.setenv("POTLUCK_SESSION_AUTH_ENABLED", "0")
@@ -75,7 +75,7 @@ async def test_passthrough_returns_stub_when_disabled(
     db_session: AsyncSession, monkeypatch
 ) -> None:
     """With auth disabled every caller resolves to STUB_MEMBER_ID, even with a
-    garbage cookie — the DB is never consulted."""
+    garbage cookie - the DB is never consulted."""
     monkeypatch.delenv("POTLUCK_SESSION_AUTH_ENABLED", raising=False)
     resolved = await resolve_session_member_id(
         potluck_session="totally-bogus", authorization=None, db=db_session

@@ -168,7 +168,7 @@ describe('chatStore persistence and routing', () => {
 
     const sendPromise = useChatStore.getState().sendMessage('hello world');
 
-    // Give the send path a turn — it must block on the pending create.
+    // Give the send path a turn - it must block on the pending create.
     await Promise.resolve();
     await Promise.resolve();
 

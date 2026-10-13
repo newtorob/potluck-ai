@@ -23,7 +23,7 @@ from coordinator.db.base import Base
 
 
 # ---------------------------------------------------------------------------
-# Legacy v0 tables — never written to anywhere. Preserved so migration
+# Legacy v0 tables - never written to anywhere. Preserved so migration
 # 0001 doesn't fail; will be removed in a future cleanup migration once
 # we're confident nothing else references them.
 # ---------------------------------------------------------------------------
@@ -68,7 +68,7 @@ class CreditRate(Base):
 
 
 # ---------------------------------------------------------------------------
-# Phase G m4 — credit ledger (PBC-era, non-monetary).
+# Credit ledger (non-monetary).
 # ---------------------------------------------------------------------------
 
 
@@ -123,7 +123,7 @@ class CreditLedger(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
-    # Operational flag — intentionally NOT part of row_hash (the chain proves
+    # Operational flag - intentionally not part of row_hash (the chain proves
     # credit amounts; escrow is mutable verification state). Earned credits from
     # cross-member public-pool jobs are held escrowed (excluded from the
     # spendable balance) until a verification result releases them (pass) or

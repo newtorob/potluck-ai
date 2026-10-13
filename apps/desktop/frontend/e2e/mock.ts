@@ -6,8 +6,8 @@ import type { Page } from '@playwright/test';
  */
 export const MEMBER = {
   id: 'm-1',
-  email: 'rob@example.com',
-  displayName: 'Rob',
+  email: 'sam@example.com',
+  displayName: 'Sam',
   avatarUrl: null,
   membershipPlan: null,
   membershipStatus: null,
@@ -75,7 +75,7 @@ interface MockOpts {
 
 /**
  * The dev server runs on 127.0.0.1:5173 while the cloud client targets
- * localhost:8080 — a different origin. The app fetches with credentials, so the
+ * localhost:8080 - a different origin. The app fetches with credentials, so the
  * browser drops any mocked response that lacks CORS headers. Echo the request
  * origin + allow credentials so intercepted responses are actually delivered.
  */
@@ -117,7 +117,7 @@ export async function mockBackends(page: Page, opts: MockOpts = {}): Promise<voi
     localStorage.setItem('potluck.theme', 'dark');
   });
 
-  // Match the cloud endpoints by PATH on any host, so the mock works whether the
+  // Match the cloud endpoints by path on any host, so the mock works whether the
   // client's base URL resolves to localhost:8080 (dev override) or the prod host.
   await page.route(/\/me(\?.*)?$/, (route) => {
     if (opts.me == null) {

@@ -5,7 +5,7 @@
   "main": "main.js",
   "author": "Potluck AI",
   "homepage": "https://trypotluck.ai",
-  "license": "AGPL-3.0",
+  "license": "MIT",
   "scripts": {
     "dev": "concurrently --kill-others --names \"VITE,PY,ELECTRON\" --prefix-colors \"magenta,yellow,cyan\" \"pnpm --dir ../frontend dev\" \"pnpm run dev:python\" \"wait-on http-get://localhost:5173 http-get://127.0.0.1:8321/health && cross-env NODE_ENV=development electron .\"",
     "dev:python": "node scripts/run-python-dev.js",

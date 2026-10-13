@@ -1,5 +1,5 @@
 /**
- * MemoryGraph — force-directed graph of memories and their cosine-similarity edges.
+ * MemoryGraph - force-directed graph of memories and their cosine-similarity edges.
  *
  * Uses react-force-graph-2d (canvas-based) loaded via React.lazy so the
  * ~50 KB bundle is never in the initial chunk.
@@ -37,7 +37,7 @@ import { CATEGORY_COLORS } from '@/components/memory/CategoryLegend';
 import type { Memory } from '@/types/memory';
 
 // ---------------------------------------------------------------------------
-// Lazy import — keeps the 2D graph out of the initial bundle
+// Lazy import - keeps the 2D graph out of the initial bundle
 // ---------------------------------------------------------------------------
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-force-graph-2d uses complex generic types; the lazy wrapper needs the cast
@@ -50,7 +50,7 @@ const ForceGraph2D = lazy(() => import('react-force-graph-2d').then((mod) => ({ 
 const RELATED_BATCH_LIMIT = 200; // max memories we call /related for
 const SIMILARITY_THRESHOLD = 0.6;
 const RELATED_LIMIT = 12;
-// Wide spread between leaves and hubs gives the Obsidian starburst look —
+// Wide spread between leaves and hubs gives the Obsidian starburst look -
 // a leaf is a tiny dot, a hub with 20+ neighbours is large and glowy.
 const NODE_RADIUS_MIN = 2;
 const NODE_RADIUS_MAX = 18;
@@ -84,7 +84,7 @@ interface GraphData {
 // ---------------------------------------------------------------------------
 
 function nodeRadius(node: GraphNode): number {
-  // Degree is the primary driver — Obsidian's vault graph is fundamentally
+  // Degree is the primary driver - Obsidian's vault graph is fundamentally
   // "what links to what." Access_count is a secondary nudge so a heavily-used
   // memory with few links still reads above pure leaves.
   const degreeNorm = Math.min(node.degree / 20, 1);
@@ -115,7 +115,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ForceGraphMethods generic is complex; ref holds the raw instance
   const graphRef = useRef<any>(null);
 
-  // Containing div — measure width/height for responsive canvas
+  // Containing div - measure width/height for responsive canvas
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 });
 
@@ -129,7 +129,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
   // Hover tooltip
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
 
-  // Near-black canvas so the additive-blend halos read as luminous — but a WARM
+  // Near-black canvas so the additive-blend halos read as luminous - but a warm
   // near-black on the Hearth hue rather than cold #000000, so the graph belongs
   // to the palette instead of clashing as a cold seam against the warm-charcoal
   // app chrome (the halos still pop against it). Light-mode graph theming is a
@@ -191,7 +191,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
           return;
         }
 
-        // Build node list — degree=0 initially, filled in once edges resolve
+        // Build node list - degree=0 initially, filled in once edges resolve
         const nodes: GraphNode[] = memories.map((m) => ({
           id: m.id,
           label: m.content.slice(0, 60),
@@ -288,7 +288,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
   useEffect(() => {
     if (graphData.nodes.length > 0 && graphRef.current) {
       // Tune the d3-force simulation toward Obsidian-style starbursts:
-      //   - Charge proportional to node radius — hubs push leaves out, leaves
+      //   - Charge proportional to node radius - hubs push leaves out, leaves
       //     barely repel each other, so a hub with N leaves fans them into a
       //     halo instead of forming a tight ball.
       //   - Short link distance keeps each starburst compact.
@@ -342,7 +342,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
       const color = CATEGORY_COLORS[g.category] ?? '#888';
       const isHovered = hoveredNode?.id === g.id;
 
-      // Additive blending — overlapping halos brighten rather than occlude,
+      // Additive blending - overlapping halos brighten rather than occlude,
       // which is what gives Obsidian's vault graph its luminous feel.
       const prevComposite = ctx.globalCompositeOperation;
       ctx.globalCompositeOperation = 'lighter';
@@ -359,7 +359,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
       ctx.globalAlpha = isHovered ? 0.45 : 0.28;
       ctx.fill();
 
-      // Core dot — solid, full saturation.
+      // Core dot - solid, full saturation.
       ctx.globalAlpha = 1;
       ctx.beginPath();
       ctx.arc(x, y, isHovered ? r + 1.5 : r, 0, Math.PI * 2);
@@ -410,7 +410,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
 
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden">
-      {/* Loading / error / empty overlays — container stays mounted so the
+      {/* Loading / error / empty overlays - container stays mounted so the
           ResizeObserver never loses its target. The graph canvas is pure
           black (Obsidian-style); these overlays sit ON the black, so they
           use a paper-tinted muted color for sufficient contrast. */}
@@ -434,7 +434,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
 
       {showEmptyState && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center z-20 animate-fade-in-up">
-          {/* Sage-tinted halo placeholder — telegraphs "alive but empty" */}
+          {/* Sage-tinted halo placeholder - telegraphs "alive but empty" */}
           <div className="relative flex h-16 w-16 items-center justify-center">
             <div className="absolute inset-0 rounded-2xl bg-sage/20 blur-xl" aria-hidden="true" />
             <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-sage/30 bg-sage/10">
@@ -448,7 +448,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
         </div>
       )}
 
-      {/* Truncation notice — paper-tinted on the black canvas */}
+      {/* Truncation notice - paper-tinted on the black canvas */}
       {showGraph && truncated && (
         <div
           className={cn(
@@ -462,7 +462,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
         </div>
       )}
 
-      {/* Recenter button — frosted on the black canvas */}
+      {/* Recenter button - frosted on the black canvas */}
       {showGraph && (
         <button
           type="button"
@@ -482,7 +482,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
         </button>
       )}
 
-      {/* Hover tooltip — frosted, always-on-black; uses the popover token
+      {/* Hover tooltip - frosted, always-on-black; uses the popover token
           shadow for elevation discipline. Animates in subtly. */}
       {showGraph && hoveredNode && (
         <div
@@ -495,7 +495,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
           role="tooltip"
         >
           <div className="mb-1.5 flex items-center gap-1.5">
-            {/* Glowing dot — matches the node's color, halos for the
+            {/* Glowing dot - matches the node's color, halos for the
                 alive-on-black feel that defines this canvas */}
             <span className="relative inline-flex h-2 w-2 shrink-0">
               <span
@@ -525,7 +525,7 @@ export function MemoryGraph({ activeProject, sourceFilter = 'all' }: MemoryGraph
         </div>
       )}
 
-      {/* Force graph — Suspense fallback is the spinner */}
+      {/* Force graph - Suspense fallback is the spinner */}
       {showGraph && canvasSize.w > 0 && canvasSize.h > 0 && (
         <Suspense
           fallback={

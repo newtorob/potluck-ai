@@ -1,5 +1,5 @@
 /**
- * MemoryMapView — /memory/map route.
+ * MemoryMapView - /memory/map route.
  *
  * Layout:
  *   - Sticky header: "Memory Map" + back-to-list link + [Graph | Clusters] tab toggle
@@ -7,7 +7,7 @@
  *   - Body: full-viewport height, renders <MemoryGraph> or <MemoryClusters>.
  *   - Footer: <CategoryLegend>.
  *
- * Project filter is local to this view — it does not mutate the global
+ * Project filter is local to this view - it does not mutate the global
  * activeProject in the settings store.
  */
 
@@ -33,7 +33,7 @@ type ActiveTab = 'graph' | 'clusters';
 export function MemoryMapView() {
   const { projects, activeProject: globalActive } = useProject();
 
-  // Local project selection — defaults to the global active project
+  // Local project selection - defaults to the global active project
   const [localProject, setLocalProject] = useState<string | null>(globalActive);
   const [activeTab, setActiveTab] = useState<ActiveTab>('graph');
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
@@ -46,7 +46,7 @@ export function MemoryMapView() {
   }, []);
 
   // Sync local project when global changes (only if the user hasn't overridden)
-  // We intentionally don't use useEffect here — this is a shallow default, not sync.
+  // We intentionally don't use useEffect here - this is a shallow default, not sync.
 
   const allProjectOptions: Array<{ label: string; value: string | null }> = [
     { label: 'Global', value: null },
@@ -116,7 +116,7 @@ export function MemoryMapView() {
           </button>
         </div>
 
-        {/* Source filter — graph view only */}
+        {/* Source filter - graph view only */}
         {activeTab === 'graph' && (
           <div
             role="radiogroup"
@@ -170,7 +170,7 @@ export function MemoryMapView() {
           </select>
         </div>
 
-        {/* Regenerate button — only meaningful for clusters */}
+        {/* Regenerate button - only meaningful for clusters */}
         {activeTab === 'clusters' && (
           <button
             type="button"

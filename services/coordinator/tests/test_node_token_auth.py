@@ -1,16 +1,16 @@
-"""HTTP-level tests for the per-node bearer-token auth contract (v0.6
-"node-token hardening" — see `middleware/node_auth.py`).
+"""HTTP-level tests for the per-node bearer-token auth contract (see
+`middleware/node_auth.py`).
 
 Background: an app-spawned mesh sidecar should never need the machine-wide
 `POTLUCK_COORDINATOR_TOKEN` for its own ongoing calls. A valid pairing
-token is now SUFFICIENT AUTH on its own for `POST /mesh/enroll`; on
+token is sufficient auth on its own for `POST /mesh/enroll`; on
 success the response carries a fresh per-node `node_token` the sidecar then
 presents as `Authorization: Bearer <node_token>` on every subsequent
 machine call. The legacy `X-Potluck-Coordinator-Token` keeps working
-unchanged everywhere (dev-fleet back-compat).
+unchanged everywhere (back-compat).
 
-These mount the REAL router against the live docker-compose Postgres (same
-DB every other coordinator integration test uses — see
+These mount the real router against the live docker-compose Postgres (same
+DB every other coordinator integration test uses - see
 `test_device_key_registration.py` for the `_make_app_with_db` pattern this
 mirrors) so the actual FastAPI dependency graph is exercised end-to-end,
 including the `/mesh/signal` WebSocket upgrade.
@@ -22,19 +22,19 @@ Coverage:
   - a reused (already-consumed) pairing token fails closed (409), even
     when re-presented with a valid coordinator token.
   - an invalid pairing token + no coordinator token -> 401 (auth gate,
-    not the token-specific 404/409/410 — those require a credential to
+    not the token-specific 404/409/410 - those require a credential to
     even reach step 1).
-  - an invalid pairing token + a VALID coordinator token still surfaces
+  - an invalid pairing token + a valid coordinator token still surfaces
     the specific 404 (coordinator token substitutes for "pairing token
     not required", never for "any pairing token accepted").
   - node_token authorizes heartbeat / peers / derp-token / node-delete /
-    the signal WS hello for its OWN node.
-  - node_token is REJECTED (403, or WS "unauthorized" + close) when the
-    request identifies a DIFFERENT node (wg_public_key/node_id mismatch).
+    the signal WS hello for its own node.
+  - node_token is rejected (403, or WS "unauthorized" + close) when the
+    request identifies a different node (wg_public_key/node_id mismatch).
   - the legacy coordinator token keeps authorizing every machine route
     with no per-node binding (back-compat regression guard).
-  - a node_token does NOT double as a member session token on the
-    session-authed routes (/mesh/households) — the two credential systems
+  - a node_token does not double as a member session token on the
+    session-authed routes (/mesh/households) - the two credential systems
     stay separated even though both ride an `Authorization: Bearer` header.
 """
 from __future__ import annotations
@@ -91,7 +91,7 @@ def _pairing_token_value() -> str:
 
 @pytest.fixture(autouse=True)
 def _derp_jwt_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    # POST /mesh/derp-token 503s without this — set it for every test in
+    # POST /mesh/derp-token 503s without this - set it for every test in
     # this module regardless of whether the individual test exercises
     # derp-token, for uniformity with test_derp_pop.py's convention.
     monkeypatch.setenv("POTLUCK_DERP_JWT_KEY", "test-derp-jwt-key")
@@ -107,7 +107,7 @@ def _no_coordinator_token_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
 @dataclass
 class _Households:
     """Tracks household IDs created during a test so teardown can delete
-    them — cascades to pairing_tokens + mesh_nodes via ON DELETE CASCADE,
+    them - cascades to pairing_tokens + mesh_nodes via ON DELETE CASCADE,
     so a single DELETE per household leaves the DB clean."""
 
     ids: list[uuid.UUID] = field(default_factory=list)
@@ -227,7 +227,7 @@ def test_enroll_reused_pairing_token_fails_closed(client) -> None:
 
     # ... and still fails even presenting a valid coordinator token, proving
     # the coordinator token never substitutes for "any pairing token
-    # accepted" — only for "no pairing token needed".
+    # accepted" - only for "no pairing token needed".
     third = _enroll(
         client,
         token_value,
@@ -250,7 +250,7 @@ def test_enroll_invalid_pairing_token_with_valid_coordinator_token_404(
 ) -> None:
     """Back-compat: with the coordinator token, enroll still validates the
     pairing token and surfaces the SPECIFIC reason (404 here) rather than a
-    generic 401 — unchanged from pre-node-token behaviour."""
+    generic 401 - unchanged from pre-node-token behaviour."""
     monkeypatch.setenv("POTLUCK_COORDINATOR_TOKEN", _COORDINATOR_TOKEN)
     resp = _enroll(
         client,
@@ -262,8 +262,8 @@ def test_enroll_invalid_pairing_token_with_valid_coordinator_token_404(
 
 
 def test_enroll_dev_fleet_flow_unchanged(client, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The classic dev-fleet path — valid coordinator token + valid pairing
-    token — still succeeds exactly as before."""
+    """The coordinator-token path - valid coordinator token + valid pairing
+    token - still succeeds."""
     monkeypatch.setenv("POTLUCK_COORDINATOR_TOKEN", _COORDINATOR_TOKEN)
     household_id, token_value = client.portal.call(_seed_household_and_pairing_token)
     client.households.ids.append(household_id)
@@ -323,7 +323,7 @@ def test_node_token_authorizes_peers(client) -> None:
         headers={"Authorization": f"Bearer {enrolled['node_token']}"},
     )
     assert resp.status_code == 200, resp.text
-    assert resp.json() == []  # sole node in the household — empty roster
+    assert resp.json() == []  # sole node in the household - empty roster
 
 
 def test_node_token_authorizes_derp_token(client) -> None:
@@ -443,7 +443,7 @@ def test_node_token_cannot_delete_claiming_another_nodes_key(client) -> None:
     wg_key_b = _wg_key_of(client, node_b)
 
     # node_a's token, but the request claims to BE node_b (wg_public_key
-    # query param names node_b) — must be rejected regardless of which
+    # query param names node_b) - must be rejected regardless of which
     # node is the delete TARGET.
     resp = client.delete(
         f"/mesh/nodes/{node_a['node_id']}",
@@ -588,7 +588,7 @@ def test_node_token_does_not_authorize_household_creation(
 ) -> None:
     """A node_token is a machine-plumbing credential, not a member session.
     Presenting it as `Authorization: Bearer` to the session-authed
-    /mesh/households route must NOT resolve to a member — proves the two
+    /mesh/households route must NOT resolve to a member - proves the two
     credential systems (per-node SHA-256(node_token) vs. per-session
     SHA-256(session_token), both against different tables) stay separated
     even though both ride the same header shape."""

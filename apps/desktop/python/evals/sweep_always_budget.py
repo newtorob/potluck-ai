@@ -1,14 +1,14 @@
-"""always_budget sweep — find the Tier-1 slot allocation that maximizes
-SEMANTIC recall@5 WITHOUT collapsing TIER1 recall.
+"""always_budget sweep - find the Tier-1 slot allocation that maximizes
+SEMANTIC recall@5 without collapsing TIER1 recall.
 
-Root cause found 2026-05-28: get_relevant_memories reserves max_memories//2
-(=10 of 20) slots for the Tier-1 preference+instruction preload, which buries
-query-relevant Tier-2 hits below the recall@5 cutoff. Neither the RRF k
-constant nor the embedder moved recall@5 — this is the structural lever.
+By default get_relevant_memories reserves max_memories//2 (=10 of 20) slots for
+the Tier-1 preference+instruction preload, which buries query-relevant Tier-2
+hits below the recall@5 cutoff. Neither the RRF k constant nor the embedder
+moves recall@5, so this reservation is the structural lever.
 
 This sweep varies POTLUCK_ALWAYS_BUDGET (read per-call by get_relevant_memories)
-and prints recall@5 overall + by query type, so we can see the tradeoff:
-lowering it should lift SEMANTIC/DISTRACTOR while TIER1 must stay healthy.
+and prints recall@5 overall + by query type, so the tradeoff is visible:
+lowering it should lift SEMANTIC/DISTRACTOR while TIER1 stays healthy.
 
 Run:  cd apps/desktop/python && .venv/bin/python -m evals.sweep_always_budget
 """
@@ -42,7 +42,7 @@ async def main() -> int:
     await _seed_corpus(_EVAL_DB)
     print("Generating embeddings once...")
     if not await _generate_embeddings(_EVAL_DB):
-        print("Embedder unavailable — aborting (semantic arm needed).")
+        print("Embedder unavailable, aborting (semantic arm needed).")
         return 2
 
     retriever = MemoryRetriever()
@@ -80,7 +80,7 @@ async def main() -> int:
     for b, overall, by_type in rows:
         t1 = by_type["TIER1"]["recalls"][5] if by_type["TIER1"] else 0.0
         if t1 < tier1_max:
-            continue  # this budget hurt standing-preference recall — disqualify
+            continue  # this budget hurt standing-preference recall - disqualify
         sem = by_type["SEMANTIC"]["recalls"][5] if by_type["SEMANTIC"] else 0.0
         dist = by_type["DISTRACTOR"]["recalls"][5] if by_type["DISTRACTOR"] else 0.0
         score = sem + dist  # favor the query-relevance types
@@ -91,7 +91,7 @@ async def main() -> int:
         b = best[0]
         bt = next(bt for bb, _, bt in rows if bb == b)
         ov = next(ov for bb, ov, _ in rows if bb == b)
-        print(f"BEST always_budget={b} — keeps TIER1 recall@5 at max ({tier1_max:.2f}) "
+        print(f"BEST always_budget={b}: keeps TIER1 recall@5 at max ({tier1_max:.2f}) "
               f"while maximizing query-relevant types.")
         print(f"  overall recall@5={ov['recalls'][5]:.2f}  "
               f"SEMANTIC={bt['SEMANTIC']['recalls'][5]:.2f}  "

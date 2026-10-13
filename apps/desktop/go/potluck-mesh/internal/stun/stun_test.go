@@ -7,7 +7,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// portOfEndpoint — the comparison primitive ClassifyNAT is built on.
+// portOfEndpoint - the comparison primitive ClassifyNAT is built on.
 // ---------------------------------------------------------------------------
 
 func TestPortOfEndpoint_IPv4(t *testing.T) {
@@ -69,7 +69,7 @@ func TestFormatEndpoint_PortOfEndpoint_RoundTrip(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// NATType — the classification result's presentation
+// NATType - the classification result's presentation
 // ---------------------------------------------------------------------------
 
 func TestNATType_String(t *testing.T) {
@@ -86,7 +86,7 @@ func TestNATType_String(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// ClassifyNAT / NewResolver — the input-validation edge (no network needed)
+// ClassifyNAT / NewResolver - the input-validation edge (no network needed)
 // ---------------------------------------------------------------------------
 
 func TestNewResolver_DefaultsWhenEmpty(t *testing.T) {

@@ -5,10 +5,8 @@
 #
 # Requirements:
 #   - Go 1.22+
-#   - On Windows cross-compilation: CGO_ENABLED=0 is required because wg-go
-#     uses cgo on Windows for wintun. For a native Windows build, run on Windows.
-#     Cross-compiling from Linux/macOS to Windows requires CGO_ENABLED=0 which
-#     disables wintun; functional as a no-tunnel build for CI smoke-testing only.
+#   - Windows binaries are built with CGO_ENABLED=0. wintun.dll is loaded at
+#     run time and is staged next to the binary (see third_party/windows/README.md).
 
 MODULE := github.com/potluck-ai/potluck-mesh
 CMD    := ./cmd/potluck-mesh

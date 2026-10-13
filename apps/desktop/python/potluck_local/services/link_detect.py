@@ -1,19 +1,19 @@
-"""Network link-type detection — classify THIS node's primary link as wired / wifi.
+"""Network link-type detection - classify this node's primary link as wired / wifi.
 
-Pipeline-parallel relays a small activation tensor through EVERY hop on EVERY token,
+Pipeline-parallel relays a small activation tensor through every hop on every token,
 so the per-token critical path is dominated by the slowest, jitteriest link in the
 chain. A WiFi link -- especially a cheap USB WiFi adapter -- is the worst case: not
 just a higher mean RTT but occasional 60ms+ stalls that make token streaming uneven.
 The orchestrator wants to prefer wired, low-jitter peers; this module gives each node
 a cheap, self-reported `link_type` it can advertise in /peer/capabilities.
 
-Strictly stdlib + subprocess. Detection is best-effort and NEVER crashes: any failure
+Strictly stdlib + subprocess. Detection is best-effort and never crashes: any failure
 (missing tool, unexpected output, permission error) degrades to 'unknown', which the
 planner treats as a mild penalty rather than a hard exclusion. The result is cached for
 the process lifetime -- a machine's primary link rarely changes mid-session, and this
 sits adjacent to the hot capabilities path, so we pay the subprocess cost at most once.
 
-DELIBERATELY torch-free and import-light: this is reached from the /peer/capabilities
+Deliberately torch-free and import-light: this is reached from the /peer/capabilities
 hot path (via peer.py), which must stay off the torch-heavy engine import graph.
 
 Approach per OS:
@@ -231,7 +231,7 @@ def _macos_iface_for_ip(ip: str | None) -> str | None:
 def _detect_macos() -> str:
     """Map the active interface to a hardware port. `networksetup -listallhardwareports`
     lists each port name + its BSD Device; the "Wi-Fi" (older OSes: "AirPort") port's
-    Device is the wireless one (usually en0 on laptops, but NOT guaranteed -- Ethernet
+    Device is the wireless one (usually en0 on laptops, but not guaranteed -- Ethernet
     is en0 on many desktops/minis), so we resolve the port by Device rather than assume."""
     iface = _macos_active_iface()
     if not iface:

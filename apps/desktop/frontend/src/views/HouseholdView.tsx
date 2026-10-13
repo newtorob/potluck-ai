@@ -1,17 +1,17 @@
 /**
- * HouseholdView — /household route.
+ * HouseholdView - /household route.
  *
  * The visible payoff for the Phase G mesh stack. Surfaces:
- *   1. **Status header** — mesh up/down + node identity (truncated mesh IP).
- *   2. **Roster** — every peer in the household with reachability badges.
- *   3. **Add another machine** CTA — opens the AddMachineWizard.
- *   4. **Onboarding for unpaired machines** — "be first" or "join existing".
- *   5. **Unpair** — destructive action, confirms inline.
+ *   1. **Status header** - mesh up/down + node identity (truncated mesh IP).
+ *   2. **Roster** - every peer in the household with reachability badges.
+ *   3. **Add another machine** CTA - opens the AddMachineWizard.
+ *   4. **Onboarding for unpaired machines** - "be first" or "join existing".
+ *   5. **Unpair** - destructive action, confirms inline.
  *
- * Privacy invariant (memory 42a7e671 / b3cbfba9):
- *   THIS view is allowed to surface per-peer identity (node_name, mesh_ip,
- *   reachability mode) — that's exactly what a household roster is for.
- *   What this view must NOT do is leak peer identity into the /network
+ * Privacy invariant:
+ *   This view is allowed to surface per-peer identity (node_name, mesh_ip,
+ *   reachability mode) - that's exactly what a household roster is for.
+ *   What this view must not do is leak peer identity into the /network
  *   aggregate view or into error toasts for unrelated peers.
  *
  * The view subscribes to the meshStore on mount and unsubscribes on
@@ -102,8 +102,8 @@ export function HouseholdView() {
 
   useEffect(() => {
     // The store is started app-wide (App.tsx) to keep the StatusBar mesh pill
-    // live across views; start() here is an idempotent safety net. We no longer
-    // stop() on unmount — that would kill the app-wide poll.
+    // live across views; start() here is an idempotent safety net. We do not
+    // stop() on unmount, since that would kill the app-wide poll.
     start();
   }, [start]);
 
@@ -128,7 +128,7 @@ export function HouseholdView() {
   }
 
   // --- mesh daemon needs enabling / approval / is starting up ---
-  // (the "app brings up the mesh" flow — macOS SMAppService today; see
+  // (the "app brings up the mesh" flow - macOS SMAppService today; see
   // MeshEnablePanel + main.js's mesh-daemon-supervision section)
   if (
     bridge === 'daemon_not_installed' ||
@@ -146,7 +146,7 @@ export function HouseholdView() {
   }
 
   // --- sidecar offline (bridge present, socket not reachable, no daemon
-  // info available to explain why — dev mode without the daemon bridge, a
+  // info available to explain why - dev mode without the daemon bridge, a
   // platform daemon supervision doesn't cover, or a rare timing race) ---
   if (bridge === 'sidecar_offline') {
     return (
@@ -216,7 +216,7 @@ export function HouseholdView() {
             />
           )}
 
-          {/* Privacy footer — same treatment as /network */}
+          {/* Privacy footer - same treatment as /network */}
           <p
             className="pt-2 text-xs text-muted-foreground max-w-2xl"
             aria-label="Privacy note"
@@ -241,7 +241,7 @@ export function HouseholdView() {
 }
 
 // ---------------------------------------------------------------------------
-// Header — title + status pill
+// Header - title + status pill
 // ---------------------------------------------------------------------------
 
 function HouseholdHeader({ status }: { status: MeshStatus | null }) {
@@ -297,7 +297,7 @@ function HouseholdHeader({ status }: { status: MeshStatus | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// Unpaired state — two onboarding paths
+// Unpaired state - two onboarding paths
 // ---------------------------------------------------------------------------
 
 const primaryButtonClass = cn(
@@ -431,7 +431,7 @@ function UnpairedPanels({ onPaired }: { onPaired: () => void }) {
   );
 }
 
-/** One-tap "join your own household" — no code. Reuses the same pairing action
+/** One-tap "join your own household" - no code. Reuses the same pairing action
  *  as first-machine setup. */
 function JoinYourHouseholdPanel({
   machines,
@@ -559,7 +559,7 @@ function BeFirstPanel({ onPaired }: { onPaired: () => void }) {
 
 /** Server-side cap on wrong-PIN guesses per broadcast session
  *  (`internal/lanpair.maxRevealAttempts`). Once hit, the inviter cancels the
- *  broadcast and stops answering — there's no distinct "exhausted" response,
+ *  broadcast and stops answering - there's no distinct "exhausted" response,
  *  so we track our own count client-side purely for messaging. */
 const MAX_PIN_ATTEMPTS = 5;
 
@@ -576,7 +576,7 @@ export function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
 
   // Poll the mesh sidecar for a pairing invite broadcast on the local
   // network, so a machine being invited from a nearby machine doesn't have
-  // to type the full token — just the short PIN shown on the inviter.
+  // to type the full token - just the short PIN shown on the inviter.
   useEffect(() => {
     let cancelled = false;
     const poll = async () => {
@@ -585,7 +585,7 @@ export function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
         setDiscovered((prev) => {
           if (!d.found) return null;
           const next = { hostname: d.hostname, fingerprint: d.fingerprint };
-          // A new invite (different fingerprint) gets a clean attempt count —
+          // A new invite (different fingerprint) gets a clean attempt count -
           // the old broadcast session, and whatever PIN went with it, is gone.
           if (!prev || prev.fingerprint !== next.fingerprint) {
             setPinAttempts(0);
@@ -824,7 +824,7 @@ export function JoinExistingPanel({ onPaired }: { onPaired: () => void }) {
 }
 
 // ---------------------------------------------------------------------------
-// Paired state — this machine + roster
+// Paired state - this machine + roster
 // ---------------------------------------------------------------------------
 
 function PairedView({
@@ -873,20 +873,20 @@ function PairedView({
 
   return (
     <div className="space-y-8">
-      {/* Connectivity health — named, root-cause-suppressed (VPN-resilience Pillar #1). */}
+      {/* Connectivity health - named, root-cause-suppressed. */}
       <PreflightBanner report={report} />
 
-      {/* Hero payoff — leads with the differentiator, not the status plumbing. */}
+      {/* Hero payoff - leads with the differentiator, not the status plumbing. */}
       <MeshPayoffCard peers={connectedPeers} enrolledCount={peers.length} capsByNode={capsByNode} onAddMachine={onAddMachine} />
 
-      {/* Household map — Deco-style radial view of the mesh, each machine
+      {/* Household map - Deco-style radial view of the mesh, each machine
           coloured by the same diagnostics the roster list uses. */}
       <section aria-label="Household mesh map">
         <SectionHeader>Your household mesh</SectionHeader>
         <MeshMap status={status} peers={peers} report={report} capsByNode={capsByNode} />
       </section>
 
-      {/* Contribution receipts — contributor side made visible. Hidden when
+      {/* Contribution receipts - contributor side made visible. Hidden when
           the user turns off the preference in Settings → Privacy. */}
       {contributionReceiptsEnabled() && (
         <section aria-label="Contribution receipts">
@@ -906,7 +906,7 @@ function PairedView({
             <div className="min-w-0">
               <p className="font-medium text-foreground truncate">
                 {/* mesh_ip is the only stable identifier we have for the
-                    local node from /status — it doesn't include the
+                    local node from /status - it doesn't include the
                     node_name (that lives on the server side). */}
                 {status.mesh_ip}
               </p>
@@ -963,7 +963,7 @@ function PairedView({
         )}
       </section>
 
-      {/* Capacity — "your network can run X fast / Y good / Z slow".
+      {/* Capacity - "your network can run X fast / Y good / Z slow".
           Renders only when at least one peer is reachable; computes from
           live /peer/capabilities probes. */}
       {connectedPeers.length > 0 && (
@@ -973,19 +973,19 @@ function PairedView({
         </section>
       )}
 
-      {/* Big Model Mode — gated on at least one peer offering rpc compute.
+      {/* Big Model Mode - gated on at least one peer offering rpc compute.
           The component itself probes on mount + shows nothing if none. */}
       <section aria-label="Big Model Mode">
         <BigModelModeCard peers={connectedPeers} />
       </section>
 
-      {/* Pipeline mode — split a model's layers across machines (WAN-viable
+      {/* Pipeline mode - split a model's layers across machines (WAN-viable
           sibling of Big Model Mode). Self-hides when no peer is eligible. */}
       <section aria-label="Pipeline mode">
         <PipelineModeCard peers={connectedPeers} />
       </section>
 
-      {/* Routing strategy — only matters when there's more than one peer */}
+      {/* Routing strategy - only matters when there's more than one peer */}
       {peers.length > 0 && (
         <section aria-label="Routing strategy">
           <SectionHeader>How requests get routed</SectionHeader>
@@ -1003,14 +1003,14 @@ function PairedView({
 }
 
 // ---------------------------------------------------------------------------
-// Mesh payoff hero — the "type small, run big" differentiator, up top
+// Mesh payoff hero - the "type small, run big" differentiator, up top
 // ---------------------------------------------------------------------------
 
 /**
  * The hero card the My Machines view leads with. It states the one thing
- * single-machine local-AI tools (LM Studio, Ollama) can't do — run a model
+ * single-machine local-AI tools (LM Studio, Ollama) can't do - run a model
  * too big for the machine you're typing on by routing to another machine you
- * own — and shows the live route as named chips. Qualitative on purpose; the
+ * own - and shows the live route as named chips. Qualitative on purpose; the
  * CapacityCard below carries the quantitative "what can it run" numbers.
  */
 function MeshPayoffCard({
@@ -1110,7 +1110,7 @@ function MeshPayoffCard({
 }
 
 // ---------------------------------------------------------------------------
-// Capacity card — "your network can run X fast / Y good / Z slow"
+// Capacity card - "your network can run X fast / Y good / Z slow"
 // ---------------------------------------------------------------------------
 
 // Fallback model size (billions of params) per catalog tier, used only
@@ -1123,7 +1123,7 @@ const TIER_REPRESENTATIVE_PARAMS_B: Record<ModelTier, number> = {
 };
 
 /**
- * CapacityCard — surface what the household's live peer set can actually
+ * CapacityCard - surface what the household's live peer set can actually
  * run, bucketed by model size. Probes each reachable peer on mount and
  * whenever the roster changes. Honesty rule: conservative buckets only;
  * "good" never lies, "unavailable" gives an actionable upgrade hint.
@@ -1134,8 +1134,8 @@ function CapacityCard({ peers }: { peers: MeshPeer[] }) {
   const models = useModelStore((s) => s.models);
 
   // Content fingerprint of the catalog (slug + tier only). The store
-  // re-allocates the `models` array on every fetch — including the 1s
-  // download-progress poll — so depending on `models` directly would
+  // re-allocates the `models` array on every fetch - including the 1s
+  // download-progress poll - so depending on `models` directly would
   // re-probe every peer each tick. Keying on this stable string rebuilds
   // the resolver only when the catalog's relevant content actually changes.
   const catalogKey = useMemo(
@@ -1266,12 +1266,12 @@ function CapacityPill({ result }: { result: CapacityResult }) {
 // ---------------------------------------------------------------------------
 
 /**
- * Big Model Mode — load the LOCAL model with one or more household peers
+ * Big Model Mode - load the local model with one or more household peers
  * acting as remote ggml-backend RPC devices. Weights + KV + compute get
  * spread across the local machine and the chosen peers.
  *
- * Honesty rule (memory e369308e): this is for CAPACITY (running models
- * bigger than any single machine holds), NOT SPEED. UX must reflect that.
+ * Honesty rule: this is for capacity (running models bigger than any single
+ * machine holds), not speed. The UX must reflect that.
  */
 function BigModelModeCard({ peers }: { peers: MeshPeer[] }) {
   const { activeModelId, loadedRpcServers, sidecarUp } = useHealth();
@@ -1283,7 +1283,7 @@ function BigModelModeCard({ peers }: { peers: MeshPeer[] }) {
   const [error, setError] = useState<string | null>(null);
 
   // Probe peers for available_for_big_model on mount + whenever the peer
-  // roster changes. Cheap — single GET /peer/capabilities per peer.
+  // roster changes. Cheap - single GET /peer/capabilities per peer.
   useEffect(() => {
     let cancelled = false;
     setProbing(true);
@@ -1304,8 +1304,8 @@ function BigModelModeCard({ peers }: { peers: MeshPeer[] }) {
 
   const isOn = (loadedRpcServers?.length ?? 0) > 0;
 
-  // Don't render the card at all when nothing's eligible AND not already
-  // running — keeps the household view uncluttered for users who haven't
+  // Don't render the card at all when nothing's eligible and not already
+  //running - keeps the household view uncluttered for users who haven't
   // set up rpc-server on any peer.
   if (!probing && eligible.length === 0 && !isOn) {
     return null;
@@ -1323,10 +1323,10 @@ function BigModelModeCard({ peers }: { peers: MeshPeer[] }) {
     setWorking(true);
     try {
       if (isOn) {
-        // Disable — reload model with no rpc_servers.
+        // Disable - reload model with no rpc_servers.
         await localApi.loadModel(activeModelId, {});
       } else {
-        // Enable — reload model distributed across eligible peers.
+        // Enable - reload model distributed across eligible peers.
         const rpcServers = eligible
           .map((e) => e.capabilities.rpc_endpoint)
           .filter((s): s is string => Boolean(s));
@@ -1338,10 +1338,10 @@ function BigModelModeCard({ peers }: { peers: MeshPeer[] }) {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // 501 from the sidecar means stock (unpatched) llama-cpp-python.
+      // 501 from the engine means its llama.cpp build has no support for remote workers.
       if (msg.includes('501') || msg.toLowerCase().includes('patched')) {
         setError(
-          'This sidecar is running stock llama-cpp-python. Install the Potluck-patched wheel (see docs/phase-g/household-contributor-headless.md).',
+          'This engine build cannot run a model across machines. See docs/managed-split-models.md.',
         );
       } else {
         setError(msg);
@@ -1485,13 +1485,13 @@ function BigModelModeCard({ peers }: { peers: MeshPeer[] }) {
 // ---------------------------------------------------------------------------
 
 /**
- * Pipeline mode — split a model's LAYERS across the local machine and household
+ * Pipeline mode - split a model's layers across the local machine and household
  * peers, with only activations crossing the wire. Sibling of Big Model Mode, but
  * WAN-viable (works across the internet, not just the LAN) and torch-based rather
  * than llama.cpp/RPC. The head sidecar orchestrates the chain itself.
  *
- * Honesty rule (memory e369308e): like Big Model Mode this is for CAPACITY
- * (running a model bigger than any single machine), NOT speed.
+ * Honesty rule: like Big Model Mode this is for capacity (running a model
+ * bigger than any single machine), not speed.
  */
 function PipelineModeCard({ peers }: { peers: MeshPeer[] }) {
   const { activeModelId, loadedPipeline, continuousBatch, sidecarUp } = useHealth();
@@ -1501,7 +1501,7 @@ function PipelineModeCard({ peers }: { peers: MeshPeer[] }) {
   const [probing, setProbing] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Desired shared-batching state for the NEXT enable. Default off. When the
+  // Desired shared-batching state for the next enable. Default off. When the
   // pipeline is already on, /health is the source of truth (continuousBatch),
   // so we show that instead of the pending choice.
   const [wantBatch, setWantBatch] = useState(false);
@@ -1528,7 +1528,7 @@ function PipelineModeCard({ peers }: { peers: MeshPeer[] }) {
 
   const isOn = loadedPipeline !== null;
 
-  // Hide the card when nothing's eligible AND not already running.
+  // Hide the card when nothing's eligible and not already running.
   if (!probing && eligible.length === 0 && !isOn) {
     return null;
   }
@@ -1545,10 +1545,10 @@ function PipelineModeCard({ peers }: { peers: MeshPeer[] }) {
     setWorking(true);
     try {
       if (isOn) {
-        // Disable — reload locally (drops the peers).
+        // Disable - reload locally (drops the peers).
         await localApi.loadModel(activeModelId, {});
       } else {
-        // Enable — the sidecar auto-orchestrates the household chain. Carry the
+        // Enable - the sidecar auto-orchestrates the household chain. Carry the
         // shared-batching choice through so the chain loads with the batcher when on.
         await localApi.loadModel(activeModelId, { pipeline: true, continuousBatch: wantBatch });
       }
@@ -1796,7 +1796,7 @@ function RoutingStrategyControl() {
 // Peer row
 // ---------------------------------------------------------------------------
 
-// ---- Per-peer capability truth (#12) ---------------------------------------
+// ---- Per-peer capability truth ---------------------------------------------
 
 function CapChip({ children, tone = 'default' }: { children: ReactNode; tone?: 'default' | 'sage' | 'amber' }) {
   return (
@@ -1845,7 +1845,7 @@ function PeerRow({
   caps?: PeerCapabilities | undefined;
   onRemoved: () => void;
 }) {
-  // A specific, actionable reason replaces a bare "Offline" — the warn/error
+  // A specific, actionable reason replaces a bare "Offline" - the warn/error
   // detail is shown inline so the user sees the fix without hovering.
   const showDetail = diag && (diag.severity === 'warn' || diag.severity === 'error');
 
@@ -1922,9 +1922,9 @@ function PeerRow({
           </div>
         )}
 
-        {/* Wiring nudge: shown when this peer is on WiFi AND eligible for
+        {/* Wiring nudge: shown when this peer is on WiFi and eligible for
             distributed inference. Shown per-peer so the user knows exactly
-            which machine to wire. Copy is plain + honest — no hype. */}
+            which machine to wire. Copy is plain + honest - no hype. */}
         {caps?.link_type === 'wifi' &&
           (caps.available_for_pipeline ?? caps.available_for_big_model) && (
             <p className="mt-1.5 flex items-start gap-1.5 text-xs leading-snug text-amber-700 dark:text-amber-300">
@@ -2023,7 +2023,7 @@ function PeerRemoveControl({ peer, onRemoved }: { peer: MeshPeer; onRemoved: () 
   );
 }
 
-/** Status pill driven by the resolved per-peer diagnostic — never just "offline". */
+/** Status pill driven by the resolved per-peer diagnostic - never just "offline". */
 function PeerStateBadge({ diag }: { diag?: PeerDiagnostic | undefined }) {
   if (!diag) return null;
 
@@ -2076,7 +2076,7 @@ function PeerStateBadge({ diag }: { diag?: PeerDiagnostic | undefined }) {
 }
 
 // ---------------------------------------------------------------------------
-// Unpair — destructive, inline confirmation
+// Unpair - destructive, inline confirmation
 // ---------------------------------------------------------------------------
 
 function UnpairControl({ onUnpaired }: { onUnpaired: () => void }) {

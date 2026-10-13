@@ -149,7 +149,7 @@ def post(client, body, **headers):
 
 
 class StrictRuntime:
-    """Signatures exactly as before this change: a call with a new keyword argument would fail."""
+    """A runtime with fixed signatures: a call with a new keyword argument would fail."""
 
     def __init__(self, text="pong"):
         self.text, self.seen = text, []

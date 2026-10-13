@@ -1,5 +1,5 @@
 /**
- * AdvancedPanel — Advanced settings tab.
+ * AdvancedPanel - Advanced settings tab.
  *
  * Contains:
  *   - Model storage path (existing ModelPathPanel)
@@ -101,7 +101,7 @@ function ToggleRow({ id, label, description, checked, disabled, onChange }: Togg
 }
 
 // ---------------------------------------------------------------------------
-// Startup section — same durable preference used by the runtime and CLI
+// Startup section - same durable preference used by the runtime and CLI
 // ---------------------------------------------------------------------------
 
 function StartupSection({ settings, isSaving, onUpdate }: Pick<AdvancedPanelProps, 'settings' | 'isSaving' | 'onUpdate'>) {
@@ -436,7 +436,7 @@ export function AdvancedPanel({ settings, isSaving, saveError, onUpdate }: Advan
       {/* External agents (MCP) */}
       <McpIntegrationPanel />
 
-      {/* Cooperative connection — coordinator URL for the Phase G control plane. */}
+      {/* Cooperative connection - coordinator URL for the Phase G control plane. */}
       <CooperativeConnectionPanel />
     </div>
   );

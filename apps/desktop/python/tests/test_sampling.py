@@ -1,4 +1,4 @@
-"""Sampling tests — services/sampling.py, WholeModelEngine, and ContinuousBatcher.
+"""Sampling tests - services/sampling.py, WholeModelEngine, and ContinuousBatcher.
 
 All model-level tests are gated on torch + transformers and use
 Qwen/Qwen2.5-0.5B-Instruct on cpu/fp32 (same fixture as the whole-model tests).
@@ -6,20 +6,20 @@ Pure sampling-util tests run without a model but still need torch.
 
 Test groups
 -----------
-1. PURE UTIL — sample_token unit tests (greedy fallback, top_k, top_p, seed
+1. PURE UTIL - sample_token unit tests (greedy fallback, top_k, top_p, seed
    reproducibility). No model required; just a synthetic logit tensor.
 
-2. GREEDY UNCHANGED — temperature=0 (and explicit default) produces the SAME
+2. GREEDY UNCHANGED - temperature=0 (and explicit default) produces the same
    tokens as the current argmax path, for both WholeModelEngine and
    ContinuousBatcher. This is the regression gate for the default behavior.
 
-3. DETERMINISM — a fixed seed + temperature>0 reproduces the same sampled
+3. DETERMINISM - a fixed seed + temperature>0 reproduces the same sampled
    sequence across two independent calls; a different seed (or no seed) can differ.
 
-4. FILTERING SANITY — top_k=1 == greedy; top_p with tiny value keeps only the
+4. FILTERING SANITY - top_k=1 == greedy; top_p with tiny value keeps only the
    top token; very low temperature is near-greedy.
 
-5. PER-ROW INDEPENDENCE (ContinuousBatcher) — a greedy request (temp=0) and a
+5. PER-ROW INDEPENDENCE (ContinuousBatcher) - a greedy request (temp=0) and a
    sampled request (temp>0, seeded) submitted to the same batcher each match
    their standalone single-stream counterpart. Neighbors do not perturb each other.
 
@@ -28,7 +28,7 @@ create_app torch-free invariant
 Importing create_app must not trigger a torch import.  Verified by a test that
 imports sampling in a subprocess without torch present -- but since we run inside
 the venv (torch present), we verify the invariant structurally: sampling.py does
-NOT import torch at module top (lazy import only), so importing the module itself
+not import torch at module top (lazy import only), so importing the module itself
 is safe in a torch-free environment.
 """
 
@@ -58,7 +58,7 @@ def engine():
 
 
 # ---------------------------------------------------------------------------
-# 1. PURE UTIL — sample_token unit tests
+# 1. PURE UTIL - sample_token unit tests
 # ---------------------------------------------------------------------------
 
 def _make_logits(n=100, *, hot_idx=3, hot_val=10.0, seed=42):
@@ -171,7 +171,7 @@ def test_sample_token_top_p_one_no_restriction():
 
 
 # ---------------------------------------------------------------------------
-# 2. GREEDY UNCHANGED — temperature=0 default must match original argmax
+# 2. GREEDY UNCHANGED - temperature=0 default must match original argmax
 # ---------------------------------------------------------------------------
 
 def _whole_model_tokens(eng, messages, max_new, *, temperature=0.0, seed=None):
@@ -265,7 +265,7 @@ def test_cb_greedy_explicit_temperature_zero(engine):
 
 
 # ---------------------------------------------------------------------------
-# 3. DETERMINISM — fixed seed + temperature > 0 is reproducible
+# 3. DETERMINISM - fixed seed + temperature > 0 is reproducible
 # ---------------------------------------------------------------------------
 
 def test_whole_model_deterministic_with_seed(engine):
@@ -368,7 +368,7 @@ def _cb_single_stream_text(eng, messages, max_new, *, temperature=0.0, seed=None
 
 def test_per_row_independence(engine):
     """A greedy request (temp=0) and a seeded sampled request (temp>0) submitted to
-    the SAME batcher each match their standalone single-request output.  Neighbors
+    the same batcher each match their standalone single-request output.  Neighbors
     must not perturb each other.
 
     Strategy:
@@ -386,7 +386,7 @@ def test_per_row_independence(engine):
     expected_sampled = _cb_single_stream_text(engine, sampled_prompt, max_new,
                                               temperature=1.0, seed=7)
 
-    # Now run BOTH in the same batcher concurrently
+    # Now run both in the same batcher concurrently
     batcher = ContinuousBatcher(engine)
     results = {}
 
@@ -443,6 +443,6 @@ def test_sampling_module_no_top_level_torch_import():
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             names = [alias.name for alias in node.names]
             assert "torch" not in names, (
-                "sampling.py imports torch at module top level — "
+                "sampling.py imports torch at module top level: "
                 "this breaks the create_app torch-free invariant"
             )

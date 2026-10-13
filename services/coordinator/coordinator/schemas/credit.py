@@ -19,7 +19,7 @@ class CreditBalanceResponse(BaseModel):
 
     `earned`/`net` count only released (spendable) credits. `pending` is the sum
     of escrowed earned credits from cross-member public-pool work awaiting a
-    verification result — not yet spendable.
+    verification result - not yet spendable.
     """
 
     member_id: uuid.UUID

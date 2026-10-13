@@ -5,7 +5,7 @@ import { afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
 // jsdom 29 omits a working localStorage unless --localstorage-file is
-// provided — depending on the platform it is either undefined or an object
+// provided - depending on the platform it is either undefined or an object
 // with no methods, so probe getItem rather than mere existence.
 const existing = globalThis.localStorage as Storage | undefined;
 if (typeof existing?.getItem !== 'function') {

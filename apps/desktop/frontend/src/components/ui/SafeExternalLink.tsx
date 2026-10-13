@@ -1,17 +1,17 @@
 /**
- * SafeExternalLink — the only `a:` renderer markdown-sourced content (memory
+ * SafeExternalLink - the only `a:` renderer markdown-sourced content (memory
  * notes, chat replies) is allowed to use.
  *
  * Two invariants close the click-through that let a poisoned
- * `[x](file:///…)` link replace the whole BrowserWindow — and its live
+ * `[x](file:///…)` link replace the whole BrowserWindow - and its live
  * preload contextBridge (window.potluck: cloud bearer session, mesh access)
- * — with arbitrary local content (see main.js will-navigate origin gate):
+ * - with arbitrary local content (see main.js will-navigate origin gate):
  *
- *   1. Only a fully-qualified http(s) href is ever clickable. Anything else —
+ *   1. Only a fully-qualified http(s) href is ever clickable. Anything else -
  *      file:, javascript:, data:, custom schemes, relative/scheme-less
- *      paths — renders as inert text. We never construct a hyperlink (or
+ *      paths - renders as inert text. We never construct a hyperlink (or
  *      navigate anything) from an unvalidated scheme.
- *   2. An allowed link is opened ONLY via window.open(), never by letting the
+ *   2. An allowed link is opened only via window.open(), never by letting the
  *      click become an in-window navigation. window.open() is intercepted by
  *      Electron's setWindowOpenHandler in main.js, which applies its own
  *      independent http(s)-only allowlist (safeOpenExternal) before ever
@@ -27,7 +27,7 @@ function isSafeHref(href: string | undefined): boolean {
   try {
     // No base URL on purpose: relative/scheme-less hrefs (e.g. "/x", "#x")
     // throw here rather than silently resolving against the app's own
-    // location, and are treated the same as any other disallowed scheme —
+    // location, and are treated the same as any other disallowed scheme -
     // inert text.
     return ALLOWED_PROTOCOLS.has(new URL(href).protocol);
   } catch {
@@ -48,7 +48,7 @@ export function SafeExternalLink({ href, children, node: _node, ...rest }: SafeE
 
   const handleClick = useCallback(
     (e: MouseEvent<HTMLAnchorElement>) => {
-      // Always prevent the default anchor click — that is the in-window
+      // Always prevent the default anchor click - that is the in-window
       // navigation path we are closing off. The only way out is explicit
       // window.open(), which Electron hands to setWindowOpenHandler.
       e.preventDefault();

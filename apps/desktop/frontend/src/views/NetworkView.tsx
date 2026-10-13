@@ -1,18 +1,18 @@
 /**
- * NetworkView — /network route.
+ * NetworkView - /network route.
  *
  * The "see the co-op work" surface. Four sections:
  *
- *   1. Aggregate fleet card — peers online, models served, jobs/tokens
+ *   1. Aggregate fleet card - peers online, models served, jobs/tokens
  *      in the last 24h.
- *   2. Available models chip rack — one chip per slug the network serves.
- *   3. Your usage card — requester-side stats for the last 24h.
- *   4. Credit balance — earned / spent / net from the Phase G ledger,
+ *   2. Available models chip rack - one chip per slug the network serves.
+ *   3. Your usage card - requester-side stats for the last 24h.
+ *   4. Credit balance - earned / spent / net from the Phase G ledger,
  *      polled every 30s.
- *   5. Credit history — the 10 most-recent ledger entries.
+ *   5. Credit history - the 10 most-recent ledger entries.
  *
- * Privacy invariant (memory 42a7e671 / b3cbfba9):
- *   NO peer_id, hostname, hardware specs, or per-request peer attribution
+ * Privacy invariant:
+ *   No peer_id, hostname, hardware specs, or per-request peer attribution
  *   surface here. Aggregate-only.
  *
  * Credit polling: balance refreshes every 30s; history refreshes alongside
@@ -136,7 +136,7 @@ export function NetworkView() {
     };
   }, []);
 
-  // Credit polling lifecycle (separate timer — 30s cadence).
+  // Credit polling lifecycle (separate timer - 30s cadence).
   useEffect(() => {
     void fetchCreditsRef.current();
     let creditTimer: ReturnType<typeof setTimeout> | null = null;
@@ -180,7 +180,7 @@ export function NetworkView() {
   const hasPeers = onlineNow > 0;
 
   // ---- error state -------------------------------------------------------
-  // Note: an empty pool (no other peers) is NOT an empty state — we still show
+  // Note: an empty pool (no other peers) is not an empty state - we still show
   // the member's own usage, contributions, and credits below, plus a
   // "be the first peer" panel in place of the aggregate fleet card. Collapsing
   // the whole page to a single "no peers" message hid everything that is
@@ -199,7 +199,7 @@ export function NetworkView() {
             <button type="button" onClick={() => void fetchFleetRef.current()} className="ml-2 rounded underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Retry</button>
           </div>
         )}
-        {/* Contribute toggle — the persistent home for contributor_mode.
+        {/* Contribute toggle - the persistent home for contributor_mode.
             Onboarding sets it too, but this is where a member turns serving on
             or off after setup (household + open-pool requests both gate on it). */}
         <section aria-label="Contribute compute">
@@ -220,7 +220,7 @@ export function NetworkView() {
               <FleetCard fleet={fleet} />
             </section>
 
-            {/* Available models — pick which one network requests use */}
+            {/* Available models - pick which one network requests use */}
             <section aria-label="Available models">
               <SectionHeader>Models the network can serve</SectionHeader>
               <ModelChips models={fleet?.models ?? []} />
@@ -291,7 +291,7 @@ function NetworkHeader({
   const onlineNow = fleet?.peers.online_now ?? 0;
   const isAlive = onlineNow > 0;
 
-  // Net balance pill — only show when we have data.
+  // Net balance pill - only show when we have data.
   const netPill = balance !== null && balance !== undefined ? (
     <NetBalancePill net={balance.net} />
   ) : null;
@@ -359,7 +359,7 @@ function NetBalancePill({ net }: { net: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// First-peer panel — shown when the pool has no other members online. This is
+// First-peer panel - shown when the pool has no other members online. This is
 // the common state before launch, so it must be useful, not a dead end.
 // ---------------------------------------------------------------------------
 
@@ -453,7 +453,7 @@ function StatCard({ icon: Icon, label, value, sub, emphasize, formatLarge }: Sta
       : formatLarge && value >= 1000
         ? `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`
         : value.toLocaleString();
-  // An idle/zero metric should read quiet, not broken — mute it so a fresh
+  // An idle/zero metric should read quiet, not broken - mute it so a fresh
   // network doesn't greet the user with bleak-loud zeros.
   const isIdle = value === 0 || value === undefined;
   return (
@@ -587,7 +587,7 @@ function MyUsageCard({ stats }: { stats: MyJobStats | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// Contribution receipts — per-machine "what my machines served this week"
+// Contribution receipts - per-machine "what my machines served this week"
 // ---------------------------------------------------------------------------
 
 /** Map a machine's canary reputation to an honest standing label. */
@@ -679,7 +679,7 @@ function SmallStat({ label, value }: { label: string; value: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Credit error note — shared by the balance card and history list. Classified
+// Credit error note - shared by the balance card and history list. Classified
 // so a 401 (session expired) reads as "sign in," not "coordinator unreachable."
 // ---------------------------------------------------------------------------
 
@@ -962,7 +962,7 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * ContributorToggleCard — the persistent contributor_mode switch.
+ * ContributorToggleCard - the persistent contributor_mode switch.
  *
  * Wired to the same NetworkSettings.contributor_mode boolean the onboarding
  * "Contribute" step writes. Until this existed, a member who declined during
@@ -1034,7 +1034,7 @@ function ContributorToggleCard() {
     }
     if (next) {
       // Pre-register the contributor device key so attestation isn't rejected
-      // later. Best-effort, same as ConnectStep — never block the toggle.
+      // later. Best-effort, same as ConnectStep - never block the toggle.
       try {
         await registerContributorDeviceKey();
       } catch (err) {

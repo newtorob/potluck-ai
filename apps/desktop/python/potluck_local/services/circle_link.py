@@ -1,10 +1,10 @@
 """Borrowing over a direct circle link, with the coordinator's relay as the fallback.
 
-A circle request used to go through the coordinator (pool_routing's
-/jobs/stream). Now it tries a direct link first: the coordinator picks a lender
+A circle request tries a direct link first: the coordinator picks a lender
 in the circle and tells both machines' mesh sidecars to add the other as a
 restricted WireGuard peer, then this engine calls the lender's circle listener
-(routers/circle_link.py) machine to machine. The open pool is not involved and
+(routers/circle_link.py) machine to machine. The fallback is the coordinator's
+relay (pool_routing's /jobs/stream). The open pool is not involved and
 never will be: a circle request is never sent to the pool.
 
 The algorithm, for one request:
@@ -13,8 +13,7 @@ The algorithm, for one request:
      what a lender accepts, the coordinator has not said links are disabled in
      the last five minutes (or answered the link route with a bare 404 or 405,
      which only a coordinator without the route does), and the local mesh sidecar
-     advertises circle_link_v1. Otherwise the relay is used at once, exactly as
-     before links existed.
+     advertises circle_link_v1. Otherwise the relay is used at once.
   2. A cached live link for the same circle and model is reused when it has at
      least 60 seconds left. Otherwise one is created (POST .../links). Any answer
      but 201 means the relay, at once. Two answers are remembered for five
@@ -80,7 +79,7 @@ from .remote_stream import RemoteStreamError, openai_chunks
 
 logger = logging.getLogger(__name__)
 
-# ---- the numbers (all from the design brief) --------------------------------
+# ---- the numbers ------------------------------------------------------------
 
 # Up to this long, in all, for a new link to be usable: the create call and the
 # wait for the sidecar to show it outbound and reachable.

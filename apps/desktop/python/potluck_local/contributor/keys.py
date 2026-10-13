@@ -1,6 +1,6 @@
 """Per-peer Ed25519 keypair management.
 
-This is the peer's STABLE identity to the coordinator — distinct from
+This is the peer's stable identity to the coordinator - distinct from
 the release-signing key (which lives only on the signer's machine, not
 on member machines). The same per-peer key reconnects to the same
 `peers` row across restarts.
@@ -45,7 +45,7 @@ def ensure_keypair(key_dir: Path) -> Ed25519PrivateKey:
     try:
         os.chmod(key_dir, 0o700)
     except OSError:
-        # Windows or unusual filesystem — best effort.
+        # Windows or unusual filesystem - best effort.
         pass
 
     priv_path = key_dir / PRIV_KEY_FILENAME

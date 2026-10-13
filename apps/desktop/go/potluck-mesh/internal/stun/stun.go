@@ -9,7 +9,7 @@
 //   - Errors back off and retry; they never panic.
 //   - Multiple server addresses are tried in order; the first success wins.
 //   - Probe socket bound to the WG transport port (magicsock-style): the STUN
-//     probe socket is bound to the SAME local port the WireGuard data plane
+//     probe socket is bound to the same local port the WireGuard data plane
 //     uses (see bindProbeConn / NewResolver's localPort), not an OS-assigned
 //     ephemeral one. On a per-flow/per-socket NAT (the common case for
 //     consumer + CGNAT routers), the external mapping is otherwise unrelated
@@ -42,8 +42,8 @@ const (
 // DefaultServers is the fallback STUN server list when none are configured.
 // Cloudflare first (lower latency, privacy-forward operator), Google second.
 //
-// NAT-type classification (ClassifyNAT) requires at least two DISTINCT
-// servers — this default list is chosen to satisfy that as well as the
+// NAT-type classification (ClassifyNAT) requires at least two distinct
+// servers - this default list is chosen to satisfy that as well as the
 // ordinary endpoint-resolution use.
 var DefaultServers = []string{
 	"stun.cloudflare.com:3478",
@@ -56,7 +56,7 @@ type Resolver struct {
 
 	// localPort is the local UDP port every probe socket attempts to bind to
 	// (see bindProbeConn). 0 disables the reusable-bind attempt entirely and
-	// always uses an OS-assigned ephemeral port (the pre-fix behaviour) —
+	// always uses an OS-assigned ephemeral port -
 	// callers that don't care about NAT-mapping alignment with a specific
 	// transport port (e.g. a test) can pass 0.
 	localPort int
@@ -65,10 +65,9 @@ type Resolver struct {
 // NewResolver creates a Resolver. If servers is empty, DefaultServers is used.
 //
 // localPort is the local UDP port STUN probes attempt to bind to, so the
-// resolved external endpoint reflects the SAME NAT mapping a UDP socket bound
+// resolved external endpoint reflects the same NAT mapping a UDP socket bound
 // to that port (typically the WireGuard transport port) would get. Pass 0 to
-// always use an OS-assigned ephemeral port instead (matches the pre-fix
-// behaviour; only appropriate when the resolved endpoint doesn't need to
+// always use an OS-assigned ephemeral port instead (only appropriate when the resolved endpoint doesn't need to
 // align with a specific local socket, e.g. in a unit test).
 func NewResolver(servers []string, localPort int) *Resolver {
 	if len(servers) == 0 {
@@ -132,12 +131,12 @@ func (r *Resolver) tryResolve(ctx context.Context, network, server string) (stri
 // bindProbeConn opens the local UDP socket a STUN probe is sent from.
 //
 // When r.localPort is set (> 0), it first attempts a SO_REUSEADDR/SO_REUSEPORT
-// bind to that exact port (see listenReusable, platform-specific) — this is
+// bind to that exact port (see listenReusable, platform-specific) - this is
 // what makes the STUN-observed mapping reflect the same NAT mapping the WG
 // transport socket (already bound to that port) gets. If that fails for any
 // reason (unsupported platform primitive, an unrelated bind error, or simply
 // because the OS doesn't allow it), this logs at Debug and falls back to an
-// OS-assigned ephemeral port — a probe on the wrong port is still strictly
+// OS-assigned ephemeral port - a probe on the wrong port is still strictly
 // better than no probe at all (endpoint resolution / connectivity-check use
 // cases degrade gracefully; only the NAT-mapping-alignment property is lost).
 func (r *Resolver) bindProbeConn(network string) (*net.UDPConn, error) {
@@ -161,7 +160,7 @@ func (r *Resolver) bindProbeConn(network string) (*net.UDPConn, error) {
 // probeOnce sends a single STUN binding request over the given (already
 // bound) conn to server and returns the mapped external address as "ip:port".
 // Shared by tryResolve (one probe per call) and ClassifyNAT (two probes over
-// the SAME conn, to two different servers, so the comparison isolates
+// the same conn, to two different servers, so the comparison isolates
 // per-destination vs. per-socket NAT mapping behaviour).
 func (r *Resolver) probeOnce(ctx context.Context, conn *net.UDPConn, network, server string) (string, error) {
 	// Resolve the server address for the requested network family.
@@ -197,7 +196,7 @@ func (r *Resolver) probeOnce(ctx context.Context, conn *net.UDPConn, network, se
 		return "", fmt.Errorf("read stun response: %w", err)
 	}
 
-	// Parse the response — intentionally do NOT log raw bytes.
+	// Parse the response - intentionally do not log raw bytes.
 	var resp stun.Message
 	resp.Raw = buf[:n]
 	if err := resp.Decode(); err != nil {
@@ -223,7 +222,7 @@ func (r *Resolver) probeOnce(ctx context.Context, conn *net.UDPConn, network, se
 // so the result is unambiguous: "[::1]:port".
 func formatEndpoint(ip net.IP, port int) string {
 	if ip.To4() == nil {
-		// IPv6 — use bracket notation.
+		// IPv6 - use bracket notation.
 		return fmt.Sprintf("[%s]:%d", ip.String(), port)
 	}
 	return fmt.Sprintf("%s:%d", ip.String(), port)
@@ -236,8 +235,8 @@ func formatEndpoint(ip net.IP, port int) string {
 // mappings per-destination (symmetric) or per-socket (endpoint-independent /
 // "cone"). Client-side hole-punching fundamentally cannot work against a
 // symmetric NAT: the external ip:port a peer learns via the coordinator (from
-// THIS node's STUN probe to server A) will not match the mapping the NAT
-// actually uses when this node sends a packet to THAT PEER's address, because
+// this node's STUN probe to server A) will not match the mapping the NAT
+// actually uses when this node sends a packet to that peer's address, because
 // the mapping depends on the destination. Classifying this up front lets
 // OnPunchCoord skip a guaranteed-failure trial instead of retrying it forever.
 // ---------------------------------------------------------------------------
@@ -247,16 +246,16 @@ type NATType int
 
 const (
 	// NATUnknown means classification did not complete (network error,
-	// insufficient servers configured, etc.). Callers should fail OPEN (treat
+	// insufficient servers configured, etc.). Callers should fail open (treat
 	// as "not symmetric") since an unclassified NAT is the common case before
 	// the one-shot classifier completes at startup.
 	NATUnknown NATType = iota
 	// NATEndpointIndependent means the same external port was observed via
-	// two different STUN servers from the same local port — a cone-family NAT
+	// two different STUN servers from the same local port - a cone-family NAT
 	// where client-side hole-punch is viable.
 	NATEndpointIndependent
-	// NATSymmetric means a DIFFERENT external port was observed per STUN
-	// server — the NAT allocates mappings per-destination, so client-side
+	// NATSymmetric means a different external port was observed per STUN
+	// server - the NAT allocates mappings per-destination, so client-side
 	// hole-punch cannot work reliably.
 	NATSymmetric
 )
@@ -272,22 +271,22 @@ func (n NATType) String() string {
 	}
 }
 
-// ClassifyNAT performs STUN binding requests to at least two DIFFERENT
-// configured servers, from the SAME local socket (and critically the SAME
-// local port — see bindProbeConn), and compares the resulting external ports.
+// ClassifyNAT performs STUN binding requests to at least two different
+// configured servers, from the same local socket (and critically the same
+// local port - see bindProbeConn), and compares the resulting external ports.
 //
 //   - Same external port on both → NATEndpointIndependent: the mapping is
 //     keyed by local port only, independent of destination. Hole-punch is
 //     viable (this is the majority of home/consumer NATs).
 //   - Different external ports → NATSymmetric: the mapping is keyed by
 //     (local port, destination), so the port a peer learns from this node's
-//     STUN probe will not be the port this node's packets to THAT PEER
+//     STUN probe will not be the port this node's packets to that peer
 //     actually arrive from. Hole-punch cannot work.
 //
 // Requires len(r.servers) >= 2; returns an error otherwise (a single-server
 // configuration cannot distinguish the two cases).
 //
-// Tries "udp6" first, then "udp4" — mirroring Resolve's family preference —
+// Tries "udp6" first, then "udp4" - mirroring Resolve's family preference -
 // but never mixes families within a single classification attempt (comparing
 // a v6 mapping against a v4 one would be meaningless).
 func (r *Resolver) ClassifyNAT(ctx context.Context) (NATType, error) {
@@ -314,7 +313,7 @@ func (r *Resolver) ClassifyNAT(ctx context.Context) (NATType, error) {
 }
 
 // classifyOnNetwork runs the two-probe comparison over a single network
-// family, sharing ONE bound socket across both probes (required — see
+// family, sharing one bound socket across both probes (required - see
 // ClassifyNAT's doc for why using two different local ports would make the
 // comparison meaningless).
 func (r *Resolver) classifyOnNetwork(ctx context.Context, network string) (NATType, error) {

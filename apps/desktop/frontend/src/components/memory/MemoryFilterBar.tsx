@@ -1,5 +1,5 @@
 /**
- * MemoryFilterBar — category multi-select chips, debounced search, and sort dropdown.
+ * MemoryFilterBar - category multi-select chips, debounced search, and sort dropdown.
  *
  * The search box calls `onSearch` after a 300ms debounce.
  * Category chips are toggle buttons with aria-pressed.

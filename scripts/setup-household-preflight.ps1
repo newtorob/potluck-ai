@@ -44,7 +44,7 @@ if ($Help) {
     exit 0
 }
 
-# ASCII-only output (per memory 5408564c). No em-dashes, no smart quotes.
+# ASCII-only output. No em-dashes, no smart quotes.
 
 if ([Console]::OutputEncoding.WebName -ne 'utf-8') {
     # Force UTF-8 output where possible; harmless if it fails.

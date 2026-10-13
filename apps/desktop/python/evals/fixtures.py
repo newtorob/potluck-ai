@@ -1,13 +1,13 @@
-"""Eval B — labeled corpus for retrieval quality measurement.
+"""Eval B - labeled corpus for retrieval quality measurement.
 
 Corpus design:
   - ~50 memories spanning all MemoryCategory values
   - ~22 labeled queries (query text + gold memory id set)
   - Three query types:
-      LEXICAL   — keyword alone finds them (control group)
-      SEMANTIC  — zero token overlap; semantic is essential (the pnpm case)
-      DISTRACTOR — topic-adjacent but wrong-answer memory present (precision test)
-  - Two NEGATIVE controls: cross-project queries that must NOT return
+      LEXICAL - keyword alone finds them (control group)
+      SEMANTIC - zero token overlap; semantic is essential (the pnpm case)
+      DISTRACTOR - topic-adjacent but wrong-answer memory present (precision test)
+  - Two NEGATIVE controls: cross-project queries that must not return
     project-B memories when scoped to project-A.
   - Tier-1 memories (preference + instruction, high confidence) are mixed in
     so we can confirm they always surface in the always-retrieve slot.
@@ -16,7 +16,7 @@ Memory fields required for insert (see memory_db._CREATE_MEMORIES):
   id, content, category, confidence, source_type, source_conversation_id,
   created_at, last_accessed_at, access_count, is_active, project
 
-Gold sets: list of memory ids that SHOULD appear in the result set.
+Gold sets: list of memory ids that should appear in the result set.
 """
 
 from __future__ import annotations
@@ -137,7 +137,7 @@ CORPUS: list[dict] = [
         "project": "backend",
     },
     # ---- Semantic-gap memories (zero keyword overlap with their queries) -----
-    # These are the critical memories that keyword-only will MISS.
+    # These are the critical memories that keyword-only will miss.
     {
         "id": "mem_sem_react_not_vue",
         "content": "The team chose React for all new UI work; no new Vue components should be written",
@@ -194,7 +194,7 @@ CORPUS: list[dict] = [
         "confidence": 0.90,
         "project": "backend",
     },
-    # ---- Distractor memories (same topic, wrong answer — tests precision) ---
+    # ---- Distractor memories (same topic, wrong answer - tests precision) ---
     # These exist alongside a correct memory so the retriever must rank the
     # right one higher.
     {
@@ -210,7 +210,7 @@ CORPUS: list[dict] = [
         "category": "preference",
         "confidence": 0.70,
         "project": None,
-    },  # distractor for mem_t1_pnpm — recall pnpm but don't return this as gold
+    },  # distractor for mem_t1_pnpm - recall pnpm but don't return this as gold
     {
         "id": "mem_dist_python312_ok",
         "content": "Python 3.12 is used in the coordinator service",
@@ -243,13 +243,13 @@ CORPUS: list[dict] = [
     # ---- Person memories ----------------------------------------------------
     {
         "id": "mem_person_rob",
-        "content": "Rob is the primary maintainer of the Python sidecar and prefers concise code reviews",
+        "content": "Sam is the primary maintainer of the Python sidecar and prefers concise code reviews",
         "category": "person",
         "confidence": 0.85,
         "project": "backend",
     },
-    # ---- Cross-project isolation — project B (mobile) -----------------------
-    # These must NOT appear in queries scoped to project "backend".
+    # ---- Cross-project isolation - project B (mobile) -----------------------
+    # These must not appear in queries scoped to project "backend".
     {
         "id": "mem_mobile_kotlin",
         "content": "Mobile app uses Kotlin coroutines for all async work — no RxJava",
@@ -342,16 +342,16 @@ CORPUS: list[dict] = [
 # Labeled queries
 # ---------------------------------------------------------------------------
 # Each query has:
-#   id         — stable identifier for per-query reporting
-#   text       — the query string (simulates what an agent or user would ask)
-#   gold       — set of memory ids that SHOULD be retrieved
-#   type       — LEXICAL | SEMANTIC | DISTRACTOR | TIER1 | NEGATIVE
-#   project    — project scope for the retrieval call (None = global only)
-#   note       — explains why this query is in the set
+#   id - stable identifier for per-query reporting
+#   text - the query string (simulates what an agent or user would ask)
+#   gold - set of memory ids that should be retrieved
+#   type - LEXICAL | SEMANTIC | DISTRACTOR | TIER1 | NEGATIVE
+#   project - project scope for the retrieval call (None = global only)
+#   note - explains why this query is in the set
 
 QUERIES: list[dict] = [
     # -----------------------------------------------------------------------
-    # LEXICAL — keyword alone should find these (control group)
+    # LEXICAL - keyword alone should find these (control group)
     # -----------------------------------------------------------------------
     {
         "id": "q_lexical_pnpm",
@@ -411,7 +411,7 @@ QUERIES: list[dict] = [
     },
 
     # -----------------------------------------------------------------------
-    # SEMANTIC — zero keyword overlap; semantic arm is essential
+    # SEMANTIC - zero keyword overlap; semantic arm is essential
     # -----------------------------------------------------------------------
     {
         "id": "q_sem_package_manager",
@@ -495,7 +495,7 @@ QUERIES: list[dict] = [
     },
 
     # -----------------------------------------------------------------------
-    # DISTRACTOR — correct memory + wrong-answer memory on same topic
+    # DISTRACTOR - correct memory + wrong-answer memory on same topic
     # -----------------------------------------------------------------------
     {
         "id": "q_dist_database",
@@ -523,7 +523,7 @@ QUERIES: list[dict] = [
     },
 
     # -----------------------------------------------------------------------
-    # TIER1 — standing preferences + instructions; must always surface
+    # TIER1 - standing preferences + instructions; must always surface
     # -----------------------------------------------------------------------
     {
         "id": "q_tier1_prefs",
@@ -535,7 +535,7 @@ QUERIES: list[dict] = [
     },
 
     # -----------------------------------------------------------------------
-    # NEGATIVE — cross-project isolation; MUST NOT return project-mobile rows
+    # NEGATIVE - cross-project isolation; must not return project-mobile rows
     # -----------------------------------------------------------------------
     {
         "id": "q_neg_mobile_leak",
@@ -554,11 +554,11 @@ QUERIES: list[dict] = [
         "note": "mem_mobile_pnpm is project=mobile and must not bleed into backend scope",
     },
     # -----------------------------------------------------------------------
-    # AMBIENT — a standing coding-convention that SHOULD apply to the task,
+    # AMBIENT - a standing coding-convention that should apply to the task,
     # but the query has zero lexical/semantic overlap with the rule. Pure
-    # relevance retrieval CANNOT surface these — only the always-preload can.
+    # relevance retrieval cannot surface these - only the always-preload can.
     # This is the case the Tier-1 preload exists for. The gold rules here are
-    # mid-confidence (0.91, 0.95) — NOT in the top-3 — so they surface at a
+    # mid-confidence (0.91, 0.95) - not in the top-3 - so they surface at a
     # generous always_budget but get squeezed out at a tight one. These
     # queries quantify the cost of lowering always_budget: query-relevant
     # recall rises but ambient-context injection falls.

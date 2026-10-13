@@ -1,4 +1,4 @@
-"""Real-inference job handlers for the contributor sidecar (Phase G m3).
+"""Real-inference job handlers for the contributor sidecar.
 
 Two backends, same interface:
 
@@ -18,10 +18,10 @@ Both backends expose:
 The contributor's job dispatcher (client.py:_handle_real_job) uses stream_chat
 when job.messages is populated; otherwise falls back to stream_completion.
 
-Privacy invariant (memory 42a7e671 + 1fc85a49):
-    Prompt content and generated tokens MUST NOT be written to disk,
+Privacy invariant:
+    Prompt content and generated tokens must not be written to disk,
     logs, or telemetry. Counter-only stats (token counts, durations) are
-    fine. The Ollama HTTP client uses 127.0.0.1 only — never sends
+    fine. The Ollama HTTP client uses 127.0.0.1 only - never sends
     prompts off-machine even if Ollama is configured with a remote URL.
     (We refuse to construct an OllamaInferenceEngine with a non-loopback
     URL; see _validate_loopback below.)
@@ -82,8 +82,7 @@ class LlamaCppInferenceEngine:
 
     Thread safety: Llama is not thread-safe across calls. We serialize
     inference with an asyncio.Lock so concurrent jobs queue rather than
-    racing the model. Multi-model + per-model locks are a future m4
-    concern.
+    racing the model. TODO: multi-model support and per-model locks.
     """
 
     def __init__(
@@ -147,7 +146,7 @@ class LlamaCppInferenceEngine:
             loop = asyncio.get_event_loop()
             error_box: list[BaseException] = []
             # Signals the producer thread to stop pulling more tokens from
-            # llama.cpp. Checked once per token AND used, together with
+            # llama.cpp. Checked once per token and used, together with
             # draining the queue below, to unstick a producer that is
             # currently blocked inside queue.put(...).result() waiting for
             # room -- see the finally block below for why that matters.
@@ -210,14 +209,14 @@ class LlamaCppInferenceEngine:
                     raise error_box[0]
             finally:
                 # Reached on normal completion, on an exception raised above,
-                # AND when this async generator is abandoned mid-stream (WS
+                # and when this async generator is abandoned mid-stream (WS
                 # send failure, disconnect, GC/aclose()) -- e.g. via a
                 # GeneratorExit thrown in at `await queue.get()`. Without
                 # this, a producer thread blocked inside queue.put(...)
                 # .result() on a full queue (maxsize=64) would never see
                 # anyone call queue.get() again and would block forever,
                 # leaking the OS thread and leaving self._llama's generator
-                # half-consumed -- then a LATER job reusing this singleton
+                # half-consumed -- then a later job reusing this singleton
                 # engine could start a second producer thread that races the
                 # first one on the same (not thread-safe) Llama instance.
                 stop_event.set()
@@ -263,7 +262,7 @@ class LlamaCppInferenceEngine:
             loop = asyncio.get_event_loop()
             error_box: list[BaseException] = []
             # See stream_completion's finally block for why this exists: it
-            # closes the launch-blocking "stranded producer thread" bug.
+            # stops a stranded producer thread.
             stop_event = threading.Event()
 
             def _produce() -> None:
@@ -344,14 +343,15 @@ def _validate_loopback(url: str) -> None:
     """Refuse to talk to a remote Ollama. The whole privacy story rests on
     inference happening on the contributor peer's own machine; an Ollama
     URL pointing at someone else's host means our prompt is leaving this
-    box, which violates the manifesto promise. Loopback only."""
+    box, which breaks the promise that prompts stay on the contributor's
+    machine. Loopback only."""
     parsed = urlparse(url)
     host = parsed.hostname or ""
     if host not in ("127.0.0.1", "localhost", "::1"):
         raise ValueError(
             f"Ollama URL must be loopback-only (127.0.0.1 / localhost), got {host!r}. "
-            "This is a hard privacy invariant: the in-memory-only rule from manifesto "
-            "10.3 means prompts must not leave the peer process to a third party."
+            "This is a hard privacy invariant: prompts are held in memory only and "
+            "must not leave the peer process to a third party."
         )
 
 
@@ -444,7 +444,7 @@ class OllamaInferenceEngine:
 
         import httpx
         # No client-level timeout for the streaming response itself; the
-        # coordinator's per-job 120s wall-clock catches stalls. We DO use
+        # coordinator's per-job 120s wall-clock catches stalls. We do use
         # a connect timeout so a dead Ollama doesn't hang the request
         # forever.
         timeout = httpx.Timeout(connect=5.0, read=None, write=10.0, pool=5.0)
@@ -548,9 +548,9 @@ def get_llamacpp_engine(
     re-load the GGUF every time."""
     global _engine
     # Recreate (which resets the lazily-loaded Llama, forcing a reload) whenever
-    # ANY identity field changes — not just the slug. Keying on slug alone left a
-    # stale GGUF loaded if model_path/n_ctx/n_gpu_layers changed under the same
-    # slug.
+    # any identity field changes - not just the slug. Keying on slug alone would
+    # leave a stale GGUF loaded if model_path/n_ctx/n_gpu_layers changed under the
+    # same slug.
     if (
         not isinstance(_engine, LlamaCppInferenceEngine)
         or _engine.model_slug != model_slug

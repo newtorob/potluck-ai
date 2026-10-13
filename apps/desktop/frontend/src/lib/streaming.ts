@@ -108,7 +108,7 @@ function parseEventBlock(block: string): ParsedBlock {
   try {
     parsed = JSON.parse(data);
   } catch {
-    // Malformed event — skip silently.
+    // Malformed event - skip silently.
     return { events: [], done: false };
   }
 
@@ -139,7 +139,7 @@ function parseEventBlock(block: string): ParsedBlock {
  * The generator reports all three. It does not decide what they mean: an error
  * is yielded and reading continues, so the consumer chooses when to stop.
  *
- * @param response — raw fetch Response with Content-Type: text/event-stream
+ * @param response - raw fetch Response with Content-Type: text/event-stream
  * @yields {StreamEvent} discriminated union of token, meta, error and done
  * @throws if the response body is null
  */
@@ -234,7 +234,7 @@ export async function* streamTokens(
     try {
       await reader.cancel();
     } catch {
-      /* already closed or errored — nothing to release the peer from */
+      /* already closed or errored - nothing to release the peer from */
     }
     try {
       reader.releaseLock();

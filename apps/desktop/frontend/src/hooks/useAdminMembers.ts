@@ -1,5 +1,5 @@
 /**
- * useAdminMembers — fetches the admin member roster and exposes the
+ * useAdminMembers - fetches the admin member roster and exposes the
  * grant/revoke-founding mutations. Admin-only; the underlying API 403s a
  * non-admin session (the caller should gate on memberProfile.isAdmin).
  *

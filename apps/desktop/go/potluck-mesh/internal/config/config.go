@@ -51,8 +51,8 @@ type Config struct {
 	WGPublicKey string
 
 	// SigningPrivateKeyPath is the path to this node's Ed25519 signing
-	// private key file, used ONLY for the DERP-token proof-of-possession
-	// challenge (POST /mesh/derp-token nonce+signature — see
+	// private key file, used only for the DERP-token proof-of-possession
+	// challenge (POST /mesh/derp-token nonce+signature - see
 	// internal/signingkey). Distinct from WGPrivateKeyPath: the WG key is
 	// Curve25519 (DH-only, cannot sign); this is a separate Ed25519 keypair.
 	// Generated once and persisted (mode 0600) alongside the WG key, mirroring
@@ -81,9 +81,9 @@ type Config struct {
 	// direct UDP hole-punch fails. If empty, DERP is disabled.
 	//
 	// Supported schemes:
-	//   "tcp+tls://host:port"       — TLS (production default)
-	//   "tcp+insecure://host:port"  — cleartext TCP (dev / localhost testing)
-	//   "tcp://host:port"           — alias for tcp+insecure
+	//   "tcp+tls://host:port" - TLS (production default)
+	//   "tcp+insecure://host:port" - cleartext TCP (dev / localhost testing)
+	//   "tcp://host:port" - alias for tcp+insecure
 	//
 	// Set via env POTLUCK_DERP_URL or --derp-url flag.
 	DERPRelayURL string
@@ -173,12 +173,12 @@ func Load() (*Config, error) {
 
 	// Keep signing.key co-located with wg.key + node.token. node.token already
 	// derives from cfg.WGPrivateKeyPath (cmd/main.go), but signing.key defaulted
-	// off defaultSigningKeyPath() — the $HOME-dependent default — independently
+	// off defaultSigningKeyPath() - the $HOME-dependent default - independently
 	// of any --wg-private-key-path override. Under launchd/systemd $HOME is
 	// unreliable, so a daemon that pins only --wg-private-key-path ended up with
 	// wg.key + node.token in one directory and signing.key in another, which
 	// desynced enrollment state and made a fresh /pair 409 already_enrolled.
-	// When the signing path was NOT explicitly set, derive it from the resolved
+	// When the signing path was not explicitly set, derive it from the resolved
 	// WG key directory so pinning --wg-private-key-path alone is sufficient.
 	signingExplicit := os.Getenv("POTLUCK_SIGNING_KEY_PATH") != ""
 	flag.Visit(func(f *flag.Flag) {

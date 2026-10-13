@@ -1,10 +1,10 @@
 /**
- * Login-CSRF regression tests (see useDeepLinkAuth.ts docstring).
+ * Login-CSRF tests (see useDeepLinkAuth.ts docstring).
  *
- * Covers the two halves of the fix:
+ * Covers two guarantees:
  *   1. A valid potluck://auth/callback deep link exchanges its token but does
- *      NOT sign in on its own — no persisted session, no cloudApi.commitSession
- *      call — until something explicitly confirms it.
+ *      not sign in on its own - no persisted session, no cloudApi.commitSession
+ *      call - until something explicitly confirms it.
  *   2. A potluck:// URL outside the exact auth/callback host+path never even
  *      reaches token extraction.
  */
@@ -55,7 +55,7 @@ function emitDeepLink(url: string): void {
   deepLinkListeners.forEach((cb) => cb(url));
 }
 
-describe('useDeepLinkAuth — login CSRF gate', () => {
+describe('useDeepLinkAuth: login CSRF gate', () => {
   beforeEach(() => {
     deepLinkListeners.length = 0;
     useAuthStore.setState({
@@ -70,7 +70,7 @@ describe('useDeepLinkAuth — login CSRF gate', () => {
     vi.mocked(cloudApi.verifyMagicLink).mockReset();
     vi.mocked(cloudApi.commitSession).mockReset().mockResolvedValue(undefined);
     // useAuth() also runs a silent getMe() rehydration probe on mount (once
-    // per test file, guarded by a module-level flag) — unrelated to this
+    // per test file, guarded by a module-level flag) - unrelated to this
     // test, but must resolve/reject rather than being left undefined.
     vi.mocked(cloudApi.getMe).mockReset().mockRejectedValue(new Error('not signed in'));
     vi.mocked(cloudApi.hasToken).mockReset().mockResolvedValue(null);
@@ -94,19 +94,19 @@ describe('useDeepLinkAuth — login CSRF gate', () => {
       expect(cloudApi.verifyMagicLink).toHaveBeenCalledWith('one-time-token');
     });
 
-    // The exchange populates pendingSession — that's what drives the "Sign
+    // The exchange populates pendingSession - that's what drives the "Sign
     // in as <email>?" confirm dialog...
     await waitFor(() => {
       expect(useAuthStore.getState().pendingSession?.email).toBe('victim@example.com');
     });
 
-    // ...but the app is NOT signed in, and nothing was persisted, until the
-    // user explicitly confirms (confirmSignIn — exercised separately).
+    // ...but the app is not signed in, and nothing was persisted, until the
+    // user explicitly confirms (confirmSignIn - exercised separately).
     expect(useAuthStore.getState().session).toBeNull();
     expect(cloudApi.commitSession).not.toHaveBeenCalled();
   });
 
-  it('ignores a potluck:// URL outside the exact auth/callback path — no token extracted', async () => {
+  it('ignores a potluck:// URL outside the exact auth/callback path, no token extracted', async () => {
     renderHook(() => useDeepLinkAuth());
 
     // Different host, same query shape a forged link could use.

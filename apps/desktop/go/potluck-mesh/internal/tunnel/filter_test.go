@@ -81,7 +81,7 @@ func TestNoEntries_NonHouseholdIsDropped(t *testing.T) {
 	}
 }
 
-// The household side of a packet is the PEER end: the destination going out,
+// The household side of a packet is the peer end: the destination going out,
 // the source coming in. The other end does not matter for a household peer.
 func TestPeerEndIsDestinationOutAndSourceIn(t *testing.T) {
 	f, _ := newTestFilter(t, hhA)
@@ -174,8 +174,8 @@ func TestRestricted_InboundPortAndReplies(t *testing.T) {
 	if f.in(fromPeer(circA, 40000, 22, fSYN)) {
 		t.Error("SYN to 22 passed")
 	}
-	// The granted port used as a SOURCE port toward a different port: the old
-	// prototype let this through as a "reply".
+	// The granted port used as a source port toward a different port must not
+	// pass as a "reply".
 	if f.in(fromPeer(circA, 8340, 22, fACK)) || f.in(fromPeer(circA, 8340, 22, fSYN)) || f.in(fromPeer(circA, 8340, 22, fSYNACK)) {
 		t.Error("granted port as source port reached port 22")
 	}

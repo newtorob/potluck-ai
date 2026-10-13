@@ -61,12 +61,12 @@ async def credit_balance(
     by_model: dict[str, dict[str, Decimal]] = {}
     earned_total = Decimal("0")  # spendable (released) earned only
     spent_total = Decimal("0")
-    pending_total = Decimal("0")  # escrowed earned — not yet spendable
+    pending_total = Decimal("0")  # escrowed earned - not yet spendable
 
     for direction, model_slug, escrowed, total in rows_result.all():
         amt = Decimal(total or 0)
         # Escrowed earned credits (unverified public-pool work) are not part of
-        # the spendable balance — surface them separately as `pending`.
+        # the spendable balance - surface them separately as `pending`.
         if direction == "earned" and escrowed:
             pending_total += amt
             continue
@@ -142,7 +142,7 @@ async def credit_history(
 
 
 # ---------------------------------------------------------------------------
-# Contribution receipts — per-machine weekly "what my machines did"
+# Contribution receipts - per-machine weekly "what my machines did"
 # ---------------------------------------------------------------------------
 
 
@@ -278,11 +278,11 @@ async def my_contributions(
 
 
 # ---------------------------------------------------------------------------
-# Weekly contribution time-series — household-wide bar-chart data
+# Weekly contribution time-series - household-wide bar-chart data
 # ---------------------------------------------------------------------------
 # Week boundary: Monday 00:00 UTC (ISO week convention).
 # date_trunc('week', ...) in Postgres uses Monday as the start of the week
-# when the session timezone is UTC — confirmed by PostgreSQL docs §9.9.
+# when the session timezone is UTC - confirmed by PostgreSQL docs §9.9.
 # ---------------------------------------------------------------------------
 
 
@@ -329,7 +329,7 @@ async def my_contributions_weekly(
 
     Returns the last `weeks` UTC week buckets (Monday 00:00 UTC boundary),
     ordered oldest first.  The current partial week is always included as
-    the final bucket.  Weeks with no activity are zero-filled — the response
+    the final bucket.  Weeks with no activity are zero-filled - the response
     always has exactly `weeks` entries.
 
     Aggregates ACROSS all of the member's own machines; never exposes
@@ -346,7 +346,7 @@ async def my_contributions_weekly(
         tzinfo=timezone.utc,
     )
 
-    # The member's own peer IDs — the scope fence that ensures own-only data.
+    # The member's own peer IDs - the scope fence that ensures own-only data.
     peers_res = await db.execute(
         select(Peer.id).where(Peer.member_id == member_id)
     )
@@ -368,8 +368,8 @@ async def my_contributions_weekly(
         )
 
     # --- Jobs: requests_served + output_tokens bucketed by completed_at week ---
-    # Selects ONLY aggregate counts/sums; no prompt content, no requester
-    # identity, no per-request rows — peer_id is used as the JOIN key to
+    # Selects only aggregate counts/sums; no prompt content, no requester
+    # identity, no per-request rows - peer_id is used as the JOIN key to
     # scope to own machines and is not included in the SELECT list.
     jobs_res = await db.execute(
         select(
@@ -393,7 +393,7 @@ async def my_contributions_weekly(
 
     # --- Credits earned: bucketed by ledger created_at week ---
     # Same scope: member's own peers via job_id -> Job.peer_id join.
-    # Selects ONLY aggregate sums; no per-row data.
+    # Selects only aggregate sums; no per-row data.
     credits_res = await db.execute(
         select(
             func.date_trunc("week", CreditLedger.created_at).label("bucket"),

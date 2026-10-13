@@ -1,28 +1,26 @@
 /**
- * ViewHeader — shared chrome primitive for top-of-view headers.
+ * ViewHeader - shared chrome primitive for top-of-view headers.
  *
- * Replaces the per-view ad-hoc <header className="border-b px-6 py-4"> +
- * <h1 className="font-serif text-2xl…"> pattern. One consistent rhythm
- * across MemoryView, AgentsView, SettingsView, MembershipView, ModelLibrary,
+ * One consistent rhythm across MemoryView, AgentsView, SettingsView, MembershipView, ModelLibrary,
  * TaskStateView, ChatView.
  *
  * Slots:
- *   title       — the serif page title (required)
- *   eyebrow     — optional small italic-serif kicker above the title
+ *   title - the serif page title (required)
+ *   eyebrow - optional small italic-serif kicker above the title
  *                 (e.g. "The network" above "Membership")
- *   count       — optional numeric badge sitting beside the title
+ *   count - optional numeric badge sitting beside the title
  *                 (e.g. "Memory 312")
- *   description — optional one-liner under the title; muted-foreground
- *   actions     — right-aligned action buttons (CTA + ancillary)
- *   tools       — left-aligned secondary controls (e.g. Chat's model
+ *   description - optional one-liner under the title; muted-foreground
+ *   actions - right-aligned action buttons (CTA + ancillary)
+ *   tools - left-aligned secondary controls (e.g. Chat's model
  *                 selector + parameter pills) sitting on the same row as
  *                 actions
- *   subnav      — full-width row beneath the title block (project chips,
+ *   subnav - full-width row beneath the title block (project chips,
  *                 tab strips, filter chips). Renders inside the header
  *                 border, no extra divider.
  *
  * Visual rules (Hearth):
- *   - Single bottom hairline (`border-b border-border`) — never a stacked
+ *   - Single bottom hairline (`border-b border-border`) - never a stacked
  *     border + shadow combo
  *   - 24px horizontal padding to match every body container
  *   - Vertical rhythm: 16px top / 14px bottom on the title row, 10px
@@ -36,7 +34,7 @@ import { type ReactNode } from 'react';
 import { cn } from '@/components/ui/cn';
 
 export interface ViewHeaderProps {
-  /** Required page title — rendered in font-serif tracking-display */
+  /** Required page title - rendered in font-serif tracking-display */
   title: ReactNode;
   /** Optional italic-serif eyebrow above the title (e.g. "The network") */
   eyebrow?: ReactNode;

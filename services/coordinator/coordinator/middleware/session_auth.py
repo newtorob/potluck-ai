@@ -1,8 +1,8 @@
 """Per-session member-identity resolution for the coordinator.
 
-Until v0.5 every coordinator endpoint attributed work to the dev-fixture
-``STUB_MEMBER_ID`` (see ``coordinator.constants``). This module replaces that
-stub with the member behind the caller's login session.
+Without session auth every coordinator endpoint attributes work to the
+dev-fixture ``STUB_MEMBER_ID`` (see ``coordinator.constants``). This module
+resolves the member behind the caller's login session instead.
 
 How identity crosses the two services
 -------------------------------------
@@ -24,7 +24,7 @@ Gating
 ``member_session_auth`` preflight check):
 
 * unset / not ``"1"`` -> dev passthrough. Every caller resolves to
-  ``STUB_MEMBER_ID``. This is the pre-v0.5 posture and what the test suite
+  ``STUB_MEMBER_ID``. This is the dev posture and what the test suite
   runs under, so credits/jobs still attribute to the fixture member.
 * ``"1"`` -> real auth. A valid, unexpired ``potluck_session`` cookie (or
   ``Authorization: Bearer`` token) is required; anything else is 401.
@@ -92,7 +92,7 @@ async def resolve_session_member_id(
     against an unexpired row in the shared ``sessions`` table.
 
     Raises:
-        HTTPException 401 — auth is enabled but the session is missing,
+        HTTPException 401 - auth is enabled but the session is missing,
         expired, or unknown.
     """
     if not session_auth_enabled():

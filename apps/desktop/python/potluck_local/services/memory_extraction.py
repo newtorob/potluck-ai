@@ -1,4 +1,4 @@
-"""Memory extraction service — LLM-based fact/preference extraction.
+"""Memory extraction service - LLM-based fact/preference extraction.
 
 Runs the loaded model over a conversation to produce structured Memory objects,
 storing them in the SQLite memory DB with Jaccard-based deduplication.
@@ -41,11 +41,11 @@ _JACCARD_THRESHOLD = 0.7
 # Limit the conversation text passed to the extraction prompt.
 # A 30-turn coding session with code snippets can exceed 4000 tokens on its
 # own, consuming the entire context window of a 3B model at n_ctx=4096 and
-# leaving no room for the prompt or the generated output — llama.cpp clips
-# silently. We take the LAST N characters because the most recent turns
+# leaving no room for the prompt or the generated output - llama.cpp clips
+# silently. We take the last N characters because the most recent turns
 # contain the most extractable signal; early turns in a long session are
 # mostly scaffolding. The tradeoff: extractions from the very start of a
-# long session may be missed. Acceptable — session-start context is usually
+# long session may be missed. Acceptable - session-start context is usually
 # re-stated later or saved via explicit memory_save.
 _EXTRACTION_MAX_CHARS = 6000
 
@@ -96,7 +96,7 @@ class Memory(BaseModel):
     is_active: bool
     superseded_by: str | None = None
     project: str | None = None  # null = global memory, applies across all projects
-    extraction_prompt_version: str | None = None  # NULL for pre-2026-05-20 rows
+    extraction_prompt_version: str | None = None  # NULL for rows written before versions were stamped
     pinned: bool = False  # always-inject into retrieval regardless of query
 
     @field_validator("content")
@@ -108,7 +108,7 @@ class Memory(BaseModel):
     @field_validator("project", mode="before")
     @classmethod
     def _coerce_empty_project(cls, v: object) -> str | None:
-        """Coerce empty string to None — both represent 'global'."""
+        """Coerce empty string to None - both represent 'global'."""
         if v == "":
             return None
         return v  # type: ignore[return-value]
@@ -167,7 +167,7 @@ def _memory_enabled() -> bool:
 def _fire_embed(memory_id: str, content: str) -> None:
     """Schedule an embedding generation as a fire-and-forget asyncio task.
 
-    Thin wrapper over services.embeddings.schedule_embed_memory — the shared
+    Thin wrapper over services.embeddings.schedule_embed_memory - the shared
     implementation used by every write path (insert, import upsert, content
     edit) so they all regenerate + persist + invalidate the cluster cache
     identically.
@@ -250,7 +250,7 @@ class MemoryExtractor:
                     continue
 
                 # Deduplicate against existing active memories in same category.
-                # Deduplication is intentionally global (across projects) — a near-
+                # Deduplication is intentionally global (across projects) - a near-
                 # identical fact in two scopes still gets a confidence bump on the
                 # existing row rather than a duplicate insert.
                 cursor = await db.execute(
@@ -392,12 +392,11 @@ class MemoryExtractor:
         """Insert-or-update a memory from an /memory/export payload, keyed on
         the exported id.
 
-        This is the fix for the "import isn't a real restore" finding: the
-        previous implementation always routed through extract_explicit(),
-        which mints a brand-new id and created_at/pinned/access_count on
-        every call — so re-importing the same export produced a second row
-        with the original's pin state and timestamps lost, instead of
-        updating the first one in place.
+        Routing an import through extract_explicit() would mint a brand-new
+        id and created_at/pinned/access_count on every call, so re-importing
+        the same export would produce a second row with the original's pin
+        state and timestamps lost. This updates the first row in place
+        instead.
 
         Behaviour:
         - No `id` in the payload, or an `id` not present locally: INSERT a
@@ -405,7 +404,7 @@ class MemoryExtractor:
           access_count/pinned when present (falls back to "now"/0/False for
           a payload that only has content+category, e.g. a hand-built
           import).
-        - `id` present locally: UPDATE that row in place — content,
+        - `id` present locally: UPDATE that row in place - content,
           category, confidence, source_type, source_conversation_id,
           project, and pinned are overwritten from the payload; id and
           created_at are preserved untouched. Calling this twice with the
@@ -417,7 +416,7 @@ class MemoryExtractor:
         pointing at a stale or absent vector. Unchanged re-imports leave the
         existing embedding alone.
 
-        Raises ValueError if content is missing/empty — the caller counts
+        Raises ValueError if content is missing/empty - the caller counts
         that as a skipped row.
         """
         content = redact_credentials(str(raw.get("content", "")).strip())
@@ -491,8 +490,8 @@ class MemoryExtractor:
 
             if content_changed:
                 # Stale vector would otherwise survive under the new content
-                # (see the sibling "edited memory keeps its old embedding"
-                # fix in memory_retrieval.update_memory) — clear it so
+                # (memory_retrieval.update_memory clears it the same way on
+                # edit) - clear it so
                 # run_embedding_backfill also treats this row as needing a
                 # fresh embedding even if the fire-and-forget task below
                 # never gets to run (e.g. process exits immediately after).

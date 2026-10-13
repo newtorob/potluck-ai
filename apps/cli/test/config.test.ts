@@ -188,7 +188,7 @@ describe("mergeSharedSafeFields (wizard write-back safety)", () => {
       coordinator_url: "http://new:8400",
       max_gpu_percent: 80,
     });
-    // gateway is passed through untouched — never the key or the enabled flag.
+    // gateway is passed through untouched - never the key or the enabled flag.
     expect(next.gateway).toEqual({ enabled: true, api_key: "SECRET", pool_routing: false });
     expect(next.runtime).toEqual({ temperature: 0.7 });
   });

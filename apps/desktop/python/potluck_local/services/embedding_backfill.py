@@ -1,4 +1,4 @@
-"""Embedding backfill — one-shot background job run at sidecar startup.
+"""Embedding backfill - one-shot background job run at sidecar startup.
 
 Finds all active memories that have no embedding yet and generates them in
 batches of 64.  Runs entirely in the background; startup is never blocked.
@@ -35,7 +35,7 @@ async def run_embedding_backfill() -> None:
 
     embedder = get_embedder()
 
-    # Re-embed memories that are missing an embedding OR were embedded by a
+    # Re-embed memories that are missing an embedding or were embedded by a
     # different model (stale after an embedding-model switch). Passing the
     # active model name makes the switch self-healing: stale rows are rebuilt
     # with the current model so retrieval (which filters by model) sees them.
@@ -50,8 +50,8 @@ async def run_embedding_backfill() -> None:
     # Attempt to load the model early so we can bail fast on failure.
     if not await embedder._ensure_loaded():
         logger.error(
-            "embedding_backfill_aborted reason=model_unavailable "
-            "— semantic search will degrade to keyword mode"
+            "embedding_backfill_aborted reason=model_unavailable, "
+            "semantic search will degrade to keyword mode"
         )
         return
 
@@ -83,8 +83,8 @@ async def run_embedding_backfill() -> None:
 
         if vectors is None:
             logger.error(
-                "embedding_backfill_aborted reason=embedder_unavailable "
-                "— semantic search will degrade to keyword mode"
+                "embedding_backfill_aborted reason=embedder_unavailable, "
+                "semantic search will degrade to keyword mode"
             )
             return
 

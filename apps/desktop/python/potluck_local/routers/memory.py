@@ -3,7 +3,7 @@
 CRUD and search endpoints for the persistent memory subsystem.
 Mounted at /memory by app.py.
 
-Privacy gate: both privacy.memory_enabled AND memory.enabled must be True
+Privacy gate: both privacy.memory_enabled and memory.enabled must be True
 for the system to accept reads/writes.  GET /memory always returns (possibly
 empty) so the UI can detect the disabled state; POST /memory/wipe also
 bypasses the gate so users can always clear their data.
@@ -13,7 +13,7 @@ Project scoping:
 - Scoped retrieval returns rows where (project = X OR project IS NULL).
 - No project = globals only (project IS NULL).
 - include_all=true bypasses project filter (browse mode).
-- The router does NOT auto-apply settings.active_project — callers pass it
+- The router does not auto-apply settings.active_project - callers pass it
   explicitly. Only the chat router implicitly uses active_project.
 """
 
@@ -77,7 +77,7 @@ class UpdateMemoryRequest(BaseModel):
     category: MemoryCategory | None = None
     confidence: float | None = None
     project: str | None = None
-    _project_set: bool = False  # sentinel — see validator
+    _project_set: bool = False  # sentinel - see validator
 
     @field_validator("project", mode="before")
     @classmethod
@@ -195,7 +195,7 @@ async def list_memories(
     return [m.model_dump() for m in memories]
 
 
-_EXPORT_PAGE_SIZE = 1_000  # hard cap per page — keeps response payloads bounded
+_EXPORT_PAGE_SIZE = 1_000  # hard cap per page - keeps response payloads bounded
 
 
 @router.get("/export")
@@ -215,10 +215,10 @@ async def export_memories(
     The cap per response is 1,000 rows.  Callers that need the full set should
     page by incrementing cursor by 1,000 until has_more is false.
 
-    since: when given, returns only rows updated after that timestamp — enables
+    since: when given, returns only rows updated after that timestamp - enables
     incremental backup instead of full-dump on every call.
 
-    Rationale: the previous 10,000-row cap could produce multi-MB responses in
+    Rationale: a cap of 10,000 rows could produce multi-MB responses in
     a single round-trip.  At 1,000 rows the worst-case payload is ~500 KB which
     is acceptable for a loopback-only export endpoint.  No rate limit is applied
     because this endpoint is loopback-gated by peer_access_middleware.
@@ -363,7 +363,7 @@ async def extract_memories(req: ExtractMemoryRequest) -> list[dict[str, Any]]:
 @router.post("/wipe")
 async def wipe_memories(req: WipeRequest) -> dict[str, str]:
     """Delete all memories (and their embeddings/access log) from the database.
-    Requires confirm=true. Scoped to the memory tables only — chats, tasks,
+    Requires confirm=true. Scoped to the memory tables only - chats, tasks,
     vault state, and agent observability history are untouched (see
     wipe_memory_tables)."""
     if not req.confirm:
@@ -385,7 +385,7 @@ async def import_memories(req: ImportRequest) -> dict[str, int]:
     place (content/category/confidence/project/pinned refreshed, id and
     created_at preserved); an id that doesn't exist yet is inserted with its
     original id/created_at/pinned/access_count intact. Re-running the same
-    import is idempotent — it never produces a second row for the same
+    import is idempotent - it never produces a second row for the same
     exported memory. See services.memory_extraction.MemoryExtractor.import_memory.
     """
     if not _memory_active():
@@ -525,7 +525,7 @@ async def update_memory(memory_id: str, req: UpdateMemoryRequest) -> dict[str, A
 async def delete_memory(memory_id: str) -> Response:
     """Permanently delete a memory (and its embedding). 204 on success, 404 if not found.
 
-    Hard delete: content is removed from disk, not just flagged inactive — the
+    Hard delete: content is removed from disk, not just flagged inactive - the
     privacy contract for a store the user owns.
     """
     if not _memory_active():

@@ -5,7 +5,7 @@
  * (Cursor, Continue, aider, Open WebUI, the openai SDK). The user enables the
  * gateway, generates an API key, and copies the base URL + key into their tool.
  *
- * The key gates ONLY the /v1 gateway surface, never the rest of the sidecar.
+ * The key gates only the /v1 gateway surface, never the rest of the sidecar.
  * Requests run on this machine's loaded model. The middleware reads these
  * settings live, so enabling / rotating takes effect with no restart.
  */

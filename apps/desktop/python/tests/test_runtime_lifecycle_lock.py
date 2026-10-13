@@ -1,8 +1,8 @@
-"""Regression test — 2026-07-31 P1 security audit, finding #4.
+"""Loading and unloading a model must wait for any in-flight generation.
 
-routers/models.py called runtime.load_model(...) directly on the event loop
-(blocking every other in-flight request for the whole multi-second GGUF
-load), and runtime.unload_model() had NO coordination with the
+Calling runtime.load_model(...) directly on the event loop would block every
+other in-flight request for the whole multi-second GGUF load, and
+runtime.unload_model() on its own has no coordination with the
 asyncio.Lock (_inference_lock) that stream_chat/chat/stream_chat_raw/
 score_sequence/benchmark hold for the full duration of an active generation.
 A worker thread could be mid `model.create_chat_completion()` while the
@@ -10,14 +10,14 @@ event-loop thread ran unload_model() -> _release_model() -> model.close(),
 freeing the llama.cpp handle out from under the still-running worker thread
 (use-after-free).
 
-The fix: load_model_async / load_pipeline_async / load_whole_model_async /
-unload_model_async on LLMRuntime acquire the SAME _inference_lock generation
+So load_model_async / load_pipeline_async / load_whole_model_async /
+unload_model_async on LLMRuntime acquire the same _inference_lock generation
 holds, and run the actual blocking work in a thread-pool executor. These are
-now the only load/unload entrypoints routers/models.py calls.
+the only load/unload entrypoints routers/models.py calls.
 
 These tests exercise the concurrency contract directly against LLMRuntime,
 with the real llama-cpp-python Llama(...) / .close() calls monkeypatched out
-(no GGUF file, no ~/.potluck, needed) — the property under test is lock
+(no GGUF file, no ~/.potluck, needed) - the property under test is lock
 ordering and event-loop responsiveness, not model correctness.
 """
 from __future__ import annotations
@@ -30,8 +30,7 @@ from potluck_local.services.runtime import LLMRuntime
 
 def test_unload_model_async_waits_for_in_flight_generation() -> None:
     """unload_model_async() must not run its body until a generation that's
-    already holding _inference_lock has released it. Pre-fix, unload_model()
-    had no lock at all and would have run immediately, out of order."""
+    already holding _inference_lock has released it."""
     rt = LLMRuntime()
     events: list[str] = []
 

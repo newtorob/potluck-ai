@@ -5,8 +5,8 @@ routing scope, sidebar state, etc.). Two invariants are tested:
 
 1. Service layer: the field exists, defaults to {}, and round-trips through
    save/get without data loss.
-2. Router layer: PATCH {ui: {k: v}} merges into the existing dict — it must
-   NEVER replace the whole dict, so writing one preference never silently
+2. Router layer: PATCH {ui: {k: v}} merges into the existing dict - it must
+   never replace the whole dict, so writing one preference never silently
    drops another.
 """
 
@@ -56,7 +56,7 @@ def test_ui_keys_merge_across_multiple_saves(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Router (PATCH /settings) tests — the critical merge assertion
+# Router (PATCH /settings) tests - the critical merge assertion
 # ---------------------------------------------------------------------------
 
 
@@ -82,8 +82,8 @@ def _make_client(tmp_path: Path, monkeypatch: object) -> TestClient:
 def test_patch_ui_dict_does_not_wipe_existing_keys(tmp_path: Path, monkeypatch: object) -> None:
     """Two sequential PATCHes to different ui keys both survive.
 
-    This is the critical regression guard: the shallow-replace bug would
-    make the second PATCH overwrite the entire ui dict with only its key.
+    This guards against a shallow replace, which would make the second PATCH
+    overwrite the entire ui dict with only its key.
     """
     client = _make_client(tmp_path, monkeypatch)
     with client:
@@ -94,7 +94,7 @@ def test_patch_ui_dict_does_not_wipe_existing_keys(tmp_path: Path, monkeypatch: 
         r2 = client.patch("/settings", json={"ui": {"potluck.routing_scope": "household"}})
         assert r2.status_code == 200
         body = r2.json()
-        # Both keys must coexist — the theme must NOT have been dropped.
+        # Both keys must coexist - the theme must not have been dropped.
         assert body["ui"].get("potluck.theme") == "light", (
             "second PATCH wiped potluck.theme from the ui dict"
         )

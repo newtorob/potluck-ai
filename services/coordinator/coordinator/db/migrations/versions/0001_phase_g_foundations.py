@@ -1,14 +1,13 @@
-"""0001 — Phase G foundations: contributor network + own WireGuard mesh.
+"""0001 - Phase G foundations: contributor network + own WireGuard mesh.
 
 Creates the schema both Phase G tracks build on:
-  - m1 protocol track: peers, peer_capabilities, peer_heartbeats, jobs,
+  - protocol track: peers, peer_capabilities, peer_heartbeats, jobs,
     compute_credits, credit_rates, contributor_releases
   - mesh track: households, household_members, mesh_nodes, pairing_tokens
 
-`peers` and `compute_credits` previously lived in the api service as v0
-stubs (api migration 0007). They are dropped from the api in api migration
-0008 and re-created here, where they belong. No data migration — the api
-stubs were never written to.
+`peers` and `compute_credits` are created here, where they belong. The api
+service's v0 stubs for them (api migration 0007) are dropped by api
+migration 0008. No data migration - the api stubs were never written to.
 
 The coordinator service has no foreign-key references back to the api's
 members table (services/api owns it). member_id columns are bare UUIDs
@@ -33,7 +32,7 @@ depends_on: str | None = None
 
 def upgrade() -> None:
     # ------------------------------------------------------------------
-    # peers — contributor network nodes (one per machine offering compute).
+    # peers - contributor network nodes (one per machine offering compute).
     # ------------------------------------------------------------------
     op.create_table(
         "peers",
@@ -90,7 +89,7 @@ def upgrade() -> None:
     op.create_index("ix_peers_member_id", "peers", ["member_id"])
 
     # ------------------------------------------------------------------
-    # compute_credits — double-entry credit ledger.
+    # compute_credits - double-entry credit ledger.
     # ------------------------------------------------------------------
     op.create_table(
         "compute_credits",
@@ -123,7 +122,7 @@ def upgrade() -> None:
     op.create_index("ix_compute_credits_created_at", "compute_credits", ["created_at"])
 
     # ------------------------------------------------------------------
-    # peer_capabilities — which models each peer is currently serving.
+    # peer_capabilities - which models each peer is currently serving.
     # ------------------------------------------------------------------
     op.create_table(
         "peer_capabilities",
@@ -147,7 +146,7 @@ def upgrade() -> None:
     )
 
     # ------------------------------------------------------------------
-    # peer_heartbeats — upsert-in-place per peer on each heartbeat.
+    # peer_heartbeats - upsert-in-place per peer on each heartbeat.
     # ------------------------------------------------------------------
     op.create_table(
         "peer_heartbeats",
@@ -179,7 +178,7 @@ def upgrade() -> None:
     )
 
     # ------------------------------------------------------------------
-    # jobs — metadata only. NEVER prompt content. See manifesto §10.3.
+    # jobs - metadata only. Never prompt content.
     # ------------------------------------------------------------------
     op.create_table(
         "jobs",
@@ -240,7 +239,7 @@ def upgrade() -> None:
     op.create_index("ix_jobs_created_at", "jobs", ["created_at"])
 
     # ------------------------------------------------------------------
-    # credit_rates — governance-editable. New row per rate change.
+    # credit_rates - governance-editable. New row per rate change.
     # ------------------------------------------------------------------
     op.create_table(
         "credit_rates",
@@ -281,7 +280,7 @@ def upgrade() -> None:
     )
 
     # ------------------------------------------------------------------
-    # contributor_releases — Ed25519-signed binary hash whitelist.
+    # contributor_releases - Ed25519-signed binary hash whitelist.
     # Coordinator rejects WS handshakes whose binary_hash is not in here.
     # ------------------------------------------------------------------
     op.create_table(
@@ -300,7 +299,7 @@ def upgrade() -> None:
     )
 
     # ------------------------------------------------------------------
-    # households — a member's machine pool. Each household is a /24 slice
+    # households - a member's machine pool. Each household is a /24 slice
     # of the 10.42.0.0/16 mesh CIDR (~254 nodes per household).
     # ------------------------------------------------------------------
     op.create_table(
@@ -326,7 +325,7 @@ def upgrade() -> None:
     op.create_index("ix_households_owner_member_id", "households", ["owner_member_id"])
 
     # ------------------------------------------------------------------
-    # household_members — many-to-many household ↔ member.
+    # household_members - many-to-many household ↔ member.
     # ------------------------------------------------------------------
     op.create_table(
         "household_members",
@@ -362,7 +361,7 @@ def upgrade() -> None:
     )
 
     # ------------------------------------------------------------------
-    # mesh_nodes — one per machine joined to a household's mesh.
+    # mesh_nodes - one per machine joined to a household's mesh.
     # mesh_ip is allocated from the household's /24 CIDR.
     # ------------------------------------------------------------------
     op.create_table(
@@ -402,7 +401,7 @@ def upgrade() -> None:
     op.create_index("ix_mesh_nodes_household_id", "mesh_nodes", ["household_id"])
 
     # ------------------------------------------------------------------
-    # pairing_tokens — single-use, 1-hour TTL, opaque base32. DB-checked.
+    # pairing_tokens - single-use, 1-hour TTL, opaque base32. DB-checked.
     # ------------------------------------------------------------------
     op.create_table(
         "pairing_tokens",

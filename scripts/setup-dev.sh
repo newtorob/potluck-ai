@@ -12,7 +12,7 @@
 #   3. Installs the frontend + Electron node_modules.
 #   4. Brings up Postgres in Docker and runs Alembic migrations.
 #
-# Idempotent — safe to re-run.
+# Idempotent - safe to re-run.
 
 set -euo pipefail
 

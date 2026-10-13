@@ -1,5 +1,5 @@
 /**
- * Adversarial review of the stream-termination fix.
+ * Adversarial cases for stream termination.
  *
  * Adversaries, in order of how much they can reach:
  *   - an open-pool contributor: controls the `message` field of a coordinator
@@ -473,7 +473,7 @@ describe('terminal decision', () => {
       id,
       expect.objectContaining({ role: 'assistant', status: 'complete' }),
     );
-    // Observation, not a bug: a drop that happened after tokens were already
+    // A drop that happened after tokens were already
     // read is filed under the same class as a dispatch that never opened.
     expect(usageRecord).toHaveBeenCalledWith(
       expect.objectContaining({ ok: false, error_class: 'dispatch_error' }),

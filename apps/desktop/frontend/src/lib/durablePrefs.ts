@@ -1,5 +1,5 @@
 /**
- * Durable UI preferences — hydration from the Python sidecar config.
+ * Durable UI preferences - hydration from the Python sidecar config.
  *
  * hydrateDurablePrefs() runs once at App mount. It fetches GET /settings from
  * the local sidecar and applies any stored values to the live stores, so
@@ -15,9 +15,8 @@
  *   3. Sidecar unreachable → try/catch returns early; localStorage defaults
  *      remain in effect. The session is always correct.
  *
- * Also consolidates the coordinator-URL hydration that previously lived
- * directly in App.tsx, so there is one GET /settings per startup instead
- * of two.
+ * It also hydrates the coordinator URL, so there is a single GET /settings
+ * per startup.
  *
  * Import graph: this module imports from stores and localApi; none of those
  * import from durablePrefs, so there is no circular dependency.
@@ -32,7 +31,7 @@ import { setContributionReceiptsEnabled } from '@/lib/appPrefs';
 
 /**
  * Fetch durable settings from the sidecar and apply them to the live stores.
- * Safe to call from a fire-and-forget useEffect — degrades gracefully when
+ * Safe to call from a fire-and-forget useEffect - degrades gracefully when
  * the sidecar is not yet ready.
  */
 export async function hydrateDurablePrefs(): Promise<void> {
@@ -40,7 +39,7 @@ export async function hydrateDurablePrefs(): Promise<void> {
   try {
     settings = await localApi.getSettings();
   } catch {
-    // Sidecar unreachable — localStorage defaults stay in effect for this launch.
+    // Sidecar unreachable - localStorage defaults stay in effect for this launch.
     return;
   }
 
@@ -77,7 +76,7 @@ export async function hydrateDurablePrefs(): Promise<void> {
     setContributionReceiptsEnabled(receipts !== 'false');
   }
 
-  // routing_scope — Zustand chatStore handles live state + localStorage.
+  // routing_scope - Zustand chatStore handles live state + localStorage.
   const scope = ui[PREF.routingScope];
   if (
     scope === 'local' ||
@@ -108,7 +107,7 @@ export async function hydrateDurablePrefs(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Preference key constants — single source of truth shared with each setter.
+// Preference key constants - single source of truth shared with each setter.
 // Must match the localStorage keys the stores already use.
 // ---------------------------------------------------------------------------
 

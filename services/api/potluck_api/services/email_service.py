@@ -8,7 +8,7 @@ Responsibilities:
 - send_membership_confirmation(to_email, plan) -> None
 
 Uses RESEND_API_KEY and FROM_EMAIL from settings. When no real key is
-configured (local dev), email is not sent — the payload is logged instead so a
+configured (local dev), email is not sent - the payload is logged instead so a
 developer can copy the magic link out of the console.
 """
 from __future__ import annotations
@@ -34,7 +34,7 @@ def _is_real_key(key: str) -> bool:
 
 
 def _mask_email(email: str) -> str:
-    """Mask an address for logs: ``newtorob@x.com`` -> ``n***@x.com``.
+    """Mask an address for logs: ``member@x.com`` -> ``m***@x.com``.
 
     We never write a full recipient address to the log stream (it ships to
     Sentry). Keeping the domain preserves deliverability debugging ("is this
@@ -101,8 +101,8 @@ class EmailService:
     ) -> None:
         if not self.enabled:
             # The magic-link URL contains a live, session-granting JWT, so it is a
-            # credential. Surface it ONLY in development (where logging it is the
-            # whole point — you copy the link out of the console). In a
+            # credential. Surface it only in development (where logging it is the
+            # whole point - you copy the link out of the console). In a
             # misconfigured production (no real key) we must never write it to the
             # log stream; instead fail loudly so the deploy gets fixed.
             if self.settings.env == "development":
@@ -120,7 +120,7 @@ class EmailService:
                 )
             return
 
-        import resend  # lazy import — the dep is only needed when sending
+        import resend  # lazy import - the dep is only needed when sending
 
         resend.api_key = self.settings.resend_api_key
 

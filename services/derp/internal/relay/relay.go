@@ -1,7 +1,7 @@
-// Package relay implements the Potluck DERP (Detour Encrypted Routing Protocol)
-// relay server.
+// Package relay implements the Potluck DERP relay server. The name follows
+// Tailscale's DERP (Designated Encrypted Relay for Packets).
 //
-// This is a SIMPLE Potluck-specific protocol, not Tailscale's full DERP wire
+// This is a simple Potluck-specific protocol, not Tailscale's full DERP wire
 // format. The design is intentionally minimal and auditable.
 //
 // Wire format (after auth):
@@ -12,7 +12,7 @@
 //	Server → Client (deliver from peer):
 //	  [2-byte big-endian payload-length][32-byte source-wg-pubkey][payload]
 //
-// The 2-byte length is the total payload length (NOT including the 32-byte
+// The 2-byte length is the total payload length (not including the 32-byte
 // pubkey prefix). Frames are capped at 65535 bytes which comfortably covers
 // any WireGuard packet (max MTU 1500).
 //
@@ -22,8 +22,8 @@
 //  3. Server replies:  {"type":"auth_ok","region":"<region>","server_time":<unix>}
 //
 // Privacy:
-//   - NEVER log payload contents.
-//   - NEVER log full pubkeys — truncate to 8 hex chars for log correlation.
+//   - Never log payload contents.
+//   - Never log full pubkeys - truncate to 8 hex chars for log correlation.
 //   - Aggregate counters (bytes forwarded, client count) are fine.
 package relay
 
@@ -56,7 +56,7 @@ const (
 	authTimeout = 15 * time.Second
 
 	// maxPacketsPerSecond is the per-client rate limit (token bucket capacity).
-	// Exceeding this drops the packet silently; does NOT kick the client.
+	// Exceeding this drops the packet silently; does not kick the client.
 	maxPacketsPerSecond = 1000
 
 	// tokenBucketRefillInterval is how often the bucket is refilled to capacity.
@@ -87,7 +87,7 @@ type derpClaims struct {
 type client struct {
 	conn      net.Conn
 	pubkey    [pubkeyLen]byte // raw 32-byte WG pubkey
-	pubkeyHex string         // lower-hex encoding, used as map key
+	pubkeyHex string          // lower-hex encoding, used as map key
 
 	writeMu sync.Mutex // serialises all writes to conn
 
@@ -117,7 +117,7 @@ func (c *client) tryConsume() bool {
 
 // sendFrame writes one delivery frame to the client.
 // Frame: [uint16 payload-len][32-byte source-pubkey][payload]
-// Must not be called concurrently — writeMu is held by the caller.
+// Must not be called concurrently - writeMu is held by the caller.
 func (c *client) sendFrame(sourcePubkey [pubkeyLen]byte, payload []byte) error {
 	if len(payload) > maxPayloadLen {
 		return fmt.Errorf("payload %d bytes exceeds max %d", len(payload), maxPayloadLen)
@@ -189,7 +189,7 @@ func (r *Relay) HandleConn(conn net.Conn) {
 	// ---- auth phase ---- //
 	cli, err := r.authenticate(conn)
 	if err != nil {
-		// Write a plain JSON error — we can't use the frame format before auth.
+		// Write a plain JSON error - we can't use the frame format before auth.
 		_, _ = fmt.Fprintf(conn, `{"type":"auth_error","message":%q}`+"\n", err.Error())
 		slog.Warn("derp: auth failed",
 			"remote", conn.RemoteAddr().String(),
@@ -203,7 +203,7 @@ func (r *Relay) HandleConn(conn net.Conn) {
 	if len(r.clients) >= r.maxConns {
 		r.mu.Unlock()
 		_, _ = fmt.Fprintf(conn, `{"type":"auth_error","message":"relay at capacity"}`+"\n")
-		slog.Warn("derp: rejected connection — at capacity",
+		slog.Warn("derp: rejected connection, at capacity",
 			"pubkey_prefix", cli.pubkeyHex[:8],
 		)
 		return
@@ -342,7 +342,7 @@ func (r *Relay) readLoop(cli *client) {
 		}
 		payloadLen := int(binary.BigEndian.Uint16(lenBuf[:]))
 		if payloadLen == 0 {
-			// Keepalive / heartbeat — no dest pubkey follows. Ignore.
+			// Keepalive / heartbeat - no dest pubkey follows. Ignore.
 			continue
 		}
 

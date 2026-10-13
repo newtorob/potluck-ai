@@ -1,18 +1,18 @@
-"""0004 — Add `escrowed` flag to credit_ledger for public-pool credit escrow.
+"""0004 - Add `escrowed` flag to credit_ledger for public-pool credit escrow.
 
-Earned credits from cross-member (public-pool) jobs are held escrowed — not
-counted toward the spendable balance — until a verification result releases
+Earned credits from cross-member (public-pool) jobs are held escrowed - not
+counted toward the spendable balance - until a verification result releases
 them (pass) or forfeits them (fail). This is the economic guard against a peer
 self-reporting work it didn't do: the headline number is bounded by the
 output_tokens clamp, but escrow stops unverified public-pool credits from being
 redeemed at all.
 
-`escrowed` is operational metadata and is intentionally NOT part of the per-row
+`escrowed` is operational metadata and is intentionally not part of the per-row
 hash chain. The chain proves credit *amounts*; escrow is mutable state the
 verification path flips. Adding it does not change any existing row_hash.
 
 Self-served / household jobs (requester member == contributor owner) are never
-escrowed — they default to false.
+escrowed - they default to false.
 
 Revision ID: 0004_credit_escrow
 Revises: 0003_credit_ledger_unique

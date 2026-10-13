@@ -4,13 +4,13 @@ Full implementation spec: guide Section 5.5.
 Task: 6
 
 Responsibilities:
-- create_magic_link(email) -> str  — signs a JWT, returns the full magic-link URL
-- verify_magic_link(token) -> tuple[Member, str, Session]  — decodes JWT,
+- create_magic_link(email) -> str - signs a JWT, returns the full magic-link URL
+- verify_magic_link(token) -> tuple[Member, str, Session] - decodes JWT,
   finds/creates the member, creates a session row, returns
   (member, opaque session token, session row)
-- validate_session(session_token) -> Member | None  — hashes the opaque token,
+- validate_session(session_token) -> Member | None - hashes the opaque token,
   looks up the unexpired session row, returns the Member
-- revoke_session(session_token) -> None  — deletes the matching session row
+- revoke_session(session_token) -> None - deletes the matching session row
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ from potluck_api.models.consumed_magic_link import ConsumedMagicLink
 from potluck_api.models.member import Member
 from potluck_api.models.session import Session
 
-# The token's "type" claim — guards against a token minted for another purpose
+# The token's "type" claim - guards against a token minted for another purpose
 # (e.g. discourse SSO) being replayed against the magic-link verifier.
 _MAGIC_LINK_TYPE = "magic_link"
 
@@ -38,7 +38,7 @@ _MAGIC_LINK_TYPE = "magic_link"
 class MagicLinkError(ValueError):
     """Raised when a magic-link token is expired, malformed, or wrong-type.
 
-    Callers map this to HTTP 400 — the message is safe to surface to the user.
+    Callers map this to HTTP 400 - the message is safe to surface to the user.
     """
 
 
@@ -50,7 +50,7 @@ class AuthService:
     def create_magic_link(self, email: str) -> str:
         """Sign a short-lived JWT and return the full magic-link URL.
 
-        The URL base is ``app_url + magic_link_path`` — both configurable so the
+        The URL base is ``app_url + magic_link_path`` - both configurable so the
         delivery transport (a web verify page vs a ``potluck://`` deep link) can
         change without editing this code.
 
@@ -81,13 +81,13 @@ class AuthService:
         database breach never yields usable session tokens.
 
         Single-use: the token's ``jti`` is inserted into ``consumed_magic_links``
-        in the SAME transaction that creates the session. A second redemption
+        in the same transaction that creates the session. A second redemption
         hits a primary-key conflict on that insert and the whole transaction
-        (including the session row) rolls back — so a replayed link never
+        (including the session row) rolls back - so a replayed link never
         mints a session, even inside the 15-minute validity window.
 
         Raises:
-            MagicLinkError — token expired, malformed, wrong type, or already
+            MagicLinkError - token expired, malformed, wrong type, or already
             redeemed.
         """
         try:

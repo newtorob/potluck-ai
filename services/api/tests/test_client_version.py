@@ -37,7 +37,7 @@ async def test_client_version_returns_200(app) -> None:
 
 @pytest.mark.asyncio
 async def test_client_version_returns_default_fields(app) -> None:
-    """Defaults must never falsely block today's build: latest == minimum == 0.1.0."""
+    """Defaults must never falsely block the shipped build: latest == minimum == 0.1.0."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/client/version")
@@ -76,7 +76,7 @@ async def test_client_version_respects_env_overrides(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_request_without_client_version_header_is_never_rejected(app) -> None:
-    """Absence of X-Potluck-Client-Version must never 400/401 — it's optional."""
+    """Absence of X-Potluck-Client-Version must never 400/401 - it's optional."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/client/version")
@@ -87,7 +87,7 @@ async def test_request_without_client_version_header_is_never_rejected(app) -> N
 @pytest.mark.asyncio
 async def test_request_with_client_version_header_is_never_rejected(app) -> None:
     """Presence of X-Potluck-Client-Version (any value, incl. garbage) must
-    never 400/401 — enforcement is the app's job, not the server's, in this
+    never 400/401 - enforcement is the app's job, not the server's, in this
     task."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

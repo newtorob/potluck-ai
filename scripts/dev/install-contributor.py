@@ -2,18 +2,18 @@
 """One-shot contributor sidecar installer.
 
 Cross-platform: macOS / Linux / Windows. Run this from a checked-out
-copy of the repo after `git clone`. Idempotent — safe to re-run.
+copy of the repo after `git clone`. Idempotent - safe to re-run.
 
 What it does:
     1. Verifies Python 3.11+
     2. Creates apps/desktop/python/.venv if missing
-    3. Installs requirements-contributor.txt (slim — no llama-cpp-python)
+    3. Installs requirements-contributor.txt (slim - no llama-cpp-python)
     4. pip-installs the potluck-local package in editable mode
     5. Verifies the `potluck-contributor` entry point is reachable
     6. Writes a `contributor.env.example` you can copy to your shell
     7. Prints the next-step run command for your platform
 
-What it does NOT do:
+What it does not do:
     - Install Python, git, or Tailscale (do that yourself first)
     - Clone the repo (you already did)
     - Write your real env vars (you set those before running the sidecar)
@@ -113,7 +113,7 @@ def create_venv(quiet: bool) -> None:
 def install_deps(quiet: bool) -> None:
     print("==> Upgrading pip")
     run([str(venv_pip()), "install", "--upgrade", "--quiet", "pip"], quiet=quiet)
-    print("==> Installing contributor dependencies (slim — no llama-cpp-python)")
+    print("==> Installing contributor dependencies (slim - no llama-cpp-python)")
     req = sidecar_dir() / "requirements-contributor.txt"
     if not req.exists():
         fail(f"missing requirements file: {req}")
@@ -138,7 +138,7 @@ def write_env_example() -> Path:
         "# Copy this file to .env and edit the placeholders below.\n"
         "# The sidecar auto-loads .env from its working directory.\n"
         "#\n"
-        "# Find the dev Mac's LAN IP:\n"
+        "# Find the coordinator machine's LAN IP:\n"
         "#   macOS:    ipconfig getifaddr en0\n"
         "#   Linux:    hostname -I | awk '{print $1}'\n"
         "#   Windows:  ipconfig | findstr IPv4\n"
@@ -147,8 +147,8 @@ def write_env_example() -> Path:
         "# Pick a hash that exists in coordinator.contributor_releases:\n"
         "POTLUCK_BINARY_HASH=59b74f2ea0e8b6f23f3672336f90c97435b1dfa13ef7aabc1994b61c54c7d65a\n"
         "\n"
-        "# REPLACE THIS with the dev Mac's actual IP — the placeholder will not work:\n"
-        "POTLUCK_COORDINATOR_URL=ws://REPLACE_WITH_DEV_MAC_IP:8400/peers/connect\n"
+        "# REPLACE THIS with the coordinator machine's actual IP - the placeholder will not work:\n"
+        "POTLUCK_COORDINATOR_URL=ws://REPLACE_WITH_COORDINATOR_IP:8400/peers/connect\n"
         "\n"
         "# Dev member fixture (any UUID works for m1):\n"
         "POTLUCK_MEMBER_ID=00000000-0000-0000-0000-000000000001\n"
@@ -164,14 +164,14 @@ def print_next_steps(env_example: Path) -> None:
     if sys.platform == "win32":
         run_cmd = (
             f"$env:POTLUCK_BINARY_HASH = '<hash>'\n"
-            f"$env:POTLUCK_COORDINATOR_URL = 'ws://<dev-mac-ip>:8400/peers/connect'\n"
+            f"$env:POTLUCK_COORDINATOR_URL = 'ws://<coordinator-ip>:8400/peers/connect'\n"
             f"$env:POTLUCK_MEMBER_ID = '00000000-0000-0000-0000-000000000001'\n"
             f"{entry} --verbose"
         )
     else:
         run_cmd = (
             f"POTLUCK_BINARY_HASH=<hash> \\\n"
-            f"POTLUCK_COORDINATOR_URL=ws://<dev-mac-ip>:8400/peers/connect \\\n"
+            f"POTLUCK_COORDINATOR_URL=ws://<coordinator-ip>:8400/peers/connect \\\n"
             f"POTLUCK_MEMBER_ID=00000000-0000-0000-0000-000000000001 \\\n"
             f"{entry} --verbose"
         )
@@ -180,18 +180,18 @@ def print_next_steps(env_example: Path) -> None:
     print("=" * 64)
     print("Install complete. Next steps:")
     print("=" * 64)
-    print(f"\n1. The template at {env_example.name} is regenerated on each install —")
+    print(f"\n1. The template at {env_example.name} is regenerated on each install -")
     print(f"   don't edit it in place. Copy then edit:")
     print(f"\n   cp {env_example} {env_example.parent / '.env'}")
-    print(f"   # then edit {env_example.parent / '.env'} with your dev Mac's IP")
+    print(f"   # then edit {env_example.parent / '.env'} with your coordinator machine's IP")
     print(f"\n2. Run the sidecar (auto-loads {env_example.parent / '.env'}):")
     print(f"\n   cd {sidecar_dir()}")
     print(f"   {contributor_entry()} --verbose")
     print(f"\n   ...or pass values inline:")
     print(f"\n{run_cmd}\n")
     print("3. Verify from another machine:")
-    print("\n   curl http://<dev-mac-ip>:8400/transparency/fleet\n")
-    print("Full doc: docs/phase-g/lan-smoke-setup.md")
+    print("\n   curl http://<coordinator-ip>:8400/transparency/fleet\n")
+    print("Full doc: apps/desktop/python/potluck_local/contributor/README.md")
 
 
 def reset_venv() -> None:

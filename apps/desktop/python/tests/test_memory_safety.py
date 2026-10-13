@@ -58,7 +58,7 @@ def test_labelled_credentials_are_redacted(text, value):
     "VITE_SHOPIFY_API_KEY=0123456789abcdef0123456789abcdef is a public client id.",
     "Commit 0123456789abcdef0123456789abcdef01234567 fixes downloads.",
     "/Users/sam/project/token_manager.py uses port 8321.",
-    "Task 1462e615-f045-439b-954d-bd85be741188 is active.",
+    "Task 123e4567-e89b-42d3-a456-426614174000 is active.",
 ])
 def test_harmless_references_and_identifiers_are_unchanged(text):
     assert redact_credentials(text) == text

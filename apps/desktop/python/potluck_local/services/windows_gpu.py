@@ -4,9 +4,8 @@ using, which adapter is which, and the real dedicated size of a large card.
 Why this module exists
 ----------------------
 ``ggml_backend_dev_memory`` reports "free" memory from the Vulkan driver. On an
-AMD RX 6600 XT (2026-09-13 and 2026-10-09) that figure tracked only what the
-engine itself had allocated: it was the same with a game holding 1.4 GiB of the
-card and with the machine idle. A load planned from it filled a card that other
+AMD RX 6600 XT that figure tracks only what the engine itself has allocated:
+it is the same with a game holding 1.4 GiB of the card and with the machine idle. A load planned from it filled a card that other
 programs were already using, and every inference afterwards failed with an
 out-of-device-memory error.
 
@@ -24,9 +23,9 @@ instance per adapter, named by LUID), the same source Task Manager draws its
 ``IDXGIAdapter3::QueryVideoMemoryInfo`` is deliberately not used for usage. Its
 ``CurrentUsage`` is the calling process's own use, and its ``Budget`` is an
 allowance the OS hands this process; neither says how much the other programs
-on the machine are holding. Read on the RX 6600 XT machine on 2026-10-09 (previous
-display driver) from a fresh process, with 4.55 GiB of the card in use by others:
-``CurrentUsage`` 0.00 GiB and ``Budget`` 7.21 GiB, against a card of 7.96 GiB.
+on the machine are holding. Read on an RX 6600 XT from a fresh process, with
+4.55 GiB of the card in use by others: ``CurrentUsage`` 0.00 GiB and ``Budget``
+7.21 GiB, against a card of 7.96 GiB.
 
 The registry value ``HardwareInformation.qwMemorySize`` (64-bit) is read for
 hardware detection, because ``Win32_VideoController.AdapterRAM`` is a 32-bit

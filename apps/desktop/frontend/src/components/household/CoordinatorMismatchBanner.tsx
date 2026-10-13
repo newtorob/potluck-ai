@@ -1,5 +1,5 @@
 /**
- * CoordinatorMismatchBanner — proactive warning when the app's configured
+ * CoordinatorMismatchBanner - proactive warning when the app's configured
  * coordinator (connectionStore.coordinatorUrl, usually a saved override)
  * disagrees with the coordinator this machine's mesh daemon is actually
  * connected to (connectionStore.sidecarReportedUrl, from the Go mesh
@@ -10,15 +10,15 @@
  * app's own (stale) coordinator setting and get rejected by a coordinator
  * that never saw the user's session. Showing this here, before the user
  * even tries "Set up household," turns that into a one-click fix instead of
- * a cryptic auth error — see also `describeCoordinatorAuthError` for the
+ * a cryptic auth error - see also `describeCoordinatorAuthError` for the
  * reactive, after-the-failure version of the same fix.
  *
  * Renders nothing when there's no mismatch, or when the mesh bridge/daemon
- * hasn't reported a coordinator yet (sidecarReportedUrl === null) — nothing
+ * hasn't reported a coordinator yet (sidecarReportedUrl === null) - nothing
  * to compare against in dev or on an unsupported platform.
  *
  * Dismissible per mismatch pair: dismissing this exact (app url, daemon
- * url) combination hides it, but a LATER, different mismatch (e.g. after
+ * url) combination hides it, but a later, different mismatch (e.g. after
  * switching once, then drifting again some other way) shows again.
  */
 

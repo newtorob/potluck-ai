@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { checkModelFit, suggestedDownload } from '@/lib/modelFit';
 /**
- * ModelLibrary — /models route.
+ * ModelLibrary - /models route.
  *
  * Shows the full model catalog from the Python sidecar with live download
  * progress, install/load/unload/delete actions, and a hardware summary badge.

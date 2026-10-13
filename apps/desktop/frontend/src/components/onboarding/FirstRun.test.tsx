@@ -1,7 +1,7 @@
 /**
- * Regression: download-complete auto-advance must call load() once.
- * A whole-store subscription in the effect deps re-fired load on every
- * zustand write and blew the React update-depth limit during onboarding.
+ * Download-complete auto-advance must call load() once. A whole-store
+ * subscription in the effect deps would re-fire load on every zustand write
+ * and hit the React update-depth limit during onboarding.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -100,7 +100,7 @@ function advanceToPick() {
   expect(screen.getByText(/choose your first model/i)).toBeInTheDocument();
 }
 
-describe('FirstRun — download complete auto-advance', () => {
+describe('FirstRun: download complete auto-advance', () => {
   beforeEach(() => {
     loadModel.mockReset().mockResolvedValue({ status: 'ok' });
     installModel.mockReset().mockResolvedValue({ status: 'started' });
@@ -176,7 +176,7 @@ describe('FirstRun — download complete auto-advance', () => {
 
     expect(screen.getByText(/loading model into memory/i)).toBeInTheDocument();
 
-    // Extra store churn that used to re-trigger the effect via `store` in deps
+    // Extra store churn must not re-trigger the effect
     act(() => {
       useModelStore.getState()._setInstalling('tiny-test', false);
       useModelStore.getState()._setLoading('tiny-test', true);
@@ -196,7 +196,7 @@ describe('FirstRun — download complete auto-advance', () => {
       </MemoryRouter>,
     );
 
-    // Still loading — and still a single load() call
+    // Still loading - and still a single load() call
     expect(screen.getByText(/loading model into memory/i)).toBeInTheDocument();
     expect(loadSpy).toHaveBeenCalledTimes(1);
 

@@ -1,23 +1,23 @@
 [Unit]
 Description=Potluck mesh firewall accept rules (Tailscale + Mullvad coexistence)
-Documentation=https://github.com/newtorob/potluckai/blob/main/scripts/systemd/README.md
+Documentation=https://github.com/newtorob/potluck-ai/blob/main/scripts/systemd/README.md
 # Run after both VPN daemons settle so their chains/tables exist before we try
-# to insert into them. We don't HARD-require them — install-firewall-rules.sh
+# to insert into them. We don't hard-require them - install-firewall-rules.sh
 # detects each one independently and no-ops if absent.
 After=network-online.target tailscaled.service mullvad-daemon.service
 Wants=network-online.target
 
 [Service]
-# Long-running self-healing watcher, NOT a one-shot. Mullvad/Proton/Nord
+# Long-running self-healing watcher, not a one-shot. Mullvad/Proton/Nord
 # recreate their nftables ruleset on every (re)connect, silently wiping our
-# accept rules — a one-shot install at boot breaks the moment the VPN cycles.
+# accept rules - a one-shot install at boot breaks the moment the VPN cycles.
 # --watch installs the rules, then reapplies them within seconds of the VPN
 # flushing them. The accompanying potluck-mesh.service still depends on this
 # unit, so the mesh waits for the firewall to be ready.
 Type=exec
 ExecStart=@FIREWALL_SCRIPT@ --watch
 ExecStop=@FIREWALL_SCRIPT@ --uninstall
-# The watcher should never stay down — if it crashes, bring it back fast so a
+# The watcher should never stay down - if it crashes, bring it back fast so a
 # VPN reconnect can't leave the mesh firewalled off.
 Restart=always
 RestartSec=2

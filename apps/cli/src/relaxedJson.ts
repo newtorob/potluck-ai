@@ -7,12 +7,12 @@
  * JSON never routes through here. The grammar is otherwise standard JSON.
  *
  * Supported beyond strict JSON:
- *  - strings delimited by EITHER " or ' (a '-string may hold raw ", and a
+ *  - strings delimited by either " or ' (a '-string may hold raw ", and a
  *    "-string may hold raw '); escapes \" \' \\ \/ \b \f \n \r \t \uXXXX.
  *  - trailing commas in objects and arrays.
  *  - unquoted object keys matching /[A-Za-z_$][\w$]*\/.
  *
- * NOT supported, on purpose: comments, NaN/Infinity/undefined. Throws a clean
+ * Not supported, on purpose: comments, NaN/Infinity/undefined. Throws a clean
  * Error (with a 0-based offset) on anything it cannot parse, including trailing
  * garbage after the top-level value. Every loop advances the cursor or throws,
  * so malformed input can never hang.

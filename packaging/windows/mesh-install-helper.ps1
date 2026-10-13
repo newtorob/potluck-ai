@@ -1,7 +1,7 @@
-# mesh-install-helper.ps1 — the ONE fixed script the Potluck desktop app
+# mesh-install-helper.ps1 - the one fixed script the Potluck desktop app
 # elevates (via Start-Process -Verb RunAs, a single UAC prompt) on Windows.
 #
-# SECURITY MODEL — READ THIS BEFORE CHANGING ANYTHING
+# Security model: read this before changing anything
 # ------------------------------------------------------
 # This is the Windows counterpart of packaging/linux/mesh-install-helper.sh
 # (run via pkexec there) and the mesh-helper Swift CLI on macOS (which wraps
@@ -12,28 +12,28 @@
 #   powershell -NoProfile -ExecutionPolicy Bypass -File mesh-install-helper.ps1 `
 #       install -CoordinatorUrl <url> -DerpUrl <url> -MeshBin <path>
 #
-# via a single Start-Process -Verb RunAs (main.js's mesh:enable handler —
+# via a single Start-Process -Verb RunAs (main.js's mesh:enable handler -
 # apps/desktop/electron/main.js). Two things keep this from becoming an
 # arbitrary-elevated-exec hole:
 #
 #   1. Every argument this script accepts is validated below (subcommand
-#      whitelist, URL shape, mesh-binary source path) BEFORE it touches disk
-#      or the Task Scheduler. main.js only ever passes FIXED production
-#      constants or values it computed itself (getWindowsMeshBinPath()) —
+#      whitelist, URL shape, mesh-binary source path) before it touches disk
+#      or the Task Scheduler. main.js only ever passes fixed production
+#      constants or values it computed itself (getWindowsMeshBinPath()) -
 #      never anything renderer-supplied. Nothing here is Invoke-Expression'd
 #      or run through a shell that could reinterpret metacharacters.
-#   2. Unlike the Linux/.deb case — where the mesh binary is placed at
-#      /usr/lib/potluck/ by a ROOT postinst script before the app ever runs —
-#      electron-builder's NSIS installer defaults to a PER-USER install
+#   2. Unlike the Linux/.deb case - where the mesh binary is placed at
+#      /usr/lib/potluck/ by a root postinst script before the app ever runs -
+#      electron-builder's NSIS installer defaults to a per-user install
 #      directory (%LOCALAPPDATA%\Programs\Potluck AI), which the same
 #      logged-in (non-admin) user who'd click "Enable mesh" can also write
 #      to. Trusting "the source path looks right" the way the Linux script
-#      trusts its root-owned prefixes would NOT be a real privilege
-#      boundary here. Instead, THIS elevated script COPIES the validated
+#      trusts its root-owned prefixes would not be a real privilege
+#      boundary here. Instead, this elevated script copies the validated
 #      mesh binary into an admin-owned location
 #      (C:\ProgramData\Potluck\mesh\potluck-mesh.exe, ACL'd below to
-#      Administrators + SYSTEM only) and points the scheduled task at THAT
-#      copy — not at the original per-user resources path. A future
+#      Administrators + SYSTEM only) and points the scheduled task at that
+#      copy - not at the original per-user resources path. A future
 #      re-install (app update, or the user re-clicking Enable) re-copies;
 #      nothing about the running service depends on the per-user directory
 #      remaining untampered after this step completes.
@@ -44,22 +44,21 @@
 #      update. The app compares the daemon's exe_sha256 with the binary it
 #      shipped and offers "Restart mesh service", which runs this script.
 #
-# WHY A SCHEDULED TASK, NOT A REAL WINDOWS SERVICE
+# Why a scheduled task, not a real Windows service
 # ---------------------------------------------------
-# potluck-mesh.exe is a plain console binary — it does not implement the
+# potluck-mesh.exe is a plain console binary - it does not implement the
 # Windows Service Control (SCM) protocol (StartServiceCtrlDispatcher /
 # a service control handler), so `sc.exe start` on it fails ("Cannot start
 # service ...", SCM kills it after ~30s for never registering a control
 # handler). Retrofitting a real SCM-compliant service wrapper is a real Go
-# change (golang.org/x/sys/windows/svc) that is out of scope for this pass.
+# change (golang.org/x/sys/windows/svc) that is out of scope here.
 # A SYSTEM-run, "At startup" + "Run with highest privileges" Scheduled Task
 # needs none of that: Task Scheduler just launches the .exe directly, exactly
 # like running it from a console, so the existing binary works unmodified.
-# This was verified end-to-end on a real Windows box (see the deliverable
-# report): the daemon runs as NT AUTHORITY\SYSTEM and survives reboots
-# (AtStartup trigger).
+# The daemon runs as NT AUTHORITY\SYSTEM and survives reboots (AtStartup
+# trigger).
 #
-# HOW IT COMES BACK AFTER IT EXITS
+# How it comes back after it exits
 # ------------------------------------
 # The sidecar exits non-zero on purpose when its binary is replaced (see
 # cmd/potluck-mesh/selfrestart.go), and may crash. Task Scheduler's
@@ -72,13 +71,13 @@
 # reaches a machine when this script runs again (the app's "Restart mesh
 # service" button), because Register-ScheduledTask is only called here.
 #
-# WHY THE PIPE IS STILL REACHABLE
+# Why the pipe is still reachable
 # -----------------------------------
 # The daemon runs as SYSTEM, same "needs elevation for the TUN/Wintun
 # adapter" reasoning as root on macOS/Linux. Reachability for the
 # interactively logged-in desktop user is handled on the Go side:
 # internal/localapi/listener_windows.go grants the named pipe's DACL to
-# BOTH the running (SYSTEM) account and the SID of the user signed in at the
+# both the running (SYSTEM) account and the SID of the user signed in at the
 # console (via WTSGetActiveConsoleSessionId -> WTSQueryUserToken), so
 # Electron, running as that same user, can connect. The task starts at boot
 # before anyone has signed in, so the daemon checks the console user every
@@ -94,13 +93,13 @@
 #   mesh-install-helper.ps1 uninstall
 #   mesh-install-helper.ps1 status
 #
-# STDOUT CONTRACT (kept in sync with main.js's runWindowsMeshHelper parsing):
+# Stdout contract (kept in sync with main.js's runWindowsMeshHelper parsing):
 #   install    -> prints exactly "installed" on success, exit 0.
 #                 On failure: message to stderr, exit 1 (non-zero).
 #   uninstall  -> prints exactly "uninstalled" on success, exit 0.
 #   status     -> prints one of: active | inactive | not-installed
-#                 (does NOT require elevation; provided for operator/CLI
-#                 parity with the Linux/mac scripts — main.js's
+#                 (does not require elevation; provided for operator/CLI
+#                 parity with the Linux/mac scripts - main.js's
 #                 computeWindowsDaemonStatus queries the scheduled task
 #                 directly instead of invoking this script, since reading
 #                 task state needs no privilege).
@@ -146,13 +145,13 @@ function Require-Admin {
 }
 
 # ----------------------------------------------------------------------------
-# Argument validation — every value that ends up in the scheduled task's
-# action or on disk is checked here BEFORE Do-Install runs. Fail closed.
+# Argument validation - every value that ends up in the scheduled task's
+# action or on disk is checked here before Do-Install runs. Fail closed.
 # Mirrors packaging/linux/mesh-install-helper.sh's validate_* functions.
 # ----------------------------------------------------------------------------
 
 # Accepts http(s):// or tcp(+tls|+insecure):// URLs with a plain
-# host[:port][/path] — deliberately conservative, same grammar as the Linux
+# host[:port][/path] - deliberately conservative, same grammar as the Linux
 # script's validate_url.
 function Test-MeshUrl {
     param([string]$Value, [string]$Label)
@@ -170,7 +169,7 @@ function Test-NodeName {
 
 # Validates the SOURCE mesh binary main.js pointed us at (the packaged app's
 # own resources\mesh\potluck-mesh.exe). Not a hard privilege boundary on its
-# own (see the header comment) — the real boundary is that we COPY it to an
+# own (see the header comment) - the real boundary is that we COPY it to an
 # admin-owned location below rather than exec it in place.
 function Test-MeshBinSource {
     param([string]$Value)
@@ -185,7 +184,7 @@ function Test-MeshBinSource {
 }
 
 # wintun.dll is a runtime LoadLibrary dependency of the mesh binary on
-# Windows (see third_party/windows/README.md in the Go module) — it must sit
+# Windows (see third_party/windows/README.md in the Go module) - it must sit
 # next to potluck-mesh.exe or TUN creation fails at startup. Packaged next
 # to the exe by prepack:mesh (apps/desktop/electron/package.json), so it's
 # always a sibling of $MeshBin in a real packaged install.
@@ -224,7 +223,7 @@ function Do-Install {
     }
     Get-Process -Name 'potluck-mesh' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
-    # Key + binary directories, ACL'd to Administrators + SYSTEM only —
+    # Key + binary directories, ACL'd to Administrators + SYSTEM only -
     # matches the Linux script's `install -d -m 0700 -o root -g root`.
     foreach ($dir in @($KeyDir, $InstallDir)) {
         if (-not (Test-Path -LiteralPath $dir)) {
@@ -254,7 +253,7 @@ function Do-Install {
 
     # cmd.exe /c wrapper: Register-ScheduledTaskAction's -Execute launches the
     # target directly (no shell), which is what we want for the real daemon
-    # process — no wrapper needed here, unlike the debug logging setup used
+    # process - no wrapper needed here, unlike the debug logging setup used
     # during manual testing. Kept simple and direct.
     $action = New-ScheduledTaskAction -Execute $InstalledBin -Argument $exeArgs
     $atStartup = New-ScheduledTaskTrigger -AtStartup
@@ -278,7 +277,7 @@ function Do-Install {
     Start-ScheduledTask -TaskName $TaskName
 
     # Confirm it actually came up rather than optimistically declaring
-    # success — same discipline as do_install() in the Linux script.
+    # success - same discipline as do_install() in the Linux script.
     Start-Sleep -Seconds 2
     $proc = Get-Process -Name 'potluck-mesh' -ErrorAction SilentlyContinue
     if (-not $proc) {

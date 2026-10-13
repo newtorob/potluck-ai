@@ -4,15 +4,15 @@ its inner `record_job_credits` call.
 `record_job_credits` was already made idempotent via a UNIQUE (job_id,
 direction) constraint + ON CONFLICT DO NOTHING (migration 0003; see
 test_credit_ledger_idempotency.py). This file proves the guarantee holds
-end-to-end through `_finalize_job_in_db` — the actual function the
+end-to-end through `_finalize_job_in_db` - the actual function the
 streaming finalizer's `finally:` block invokes, including its own DB-row
-update (jobs.status/output_tokens/duration_ms/completed_at) — for the
+update (jobs.status/output_tokens/duration_ms/completed_at) - for the
 scenario the pool-reliability spine cares about: a duplicate finalize call
 for the same job_id (e.g. a finalize firing after a drain, or a retried
 background task) must never write the credit rows twice.
 
 `_finalize_job_in_db` opens its own session via
-`coordinator.db.database.get_session_factory()` (by design — it must
+`coordinator.db.database.get_session_factory()` (by design - it must
 survive the request-scoped session closing), so these tests bring up the
 real module-global engine via init_db()/close_db() rather than the
 `db_session` single-transaction fixture used elsewhere. Fixture rows are
@@ -98,7 +98,7 @@ async def test_double_finalize_writes_credits_once() -> None:
             count = await _count_ledger_rows(db, job_id)
             assert count == 2, (
                 f"double _finalize_job_in_db call created duplicate credit "
-                f"rows — expected 2 (one spent + one earned), got {count}"
+                f"rows - expected 2 (one spent + one earned), got {count}"
             )
 
             rows = (
@@ -110,7 +110,7 @@ async def test_double_finalize_writes_credits_once() -> None:
             assert directions == {"spent", "earned"}
 
             # The jobs row itself also settled into exactly one terminal
-            # state — no half-applied update from the second call.
+            # state - no half-applied update from the second call.
             db_job = await db.get(Job, job_id)
             assert db_job is not None
             assert db_job.status == "completed"
@@ -133,7 +133,7 @@ async def test_double_finalize_writes_credits_once() -> None:
 @pytest.mark.asyncio
 async def test_double_finalize_self_served_writes_credits_once() -> None:
     """Same guarantee for the self-served path (requester == contributor
-    owner) — finalize skips the ledger entirely for self-served jobs, so
+    owner) - finalize skips the ledger entirely for self-served jobs, so
     this proves the double-call doesn't somehow write anything either."""
     await init_db()
     factory = get_session_factory()
@@ -192,7 +192,7 @@ async def test_double_finalize_self_served_writes_credits_once() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Terminal-outcome policy matrix (audit finding 5)
+# Terminal-outcome policy matrix
 # ---------------------------------------------------------------------------
 #
 # `_finalize_job_in_db` is the single place a job settles. Exactly one

@@ -1,6 +1,6 @@
 name: CI - Privacy invariants
 
-# Enforces the two manifesto-level rules from memory 42a7e671 + 1fc85a49:
+# Enforces the two privacy rules of the contributor network:
 #   - member_id MUST NOT appear in any peer-bound message construction
 #     or coordinator→peer WebSocket send (lint #20).
 #   - The contributor sidecar MUST NOT write prompt or response content

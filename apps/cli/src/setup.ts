@@ -73,7 +73,7 @@ export async function runSetup(io: SetupIO): Promise<CliPrefs> {
         out(`${c.dim("installed models:")} ${models.map((m) => m.id).join(", ")}`);
       }
     } catch {
-      out(c.dim("(could not list models — the gateway is unreachable right now)"));
+      out(c.dim("(could not list models: the gateway is unreachable right now)"));
     }
   }
   const modelAnswer = await ask(
@@ -85,7 +85,7 @@ export async function runSetup(io: SetupIO): Promise<CliPrefs> {
   const scopeDefault: Scope = existing.scope ?? DEFAULT_SCOPE;
   out("");
   out(`${c.dim("scopes:")} ${c.bold("local")} = this machine, ${c.bold("mine")} = your machines (household)`);
-  out(c.dim('       circle / cooperative are single-turn only — not for agent sessions yet'));
+  out(c.dim('       circle / cooperative are single-turn only, not for agent sessions yet'));
   const scopeAnswer = await ask(
     c.yellow(`Default scope [${AGENT_SCOPES.join(" / ")}] (${scopeDefault}): `),
   );
@@ -130,7 +130,7 @@ export async function runSetup(io: SetupIO): Promise<CliPrefs> {
     }
   }
 
-  // 6) Verify command — a build/test command the agent runs after each edit so
+  // 6) Verify command - a build/test command the agent runs after each edit so
   //    it can catch and fix its own mistakes. Offer the auto-detected default.
   out("");
   out(c.dim("verify runs a build/test command after each edit so the agent can"));
@@ -179,7 +179,7 @@ export async function runSetup(io: SetupIO): Promise<CliPrefs> {
 export function printSetupHelp(out: (s: string) => void): void {
   out(
     [
-      `${c.bold("potluck setup --preferences")} — configure CLI defaults`,
+      `${c.bold("potluck setup --preferences")} - configure CLI defaults`,
       "",
       "Walks you through the default model, the default network scope, the",
       "gateway URL, and the verify command (a build/test command the agent runs",

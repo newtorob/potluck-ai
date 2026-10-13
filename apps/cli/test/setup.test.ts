@@ -68,7 +68,7 @@ describe("runSetup", () => {
     expect(raw.active_model_id).toBe("app-model");
     expect((raw.network as Record<string, unknown>).coordinator_url).toBe("http://coord:8400");
     expect((raw.network as Record<string, unknown>).max_gpu_percent).toBe(80);
-    // The app owns the key + the enabled flag — never written by the CLI.
+    // The app owns the key + the enabled flag - never written by the CLI.
     expect(raw.gateway).toEqual({ enabled: false, api_key: "" });
     expect(runtimeRequest).toHaveBeenCalledWith("/settings", {
       method: "PATCH", timeout: 3000,
@@ -78,7 +78,7 @@ describe("runSetup", () => {
 
   it("does not modify config.json when the share step is declined", async () => {
     // Gateway disabled keeps the wizard offline; the CLI must still preserve the
-    // stored block verbatim (it never rewrites gateway.* — key or enabled).
+    // stored block verbatim (it never rewrites gateway.* - key or enabled).
     await writeAppConfig({
       gateway: { enabled: false, api_key: "KEEP-KEY" },
       active_model_id: "orig-model",

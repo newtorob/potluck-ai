@@ -1,12 +1,12 @@
 /**
- * ConnectStep — step 5 of the First Run wizard ("Your machines").
+ * ConnectStep - step 5 of the First Run wizard ("Your machines").
  *
  * Three sections, top to bottom:
- *   1. Coordinator — confirm what the sidecar is connected to (read-only;
+ *   1. Coordinator - confirm what the sidecar is connected to (read-only;
  *      editing lives in Settings → Advanced).
- *   2. Your machines — mesh status, this machine's mesh IP, peer count, and
+ *   2. Your machines - mesh status, this machine's mesh IP, peer count, and
  *      a link to /household to add more machines.
- *   3. Contribute — opt-in toggle for contributor_mode (share spare compute
+ *   3. Contribute - opt-in toggle for contributor_mode (share spare compute
  *      with the open pool). Wired to the real NetworkSettings boolean via the
  *      settingsStore. Default off, matching the sidecar default.
  *
@@ -63,7 +63,7 @@ export function ConnectStep() {
       // coordinator so attestation isn't rejected by REQUIRE_REGISTERED_KEYS
       // (see lib/deviceKey.ts). Best-effort: a coordinator that's
       // unreachable here just means the machine will fail attestation
-      // later, same as before this wiring existed — don't block the toggle
+      // later, same as before this wiring existed - don't block the toggle
       // or roll it back over this.
       try {
         await registerContributorDeviceKey();

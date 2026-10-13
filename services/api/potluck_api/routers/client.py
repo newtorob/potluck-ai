@@ -12,7 +12,7 @@ class ClientVersionResponse(BaseModel):
     """Response body for GET /client/version.
 
     `latest` is the newest client build available; `minimum` is the oldest
-    version still allowed to run — the desktop app hard-blocks itself with an
+    version still allowed to run - the desktop app hard-blocks itself with an
     "Update required" screen if its own version is below `minimum`.
     """
 
@@ -25,7 +25,7 @@ class ClientVersionResponse(BaseModel):
 async def get_client_version() -> ClientVersionResponse:
     """Return the client version handshake.
 
-    Public, unauthenticated, no DB access — every desktop client polls this
+    Public, unauthenticated, no DB access - every desktop client polls this
     on launch, so it stays cheap. Values are a config decision (env
     overrides: CLIENT_LATEST_VERSION, CLIENT_MINIMUM_VERSION,
     CLIENT_NOTES_URL), not hardcoded here, so bumping the minimum supported

@@ -1,16 +1,16 @@
-# Potluck mesh sidecar — systemd system service template.
+# Potluck mesh sidecar - systemd system service template.
 #
 # Installed to /etc/systemd/system/potluck-mesh.service by the .deb /
 # .rpm post-install script. Runs as the dedicated `potluck` system user
 # (created at install time). Starts at boot; survives logout.
 #
 # Substitution tokens (rendered by the installer):
-#   @BINARY_PATH@       — absolute path to the installed sidecar binary
-#   @COORDINATOR_URL@   — defaults to the cooperative's hosted URL
-#   @KEY_DIR@           — /var/lib/potluck/keys (0700, owned by potluck)
-#   @LOG_DIR@           — /var/log/potluck (0755, owned by potluck)
-# TODO(installer): substitute at install time, or write a config file
-# the binary reads at startup.
+#   @BINARY_PATH@ - absolute path to the installed sidecar binary
+#   @COORDINATOR_URL@ - defaults to the cooperative's hosted URL
+#   @KEY_DIR@ - /var/lib/potluck/keys (0700, owned by potluck)
+#   @LOG_DIR@ - /var/log/potluck (0755, owned by potluck)
+# TODO: substitute at install time, or write a config file the binary reads
+# at startup.
 
 [Unit]
 Description=Potluck mesh sidecar (cooperative AI mesh)

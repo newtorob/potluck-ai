@@ -27,7 +27,7 @@ import (
 func assignInterfaceAddress(ifName, ip string) error {
 	// netsh interface ip add address "<ifName>" <ip> 255.255.255.255
 	//
-	// Using the interface name rather than index is more portable — wg-go
+	// Using the interface name rather than index is more portable - wg-go
 	// names the Wintun adapter using whatever string was passed to
 	// tun.CreateTUN, which is the value of tunInterfaceName() ("Wintun").
 	// The caller (Tunnel.SetMeshIP) always passes t.ifName, which is the

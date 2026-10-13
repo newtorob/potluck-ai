@@ -95,10 +95,10 @@ def create_app() -> FastAPI:
     # ------------------------------------------------------------------ #
     # Routers                                                              #
     # ------------------------------------------------------------------ #
-    # Health — no prefix, no auth
+    # Health - no prefix, no auth
     app.include_router(health.router)
 
-    # Client version handshake — GET /client/version
+    # Client version handshake - GET /client/version
     app.include_router(client.router, prefix="/client")
 
     # Auth endpoints live at /auth/...
@@ -107,22 +107,22 @@ def create_app() -> FastAPI:
     app.include_router(device_auth.router, prefix="/auth/device")
     app.include_router(discourse_sso.router, prefix="/auth")
 
-    # Member profile — routes are /me and /me/...
+    # Member profile - routes are /me and /me/...
     app.include_router(members.router)
 
-    # Billing — /billing/...
+    # Billing - /billing/...
     app.include_router(billing.router, prefix="/billing")
 
-    # Webhooks — /webhooks/...
+    # Webhooks - /webhooks/...
     app.include_router(webhooks.router, prefix="/webhooks")
 
-    # Model registry — /models and /models/:slug/manifest
+    # Model registry - /models and /models/:slug/manifest
     app.include_router(models.router, prefix="/models")
 
-    # Governance — routes are /proposals, /votes/:id
+    # Governance - routes are /proposals, /votes/:id
     app.include_router(governance.router)
 
-    # Admin — /admin/...  (all routes gated by require_admin dependency)
+    # Admin - /admin/...  (all routes gated by require_admin dependency)
     app.include_router(admin.router, prefix="/admin")
 
     return app

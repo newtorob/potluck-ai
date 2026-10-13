@@ -93,7 +93,7 @@ class ModelDownloader:
 
         self._cancel_flags[model_id] = False
 
-        # Only resume a partial that belongs to THIS (url, expected_sha256). A
+        # Only resume a partial that belongs to this (url, expected_sha256). A
         # leftover partial from an earlier attempt with a different source (e.g.
         # the catalog url or quant changed for this slug) would otherwise be
         # appended to and only fail the sha256 check at the very end, with no

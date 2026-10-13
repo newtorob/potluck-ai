@@ -15,10 +15,10 @@ _gate = threading.Lock()
 def _run_compute_probe(device_str: str) -> tuple[bool, float, str]:
     """Allocate a small tensor on *device_str*, do a matmul, sync, check finite.
 
-    Returns (ok, latency_ms, detail).  Never raises — caller receives a bool.
+    Returns (ok, latency_ms, detail).  Never raises - caller receives a bool.
     """
     try:
-        import torch  # lazy — only imported here, never at module load
+        import torch  # lazy - only imported here, never at module load
     except ImportError:
         return False, 0.0, "torch is not installed; install the inference backend to verify the GPU"
 

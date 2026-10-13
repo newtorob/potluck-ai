@@ -71,7 +71,7 @@ func recoveryFixture(t *testing.T) (*rosterHandler, *recoveryTunnel, *recoverySi
 	return h, tun, signal, p, pub
 }
 
-// Reproduce the incident: direct failed, relay handshakes remain fresh, and
+// The scenario: direct failed, relay handshakes remain fresh, and
 // endpoints stay unchanged. Recovery must happen after backoff without a
 // restart/roster event, while repeated or concurrent ticks stay throttled.
 func TestRelayedLANRecoveryAfterBackoff(t *testing.T) {

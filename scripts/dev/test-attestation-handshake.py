@@ -132,12 +132,12 @@ def main() -> None:
     p.add_argument(
         "--invalid-signature",
         action="store_true",
-        help="sign the wrong bytes — handshake should reject",
+        help="sign the wrong bytes - handshake should reject",
     )
     p.add_argument(
         "--invalid-pubkey",
         action="store_true",
-        help="send a zero-bytes pubkey — coordinator can't verify, should reject",
+        help="send a zero-bytes pubkey - coordinator can't verify, should reject",
     )
     args = p.parse_args()
 

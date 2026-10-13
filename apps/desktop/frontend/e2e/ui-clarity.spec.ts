@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { mockBackends, ADMIN } from './mock';
 
-const output = '/tmp/potluck-ui-review-20260915';
+const output = '/tmp/potluck-ui-review';
 const models = [
   { slug: 'qwen-4b', name: 'Qwen 4B', tier: 'small', installed: true, min_ram_gb: 8, min_vram_gb: 4, size_bytes: 2.3e9, is_featured: false },
   { slug: 'gemma-4b', name: 'Gemma 4B', tier: 'small', installed: false, min_ram_gb: 8, min_vram_gb: 4, size_bytes: 2.3e9, is_featured: true },
@@ -11,7 +11,7 @@ const models = [
 
 async function desktop(page: Page) {
   const appOrigin = new URL(test.info().project.use.baseURL as string).origin;
-  // Every backend request is intercepted. The tests never touch the dogfood
+  // Every backend request is intercepted. The tests never touch a real
   // sidecar, stored memories, or a production coordinator, even on mutations.
   await page.route('**/*', (route) => {
     const url = new URL(route.request().url());

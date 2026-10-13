@@ -1,5 +1,5 @@
 /**
- * Mesh types — mirror the on-the-wire shapes from the Go sidecar's
+ * Mesh types - mirror the on-the-wire shapes from the Go sidecar's
  * `internal/localapi` package and the coordinator's `routers/mesh.py`.
  *
  * Sources of truth:
@@ -36,7 +36,7 @@ export interface MeshStatus {
   peers_online_count: number;
   last_error: string | null;
   /** True when the sidecar detects a VPN that may interfere with mesh routing.
-   *  Passive — no op is triggered; sampled each status poll. */
+   *  Passive - no op is triggered; sampled each status poll. */
   vpn_conflict: boolean;
   /** Human-readable detail for the VPN conflict, e.g. "Mullvad detected
    *  (tun0 present)". Empty string when vpn_conflict is false. */
@@ -63,7 +63,7 @@ export interface MeshPeer {
   reachable: boolean;
   reachability_mode: ReachabilityMode | null;
   /** Age of the last WireGuard handshake, in seconds. Absent/null when no
-   *  handshake has ever completed — lets the UI tell "stale" from "never".
+   *  handshake has ever completed - lets the UI tell "stale" from "never".
    *  Optional: older mesh sidecars don't send it. */
   handshake_age_seconds?: number | null;
   /** Whether this peer's key is provisioned on the WG device. Absent = unknown
@@ -103,7 +103,7 @@ export interface PairingTokenIssueResponse {
   created_at: string; // ISO 8601
 }
 
-// GET /mesh/households/current — the member's own household + machines already
+// GET /mesh/households/current - the member's own household + machines already
 // in it, so the app can offer a one-tap "join your household" instead of a
 // pairing code (Tier 1). Session-authed; `household` is null when the member
 // has no household yet (this is their first machine).
@@ -146,19 +146,19 @@ export interface MeshBridgeResult<T> {
 /**
  * Mesh daemon lifecycle, as reported by main.js's mesh:daemon-status /
  * mesh:enable IPC handlers. Distinct from MeshStatusValue above, which is
- * the sidecar's OWN mesh_status once it's actually running — this is
+ * the sidecar's own mesh_status once it's actually running - this is
  * "is there even a sidecar process to ask" rather than "what is it doing."
  *
- *   not_installed     — never registered (or the OS lost track of it)
- *   requires_approval — registered, needs a click in System Settings
- *   starting          — registered + approved, but the local IPC socket
+ *   not_installed - never registered (or the OS lost track of it)
+ *   requires_approval - registered, needs a click in System Settings
+ *   starting - registered + approved, but the local IPC socket
  *                        hasn't answered a status probe yet
- *   running           — registered, approved, and the socket answered
+ *   running - registered, approved, and the socket answered
  *   outdated          running and answering, but it is the sidecar from
  *                        before the last app update, not the binary this app
  *                        shipped. The mesh works; the UI offers a restart.
  *   failed            installed, but the service crashed or is crash-looping
- *   unsupported       — this platform's daemon supervision isn't
+ *   unsupported - this platform's daemon supervision isn't
  *                        implemented yet (Linux/Windows today)
  */
 export type MeshDaemonState =

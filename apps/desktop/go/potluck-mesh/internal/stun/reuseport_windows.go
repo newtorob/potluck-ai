@@ -11,10 +11,10 @@ import (
 
 // listenReusable binds a UDP socket to ":port" with SO_REUSEADDR set before
 // bind, so it can coexist with wireguard-go's own socket already bound to the
-// same port (internal/tunnel's wgPort — see tunnel.go).
+// same port (internal/tunnel's wgPort - see tunnel.go).
 //
 // Windows has no SO_REUSEPORT; SO_REUSEADDR is the closest primitive and
-// behaves differently than on Linux/Darwin (see reuseport_unix.go) — multiple
+// behaves differently than on Linux/Darwin (see reuseport_unix.go) - multiple
 // sockets CAN bind the same UDP port, but inbound-delivery semantics across
 // them are not the clean hash-based fan-out SO_REUSEPORT gives on Unix. That
 // is acceptable here: this socket only exists for the brief lifetime of a

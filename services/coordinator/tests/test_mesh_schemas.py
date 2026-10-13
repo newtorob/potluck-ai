@@ -5,7 +5,7 @@ schema drift can't accidentally break wire compatibility with the
 desktop mesh sidecar.
 
 Live-DB integration tests for the enroll/peers/heartbeat flow are in
-`scripts/mesh-enroll-smoke.py` — they require a running coordinator
+`scripts/mesh-enroll-smoke.py` - they require a running coordinator
 + Postgres and aren't part of the pytest suite (which we want to keep
 DB-free for fast inner-loop runs).
 """
@@ -40,7 +40,7 @@ from coordinator.schemas.mesh import (
 # Fields the mesh-layer schemas are allowed to carry. Adding fields
 # requires explicit acknowledgement (update _ALLOWED_FIELDS below).
 # We do not include identifying fields like member_id, conversation_id,
-# session_id — the mesh layer doesn't need them.
+# session_id - the mesh layer doesn't need them.
 _ENROLL_REQUEST_FIELDS = frozenset(
     {"pairing_token", "wg_public_key", "node_name", "platform", "signing_public_key"}
 )
@@ -162,7 +162,7 @@ def test_heartbeat_request_minimal_shape() -> None:
 
 
 # ---------------------------------------------------------------------------
-# LAN direct-path candidates (local_endpoints) — Phase 0/1 plumbing
+# LAN direct-path candidates (local_endpoints) - Phase 0/1 plumbing
 # ---------------------------------------------------------------------------
 
 
@@ -170,7 +170,7 @@ def test_enrolled_peer_has_local_endpoints_field() -> None:
     """EnrolledPeer carries local_endpoints so LAN candidates flow through the
     roster. The field name is mesh-layer metadata (no inference identity), so
     the forbidden-substring invariant in test_no_inference_layer_identity_in_
-    mesh_schemas still holds — this just pins the field's presence + default."""
+    mesh_schemas still holds - this just pins the field's presence + default."""
     assert "local_endpoints" in EnrolledPeer.model_fields
     for forbidden in _FORBIDDEN_SUBSTRINGS:
         assert forbidden not in "local_endpoints"
@@ -186,22 +186,22 @@ def test_enrolled_peer_has_local_endpoints_field() -> None:
 def test_signal_endpoint_update_filters_non_private_endpoints() -> None:
     """The server-side validator drops anything that isn't a private ip:port:
     public, tailnet/CGNAT, loopback, link-local, IPv6, and malformed entries
-    are all rejected (defense in depth — a client cannot get a tailnet or
+    are all rejected (defense in depth - a client cannot get a tailnet or
     public address redistributed to peers)."""
     upd = SignalEndpointUpdate(
         external_endpoint="203.0.113.7:51820",
         local_endpoints=[
-            "192.168.1.20:51820",      # keep — RFC1918
-            "10.0.0.5:51820",          # keep — RFC1918
-            "172.16.4.4:51820",        # keep — RFC1918
-            "8.8.8.8:51820",           # drop — public
-            "100.100.50.50:51820",     # drop — tailnet/CGNAT (100.64/10)
-            "127.0.0.1:51820",         # drop — loopback
-            "169.254.1.1:51820",       # drop — link-local
-            "[fe80::1]:51820",         # drop — IPv6
-            "192.168.1.20:51820",      # drop — duplicate
-            "not-an-endpoint",         # drop — malformed (no port)
-            "192.168.1.30:999999",     # drop — port out of range
+            "192.168.1.20:51820",      # keep - RFC1918
+            "10.0.0.5:51820",          # keep - RFC1918
+            "172.16.4.4:51820",        # keep - RFC1918
+            "8.8.8.8:51820",           # drop - public
+            "100.100.50.50:51820",     # drop - tailnet/CGNAT (100.64/10)
+            "127.0.0.1:51820",         # drop - loopback
+            "169.254.1.1:51820",       # drop - link-local
+            "[fe80::1]:51820",         # drop - IPv6
+            "192.168.1.20:51820",      # drop - duplicate
+            "not-an-endpoint",         # drop - malformed (no port)
+            "192.168.1.30:999999",     # drop - port out of range
         ],
     )
     assert upd.local_endpoints == [
@@ -222,19 +222,19 @@ def test_signal_endpoint_update_caps_local_endpoints() -> None:
 
 
 def test_signal_endpoint_update_defaults_empty() -> None:
-    """Omitting local_endpoints yields an empty list, never None — so older
+    """Omitting local_endpoints yields an empty list, never None - so older
     clients that don't send the field still validate."""
     upd = SignalEndpointUpdate(external_endpoint="203.0.113.7:51820")
     assert upd.local_endpoints == []
 
 
 # ---------------------------------------------------------------------------
-# /mesh/signal protocol — signal messages
+# /mesh/signal protocol - signal messages
 # ---------------------------------------------------------------------------
 
 
 def test_signal_messages_carry_type_discriminator() -> None:
-    """Every signal message has a `type` literal — clients use it as the
+    """Every signal message has a `type` literal - clients use it as the
     discriminator to parse incoming traffic. If we ever drop it, peers
     can't tell messages apart."""
     classes = [
@@ -255,8 +255,8 @@ def test_signal_messages_carry_type_discriminator() -> None:
 
 
 def test_signal_messages_carry_no_inference_layer_identity() -> None:
-    """Signal messages route mesh-layer concerns — endpoints, pubkeys,
-    pairing — and must not carry inference-layer identifiers."""
+    """Signal messages route mesh-layer concerns - endpoints, pubkeys,
+    pairing - and must not carry inference-layer identifiers."""
     classes = [
         SignalHello,
         SignalEndpointUpdate,
@@ -291,7 +291,7 @@ def test_signal_hello_validates_wg_key_length() -> None:
 
 
 def test_signal_punch_coord_role_locked_down() -> None:
-    """`role` is a Literal — peers branch on it for simultaneous-send
+    """`role` is a Literal - peers branch on it for simultaneous-send
     logic. Drift would silently break the hole-punch protocol."""
     msg = SignalPunchCoord(
         peer_node_id=uuid.uuid4(),
@@ -315,16 +315,15 @@ def test_signal_punch_coord_role_locked_down() -> None:
 
 
 # ---------------------------------------------------------------------------
-# ip:port endpoint-string injection (LAUNCH-BLOCKER, coordinator half)
+# ip:port endpoint-string injection
 # ---------------------------------------------------------------------------
 #
 # HeartbeatRequest.external_endpoint, SignalEndpointUpdate.external_endpoint,
 # and SignalPunchCoord.peer_endpoint all flow into the sidecar's WireGuard
-# UAPI config on the receiving side. Before this fix they had only a
-# max_length cap (or, for peer_endpoint, no cap at all) and no shape
-# validation — a value like "1.1.1.1:1\nallowed_ip=0.0.0.0/0\n" would have
-# been accepted and relayed. These pin that a malformed value is REJECTED
-# (raises ValidationError), not silently truncated or passed through.
+# UAPI config on the receiving side. A length cap alone would accept a value
+# like "1.1.1.1:1\nallowed_ip=0.0.0.0/0\n" and relay it. These pin that a
+# malformed value is rejected (raises ValidationError), not silently
+# truncated or passed through.
 
 _INJECTION_ENDPOINTS = [
     "1.1.1.1:1\nallowed_ip=0.0.0.0/0\n",  # newline-smuggled UAPI directive
@@ -369,7 +368,7 @@ def test_signal_endpoint_update_rejects_malformed_external_endpoint() -> None:
 
 
 def test_signal_punch_coord_rejects_malformed_peer_endpoint() -> None:
-    """peer_endpoint previously had NO cap and no validation at all."""
+    """peer_endpoint is length-capped and validated as ip:port."""
     for bad in _INJECTION_ENDPOINTS:
         with pytest.raises(ValidationError):
             SignalPunchCoord(
@@ -401,7 +400,7 @@ def test_signal_punch_coord_accepts_well_formed_public_endpoint() -> None:
 
 
 def test_signal_welcome_includes_roster() -> None:
-    """SignalWelcome must include the roster — that's how new peers
+    """SignalWelcome must include the roster - that's how new peers
     learn their household composition."""
     msg = SignalWelcome(
         node_id=uuid.uuid4(),
@@ -428,16 +427,16 @@ def test_signal_roster_update_three_lists() -> None:
 
 
 # Expected field sets for DERP schemas. Adding any field here requires
-# explicit review — especially guard against inference-layer identity leaking
+# explicit review - especially guard against inference-layer identity leaking
 # into the JWT request/response (which flows to the relay).
 #
-# `nonce` + `signature` (2026-07-20, coordinator-DERP-PoP hardening) are the
-# OPTIONAL proof-of-possession fields: a caller MAY prove it holds the
+# `nonce` + `signature` are the optional proof-of-possession fields: a
+# caller MAY prove it holds the
 # private key for a registered `MeshNode.signing_public_key` by signing
 # `f"derp-token:{wg_public_key}:{region}:{nonce}"`. Neither carries identity
-# — a nonce is just a timestamp string and a signature is opaque bytes — so
+# - a nonce is just a timestamp string and a signature is opaque bytes - so
 # they don't violate the "no inference-layer identity" invariant this file
-# guards. Both default to None so old clients that omit them are unaffected.
+# guards. Both default to None so clients that omit them are unaffected.
 _DERP_TOKEN_REQUEST_FIELDS = frozenset(
     {"wg_public_key", "region", "nonce", "signature"}
 )
@@ -468,7 +467,7 @@ def test_derp_token_response_field_set_locked_down() -> None:
     """DERPTokenResponse carries only token + expires_at + region.
 
     No identity beyond what the relay needs for auth. The JWT itself
-    carries wg_pubkey + region + exp/iat — the relay does not need more.
+    carries wg_pubkey + region + exp/iat - the relay does not need more.
     """
     actual = set(DERPTokenResponse.model_fields.keys())
     extras = actual - _DERP_TOKEN_RESPONSE_FIELDS
@@ -491,7 +490,7 @@ def test_no_inference_layer_identity_in_derp_schemas() -> None:
                 assert forbidden not in lowered, (
                     f"{schema.__name__}.{field_name} contains forbidden "
                     f"substring '{forbidden}'. DERP token schemas must not "
-                    "carry inference-layer identity — the relay only needs "
+                    "carry inference-layer identity - the relay only needs "
                     "wg_pubkey + region + exp/iat."
                 )
 

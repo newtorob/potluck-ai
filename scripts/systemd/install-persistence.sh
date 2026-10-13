@@ -6,10 +6,10 @@
 # running across reboots, plus the firewall accept rules that let it
 # coexist with Tailscale and Mullvad.
 #
-# WHEN TO RUN THIS
+# When to run this
 # -----------------
-# Run AFTER setup-household.sh has built the mesh binary and paired this
-# machine into a household. This script doesn't pair, doesn't build —
+# Run after setup-household.sh has built the mesh binary and paired this
+# machine into a household. This script doesn't pair, doesn't build -
 # it just wires up the already-working system to survive a reboot.
 #
 # USAGE
@@ -18,7 +18,7 @@
 #   sudo ./install-persistence.sh --uninstall
 #   sudo ./install-persistence.sh --status
 #
-# WHAT IT DOES (install)
+# What it does (install)
 # -----------------------
 #   1. Copies install-firewall-rules.sh to /usr/local/lib/potluck/
 #   2. Renders potluck-firewall.service from template, installs to
@@ -28,14 +28,14 @@
 #      enables + starts.
 #   4. Verifies both units are active.
 #
-# WHAT IT DOES (uninstall)
+# What it does (uninstall)
 # -------------------------
 #   1. Stops + disables both units, removes the unit files.
 #   2. Runs install-firewall-rules.sh --uninstall to delete nft rules.
 #   3. Removes /usr/local/lib/potluck/install-firewall-rules.sh.
-#   4. Does NOT touch your $HOME/.potluck state, pairing tokens, etc.
+#   4. Does not touch your $HOME/.potluck state, pairing tokens, etc.
 #
-# Re-running --install is safe — service files are overwritten with current
+# Re-running --install is safe - service files are overwritten with current
 # values, which is what you want if the mesh binary moved or the coordinator
 # URL changed.
 
@@ -54,8 +54,8 @@ MESH_BIN_DEFAULT="$REPO_ROOT/apps/desktop/go/potluck-mesh/dist/potluck-mesh"
 LIB_DIR="/usr/local/lib/potluck"
 FIREWALL_SCRIPT_DST="$LIB_DIR/install-firewall-rules.sh"
 # Mesh binary is staged into a system path so the dedicated 'potluck' user
-# can exec it. Running as User=potluck means the daemon can NOT traverse
-# /home/sam (mode 0750) to read the binary out of the repo checkout.
+# can exec it. Running as User=potluck means the daemon cannot traverse
+# the invoking user's home (mode 0750) to read the binary out of the repo checkout.
 MESH_BIN_DST="$LIB_DIR/potluck-mesh"
 SYSTEMD_DIR="/etc/systemd/system"
 FIREWALL_UNIT_DST="$SYSTEMD_DIR/potluck-firewall.service"
@@ -101,16 +101,16 @@ require_systemd() {
 }
 
 # Production DERP relay fallback (services/derp, fly.toml app=potluck-derp,
-# custom domain with its own cert — Fly terminates TLS on 443 and forwards
+# custom domain with its own cert - Fly terminates TLS on 443 and forwards
 # cleartext to the relay binary on 8443, so the client-facing scheme is
 # tcp+tls per internal/derp/client.go). This is the shipped default; it is
-# NOT derived from --coordinator-url (a self-hosted/LAN coordinator does not
+# not derived from --coordinator-url (a self-hosted/LAN coordinator does not
 # imply a self-hosted relay). Override with --derp-url / POTLUCK_DERP_URL,
 # e.g. for LAN-only dev against a local services/derp run without TLS.
 DERP_URL_DEFAULT="tcp+tls://derp.trypotluck.ai:443"
 
 # Create the dedicated 'potluck' system user if it doesn't exist.
-# Idempotent — re-running --install is a no-op when the user is already there.
+# Idempotent - re-running --install is a no-op when the user is already there.
 # We use --system (UID < 1000), --no-create-home, and a nologin shell so the
 # account can't be used for interactive access.
 create_potluck_user() {
@@ -139,23 +139,23 @@ create_potluck_user() {
 #   - Both present                → keep the new one untouched, warn loudly
 #   - Old key absent              → no-op
 #
-# We do NOT delete the old key — operator deletes it after verifying the
+# We do not delete the old key - operator deletes it after verifying the
 # service comes up with the same public key. Silent identity changes are
 # the footgun we're guarding against.
 migrate_existing_key() {
     # Discover the canonical legacy key. In priority order:
     #   1. The home of the User= currently set in /etc/systemd/system/potluck-mesh.service
-    #      — this is THE active key, because that's the user under whose $HOME
+    # - this is the active key, because that's the user under whose $HOME
     #      the Go binary's default key path resolved.
-    #   2. $SUDO_USER's $HOME — first-time install from setup-household.sh
+    #   2. $SUDO_USER's $HOME - first-time install from setup-household.sh
     #      with no prior systemd unit.
-    #   3. /root — belt-and-suspenders for ad-hoc `sudo -E` runs.
+    #   3. /root - belt-and-suspenders for ad-hoc `sudo -E` runs.
     #
     # Priority matters: multiple legacy keys can coexist (e.g. user ran
-    # setup-household.sh interactively, THEN systemd installed under root —
-    # both /home/sam/...wg.key and /root/...wg.key exist, but only /root's is
+    # setup-household.sh interactively, then systemd installed under root -
+    # both ~/...wg.key and /root/...wg.key exist, but only /root's is
     # the active identity). Picking the wrong one silently re-enrolls the
-    # node under a new public key. (Discovered 2026-05-26 on media server.)
+    # node under a new public key.
     local old_key=""
 
     local existing_unit="/etc/systemd/system/potluck-mesh.service"
@@ -165,7 +165,7 @@ migrate_existing_key() {
         # No User= line ⇒ systemd default of root.
         [ -n "$prev_user" ] || prev_user="root"
         # If the previous unit already ran as $POTLUCK_USER, the migration
-        # is already done — no legacy lookup needed.
+        # is already done - no legacy lookup needed.
         if [ "$prev_user" != "$POTLUCK_USER" ]; then
             local prev_home
             if [ "$prev_user" = "root" ]; then
@@ -211,12 +211,12 @@ migrate_existing_key() {
     info "found existing key: $old_key"
 
     if [ -f "$POTLUCK_KEY_PATH" ]; then
-        warn "key already exists at $POTLUCK_KEY_PATH — NOT overwriting."
+        warn "key already exists at $POTLUCK_KEY_PATH - NOT overwriting."
         warn "If you want the old key to win, run:"
         warn "  sudo cp '$old_key' '$POTLUCK_KEY_PATH'"
         warn "  sudo chown $POTLUCK_USER:$POTLUCK_USER '$POTLUCK_KEY_PATH'"
         warn "  sudo chmod 0600 '$POTLUCK_KEY_PATH'"
-        warn "Leaving things alone — service will use the existing system key."
+        warn "Leaving things alone - service will use the existing system key."
         return 0
     fi
 
@@ -231,7 +231,7 @@ migrate_existing_key() {
 
     ok "copied key to $POTLUCK_KEY_PATH (owner=$POTLUCK_USER, mode=0600)"
     printf "\n%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n" "$C_YELLOW" "$C_OFF"
-    printf "%s KEY MIGRATED — preserving household identity %s\n" "$C_YELLOW" "$C_OFF"
+    printf "%s KEY MIGRATED - preserving household identity %s\n" "$C_YELLOW" "$C_OFF"
     printf "%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n" "$C_YELLOW" "$C_OFF"
     info "Old key at $old_key was NOT deleted."
     info "Verify the service starts with the same public key, then remove it:"
@@ -266,13 +266,13 @@ do_install() {
     local sudo_uid="$4"
     local sudo_gid="$5"
 
-    [ -x "$mesh_bin" ] || fail "mesh binary not executable at $mesh_bin — run setup-household.sh first"
+    [ -x "$mesh_bin" ] || fail "mesh binary not executable at $mesh_bin - run setup-household.sh first"
     [ -f "$FIREWALL_SCRIPT_SRC" ] || fail "firewall script template missing: $FIREWALL_SCRIPT_SRC"
     [ -f "$FIREWALL_TEMPLATE" ] || fail "firewall unit template missing: $FIREWALL_TEMPLATE"
     [ -f "$MESH_TEMPLATE" ] || fail "mesh unit template missing: $MESH_TEMPLATE"
 
-    # User + state must exist BEFORE we render the unit (which references
-    # User=potluck) and BEFORE we migrate the key (which chowns to potluck).
+    # User + state must exist before we render the unit (which references
+    # User=potluck) and before we migrate the key (which chowns to potluck).
     create_potluck_user
     migrate_existing_key
 
@@ -283,7 +283,7 @@ do_install() {
 
     step "Staging mesh binary to $MESH_BIN_DST"
     # Copy (don't symlink) so the running daemon under User=potluck doesn't
-    # depend on /home/sam being traversable. Re-running --install picks up
+    # depend on the user's home being traversable. Re-running --install picks up
     # a newer binary from the repo checkout automatically.
     install -m 0755 "$mesh_bin" "$MESH_BIN_DST"
     ok "staged $MESH_BIN_DST"
@@ -389,7 +389,7 @@ do_uninstall() {
         rm -f "$MESH_BIN_DST"
         ok "removed $MESH_BIN_DST"
     fi
-    # Don't rmdir $LIB_DIR — other Potluck installers may share it.
+    # Don't rmdir $LIB_DIR - other Potluck installers may share it.
 
     if [ "$purge_user" = "yes" ]; then
         remove_potluck_user
@@ -433,7 +433,7 @@ DERP_URL="${POTLUCK_DERP_URL:-}"
 PURGE_USER="no"
 
 # When invoked via sudo, SUDO_UID/SUDO_GID are set by sudo itself. When invoked
-# as root directly (not via sudo), fall back to 0/0 — which means the IPC
+# as root directly (not via sudo), fall back to 0/0 - which means the IPC
 # socket will be root-owned and CLI tools running as the user will need sudo.
 # We warn in that case below.
 TARGET_UID="${SUDO_UID:-}"
@@ -476,7 +476,7 @@ case "$MODE" in
         [ -n "$COORD_URL" ] || fail "--coordinator-url is required for --install (or set POTLUCK_COORDINATOR_URL)"
         [ -n "$DERP_URL" ] || DERP_URL="$DERP_URL_DEFAULT"
         if [ -z "$TARGET_UID" ] || [ -z "$TARGET_GID" ]; then
-            warn "SUDO_UID/SUDO_GID not set — IPC socket will be root-owned."
+            warn "SUDO_UID/SUDO_GID not set - IPC socket will be root-owned."
             warn "CLI tools running as a non-root user will need sudo to talk to it."
             warn "To fix: re-run via sudo (not as root directly), or pass --user-uid/--user-gid."
             TARGET_UID="${TARGET_UID:-0}"

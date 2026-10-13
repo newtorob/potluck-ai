@@ -14,7 +14,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// fakeBind — minimal conn.Bind for testing DerpBind without real UDP sockets
+// fakeBind - minimal conn.Bind for testing DerpBind without real UDP sockets
 // ---------------------------------------------------------------------------
 
 type fakeBind struct {
@@ -36,12 +36,12 @@ func newFakeBind() *fakeBind {
 }
 
 func (f *fakeBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
-	// Return an empty receive-func list — the test controls inbound via Inject.
+	// Return an empty receive-func list - the test controls inbound via Inject.
 	return f.recvFuncs, port, nil
 }
-func (f *fakeBind) Close() error                   { f.closed = true; return nil }
-func (f *fakeBind) SetMark(mark uint32) error      { return nil }
-func (f *fakeBind) BatchSize() int                 { return 1 }
+func (f *fakeBind) Close() error              { f.closed = true; return nil }
+func (f *fakeBind) SetMark(mark uint32) error { return nil }
+func (f *fakeBind) BatchSize() int            { return 1 }
 func (f *fakeBind) Send(bufs [][]byte, ep conn.Endpoint) error {
 	// Copy bufs to avoid aliasing issues in assertions.
 	copied := make([][]byte, len(bufs))
@@ -62,7 +62,6 @@ func (f *fakeBind) ParseEndpoint(s string) (conn.Endpoint, error) {
 	}
 	return nil, errors.New("fakeBind: ParseEndpoint not configured")
 }
-
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -99,11 +98,11 @@ func TestSyntheticEndpointRoundTrip(t *testing.T) {
 }
 
 // TestIsSyntheticEndpointPrefix_MatchesBothFullAndAbbreviatedForms verifies the
-// UAPI-drift-detection helper matches BOTH the round-trippable 64-hex form
-// (SyntheticEndpointString, what we write via UpdatePeerEndpoint) AND the
+// UAPI-drift-detection helper matches both the round-trippable 64-hex form
+// (SyntheticEndpointString, what we write via UpdatePeerEndpoint) and the
 // abbreviated 8-hex-char form (syntheticEndpoint.DstToString(), what
-// wireguard-go's UAPI GET actually echoes back for a peer's live endpoint —
-// see internal/tunnel's Tunnel.PeerEndpoint doc) — while still rejecting a
+// wireguard-go's UAPI GET actually echoes back for a peer's live endpoint -
+// see internal/tunnel's Tunnel.PeerEndpoint doc) - while still rejecting a
 // real ip:port, which is exactly the "peer roamed off DERP" signal callers
 // need to detect.
 func TestIsSyntheticEndpointPrefix_MatchesBothFullAndAbbreviatedForms(t *testing.T) {
@@ -128,7 +127,7 @@ func TestIsSyntheticEndpointPrefix_MatchesBothFullAndAbbreviatedForms(t *testing
 	}
 }
 
-// fullHexPrefix returns the first 4 bytes of key as lowercase hex — mirrors
+// fullHexPrefix returns the first 4 bytes of key as lowercase hex - mirrors
 // syntheticEndpoint.DstToString()'s "derp:%x" over pubkey[:4] without
 // depending on an unexported type.
 func fullHexPrefix(key [32]byte) string {
@@ -281,7 +280,7 @@ func TestCloseShutsDownReceiveFunc(t *testing.T) {
 	// Give the goroutine time to block on the channel.
 	time.Sleep(50 * time.Millisecond)
 
-	// Close the bind — should unblock the receive func.
+	// Close the bind - should unblock the receive func.
 	if err := b.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
@@ -353,7 +352,7 @@ func TestSendViaDERPRoutesFakeClient(t *testing.T) {
 
 	select {
 	case <-frameReceived:
-		// Relay received the frame — DERP routing worked.
+		// Relay received the frame - DERP routing worked.
 	case <-time.After(3 * time.Second):
 		t.Fatal("relay did not receive DERP frame within 3s")
 	}
@@ -387,14 +386,14 @@ func TestSendNonSyntheticDelegatesToInner(t *testing.T) {
 	}
 }
 
-// TestSendToSyntheticEndpointRelaysWithoutPriorFlip verifies the fix for the
-// DERP-responder-drop bug: Send() to a syntheticEndpoint must relay the
+// TestSendToSyntheticEndpointRelaysWithoutPriorFlip verifies that Send() to a
+// syntheticEndpoint relays the
 // packet via the DERP client even when SetPeerRouting was never called for
 // that peer on this node (the wireguard-go endpoint-roaming race described in
-// Send's doc comment — a responder can be asked to send a handshake response
+// Send's doc comment - a responder can be asked to send a handshake response
 // over a synthetic endpoint before its own reachability ticker has flipped
-// the peer to DERP). Previously this silently dropped the packet ("peer not
-// in DERP map, dropping"), black-holing the handshake response.
+// the peer to DERP). Dropping the packet ("peer not in DERP map, dropping")
+// would black-hole the handshake response.
 func TestSendToSyntheticEndpointRelaysWithoutPriorFlip(t *testing.T) {
 	frameReceived := make(chan struct{}, 1)
 
@@ -429,7 +428,7 @@ func TestSendToSyntheticEndpointRelaysWithoutPriorFlip(t *testing.T) {
 		destKey[i] = 0xDD
 	}
 
-	// Deliberately do NOT call SetPeerRouting first — this is the
+	// Deliberately do not call SetPeerRouting first - this is the
 	// responder-drop scenario: wg-go resolved a syntheticEndpoint for this
 	// peer (via inbound endpoint roaming) and is calling Send() before this
 	// node's own local flip has happened.
@@ -449,9 +448,9 @@ func TestSendToSyntheticEndpointRelaysWithoutPriorFlip(t *testing.T) {
 
 	select {
 	case <-frameReceived:
-		// Relay received the frame — the packet was NOT dropped.
+		// Relay received the frame - the packet was not dropped.
 	case <-time.After(3 * time.Second):
-		t.Fatal("relay did not receive DERP frame within 3s — Send silently dropped the packet")
+		t.Fatal("relay did not receive DERP frame within 3s, Send silently dropped the packet")
 	}
 
 	// The opportunistic mark must have flipped the peer to DERP-routed so

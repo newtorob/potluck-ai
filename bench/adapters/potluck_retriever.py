@@ -13,7 +13,7 @@ Design notes:
 
     We do NOT run memory extraction (which would require the LLM). Instead we
     index each session as a single memory whose content is the concatenated
-    user turns from that session. This is the "flat dense" approach — the same
+    user turns from that session. This is the "flat dense" approach - the same
     strategy LongMemEval's own flat-contriever / flat-bm25 baselines use. It
     keeps the adapter dependency-free (no LLM needed) and makes the comparison
     fair against those baselines.
@@ -30,7 +30,7 @@ Design notes:
 
   Retrieval mode:
     We use semantic_search() directly rather than get_relevant_memories(). Reason:
-    get_relevant_memories() is designed for chat-session context injection — it
+    get_relevant_memories() is designed for chat-session context injection - it
     extracts keywords from the last 3 user messages, applies Tier-0/Tier-1
     ambient preloading, and writes access metadata. For a standalone retrieval
     benchmark we want:
@@ -66,7 +66,7 @@ from pathlib import Path
 # Bootstrap: redirect all potluck_local DB calls to a temp file BEFORE any
 # potluck_local import. The env var is set here; get_memory_db_path() reads
 # it at call time, so this is safe even if potluck_local is already imported
-# elsewhere — the singleton will be updated by set_db_path() if needed.
+# elsewhere - the singleton will be updated by set_db_path() if needed.
 # ---------------------------------------------------------------------------
 
 def _setup_tmpdir() -> tuple[str, str]:
@@ -77,7 +77,7 @@ def _setup_tmpdir() -> tuple[str, str]:
 
 
 # ---------------------------------------------------------------------------
-# Potluck sidecar on sys.path — the adapter is called from the repo root, but
+# Potluck sidecar on sys.path - the adapter is called from the repo root, but
 # the potluck_local package lives in apps/desktop/python. We add it here so
 # the adapter can be run from bench/run_longmemeval.py without requiring the
 # caller to manage PYTHONPATH.
@@ -137,7 +137,7 @@ async def _run_instance(
     This is the inner async loop for one LongMemEval instance. A fresh DB is
     passed in; the caller owns its lifecycle.
     """
-    import numpy as np  # noqa: F401 — imported for type checking only
+    import numpy as np  # noqa: F401 - imported for type checking only
     import aiosqlite
 
     from potluck_local.services.embeddings import get_embedder
@@ -197,7 +197,7 @@ async def _run_instance(
         )
         ranked_ids = [m.id for m, _ in pairs]
     else:
-        # Embedder unavailable — fall back to ordering by insertion order (random baseline).
+        # Embedder unavailable - fall back to ordering by insertion order (random baseline).
         # This will score poorly; the caller reports embedder_ok=False so the user knows.
         ranked_ids = memory_ids[:k]
     elapsed_ms = (time.perf_counter() - t0) * 1000
@@ -312,7 +312,7 @@ async def run_longmemeval(
             all_results.append(result)
             latencies.append(result["elapsed_ms"])
         except Exception as exc:
-            # Log failure but keep going — one bad instance shouldn't abort
+            # Log failure but keep going - one bad instance shouldn't abort
             all_results.append({
                 "question_id": instance["question_id"],
                 "question_type": instance["question_type"],

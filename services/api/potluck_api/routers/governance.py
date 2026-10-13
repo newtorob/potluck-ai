@@ -25,10 +25,10 @@ class VoteRequest(BaseModel):
 async def list_proposals() -> list[object]:
     """Return all active governance proposals.
 
-    Returns an empty list until the governance system is implemented in
-    Task 9 (governance_service.py).
+    Returns an empty list until the governance system is implemented
+    (governance_service.py).
     """
-    # TODO (Task 9): return await GovernanceService.list_active()
+    # TODO: return await GovernanceService.list_active()
     return []
 
 
@@ -45,10 +45,10 @@ async def cast_vote(
 ) -> dict[str, object]:
     """Cast or update the authenticated member's vote on a proposal.
 
-    Full implementation in Task 9.
+    Not implemented yet.
     """
-    # TODO (Task 9): call GovernanceService.cast_vote(member, proposal_id, body.choice)
+    # TODO: call GovernanceService.cast_vote(member, proposal_id, body.choice)
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Voting not yet implemented — see Task 9",
+        detail="Voting not yet implemented",
     )

@@ -4,13 +4,13 @@
  *
  * Why this is a standalone module: the stores that need write-through
  * (uiPrefsStore, chatStore, appPrefs) would create a circular import if they
- * used localApi.updateSettings — localApi imports connectionStore which
+ * used localApi.updateSettings - localApi imports connectionStore which
  * imports nothing from app code, but adding a cross-store dependency in the
  * other direction would chain unpredictably. Using bare fetch here, matching
  * the pattern connectionStore uses for its own persistToSidecar helper,
  * keeps the import graph acyclic.
  *
- * Callers always write to localStorage FIRST so the session is correct even
+ * Callers always write to localStorage first so the session is correct even
  * when the sidecar is unreachable. This call is best-effort.
  */
 

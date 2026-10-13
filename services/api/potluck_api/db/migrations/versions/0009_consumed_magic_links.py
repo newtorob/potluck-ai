@@ -1,8 +1,8 @@
-"""009 — consumed_magic_links (single-use magic links)
+"""009 - consumed_magic_links (single-use magic links)
 
 Magic links were replayable inside their 15-minute validity window: nothing
 recorded that a token had already been redeemed. This table backs the
-single-use enforcement added to AuthService.verify_magic_link() — the
+single-use enforcement added to AuthService.verify_magic_link() - the
 token's `jti` claim is inserted here in the same transaction that creates
 the session, and a second redemption hits a primary-key conflict.
 

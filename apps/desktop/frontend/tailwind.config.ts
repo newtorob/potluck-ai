@@ -64,14 +64,14 @@ const config: Config = {
           foreground: 'hsl(var(--sage-foreground))',
         },
         paper: 'hsl(var(--paper))',
-        // Layered surface aliases — semantic elevation
+        // Layered surface aliases - semantic elevation
         'surface-1': 'hsl(var(--surface-1))',
         'surface-2': 'hsl(var(--surface-2))',
         'surface-3': 'hsl(var(--surface-3))',
       },
       borderRadius: {
-        // Slightly larger default than shadcn's 0.5rem — pushes
-        // Direction-B "softer corners, more breath."
+        // Slightly larger default than shadcn's 0.5rem, for softer corners
+        // and more breathing room.
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
@@ -80,9 +80,8 @@ const config: Config = {
         // 'Inter Variable' is the @fontsource-variable export; falls back
         // to the static cut + system stack if the variable face fails.
         sans: ['"Inter Variable"', 'Inter', 'system-ui', 'sans-serif'],
-        // Display / editorial face for headlines + the manifesto layer.
-        // The single biggest character lever versus the default-shadcn
-        // cold-violet vibe.
+        // Display / editorial face for headlines and editorial text.
+        // The single biggest lever on the app's character.
         serif: ['"Instrument Serif"', 'Iowan Old Style', 'Georgia', 'serif'],
         // Mono variable face for code, MCP tool args, model slugs.
         mono: ['"JetBrains Mono Variable"', '"JetBrains Mono"', 'ui-monospace', 'monospace'],
@@ -90,18 +89,18 @@ const config: Config = {
       letterSpacing: {
         // Tight tracking on display headlines (per Things 3 / Oxide style).
         display: '-0.015em',
-        // Open tracking on the Hearth label pattern — font-serif text-[11px] italic
-        // used for section sub-headers throughout the app. Replaces style={{ letterSpacing: '0.04em' }}.
+        // Open tracking on the Hearth label pattern - font-serif text-[11px] italic
+        // used for section sub-headers throughout the app.
         'hearth-label': '0.04em',
       },
-      // Hearth elevation — surface tinting + hairline, NOT stacked shadows.
+      // Hearth elevation - surface tinting + hairline, not stacked shadows.
       // These shadows are deliberately quiet; if you reach for them, ask
       // whether a surface tint would do the same job.
       boxShadow: {
         'hearth-sm': '0 1px 2px 0 hsl(28 30% 4% / 0.08)',
         'hearth':    '0 4px 16px -4px hsl(28 30% 4% / 0.18), 0 1px 0 0 hsl(var(--border))',
         'hearth-lg': '0 12px 32px -10px hsl(28 30% 4% / 0.32), 0 1px 0 0 hsl(var(--border))',
-        // Inner ring for selected cards — softer than ring-2
+        // Inner ring for selected cards - softer than ring-2
         'ember-inset':  'inset 0 0 0 1px hsl(var(--primary) / 0.45)',
         'ember-glow':   '0 0 0 1px hsl(var(--primary) / 0.40), 0 6px 24px -6px hsl(var(--primary) / 0.32)',
       },

@@ -1,6 +1,6 @@
 """Liveness backstop: reap peers whose heartbeat has gone stale.
 
-`/peers/connect` never pings the peer — the coordinator only learns a peer
+`/peers/connect` never pings the peer - the coordinator only learns a peer
 is gone via (a) a WebSocketDisconnect on the socket, or (b) a same-key
 reconnect draining the old connection (see register_peer). A peer that
 black-holes (process frozen, network partitioned one-way, etc.) without the
@@ -8,19 +8,19 @@ TCP connection actually tearing down produces neither: it just stops
 heartbeating while still looking "connected" in the in-memory registry.
 
 `pick_peer_for_model`'s HEARTBEAT_TTL_SECONDS read-side filter (in
-peer_registry.py) stops NEW jobs from being routed to such a peer, but does
+peer_registry.py) stops new jobs from being routed to such a peer, but does
 nothing about jobs already dispatched to it before it went stale, and does
 nothing to free the registry slot. This module is the write-side half: a
 periodic loop that finds peers whose last_beat_at is older than the same
 TTL and actively drains their in-flight jobs (fast-fail the requester
 instead of leaving it to hang out JOB_TIMEOUT_S) and unregisters them.
 
-Only reaps peers that HAVE a heartbeat row and it's stale — a peer that just
+Only reaps peers that have a heartbeat row and it's stale - a peer that just
 connected and hasn't sent its first heartbeat yet gets the same grace period
 the read-side filter gives it (see HEARTBEAT_TTL_SECONDS in peer_registry.py).
 
-Privacy / trust note: reaping is a LIVENESS event, not a correctness
-signal — `drain_peer_jobs` already marks the drained jobs
+Privacy / trust note: reaping is a liveness event, not a correctness
+signal - `drain_peer_jobs` already marks the drained jobs
 `error_category="peer_disconnected"`, a sentinel that (by construction,
 see drain_peer_jobs' docstring) never feeds reputation or quality-score
 writes. A peer that went stale because its laptop lid closed must not be
@@ -43,9 +43,9 @@ REAP_INTERVAL_S = 30.0
 async def reap_stale_peers(session_factory: async_sessionmaker) -> int:
     """One reap cycle. Returns the number of peers actually reaped.
 
-    Snapshots the online peer_id -> session_id map FIRST, then checks
+    Snapshots the online peer_id -> session_id map first, then checks
     heartbeat staleness against that snapshot, then drains/unregisters each
-    stale peer passing its snapshotted session_id — so a peer that
+    stale peer passing its snapshotted session_id - so a peer that
     reconnects (fresh session_id) between the snapshot and the reap action
     is left alone; `drain_peer_jobs`/`unregister_peer`'s session_id guard
     makes that a no-op rather than evicting the new connection (same
@@ -86,7 +86,7 @@ async def reap_stale_peers(session_factory: async_sessionmaker) -> int:
         drained = await drain_peer_jobs(peer_id, session_id=session_id)
         removed = await unregister_peer(peer_id, session_id=session_id)
         if not removed:
-            # Session moved on (reconnected) between the snapshot and here —
+            # Session moved on (reconnected) between the snapshot and here -
             # the guards above already no-op'd; nothing to log as a reap.
             continue
         reaped += 1

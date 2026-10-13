@@ -5,7 +5,7 @@ primary_region = "ord"
   dockerfile = "Dockerfile"
 
 # Coordinator migrations use their own alembic version table, so this is safe to
-# run on every deploy. On a FRESH DB, deploy the API first (see its fly.toml) —
+# run on every deploy. On a fresh DB, deploy the API first (see its fly.toml) -
 # its 0008 migration drops v0 stubs this service then re-creates.
 [deploy]
   release_command = "alembic upgrade head"
@@ -33,11 +33,10 @@ primary_region = "ord"
   POTLUCK_SESSION_AUTH_ENABLED = "1"
   # Prod preflight is fail-closed: these two are non-secret config, so they live
   # here rather than in `fly secrets`.
-  #   REQUIRE_REGISTERED_KEYS  — strict allowlist; an attesting device key must
-  #     already be in member_keys (written during enrollment). VALIDATE the
-  #     enrollment-then-attest path in dogfood before public launch: if
-  #     enrollment does not pre-register the key, joins will fail closed.
-  #   POTLUCK_DB_LINK_ENCRYPTED — acknowledges the DB link is encrypted at the
+  #   REQUIRE_REGISTERED_KEYS - strict allowlist; an attesting device key must
+  #     already be in member_keys (written during enrollment). If enrollment
+  #     does not pre-register the key, joins fail closed.
+  #   POTLUCK_DB_LINK_ENCRYPTED - acknowledges the DB link is encrypted at the
   #     network layer. True on Fly: the app reaches Postgres over the private
   #     6PN (.internal) WireGuard mesh, which asyncpg's ssl= arg can't express.
   REQUIRE_REGISTERED_KEYS = "true"

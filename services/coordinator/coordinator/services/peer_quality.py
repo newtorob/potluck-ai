@@ -29,7 +29,7 @@ stopping at the first observation >= QUALITY_FAIL_THRESHOLD.
 
 When consecutive_failures() >= QUALITY_CONSECUTIVE_FAIL_THRESHOLD (default 3),
 the peer is hard-excluded from all dispatch eligibility until a passing
-observation is recorded.  A single bad signal NEVER triggers exclusion
+observation is recorded.  A single bad signal never triggers exclusion
 (the threshold is 3 by design, not 1).
 
 Privacy stance:
@@ -37,7 +37,7 @@ Privacy stance:
 PeerQualityScore rows contain only peer_id + model_slug + signal_type +
 scalar score + sample_size + timestamp.  No prompt, no completion, no
 requester identity.  The feedback endpoint (POST /jobs/{job_id}/feedback)
-records only the binary rating and the job's peer/model — never prompt or
+records only the binary rating and the job's peer/model - never prompt or
 completion content.
 
 Follow-ons (out of scope for this implementation):
@@ -55,7 +55,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 # ---------------------------------------------------------------------------
-# Configuration constants — all tunable; kept in one place for visibility.
+# Configuration constants - all tunable; kept in one place for visibility.
 # ---------------------------------------------------------------------------
 
 #: Only observations within this many days contribute to the score.
@@ -85,7 +85,7 @@ SignalType = Literal["determinism", "coherence", "latency", "user_feedback"]
 
 
 async def record_quality_signal(
-    db,  # AsyncSession — typed loosely to avoid sqlalchemy at module load
+    db,  # AsyncSession - typed loosely to avoid sqlalchemy at module load
     peer_id: uuid.UUID,
     model_slug: str,
     signal_type: SignalType,
@@ -114,7 +114,7 @@ async def record_quality_signal(
 
 
 # ---------------------------------------------------------------------------
-# Read / aggregate path — single-peer helpers
+# Read / aggregate path - single-peer helpers
 # ---------------------------------------------------------------------------
 
 
@@ -126,7 +126,7 @@ async def peer_quality_score(
     """Return the current quality score (0..1) for one (peer_id, model_slug).
 
     Returns QUALITY_NEUTRAL (1.0) when no observations fall within the window
-    (new peer — do not penalise).
+    (new peer - do not penalise).
 
     See batch_quality_scores for the exact formula and window definition.
     """
@@ -150,7 +150,7 @@ async def consecutive_failures(
 
 
 # ---------------------------------------------------------------------------
-# Read / aggregate path — batch helpers (used by peer_registry._score_peers
+# Read / aggregate path - batch helpers (used by peer_registry._score_peers
 # and pick_peer_for_model for efficient per-dispatch lookups)
 # ---------------------------------------------------------------------------
 
@@ -163,7 +163,7 @@ async def batch_quality_scores(
     """Batch-compute quality scores for a list of peers.  One DB query.
 
     Returns {peer_id: score}; peers with no observations in the window are
-    absent from the dict — the caller should default to QUALITY_NEUTRAL (1.0).
+    absent from the dict - the caller should default to QUALITY_NEUTRAL (1.0).
 
     Formula:
         weighted_score = sum(w_i * score_i) / sum(w_i)
@@ -261,7 +261,7 @@ async def _fetch_trailing_failure_counts(
 
     from coordinator.models.peer_quality import PeerQualityScore
 
-    # Subquery: rank observations per peer — most recent gets rn=1.
+    # Subquery: rank observations per peer - most recent gets rn=1.
     ranked_subq = (
         select(
             PeerQualityScore.peer_id,
@@ -301,7 +301,7 @@ async def _fetch_trailing_failure_counts(
             if s < QUALITY_FAIL_THRESHOLD:
                 fail_count += 1
             else:
-                break  # consecutive run broken — stop counting
+                break  # consecutive run broken - stop counting
         counts[pid] = fail_count
 
     return counts

@@ -2,8 +2,8 @@
  * A compact repository map injected once at session start.
  *
  * Two problems it solves for weak local models: they waste turns on
- * glob/list_dir just to learn what exists, and they hallucinate paths (seen
- * live: a model invented a `src/` directory and wrote to the wrong file). Giving
+ * glob/list_dir just to learn what exists, and they hallucinate paths (for
+ * example, inventing a `src/` directory and writing to the wrong file). Giving
  * the real file list and bounded declaration hints up front helps locate the
  * owning file. Hints are heuristic, not a parser; inspect source before editing.
  */

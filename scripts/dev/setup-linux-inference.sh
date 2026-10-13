@@ -1,12 +1,12 @@
 #!/bin/bash
-# One-shot Linux inference setup for the Potluck contributor (Phase G m3).
+# One-shot Linux inference setup for the Potluck contributor.
 # Linux equivalent of scripts/setup-windows-inference.ps1.
 #
 # Auto-detects GPU vendor and picks a backend:
 #   - NVIDIA (nvidia-smi works) -> llama-cpp-python with CUDA wheels
 #   - AMD / Intel / no GPU      -> Ollama (handles ROCm/Vulkan/CPU itself)
 #
-# Run AFTER scripts/dev/setup-linux-contributor.sh OR scripts/dev/setup-linux-tailscale-contributor.sh.
+# Run after scripts/dev/setup-linux-contributor.sh or scripts/dev/setup-linux-tailscale-contributor.sh.
 # Idempotent.
 
 set -euo pipefail
@@ -66,7 +66,7 @@ pass() { printf "    %s[ok]   %s%s\n" "$C_GREEN" "$1" "$C_OFF"; }
 warn() { printf "    %s[warn] %s%s\n" "$C_YELLOW" "$1" "$C_OFF"; }
 fail() { printf "    %s[fail] %s%s\n" "$C_RED" "$1" "$C_OFF"; exit 1; }
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SIDECAR_DIR="$REPO_ROOT/apps/desktop/python"
 VENV_PY="$SIDECAR_DIR/.venv/bin/python"
 VENV_PIP="$SIDECAR_DIR/.venv/bin/pip"
@@ -347,7 +347,7 @@ To activate: restart the contributor sidecar.
    systemctl --user restart potluck-contributor
    journalctl --user -u potluck-contributor -f      # watch the log
 
-To verify from the dev Mac after restart:
+To verify from the coordinator machine after restart:
    curl -X POST http://<mac-ip>:8400/jobs -H 'Content-Type: application/json' \\
      -d '{"prompt":"Hello","model_slug":"$MODEL_SLUG","sampling":{"max_tokens":20}}'
 

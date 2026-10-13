@@ -1,8 +1,8 @@
-"""Continuous batching — Phase 1 (single-node) and Phase 2 (distributed pipeline).
+"""Continuous batching - single-node and distributed (pipeline).
 
-PHASE 1 — ContinuousBatcher
+SINGLE-NODE - ContinuousBatcher
   Wraps a WholeModelEngine. Implements vLLM-style dynamic admit/evict with shared
-  batched forward passes so many concurrent callers share ONE model instance rather
+  batched forward passes so many concurrent callers share one model instance rather
   than serialising behind a lock.
 
 Design overview
@@ -16,8 +16,8 @@ STEP LOOP
   A single background thread drives _step() repeatedly while any sequence is active.
   Each _step():
     1. Snapshot active sequences under the admit lock.
-    2. Build ONE batched forward:
-       - input_ids [B, 1] — one decode token per sequence.
+    2. Build one batched forward:
+       - input_ids [B, 1] - one decode token per sequence.
        - A batched DynamicCache built by left-padding each sequence's per-layer
          KV tensors (shape [1, heads, depth_i, head_dim]) to the same max depth,
          then stacking on the batch axis -> [B, heads, kv_max, head_dim].
@@ -42,10 +42,10 @@ EVICT (dynamic)
   when its DynamicCache is garbage-collected.
 
 KV APPROACH AND COST
-  Phase 1 rebuilds the batched DynamicCache from individual per-sequence caches on
-  every step. Cost: O(B * n_layers * kv_max_depth) tensor-stack operations per step,
-  where kv_max_depth grows as decoding progresses. For small B and short sequences
-  (tests: B=3, max_new=30) this is fast. Phase 2 upgrade path: paged attention (a
+  The single-node batcher rebuilds the batched DynamicCache from individual per-sequence
+  caches on every step. Cost: O(B * n_layers * kv_max_depth) tensor-stack operations per
+  step, where kv_max_depth grows as decoding progresses. For small B and short sequences
+  (tests: B=3, max_new=30) this is fast. Possible upgrade path: paged attention (a
   shared physical KV pool with per-sequence logical mappings) eliminates the per-step
   copy entirely and makes eviction O(1).
 
@@ -62,7 +62,7 @@ THREAD SAFETY
   _admit_lock: guards _active and _pending. Held only for list ops (< 1µs).
   _prefill_lock: serialises prefill forwards (each is a full model forward;
     concurrent prefills on the same CPU model would just contend on the GIL and
-    produce nonsense cache state — serialise instead).
+    produce nonsense cache state - serialise instead).
   _step runs in one background thread; no concurrent step calls.
   submit() blocks until its own prefill is done, then returns a generator that
   pulls from the sequence's queue.
@@ -72,18 +72,18 @@ PUBLIC API
   gen = batcher.submit(messages, max_new=64)   # blocking generator of text deltas
   stats = batcher.stats()                       # forward-pass count, max batch, tokens
 
-PHASE 2 — DistributedContinuousBatcher
+DISTRIBUTED - DistributedContinuousBatcher
   Drives a PipelineParallelEngine chain (head block + downstream tail) instead of a
   local whole model. Uses the same scheduler (same _Sequence, same admit/evict loop),
   but each step:
 
-    HEAD SIDE — same as Phase 1's _step() up through building the batched forward:
+    HEAD SIDE - same as the single-node _step() up through building the batched forward:
       * Left-pad per-sequence KV caches -> batched DynamicCache for HEAD layers.
       * Build input_ids [B,1], attention_mask [B, kv_max+1], position_ids [B,1].
       * Run head's embed + layer block -> activations h [B, 1, H].
       * Compute drop list (rows that finished last step).
 
-    WIRE — one round-trip to the tail per step:
+    WIRE - one round-trip to the tail per step:
       * PREFILL: new row admitted -> send op="cb_prefill" with h [1, q, H] + row_id
         -> tail creates that row's per-row KV for its layers, returns first token.
       * DECODE: send op="cb_step" with h [B,1,H] + row_ids + kv_depths + kv_max +
@@ -92,13 +92,13 @@ PHASE 2 — DistributedContinuousBatcher
 
     PER-ROW KV ACROSS NODES:
       * HEAD: each sequence holds a DynamicCache for the head's layers (same as
-        Phase 1 — the existing _Sequence.cache covers head layers only).
+        the single-node batcher - _Sequence.cache covers head layers only).
       * TAIL: the tail's serve() handler maintains cb_cache: dict[row_id, DynamicCache]
         for the tail's layers. Admit adds an entry (via cb_prefill), evict removes it.
       * CONSISTENCY: the drop list in cb_step is the tail's eviction signal. The head
         evicts its own cache by removing the sequence from _active. Both happen in the
         same step so they stay in sync: a row that finishes is dropped from the tail's
-        cb_cache in the SAME step it is removed from the head's _active list.
+        cb_cache in the same step it is removed from the head's _active list.
 
     OPT-IN: DistributedContinuousBatcher is a separate class. Pass it a loaded
     PipelineParallelEngine. The single-stream, lockstep-batch, and speculative paths
@@ -131,7 +131,7 @@ class _Sequence:
     generated: int = 0        # decode tokens produced so far
     done: bool = False
     out: queue.Queue = field(default_factory=queue.Queue)
-    # Sampling params — per-request so mixed greedy/creative batches work correctly.
+    # Sampling params - per-request so mixed greedy/creative batches work correctly.
     # temperature <= 0 => greedy argmax for this row; generator is then unused.
     temperature: float = 0.0
     top_k: int = 0
@@ -193,7 +193,7 @@ class ContinuousBatcher:
         seed                            ->  seed for a per-request torch.Generator.
                                             None = global RNG.  Ignored when greedy.
 
-        Each request carries its OWN generator, so a greedy and a sampled request
+        Each request carries its own generator, so a greedy and a sampled request
         in the same batch step are fully independent (different seeds, different RNG
         state; neither perturbs the other).
         """
@@ -228,7 +228,7 @@ class ContinuousBatcher:
         """Run the prompt forward to populate the sequence's KV cache.
 
         Serialised by _prefill_lock so concurrent submitters don't call the
-        model simultaneously. The prefill runs OUTSIDE the step loop's step,
+        model simultaneously. The prefill runs outside the step loop's step,
         so the step loop keeps running while we prefill (it will pick up the
         new sequence on the next iteration after _admit).
 
@@ -250,7 +250,7 @@ class ContinuousBatcher:
 
         cache = DynamicCache()
 
-        # Build a seeded per-request generator BEFORE the prefill so the generator
+        # Build a seeded per-request generator before the prefill so the generator
         # state is consistent whether or not the prefill forward is fast or slow.
         gen = None
         if temperature > 0.0 and seed is not None:
@@ -342,7 +342,7 @@ class ContinuousBatcher:
                     self._active.clear()
 
     def _step(self) -> None:
-        """Run ONE batched decode step over all active sequences."""
+        """Run one batched decode step over all active sequences."""
         import torch
         from transformers import DynamicCache
 
@@ -493,7 +493,7 @@ class ContinuousBatcher:
 
         The first decode token was produced in _prefill (the argmax of the
         prefill's last logit position). It is stored as the last element of
-        seq.token_ids but NOT put in the queue — we emit it here directly so
+        seq.token_ids but not put in the queue - we emit it here directly so
         callers see the first token without waiting for the first step to complete.
 
         Text delta strategy: incrementally decode the growing produced[] list
@@ -538,15 +538,15 @@ class ContinuousBatcher:
 
 
 # ---------------------------------------------------------------------------
-# Phase 2: DistributedContinuousBatcher
+# DistributedContinuousBatcher
 # ---------------------------------------------------------------------------
 
 class DistributedContinuousBatcher:
-    """Distributed continuous batcher — drives a pipeline chain (head + tail) with the
-    same dynamic admit/evict scheduler as ContinuousBatcher, but ONE shared chain
+    """Distributed continuous batcher - drives a pipeline chain (head + tail) with the
+    same dynamic admit/evict scheduler as ContinuousBatcher, but one shared chain
     round-trip per step instead of one local model forward.
 
-    The head runs the same left-pad batching logic (Phase 1's _step structure) over
+    The head runs the same left-pad batching logic (ContinuousBatcher's _step structure) over
     its own layer block, then sends batched activations to the tail in a single
     op="cb_step" round-trip. The tail maintains per-row KV for its layers and returns
     B next-tokens. Per-row KV consistency across nodes is managed via:
@@ -571,7 +571,7 @@ class DistributedContinuousBatcher:
         the wire for each step."""
         # Lazy import so continuous_batch.py stays importable without torch at module
         # level (create_app torch-free invariant). torch is needed here because we
-        # drive a pipeline engine — which already required torch to load — so the
+        # drive a pipeline engine - which already required torch to load - so the
         # import guard is already satisfied by the time this constructor runs.
         from potluck_local.services import pipeline_parallel as pp
         from potluck_local.services.pipeline_wire import send_msg, recv_msg
@@ -610,7 +610,7 @@ class DistributedContinuousBatcher:
         self._thread.start()
 
         # One persistent TCP socket to the tail, opened lazily and re-opened on error.
-        # _wire_lock serializes ALL send+recv round-trips (prefill calls from caller
+        # _wire_lock serializes all send+recv round-trips (prefill calls from caller
         # threads + decode steps from the step thread share the same socket; interleaving
         # them would garble the framing). Hold _wire_lock for the full send+recv pair.
         self._sock = None
@@ -662,7 +662,7 @@ class DistributedContinuousBatcher:
                 self._sock = None
 
     # ------------------------------------------------------------------
-    # Socket management — one persistent connection to the tail per batcher
+    # Socket management - one persistent connection to the tail per batcher
     # ------------------------------------------------------------------
 
     def _get_sock(self):
@@ -698,7 +698,7 @@ class DistributedContinuousBatcher:
               the first decoded token (greedy) or top-K logits (sampling).
 
         Serialised by _prefill_lock: the head model forward is not safe for concurrent
-        calls (same as Phase 1). The step loop continues during a prefill — the new
+        calls (same as ContinuousBatcher). The step loop continues during a prefill - the new
         sequence joins on the next iteration after _admit().
 
         _Sequence.cache stores head-layer KV only. The tail's per-row KV is stored
@@ -718,7 +718,7 @@ class DistributedContinuousBatcher:
         input_ids = enc["input_ids"].to(self._device)
         prompt_tokens = input_ids[0].tolist()
 
-        # Build a seeded per-request generator BEFORE the prefill so the generator
+        # Build a seeded per-request generator before the prefill so the generator
         # state is consistent whether or not the prefill forward is fast or slow.
         gen = None
         if sampling and seed is not None:
@@ -730,14 +730,14 @@ class DistributedContinuousBatcher:
                 self._seq_id += 1
                 seq_id = self._seq_id
 
-            # Head prefill. _head_forward acquires _COMPUTE internally; we must NOT
+            # Head prefill. _head_forward acquires _COMPUTE internally; we must not
             # hold _COMPUTE ourselves here (non-reentrant lock).
             head_cache = DynamicCache()
             with torch.no_grad():
                 h = self._pp._head_forward(
                     self._parts, input_ids, head_cache, 0, self._device)
 
-            # Tail prefill — one round-trip. h is [1, q, H]; start=0 (absolute
+            # Tail prefill - one round-trip. h is [1, q, H]; start=0 (absolute
             # position of the prompt start at the tail, which also starts from 0).
             # Hold _wire_lock for the full send+recv to prevent interleaving with
             # concurrent prefill calls or the decode step thread.
@@ -821,9 +821,9 @@ class DistributedContinuousBatcher:
                 self._reset_sock()
 
     def _step(self) -> None:
-        """Run ONE distributed decode step.
+        """Run one distributed decode step.
 
-        HEAD SIDE (mirrors Phase 1 _step):
+        HEAD SIDE (mirrors ContinuousBatcher._step):
           1. Snapshot active sequences.
           2. Left-pad per-sequence head-layer KV -> batched DynamicCache.
           3. Build input_ids [B,1], attention_mask [B, kv_max+1], position_ids [B,1].
@@ -837,7 +837,7 @@ class DistributedContinuousBatcher:
              evicts dropped rows, returns B next-tokens.
 
         EVICT:
-          8. Tokens distributed; finished rows added to _drop_queue for the NEXT
+          8. Tokens distributed; finished rows added to _drop_queue for the next
              step's wire message. The head removes them from _active immediately.
              The tail removes them when the next cb_step arrives with them in drop.
 
@@ -1031,7 +1031,7 @@ class DistributedContinuousBatcher:
 
     def _drain(self, seq: _Sequence) -> Iterator[str]:
         """Decode token ids from the sequence queue and yield text deltas.
-        Emits the prefill's first token immediately (same as Phase 1)."""
+        Emits the prefill's first token immediately (same as ContinuousBatcher)."""
         eos_id = self._tok.eos_token_id
         produced: list[int] = []
         emitted = 0

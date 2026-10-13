@@ -21,7 +21,7 @@ interface State {
  * fallback instead of unmounting the whole app (a single bad date or a
  * malformed sidecar payload should never white-screen the window).
  *
- * Privacy: errors are logged to the local console only — never sent anywhere.
+ * Privacy: errors are logged to the local console only - never sent anywhere.
  */
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null };

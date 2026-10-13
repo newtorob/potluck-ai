@@ -1,4 +1,4 @@
-"""Tests for GET /models/catalog — the cloud feed the desktop sidecar polls.
+"""Tests for GET /models/catalog - the cloud feed the desktop sidecar polls.
 
 Self-contained: the route reads a bundled static JSON file, no database or
 external service required. Follows the same no-DB pattern as test_health.py.

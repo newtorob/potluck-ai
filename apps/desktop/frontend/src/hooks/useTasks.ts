@@ -1,8 +1,8 @@
 /**
- * useTasks — facade over the task store.
+ * useTasks - facade over the task store.
  *
  * Auto-fetches on mount and refetches on window focus (for cross-session
- * consistency — an agent may have mutated tasks while the window was blurred).
+ * consistency - an agent may have mutated tasks while the window was blurred).
  */
 
 import { useEffect, useCallback } from 'react';
@@ -33,7 +33,7 @@ export function useTasks(opts?: UseTasksOptions | TaskStatus) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options.status, options.project, options.include_all]);
 
-  // Refetch on window focus — agent may have mutated tasks externally
+  // Refetch on window focus - agent may have mutated tasks externally
   useEffect(() => {
     window.addEventListener('focus', refetch);
     return () => window.removeEventListener('focus', refetch);

@@ -5,19 +5,17 @@ The Potluck coordinator only accepts WebSocket connections from contributor
 clients whose `binary_hash` is in the `contributor_releases` table, signed
 by the co-op release key. This script handles the signing workflow:
 
-    keygen     — generate a new Ed25519 release keypair (one-time bootstrap)
-    info       — show fingerprint of the current release public key
-    sign       — sign a built artifact (wheel, tarball, binary), emit hash + sig
-    verify     — verify a signature against an artifact
-    emit-sql   — sign + emit a contributor_releases INSERT statement
-    emit-sql-stamp — the same, for a built desktop or CLI engine bundle
+    keygen - generate a new Ed25519 release keypair (one-time bootstrap)
+    info - show fingerprint of the current release public key
+    sign - sign a built artifact (wheel, tarball, binary), emit hash + sig
+    verify - verify a signature against an artifact
+    emit-sql - sign + emit a contributor_releases INSERT statement
+    emit-sql-stamp - the same, for a built desktop or CLI engine bundle
 
-The private key lives ONLY on the signer's machine. It NEVER goes to
-stdout, NEVER appears in logs, and is created with mode 0o600.
+The private key lives only on the signer's machine. It never goes to
+stdout, never appears in logs, and is created with mode 0o600.
 
-See docs/security/release-key.md for the full operational runbook,
-threat model, rotation procedure, and migration path to HSM-backed
-signing once the co-op has governance around it.
+See docs/security/release-key.md for how release attestation works.
 
 Dependency: `cryptography` package. Either run inside the coordinator's
 venv (services/coordinator/.venv) or `pip install cryptography>=44`.
@@ -47,9 +45,7 @@ except ImportError:
     sys.exit(1)
 
 
-# Default key location. Single-machine for now (single signer in the
-# bootstrap phase). When the co-op has governance for key custody, this
-# becomes an HSM-backed key — see docs/security/release-key.md.
+# Default key location on the signer's machine.
 DEFAULT_KEY_DIR = Path.home() / ".potluck" / "release-keys" / "dev"
 PRIV_KEY_FILENAME = "private.pem"
 PUB_KEY_FILENAME = "public.pem"
@@ -121,13 +117,12 @@ def cmd_keygen(args: argparse.Namespace) -> None:
     if priv_path.exists() and not args.force:
         sys.stderr.write(
             f"error: private key already exists at {priv_path}\n"
-            f"  use --force to overwrite (NOT RECOMMENDED — see docs/security/release-key.md\n"
-            f"  for the rotation procedure)\n"
+            f"  use --force to overwrite (not recommended: the existing key is lost)\n"
         )
         sys.exit(3)
 
     key_dir.mkdir(parents=True, exist_ok=True)
-    # Tighten directory perms — best effort on POSIX, no-op on Windows.
+    # Tighten directory perms - best effort on POSIX, no-op on Windows.
     try:
         os.chmod(key_dir, 0o700)
     except OSError:
@@ -146,18 +141,18 @@ def cmd_keygen(args: argparse.Namespace) -> None:
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
 
-    # Write private key with restricted perms BEFORE writing contents.
+    # Write private key with restricted perms before writing contents.
     priv_path.touch(mode=0o600, exist_ok=False)
     priv_path.write_bytes(priv_pem)
     pub_path.write_bytes(pub_pem)
 
     print(f"generated Ed25519 release keypair")
-    print(f"  private key: {priv_path}  (mode 0600 — DO NOT commit, paste, or share)")
+    print(f"  private key: {priv_path}  (mode 0600 - DO NOT commit, paste, or share)")
     print(f"  public key:  {pub_path}")
     print(f"  fingerprint: {_public_fingerprint(pub)}")
     print()
     print("next steps:")
-    print(f"  1. back up the private key — see docs/security/release-key.md")
+    print(f"  1. back up the private key somewhere safe; it cannot be recovered")
     print(f"  2. seed contributor_releases with a dev binary hash:")
     print(f"     {sys.argv[0]} emit-sql <built-artifact> --version 0.0.1-dev")
 
@@ -222,10 +217,10 @@ def cmd_verify(args: argparse.Namespace) -> None:
     try:
         pub.verify(sig, artifact_hash.encode("ascii"))
     except InvalidSignature:
-        print(f"INVALID — signature does not match artifact + public key")
+        print(f"INVALID - signature does not match artifact + public key")
         sys.exit(1)
 
-    print(f"VALID — signature matches {artifact} under fingerprint {_public_fingerprint(pub)}")
+    print(f"VALID - signature matches {artifact} under fingerprint {_public_fingerprint(pub)}")
 
 
 def cmd_emit_sql(args: argparse.Namespace) -> None:
@@ -334,7 +329,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_keygen.add_argument(
         "--force",
         action="store_true",
-        help="overwrite an existing private key (DANGEROUS — see runbook)",
+        help="overwrite an existing private key (DANGEROUS - see runbook)",
     )
     p_keygen.set_defaults(func=cmd_keygen)
 

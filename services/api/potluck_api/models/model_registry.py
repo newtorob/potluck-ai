@@ -20,7 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from potluck_api.db.base import Base
 
-# NOTE: Class is named ModelRegistryEntry, NOT Model, to avoid shadowing
+# NOTE: Class is named ModelRegistryEntry, not Model, to avoid shadowing
 # Pydantic's BaseModel in any shared namespace.
 
 

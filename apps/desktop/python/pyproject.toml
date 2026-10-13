@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Local FastAPI sidecar for the Potluck AI desktop app"
 requires-python = ">=3.11"
 readme = "README.md"
-license = { text = "AGPL-3.0" }
+license = { text = "MIT" }
 
 [project.scripts]
 potluck-local = "potluck_local.app:main"
@@ -17,13 +17,13 @@ potluck-contributor = "potluck_local.contributor.client:main"
 potluck-agent-bridge = "potluck_local.agent_bridge:main"
 
 # Base runtime deps live in requirements.txt (pinned for the PyInstaller bundle),
-# NOT here — these groups only ADD optional extras on top.
+# NOT here - these groups only ADD optional extras on top.
 [project.optional-dependencies]
 # Pipeline-parallel distributed-inference backend (potluck_local.services.
 # pipeline_parallel / pipeline_wire). Imported LAZILY so the base sidecar/bundle
 # stays light; install with `pip install -e .[pipeline]` on a node that hosts a stage.
 pipeline = ["torch", "transformers", "accelerate"]
-# Test deps — pytest is currently installed ad-hoc in the venv but undeclared.
+# Test deps - pytest is currently installed ad-hoc in the venv but undeclared.
 # `pip install -e .[dev]` reproduces the test environment (torch-optional tests
 # importorskip torch, so the base [dev] set needs no GPU stack).
 dev = ["pytest"]

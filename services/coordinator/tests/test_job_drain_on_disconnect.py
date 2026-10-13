@@ -1,25 +1,24 @@
-"""drain-on-disconnect keystone (FIX 3, launch-blocker).
+"""Drain-on-disconnect.
 
-Before this fix, `peer_registry._jobs` was keyed only by job_id, and a
-peer disconnecting mid-job left the requester's JobBuffer to hang until
-JOB_TIMEOUT_S (120s) with no failover signal — `routers/peers.py`'s
-`finally: unregister_peer` never touched `_jobs`.
+`peer_registry._peer_jobs` maps each peer to its in-flight jobs, so a peer
+disconnecting mid-job fails the requester's JobBuffer fast instead of
+leaving it to hang until JOB_TIMEOUT_S (120s) with no failover signal.
 
 These tests exercise `peer_registry` directly (module-global in-memory
-state, no DB / no real WebSocket needed — mirrors the pattern in
+state, no DB / no real WebSocket needed - mirrors the pattern in
 test_peer_quality_routing.py) to pin:
 
   1. A disconnect (`drain_peer_jobs`) fails every job in flight to that
      peer: `error_category` is set to the "peer_disconnected" sentinel and
      `done` fires immediately (not after a timeout).
-  2. A job that already completed normally is NOT touched by a later
+  2. A job that already completed normally is not touched by a later
      disconnect (complete_job discards it from `_peer_jobs` first).
   3. The reconnect race: `register_peer` on a same-key reconnect drains the
-     OLD connection's jobs itself, and the OLD connection's later
+     old connection's jobs itself, and the old connection's later
      session-gated `drain_peer_jobs`/`unregister_peer` calls become no-ops
-     (they must not touch the NEW connection or its jobs).
+     (they must not touch the new connection or its jobs).
   4. `error_category="peer_disconnected"` never writes a reputation/quality
-     row — draining alone must not touch the DB at all.
+     row - draining alone must not touch the DB at all.
 """
 from __future__ import annotations
 
@@ -110,7 +109,7 @@ async def test_drain_peer_jobs_only_touches_that_peers_jobs() -> None:
 @pytest.mark.asyncio
 async def test_complete_job_then_disconnect_does_not_redrain() -> None:
     """A job that finished normally (complete_job) before the peer
-    disconnects must not be touched by a later drain — complete_job already
+    disconnects must not be touched by a later drain - complete_job already
     discarded it from `_peer_jobs`."""
     peer_id = uuid.uuid4()
     await register_peer(_mk_conn(peer_id))
@@ -160,7 +159,7 @@ async def test_reconnect_drains_old_connections_jobs_not_new() -> None:
     old_job = uuid.uuid4()
     old_buf = await register_job(old_job, peer_id=peer_id)
 
-    # Same-key reconnect: register_peer must drain the OLD connection's job.
+    # Same-key reconnect: register_peer must drain the old connection's job.
     new_conn = _mk_conn(peer_id)
     await register_peer(new_conn)
 
@@ -171,7 +170,7 @@ async def test_reconnect_drains_old_connections_jobs_not_new() -> None:
     new_job = uuid.uuid4()
     new_buf = await register_job(new_job, peer_id=peer_id)
 
-    # ...survives the OLD connection's belated, session-gated disconnect
+    # ...survives the old connection's belated, session-gated disconnect
     # handler: session_id no longer matches the currently-registered conn,
     # so both drain and unregister are no-ops.
     stale_drained = await drain_peer_jobs(peer_id, session_id=old_conn.session_id)
@@ -182,7 +181,7 @@ async def test_reconnect_drains_old_connections_jobs_not_new() -> None:
     still_removed = await unregister_peer(peer_id, session_id=old_conn.session_id)
     assert still_removed is False
 
-    # The NEW connection is still registered.
+    # The new connection is still registered.
     from coordinator.services.peer_registry import get_peer
 
     current = await get_peer(peer_id)

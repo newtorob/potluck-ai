@@ -9,30 +9,30 @@ import (
 )
 
 // firewallRuleName is the stable DisplayName for the mesh inbound-allow rule
-// bound to the Wintun INTERFACE, so the add is idempotent and the remove can
+// bound to the Wintun interface, so the add is idempotent and the remove can
 // find it again.
 func firewallRuleName(ifName string) string {
 	return fmt.Sprintf("Potluck Mesh inbound (%s)", ifName)
 }
 
 // firewallPortRuleName is the stable DisplayName for the rule that opens the WG
-// TRANSPORT port inbound on the physical NIC. Keyed by port so a port change
+// transport port inbound on the physical NIC. Keyed by port so a port change
 // (unlikely) does not collide with a stale rule.
 func firewallPortRuleName(wgPort int) string {
 	return fmt.Sprintf("Potluck Mesh WG transport (UDP %d)", wgPort)
 }
 
 // allowMeshInbound ensures the Windows Firewall rules a mesh node needs to be
-// reachable. It opens TWO things:
+// reachable. It opens two things:
 //
-//  1. The mesh (Wintun) INTERFACE. A freshly-created Wintun adapter lands on a
+//  1. The mesh (Wintun) interface. A freshly-created Wintun adapter lands on a
 //     firewall profile that blocks inbound, so without this rule a Windows node
 //     is reachable by nobody on the mesh. Every packet that arrives on Wintun
 //     has already been authenticated + decrypted by WireGuard, so the interface
 //     itself is the trust boundary -- there is no value in enumerating ports.
 //
-//  2. The WG TRANSPORT port (UDP wgPort) inbound on the PHYSICAL NIC. The
-//     interface rule above does nothing for the ENCRYPTED WireGuard packets that
+//  2. The WG transport port (UDP wgPort) inbound on the physical NIC. The
+//     interface rule above does nothing for the encrypted WireGuard packets that
 //     a direct LAN/WAN peer sends to this node's real ip:wgPort -- those arrive
 //     on the physical adapter, before Wintun, and are dropped by default. Without
 //     this rule a direct LAN handshake (POTLUCK_LAN_DIRECT) can never complete to
@@ -53,8 +53,8 @@ func firewallPortRuleName(wgPort int) string {
 // adapter, with a new interface GUID, each time the sidecar starts. A rule left
 // behind by a sidecar that was killed (an update, a crash, the install helper's
 // Stop-Process) points at an adapter that is gone and lets nothing in on the
-// new one: on a real machine every inbound packet over the mesh was dropped
-// until the next reboot, while outbound traffic and the handshake looked fine.
+// new one: every inbound packet over the mesh is dropped until the next
+// reboot, while outbound traffic and the handshake look fine.
 // The port rule has no such binding and is added only when missing.
 //
 // Requires elevation, which the sidecar already has on Windows (creating the

@@ -1,7 +1,7 @@
 /**
- * ModelSelector — dropdown of installed models.
+ * ModelSelector - dropdown of installed models.
  *
- * Fetches model list directly from the sidecar (does NOT touch modelStore).
+ * Fetches model list directly from the sidecar (does not touch modelStore).
  * Polls every 30 seconds and refetches on window focus.
  *
  * Clicking an unloaded model triggers POST /models/{slug}/load with a spinner.

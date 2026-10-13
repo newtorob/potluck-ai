@@ -1,14 +1,14 @@
 /**
- * useTheme — Hearth/Common-Room theme toggle.
+ * useTheme - Hearth/Common-Room theme toggle.
  *
  * The Hearth design system supports two themes:
- *   - dark  → "Hearth"        — warm-charcoal product chrome (default)
- *   - light → "Common Room"   — cream paper for manifesto/membership
+ *   - dark  → "Hearth" - warm-charcoal product chrome (default)
+ *   - light → "Common Room" - cream paper
  *
  * State lives in uiPrefsStore (Zustand) so it is imperatively updatable from
  * hydrateDurablePrefs() on startup. The store reads localStorage synchronously
- * at module load time (no startup flash) and applies applyTheme() immediately —
- * before the first React render — so the HTML class matches user preference
+ * at module load time (no startup flash) and applies applyTheme() immediately -
+ * before the first React render - so the HTML class matches user preference
  * before paint.
  *
  * Write-through: setTheme writes localStorage, updates the DOM class, and

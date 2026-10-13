@@ -1,12 +1,12 @@
 /**
- * TagCloud — collapsible keyword frequency visualization.
+ * TagCloud - collapsible keyword frequency visualization.
  *
  * Fetches GET /memory/keywords on mount and whenever activeProject changes.
  * Font size scales linearly from 12px (min count) to 24px (max count).
  * Clicking a keyword fills the search bar with that keyword and switches
  * search mode to 'exact' (the user wants literal substring matching).
  *
- * No external layout library — native button grid with inline font-size.
+ * No external layout library - native button grid with inline font-size.
  */
 
 import { useState, useEffect } from 'react';
@@ -38,7 +38,7 @@ function scaleFontSize(count: number, minCount: number, maxCount: number): numbe
 // ---------------------------------------------------------------------------
 
 interface TagCloudProps {
-  /** Currently active project — undefined means global scope */
+  /** Currently active project - undefined means global scope */
   activeProject?: string | null;
   /** Called when the user clicks a keyword: fills search + switches to exact */
   onKeywordClick: (keyword: string) => void;

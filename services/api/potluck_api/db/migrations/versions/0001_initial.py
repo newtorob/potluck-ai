@@ -1,4 +1,4 @@
-"""001 — members + sessions
+"""001 - members + sessions
 
 Revision ID: 0001_initial
 Revises: (none)

@@ -49,7 +49,7 @@ func LoadOrGenerateKeyPair(cfg *Config) error {
 	}
 
 	cfg.WGPublicKey = pubEncoded
-	// Log only the truncated prefix — never the full public key in logs.
+	// Log only the truncated prefix - never the full public key in logs.
 	slog.Debug("loaded existing WG keypair", "wg_public_key_prefix", util.TruncatePubkey(pubEncoded))
 	return nil
 }
@@ -61,7 +61,7 @@ func generateAndSave(cfg *Config) error {
 	}
 	cfg.WGPublicKey = pubEncoded
 
-	slog.Info("keypair generated — register this node via POST /mesh/enroll",
+	slog.Info("keypair generated, register this node via POST /mesh/enroll",
 		"wg_public_key", pubEncoded,
 		"private_key_path", cfg.WGPrivateKeyPath,
 	)

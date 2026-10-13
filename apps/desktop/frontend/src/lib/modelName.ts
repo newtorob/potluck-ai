@@ -1,8 +1,8 @@
 /**
  * Human-readable display names for model slugs.
  *
- * Raw slugs come in two flavors — Ollama ("qwen2.5:3b-instruct-q4_K_M") and
- * llama-cpp ("qwen-2.5-3b-instruct-q4") — plus the dev stub ("stub-echo").
+ * Raw slugs come in two flavors - Ollama ("qwen2.5:3b-instruct-q4_K_M") and
+ * llama-cpp ("qwen-2.5-3b-instruct-q4") - plus the dev stub ("stub-echo").
  * These are fine in logs but must never be shown bare in the UI: they read as
  * leaked internals (especially "stub-echo"). Render `formatModelName(slug)` and
  * keep the raw slug in a `title` tooltip for power users.

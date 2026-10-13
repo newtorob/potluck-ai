@@ -2,8 +2,7 @@
  * Recurrence guard: no coordinator call without the session bearer.
  *
  * `coordinatorSessionRequest` (coordinatorAuth.ts) is the only path in this
- * codebase that attaches the member session bearer to a coordinator call —
- * see cc66f83 and the credit/contribution migration that followed it. A
+ * codebase that attaches the member session bearer to a coordinator call. A
  * bare `nativeFetch`/`timedFetch` straight to `coordinatorBase()` silently
  * drops the bearer and 401s in prod (session auth is enforced there).
  *
@@ -16,7 +15,7 @@
  * special-casing routes here.
  */
 import { describe, it, expect } from 'vitest';
-// Vite's `?raw` import loads the file as a plain string — the simplest way
+// Vite's `?raw` import loads the file as a plain string - the simplest way
 // to statically scan localApi.ts's own source without relying on node:fs
 // path resolution (which is awkward to make portable under vitest's
 // transformed import.meta.url).
@@ -24,7 +23,7 @@ import localApiSource from './localApi.ts?raw';
 
 const OPT_OUT_MARKER = 'coordinator-bare-fetch-ok:';
 // Bare-fetch wrappers used in this file. Matches `nativeFetch(`/`timedFetch(`
-// whose first argument's template literal interpolates coordinatorBase() —
+// whose first argument's template literal interpolates coordinatorBase() -
 // i.e. a coordinator call that bypasses coordinatorSessionRequest.
 const BARE_COORDINATOR_FETCH_RE =
   /(nativeFetch|timedFetch)\(\s*`\$\{coordinatorBase\(\)\}/;
@@ -56,7 +55,7 @@ describe('localApi coordinator call guard (static scan)', () => {
   });
 
   it('the credit/contribution/jobs-stats routes are migrated to coordinatorSessionRequest', () => {
-    // Only look at the API surface (the `localApi` object body) — the type
+    // Only look at the API surface (the `localApi` object body) - the type
     // definitions above it legitimately mention these paths in JSDoc, which
     // would otherwise be mistaken for the call site.
     const apiSurfaceStart = localApiSource.indexOf('export const localApi = {');
@@ -70,7 +69,7 @@ describe('localApi coordinator call guard (static scan)', () => {
       '/me/contributions/weekly',
       '/jobs/stats',
     ]) {
-      // The last occurrence of the path is its actual call site — the
+      // The last occurrence of the path is its actual call site - the
       // history()/myContributions() JSDoc above each call also names it.
       const idx = src.lastIndexOf(path);
       expect(idx, `expected localApi.ts's API surface to call ${path}`).toBeGreaterThan(-1);

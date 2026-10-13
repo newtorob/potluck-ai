@@ -1,7 +1,7 @@
 /**
- * Filesystem-confinement tests (audit P1, 2026-09-06).
+ * Filesystem-confinement tests.
  *
- * The lexical resolveInCwd() check let a path that LOOKS inside the workspace be
+ * A lexical resolveInCwd() check alone lets a path that looks inside the workspace be
  * a symlink (or sit under a symlinked directory) that resolves outside it, and
  * the fs calls after the check follow symlinks. These tests pin the canonical
  * (realpath-based) containment check, and pin that the walker does not cross a
@@ -229,9 +229,9 @@ describe("paths that must keep working", () => {
 });
 
 describe("DANGLING symlinks (target does not exist yet)", () => {
-  // realpath() reports ENOENT for a genuinely missing component AND for a
-  // dangling symlink. Treating the second as "missing" judged containment on the
-  // link's own path while open(..., "w") followed the link and created the file
+  // realpath() reports ENOENT for a genuinely missing component and for a
+  // dangling symlink. Treating the second as "missing" would judge containment on the
+  // link's own path while open(..., "w") follows the link and creates the file
   // at its target; these pin both directions of that distinction.
 
   it("allows a dangling link whose target is INSIDE, and the write lands inside", async () => {

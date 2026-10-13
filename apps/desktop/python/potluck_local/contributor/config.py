@@ -39,12 +39,12 @@ class Settings(BaseSettings):
 
     # Optional coordinator token. When the coordinator enforces
     # POTLUCK_COORDINATOR_TOKEN, the contributor must present it on the WS
-    # handshake (X-Potluck-Coordinator-Token header). Unset by default —
+    # handshake (X-Potluck-Coordinator-Token header). Unset by default -
     # dev/household coordinators run open.
     coordinator_token: str | None = None
 
-    # Which member this peer belongs to. Stub-UUID for m1 dev; real
-    # membership integration lands in v0.5 (see roadmap memory 6d50b79d).
+    # Which member this peer belongs to. Stub UUID for dev.
+    # TODO: real membership integration.
     member_id: uuid.UUID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
     # SHA256 of the contributor build, hex-encoded. Empty means "resolve it":
@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     # Where to load + persist the per-peer Ed25519 key.
     key_dir: Path = _default_key_dir()
 
-    # ---- Inference (m3) ---- #
+    # ---- Inference ---- #
     #
     # Set inference_enabled=True on peers that should serve real jobs.
     # When False (the default), the peer accepts JobAssignedMessages but
@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     model_path: Path | None = None
     n_gpu_layers: int = -1  # -1 = offload all (Metal/CUDA); 0 = CPU only
 
-    # Ollama-only: where the local daemon listens. MUST be loopback —
+    # Ollama-only: where the local daemon listens. Must be loopback -
     # _validate_loopback in inference.py refuses any other host as a
     # privacy-invariant guard.
     ollama_url: str = "http://127.0.0.1:11434"

@@ -1,24 +1,24 @@
-# Potluck mesh sidecar — Windows Service install script template.
+# Potluck mesh sidecar - Windows Service install script template.
 #
-# Run during .msi installation (CustomAction) AFTER the binary is
+# Run during .msi installation (CustomAction) after the binary is
 # laid down on disk. Registers potluck-mesh as a Windows Service that
 # starts automatically at boot under a dedicated low-privilege service
 # account.
 #
 # Substitution tokens (rendered by the WiX installer):
-#   @BINARY_PATH@         — absolute path to the installed sidecar binary
+#   @BINARY_PATH@ - absolute path to the installed sidecar binary
 #                              e.g. C:\Program Files\Potluck\bin\potluck-mesh.exe
-#   @COORDINATOR_URL@     — defaults to the cooperative's hosted URL
-#   @DERP_URL@            — DERP relay fallback for when direct UDP punch
+#   @COORDINATOR_URL@ - defaults to the cooperative's hosted URL
+#   @DERP_URL@ - DERP relay fallback for when direct UDP punch
 #                              fails; defaults to the production relay
 #                              (services/derp, tcp+tls per
 #                              internal/derp/client.go). Not derived from
-#                              @COORDINATOR_URL@ — a self-hosted/LAN
+#                              @COORDINATOR_URL@ - a self-hosted/LAN
 #                              coordinator does not imply a self-hosted
 #                              relay. Override at render time for LAN-only
 #                              installs (e.g. tcp+insecure://host:8443).
-#   @KEY_DIR@             — %ProgramData%\Potluck\keys (ACL'd to LocalService)
-#   @LOG_DIR@             — %ProgramData%\Potluck\logs
+#   @KEY_DIR@ - %ProgramData%\Potluck\keys (ACL'd to LocalService)
+#   @LOG_DIR@ - %ProgramData%\Potluck\logs
 #
 # Why a dedicated account (rather than SYSTEM): SYSTEM has too much
 # privilege. wintun + the named-pipe IPC don't need it. We create a
@@ -45,7 +45,7 @@ param(
 $ErrorActionPreference = "Stop"
 $ServiceName = "PotluckMesh"
 $DisplayName = "Potluck Mesh"
-$Description = "Cooperative AI mesh sidecar — connects this machine to its household mesh."
+$Description = "Cooperative AI mesh sidecar - connects this machine to its household mesh."
 
 # 1. Ensure the working directories exist with the right ACLs.
 foreach ($dir in @($KeyDir, $LogDir)) {
@@ -95,7 +95,7 @@ $acl = Get-Acl $LogDir
 $acl.SetAccessRule($rule)
 Set-Acl -Path $LogDir -AclObject $acl
 
-# 6. Configure recovery actions — restart on failure with 10-second delay,
+# 6. Configure recovery actions - restart on failure with 10-second delay,
 #    up to 3 times, then leave it stopped so the user can investigate.
 sc.exe failure $ServiceName reset= 86400 actions= restart/10000/restart/10000/restart/10000 | Out-Null
 

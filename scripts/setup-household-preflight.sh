@@ -9,7 +9,7 @@
 # cause setup-household.sh to fail mid-install:
 #
 #   1. Active VPN (Mullvad, OpenVPN, generic WireGuard non-mesh) that
-#      blackholes apt/pip/npm traffic. Yesterday's bug.
+#      blackholes apt/pip/npm traffic.
 #   2. Python 3.11+ availability. Ubuntu 22.04 ships 3.10 and we need 3.11.
 #   3. sudo availability for the mesh-sidecar TUN creation.
 #   4. Network endpoint reachability (PyPI, GitHub, npm registry).
@@ -78,7 +78,7 @@ record_warn() {
 }
 
 # ----------------------------------------------------------------------------
-# Check 1: VPN detection (the yesterday-killed-apt bug)
+# Check 1: VPN detection (a VPN that blackholes apt)
 # ----------------------------------------------------------------------------
 
 check_vpn() {

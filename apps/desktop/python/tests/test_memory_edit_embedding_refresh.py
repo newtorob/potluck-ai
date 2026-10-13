@@ -1,15 +1,15 @@
-"""Regression test — 2026-07-31 P2 sidecar audit, finding #7.
+"""Editing a memory's content must invalidate its stored embedding.
 
-MemoryRetriever.update_memory() persisted the new content but never touched
-memory_embeddings, so an edited memory kept pointing at the vector computed
-from its OLD text. services.memory_db.memories_missing_embeddings() only
-catches rows with NO embedding at all (or one from a different model) — it
+If MemoryRetriever.update_memory() persisted the new content without touching
+memory_embeddings, an edited memory would keep pointing at the vector computed
+from its old text. services.memory_db.memories_missing_embeddings() only
+catches rows with no embedding at all (or one from a different model) - it
 has no way to know a same-model embedding is stale relative to content it no
-longer matches — so the periodic backfill never re-embedded it either. The
-result: semantic search silently ranked/matched an edited memory on its
-pre-edit meaning forever.
+longer matches - so the periodic backfill would never re-embed it either, and
+semantic search would silently rank/match an edited memory on its pre-edit
+meaning forever.
 
-The fix: update_memory() clears the embedding row synchronously (in the same
+So update_memory() clears the embedding row synchronously (in the same
 edit) whenever content actually changes, and schedules a fresh embedding via
 services.embeddings.schedule_embed_memory. Clearing it also makes
 memories_missing_embeddings() pick the row up as a safety net even if the
@@ -17,7 +17,7 @@ fire-and-forget regen never runs (e.g. process exits right after the edit).
 
 Isolated via POTLUCK_MEMORY_DB_PATH + POTLUCK_DATA_DIR so this test can never
 touch a real ~/.potluck. The embedder is monkeypatched to a fast deterministic
-fake — no network/model download required.
+fake - no network/model download required.
 """
 from __future__ import annotations
 
@@ -72,9 +72,9 @@ def isolated_env(tmp_path, monkeypatch):
         "potluck_local.services.embeddings.get_embedder", lambda: _FakeEmbedder()
     )
     # Neutralise the fire-and-forget regen task everywhere it's scheduled
-    # (extract_explicit's insert path AND update_memory's edit path) so this
+    # (extract_explicit's insert path and update_memory's edit path) so this
     # test deterministically exercises only the synchronous "clear on edit"
-    # fix plus the explicit, awaited backfill call — not asyncio scheduling
+    # behavior plus the explicit, awaited backfill call - not asyncio scheduling
     # order between a background task and the test's own assertions.
     monkeypatch.setattr(
         "potluck_local.services.embeddings.schedule_embed_memory", lambda *a, **k: None
@@ -93,7 +93,7 @@ def test_editing_content_clears_the_stale_embedding_and_backfill_refreshes_it(is
     )
 
     # Simulate the embedding the (fire-and-forget) insert-path would have
-    # produced for the ORIGINAL content, using the same model name the
+    # produced for the original content, using the same model name the
     # backfill/edit path will check against.
     original_vector = _vector_for(original_content)
     _run(save_embedding(mem.id, original_vector, _FAKE_MODEL_NAME))
@@ -102,24 +102,24 @@ def test_editing_content_clears_the_stale_embedding_and_backfill_refreshes_it(is
     assert stored is not None
     assert np.allclose(stored[0], original_vector)
 
-    # Edit the content — this is the auditor's repro step.
+    # Edit the content.
     new_content = "the deploy script lives at ops/deploy.sh (moved)"
     updated = _run(retriever.update_memory(mem.id, content=new_content))
     assert updated is not None
     assert updated.content == new_content
 
-    # 1. The stale vector must be gone immediately — not silently kept.
+    # 1. The stale vector must be gone immediately - not silently kept.
     assert _run(get_embedding(mem.id)) is None
 
     # 2. The backfill's missing-embeddings query must now catch this row
-    #    (the safety net referenced in the fix, independent of whether the
+    #    (the safety net, independent of whether the
     #    fire-and-forget regen task has run yet).
     missing = _run(memories_missing_embeddings(model=_FAKE_MODEL_NAME))
     assert mem.id in missing
 
-    # 3. Confirm edited content actually gets a FRESH vector: run the
-    #    established backfill path (awaited, deterministic) and check the
-    #    new embedding matches the NEW content, not the old one.
+    # 3. Confirm edited content actually gets a fresh vector: run the
+    #    backfill path (awaited, deterministic) and check the
+    #    new embedding matches the new content, not the old one.
     _run(run_embedding_backfill())
     refreshed = _run(get_embedding(mem.id))
     assert refreshed is not None
@@ -130,7 +130,7 @@ def test_editing_content_clears_the_stale_embedding_and_backfill_refreshes_it(is
 
 
 def test_editing_non_content_fields_leaves_the_embedding_untouched(isolated_env):
-    """Regression guard: don't over-clear — a category/confidence-only edit
+    """Don't over-clear - a category/confidence-only edit
     must not blow away a perfectly valid embedding."""
     extractor = get_memory_extractor()
     retriever = get_memory_retriever()

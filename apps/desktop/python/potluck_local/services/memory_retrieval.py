@@ -1,4 +1,4 @@
-"""Memory retrieval service — keyword-based and semantic retrieval.
+"""Memory retrieval service - keyword-based and semantic retrieval.
 
 Retrieves relevant memories for context injection before each model call.
 Also provides semantic search, related-memory lookup, and keyword frequency.
@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 
 # In-memory cache of the stacked embedding matrix, keyed by (project, model).
 # Value: (memory_ids, matrix, change_key). Avoids reloading and re-stacking
-# every active vector on every chat turn — the previous per-call cost was O(N)
-# blob reads plus a full np.stack. A cheap COUNT + MAX(updated_at) probe per call
+# every active vector on every chat turn, which costs O(N) blob reads plus a
+# full np.stack per call. A cheap COUNT + MAX(updated_at) probe per call
 # decides whether the cached matrix is still valid.
 _MATRIX_CACHE: "dict[tuple[str | None, str], tuple[list[str], np.ndarray | None, tuple]]" = {}
 
@@ -39,7 +39,7 @@ async def _embeddings_change_key(
 ) -> tuple[int, str | None]:
     """Cheap fingerprint of the model+project-scoped embedding set:
     (count, max memories.updated_at). It changes when a row is added, removed,
-    re-embedded to this model, or its memory is updated — so the matrix cache
+    re-embedded to this model, or its memory is updated - so the matrix cache
     can be reused safely without rescanning every blob."""
     from potluck_local.services.memory_db import get_memory_db_path
 
@@ -128,7 +128,7 @@ def _extract_keywords(messages: list[dict], max_keywords: int = 15) -> list[str]
     return unique[:max_keywords]
 
 
-# project_clause(project, alias) is imported from memory_db — shared with
+# project_clause(project, alias) is imported from memory_db - shared with
 # task_state + memory_clustering.
 
 
@@ -155,11 +155,11 @@ async def semantic_search(
 ) -> list[tuple[Memory, float]]:
     """Embed the query and return top-K memories by cosine similarity.
 
-    Returns [] (not raises) if the embedder is unavailable — callers should
+    Returns [] (not raises) if the embedder is unavailable - callers should
     fall back to keyword search in that case.
 
     include_pinned: when True, pinned memories (in scope) are prepended to the
-    results regardless of cosine score — ambient/standing context that should
+    results regardless of cosine score - ambient/standing context that should
     always be present. Off by default so the RRF retriever's internal call
     isn't double-counted (it injects pinned via its own Tier-0).
     """
@@ -179,7 +179,7 @@ async def semantic_search(
     project = project or None
     model = embedder.MODEL_NAME
 
-    # Matrix cache — rebuild only when the model+project-scoped embedding set
+    # Matrix cache - rebuild only when the model+project-scoped embedding set
     # actually changed (cheap COUNT + MAX(updated_at) probe), instead of
     # reloading and re-stacking every active vector on every call. Filtering by
     # `model` also guarantees a single embedding dimension in the matrix, so a
@@ -398,7 +398,7 @@ class MemoryRetriever:
 
         category: when given, restricts results to that category only.
         Tier 1 (preference + instruction preloading) is skipped entirely when a
-        category is specified — the caller asked for something specific and we
+        category is specified - the caller asked for something specific and we
         push the filter to the DB rather than post-filtering results.
         """
         if not _memory_enabled() or max_memories <= 0:
@@ -415,17 +415,17 @@ class MemoryRetriever:
         db_path = get_memory_db_path()
 
         # How many of the max_memories slots Tier 1 (standing preference +
-        # instruction preload) may take. Lowered from max_memories//2 (=10) to
-        # 3 on 2026-05-28 after the eval showed the half-budget preload buried
-        # query-relevant results below the recall@5 cutoff: capping it 10->0
-        # roughly doubled recall@5 (0.40->0.80) with no loss to standing-pref
-        # recall. We keep a small floor of 3 (not 0) so the top-3-confidence
-        # standing rules still inject as ambient context on unrelated queries.
+        # instruction preload) may take. A half-budget preload (max_memories//2
+        # = 10) buries query-relevant results below the recall@5 cutoff: the
+        # eval showed capping it 10->0 roughly doubles recall@5 (0.40->0.80)
+        # with no loss to standing-pref recall. We keep a small floor of 3
+        # (not 0) so the top-3-confidence standing rules still inject as
+        # ambient context on unrelated queries.
         # NOTE: the eval also showed this confidence-ranked preload only ever
         # delivers ambient context for the top-~3 rules at a tight budget;
         # mid-confidence standing rules never reach the top-5 via preload. True
-        # always-inject ambient context needs a separate pinned-instructions
-        # mechanism (tracked as a follow-up), not this budget knob.
+        # always-inject ambient context is what pinning (Tier 0 below) is for,
+        # not this budget knob.
         # Overridable per-call via POTLUCK_ALWAYS_BUDGET (eval sweeps / tuning).
         _default_always = 3
         always_budget = int(os.environ.get("POTLUCK_ALWAYS_BUDGET", str(_default_always)))
@@ -439,8 +439,8 @@ class MemoryRetriever:
 
             always_rows: list[dict] = []
 
-            # Tier 0 — PINNED: standing/ambient memories that always inject,
-            # regardless of query OR category. Capped at max_memories so they
+            # Tier 0 - PINNED: standing/ambient memories that always inject,
+            # regardless of query or category. Capped at max_memories so they
             # can't overflow the budget; query results fill whatever remains.
             pinned_cursor = await db.execute(
                 f"""SELECT * FROM memories
@@ -457,22 +457,22 @@ class MemoryRetriever:
                 # ambient context (excludes already-pinned rows so they don't
                 # double-count).
                 #
-                # SECURITY (2026-07-17 audit, MEDIUM): auto-extracted
-                # ('source_type=extracted') instruction memories are NOT
+                # SECURITY: auto-extracted
+                # ('source_type=extracted') instruction memories are not
                 # granted Tier-1 always-inject status here. The extractor
                 # pulls 'instruction' memories out of raw conversation text,
                 # which may include pasted/quoted untrusted content (e.g. a
                 # copied doc containing "ignore previous instructions..."). If
-                # that text scores >=0.7 confidence it used to become a
+                # that text scores >=0.7 confidence it would otherwise become a
                 # standing instruction force-injected into every future
                 # session and every MCP-connected agent, with no review. It
                 # is still stored and still retrievable via Tier 2 (keyword +
                 # semantic ranking, subject to relevance and confidence like
-                # any other memory) -- it just no longer bypasses relevance
+                # any other memory) -- it just does not bypass relevance
                 # ranking for free. Explicitly user-confirmed instructions
                 # (source_type='explicit', i.e. saved via memory_save because
-                # the user or agent directly asked to remember them) are
-                # unaffected and still preload here, as do preference-category
+                # the user or agent directly asked to remember them) still
+                # preload here, as do preference-category
                 # memories of either source_type. The reversible opt-in path
                 # for an auto-extracted instruction to become standing/ambient
                 # context is the existing `pinned` mechanism (memory_retrieval.
@@ -494,7 +494,7 @@ class MemoryRetriever:
                 for r in await cursor.fetchall():
                     if r["id"] not in pinned_ids:
                         always_rows.append(dict(r))
-            # When category is specified, skip the Tier 1 heuristic — but the
+            # When category is specified, skip the Tier 1 heuristic - but the
             # pinned rows above still inject (that's the whole point of pinning).
 
             # Tier 2: RRF-fused keyword + semantic retrieval.
@@ -506,7 +506,7 @@ class MemoryRetriever:
             #
             # Graceful degradation: if semantic_search returns [] (embedder
             # unavailable or zero stored embeddings), RRF reduces to pure keyword
-            # ranking — identical to the previous v1 behavior.
+            # ranking - identical to the previous v1 behavior.
             keywords = sorted(chat_terms)[:32] if for_chat else _extract_keywords(current_messages)
             # Query results get whatever budget the pinned + ambient rows leave.
             tier2_budget = max(0, max_memories - len(always_rows))
@@ -521,25 +521,23 @@ class MemoryRetriever:
                 cat_params: list = [category]
             else:
                 # Exclude Tier-1 categories to avoid duplicating those rows --
-                # EXCEPT auto-extracted ('source_type=extracted') instruction
-                # memories. As of the 2026-07-17 security fix those no longer
-                # get Tier-1 always-inject status (see the Tier-1 query
-                # above), so Tier 2 is their only path to being surfaced by
-                # relevance. Without this carve-out they would be excluded
-                # from BOTH tiers -- contradicting the fix's explicit
-                # contract that they "are still stored and still retrievable
-                # by relevance", not force-injected.
+                # except auto-extracted ('source_type=extracted') instruction
+                # memories. Those do not get Tier-1 always-inject status (see
+                # the Tier-1 query above), so Tier 2 is their only path to
+                # being surfaced by relevance. Without this carve-out they
+                # would be excluded from both tiers, though they are meant to
+                # stay stored and retrievable by relevance, not force-injected.
                 cat_clause = (
                     "AND (category NOT IN ('preference', 'instruction') "
                     "OR (category = 'instruction' AND source_type = 'extracted'))"
                 )
                 cat_params = []
 
-            # --- Keyword arm (same SQL as before) ---
+            # --- Keyword arm ---
             async def _keyword_query() -> list[dict]:
                 if not keywords or tier2_budget <= 0:
                     return []
-                # Build parameterized OR conditions — no f-string SQL injection risk
+                # Build parameterized OR conditions - no f-string SQL injection risk
                 conditions = " OR ".join("content LIKE ?" for _ in keywords)
                 like_params = [f"%{kw}%" for kw in keywords]
                 # params order: like values, min_confidence, category params, project params, limit
@@ -555,7 +553,7 @@ class MemoryRetriever:
                               {cat_clause}
                               AND {proj_clause}
                             ORDER BY confidence DESC, last_accessed_at DESC
-                            LIMIT ?""",  # noqa: S608 — conditions built safely above
+                            LIMIT ?""",  # noqa: S608 - conditions built safely above
                         kw_params,
                     )
                     rows = [dict(r) for r in await cur.fetchall()]
@@ -567,7 +565,7 @@ class MemoryRetriever:
 
             # --- Semantic arm ---
             # semantic_search already applies: project scope, is_active=1, min_confidence.
-            # Category is NOT applied inside semantic_search, so we post-filter here.
+            # Category is not applied inside semantic_search, so we post-filter here.
             async def _semantic_query() -> list[tuple[Memory, float]]:
                 if tier2_budget <= 0 or not keywords:
                     return []
@@ -600,7 +598,7 @@ class MemoryRetriever:
                     pairs = [(m, s) for m, s in pairs if m.category == category]
                 return pairs
 
-            # Run both arms in parallel — neither touches the open db connection
+            # Run both arms in parallel - neither touches the open db connection
             # from the outer context (each opens its own).
             keyword_rows, semantic_pairs = await asyncio.gather(
                 _keyword_query(), _semantic_query()
@@ -609,7 +607,7 @@ class MemoryRetriever:
             # --- RRF fusion (1-based ranks) ---
             # Score each memory id by summing 1/(k + rank) across lists it appears in.
             # k is read per-call from POTLUCK_RRF_K (default 60) so the eval can
-            # sweep it without a code change — and so an eval-driven tuning loop
+            # sweep it without a code change - and so an eval-driven tuning loop
             # can later set the winning value. Lower k lets top-ranked hits in
             # either arm dominate (matters at tight budgets); higher k flattens.
             _RRF_K = int(os.environ.get("POTLUCK_RRF_K", "60"))
@@ -650,7 +648,7 @@ class MemoryRetriever:
 
             logger.debug(
                 "rrf_tier2 keyword_hits=%d semantic_hits=%d fused=%d budget=%d",
-                len(keyword_rows),  # after slice — use pre-slice counts below would be clearer
+                len(keyword_rows),
                 len(semantic_pairs),
                 len(rrf_scores),
                 tier2_budget,
@@ -666,7 +664,7 @@ class MemoryRetriever:
 
             combined = combined[:max_memories]
 
-            # Update access metadata for returned memories AND log the
+            # Update access metadata for returned memories and log the
             # access with the retrieval profile version. The version stamp
             # lets the debugger answer "what retrieval rules ranked this
             # memory at this point in history?" even after we bump the
@@ -714,7 +712,7 @@ class MemoryRetriever:
         project: scope filter. Ignored when include_all=True.
         include_all: when True, bypasses the project filter entirely (browse mode).
         since: ISO-8601 string. When given, only rows with updated_at > since are
-               returned. Pushed to SQL — not post-filtered.
+               returned. Pushed to SQL - not post-filtered.
         """
         # Normalise empty string to None
         project = project or None
@@ -795,9 +793,9 @@ class MemoryRetriever:
         """Permanently delete a memory and its embedding. Returns True if removed.
 
         Hard delete by design: "delete" must mean the content is actually gone
-        from disk, not just flagged inactive — that's the privacy contract for a
-        local-first store the user owns. A prior soft delete left the row (and
-        its content) in memory.db and still surfaced it, with content, in the
+        from disk, not just flagged inactive - that's the privacy contract for a
+        local-first store the user owns. A soft delete would leave the row (and
+        its content) in memory.db and still surface it, with content, in the
         /agents "memories touched" debugger.
 
         Removes the row from `memories` and its vector from `memory_embeddings`.
@@ -807,7 +805,7 @@ class MemoryRetriever:
         shows the touch count but can no longer resurrect the deleted content.
 
         Note: SQLite leaves freed bytes in free pages until VACUUM; run a VACUUM
-        as a periodic maintenance op for stronger "unrecoverable" guarantees —
+        as a periodic maintenance op for stronger "unrecoverable" guarantees -
         not per-delete (a full-DB rewrite is too costly to do on every call).
         """
         from potluck_local.services.memory_db import get_memory_db_path
@@ -862,14 +860,14 @@ class MemoryRetriever:
         else:
             new_project = project or None  # coerce "" -> None
 
-        # An edited content string invalidates the stored vector — it was
-        # computed from the OLD text. memories_missing_embeddings() only
+        # An edited content string invalidates the stored vector - it was
+        # computed from the old text. memories_missing_embeddings() only
         # catches rows with no embedding row at all, or one from a
-        # different model, so leaving the stale row in place meant an
-        # edited memory silently kept ranking/matching on its pre-edit
+        # different model, so leaving the stale row in place would let an
+        # edited memory silently keep ranking/matching on its pre-edit
         # semantics forever. Clear it synchronously (so it's gone the
         # instant this call returns, even if the process exits before the
-        # fire-and-forget regen below runs — the periodic backfill picks up
+        # fire-and-forget regen below runs - the periodic backfill picks up
         # any row with no embedding row) and schedule a fresh one.
         async with aiosqlite.connect(db_path) as db:
             cur = await db.execute("SELECT content FROM memories WHERE id = ?", (memory_id,))

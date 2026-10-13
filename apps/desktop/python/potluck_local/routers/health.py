@@ -26,7 +26,7 @@ async def control_info(request: Request) -> dict[str, object]:
 
 @router.get("/health")
 async def health() -> dict[str, object]:
-    """Liveness probe — frontend polls this to confirm the sidecar is up."""
+    """Liveness probe - frontend polls this to confirm the sidecar is up."""
     runtime = get_runtime()
     rpc_servers = runtime.loaded_rpc_servers()
     return {
@@ -36,16 +36,16 @@ async def health() -> dict[str, object]:
         "active_model_id": runtime.current_model_id(),
         "model_restore": get_model_lifecycle().status(),
         "n_ctx_loaded": runtime.loaded_n_ctx(),
-        # Big Model Mode status — list of llama.cpp RPC endpoints the
+        # Big Model Mode status - list of llama.cpp RPC endpoints the
         # current model is loaded across. Null when the model is local-only
         # or no model is loaded. Frontend uses this as the source of truth
         # for whether the toggle in HouseholdView shows on/off.
         "loaded_rpc_servers": list(rpc_servers) if rpc_servers else None,
-        # Pipeline-parallel status — describes the distributed engine (head layers,
+        # Pipeline-parallel status - describes the distributed engine (head layers,
         # downstream peer, device) when a model is loaded with the pipeline strategy;
         # null otherwise. The other WAN-viable "big model" path, sibling to RPC mode.
         "loaded_pipeline": runtime.loaded_pipeline(),
-        # Shared (continuous) batching — true when the loaded model is served through a
+        # Shared (continuous) batching - true when the loaded model is served through a
         # continuous batcher so concurrent requests share batched forward passes. Only
         # the transformers paths (whole-model / pipeline) can be loaded this way; always
         # false on the single-stream + llama.cpp paths. The frontend reads this as the
@@ -65,7 +65,7 @@ async def health() -> dict[str, object]:
 async def inference_diagnostics() -> dict[str, object]:
     """Backend, devices and measured speed for the loaded model.
 
-    Separates three things the app used to conflate: what this build can do,
+    Keeps three things apart: what this build can do,
     what was asked for, and what actually happened. Anything not measurable
     right now is null rather than inferred.
     """
@@ -121,7 +121,7 @@ async def shutdown(request: Request) -> dict[str, str]:
         await get_runtime().unload_model_async()
         gc.collect()
     except Exception:  # noqa: BLE001
-        # Still proceed to terminate — better a noisy exit than a hung sidecar.
+        # Still proceed to terminate - better a noisy exit than a hung sidecar.
         pass
 
     def _terminate() -> None:

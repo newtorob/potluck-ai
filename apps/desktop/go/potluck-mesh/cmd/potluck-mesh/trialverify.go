@@ -21,8 +21,8 @@ import (
 //
 // Both trials (the WAN punch trial driven by punch_coord, and the LAN trial)
 // clear the peer's WireGuard session and add the peer again pinned to the direct
-// endpoint, so that wireguard-go has to handshake there. Two defects came out of
-// that, both measured with the vendored wireguard-go (v0.0.0-20231211153847)
+// endpoint, so that wireguard-go has to handshake there. That has two pitfalls
+// in the vendored wireguard-go (v0.0.0-20231211153847), visible when it is
 // instrumented to log handshake indexes and keypair slots.
 //
 // 1. The coordinator sends punch_coord to both machines at the same moment, so
@@ -47,11 +47,11 @@ import (
 //      local index is 0. SwapIndexForKeypair ignores index 0, so that keypair is
 //      never registered. The peer's packets address the deleted initiator index
 //      and are dropped on arrival, one way, while handshakes and the peer's own
-//      packets look healthy on both sides. The trial was declared VERIFIED on the
-//      handshake time alone and the relay stayed off.
+//      packets look healthy on both sides. A trial that verified on the
+//      handshake time alone would keep the relay off in this state.
 //
-//    Fix: one side starts the handshake. The side with the lower public key does
-//    what a trial always did. The other side clears its session and adds the peer
+//    The answer is that one side starts the handshake. The side with the lower
+//    public key does the standard trial sequence. The other side clears its session and adds the peer
 //    with no persistent keepalive and no endpoint, so that nothing it sends can
 //    become an initiation on the wire (with no session, wireguard-go starts a
 //    handshake for any packet it is asked to send; with no endpoint the attempt has
@@ -62,8 +62,8 @@ import (
 //    its own initiation goes out, now no longer crossing the first.
 //
 // 2. A handshake time says that handshake messages crossed, not that packets flow
-//    in both directions. A trial is now VERIFIED only when the handshake is fresh
-//    AND at least one of two kinds of evidence has been seen since the peer was
+//    in both directions. A trial is verified only when the handshake is fresh
+//    and at least one of two kinds of evidence has been seen since the peer was
 //    last added (at the trial's start, or at its one retry):
 //
 //    - the probe was answered: a TCP connect from this machine's mesh address to

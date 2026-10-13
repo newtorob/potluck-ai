@@ -75,8 +75,8 @@ describe('streamTokens', () => {
   });
 
   it('reports the timeout shape error before the trailing meta and done', async () => {
-    // Producer bug (audit finding 5): the coordinator's timeout branch emits an
-    // error and then still finishes the envelope. The parser reports all three
+    // The coordinator's timeout branch emits an error and then still finishes
+    // the envelope. The parser reports all three
     // in order; the consumer decides the error wins.
     const events = await collect(
       sse(

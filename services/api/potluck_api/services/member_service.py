@@ -7,7 +7,7 @@ Responsibilities:
 - get_by_email(email) -> Member | None
 - update(member, patch) -> Member
 - get_membership(member_id) -> Membership | None
-- list_all() -> list[Member]  — admin only
+- list_all() -> list[Member] - admin only
 """
 from __future__ import annotations
 

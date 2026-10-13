@@ -1,5 +1,5 @@
 /**
- * Adversarial review of streamTokens.
+ * Adversarial cases for streamTokens.
  *
  * Adversary model: the producer on the far end of the body is not trusted to
  * be well-behaved. It may be a buggy proxy that reframes the stream, a peer

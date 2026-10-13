@@ -8,8 +8,8 @@
 // broadcastSweepLoop). Only RFC1918 interfaces are used; the tailnet range
 // (100.64.0.0/10) is never sent to, so pairing stays on the physical LAN.
 //
-// Security model: the periodic LAN announce carries ONLY an opaque
-// fingerprint of the pairing token plus the inviter's hostname — never the
+// Security model: the periodic LAN announce carries only an opaque
+// fingerprint of the pairing token plus the inviter's hostname - never the
 // raw, redeemable token. A fingerprint is a one-way hash: it lets a listener
 // notice "there's an invite from this host" and correlate it against a later
 // exchange, but it cannot be replayed at the coordinator's /mesh/enroll to
@@ -19,7 +19,7 @@
 // The actual token is handed over only through a second, PIN-gated exchange
 // (RequestReveal / handleRevealRequest): the inviter's sidecar generates a
 // random 6-digit PIN when it starts broadcasting and returns it to its own
-// local caller only (displayed on the inviter's screen — it is never put on
+// local caller only (displayed on the inviter's screen - it is never put on
 // the wire). A joining machine that wants to auto-join must have a human read
 // that PIN off the inviter's screen and supply it locally; only then does the
 // joiner's sidecar unicast a reveal request carrying the PIN to the inviter,
@@ -30,9 +30,9 @@
 // 6-digit space rather than an unlimited, unauthenticated redemption.
 //
 // This closes the "passive listener wins the race" hole a raw-token broadcast
-// had: coordinator validation of the token IS the trust grant, so it was
-// never sufficient to reason that broadcasting the token was safe merely
-// because the coordinator also checks it — a listener who captured the raw
+// would have: coordinator validation of the token is the trust grant, so it
+// is never sufficient to reason that broadcasting the token is safe merely
+// because the coordinator also checks it - a listener who captured the raw
 // token could redeem it directly against the coordinator, bypassing this
 // sidecar (and the legitimate second machine) entirely.
 //
@@ -68,10 +68,10 @@ var (
 )
 
 const (
-	// magic bumped from POTLUCK-PAIR-1: the wire format no longer carries a
-	// raw redeemable token (see package doc), so an old build's announce
-	// (which did) and a new build's announce are deliberately incompatible
-	// rather than silently interpreted with the wrong field meaning.
+	// magic identifies the announce format. The wire format carries no raw
+	// redeemable token (see package doc), so it is deliberately incompatible
+	// with the POTLUCK-PAIR-1 announce (which did) rather than silently
+	// interpreted with the wrong field meaning.
 	magic           = "POTLUCK-PAIR-2"
 	revealReqMagic  = "POTLUCK-PAIR-REVEAL-REQ-1"
 	revealRespMagic = "POTLUCK-PAIR-REVEAL-RESP-1"
@@ -92,7 +92,7 @@ const (
 )
 
 // announce is the periodic LAN beacon. It intentionally carries no
-// redeemable secret — see the package doc.
+// redeemable secret - see the package doc.
 type announce struct {
 	Magic       string `json:"m"`
 	Hostname    string `json:"h"`
@@ -258,7 +258,7 @@ func broadcastDests() []net.IP {
 
 // fingerprintOf returns a short, one-way, non-redeemable correlation handle
 // for token: enough entropy (48 bits) that guessing it is no easier than
-// guessing the token itself, and — being a one-way hash — it cannot be
+// guessing the token itself, and - being a one-way hash - it cannot be
 // inverted back into the token. Safe to put on an unauthenticated broadcast.
 func fingerprintOf(token string) string {
 	sum := sha256.Sum256([]byte(token))
@@ -348,7 +348,7 @@ func (s *Service) RunListener(ctx context.Context) {
 			// different source addresses. Only accept one whose source is
 			// actually on the physical LAN (or loopback, for same-host
 			// listener+broadcaster in tests): a tunnel-adapter address isn't
-			// a real second machine, and — worse — a reveal request unicast
+			// a real second machine, and - worse - a reveal request unicast
 			// back to it can be silently swallowed by that tunnel's own
 			// routing rather than ever reaching a listening socket, turning
 			// a legitimate reveal into a silent timeout.
@@ -394,8 +394,8 @@ func groupPortAddr(a net.Addr) *net.UDPAddr {
 }
 
 // Discovered returns the freshest heard invite within maxAge, if any. It
-// returns a fingerprint — not the redeemable token, which is never
-// broadcast — so a caller can show "found an invite from HOST" and then use
+// returns a fingerprint - not the redeemable token, which is never
+// broadcast - so a caller can show "found an invite from HOST" and then use
 // RequestReveal (after a human supplies the inviter's PIN) to actually obtain
 // the token.
 func (s *Service) Discovered(maxAge time.Duration) (fingerprint, hostname string, ok bool) {
@@ -408,7 +408,7 @@ func (s *Service) Discovered(maxAge time.Duration) (fingerprint, hostname string
 }
 
 // RequestReveal asks the LAN host that broadcast fingerprint to reveal the
-// real pairing token, authenticating with pin — a value a human must read off
+// real pairing token, authenticating with pin - a value a human must read off
 // the inviter's screen and supply locally; it is never transmitted by the
 // periodic LAN announce. A passive listener that only captured the broadcast
 // fingerprint cannot complete this exchange without also guessing the PIN,
@@ -499,7 +499,7 @@ func (s *Service) handleRevealRequest(rq revealRequest, src net.Addr) {
 	sess := s.session
 	if sess == nil || sess.fingerprint != rq.Fingerprint {
 		s.mu.Unlock()
-		return // not (or no longer) our session — say nothing
+		return // not (or no longer) our session - say nothing
 	}
 	if sess.attempts >= maxRevealAttempts {
 		s.mu.Unlock()

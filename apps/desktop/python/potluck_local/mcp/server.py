@@ -1,6 +1,6 @@
 """Potluck MCP server entry point.
 
-Runs as a standalone process — separate from the FastAPI sidecar. Both
+Runs as a standalone process - separate from the FastAPI sidecar. Both
 processes share state through the same SQLite file at ~/.potluck/data/memory.db.
 No IPC between them; SQLite handles concurrent access via file locks (WAL mode
 is set by the services layer).
@@ -15,13 +15,13 @@ Usage:
     python -m potluck_local.mcp --stdio
     python -m potluck_local.mcp --tcp 8322
 
-Auth contract (2026-07-17 security audit, MEDIUM)
----------------------------------------------------
-stdio is unchanged and carries NO token: it is a private pipe to a single
+Auth contract
+-------------
+stdio carries no token: it is a private pipe to a single
 child process spawned by the caller (Electron, Claude Code, ...), so the
 OS process boundary is the credential. This is how most agents connect.
 
---tcp is a loopback TCP/SSE listener, reachable by ANY local process that
+--tcp is a loopback TCP/SSE listener, reachable by any local process that
 can open a socket to 127.0.0.1 -- unlike stdio there is no OS-enforced
 caller identity. It therefore requires a shared-secret bearer token, read
 from POTLUCK_MCP_TOKEN (or POTLUCK_SIDECAR_TOKEN as a fallback, so the
@@ -30,7 +30,7 @@ the HTTP sidecar). Every request must send `Authorization: Bearer <token>`;
 requests are compared with hmac.compare_digest (see _TokenAuthMiddleware),
 mirroring the sidecar_token gate in potluck_local.app.
 
-FastMCP's own `auth=` parameter is NOT used here: it implements the full
+FastMCP's own `auth=` parameter is not used here: it implements the full
 MCP OAuth flow and requires an `issuer_url` (a real OAuth authorization
 server) -- there is no local-shared-secret mode in the installed SDK
 (mcp==1.12.4). Instead we wrap the plain Starlette app FastMCP.sse_app()
@@ -46,7 +46,7 @@ path used by Electron/Claude Code/etc.
 Observability:
   On startup: opens an AgentSession row in mcp_sessions.
   clientInfo is captured via a notifications/initialized handler registered on
-  the low-level MCPServer — it fires after the handshake, when client_params
+  the low-level MCPServer - it fires after the handshake, when client_params
   is populated on the ServerSession.
   Each tool call is wrapped: args captured (privacy-filtered), duration timed,
   errors recorded.  Session closed on graceful shutdown.
@@ -130,8 +130,8 @@ async def _parent_watch_loop(session_id: str) -> None:
     """Detect parent-process death and exit cleanly (stdio orphan guard).
 
     A stdio MCP server is one-per-agent: if the parent (Claude Code, Cursor,
-    Zed, …) dies ungracefully, we should NOT linger as an orphan. In normal
-    shutdown the parent closes our stdin and the read loop exits — but as a
+    Zed, …) dies ungracefully, we should not linger as an orphan. In normal
+    shutdown the parent closes our stdin and the read loop exits - but as a
     belt-and-suspenders against held-fd or kill-9 paths, we also poll
     os.getppid(): a reparented orphan's ppid drifts (usually to 1 = init/
     launchd). When that happens we close the session and hard-exit.
@@ -143,14 +143,14 @@ async def _parent_watch_loop(session_id: str) -> None:
         ppid = os.getppid()
         if ppid != initial_ppid or ppid <= 1:
             logger.warning(
-                "mcp_parent_died initial_ppid=%d now_ppid=%d session=%s — exiting",
+                "mcp_parent_died initial_ppid=%d now_ppid=%d session=%s, exiting",
                 initial_ppid, ppid, session_id,
             )
             try:
                 await observer.close_session(session_id)
             except Exception:
                 logger.debug("observer_close_on_parent_death_error", exc_info=True)
-            # Hard exit — don't risk lingering as an orphan. Skips Python
+            # Hard exit - don't risk lingering as an orphan. Skips Python
             # atexit handlers, which is intentional (heartbeat task etc. get
             # torn down by the kernel).
             os._exit(0)
@@ -168,7 +168,7 @@ def _extract_memory_ids(
 ) -> list[str] | None:
     """Pull the memory ids a tool call touched, from args or result shape.
 
-    Pure ids, no content — already privacy-safe. AgentObserver enforces its
+    Pure ids, no content - already privacy-safe. AgentObserver enforces its
     own whitelist (_MEMORY_TOOL_NAMES) as defense-in-depth, so a non-memory
     tool that returns dicts-with-ids won't accidentally write a memory link.
 
@@ -207,7 +207,7 @@ def _wrap_tool_fn(
 
     Also performs lazy client identification on the first tool call: tool
     requests have request_ctx set, so client_params is accessible there.
-    Exceptions are always re-raised after logging — never swallowed.
+    Exceptions are always re-raised after logging - never swallowed.
     """
     import functools
 
@@ -252,8 +252,8 @@ def _wrap_tool_fn(
                     asyncio.create_task(
                         observer.update_session(session_id, project=project)
                     )
-                # Lazy client identification — runs once on the first tool call
-                # where request_ctx IS set (unlike notification handlers).
+                # Lazy client identification - runs once on the first tool call
+                # where request_ctx is set (unlike notification handlers).
                 if not _client_identified:
                     _client_identified = True  # prevent re-entry before task runs
                     asyncio.create_task(
@@ -268,7 +268,7 @@ def _wrap_tool_fn(
 async def _identify_client_from_request_ctx(session_id: str) -> None:
     """Identify the calling agent from the current request_ctx.
 
-    Called on the first tool dispatch — request_ctx is guaranteed to be set
+    Called on the first tool dispatch - request_ctx is guaranteed to be set
     at that point (the tool handler runs inside _handle_request which sets it).
     """
     global _client_identified
@@ -343,7 +343,7 @@ FastMCP.add_tool = _patched_add_tool  # type: ignore[method-assign]
 
 
 # ---------------------------------------------------------------------------
-# FastMCP lifespan — open/close session, start heartbeat
+# FastMCP lifespan - open/close session, start heartbeat
 # ---------------------------------------------------------------------------
 
 
@@ -373,7 +373,7 @@ async def _observability_lifespan(mcp: FastMCP) -> AsyncIterator[None]:
     # Start heartbeat task.
     _heartbeat_task = asyncio.create_task(_heartbeat_loop(session_id))
 
-    # Stdio MCP servers are one-per-agent — if the parent agent dies, we
+    # Stdio MCP servers are one-per-agent - if the parent agent dies, we
     # shouldn't linger. The stdio read loop usually exits on stdin EOF; this
     # watcher is belt-and-suspenders against held-fd / SIGKILL paths.
     if transport_str == "stdio":
@@ -413,9 +413,9 @@ def _register_initialized_handler(mcp_server: Any, session_id: str) -> None:
     notifications/initialized.  At that point, session._client_params is set
     and accessible.
 
-    Notifications don't have a request_ctx, but they ARE dispatched on the
+    Notifications don't have a request_ctx, but they are dispatched on the
     same ServerSession instance.  We reach client_params by accessing the
-    session stored on the mcp_server after run() starts — using a deferred
+    session stored on the mcp_server after run() starts - using a deferred
     asyncio task so we don't block the notification path.
     """
     import mcp.types as t
@@ -435,7 +435,7 @@ async def _identify_client(session_id: str, mcp_server: Any) -> None:
     the session object is accessible via the server's active connection.
 
     We use a short retry loop because the ContextVar may not be set in the
-    task continuation — the actual client_params is on the ServerSession
+    task continuation - the actual client_params is on the ServerSession
     which is the same object used throughout the connection.  We get it by
     looking at the server's _client_params reference stored during ListTools/
     any subsequent request, or by inspecting the existing session via the
@@ -446,7 +446,7 @@ async def _identify_client(session_id: str, mcp_server: Any) -> None:
     from potluck_local.services.memory_db import get_memory_db_path
 
     # The notifications/initialized fires before any tool calls, so we may
-    # not have a request_ctx yet.  Use a short retry — the first real request
+    # not have a request_ctx yet.  Use a short retry - the first real request
     # will populate it; worst case we update on first tool call via the wrapper.
     params = None
     for _ in range(3):
@@ -464,7 +464,7 @@ async def _identify_client(session_id: str, mcp_server: Any) -> None:
 
     # Fallback: check the mcp_server for a stored session reference.
     # The lowlevel server doesn't expose it directly, but we can look at the
-    # _mcp_server's request_handlers — if a session ref is stored there we use
+    # _mcp_server's request_handlers - if a session ref is stored there we use
     # it.  If we still can't get params, bail gracefully.
     if params is None:
         logger.debug(
@@ -620,7 +620,7 @@ async def _serve_sse_authenticated(mcp: FastMCP, token: str) -> None:
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="potluck-mcp",
-        description="Potluck MCP server — persistent memory and task state for coding agents.",
+        description="Potluck MCP server: persistent memory and task state for coding agents.",
     )
     transport_group = parser.add_mutually_exclusive_group()
     transport_group.add_argument(
@@ -667,14 +667,14 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.tcp is not None:
         port = args.tcp
-        # Shared-secret gate — see the module docstring "Auth contract"
+        # Shared-secret gate - see the module docstring "Auth contract"
         # section. Fail safe: refuse to bind an unauthenticated TCP/SSE
         # socket rather than silently exposing memory_search/memory_list/
         # memory_delete to any local process that finds the port.
         token = os.environ.get(MCP_TOKEN_ENV) or os.environ.get(_SIDECAR_TOKEN_ENV)
         if not token:
             logger.error(
-                "potluck_mcp_tcp_refused reason=no_token — set %s (or %s) "
+                "potluck_mcp_tcp_refused reason=no_token: set %s (or %s) "
                 "before starting --tcp mode; the TCP/SSE transport has no "
                 "other authentication and must never be exposed unauthenticated",
                 MCP_TOKEN_ENV,

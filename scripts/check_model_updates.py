@@ -52,7 +52,7 @@ PROPOSED_PATH = CATALOG_PATH.with_name("models.json.proposed")
 # The catalog is consumed in TWO places that must stay byte-identical: the
 # desktop sidecar's bundled copy (CATALOG_PATH, the offline floor) and the
 # cloud API's copy (served at GET /models/catalog as the live feed). --write
-# emits a reviewable .proposed next to EACH; after eyeballing them, promote
+# emits a reviewable .proposed next to each; after eyeballing them, promote
 # both together, e.g.:
 #   mv apps/desktop/python/potluck_local/data/models.json{.proposed,}
 #   mv services/api/potluck_api/data/models.json{.proposed,}
@@ -68,7 +68,7 @@ HF_GGUF_EXPAND_URL = "https://huggingface.co/api/models/{repo}?expand[]=gguf"
 # CURATED LINEUP SPEC -- hand-edit this to bump generations.
 #
 # Each entry names the exact HF repo + GGUF filename we ship. Sizes/hashes
-# below are NOT trusted -- they're re-resolved live from the Hub every run.
+# below are not trusted -- they're re-resolved live from the Hub every run.
 # Quant choice: Q4_K_M is the default (matches the shipped catalog's
 # convention); Q5_K_M only where the shipped predecessor already used it
 # (llama-3.1-8b, to avoid a quality regression on an unchanged model).
@@ -319,8 +319,8 @@ LINEUP: list[LineupEntry] = [
 ]
 
 # Public, documented layer counts (from each model's official card / technical
-# report) used ONLY as a fallback when `base_repo`'s config.json 401s because
-# the repo is gate-walled (Llama, Gemma). Never fabricated -- these are the
+# report) used only as a fallback when `base_repo`'s config.json 401s because
+# the repo is gate-walled (Llama, Gemma). These are the
 # same numbers Meta/Google publish; just not fetchable anonymously via the API.
 DOCUMENTED_LAYERS: dict[str, int] = {
     "meta-llama/Llama-3.2-3B-Instruct": 28,  # Meta Llama 3.2 model card
@@ -412,7 +412,7 @@ SUPERSEDES: dict[str, list[str]] = {
     # (identical slug in both catalogs) -> no supersedes entry.
     # deepseek-r1-distill-llama-8b-q4, gemma-3-12b-it-q4, phi-4-q4,
     # ministral-8b-instruct-2410-q4, deepseek-r1-distill-qwen-32b-q4,
-    # gemma-3-27b-it-q4 are all NEW additions -> no supersedes entry.
+    # gemma-3-27b-it-q4 are all new additions -> no supersedes entry.
 }
 
 

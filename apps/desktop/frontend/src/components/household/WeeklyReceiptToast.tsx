@@ -1,9 +1,9 @@
 /**
- * WeeklyReceiptToast — a dismissible in-app banner that appears once per
+ * WeeklyReceiptToast - a dismissible in-app banner that appears once per
  * completed week when the user's machines had contribution activity.
  *
  * Rendered in the App shell (fixed position, bottom-right). Lifecycle is
- * managed by useWeeklyReceiptToast — this component is purely presentational.
+ * managed by useWeeklyReceiptToast - this component is purely presentational.
  *
  * Privacy rule: shows aggregate totals only. No per-request, per-peer, or
  * requester detail. Identical constraints as ContributionReceiptsCard.
@@ -14,7 +14,7 @@ import { cn } from '@/components/ui/cn';
 import type { WeeklyReceiptToastData } from '@/hooks/useWeeklyReceiptToast';
 
 // ---------------------------------------------------------------------------
-// Helpers (local — avoids importing from ContributionReceiptsCard)
+// Helpers (local - avoids importing from ContributionReceiptsCard)
 // ---------------------------------------------------------------------------
 
 function formatCount(n: number): string {

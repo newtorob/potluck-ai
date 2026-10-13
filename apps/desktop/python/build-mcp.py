@@ -4,10 +4,10 @@ Produces a onedir bundle at dist/potluck-mcp/ containing the executable
 and an _internal/ directory with all shared libraries and data files.
 
 Heavy inference deps (llama_cpp, torch, sentence_transformers, numpy, GPUtil)
-are excluded — the MCP server only needs the db/settings/services layer.
+are excluded - the MCP server only needs the db/settings/services layer.
 
 The spec file (potluck-mcp.spec) is the source of truth for build flags.
-Regenerate it intentionally when dependencies change — do not delete it
+Regenerate it intentionally when dependencies change - do not delete it
 between builds, as that breaks reproducibility.
 
 Usage:

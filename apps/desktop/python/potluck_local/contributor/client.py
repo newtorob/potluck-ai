@@ -7,7 +7,7 @@ dispatched jobs. Reconnects on any failure with exponential backoff.
 Two callers share this module:
 
   * ``python -m potluck_local.contributor`` (``main()`` below): the
-    standalone bench-fleet client. Settings come from POTLUCK_* environment
+    standalone client. Settings come from POTLUCK_* environment
     variables (see config.py); jobs are served by the standalone engines in
     inference.py.
   * ``potluck_local.services.contributor_service.ContributorService``: the
@@ -20,7 +20,7 @@ travels in ``LoopHooks``; the loop itself owns the protocol, the backoff,
 the in-flight job cap and the stop semantics (set ``stop`` and the loop
 closes its socket and returns).
 
-Architectural invariant (see manifesto §10.3): this loop must never write
+Architectural invariant: this loop must never write
 prompt content or member-identifying data to disk, logs, or telemetry. Log
 lines carry counters and ids only.
 """
@@ -67,7 +67,7 @@ from potluck_local.contributor.telemetry import (
 
 logger = logging.getLogger("potluck.contributor")
 
-# Module version — embedded in attestation, persisted by coordinator into
+# Module version - embedded in attestation, persisted by coordinator into
 # peer_heartbeats.client_version. Bump when the wire protocol or
 # heartbeat shape changes.
 CLIENT_VERSION = "0.0.2-dev"
@@ -95,7 +95,7 @@ CIRCLE_PREPARE_TIMEOUT_S = 1.5
 
 
 class HandshakeFailed(Exception):
-    """Wraps a coordinator reject — caller treats this as fatal vs.
+    """Wraps a coordinator reject - caller treats this as fatal vs.
     transient based on context."""
 
 
@@ -120,14 +120,14 @@ class LoopHooks:
     headers_provider: HeadersProvider
     max_concurrent_jobs: int | None = 1
     # Who this peer serves beyond its owner: "circle" and/or "pool". None
-    # names no audience and serves both, as peers did before the choice.
+    # names no audience and serves both.
     audiences: list[str] | None = None
     # on_state(event, **fields). Events: connecting, connected, heartbeat,
     # rejected, disconnected, job_started, job_finished, stopped. Never
     # carries prompt content or member ids.
     on_state: StateCallback | None = None
     # Direct circle links. Both stay None for the standalone client, which then
-    # behaves exactly as before them.
+    # runs without them.
     #   circle_attest() -> (mesh node id, circle listener port) while the
     #     listener is up, else None. Read at every handshake and compared by the
     #     capability watch, so a listener that comes up (or goes) is re-attested.
@@ -156,7 +156,7 @@ class JobTracker:
 def detect_platform() -> str:
     """Cross-platform identifier, e.g. 'darwin-arm64', 'linux-x86_64'.
 
-    Note Windows reports machine() as 'AMD64' rather than 'x86_64' — we
+    Note Windows reports machine() as 'AMD64' rather than 'x86_64' - we
     keep what platform.machine() returns rather than normalizing, so the
     string is faithful to what the underlying OS calls itself. Coordinator
     treats this as informational, not a routing key.
@@ -192,7 +192,7 @@ async def _build_capabilities(settings: Settings) -> list[CapabilityEntry]:
       - inference_enabled=False: empty list (peer is stub-echo only).
       - llama-cpp: a single entry derived from settings.model_slug.
       - Ollama: query /api/tags and emit one entry per installed model.
-        That way a peer that has both qwen2.5:3b AND llama3.1:8b pulled
+        That way a peer that has both qwen2.5:3b and llama3.1:8b pulled
         can serve jobs targeting either, with no manual config needed.
     """
     if not settings.inference_enabled:
@@ -398,7 +398,7 @@ async def _heartbeat_loop(
         _emit(hooks, "heartbeat", current_jobs=current_jobs)
 
 
-# m3 stub: per-token "inference" delay so the streaming feels real on the
+# Stub: per-token "inference" delay so the streaming feels real on the
 # coordinator + desktop side.
 _STUB_TOKEN_DELAY_S = 0.03
 
@@ -406,8 +406,8 @@ _STUB_TOKEN_DELAY_S = 0.03
 def _job_error_fields(exc: BaseException, *, gpu_offload: bool) -> tuple[str, str]:
     """(error_category, error_message) for a job_error sent to the coordinator.
 
-    The message is fixed text chosen by category. It used to be the first 200
-    characters of the exception, which went to another machine.
+    The message is fixed text chosen by category, never the exception text,
+    which would go to another machine.
     """
     from potluck_local.services import inference_errors
 
@@ -421,7 +421,7 @@ async def _handle_real_job(
     job: JobAssignedMessage,
     settings: Settings,
 ) -> None:
-    """Standalone real-inference handler (Phase G m3 step 5).
+    """Standalone real-inference handler.
 
     Lazy-loads the configured GGUF on first job, streams generated tokens
     back as JobTokenMessages, sends JobCompleteMessage when done. If the
@@ -437,7 +437,7 @@ async def _handle_real_job(
 
     # Decide whether this peer can serve the requested model, per backend, and
     # which slug to actually load. This must agree with _build_capabilities:
-    #   - ollama: the peer advertised EVERY installed Ollama model, so serve
+    #   - ollama: the peer advertised every installed Ollama model, so serve
     #     whatever the coordinator routed (job.model_slug). Ollama loads it on
     #     demand; the engine's _ensure_loaded reports if it isn't installed.
     #   - llama-cpp: the peer has exactly one GGUF (settings.model_slug) and can
@@ -536,9 +536,9 @@ async def _handle_real_job(
             "real_job_complete job_id=%s output_tokens=%d duration_ms=%d reason=%s",
             job.job_id, token_index, duration_ms, finish_reason,
         )
-        # Usage dashboard: record that this machine SERVED a network request.
+        # Usage dashboard: record that this machine served a network request.
         # The wire deliberately hides whether it was circle or pool, so served
-        # rows are recorded as "pool" with NO peer identity. Failure-tolerant.
+        # rows are recorded as "pool" with no peer identity. Failure-tolerant.
         try:
             from potluck_local.services.usage_store import record_usage_event
             await record_usage_event(
@@ -553,7 +553,7 @@ async def _handle_real_job(
             logger.debug("usage_record_served_failed job_id=%s", job.job_id, exc_info=True)
     except websockets.ConnectionClosed:
         logger.warning("real_job_aborted_connection_closed job_id=%s", job.job_id)
-    except Exception as exc:  # pragma: no cover — defensive
+    except Exception as exc:  # pragma: no cover - defensive
         logger.exception("real_job_internal_error job_id=%s", job.job_id)
         try:
             category, message = _job_error_fields(exc, gpu_offload=settings.n_gpu_layers != 0)
@@ -567,9 +567,9 @@ async def _handle_stub_job(
     ws: Any,
     job: JobAssignedMessage,
 ) -> None:
-    """m3 stub inference handler — echoes the prompt back as tokens.
+    """Stub inference handler - echoes the prompt back as tokens.
 
-    Privacy invariant: this function MUST NOT log job.prompt content,
+    Privacy invariant: this function must not log job.prompt content,
     write it to disk, or persist it anywhere.
     """
     started = time.monotonic()
@@ -601,7 +601,7 @@ async def _handle_stub_job(
         )
     except websockets.ConnectionClosed:
         logger.warning("stub_job_aborted_connection_closed job_id=%s", job.job_id)
-    except Exception as exc:  # pragma: no cover — defensive
+    except Exception as exc:  # pragma: no cover - defensive
         logger.exception("stub_job_internal_error job_id=%s", job.job_id)
         try:
             category, message = _job_error_fields(exc, gpu_offload=False)
@@ -639,7 +639,7 @@ async def _receive_loop(
     function returns, so a disconnect never leaves a handler driving a
     model against a socket that is gone.
 
-    The in-flight cap is enforced HERE, once, for every caller: a job that
+    The in-flight cap is enforced here, once, for every caller: a job that
     arrives while ``max_concurrent_jobs`` are already running is declined on
     the wire (category ``declined``) so the coordinator reroutes it. Direct
     circle requests count against the same cap.
@@ -904,7 +904,7 @@ async def run_contributor_loop(
 
 
 def standalone_hooks(settings: Settings) -> LoopHooks:
-    """The hooks the bench-fleet script uses: standalone engines from
+    """The hooks the standalone client uses: standalone engines from
     inference.py, GPU capacity from telemetry, headers from the shared
     coordinator token when configured."""
 

@@ -1,10 +1,10 @@
-"""Token-cap tests (P0-2): billing is bounded by the job's requested
+"""Token-cap tests: billing is bounded by the job's requested
 sampling.max_tokens, so a peer that over-generates can't inflate credits.
 
 The cap itself lives in routers/peers.py (job_complete):
     billed = min(len(buf.tokens), buf.max_tokens)
-These tests cover the plumbing that makes the cap possible — register_job
-threads the job's max_tokens onto the JobBuffer that job_complete reads —
+These tests cover the plumbing that makes the cap possible - register_job
+threads the job's max_tokens onto the JobBuffer that job_complete reads -
 plus the cap arithmetic as the billing contract. No DB needed: the job
 registry is in-memory.
 """

@@ -18,8 +18,8 @@ primary_region = "ord"
   POTLUCK_DERP_PORT = "8443"
   POTLUCK_DERP_HEALTH_PORT = "8444"
   POTLUCK_DERP_MAX_CLIENTS = "10000"
-  # POTLUCK_DERP_JWT_KEY is a secret — set via `fly secrets set` (identical to
-  # the coordinator's key). See docs/launch/fly-deploy.md.
+  # POTLUCK_DERP_JWT_KEY is a secret - set via `fly secrets set` (identical to
+  # the coordinator's key).
 
 [[vm]]
   cpu_kind = "shared"

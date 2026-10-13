@@ -1,12 +1,12 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Potluck household contributor setup for Windows (gaming PC / desktop).
+    Potluck household contributor setup for Windows (desktop).
 
 .DESCRIPTION
     Sister script to scripts/setup-household.sh. Installs everything a
     Windows machine needs to join a Potluck household + serve inference,
-    AND builds the Electron desktop app so the user gets a normal
+    and builds the Electron desktop app so the user gets a normal
     GUI experience (not a CLI tool).
 
     What it does:
@@ -19,8 +19,8 @@
          full stack (mesh sidecar + Python sidecar + Electron app)
          with a single double-click.
 
-    Designed for the "gaming PC contributor" UX (memory 5408564c):
-      - Interactive, opt-in launcher (NOT a Windows Service). The user
+    Designed for a Windows desktop that is also used for gaming:
+      - Interactive, opt-in launcher (not a Windows Service). The user
         starts Potluck when they step away from gaming; closes it when
         they want to game.
       - No code-signing cert required because we build the Electron app
@@ -37,9 +37,9 @@
     Re-runnable - every step skips work that's already done.
 
 .NOTES
-    Per memory 5408564c (Windows scripting gotchas):
+    Windows scripting notes:
       - ASCII-only file (no em-dashes, smart quotes, etc.)
-      - PATH only refreshes in NEW shells; we probe install dirs after winget
+      - PATH only refreshes in new shells; we probe install dirs after winget
       - Desktop shortcut paths are baked in absolute (not %~dp0-relative)
       - .env merging not overwriting
       - Surface exception messages, never silent failures
@@ -113,7 +113,7 @@ function Ask($prompt, $default = "") {
 
 # Invoke-Native: run an external command tolerantly.
 #
-# PowerShell with $ErrorActionPreference = 'Stop' treats ANY stderr output
+# PowerShell with $ErrorActionPreference = 'Stop' treats any stderr output
 # from a native command (npm notice lines, 'go: downloading <dep>' lines,
 # pip warnings, etc.) as a fatal NativeCommandError. This wrapper relaxes
 # the policy for the duration of the call and reports the real exit code
@@ -211,7 +211,7 @@ function Install-IfMissing($commandName, $wingetId, $extraProbePaths = @()) {
     if ($exe) { return $exe.Source }
 
     # Probe well-known install locations (PATH may not have refreshed yet
-    # in this shell - per memory 5408564c).
+    # in this shell).
     foreach ($p in $extraProbePaths) {
         if (Test-Path $p) {
             $env:PATH = (Split-Path -Parent $p) + ";" + $env:PATH
@@ -443,16 +443,16 @@ function Setup-PythonVenv {
         & $VenvPip install --upgrade pip
     } | Out-Null
 
-    # Install llama-cpp-python via the smart fallback chain BEFORE the
+    # Install llama-cpp-python via the smart fallback chain before the
     # rest of requirements.txt. If it succeeds, the subsequent
     # `-r requirements.txt` install sees llama_cpp is already satisfied
     # and skips it. If it fails, we Fail() with actionable advice.
     Install-LlamaCppPython
 
     Info "installing remaining requirements.txt (visible progress - no --quiet)..."
-    # No --quiet: yesterday's lesson was that silent installs make hangs
-    # indistinguishable from progress. The output is verbose but at least
-    # you can tell if pip is doing something or stuck.
+    # No --quiet: silent installs make hangs indistinguishable from
+    # progress. The output is verbose but at least you can tell if pip is
+    # doing something or stuck.
     $rc = Invoke-Native -Label "pip install -r requirements.txt" -Block {
         & $VenvPip install --prefer-binary -r (Join-Path $PyDir "requirements.txt")
     }
@@ -469,9 +469,8 @@ function Setup-PythonVenv {
 function Build-ElectronApp {
     Step "Building Electron desktop app (this can take 5-10 minutes the first time)"
 
-    # Frontend deps + production build. No --silent on pnpm - yesterday's
-    # lesson was that silent makes hangs look like progress. The output
-    # is noisy but legible.
+    # Frontend deps + production build. No --silent on pnpm - silent makes
+    # hangs look like progress. The output is noisy but legible.
     Info "installing frontend deps (visible progress)..."
     Push-Location $FrontendDir
     try {
@@ -526,8 +525,7 @@ function Create-DesktopShortcut {
     Step "Creating Desktop shortcut 'Potluck.lnk'"
 
     # The launcher script lives next to this setup script. Absolute paths
-    # baked in so the shortcut survives the user copying it elsewhere
-    # (per memory 5408564c gotcha #3).
+    # baked in so the shortcut survives the user copying it elsewhere.
     $launcherScript = Join-Path $ScriptDir "start-household-windows.ps1"
     if (-not (Test-Path $launcherScript)) {
         # Write the launcher script if it doesn't exist yet. Keeping it
@@ -608,9 +606,9 @@ function Start-MeshSidecar {
     }
     Pass "coordinator reachable"
 
-    # DERP relay URL — the fallback when direct UDP punch fails (hairpin
+    # DERP relay URL - the fallback when direct UDP punch fails (hairpin
     # NAT, symmetric NAT, restrictive firewalls). Defaults to the production
-    # relay (services/derp, tcp+tls per internal/derp/client.go); it is NOT
+    # relay (services/derp, tcp+tls per internal/derp/client.go); it is not
     # derived from the coordinator URL, since a self-hosted/LAN coordinator
     # does not imply a self-hosted relay. Override with $env:POTLUCK_DERP_URL,
     # e.g. tcp+insecure://<lan-host>:8443 for LAN-only dev against a local

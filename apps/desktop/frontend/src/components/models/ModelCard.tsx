@@ -1,5 +1,5 @@
 /**
- * ModelCard — displays one model from the catalog with contextual actions.
+ * ModelCard - displays one model from the catalog with contextual actions.
  *
  * State machine:
  *   downloading  → DownloadProgress + Cancel
@@ -9,7 +9,7 @@
  *
  * Hardware sufficiency is determined by comparing the model's min_ram_gb /
  * min_vram_gb against the detected hardware. Pass `null` hardware when
- * detection hasn't completed yet — requirements are shown without colour.
+ * detection hasn't completed yet - requirements are shown without colour.
  */
 
 import { useState } from 'react';
@@ -85,7 +85,7 @@ interface ModelCardProps {
    * Display name of the installed model this entry supersedes, resolved by
    * the caller from the current catalog. Undefined when `model.upgrade_from`
    * is empty/absent, or when the superseded model isn't in the catalog
-   * (older sidecar builds, removed model, etc) — the badge falls back to
+   * (older sidecar builds, removed model, etc) - the badge falls back to
    * generic copy rather than showing a slug.
    */
   upgradeFromName?: string;

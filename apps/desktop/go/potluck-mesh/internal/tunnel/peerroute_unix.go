@@ -13,7 +13,7 @@ import (
 // addPeerHostRoute installs a /32 host route for the given peer mesh IP via
 // the TUN interface so the kernel actually delivers packets to WG. Without
 // this, the only routes for the household subnet are the local node's /32
-// (assigned via assignInterfaceAddress) — packets to other peers fall through
+// (assigned via assignInterfaceAddress) - packets to other peers fall through
 // to the default gateway and get dropped.
 //
 // Idempotent: re-running for the same (ip, iface) is a no-op (existing-route
@@ -22,7 +22,7 @@ import (
 // Linux: `ip route add <ip>/32 dev <iface>`
 // macOS: `route -n add -host <ip> -interface <iface>`
 //
-// TODO(post-launch): replace with native netlink (Linux) / route-socket (macOS).
+// TODO: replace with native netlink (Linux) / route-socket (macOS).
 func addPeerHostRoute(ifName, peerIP string) error {
 	var cmd *exec.Cmd
 
@@ -77,7 +77,7 @@ func removePeerHostRoute(ifName, peerIP string) error {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		outStr := strings.ToLower(string(out))
-		// "no such process" (Linux) / "not in table" (macOS) — already gone, success.
+		// "no such process" (Linux) / "not in table" (macOS) - already gone, success.
 		if strings.Contains(outStr, "no such process") || strings.Contains(outStr, "not in table") {
 			slog.Debug("tunnel: peer host route already absent",
 				"interface", ifName,

@@ -1,6 +1,6 @@
-"""Model registry — loads the curated catalog and merges installation status.
+"""Model registry - loads the curated catalog and merges installation status.
 
-The bundled catalog in potluck_local/data/models.json is the offline floor —
+The bundled catalog in potluck_local/data/models.json is the offline floor -
 always present, ships inside the packaged app. services.catalog_feed
 periodically fetches a cloud copy in the background and caches it to disk
 (utils.paths.catalog_cache_path()); _load_catalog() below picks whichever of
@@ -30,11 +30,11 @@ def _load_bundled_catalog() -> dict[str, Any]:
 
 
 def _load_catalog() -> list[dict]:
-    """Return the freshest VALID catalog's model list.
+    """Return the freshest valid catalog's model list.
 
     Bundled is always the fallback. The cached remote feed (written by
     services.catalog_feed's background refresh) is preferred only when it
-    parses AND its schema_version >= bundled's AND its updated_at >=
+    parses and its schema_version >= bundled's and its updated_at >=
     bundled's (bundled ships with no updated_at, so any remote timestamp
     beats it once the schema version is compatible). Any error reading
     either source falls back toward bundled; this never raises and never
@@ -113,7 +113,7 @@ def list_models() -> list[dict]:
 
         # Surface "this catalog entry supersedes something you have installed"
         # without synthesizing an entry for a model that's been removed from
-        # the catalog — only the still-installed old slugs are listed.
+        # the catalog - only the still-installed old slugs are listed.
         upgrade_from = [s for s in entry.get("supersedes", []) if s in installed]
         if upgrade_from:
             item["upgrade_from"] = upgrade_from

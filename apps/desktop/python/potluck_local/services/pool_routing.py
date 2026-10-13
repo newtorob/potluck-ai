@@ -2,7 +2,7 @@
 
 The third and widest routing scope. When a gateway request asks for a model that
 is neither loaded locally nor on a reachable household peer, this dispatches it
-through the coordinator to the OPEN POOL (machines owned by other members),
+through the coordinator to the open pool (machines owned by other members),
 reusing the same blinded job path the desktop chat uses for "Use contributor
 network".
 
@@ -11,14 +11,14 @@ How it differs from household routing (gateway_routing.py):
     coordinator is never involved.
   * pool goes through the coordinator's POST /jobs/stream, which selects a peer
     via blinded routing (no member identity crosses the wire) and streams tokens
-    back. This serves STRANGERS' models, so it is opt-in (GatewaySettings.
+    back. This serves strangers' models, so it is opt-in (GatewaySettings.
     pool_routing, default off) and never automatic.
 
-Privacy invariants (memory 42a7e671):
-  * SINGLE-TURN. Only the latest user message is sent as the prompt — never the
+Privacy invariants:
+  * Single-turn. Only the latest user message is sent as the prompt - never the
     full conversation. The coordinator's job schema has no multi-turn slot and
     sending history to strangers is a privacy hazard. This matches the frontend
-    streamNetworkJob decision; do not widen it without a thoughtful design.
+    streamNetworkJob behavior; do not widen it without a thoughtful design.
   * No member-identifying metadata leaves this process. The coordinator does the
     blinding; we send only prompt + model_slug + sampling + scope.
 
@@ -26,7 +26,7 @@ Config: the coordinator HTTP base comes from POTLUCK_COORDINATOR_HTTP_URL,
 then settings, then the contributor's POTLUCK_COORDINATOR_URL, then the public
 coordinator. Requests carry the signed-in member's session, which is what the
 coordinator authenticates in production; POTLUCK_COORDINATOR_TOKEN is added
-only where an operator set it (the dev fleet).
+only where an operator set it (development setups).
 
 Trusted circles: scope "circle" always names one circle (circle_id). The
 gateway caller picks it with X-Potluck-Circle (a name or an ID); with exactly
@@ -94,11 +94,11 @@ def coordinator_http_base() -> str:
     """Resolve the coordinator's HTTP base URL.
 
     Order:
-      1. POTLUCK_COORDINATOR_HTTP_URL — explicit http(s) base (e.g.
+      1. POTLUCK_COORDINATOR_HTTP_URL - explicit http(s) base (e.g.
          "http://100.64.0.1:8400"). Env override, wins (tests / ops).
-      2. settings.network.coordinator_url — synced from the frontend's
+      2. settings.network.coordinator_url - synced from the frontend's
          connection setting; the normal source in the running app.
-      3. POTLUCK_COORDINATOR_URL — the contributor's websocket URL
+      3. POTLUCK_COORDINATOR_URL - the contributor's websocket URL
          (e.g. "ws://100.64.0.1:8400/peers/connect"); converted ws->http and
          stripped of its path.
       4. The public coordinator, so a default install needs no setup.
@@ -149,7 +149,7 @@ def pool_available() -> bool:
 
 def pool_enabled() -> bool:
     """True when open-pool routing should be used: the user opted in
-    (GatewaySettings.pool_routing) AND a coordinator is configured. Read live so
+    (GatewaySettings.pool_routing) and a coordinator is configured. Read live so
     toggling takes effect without a restart, matching the gateway key."""
     if not pool_available():
         return False
@@ -164,7 +164,7 @@ def pool_enabled() -> bool:
 
 def _pool_multiturn_enabled() -> bool:
     """True when the user explicitly opted in to sending the full messages array
-    to pool contributors (gateway.pool_multiturn, default OFF).
+    to pool contributors (gateway.pool_multiturn, default off).
 
     This is checked only on the pool path; circle always sends full messages
     regardless of this setting. Read live so toggling takes effect without a
@@ -194,10 +194,10 @@ def refusal_message(exc: "PoolDispatchError", scope: str, model: str) -> str:
 
 
 def last_user_prompt(messages: list[dict]) -> str:
-    """The latest user message content — the only thing we send to the pool.
+    """The latest user message content - the only thing we send to the pool.
 
     Single-turn by design (see module docstring). Returns "" when there is no
-    user turn: we deliberately do NOT fall back to a system/assistant message,
+    user turn: we deliberately do not fall back to a system/assistant message,
     so a crafted request ending in a system prompt can't push that content to a
     stranger.
     """
@@ -329,14 +329,14 @@ def _job_body(
 ) -> dict:
     """Build the coordinator job body, applying the multi-turn privacy policy.
 
-    prompt = last_user_prompt(messages) is ALWAYS populated as the backward-compat
+    prompt = last_user_prompt(messages) is always populated as the backward-compat
     fallback. An old contributor that does not know `messages` uses `prompt`.
 
     messages is included when:
-      - scope == "circle" (trusted members always receive the full conversation), OR
-      - scope == "pool" AND gateway.pool_multiturn is explicitly enabled by the user.
+      - scope == "circle" (trusted members always receive the full conversation), or
+      - scope == "pool" and gateway.pool_multiturn is explicitly enabled by the user.
 
-    Default (pool, multiturn off): only prompt is sent — no conversation history
+    Default (pool, multiturn off): only prompt is sent - no conversation history
     crosses the wire to strangers. This preserves the original privacy invariant.
     """
     prompt = last_user_prompt(messages)
@@ -371,7 +371,7 @@ async def stream_pool_openai(
 ):
     """Dispatch to the coordinator and yield OpenAI chat.completion.chunk dicts.
 
-    Works for both pool (strangers) and circle (trusted members) scopes — the
+    Works for both pool (strangers) and circle (trusted members) scopes - the
     privacy policy in _job_body decides whether messages or only prompt is sent.
     Yields the same chunk shape as gateway_routing.stream_peer_openai so gateway
     routers consume both identically.

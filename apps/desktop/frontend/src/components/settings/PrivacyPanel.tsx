@@ -1,5 +1,5 @@
 /**
- * PrivacyPanel — privacy and telemetry toggles.
+ * PrivacyPanel - privacy and telemetry toggles.
  *
  * Each toggle has a label, description, and immediate save on change.
  * Re-asserts the core Potluck AI privacy guarantee.

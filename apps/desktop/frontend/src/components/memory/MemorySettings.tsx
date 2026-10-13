@@ -1,7 +1,7 @@
 /**
- * MemorySettings — embeddable panel for Settings → Privacy tab.
+ * MemorySettings - embeddable panel for Settings → Privacy tab.
  *
- * Rendered by PrivacyPanel (Agent B integrates it). Accepts settings props
+ * Rendered by PrivacyPanel. Accepts settings props
  * passed down from SettingsView so it doesn't need its own settings fetch.
  *
  * Contains:
@@ -28,7 +28,7 @@ interface MemorySettingsProps {
 }
 
 // ---------------------------------------------------------------------------
-// WipeConfirmDialog — modal dialog requiring typed confirmation
+// WipeConfirmDialog - modal dialog requiring typed confirmation
 // ---------------------------------------------------------------------------
 
 interface WipeConfirmDialogProps {
@@ -117,7 +117,7 @@ function WipeConfirmDialog({ onConfirm, onCancel, isWiping, error }: WipeConfirm
 }
 
 // ---------------------------------------------------------------------------
-// InlineToast — lightweight success message (no external dep)
+// InlineToast - lightweight success message (no external dep)
 // ---------------------------------------------------------------------------
 
 interface InlineToastProps {

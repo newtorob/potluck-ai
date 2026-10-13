@@ -1,5 +1,5 @@
 /**
- * CategoryLegend — horizontal legend row showing the 6 memory categories
+ * CategoryLegend - horizontal legend row showing the 6 memory categories
  * and their associated canvas/graph colors.
  *
  * Used by MemoryMapView footer to decode node/point colors on both the
@@ -9,7 +9,7 @@
 import type { MemoryCategory } from '@/types/memory';
 
 /** Solid hex colors for canvas rendering (graph nodes and UMAP points).
- *  Saturated palette tuned for an Obsidian-style graph on a black canvas —
+ *  Saturated palette tuned for an Obsidian-style graph on a black canvas -
  *  high chroma so additive-blend glow halos read as luminous, not muddy. */
 export const CATEGORY_COLORS: Record<MemoryCategory, string> = {
   preference: '#22d3ee', // cyan-400
@@ -18,7 +18,7 @@ export const CATEGORY_COLORS: Record<MemoryCategory, string> = {
   project: '#f59e0b', // amber-500
   person: '#ec4899', // pink-500
   instruction: '#ef4444', // red-500
-  reference: '#14b8a6', // teal-500 — ingested vault / docs / code symbols
+  reference: '#14b8a6', // teal-500 - ingested vault / docs / code symbols
 };
 
 const CATEGORY_LABELS: Record<MemoryCategory, string> = {

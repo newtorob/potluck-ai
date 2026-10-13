@@ -1,23 +1,23 @@
-"""0002 — Credit ledger (Phase G m4, PBC-era).
+"""0002 - Credit ledger.
 
-Creates the append-only ledger that records every credit event — one
+Creates the append-only ledger that records every credit event - one
 'earned' row per job served (to the contributor's owner) and one 'spent'
 row per job consumed (by the requester). The ledger is the single source
 of truth for two downstream systems:
 
-  (a) Member-share benefit map  — priority routing / capability tiers /
+  (a) Member-share benefit map - priority routing / capability tiers /
       beta access for members holding the governance share.
-  (b) Contributor equity program — option grants vest on accumulated
-      `earned` credits (`docs/governance/contributor-equity.md`).
+  (b) Contributor equity program - option grants vest on accumulated
+      `earned` credits.
 
-This migration ALSO creates the per-model-class multiplier config table.
-The `contribution_bonus_multiplier` (default 1.5 — earn pays 1.5x spend)
+This migration also creates the per-model-class multiplier config table.
+The `contribution_bonus_multiplier` (default 1.5 - earn pays 1.5x spend)
 is held as a constant in the service layer for v0; future work moves it
 to a `credit_config` singleton when governance can vote on it.
 
-Privacy note: the ledger HAS to know member_id to attribute credit
-correctly. That is allowed at this layer — it's the equivalent of REI's
-membership ledger knowing which member bought what. What's NOT allowed
+Privacy note: the ledger has to know member_id to attribute credit
+correctly. That is allowed at this layer - it's the equivalent of REI's
+membership ledger knowing which member bought what. What's not allowed
 is forwarding member_id to a contributor peer in a JobAssignedMessage;
 that invariant lives in routers/jobs.py + the privacy tests.
 
@@ -43,7 +43,7 @@ depends_on: str | None = None
 
 def upgrade() -> None:
     # ------------------------------------------------------------------
-    # credit_model_multipliers — per-model rate config. Snapshotted into
+    # credit_model_multipliers - per-model rate config. Snapshotted into
     # every ledger row at write time, so re-tuning multipliers later
     # doesn't re-price history.
     # ------------------------------------------------------------------
@@ -86,7 +86,7 @@ def upgrade() -> None:
     )
 
     # ------------------------------------------------------------------
-    # credit_ledger — append-only event log.
+    # credit_ledger - append-only event log.
     # Each completed job produces two rows: one 'earned' for the peer's
     # owner_member, one 'spent' for the requester. They share job_id +
     # output_tokens but their multiplier differs (earn = base × 1.5).
@@ -113,11 +113,11 @@ def upgrade() -> None:
         ),
         sa.Column("model_slug", sa.String(length=128), nullable=False),
         sa.Column("output_tokens", sa.Integer(), nullable=False),
-        # multiplier and credits snapshotted at write — re-tuning the
+        # multiplier and credits snapshotted at write - re-tuning the
         # multiplier table later doesn't re-price the past.
         sa.Column("multiplier", sa.Numeric(6, 2), nullable=False),
         sa.Column("credits", sa.Numeric(12, 2), nullable=False),
-        # Hash chain — per-member. Each new row's prev_row_hash is the
+        # Hash chain - per-member. Each new row's prev_row_hash is the
         # previous row's row_hash for the same member. Bootstrap value
         # for the first row in a chain is a constant ('' string-hashed).
         sa.Column("prev_row_hash", sa.String(length=64), nullable=False),

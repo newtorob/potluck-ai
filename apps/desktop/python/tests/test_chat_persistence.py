@@ -2,18 +2,18 @@
 
 The frontend chatStore persists every conversation + message through the
 /chat/conversations endpoints, which write to the shared memory_db SQLite file.
-The launch worry was "chats are lost on restart"; these lock that they are NOT.
+These tests check that chats are not lost on restart.
 
 Each memory_db call opens its own connection to the on-disk file, so reading
 after writing already goes through disk. To make the restart semantics explicit,
 the read phase runs on a fresh event loop and re-runs the idempotent schema init
 (CREATE TABLE IF NOT EXISTS) -- exactly what a cold sidecar start does.
 
-These tests write chat content directly through memory_db, which since the
-2026-09-06 privacy fix refuses to write with privacy.chat_history_enabled off
-(the shipped default). The chat_history_on autouse fixture below turns the
-switch on for this module, which is the state these tests were always about:
-a user who opted into saving chat history expects it to survive a restart.
+These tests write chat content directly through memory_db, which refuses to
+write with privacy.chat_history_enabled off (the shipped default). The
+chat_history_on autouse fixture below turns the switch on for this module,
+which is the state these tests are about: a user who opted into saving chat
+history expects it to survive a restart.
 See tests/test_chat_history_privacy_gate.py for the switch-off behaviour.
 """
 from __future__ import annotations
@@ -106,7 +106,7 @@ def test_delete_conversation_cascades_and_is_gone_after_restart(tmp_path):
 
 
 def test_create_conversation_is_idempotent(tmp_path):
-    """Re-POST create with the same id must not 500 (UNIQUE) — optimistic
+    """Re-POST create with the same id must not 500 (UNIQUE) - optimistic
     clients retry create before append."""
     db = tmp_path / "memory.db"
 
@@ -119,5 +119,5 @@ def test_create_conversation_is_idempotent(tmp_path):
     first, second = _run(scenario())
     assert first["id"] == "c1"
     assert second["id"] == "c1"
-    # Existing row wins — title is not overwritten by the duplicate create.
+    # Existing row wins - title is not overwritten by the duplicate create.
     assert second["title"] == "First"

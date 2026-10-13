@@ -1,5 +1,5 @@
 /**
- * ChatView — main chat interface route (/chat).
+ * ChatView - main chat interface route (/chat).
  *
  * Layout:
  *   Top bar:   ModelSelector + loaded-model info (context, temp, max_tokens)
@@ -33,10 +33,9 @@ import { PotluckLogo } from '@/components/brand/PotluckLogo';
 // Example prompts for empty state
 // ---------------------------------------------------------------------------
 
-// First-impression prompts. Tone matters here — these are the moment a
-// new user infers the app's character. Replaced the generic
-// quantum/CSV/vegan trio with prompts that lean into the manifesto's
-// voice (curiosity, craft, useful work, a touch of warmth).
+// First-impression prompts. Tone matters here - these are the moment a
+// new user infers the app's character. The prompts lean toward curiosity,
+// craft, useful work, and a touch of warmth.
 const EXAMPLE_PROMPTS = [
   'What should I cook tonight with what’s already in my fridge?',
   'Help me draft an honest two-paragraph note to a friend I’ve been ignoring',
@@ -59,7 +58,7 @@ export function ChatView() {
   const { settings, isLoaded: settingsLoaded } = useSettings();
   const { modelLoaded, nCtxLoaded } = useHealth();
 
-  // Primary routing scope — the four-tier trust gradient.
+  // Primary routing scope - the four-tier trust gradient.
   const routingScope = useChatStore((s) => s.routingScope);
   const setRoutingScope = useChatStore((s) => s.setRoutingScope);
   const networkModelSlug = useChatStore((s) => s.networkModelSlug);
@@ -83,14 +82,14 @@ export function ChatView() {
         if (next !== current) setActiveCircleId(next);
       })
       .catch(() => {
-        // Coordinator unreachable — circles stays empty; tier stays disabled.
+        // Coordinator unreachable - circles stays empty; tier stays disabled.
       });
     return () => {
       cancelled = true;
     };
   }, [setActiveCircleId]);
 
-  // Household-peer availability — mesh store polls the sidecar; we gate
+  // Household-peer availability - mesh store polls the sidecar; we gate
   // the household tier on having at least one reachable peer.
   const householdPeersReachable = useMeshStore(
     (s) => getConnectedPeers(s).length > 0,
@@ -103,8 +102,8 @@ export function ChatView() {
     meshStart();
   }, [meshStart]);
 
-  // Coordinator reachability — gates the cooperative tier. If the user has
-  // cooperative scope active AND the coordinator drops, fall back to local
+  // Coordinator reachability - gates the cooperative tier. If the user has
+  // cooperative scope active and the coordinator drops, fall back to local
   // rather than letting them hit send and get an opaque error.
   const { reachable: coordinatorReachable, lastCheckedAt } = useCoordinatorHealth();
 
@@ -142,7 +141,7 @@ export function ChatView() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* ------------------------------------------------------------------ */}
-      {/* Top bar — unified ViewHeader with model selector + parameter chips */}
+      {/* Top bar - unified ViewHeader with model selector + parameter chips */}
       {/* ------------------------------------------------------------------ */}
       <ViewHeader
         title="Chat"
@@ -150,7 +149,7 @@ export function ChatView() {
           <>
             <ModelSelector disabled={isStreaming || networkMode || householdMode || circleMode} />
 
-            {/* Four-tier scope selector — replaces the old pair of binary toggles. */}
+            {/* Four-tier scope selector. */}
             <ScopeSelector
               scope={routingScope}
               onChange={setRoutingScope}
@@ -192,7 +191,7 @@ export function ChatView() {
                       <span className="inline-block h-3 w-6 animate-hearth-pulse rounded bg-muted" aria-hidden="true" />
                     ) : (
                       // Temperatures above the valid 0–2 range are a "use the model's
-                      // own default" sentinel (e.g. 999) — show that, not the raw number.
+                      // own default" sentinel (e.g. 999) - show that, not the raw number.
                       settings.runtime.temperature > 2
                         ? 'Temp default'
                         : `Temp ${settings.runtime.temperature.toFixed(1)}`
@@ -266,7 +265,7 @@ export function ChatView() {
 }
 
 // ---------------------------------------------------------------------------
-// ScopeSelector — four-tier routing scope picker
+// ScopeSelector - four-tier routing scope picker
 // ---------------------------------------------------------------------------
 
 interface ScopeTierConfig {
@@ -512,7 +511,7 @@ function ScopeSelector({
       )}
     </div>
 
-    {/* Circle picker — shown inline when circle scope is active and the user
+    {/* Circle picker - shown inline when circle scope is active and the user
         has more than one circle to choose from. When there's only one circle
         it was auto-selected on tier switch, so no picker is needed. */}
     {scope === 'circle' && circles.length > 1 && (
@@ -528,7 +527,7 @@ function ScopeSelector({
 }
 
 // ---------------------------------------------------------------------------
-// CircleModelPicker — the models the chosen circle can run right now
+// CircleModelPicker - the models the chosen circle can run right now
 // ---------------------------------------------------------------------------
 
 const CIRCLE_MODELS_REFRESH_MS = 20_000;
@@ -609,7 +608,7 @@ function CircleModelPicker({ circleId, disabled }: { circleId: string; disabled:
 }
 
 // ---------------------------------------------------------------------------
-// CirclePicker — compact inline selector for the active circle
+// CirclePicker - compact inline selector for the active circle
 // ---------------------------------------------------------------------------
 
 interface CirclePickerProps {
@@ -756,11 +755,10 @@ interface EmptyStateProps {
 function EmptyState({ modelLoaded, onSelectPrompt, onGoToModels }: EmptyStateProps) {
   return (
     <div className="relative flex flex-1 flex-col items-center justify-center gap-8 px-4 grain">
-      {/* Centered greeting. The serif heading is the moment the new
-          aesthetic announces itself — Direction-B "warm + handcrafted"
-          versus the previous default-shadcn cold sans heading. */}
+      {/* Centered greeting. The serif heading sets the "warm + handcrafted"
+          tone of the app. */}
       <div className="relative z-10 flex flex-col items-center gap-4 text-center animate-fade-in-up">
-        {/* Brandmark with ember halo — matches FirstRun and Membership */}
+        {/* Brandmark with ember halo - matches FirstRun and Membership */}
         <div className="relative h-14 w-14">
           <div
             className="absolute inset-0 rounded-2xl bg-primary/15 blur-xl"

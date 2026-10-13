@@ -1,5 +1,5 @@
 /**
- * ModelPathPanel — shows the model storage directory.
+ * ModelPathPanel - shows the model storage directory.
  *
  * "Reveal in Finder" uses the Electron context bridge if available.
  * Falls back to a copy-to-clipboard button when the preload doesn't expose it.
@@ -41,7 +41,7 @@ export function ModelPathPanel({ settings }: ModelPathPanelProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard API unavailable in some contexts — silent fail
+      // Clipboard API unavailable in some contexts - silent fail
     }
   };
 

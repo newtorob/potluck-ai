@@ -1,7 +1,7 @@
 /**
  * Time formatting utilities shared across the desktop frontend.
  *
- * Kept as pure functions — no side effects, no dependencies.
+ * Kept as pure functions - no side effects, no dependencies.
  * ISO-8601 string overloads accept the backend contract format.
  * Unix-ms overloads accept the chatStore / in-memory format.
  */

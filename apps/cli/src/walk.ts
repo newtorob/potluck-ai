@@ -38,13 +38,13 @@ export function globToRegExp(pattern: string): string {
       if (pattern[i + 1] === "*") {
         i++; // consume the second '*'
         if (pattern[i + 1] === "/") {
-          out += "(?:.*/)?"; // `**/` — zero or more leading directories
+          out += "(?:.*/)?"; // `**/` - zero or more leading directories
           i++;
         } else {
-          out += ".*"; // `**` — anything, including separators
+          out += ".*"; // `**` - anything, including separators
         }
       } else {
-        out += "[^/]*"; // `*` — anything except a separator
+        out += "[^/]*"; // `*` - anything except a separator
       }
     } else if (ch === "?") {
       out += "[^/]";
@@ -114,7 +114,7 @@ export async function loadIgnore(root: string): Promise<IgnoreRule[]> {
     const text = await readFile(join(root, ".gitignore"), "utf8");
     lines.push(...text.split("\n"));
   } catch {
-    // No .gitignore — defaults still apply.
+    // No .gitignore - defaults still apply.
   }
   return compileIgnore(lines);
 }
@@ -126,15 +126,14 @@ export async function loadIgnore(root: string): Promise<IgnoreRule[]> {
  *
  * Symlinked entries are skipped outright, which is what keeps the walk inside
  * the workspace: a symlinked directory can point anywhere, and following it
- * would hand search_files and glob the contents of files outside the workspace
- * (audit P1). The alternative, realpath-ing each symlink and keeping the ones
+ * would hand search_files and glob the contents of files outside the workspace.
+ * The alternative, realpath-ing each symlink and keeping the ones
  * that land inside, costs a syscall per entry and reopens the same check-then-use
  * race the walk would otherwise not have, for the small benefit of listing
- * in-workspace aliases; symlinks are skipped instead. Note this was already the
- * de facto behavior (readdir's Dirent reports a symlink as neither a file nor a
- * directory), so the guard below makes an accident explicit rather than changing
- * what the walk yields. Callers still have to confine `startDir` themselves:
- * readdir DOES follow a symlink handed to it as the walk root.
+ * in-workspace aliases; symlinks are skipped instead. readdir's Dirent reports a
+ * symlink as neither a file nor a directory, so the guard below makes that
+ * skip explicit rather than relying on it. Callers still have to confine
+ * `startDir` themselves: readdir follows a symlink handed to it as the walk root.
  */
 export async function* walkFiles(
   startDir: string,
@@ -146,7 +145,7 @@ export async function* walkFiles(
     try {
       entries = await readdir(dir, { withFileTypes: true });
     } catch {
-      return; // unreadable directory — skip it rather than crash
+      return; // unreadable directory - skip it rather than crash
     }
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const e of entries) {

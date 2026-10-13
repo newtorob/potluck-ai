@@ -1,4 +1,4 @@
-"""The in-process contributor service (M2.5): settings drive the loop,
+"""The in-process contributor service: settings drive the loop,
 jobs are served through the runtime, status reflects the loop's events."""
 from __future__ import annotations
 
@@ -120,7 +120,7 @@ def _service(runner=None, runtime=None, monkeypatch=None, tmp_path=None):
         monkeypatch.delenv("POTLUCK_COORDINATOR_URL", raising=False)
         from potluck_local.contributor.config import Settings as ContributorSettings
 
-        # The dev checkout's .env (bench-fleet values) must not leak into
+        # The dev checkout's .env (local machine values) must not leak into
         # these tests: build the base contributor settings without it.
         monkeypatch.setattr(
             cs, "get_contributor_settings",

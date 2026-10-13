@@ -1,8 +1,8 @@
-"""Eval B — retrieval quality evaluation for Potluck's memory system.
+"""Eval B - retrieval quality evaluation for Potluck's memory system.
 
 Measures recall@{3,5,10,20} and MRR for two configurations:
-  1. keyword-only  (semantic arm disabled — reproduces pre-RRF behavior)
-  2. RRF           (the new default: keyword + semantic fused)
+  1. keyword-only  (semantic arm disabled - reproduces pre-RRF behavior)
+  2. RRF           (the default: keyword + semantic fused)
 
 Usage:
     cd apps/desktop/python
@@ -12,9 +12,9 @@ Or via make:
     make eval-retrieval
 
 Exit codes:
-    0 — RRF recall@20 is at or above the regression floor
-    1 — RRF recall@20 fell below the regression floor (regression detected)
-    2 — embedder unavailable; semantic arm could not be tested (WARN, not fail)
+    0 - RRF recall@20 is at or above the regression floor
+    1 - RRF recall@20 fell below the regression floor (regression detected)
+    2 - embedder unavailable; semantic arm could not be tested (WARN, not fail)
 
 Design notes:
   - Uses a temp SQLite DB isolated from the user's ~/.potluck/data/memory.db.
@@ -43,7 +43,7 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 # ---------------------------------------------------------------------------
-# 1. Point all potluck_local DB calls at a fresh temp file BEFORE importing
+# 1. Point all potluck_local DB calls at a fresh temp file before importing
 #    anything from potluck_local.  get_memory_db_path() reads the env var at
 #    call time, so setting it here is sufficient as long as no module has
 #    cached the path yet.
@@ -66,17 +66,16 @@ from potluck_local.utils.time import now_iso  # noqa: E402
 from evals.fixtures import CORPUS, QUERIES  # noqa: E402
 
 # ---------------------------------------------------------------------------
-# HEADLINE_K — the budget the headline metric + regression floor key off.
+# HEADLINE_K - the budget the headline metric + regression floor key off.
 #
-# We headline recall@5, NOT recall@20. recall@20 saturated at 1.00 on this
-# corpus (20 slots covers half of 42 memories) — a pinned metric has no
-# gradient, so it can't DRIVE tuning, only catch gross regressions. recall@5
+# We headline recall@5 rather than recall@20. recall@20 saturates at 1.00 on
+# this corpus (20 slots covers half of 42 memories) - a pinned metric has no
+# gradient, so it can't drive tuning, only catch gross regressions. recall@5
 # is the realistic tight-budget case (the agent injects a handful of
 # memories, and rank actually matters) and it leaves room to improve, which
-# is what makes the eval a tuning flywheel rather than just a tripwire.
+# is what makes the eval a tuning loop rather than just a tripwire.
 #
-# Sequencing (decided 2026-05-28): tight headline now (recall@5 on the
-# current 42-memory corpus); grow the corpus to hundreds/thousands later for
+# TODO: grow the corpus to hundreds or thousands of memories for
 # scale-realism, at which point recall@20 becomes meaningful again too.
 # All of recall@{3,5,10,20} are still computed + printed; only the headline
 # + floor key off HEADLINE_K.
@@ -85,21 +84,20 @@ HEADLINE_K: int = 5
 
 K_VALUES: list[int] = [3, 5, 10, 20]
 
-# Regression floor — RRF recall@HEADLINE_K must stay at or above this.
+# Regression floor - RRF recall@HEADLINE_K must stay at or above this.
 #
-# recall@5 baselines (2026-05-28), 25-query corpus incl. AMBIENT:
-#   - Before tuning (always_budget=10):     RRF 0.43 vs keyword 0.43  (+0.00)
-#   - After always_budget 10->3:            RRF 0.72 vs keyword 0.48  (+0.24)
-# The fix was NOT the embedder or the RRF k (both ruled out by sweeps) — it
-# was the Tier-1 preload eating half the budget and burying query-relevant
-# hits below the recall@5 cutoff. Dropping always_budget to 3 freed those
-# slots; the wedge ("retrieval beats keyword") now holds at a realistic
-# budget, not just at the saturated @20.
+# recall@5 baselines, 25-query corpus incl. AMBIENT:
+#   - always_budget=10:     RRF 0.43 vs keyword 0.43  (+0.00)
+#   - always_budget=3:      RRF 0.72 vs keyword 0.48  (+0.24)
+# The embedder and the RRF k do not move this (both ruled out by sweeps). The
+# Tier-1 preload eats half the budget and buries query-relevant hits below the
+# recall@5 cutoff. Dropping always_budget to 3 frees those slots, so retrieval
+# beats keyword at a realistic budget, not just at the saturated @20.
 # Floor set ~0.12 below the 0.72 baseline: a drop here means several queries
-# regressed, a real signal. (AMBIENT queries score 0 by construction —
+# regressed, a real signal. (AMBIENT queries score 0 by construction -
 # mid-confidence standing rules never reach top-5 via the confidence-ranked
 # preload; true ambient injection needs a separate pinned-instructions
-# mechanism, tracked as a follow-up — so they pull the absolute number down
+# mechanism, tracked as a follow-up - so they pull the absolute number down
 # but don't affect the RRF-vs-keyword lift.)
 RECALL_FLOOR: float = 0.60
 
@@ -150,7 +148,7 @@ async def _generate_embeddings(db_path: str) -> bool:
 
     Returns True if embeddings were generated, False if the embedder is
     unavailable (in which case the semantic arm of RRF will degrade to
-    keyword-only — both modes will look identical and the eval will still
+    keyword-only - both modes will look identical and the eval will still
     run but cannot measure semantic lift).
     """
     embedder = get_embedder()
@@ -372,7 +370,7 @@ def _check_negative_controls(results_rrf: list[dict]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 async def main() -> int:
-    print("\n=== Potluck Eval B — Retrieval Quality ===")
+    print("\n=== Potluck Eval B: Retrieval Quality ===")
     print(f"Corpus: {len(CORPUS)} memories | Queries: {len(QUERIES)}")
     print(f"Eval DB: {_EVAL_DB}")
 
@@ -392,7 +390,7 @@ async def main() -> int:
         print(f"  Embeddings generated in {embed_elapsed:.1f}s")
     else:
         print(
-            "  WARNING: embedder unavailable — semantic arm will degrade to keyword-only."
+            "  WARNING: embedder unavailable, semantic arm will degrade to keyword-only."
         )
         print("  Both modes will produce identical results; install sentence-transformers to fix.")
 
@@ -444,9 +442,9 @@ async def main() -> int:
         for f in neg_failures:
             print(f)
     else:
-        print("PASS: Cross-project isolation — no mobile memories leaked into backend scope")
+        print("PASS: Cross-project isolation: no mobile memories leaked into backend scope")
 
-    # 10. RRF regressions vs keyword (where RRF was WORSE at the headline budget)
+    # 10. RRF regressions vs keyword (where RRF was worse at the headline budget)
     regressions = [
         rrf for rrf, kw in zip(results_rrf, results_kw)
         if rrf["recalls"][HEADLINE_K] < kw["recalls"][HEADLINE_K]
@@ -462,13 +460,13 @@ async def main() -> int:
         print("  -> The keyword arm found a strong hit that RRF diluted by rank at this budget.")
         print("     This is the signal to tune k (k=60 -> higher favors keyword rank).")
     else:
-        print(f"No recall@{HEADLINE_K} regressions — RRF never scored lower than keyword-only")
+        print(f"No recall@{HEADLINE_K} regressions: RRF never scored lower than keyword-only")
 
     # 11. Embedder caveat
     if not embedder_ok:
         print(
             "\nWARNING: Embedder was unavailable. Both modes ran keyword-only."
-            " Exit code 2 (not a regression — infrastructure issue)."
+            " Exit code 2 (not a regression, an infrastructure issue)."
         )
         return 2
 

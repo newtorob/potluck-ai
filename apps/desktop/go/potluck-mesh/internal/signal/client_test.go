@@ -22,7 +22,7 @@ func (noopHandler) OnRosterUpdate(signal.RosterUpdate) {}
 func (noopHandler) OnPunchCoord(signal.PunchCoord)     {}
 
 // headerCapture is a thread-safe holder for the most recently observed
-// /mesh/signal upgrade request headers — read from the test goroutine,
+// /mesh/signal upgrade request headers - read from the test goroutine,
 // written from the httptest server's handler goroutine.
 type headerCapture struct {
 	mu  sync.Mutex
@@ -77,9 +77,9 @@ func capturingWSServer(t *testing.T) (*httptest.Server, *headerCapture) {
 }
 
 // TestDial_AttachesBearerAndLegacyHeaders pins the wire contract: the
-// /mesh/signal WS upgrade carries BOTH Authorization: Bearer <node_token>
-// (primary, whenever nodeTokenFn returns non-empty) AND
-// X-Potluck-Coordinator-Token (legacy, whenever configured) — matching
+// /mesh/signal WS upgrade carries both Authorization: Bearer <node_token>
+// (primary, whenever nodeTokenFn returns non-empty) and
+// X-Potluck-Coordinator-Token (legacy, whenever configured) - matching
 // coordinator/middleware/node_auth.py's "either credential is accepted,
 // attach both when both are available" contract.
 func TestDial_AttachesBearerAndLegacyHeaders(t *testing.T) {
@@ -97,8 +97,8 @@ func TestDial_AttachesBearerAndLegacyHeaders(t *testing.T) {
 }
 
 // TestDial_NoNodeToken_OmitsBearer pins the pre-enroll case: nodeTokenFn
-// returning "" (not yet enrolled) must NOT send an empty/garbage
-// Authorization header — it must be entirely absent, falling back to
+// returning "" (not yet enrolled) must not send an empty/garbage
+// Authorization header - it must be entirely absent, falling back to
 // whatever legacy coordinator token is configured (possibly also empty in
 // full dev mode, in which case neither header is sent at all).
 func TestDial_NoNodeToken_OmitsBearer(t *testing.T) {
@@ -164,7 +164,7 @@ func dialAndWaitForHeaders(t *testing.T, srv *httptest.Server, coordinatorToken 
 }
 
 // ---------------------------------------------------------------------------
-// SignalURL / SetSignalURL — runtime coordinator-URL override support
+// SignalURL / SetSignalURL - runtime coordinator-URL override support
 // ---------------------------------------------------------------------------
 
 func TestClient_SignalURL_ReturnsConstructorValue(t *testing.T) {
@@ -183,7 +183,7 @@ func TestClient_SetSignalURL_UpdatesLiveValue(t *testing.T) {
 }
 
 // TestClient_SetSignalURL_ConcurrentWithRun is the concurrency-safety
-// regression test for the runtime coordinator-URL override path
+// test for the runtime coordinator-URL override path
 // (cmd/potluck-mesh/main.go's applyCoordinatorURL calls SetSignalURL while
 // Run's connect loop is independently reading the URL on every reconnect
 // attempt). Run under -race; a bare string field would fail this test.
@@ -194,7 +194,7 @@ func TestClient_SetSignalURL_ConcurrentWithRun(t *testing.T) {
 			return
 		}
 		defer conn.CloseNow() //nolint:errcheck
-		// Never send a welcome — the dial loop will time out on helloTimeout
+		// Never send a welcome - the dial loop will time out on helloTimeout
 		// and retry, giving SetSignalURL plenty of concurrent opportunities.
 		<-r.Context().Done()
 	}))
@@ -220,13 +220,13 @@ func TestClient_SetSignalURL_ConcurrentWithRun(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// WGPublicKey / SetWGPublicKey — live-key propagation after POST /pair
+// WGPublicKey / SetWGPublicKey - live-key propagation after POST /pair
 // ---------------------------------------------------------------------------
 //
-// Regression coverage for the bug where a /pair on an already-running daemon
-// (started unenrolled, so already mid-backoff-loop hello-ing with "") never
-// picked up the freshly-enrolled key until the whole process restarted —
-// client.wgPublicKey was captured once at NewClient time with no update path.
+// A /pair on an already-running daemon (started unenrolled, so already
+// mid-backoff-loop hello-ing with "") must pick up the freshly-enrolled key
+// without a process restart, so client.wgPublicKey has an update path after
+// NewClient.
 
 func TestClient_WGPublicKey_ReturnsConstructorValue(t *testing.T) {
 	c := signal.NewClient("ws://127.0.0.1:8400/mesh/signal", "pubkey", "", nil, noopHandler{})
@@ -244,7 +244,7 @@ func TestClient_SetWGPublicKey_UpdatesLiveValue(t *testing.T) {
 }
 
 // TestClient_SetWGPublicKey_ConcurrentWithRun mirrors
-// TestClient_SetSignalURL_ConcurrentWithRun — run under -race.
+// TestClient_SetSignalURL_ConcurrentWithRun - run under -race.
 func TestClient_SetWGPublicKey_ConcurrentWithRun(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := websocket.Accept(w, r, nil)
@@ -252,7 +252,7 @@ func TestClient_SetWGPublicKey_ConcurrentWithRun(t *testing.T) {
 			return
 		}
 		defer conn.CloseNow() //nolint:errcheck
-		// Never send a welcome — the dial loop will time out on helloTimeout
+		// Never send a welcome - the dial loop will time out on helloTimeout
 		// and retry, giving SetWGPublicKey plenty of concurrent opportunities.
 		<-r.Context().Done()
 	}))
@@ -297,10 +297,10 @@ func (h *helloKeyCapture) snapshot() []string {
 }
 
 // TestClient_SetWGPublicKey_PropagatesToNextHello is the end-to-end
-// regression test for the /pair-without-restart bug: it dials once with an
-// initial key, calls SetWGPublicKey (as main.go's signalRestart now does
-// immediately after a successful /pair), and asserts the NEXT reconnect's
-// hello carries the updated key — all without recreating the Client or
+// test for the /pair-without-restart case: it dials once with an
+// initial key, calls SetWGPublicKey (as main.go's signalRestart does
+// immediately after a successful /pair), and asserts the next reconnect's
+// hello carries the updated key - all without recreating the Client or
 // restarting the process. The server never completes the welcome handshake,
 // so the client's own backoff/retry loop drives the reconnect.
 func TestClient_SetWGPublicKey_PropagatesToNextHello(t *testing.T) {
@@ -321,7 +321,7 @@ func TestClient_SetWGPublicKey_PropagatesToNextHello(t *testing.T) {
 			return
 		}
 		hc.add(hello.WGPublicKey)
-		// Deliberately never send a welcome — closes immediately (via the
+		// Deliberately never send a welcome - closes immediately (via the
 		// deferred CloseNow above) so the client's backoff loop retries.
 	}))
 	defer srv.Close()
@@ -340,7 +340,7 @@ func TestClient_SetWGPublicKey_PropagatesToNextHello(t *testing.T) {
 	waitFor(t, 3*time.Second, func() bool { return len(hc.snapshot()) >= 1 })
 
 	// Simulate /pair completing on the running daemon: propagate the freshly
-	// minted key to the live client BEFORE the next reconnect fires.
+	// minted key to the live client before the next reconnect fires.
 	c.SetWGPublicKey("pubkey-v2-post-pair")
 
 	// Wait for a subsequent hello driven by the client's own retry loop.
@@ -357,7 +357,7 @@ func TestClient_SetWGPublicKey_PropagatesToNextHello(t *testing.T) {
 		t.Errorf("first hello: got %q want %q", keys[0], "pubkey-v1-pre-enroll")
 	}
 	if last := keys[len(keys)-1]; last != "pubkey-v2-post-pair" {
-		t.Errorf("hello after SetWGPublicKey: got %q want %q (client is still hello-ing with the stale key — the /pair-without-restart bug)", last, "pubkey-v2-post-pair")
+		t.Errorf("hello after SetWGPublicKey: got %q want %q (client is still hello-ing with the stale key, the /pair-without-restart bug)", last, "pubkey-v2-post-pair")
 	}
 }
 

@@ -1,14 +1,14 @@
 /**
- * ReadinessView — "/readiness" — the netcheck.
+ * ReadinessView - "/readiness" - the netcheck.
  *
  * One glance answers two questions the two-machine bring-up made us answer by
  * hand over SSH: (1) can this machine run inference locally, and (2) is it
- * reachable on the mesh — each gap named with a fix.
+ * reachable on the mesh - each gap named with a fix.
  *
  * Composes signals from useHealth, useHardware, meshStore + deriveDiagnostics.
  * Two passive network probes (VPN conflict, WG port) are now fed from the mesh
  * status poll. The GPU verify button runs a real device op on demand via
- * GET /readiness/gpu-test — never auto-runs on mount.
+ * GET /readiness/gpu-test - never auto-runs on mount.
  */
 
 import { useMemo, useState, type ReactNode } from 'react';
@@ -152,7 +152,7 @@ export function ReadinessView() {
   const report: ReadinessReport = useMemo(() => {
     const mesh = deriveDiagnostics({ bridge, status, peers });
     // exactOptionalPropertyTypes: spread optional fields only when the signal
-    // is present — passing `prop: undefined` would fail the strict type check.
+    // is present - passing `prop: undefined` would fail the strict type check.
     // VPN/port are derived inline here so useMemo's dep array stays stable
     // (no new-object intermediary consts that reconstruct on every render).
     const vpnConflict =
@@ -176,7 +176,7 @@ export function ReadinessView() {
 
   const machineChecks = report.checks.filter((c) => c.group === 'machine');
   const networkChecks = report.checks.filter((c) => c.group === 'network');
-  // The banner answers "is this machine ready", so it tracks MACHINE severity
+  // The banner answers "is this machine ready", so it tracks machine severity
   // only, never the optional network. A relayed or unreachable peer (amber/red
   // below) must not tint the headline when local inference is fine.
   const machineSeverity = machineChecks.reduce<DiagSeverity>(
@@ -248,7 +248,7 @@ export function ReadinessView() {
             </div>
           </div>
 
-          {/* Machine group — GPU verify button is injected after the HARDWARE row */}
+          {/* Machine group - GPU verify button is injected after the HARDWARE row */}
           <MachineGroup checks={machineChecks} gpuVerify={gpuVerify} onVerifyGpu={onVerifyGpu} />
           <Group title="Network" icon={Network} checks={networkChecks} />
 
@@ -268,7 +268,7 @@ export function ReadinessView() {
 }
 
 // ---------------------------------------------------------------------------
-// Machine group — wraps the standard Group but inserts the GPU verify widget
+// Machine group - wraps the standard Group but inserts the GPU verify widget
 // after the HARDWARE check row.
 // ---------------------------------------------------------------------------
 
@@ -308,7 +308,7 @@ function MachineGroup({
 }
 
 // ---------------------------------------------------------------------------
-// GPU verify widget — rendered inside the HARDWARE list item, below the row.
+// GPU verify widget - rendered inside the HARDWARE list item, below the row.
 // ---------------------------------------------------------------------------
 
 function GpuVerifyWidget({

@@ -1,7 +1,7 @@
 """The privacy lint must actually read the files it claims to check.
 
-It once resolved its repository root one level short, found none of its
-targets, skipped them silently and reported a pass on every commit.
+A repository root resolved one level short would find none of its
+targets, skip them silently and report a pass on every commit.
 """
 from __future__ import annotations
 

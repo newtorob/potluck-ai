@@ -1,18 +1,18 @@
 /**
- * MeshMap — a Deco-style topology of the household mesh, laid out to match the
- * TP-Link Deco app's network map (Rob's confirmed reference):
+ * MeshMap - a Deco-style topology of the household mesh, laid out to match the
+ * TP-Link Deco app's network map:
  *
- *   - the COORDINATOR sits at the top as the uplink (the control plane this
+ *   - the coordinator sits at the top as the uplink (the control plane this
  *     household dials: Potluck's hosted one, or an org's on-prem one),
- *   - THIS MACHINE is the center node (the "main unit"),
- *   - OTHER MACHINES fan out below as satellites, each linked to this machine,
+ *   - this machine is the center node (the "main unit"),
+ *   - other machines fan out below as satellites, each linked to this machine,
  *   - a plain-language health line up top ("Everything looks good").
  *
  * Spokes carry the live connection state: direct = solid, relayed/connecting =
- * dashed. It's a hand-laid radial layout, not a physics force-graph — a
+ * dashed. It's a hand-laid radial layout, not a physics force-graph - a
  * household is a handful of nodes and a static topology reads cleaner.
  *
- * Single source of truth: it consumes the SAME deriveDiagnostics() report the
+ * Single source of truth: it consumes the same deriveDiagnostics() report the
  * roster list uses, so a machine's colour here always matches its status pill
  * below. No new probing, no parallel state.
  *
@@ -89,7 +89,7 @@ export function MeshMap({
   peers: MeshPeer[];
   report: DiagnosticsReport;
   /** Optional: live capabilities keyed by node_id. Used only for the WiFi
-   *  indicator glyph — no new network calls; PairedView passes its existing
+   *  indicator glyph - no new network calls; PairedView passes its existing
    *  probe results down. */
   capsByNode?: Record<string, PeerCapabilities>;
 }) {

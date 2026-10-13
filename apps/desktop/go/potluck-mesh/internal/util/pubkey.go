@@ -1,13 +1,13 @@
 // Package util provides small helpers shared across multiple internal packages.
 //
-// Nothing in this package may import other internal packages — it sits at the
+// Nothing in this package may import other internal packages - it sits at the
 // bottom of the dependency graph to avoid import cycles.
 package util
 
 import "fmt"
 
 // TruncatePubkey returns the first 8 characters of a base64-encoded WireGuard
-// public key, followed by "...". Used throughout for safe log output — enough
+// public key, followed by "...". Used throughout for safe log output - enough
 // to correlate lines, not enough to reconstruct the key.
 //
 // If the input is shorter than 8 characters it is returned as-is (without the

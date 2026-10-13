@@ -1,28 +1,28 @@
 /**
- * Mesh client — typed wrapper over `window.potluck.mesh.request` (the
+ * Mesh client - typed wrapper over `window.potluck.mesh.request` (the
  * Electron bridge to the Go sidecar's Unix-socket IPC) plus a thin
  * coordinator-side helper for the pairing-token issuance flow.
  *
  * Two transport surfaces in this file:
  *
  *   1. **Local IPC** (via the Electron bridge). For status / peers / pair /
- *      unpair. Goes over the Unix socket — never network.
+ *      unpair. Goes over the Unix socket - never network.
  *   2. **Coordinator HTTP** (via `coordinatorAuth.coordinatorSessionRequest`).
- *      For issuing pairing tokens. Session-authenticated — see that module's
+ *      For issuing pairing tokens. Session-authenticated - see that module's
  *      doc comment. Reads the coordinator URL from connectionStore so users
  *      can target a coordinator on another machine in their fleet.
  *
  * Error model:
- *   - `MeshBridgeUnavailableError` — `window.potluck.mesh` isn't there.
+ *   - `MeshBridgeUnavailableError` - `window.potluck.mesh` isn't there.
  *     Usually means we're running in a plain browser (Vite dev outside
  *     Electron); the UI should fall back to an offline message.
- *   - `MeshSidecarUnreachableError` — bridge is present but the sidecar
+ *   - `MeshSidecarUnreachableError` - bridge is present but the sidecar
  *     socket isn't accepting connections. User hasn't installed / started
  *     the mesh sidecar yet.
- *   - `MeshApiError` — sidecar responded with HTTP >= 400. `code` is the
+ *   - `MeshApiError` - sidecar responded with HTTP >= 400. `code` is the
  *     stable identifier from `routers/mesh.go` (e.g. `already_enrolled`,
  *     `pair_in_progress`, `coordinator_error`).
- *   - `CoordinatorError` — coordinator's HTTP response was non-2xx.
+ *   - `CoordinatorError` - coordinator's HTTP response was non-2xx.
  */
 
 import type {
@@ -115,7 +115,7 @@ async function meshRequest<T>(
   const bridge = getBridge();
   const result = await bridge.request<T>(method, path, body);
 
-  // Transport-layer failure — status 0 with `error.code` of
+  // Transport-layer failure - status 0 with `error.code` of
   // `sidecar_unreachable` or `timeout` per main.js.
   if (result.status === 0) {
     const err = result.body as { error?: { code: string; message: string } } | null;
@@ -124,7 +124,7 @@ async function meshRequest<T>(
     throw new MeshSidecarUnreachableError(`${code}: ${message}`);
   }
 
-  // Application-layer error — sidecar returned HTTP 4xx/5xx with the
+  // Application-layer error - sidecar returned HTTP 4xx/5xx with the
   // `{ error: { code, message } }` envelope.
   if (result.status >= 400) {
     const err = result.body as { error?: { code: string; message: string } } | null;
@@ -164,7 +164,7 @@ export const meshClient = {
    * the same LAN can discover it without manual copy-paste. Enrolled machine
    * only; the sidecar stops after a short window.
    *
-   * The raw token is NEVER put on the wire — only a one-way fingerprint of
+   * The raw token is never put on the wire - only a one-way fingerprint of
    * it. The response additively includes `confirmation_pin`, a 6-digit code
    * generated locally that the caller must display so a human can read it
    * to whoever is joining; without it, a LAN listener that only captured
@@ -178,7 +178,7 @@ export const meshClient = {
     ),
 
   /** A pairing invite heard on the LAN, if any (unenrolled machine only).
-   *  Carries a fingerprint only — never a redeemable token. */
+   *  Carries a fingerprint only - never a redeemable token. */
   discoveredPairing: () => meshRequest<DiscoveredPairing>('GET', '/pairing/discovered'),
 
   /**
@@ -199,12 +199,12 @@ export type DiscoveredPairing =
   | { found: true; hostname: string; fingerprint: string; pin_required: true };
 
 // ---------------------------------------------------------------------------
-// Daemon supervision — "is there a mesh sidecar to talk to at all"
+// Daemon supervision - "is there a mesh sidecar to talk to at all"
 // ---------------------------------------------------------------------------
 //
 // Separate bridge surface from `meshClient` above: that one assumes a
 // running sidecar and talks to its socket. This one is about bringing the
-// sidecar itself up — on macOS, registering it as a root LaunchDaemon via
+// sidecar itself up - on macOS, registering it as a root LaunchDaemon via
 // SMAppService. See apps/desktop/electron/main.js's mesh-daemon-supervision
 // section for the full state machine and apps/desktop/electron/preload.js
 // for the exact bridge shape this wraps.
@@ -233,7 +233,7 @@ function getDaemonBridge(): MeshDaemonBridge {
  * True when the daemon-supervision bridge (daemonStatus/enable/
  * openLoginItems) is present. Same "running outside Electron, or a stale
  * preload script" guard as `isMeshBridgeAvailable`, scoped to this
- * sub-surface — use this before calling into `meshDaemon` from code that
+ * sub-surface - use this before calling into `meshDaemon` from code that
  * needs to degrade gracefully (a plain browser, or a dev preload that
  * predates this bridge) instead of throwing.
  */
@@ -245,7 +245,7 @@ export function isMeshDaemonBridgeAvailable(): boolean {
 /**
  * Mesh daemon supervision. macOS today: backed by SMAppService via main.js's
  * signed mesh-helper CLI. Linux/Windows always resolve
- * `{ state: 'unsupported' }` for now — see main.js for the TODOs.
+ * `{ state: 'unsupported' }` for now.
  */
 export const meshDaemon = {
   /** Current daemon status. Cheap enough to poll on the household 2s cadence. */
@@ -253,7 +253,7 @@ export const meshDaemon = {
 
   /**
    * Registers (or re-registers) the mesh daemon. Resolving with
-   * `state: 'requires_approval'` is a normal, successful outcome — the
+   * `state: 'requires_approval'` is a normal, successful outcome - the
    * daemon is registered but macOS needs the user to approve it in System
    * Settings before it starts. It is not an error. When the status is
    * 'outdated' this restarts the service instead.
@@ -267,15 +267,15 @@ export const meshDaemon = {
 };
 
 // ---------------------------------------------------------------------------
-// Coordinator helpers (session-authenticated HTTP — see coordinatorAuth.ts)
+// Coordinator helpers (session-authenticated HTTP - see coordinatorAuth.ts)
 // ---------------------------------------------------------------------------
 
 /**
  * Ensure the calling member has a household, then issue a fresh pairing
- * token. Returns the plaintext token (only exposed in this response — the
+ * token. Returns the plaintext token (only exposed in this response - the
  * coordinator stores its primary-key form server-side).
  *
- * Both calls are session-authenticated (not gated by the coordinator token —
+ * Both calls are session-authenticated (not gated by the coordinator token -
  * see `coordinatorSessionRequest`'s doc comment): the coordinator resolves
  * the calling member from the bearer this attaches, via
  * `resolve_session_member_id`.
@@ -310,7 +310,7 @@ export async function issuePairingToken(): Promise<PairingTokenIssueResponse> {
 /**
  * Detect whether the signed-in member already has a household (and which
  * machines are in it), so the unpaired-machine UI can offer a one-tap "join
- * your household" instead of a pairing code — and never spawn a duplicate
+ * your household" instead of a pairing code - and never spawn a duplicate
  * household. Session-authenticated, same bearer as issuePairingToken().
  * Returns `{ household: null, machines: [] }` when this is the first machine.
  */
@@ -326,7 +326,7 @@ export async function getCurrentHousehold(): Promise<CurrentHouseholdResponse> {
 }
 
 /**
- * Remove a machine from the signed-in member's own household — for dropping a
+ * Remove a machine from the signed-in member's own household - for dropping a
  * stale/ghost node left behind when a machine was wiped or reinstalled without
  * unpairing. Session-authenticated; the coordinator verifies the node belongs
  * to the caller's household. Idempotent (204 even if already gone).

@@ -1,6 +1,6 @@
 """Hardware detection router.
 
-GET /hardware — return OS, CPU, RAM, GPU info for model recommendations.
+GET /hardware - return OS, CPU, RAM, GPU info for model recommendations.
 
 `detect_hardware()` calls subprocess.run(system_profiler) on macOS which
 can block for up to 10 s on the first invocation.  We off-load it to the

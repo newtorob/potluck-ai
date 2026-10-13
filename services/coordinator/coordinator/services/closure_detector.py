@@ -1,11 +1,11 @@
-"""Closure scoring-challenge detector (OBSERVE-ONLY).
+"""Closure scoring-challenge detector (observe-only).
 
 Accumulates the per-peer model-substitution signal from the scoring challenge
-and produces an advisory suspicion verdict. It NEVER slashes, forfeits escrow,
+and produces an advisory suspicion verdict. It never slashes, forfeits escrow,
 or mutates reputation on its own; the coordinator decides what (if anything) to
 do with a verdict, and for now that is: log and surface, nothing else.
 
-Signal (see ~/Documents/potluck-closure-verification-mechanism-2026-06-15.md):
+Signal:
   For a fixed sequence O, an anchor running the genuine model X and the
   peer-under-test each return an average per-token log-prob (via /verify/score).
   gap = anchor_avg_logprob - peer_avg_logprob.
@@ -21,7 +21,7 @@ roughly 8-15 challenges before a 2x impostor clears the threshold (more at highe
 z), a few for a 6x impostor, and a very close impostor may never clear it. So
 this is a slow-burn reputation signal.
 
-Defaults below come from the 2026-06-15 Mac experiment; they are placeholders
+Defaults below come from a single-machine experiment; they are placeholders
 until calibrated on real heterogeneous peers (the gate before this ever drives
 payout).
 """
@@ -31,7 +31,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-# --- Calibration constants (placeholders; recalibrate on the fleet/real peers).
+# --- Calibration constants (placeholders; recalibrate on real peers).
 # Honest cross-quant band std, nats/token (q4-vs-q8 measured ~0.07).
 DEFAULT_BAND_STD = 0.07
 # Decision threshold on the running-mean gap, nats/token. Above the band, below

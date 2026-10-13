@@ -1,4 +1,4 @@
-"""Vault ingestion — markdown folder → memory chunks.
+"""Vault ingestion - markdown folder → memory chunks.
 
 Walks a configured folder for `.md` files, splits each into heading-bounded
 chunks, embeds them, and inserts as memories with source_type='vault' +
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 # Chunks larger than this get split further on paragraph boundaries to keep
 # embedding quality reasonable (the embedder truncates at ~256 tokens).
 _MAX_CHUNK_CHARS = 1800
-# Chunks smaller than this are merged with the previous chunk — avoids
+# Chunks smaller than this are merged with the previous chunk - avoids
 # degenerate single-line headings becoming their own node.
 _MIN_CHUNK_CHARS = 80
 
@@ -196,7 +196,7 @@ async def _ingest_file(
     bodies = [_chunk_content(c, file_path) for c in chunks]
     vectors = await embedder.embed_many(bodies)
     # If embedder is unavailable we still insert the chunks (graph will show
-    # them as orphans) — better than silently dropping the user's content.
+    # them as orphans) - better than silently dropping the user's content.
 
     now = _now_iso()
     inserted_ids: list[tuple[str, list]] = []  # (id, vector-or-None)
@@ -348,6 +348,6 @@ _scan_lock = asyncio.Lock()
 
 
 async def scan_vault_locked(folder: Path) -> ScanResult:
-    """scan_vault wrapped in a global lock — call this from API handlers."""
+    """scan_vault wrapped in a global lock - call this from API handlers."""
     async with _scan_lock:
         return await scan_vault(folder)

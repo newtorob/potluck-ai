@@ -1,4 +1,4 @@
-"""Agent task-state manager — persistent task tracking across context windows.
+"""Agent task-state manager - persistent task tracking across context windows.
 
 Task states survive context compression and session restarts, giving agentic
 workflows a durable record of progress, pending steps, constraints, and errors.
@@ -64,7 +64,7 @@ class TaskState(BaseModel):
     @field_validator("project", mode="before")
     @classmethod
     def _coerce_empty_project(cls, v: object) -> str | None:
-        """Coerce empty string to None — both represent 'global'."""
+        """Coerce empty string to None - both represent 'global'."""
         if v == "":
             return None
         return v  # type: ignore[return-value]
@@ -138,21 +138,21 @@ def _row_to_task(row: dict) -> TaskState:
     )
 
 
-# project_clause(project, alias) is imported from memory_db — shared with
+# project_clause(project, alias) is imported from memory_db - shared with
 # memory_retrieval + memory_clustering.
 
 
 class TaskStateManager:
     """CRUD manager for persistent agent task states.
 
-    update_task() previously did an unlocked read -> full-row merge -> write:
-    two concurrent callers (e.g. two agents patching the same task) each read
-    the row before either wrote, so whichever write landed second silently
-    clobbered the first caller's change. Every mutation now serializes
-    through a per-task_id asyncio.Lock (see _lock_for) so a read-merge-write
-    is atomic with respect to other calls for the same task_id within this
-    process — the only place concurrent agents actually contend, since they
-    all talk to the same sidecar.
+    update_task() does a read -> full-row merge -> write: without a lock, two
+    concurrent callers (e.g. two agents patching the same task) would each read
+    the row before either wrote, and whichever write landed second would
+    silently clobber the first caller's change. Every mutation therefore
+    serializes through a per-task_id asyncio.Lock (see _lock_for) so a
+    read-merge-write is atomic with respect to other calls for the same
+    task_id within this process - the only place concurrent agents actually
+    contend, since they all talk to the same sidecar.
     """
 
     def __init__(self) -> None:
@@ -296,7 +296,7 @@ class TaskStateManager:
         The whole read -> merge -> write happens under this task's lock, so a
         concurrent update_task/complete_step/add_error call for the same
         task_id can't read the pre-patch row and clobber this write (or vice
-        versa) — see the class docstring.
+        versa) - see the class docstring.
         """
         unknown = set(patch.keys()) - _UPDATABLE_FIELDS
         if unknown:
@@ -311,7 +311,7 @@ class TaskStateManager:
 
     async def _write_patch(self, task_id: str, task: TaskState, patch: dict) -> TaskState:
         """Merge `patch` onto `task` and persist. Caller must hold the
-        per-task_id lock — `task` must be a read taken under that same lock
+        per-task_id lock - `task` must be a read taken under that same lock
         so the merge reflects the latest committed state."""
         from potluck_local.services.memory_db import get_memory_db_path
         db_path = get_memory_db_path()
@@ -366,7 +366,7 @@ class TaskStateManager:
 
     async def complete_step(self, task_id: str, step: str) -> TaskState:
         """Move a step from pending to completed. Idempotent: a step that is
-        already completed (or was never pending) is a no-op — retrying the
+        already completed (or was never pending) is a no-op - retrying the
         same completion twice must not append a second "completed" entry."""
         lock = await self._lock_for(task_id)
         async with lock:

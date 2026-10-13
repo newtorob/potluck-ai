@@ -1,17 +1,17 @@
 /**
- * UpdateBanner — a thin top strip that drives the auto-update flow exposed
+ * UpdateBanner - a thin top strip that drives the auto-update flow exposed
  * over window.potluck.updater.
  *
  * On mount, if the build is packaged and the updater bridge is present, it
  * kicks off a check(). It then subscribes to the updater's events for the
  * lifetime of the app shell (this component is never unmounted while the
- * user is signed in) and mirrors them into updateStore — the same store the
+ * user is signed in) and mirrors them into updateStore - the same store the
  * version-handshake "soft available" nudge (see updateStore.checkVersionHandshake,
  * driven from App.tsx) and the Settings status line read from, so all three
  * surfaces agree.
  *
  * Outside Electron, or before main/preload ship window.potluck.updater,
- * every ipc.onUpdate* call is a safe no-op — this renders nothing there.
+ * every ipc.onUpdate* call is a safe no-op - this renders nothing there.
  *
  * Pairs with the updater wiring in electron/main.js.
  */
@@ -37,7 +37,7 @@ export function UpdateBanner() {
     const offError = ipc.onUpdateError((m) => useUpdateStore.getState().setError(m));
 
     // Kick off a check on mount. Only meaningful in a packaged build with
-    // the updater bridge present — buildInfo defaults to "packaged" when
+    // the updater bridge present - buildInfo defaults to "packaged" when
     // absent (an older build predating buildInfo), since ipc.hasUpdater is
     // the real safety gate: check() is a no-op whenever the bridge is gone.
     const packaged = ipc.buildInfo?.packaged !== false;

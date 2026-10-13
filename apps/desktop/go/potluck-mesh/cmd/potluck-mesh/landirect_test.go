@@ -23,7 +23,7 @@ func mustIPNet(t *testing.T, cidr string) net.IPNet {
 // ---------------------------------------------------------------------------
 
 func TestSameLANEndpoint_CoSubnetMatch(t *testing.T) {
-	// My interface: 192.168.1.10/24. Peer advertises 192.168.1.20:51820 — same
+	// My interface: 192.168.1.10/24. Peer advertises 192.168.1.20:51820 - same
 	// /24, so it must match.
 	myNets := []net.IPNet{mustIPNet(t, "192.168.1.10/24")}
 	peerEps := []string{"192.168.1.20:51820"}
@@ -38,8 +38,8 @@ func TestSameLANEndpoint_CoSubnetMatch(t *testing.T) {
 }
 
 func TestSameLANEndpoint_DifferentSubnetReject(t *testing.T) {
-	// My interface: 192.168.1.10/24. Peer is on 192.168.2.20 — shares the /16
-	// prefix but is NOT co-subnet under the /24 mask. Must reject.
+	// My interface: 192.168.1.10/24. Peer is on 192.168.2.20 - shares the /16
+	// prefix but is not co-subnet under the /24 mask. Must reject.
 	myNets := []net.IPNet{mustIPNet(t, "192.168.1.10/24")}
 	peerEps := []string{"192.168.2.20:51820"}
 
@@ -49,7 +49,7 @@ func TestSameLANEndpoint_DifferentSubnetReject(t *testing.T) {
 }
 
 func TestSameLANEndpoint_HairpinSameAddressReject(t *testing.T) {
-	// Hairpin / same-public-different-subnet: the peer advertises OUR OWN
+	// Hairpin / same-public-different-subnet: the peer advertises our own
 	// address. Routing at our own IP is never a usable direct path. Reject even
 	// though it trivially "co-subnets" with itself.
 	myNets := []net.IPNet{mustIPNet(t, "192.168.1.10/24")}
@@ -62,7 +62,7 @@ func TestSameLANEndpoint_HairpinSameAddressReject(t *testing.T) {
 
 func TestSameLANEndpoint_DifferentPrivateRangeReject(t *testing.T) {
 	// Two hosts on entirely different RFC1918 ranges behind separate NATs that
-	// happen to both be "private" — e.g. one on 10.x, the peer on 192.168.x.
+	// happen to both be "private" - e.g. one on 10.x, the peer on 192.168.x.
 	// Not co-subnet; reject.
 	myNets := []net.IPNet{mustIPNet(t, "10.0.0.5/8")}
 	peerEps := []string{"192.168.1.20:51820"}
@@ -89,7 +89,7 @@ func TestSameLANEndpoint_FirstCoSubnetWinsAmongMany(t *testing.T) {
 
 func TestSameLANEndpoint_MultiHomedMatchesSecondInterface(t *testing.T) {
 	// Multi-homed host: wired 10.0.0.0/24 + WiFi 192.168.1.0/24. Peer is on the
-	// WiFi subnet only — must match against the second interface.
+	// WiFi subnet only - must match against the second interface.
 	myNets := []net.IPNet{
 		mustIPNet(t, "10.0.0.2/24"),
 		mustIPNet(t, "192.168.1.2/24"),
@@ -124,14 +124,14 @@ func TestSameLANEndpoint_MalformedCandidatesSkipped(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// punchTargetEndpoint — same-NAT hairpin correctness fix for OnPunchCoord
+// punchTargetEndpoint - same-NAT hairpin correctness fix for OnPunchCoord
 // ---------------------------------------------------------------------------
 
 func TestPunchTargetEndpoint_PrefersLANCandidateOverWANHairpin(t *testing.T) {
 	// The exact prod scenario this fixes: two peers behind the same home NAT
 	// (same public IP) both advertise a LAN candidate on the shared /24. The
-	// coordinator-supplied WAN endpoint is the shared public IP — a
-	// guaranteed-fail hairpin target on routers that don't support it — so the
+	// coordinator-supplied WAN endpoint is the shared public IP - a
+	// guaranteed-fail hairpin target on routers that don't support it - so the
 	// LAN candidate must win.
 	myNets := []net.IPNet{mustIPNet(t, "192.168.4.96/24")}
 	peerLocalEps := []string{"192.168.4.94:51820"}
@@ -146,7 +146,7 @@ func TestPunchTargetEndpoint_PrefersLANCandidateOverWANHairpin(t *testing.T) {
 func TestPunchTargetEndpoint_FallsBackToWANWhenNoLANCandidate(t *testing.T) {
 	// Genuinely different networks (the normal cross-NAT case): no co-subnet
 	// candidate exists, so the coordinator's WAN endpoint must pass through
-	// unchanged — this must be a no-op for every peer that isn't same-LAN.
+	// unchanged - this must be a no-op for every peer that isn't same-LAN.
 	myNets := []net.IPNet{mustIPNet(t, "192.168.1.10/24")}
 	peerLocalEps := []string{"10.0.0.5:51820"} // peer's own (different) LAN
 	wanEp := "203.0.113.9:41234"
@@ -158,10 +158,10 @@ func TestPunchTargetEndpoint_FallsBackToWANWhenNoLANCandidate(t *testing.T) {
 }
 
 func TestPunchTargetEndpoint_IgnoresDockerBridgeCandidate(t *testing.T) {
-	// A peer that advertises a docker0-style bridge candidate ALONGSIDE its
+	// A peer that advertises a docker0-style bridge candidate alongside its
 	// real LAN address (pre-filtering, or an older peer's roster payload)
 	// must still resolve to the real LAN candidate, not the unroutable bridge
-	// address — sameLANEndpoint's co-subnet test naturally rejects the bridge
+	// address - sameLANEndpoint's co-subnet test naturally rejects the bridge
 	// subnet since it doesn't co-subnet under my mask.
 	myNets := []net.IPNet{mustIPNet(t, "192.168.4.96/24")}
 	peerLocalEps := []string{"172.17.0.1:51820", "192.168.4.94:51820"}
@@ -174,7 +174,7 @@ func TestPunchTargetEndpoint_IgnoresDockerBridgeCandidate(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// shouldStartLANTrial — derp→trial gate
+// shouldStartLANTrial - derp→trial gate
 // ---------------------------------------------------------------------------
 
 func TestShouldStartLANTrial(t *testing.T) {
@@ -225,7 +225,7 @@ func TestShouldStartLANTrial_BackoffSuppressesThenExpires(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// evaluateLANTrial — trial→direct / trial→derp+backoff / pending
+// evaluateLANTrial - trial→direct / trial→derp+backoff / pending
 // ---------------------------------------------------------------------------
 
 func TestEvaluateLANTrial(t *testing.T) {
@@ -242,7 +242,7 @@ func TestEvaluateLANTrial(t *testing.T) {
 	})
 
 	t.Run("handshake not newer than snapshot → pending (not verified)", func(t *testing.T) {
-		// last == snapshot: no NEW handshake observed yet, deadline not passed.
+		// last == snapshot: no new handshake observed yet, deadline not passed.
 		if got := evaluateLANTrial(preTrial, preTrial, deadline, now, fresh); got != trialPending {
 			t.Errorf("got %v, want trialPending", got)
 		}
@@ -296,7 +296,7 @@ func TestModeTracker_DefaultsAndManaged(t *testing.T) {
 	mt := newModeTracker()
 	const k = "AAAA"
 
-	// Unknown peer defaults to derp and is NOT LAN-managed (off-by-default
+	// Unknown peer defaults to derp and is not LAN-managed (off-by-default
 	// invariant: the guard must fall through to the dBind DERP check).
 	if got := mt.get(k); got != modeDERP {
 		t.Errorf("unknown peer mode = %v, want modeDERP", got)
@@ -314,7 +314,7 @@ func TestModeTracker_DefaultsAndManaged(t *testing.T) {
 		t.Errorf("modeDERP must NOT be LAN-managed")
 	}
 
-	// LAN modes are stored and ARE LAN-managed.
+	// LAN modes are stored and are LAN-managed.
 	for _, m := range []routingMode{modeLANTrial, modeLANDirect} {
 		mt.set(k, m)
 		if mt.get(k) != m {
@@ -404,7 +404,7 @@ func TestModeTracker_PunchModesAreManaged(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// shouldStartPunchTrial — the WAN twin of shouldStartLANTrial
+// shouldStartPunchTrial - the WAN twin of shouldStartLANTrial
 // ---------------------------------------------------------------------------
 
 func TestShouldStartPunchTrial(t *testing.T) {
@@ -439,7 +439,7 @@ func TestShouldStartPunchTrial(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// punchTrialTracker — cross-goroutine trial bookkeeping
+// punchTrialTracker - cross-goroutine trial bookkeeping
 // ---------------------------------------------------------------------------
 
 func TestPunchTrialTracker_EntryDefaultsToZeroValue(t *testing.T) {
@@ -572,7 +572,7 @@ func TestStateMachine_PunchTrialTimeoutBacksOff(t *testing.T) {
 	preTrial := now
 	deadline := now.Add(punchTrialDuration)
 
-	// No handshake ever lands (NAT combination doesn't permit a punch) —
+	// No handshake ever lands (NAT combination doesn't permit a punch) -
 	// deadline passes.
 	verifyAt := deadline.Add(time.Second)
 	if got := evaluateLANTrial(time.Time{}, preTrial, deadline, verifyAt, fresh); got != trialTimedOut {
@@ -595,7 +595,7 @@ func TestStateMachine_PunchTrialTimeoutBacksOff(t *testing.T) {
 //
 // These guard the constants that the (I/O-bound, not unit-testable) trial-start
 // side effects depend on. The fix re-adds the peer pinned to the LAN endpoint
-// with a SHORT keepalive so WG re-handshakes promptly; the trial deadline must
+// with a short keepalive so WG re-handshakes promptly; the trial deadline must
 // comfortably exceed that keepalive trigger plus a WG handshake retry, and the
 // verify ticker must fire several times inside the window so a success is caught
 // quickly. A verified peer is then re-pinned with the standard keepalive.
@@ -615,7 +615,7 @@ func TestForceRekeyTimingInvariants(t *testing.T) {
 			lanTrialDuration, 2*trialKeepalive)
 	}
 
-	// The trial keepalive must be SHORTER than the standard keepalive — its whole
+	// The trial keepalive must be shorter than the standard keepalive - its whole
 	// purpose is to provoke a prompt handshake during the brief trial; a verified
 	// link is restored to the standard (less chatty) keepalive.
 	if trialKeepalive >= directKeepalive {
@@ -634,7 +634,7 @@ func TestForceRekeyTimingInvariants(t *testing.T) {
 
 // TestForceRekeyDeadlineExceedsKeepaliveTrigger walks the timing the loop drives:
 // the keepalive provokes a handshake around t=keepalive; that handshake (snapshot
-// is pre-trial) must be observable as trialVerified on a verify tick BEFORE the
+// is pre-trial) must be observable as trialVerified on a verify tick before the
 // deadline. Proves the chosen deadline gives the forced handshake room to verify.
 func TestForceRekeyDeadlineExceedsKeepaliveTrigger(t *testing.T) {
 	const fresh = 3 * time.Minute
@@ -651,7 +651,7 @@ func TestForceRekeyDeadlineExceedsKeepaliveTrigger(t *testing.T) {
 	// that tick must land before the deadline.
 	verifyAt := handshakeAt.Add(lanVerifyInterval)
 	if !verifyAt.Before(deadline) {
-		t.Fatalf("verify tick at %v lands at/after deadline %v — no room to confirm the forced handshake",
+		t.Fatalf("verify tick at %v lands at/after deadline %v, no room to confirm the forced handshake",
 			verifyAt.Sub(start), deadline.Sub(start))
 	}
 	if got := evaluateLANTrial(handshakeAt, preTrial, deadline, verifyAt, fresh); got != trialVerified {

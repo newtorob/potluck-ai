@@ -2,7 +2,7 @@
 
 Calls the endpoint function directly against the db_session fixture (the
 dominant pattern in this suite). NOTE: db_session is backed by a live DB that
-may already contain the developer's own peers/jobs, and only THIS test's writes
+may already contain the developer's own peers/jobs, and only this test's writes
 are rolled back. So assertions are scoped to uniquely-named seed peers rather
 than global totals. Verifies: own-machine scoping (other members excluded), the
 completed + in-window job filter, per-machine served/tokens, and per-machine
@@ -96,7 +96,7 @@ async def test_contributions_per_machine(db_session: AsyncSession) -> None:
     )
     # beta: 1 completed in-window (200 tokens).
     await _job(db_session, peer_id=beta, requester=STUB_MEMBER_ID, tokens=200)
-    # not-mine did work for another member: must NOT appear in my receipt.
+    # not-mine did work for another member: must not appear in my receipt.
     await _job(db_session, peer_id=not_mine, requester=other_member, tokens=500)
 
     # A cross-member earned credit attributed to alpha via its job j_a1.

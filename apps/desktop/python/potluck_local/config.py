@@ -13,10 +13,10 @@ class LocalSettings(BaseSettings):
     """Runtime configuration for the local sidecar.
 
     All values can be overridden via environment variables:
-      POTLUCK_PORT            — TCP port uvicorn listens on (default 8321)
-      POTLUCK_DEV             — Enable debug mode / Swagger UI (set to "1")
-      POTLUCK_DATA_DIR        — Base data directory (default ~/.potluck)
-      POTLUCK_CLOUD_API_BASE  — Base URL of the Potluck cloud API, used by
+      POTLUCK_PORT - TCP port uvicorn listens on (default 8321)
+      POTLUCK_DEV - Enable debug mode / Swagger UI (set to "1")
+      POTLUCK_DATA_DIR - Base data directory (default ~/.potluck)
+      POTLUCK_CLOUD_API_BASE - Base URL of the Potluck cloud API, used by
                                  catalog_feed's background model-catalog
                                  refresh (default https://api.trypotluck.ai)
     """

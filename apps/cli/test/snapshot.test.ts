@@ -48,15 +48,15 @@ afterEach(async () => {
 
 describe("projectKey", () => {
   it("drops the leading slash and joins path segments with dashes", () => {
-    expect(projectKey("/Users/sam/Documents/potluckai")).toBe(
-      "Users-rob-Documents-potluckai",
+    expect(projectKey("/Users/sam/code/app")).toBe(
+      "Users-sam-code-app",
     );
   });
 });
 
 describe("snapshotPath", () => {
   it("puts <key>.md under the given store directory", () => {
-    expect(snapshotPath("/Users/sam/x", { dir: "/store" })).toBe("/store/Users-rob-x.md");
+    expect(snapshotPath("/Users/sam/x", { dir: "/store" })).toBe("/store/Users-sam-x.md");
   });
 });
 

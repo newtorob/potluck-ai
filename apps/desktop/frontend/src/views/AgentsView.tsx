@@ -1,5 +1,5 @@
 /**
- * AgentsView — /agents route.
+ * AgentsView - /agents route.
  *
  * Shows connected agent sessions and a real-time activity feed.
  *
@@ -8,7 +8,7 @@
  *
  * The drawer pushes content rather than overlaying it.
  *
- * "Active now" = disconnected_at === null AND last_seen_at within last 60s.
+ * "Active now" = disconnected_at === null and last_seen_at within last 60s.
  * "Stale" = disconnected_at === null but last_seen_at older than 60s.
  *
  * New activity rows arrive prepended from the store; we track their IDs
@@ -30,7 +30,7 @@ import { EmptyState } from '@/components/layout/EmptyState';
 import type { AgentSession, ToolCall, SessionDetail } from '@/types/agents';
 
 // ---------------------------------------------------------------------------
-// Session status helpers — keyed off the server-computed `liveness` field so
+// Session status helpers - keyed off the server-computed `liveness` field so
 // the four tiers (live / idle / stale / disconnected) match the backend's
 // own time math. Pre-migration sessions without `liveness` fall back to the
 // older client-side calc.
@@ -52,7 +52,7 @@ function isDisconnected(session: AgentSession): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// CountChip — colored-dot count for the AgentsView header. One per liveness
+// CountChip - colored-dot count for the AgentsView header. One per liveness
 // tier. Declared above the main view so Vite's fast-refresh can't trip on
 // a forward reference during HMR.
 // ---------------------------------------------------------------------------
@@ -396,7 +396,7 @@ export function AgentsView() {
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-8">
-          {/* CONNECTED NOW section — sessions with heartbeat in last 60s.
+          {/* CONNECTED NOW section - sessions with heartbeat in last 60s.
               This is what "my one agent" means colloquially; it's the
               actually-alive process you're working with right now. */}
           <AgentSessionGroup
@@ -415,7 +415,7 @@ export function AgentsView() {
             onDelete={(id) => void handleDeleteSession(id)}
           />
 
-          {/* IDLE section — connected but quiet for 1–5 min. Same agent,
+          {/* IDLE section - connected but quiet for 1–5 min. Same agent,
               just not invoking a tool right this second. Common during
               user-think pauses. */}
           {idleSessions.length > 0 && (
@@ -432,7 +432,7 @@ export function AgentsView() {
             />
           )}
 
-          {/* STALE section — last seen >5 min ago, sweep will mark them
+          {/* STALE section - last seen >5 min ago, sweep will mark them
               disconnected on its next tick. Surfacing them gives users a
               chance to see what's about to be cleaned up. */}
           {staleSessions.length > 0 && (
@@ -449,7 +449,7 @@ export function AgentsView() {
             />
           )}
 
-          {/* DISCONNECTED section — gated by the toolbar checkbox. */}
+          {/* DISCONNECTED section - gated by the toolbar checkbox. */}
           {showDisconnected && disconnectedSessions.length > 0 && (
             <AgentSessionGroup
               label="Disconnected"
@@ -478,7 +478,7 @@ export function AgentsView() {
         </div>
       </div>
 
-      {/* Session detail drawer — pushes content */}
+      {/* Session detail drawer - pushes content */}
       <SessionDetailDrawer
         detail={selectedSessionId !== null ? sessionDetail : null}
         onClose={handleCloseDrawer}
@@ -488,7 +488,7 @@ export function AgentsView() {
 }
 
 // ---------------------------------------------------------------------------
-// AgentsHeader — local helper that wraps the shared ViewHeader to surface
+// AgentsHeader - local helper that wraps the shared ViewHeader to surface
 // the spinner-while-fetching affordance the original local helper provided.
 // ---------------------------------------------------------------------------
 
@@ -518,7 +518,7 @@ function AgentsHeader({ isFetching, children }: AgentsHeaderProps) {
 }
 
 // ---------------------------------------------------------------------------
-// AgentSessionGroup — one liveness-tier section of the AgentsView. Renders
+// AgentSessionGroup - one liveness-tier section of the AgentsView. Renders
 // a 3-column grid of cards (sm:2, lg:3 cards across), or a single explanatory
 // line when the group is empty (only used by "Connected now"). Other groups
 // don't render at all when empty so the page stays compact.
@@ -528,7 +528,7 @@ interface AgentSessionGroupProps {
   label: string;
   /** Optional subtle text beneath the section label, explaining the tier. */
   hint?: string;
-  /** Only rendered when `sessions` is empty — explains why nothing's here. */
+  /** Only rendered when `sessions` is empty - explains why nothing's here. */
   emptyHint?: string | null;
   sessions: AgentSession[];
   activity: ToolCall[];

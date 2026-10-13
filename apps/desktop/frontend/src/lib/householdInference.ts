@@ -1,21 +1,21 @@
 /**
- * Household inference — dispatch chat requests to a peer's Python sidecar
+ * Household inference - dispatch chat requests to a peer's Python sidecar
  * over the WireGuard household mesh.
  *
  * This is the third inference path alongside the existing two:
  *
- *   1. **Local** — `localApi.streamChat()` posts to 127.0.0.1:8321 (this
+ *   1. **Local** - `localApi.streamChat()` posts to 127.0.0.1:8321 (this
  *      machine's Python sidecar with full memory + history injection).
- *   2. **Cooperative network** — `localApi.streamNetworkJob()` posts to
+ *   2. **Cooperative network** - `localApi.streamNetworkJob()` posts to
  *      the coordinator's `/jobs/stream`, which fans out to a contributor
  *      peer via blinded routing. Member identity is hidden by design.
- *   3. **Household** (this module) — directly POSTs to a household
+ *   3. **Household** (this module) - directly POSTs to a household
  *      peer's `/peer/chat/completions` over the mesh IP. Goes through
  *      no coordinator and no third-party routing. The trust model is
  *      "I paired this machine into my household; I trust it."
  *
  * Why this exists:
- *   The user has a beefier media server on their LAN. They want to run
+ *   The user has a more powerful machine on their LAN. They want to run
  *   inference on it from their laptop without (a) loading models locally,
  *   (b) routing through the cooperative network (which is for serving
  *   strangers, not your own boxes), or (c) wiring up Tailscale and
@@ -23,13 +23,13 @@
  *
  * Why this is private:
  *   The peer endpoint (`/peer/chat/completions` in the Python sidecar)
- *   is STATELESS — no memory injection, no conversation persistence, no
+ *   is stateless - no memory injection, no conversation persistence, no
  *   observability session. The serving peer remembers nothing about the
  *   request. The coordinator never sees the prompt.
  *
  * Wire protocol:
- *   Identical to the local `/chat/completions` SSE stream — same
- *   OpenAI-format `data: {...}` chunks — so `streamTokens()` in
+ *   Identical to the local `/chat/completions` SSE stream - same
+ *   OpenAI-format `data: {...}` chunks - so `streamTokens()` in
  *   lib/streaming.ts parses both shapes with no changes.
  */
 
@@ -87,19 +87,19 @@ export interface PeerCapabilities {
   // Big Model Mode (protocol_version >= 3). rpc_endpoint is where this
   // peer's llama.cpp rpc-server listens; the requesting orchestrator
   // includes it in its own /models/<slug>/load when enabling Big Model
-  // Mode. available_for_big_model is true when rpc_endpoint is set AND
+  // Mode. available_for_big_model is true when rpc_endpoint is set and
   // contributor mode is on.
   rpc_endpoint?: string | null;
   available_for_big_model?: boolean;
   // Pipeline-parallel (protocol_version >= 4). True when this peer can serve a
-  // pipeline stage: torch present, contributor mode on, AND POTLUCK_PIPELINE_ENABLED
+  // pipeline stage: torch present, contributor mode on, and POTLUCK_PIPELINE_ENABLED
   // set. The head sidecar does the actual orchestration + stage starts; the
   // frontend only needs this flag to decide whether to offer the toggle.
   available_for_pipeline?: boolean;
   // Network link type (protocol_version >= 5). Populated from the peer's
   // interface probe; null / undefined means the peer hasn't reported it yet.
   // WiFi peers add latency and jitter in pipeline-parallel inference because
-  // activations cross the wire on every token — wiring them (Ethernet) is the
+  // activations cross the wire on every token - wiring them (Ethernet) is the
   // single biggest real-world speedup the user can make.
   link_type?: 'wired' | 'wifi' | 'unknown' | null;
 }
@@ -112,7 +112,7 @@ export type RoutingMode = 'capability' | 'round_robin';
 // ---------------------------------------------------------------------------
 
 /** Probe all reachable household peers and return the subset that's
- *  advertising an rpc_endpoint AND has contributor mode on. These are
+ *  advertising an rpc_endpoint and has contributor mode on. These are
  *  the peers eligible to contribute compute when the local sidecar
  *  loads a model with rpc_servers (Big Model Mode). */
 export async function getBigModelEligiblePeers(
@@ -134,7 +134,7 @@ export async function getBigModelEligiblePeers(
 
 /** Probe all reachable household peers and return the subset eligible to serve a
  *  pipeline-parallel stage (available_for_pipeline). Unlike Big Model Mode, the
- *  head sidecar does the actual orchestration + stage starts — this is only used
+ *  head sidecar does the actual orchestration + stage starts - this is only used
  *  by the UI to decide whether to offer the toggle and to show how many peers
  *  could participate. */
 export async function getPipelineEligiblePeers(
@@ -157,7 +157,7 @@ export async function getPipelineEligiblePeers(
 const CAPABILITIES_TIMEOUT_MS = 1_500;
 
 /** Probe a single household peer for its current capabilities. Returns
- *  null on any failure (unreachable, non-2xx, malformed body) — null
+ *  null on any failure (unreachable, non-2xx, malformed body) - null
  *  is just "not available," never an exception. */
 export async function probePeer(
   peer: MeshPeer, signal?: AbortSignal, timeoutMs = CAPABILITIES_TIMEOUT_MS,
@@ -183,11 +183,11 @@ export async function probePeer(
   }
 }
 
-/** Find a household peer that's reachable AND available for inference.
+/** Find a household peer that's reachable and available for inference.
  *  Probes peers in parallel with a 1.5s timeout each. Returns the first
  *  successful match (in roster order) along with its capabilities.
  *
- *  This is the lowest-common-denominator picker — kept for legacy
+ *  This is the lowest-common-denominator picker - kept for legacy
  *  callers. New code should use {@link pickPeerForPrompt} which adds
  *  capability-aware scoring + round-robin support. */
 export async function pickAvailablePeer(
@@ -212,13 +212,13 @@ export async function pickAvailablePeer(
 // ---------------------------------------------------------------------------
 
 /** Module-level cursor for round-robin mode. In-memory only; resets on
- *  reload. We don't persist this — coordinator-side state for routing
+ *  reload. We don't persist this - coordinator-side state for routing
  *  decisions would be over-engineered for a UI knob, and "even spread
  *  this session" is a reasonable interpretation of the user's intent. */
 let _roundRobinCursor = 0;
 
 /** Score a peer for a given request. Higher = better choice. Negative
- *  means the peer is unusable. The scoring is intentionally simple — we
+ *  means the peer is unusable. The scoring is intentionally simple - we
  *  want the routing decision to be legible, not a black box. */
 function scorePeer(
   caps: PeerCapabilities,
@@ -232,11 +232,11 @@ function scorePeer(
   score += 1;
 
   // Penalty: peer is currently serving another inference. Prefer idle
-  // peers — single-machine inference doesn't pipeline.
+  // peers - single-machine inference doesn't pipeline.
   if (caps.inference_load?.busy) score -= 5;
 
   // Hardware bias: longer prompts benefit from more memory + faster GPUs.
-  // The `recommended_tier` field is the cheapest signal — it's a coarse
+  // The `recommended_tier` field is the cheapest signal - it's a coarse
   // bucket the hardware-detect service already computes. We treat it as
   // a soft preference, not a hard gate.
   const tier = caps.hardware?.recommended_tier;
@@ -250,7 +250,7 @@ function scorePeer(
     if (tier === 'high') score += 1;
   }
 
-  // Larger context windows are a real differentiator — favour peers
+  // Larger context windows are a real differentiator - favour peers
   // whose loaded model can hold long conversations.
   const ctx = caps.loaded_model_detail?.context_size ?? 0;
   if (ctx >= 32_768) score += 2;
@@ -261,7 +261,7 @@ function scorePeer(
 
 export interface PickPeerOptions {
   /** Prompt content used to inform hardware/context scoring. The full
-   *  conversation isn't needed — just the latest user content is a
+   *  conversation isn't needed - just the latest user content is a
    *  good enough signal for "is this a long prompt?" */
   promptCharLength: number;
   mode: RoutingMode;
@@ -277,7 +277,7 @@ export interface PickPeerOptions {
  *  - `capability` mode: scores each peer (hardware + load + model) and
  *    picks the highest. Ties broken by roster order.
  *  - `round_robin` mode: rotates a session-local cursor across all
- *    eligible peers — independent of hardware. Gives users an "even
+ *    eligible peers - independent of hardware. Gives users an "even
  *    spread" option when they want to keep all their machines warm. */
 export async function pickPeerForPrompt(
   peers: MeshPeer[],
@@ -371,9 +371,9 @@ export class HouseholdNoPeerError extends Error {
  *
  * Returns a validated, bounded Response (SSE stream). Caller pipes it through
  * `streamTokens()` from lib/streaming.ts exactly like the local-sidecar
- * response — the wire format is identical.
+ * response - the wire format is identical.
  *
- * The conversation history IS sent (unlike the cooperative-network path,
+ * The conversation history is sent (unlike the cooperative-network path,
  * which is single-turn for privacy reasons). The household trust model
  * permits it: the receiving peer is a machine you own.
  */

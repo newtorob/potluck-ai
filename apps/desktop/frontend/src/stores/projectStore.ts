@@ -1,5 +1,5 @@
 /**
- * projectStore — Zustand store for project-scoping.
+ * projectStore - Zustand store for project-scoping.
  *
  * Projects are implicit: they exist the moment any memory or task is tagged
  * with a project name. The active_project field in settings is the persistent
@@ -46,7 +46,7 @@ export const useProjectStore = create<ProjectStoreState>()((set) => ({
       const projects = await localApi.memory.projects();
       set({ projects, isLoading: false });
     } catch {
-      // Sidecar may not be running — fail silently, projects are non-critical
+      // Sidecar may not be running - fail silently, projects are non-critical
       set({ isLoading: false });
     }
   },

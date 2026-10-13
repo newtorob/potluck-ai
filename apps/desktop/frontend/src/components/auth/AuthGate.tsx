@@ -9,22 +9,22 @@ interface AuthGateProps {
 }
 
 /**
- * AuthGate — resolves auth state, handles magic-link deep links, and
+ * AuthGate - resolves auth state, handles magic-link deep links, and
  * requires a signed-in account to use the app.
  *
  * An account is required, but Potluck must still work for a signed-in member
  * who is offline or hitting a cloud-API blip: local chat, memory, and MCP run
  * against the local sidecar and don't need the cloud API on every launch.
- * useAuth's rehydration probe distinguishes an auth failure (401/403 — the
+ * useAuth's rehydration probe distinguishes an auth failure (401/403 - the
  * token is invalid, show the wall) from a network failure (offline/5xx/
- * timeout — treat it as a cached account and let the app run). See
+ * timeout - treat it as a cached account and let the app run). See
  * useAuth.hasCachedAccount for the underlying logic.
  *
  * Three states:
- *   1. isAuthLoading — the first getMe() probe hasn't resolved yet. Render a
+ *   1. isAuthLoading - the first getMe() probe hasn't resolved yet. Render a
  *      neutral loading screen; never flash the wall or the app first.
- *   2. Resolved, not signed in, no cached account — render the sign-in wall.
- *   3. Resolved, signed in OR resolved with a cached account (offline) —
+ *   2. Resolved, not signed in, no cached account - render the sign-in wall.
+ *   3. Resolved, signed in OR resolved with a cached account (offline) -
  *      render children.
  *
  * useDeepLinkAuth and SignInConfirmDialog are mounted unconditionally in

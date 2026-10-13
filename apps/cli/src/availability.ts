@@ -31,7 +31,7 @@ export function formatAvailability(report: Availability): string {
       `  ${sources.join(", ")}${model.machines.length ? ` · ${model.idleMachineCount} remote machine(s) idle` : ""}${model.matchesProjectPin ? " · matches project pin" : ""}`);
   }
   lines.push("", `${report.additionalModels} additional model choice(s) across your machines.`);
-  if (report.projectPin) lines.push(`Project pin: ${report.projectPin.id} — ${report.projectPin.available ? "exact bytes available" : "not currently available; no model substitution"}.`);
+  if (report.projectPin) lines.push(`Project pin: ${report.projectPin.id} - ${report.projectPin.available ? "exact bytes available" : "not currently available; no model substitution"}.`);
   lines.push("", `Split workers ready: ${report.splitWorkerCount}`);
   for (const machine of report.machines) {
     lines.push(`  ${machine.name}: ${machine.splitReady ? `ready (${machine.backend || "unknown backend"})` : !machine.responding ? "runtime not responding" : "split worker unavailable"}`);

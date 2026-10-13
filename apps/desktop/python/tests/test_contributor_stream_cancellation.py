@@ -1,31 +1,31 @@
-"""Regression test — 2026-07-31 P1 security audit, finding #5.
+"""The contributor sidecar must not leak producer threads or job-handler tasks.
 
-Two related leaks in the contributor sidecar:
+Two related leaks to guard against:
 
 1. LlamaCppInferenceEngine.stream_completion/stream_chat (contributor/
-   inference.py) ran a bounded-queue (maxsize=64) producer on a daemon
-   thread that pushed tokens via a BLOCKING
-   `asyncio.run_coroutine_threadsafe(queue.put(text), loop).result()`, with
-   no cancellation and no join. If the consumer (the async generator's
-   caller) stops reading before the producer finishes — e.g. because the WS
+   inference.py) run a bounded-queue (maxsize=64) producer on a daemon
+   thread that pushes tokens via a blocking
+   `asyncio.run_coroutine_threadsafe(queue.put(text), loop).result()`. With
+   no cancellation and no join, if the consumer (the async generator's
+   caller) stops reading before the producer finishes - e.g. because the WS
    send failed and _handle_real_job aborted, or the caller cancelled/aclose()'d
-   the generator — the producer thread can be left blocked forever inside
-   that `.result()` call once the queue fills, leaking the OS thread AND
+   the generator - the producer thread could be left blocked forever inside
+   that `.result()` call once the queue fills, leaking the OS thread and
    leaving the underlying (not thread-safe) Llama instance's generator
    half-consumed. A later job reusing the same singleton engine could then
    spawn a second producer thread that races the stuck first one on the
    same Llama instance.
 
-2. client.py's _receive_loop spawned job-handler tasks via
-   `asyncio.create_task(...)` with no tracking, so a WS disconnect left any
-   in-flight handler (and the producer thread underneath it) running
+2. client.py's _receive_loop spawns job-handler tasks via
+   `asyncio.create_task(...)`. Without tracking, a WS disconnect would leave
+   any in-flight handler (and the producer thread underneath it) running
    detached in the background instead of being cancelled.
 
-The fix: a threading.Event the generator's `finally` sets + a queue drain
-(to unstick a producer blocked on a full queue) + a bounded join, invoked
-whenever the generator is exhausted, errors, OR is abandoned early
-(GeneratorExit via aclose()). Plus: _receive_loop now tracks every spawned
-task and cancels + awaits them all in its own `finally`.
+So the generator's `finally` sets a threading.Event, drains the queue (to
+unstick a producer blocked on a full queue) and does a bounded join, whenever
+the generator is exhausted, errors, or is abandoned early (GeneratorExit via
+aclose()). And _receive_loop tracks every spawned task and cancels + awaits
+them all in its own `finally`.
 """
 from __future__ import annotations
 
@@ -63,18 +63,17 @@ def _make_engine(tmp_path) -> LlamaCppInferenceEngine:
 
 def _produce_threads() -> list[threading.Thread]:
     """Find the engine's producer thread specifically, by its target
-    function's identity -- NOT by Thread.name (the fixed code names it
-    "potluck-llamacpp-producer", but that name is part of the fix itself, so
-    filtering by it would make this test blind to the pre-fix,
-    default-named "Thread-N (_produce)" thread) and NOT by a before/after
-    thread-count diff (loop.run_in_executor's default ThreadPoolExecutor
-    lazily spins up its own persistent, legitimately-idle worker thread the
-    first time anything awaits it -- e.g. the fix's own producer.join() call
-    -- which a raw "any new thread" diff would misreport as a leak).
+    function's identity -- not by Thread.name (the code names it
+    "potluck-llamacpp-producer", but filtering by that name would make this
+    test blind to a producer that kept the default "Thread-N (_produce)"
+    name) and not by a before/after thread-count diff
+    (loop.run_in_executor's default ThreadPoolExecutor lazily spins up its
+    own persistent, legitimately-idle worker thread the first time anything
+    awaits it -- e.g. the engine's own producer.join() call -- which a raw
+    "any new thread" diff would misreport as a leak).
     Threading.Thread stores the callable passed as `target=` on `_target`;
-    both the pre-fix and fixed code name that inner function `_produce`,
-    so matching on its `__name__` identifies exactly the thread under test
-    on either side of the fix.
+    the inner function is named `_produce`, so matching on its `__name__`
+    identifies exactly the thread under test.
     """
     return [
         t for t in threading.enumerate()
@@ -106,12 +105,12 @@ def test_producer_thread_does_not_leak_when_stream_abandoned_early(tmp_path, met
         # disconnects: the generator is closed without being exhausted.
         await gen.aclose()
 
-        # Check thread liveness while THIS event loop is still running -- not
+        # Check thread liveness while this event loop is still running -- not
         # after asyncio.run() returns. asyncio.run()'s own shutdown sequence
         # cancels every outstanding task on the loop, including the pending
         # queue.put(...) coroutine the stuck producer thread is blocked
         # waiting on -- which would incidentally unblock (and thus hide) a
-        # leaked pre-fix producer thread as a side effect of the TEST
+        # leaked producer thread as a side effect of the test
         # harness tearing down, not because the code under test cleaned up
         # after itself. Polling from inside the still-alive loop is the only
         # way to observe the real, production-faithful hang.
@@ -180,7 +179,7 @@ class _FakeWS:
             return self._messages.pop(0)
         # A real websockets.recv() awaits actual network I/O, which yields
         # control back to the event loop -- long enough for a task spawned
-        # on the PREVIOUS iteration (asyncio.create_task doesn't run
+        # on the previous iteration (asyncio.create_task doesn't run
         # synchronously) to actually start. This fake has no I/O to await,
         # so it has to yield explicitly to be a faithful stand-in.
         await asyncio.sleep(0.05)
@@ -230,8 +229,8 @@ def test_receive_loop_cancels_in_flight_job_handlers_on_disconnect(monkeypatch) 
             handler_cancelled.set()
             raise
 
-    # The loop now takes its job handler through LoopHooks (M2.5) rather than
-    # dispatching on settings; the invariant under test is unchanged.
+    # The loop takes its job handler through LoopHooks rather than
+    # dispatching on settings.
     settings = Settings(_env_file=None, inference_enabled=False)
     hooks = client_mod.standalone_hooks(settings)
     hooks.job_handler = _hanging_stub_job
@@ -240,7 +239,7 @@ def test_receive_loop_cancels_in_flight_job_handlers_on_disconnect(monkeypatch) 
 
     async def scenario() -> None:
         # _receive_loop propagates ConnectionClosed once ws.recv() raises it
-        # (unchanged pre/post-fix -- the caller, _session, handles reconnect).
+        # (the caller, _session, handles reconnect).
         # What must be true by the time that propagates is that the `finally`
         # has already cancelled + awaited the spawned handler.
         with pytest.raises(websockets.ConnectionClosed):

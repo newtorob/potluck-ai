@@ -3,7 +3,7 @@ offline floor. These tests pin the guarantees the sidecar relies on:
 
   1. With no cached remote feed (offline / never-fetched / not-yet-deployed),
      the registry serves the bundled catalog and never returns empty.
-  2. A cached remote feed is preferred only when it is schema-compatible AND
+  2. A cached remote feed is preferred only when it is schema-compatible and
      at least as fresh (updated_at) as the bundled catalog.
   3. A refresh against an unreachable/erroring endpoint returns False and
      never raises, leaving whatever the cache already had.

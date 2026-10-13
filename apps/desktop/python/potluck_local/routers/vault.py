@@ -1,10 +1,10 @@
-"""Vault router — markdown folder ingestion endpoints.
+"""Vault router - markdown folder ingestion endpoints.
 
 Mounted at /vault by app.py.
 
-GET    /vault/status   — current folder + ingestion stats (file/chunk counts)
-POST   /vault/rescan   — re-ingest the configured folder (idempotent)
-DELETE /vault          — wipe all vault content from memories + clear config
+GET    /vault/status - current folder + ingestion stats (file/chunk counts)
+POST   /vault/rescan - re-ingest the configured folder (idempotent)
+DELETE /vault - wipe all vault content from memories + clear config
 
 Folder configuration uses the standard PATCH /settings flow with
 {"vault": {"folder": "/abs/path"}}. The dedicated endpoints below operate
@@ -73,7 +73,7 @@ async def vault_rescan() -> dict:
         logger.exception("vault_rescan_failed", extra={"event": "vault_rescan_failed"})
         raise HTTPException(
             status_code=500,
-            detail="Vault scan failed — check sidecar logs",
+            detail="Vault scan failed, check sidecar logs",
         )
 
     # Persist updated stats back to settings so the UI shows them even before

@@ -4,8 +4,8 @@
 #
 # One-shot Linux setup for a Potluck **household** contributor. This is the
 # script for "I want my Linux box to serve inference for my own laptop over
-# my private WireGuard household mesh." It is NOT for joining the open
-# cooperative network — see setup-linux-contributor.sh for that.
+# my private WireGuard household mesh." It is not for joining the open
+# cooperative network - see setup-linux-contributor.sh for that.
 #
 # What it does in order:
 #   1. Detects distro (Ubuntu/Debian, Fedora/RHEL, Arch) and installs the
@@ -14,13 +14,13 @@
 #   3. Sets up the Python virtualenv at apps/desktop/python/.venv and
 #      installs the sidecar's pip requirements.
 #   4. If running on a Linux desktop (a graphical session is detected),
-#      ALSO installs Node + pnpm, builds the Electron desktop app, and
+#      also installs Node + pnpm, builds the Electron desktop app, and
 #      drops a "Potluck" entry in your application launcher. On a headless
 #      server (TTY-only / SSH session, no $DISPLAY), skips the GUI build
 #      and stays sidecar-only. Override with --gui / --headless.
 #   5. Starts the sidecars in the background under nohup, with the mesh
 #      sidecar running under sudo (needed for TUN creation).
-#   6. GUI mode: launches the Electron app — pair + manage via the in-app
+#   6. GUI mode: launches the Electron app - pair + manage via the in-app
 #      Household view.
 #      Headless mode: walks you through pairing, loading a model, and
 #      turning on contributor mode entirely from the CLI.
@@ -39,12 +39,12 @@
 #   $ ./setup-household.sh --headless      # force CLI-only, no Electron build
 #   $ ./setup-household.sh --gui           # force GUI build even with no DISPLAY
 #
-# Re-running is safe — every step skips work that's already done.
+# Re-running is safe - every step skips work that's already done.
 #
 # Privacy note:
 #   The Python sidecar binds to 0.0.0.0 so household peers can dial it over
 #   the mesh. A path-based access middleware restricts non-loopback callers
-#   to /peer/* + /health — your memory, tasks, and chat history are still
+#   to /peer/* + /health - your memory, tasks, and chat history are still
 #   only reachable from this machine.
 
 set -euo pipefail
@@ -150,7 +150,7 @@ install_system_deps() {
     step "Installing system dependencies"
     case "$DISTRO_FAMILY" in
         debian)
-            info "detected Debian/Ubuntu family — using apt"
+            info "detected Debian/Ubuntu family - using apt"
             sudo apt-get update -qq
             sudo apt-get install -y --no-install-recommends \
                 git curl ca-certificates \
@@ -160,7 +160,7 @@ install_system_deps() {
             ok "apt packages installed"
             ;;
         fedora)
-            info "detected Fedora/RHEL family — using dnf"
+            info "detected Fedora/RHEL family - using dnf"
             sudo dnf install -y \
                 git curl ca-certificates \
                 gcc gcc-c++ make pkgconf-pkg-config \
@@ -169,7 +169,7 @@ install_system_deps() {
             ok "dnf packages installed"
             ;;
         arch)
-            info "detected Arch family — using pacman"
+            info "detected Arch family - using pacman"
             sudo pacman -Sy --noconfirm --needed \
                 git curl base-devel \
                 python python-virtualenv python-pip \
@@ -177,7 +177,7 @@ install_system_deps() {
             ok "pacman packages installed"
             ;;
         *)
-            warn "unknown distro — install these by hand and re-run:"
+            warn "unknown distro - install these by hand and re-run:"
             warn "  git, curl, a C toolchain, pkg-config, Python 3.11+, wireguard-tools"
             fail "unsupported distro; see /etc/os-release"
             ;;
@@ -401,7 +401,7 @@ EOF
     chmod +x "$entry" 2>/dev/null || true
 
     # Refresh the desktop database so file managers / launchers pick it up
-    # immediately. Quiet failure — newer desktops watch the dir directly.
+    # immediately. Quiet failure - newer desktops watch the dir directly.
     if command -v update-desktop-database >/dev/null; then
         update-desktop-database "$apps_dir" 2>/dev/null || true
     fi
@@ -445,10 +445,10 @@ start_mesh_sidecar() {
     fi
     ok "coordinator reachable"
 
-    # DERP relay URL — the fallback path when direct UDP punch fails (hairpin
+    # DERP relay URL - the fallback path when direct UDP punch fails (hairpin
     # NAT, symmetric NAT, restrictive firewalls). Without it, nodes can be
     # roster-aware but unable to exchange traffic. Defaults to the production
-    # relay (services/derp, tcp+tls per internal/derp/client.go); it is NOT
+    # relay (services/derp, tcp+tls per internal/derp/client.go); it is not
     # derived from the coordinator URL, since a self-hosted/LAN coordinator
     # does not imply a self-hosted relay. Override with $POTLUCK_DERP_URL,
     # e.g. tcp+insecure://<lan-host>:8443 for LAN-only dev against a local
@@ -476,7 +476,7 @@ start_mesh_sidecar() {
         sleep 0.5
         i=$((i + 1))
     done
-    warn "mesh sidecar didn't open the IPC socket in 10s — recent log:"
+    warn "mesh sidecar didn't open the IPC socket in 10s - recent log:"
     tail -n 20 "$MESH_LOG" | sed 's/^/      | /' >&2
     fail "mesh sidecar failed to start"
 }
@@ -484,7 +484,7 @@ start_mesh_sidecar() {
 resolve_cuda_lib_path() {
     # If the installed llama-cpp-python wheel was built with CUDA support,
     # libllama.so depends on libcudart.so.12 + libcublas.so.12 + libcublasLt.so.12.
-    # These ship with the CUDA Toolkit but NOT with the bare NVIDIA driver,
+    # These ship with the CUDA Toolkit but not with the bare NVIDIA driver,
     # and most contributor machines have the driver only.
     #
     # Workaround: if Ollama is installed, its CUDA-12 bundle at
@@ -550,7 +550,7 @@ start_python_sidecar() {
         sleep 0.5
         i=$((i + 1))
     done
-    warn "python sidecar didn't return /health in 10s — recent log:"
+    warn "python sidecar didn't return /health in 10s - recent log:"
     tail -n 20 "$PY_LOG" | sed 's/^/      | /' >&2
     fail "python sidecar failed to start"
 }
@@ -571,7 +571,7 @@ launch_electron_app() {
     local pid=$!
     echo "$pid" >"$APP_PID"
     cd - >/dev/null
-    # No health probe — Electron's window-ready event isn't directly
+    # No health probe - Electron's window-ready event isn't directly
     # observable from outside. Give it a beat then check the process
     # is still alive (i.e. didn't crash on startup).
     sleep 2
@@ -634,7 +634,7 @@ pair_with_household() {
     info "Copy the token shown, then paste it here:"
     local token
     token="$(ask "Pairing token")"
-    [ -n "$token" ] || fail "no token entered — re-run with --run-only"
+    [ -n "$token" ] || fail "no token entered - re-run with --run-only"
 
     info "calling POST /pair"
     local resp
@@ -642,10 +642,10 @@ pair_with_household() {
     if echo "$resp" | grep -q '"mesh_ip"'; then
         local ip
         ip=$(echo "$resp" | grep -oE '"mesh_ip":"[^"]*"' | cut -d'"' -f4)
-        ok "paired — this machine is $ip on the household mesh"
+        ok "paired - this machine is $ip on the household mesh"
     else
         warn "pair returned: $resp"
-        fail "pairing failed — check the token and try again"
+        fail "pairing failed - check the token and try again"
     fi
 }
 
@@ -682,7 +682,7 @@ for i in ids:
         local install_default
         install_default="$(ask "Install $default_slug now? (~2GB download)" "y")"
         if [ "${install_default,,}" != "y" ] && [ "${install_default,,}" != "yes" ]; then
-            info "skip — install one yourself via:"
+            info "skip - install one yourself via:"
             info "  curl -X POST http://127.0.0.1:$PYTHON_PORT/models/<slug>/install"
             info "then re-run: $0 --run-only"
             fail "no installed model to load"
@@ -739,7 +739,7 @@ for i in ids:
         ok "loaded $picked"
     else
         warn "load returned: $load_resp"
-        fail "model load failed — see $PY_LOG"
+        fail "model load failed - see $PY_LOG"
     fi
 }
 
@@ -856,7 +856,7 @@ print_summary() {
 MODE="full"
 # GUI default: 'on' if a display is detected, 'off' on headless boxes.
 # Override with --gui or --headless. The check looks for $DISPLAY (X11) or
-# $WAYLAND_DISPLAY (Wayland) — both unset on a TTY-only / SSH-into-server
+# $WAYLAND_DISPLAY (Wayland) - both unset on a TTY-only / SSH-into-server
 # session, which is the natural "headless contributor" case.
 if [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
     GUI="on"
@@ -892,13 +892,13 @@ if [ "$MODE" = "status" ]; then
     exit 0
 fi
 
-step "Potluck household contributor — Linux ($DISTRO_FAMILY family, gui=$GUI)"
+step "Potluck household contributor - Linux ($DISTRO_FAMILY family, gui=$GUI)"
 info "repo root: $REPO_ROOT"
 
 # Pre-flight checks: catch environmental issues (VPN, Python version, network,
-# coordinator reachability) BEFORE any installs run. Yesterday's pain came
-# almost entirely from these conditions failing silently mid-install.
-# `--auto-fix` disconnects Mullvad if connected; leave it OFF if you'd rather
+# coordinator reachability) before any installs run. These conditions
+# otherwise fail silently mid-install.
+# `--auto-fix` disconnects Mullvad if connected; leave it off if you'd rather
 # disconnect manually.
 PREFLIGHT="$REPO_ROOT/scripts/setup-household-preflight.sh"
 if [ -x "$PREFLIGHT" ]; then
@@ -924,8 +924,8 @@ if [ "$MODE" = "setup" ] || [ "$MODE" = "full" ]; then
 fi
 
 if [ "$MODE" = "run" ] || [ "$MODE" = "full" ]; then
-    [ -x "$MESH_BIN" ] || fail "mesh binary not built — run with --setup-only first"
-    [ -x "$VENV_PY" ]  || fail "python venv missing — run with --setup-only first"
+    [ -x "$MESH_BIN" ] || fail "mesh binary not built - run with --setup-only first"
+    [ -x "$VENV_PY" ]  || fail "python venv missing - run with --setup-only first"
     # PYTHON_BIN is needed for pick_python errors but venv is what we actually use here
     PYTHON_BIN="$VENV_PY"
 

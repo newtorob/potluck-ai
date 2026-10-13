@@ -9,7 +9,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from coordinator.db.base import Base
-import coordinator.models  # noqa: F401 — side-effect import to register all tables
+import coordinator.models  # noqa: F401 - side-effect import to register all tables
 
 from coordinator.config import get_settings
 
@@ -21,7 +21,7 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Coordinator owns its own version table to avoid colliding with the api's
-# alembic chain — both services share Postgres but maintain independent
+# alembic chain - both services share Postgres but maintain independent
 # migration histories.
 VERSION_TABLE = "alembic_version_coordinator"
 

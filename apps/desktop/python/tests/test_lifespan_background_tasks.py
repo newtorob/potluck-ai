@@ -1,19 +1,19 @@
-"""Regression test — 2026-07-31 P2 sidecar audit, finding #9.
+"""Background tasks spawned by the app lifespan must be cancelled and drained on shutdown.
 
-app.py's _lifespan() spawned the hardware-warm, embedding-backfill, and
-stale-session-sweeper tasks via bare asyncio.create_task(...) without
-retaining a reference. Nothing cancelled or awaited them on shutdown, so a
-task that was still running when the process/event loop went away (most
-visibly the stale-session sweeper, which loops forever on
-asyncio.sleep(60)) was simply abandoned — the auditor saw an aiosqlite
-worker hit a closed event loop after a test run tore its loop down while
-that sweeper was still alive.
+app.py's _lifespan() spawns the hardware-warm, embedding-backfill, and
+stale-session-sweeper tasks. If they were spawned via bare
+asyncio.create_task(...) without retaining a reference, nothing would cancel
+or await them on shutdown, and a task still running when the process/event
+loop went away (most visibly the stale-session sweeper, which loops forever on
+asyncio.sleep(60)) would be abandoned - an aiosqlite worker could hit a
+closed event loop after a test run tore its loop down while that sweeper was
+still alive.
 
-The fix: every task spawned in _lifespan is added to a local
+So every task spawned in _lifespan is added to a local
 `background_tasks` set (via a small _track() helper using
 task.add_done_callback to self-remove on completion). After the lifespan's
-`yield` — i.e. on shutdown — every task still in that set is cancelled and
-then awaited (asyncio.gather(..., return_exceptions=True)) BEFORE the
+`yield` - i.e. on shutdown - every task still in that set is cancelled and
+then awaited (asyncio.gather(..., return_exceptions=True)) before the
 model-unload/GC step runs, so nothing is left pending when the loop this
 lifespan belongs to starts closing.
 
@@ -93,6 +93,6 @@ def test_lifespan_cancels_and_drains_background_tasks_on_shutdown(isolated_env, 
 
     remaining = asyncio.run(scenario())
     assert remaining == set(), (
-        f"{len(remaining)} background task(s) still pending after lifespan shutdown — "
+        f"{len(remaining)} background task(s) still pending after lifespan shutdown: "
         "they were not cancelled/drained before teardown"
     )

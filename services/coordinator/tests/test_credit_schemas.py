@@ -41,7 +41,7 @@ _HISTORY_ENTRY_FIELDS = frozenset(
 
 # Substrings that, if they appear in any credit-response field name,
 # indicate inference-layer identity is leaking into the ledger surface.
-# Member_id is explicitly allowed — the ledger has to know which member
+# Member_id is explicitly allowed - the ledger has to know which member
 # a row belongs to. But conversation_id, prompt, response, etc. must not
 # appear (they're inference-layer concepts the ledger doesn't touch).
 _FORBIDDEN_SUBSTRINGS = (
@@ -72,7 +72,7 @@ def test_balance_by_model_fields_locked_down() -> None:
 
 
 def test_history_entry_includes_hash_chain_fields() -> None:
-    """Hash-chain fields must be in the history response — they're the
+    """Hash-chain fields must be in the history response - they're the
     member's audit mechanism. See docs/security/threat-model.md §6."""
     actual = set(CreditHistoryEntry.model_fields.keys())
     assert actual == _HISTORY_ENTRY_FIELDS, (

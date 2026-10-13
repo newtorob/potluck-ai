@@ -21,35 +21,35 @@ def data_dir() -> Path:
 
 
 def models_dir() -> Path:
-    """~/.potluck/models — GGUF weight files live here."""
+    """~/.potluck/models - GGUF weight files live here."""
     return _base() / "models"
 
 
 def logs_dir() -> Path:
-    """~/.potluck/logs — rotated log files."""
+    """~/.potluck/logs - rotated log files."""
     return _base() / "logs"
 
 
 def config_path() -> Path:
-    """~/.potluck/config.json — user settings."""
+    """~/.potluck/config.json - user settings."""
     return _base() / "config.json"
 
 
 def db_path() -> Path:
-    """~/.potluck/data/chat_history.db — optional SQLite chat store."""
+    """~/.potluck/data/chat_history.db - optional SQLite chat store."""
     return _base() / "data" / "chat_history.db"
 
 
 def memory_db_path() -> Path:
-    """~/.potluck/data/memory.db — persistent memory and task-state store."""
+    """~/.potluck/data/memory.db - persistent memory and task-state store."""
     return _base() / "data" / "memory.db"
 
 
 def catalog_cache_path() -> Path:
-    """~/.potluck/data/model_catalog_cache.json — cached cloud model-catalog feed.
+    """~/.potluck/data/model_catalog_cache.json - cached cloud model-catalog feed.
 
     Written only by services.catalog_feed's background refresh. Never the
-    bundled offline floor on its own — model_registry merges this against
+    bundled offline floor on its own - model_registry merges this against
     the packaged potluck_local/data/models.json and prefers whichever is
     newer/valid (see model_registry._load_catalog).
     """

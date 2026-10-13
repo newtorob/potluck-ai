@@ -6,17 +6,17 @@ Why this exists
 The execution debugger and any future quality / regression work needs to
 answer "what prompt extracted this memory?" and "what retrieval profile
 ranked this result?" If we edit the extraction prompt or rebalance the
-retrieval scoring, rows written before the change must KEEP their old
+retrieval scoring, rows written before the change must keep their old
 version stamp so we can reproduce / explain past behavior.
 
 Versions are strings, not auto-incrementing ints. They are human-readable
 and meant to be displayed in the debugger UI as-is. Bumps are manual: any
 behavior-changing prompt edit, retrieval weight change, or tool-schema
-add/remove requires bumping the relevant constant AND a commit message
+add/remove requires bumping the relevant constant and a commit message
 that explains what changed.
 
-Privacy invariant (memory b3cbfba9)
------------------------------------
+Privacy invariant
+-----------------
 Nothing here leaks prompt content or memory content. Versions are pure
 metadata, safe to surface in any UI, log, or trace.
 """
@@ -37,9 +37,9 @@ from __future__ import annotations
 #   - the JSON schema we ask the model to return changes
 #   - the input-conversation slicing (how much context we pass in) changes
 #
-# v3 (2026-07-17 security audit, MEDIUM): added a rule restricting category
-# "instruction" to directives the user typed themselves — never pasted,
-# quoted, or copied text — to reduce prompt-injection-via-paste turning into
+# v3: added a rule restricting category
+# "instruction" to directives the user typed themselves - never pasted,
+# quoted, or copied text - to reduce prompt-injection-via-paste turning into
 # a stored "instruction" memory. See RETRIEVAL_PROFILE_VERSION v3 for the
 # paired retrieval-side mitigation (auto-extracted instructions no longer
 # get always-inject status).
@@ -47,9 +47,9 @@ EXTRACTION_PROMPT_VERSION = "extraction-v4-redacted-2026-09-15"
 
 # Version stamped on memories saved via the explicit user-typed path
 # (memory_save MCP tool, /memory POST endpoint). No LLM is involved here,
-# so this is effectively "the contract for user-provided memories" — it
+# so this is effectively "the contract for user-provided memories" - it
 # bumps if we change validation, normalisation, or storage semantics
-# (NOT if the user happens to type something different).
+# (not if the user happens to type something different).
 EXPLICIT_MEMORY_VERSION = "explicit-v2-redacted-2026-09-15"
 
 # Version stamped on memories produced by the vault-ingestion pipeline
@@ -64,25 +64,25 @@ VAULT_INGESTION_VERSION = "vault-ingest-v2-redacted-2026-09-15"
 # Memory retrieval
 # ---------------------------------------------------------------------------
 
-# Version of the retrieval profile in memory_retrieval.py — the algorithm
-# AND its parameters as a single unit. Same algorithm with different top_k
+# Version of the retrieval profile in memory_retrieval.py - the algorithm
+# and its parameters as a single unit. Same algorithm with different top_k
 # or threshold = different version.
 #
 # v1 was a two-tier hybrid with keyword-only Tier 2 (retrieval-v1-2026-05-20).
 #
 # v2 (retrieval-v2-rrf-2026-05-28) adds Reciprocal Rank Fusion to Tier 2:
-#   tier 1 — unchanged: top N//2 preference + instruction memories above
+#   tier 1 - unchanged: top N//2 preference + instruction memories above
 #            min_confidence, ordered by (confidence DESC, last_accessed_at DESC).
-#   tier 2 — RRF-fused keyword+semantic: keyword LIKE query and
+#   tier 2 - RRF-fused keyword+semantic: keyword LIKE query and
 #            semantic_search() (cosine similarity via sentence-transformers
 #            all-MiniLM-L6-v2) run in parallel via asyncio.gather; results
 #            are fused with RRF (k=60, 1-based ranks), deduped by memory ID,
 #            sorted by fused score, top N fills the remaining budget.
 #            Graceful degradation: if semantic_search returns [] (no embedder
-#            or empty embedding store), RRF reduces to keyword-only ranking —
+#            or empty embedding store), RRF reduces to keyword-only ranking -
 #            identical to v1 behavior.
 #
-# v3 (2026-07-17 security audit, MEDIUM): Tier 1 no longer always-injects
+# v3: Tier 1 no longer always-injects
 #   category='instruction' memories whose source_type='extracted' (i.e.
 #   auto-extracted from raw conversation text, which may contain pasted/
 #   untrusted content). Tier 1 now injects: all 'preference' memories, plus

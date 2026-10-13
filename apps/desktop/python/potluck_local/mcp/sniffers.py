@@ -3,8 +3,8 @@
 sniff_client_config(client_name) -> (model, peer_mcps)
 
 Returns (None, []) when the client is unknown, its config cannot be read, or
-the relevant keys are absent.  All failures are swallowed — this is advisory
-metadata, never load-bearing for tool execution.
+the relevant keys are absent.  All failures are swallowed - this is advisory
+metadata, never required for tool execution.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def _sniff_claude_code() -> tuple[str | None, list[str]]:
         logger.debug("sniff_claude_code_read_failed path=%s error=%s", config_path, exc)
         return None, []
 
-    # Model — try common key paths in order of preference.
+    # Model - try common key paths in order of preference.
     model: str | None = None
     for key in ("defaultModel", "model", "selectedModel"):
         candidate = data.get(key)
@@ -68,7 +68,7 @@ def _sniff_claude_code() -> tuple[str | None, list[str]]:
                 if isinstance(candidate, str) and candidate:
                     model = candidate
 
-    # Peer MCPs — take mcpServers keys, filter out potluck.
+    # Peer MCPs - take mcpServers keys, filter out potluck.
     peer_mcps: list[str] = []
     mcp_servers = data.get("mcpServers")
     if isinstance(mcp_servers, dict):
@@ -81,9 +81,9 @@ def _sniff_claude_code() -> tuple[str | None, list[str]]:
 
 
 def _sniff_cursor() -> tuple[str | None, list[str]]:
-    """Stub — read Cursor's config to extract model and MCP server list.
+    """Stub - read Cursor's config to extract model and MCP server list.
 
-    TODO: Cursor stores its config at:
+    TODO: read the config, which Cursor stores at:
       macOS: ~/Library/Application Support/Cursor/User/settings.json
       Linux: ~/.config/Cursor/User/settings.json
       Windows: %APPDATA%/Cursor/User/settings.json
@@ -93,9 +93,9 @@ def _sniff_cursor() -> tuple[str | None, list[str]]:
 
 
 def _sniff_zed() -> tuple[str | None, list[str]]:
-    """Stub — read Zed's config to extract model and MCP server list.
+    """Stub - read Zed's config to extract model and MCP server list.
 
-    TODO: Zed stores its config at:
+    TODO: read the config, which Zed stores at:
       macOS: ~/.config/zed/settings.json
       Linux: ~/.config/zed/settings.json
     Relevant keys: "language_models", "context_servers"
@@ -104,9 +104,9 @@ def _sniff_zed() -> tuple[str | None, list[str]]:
 
 
 def _sniff_windsurf() -> tuple[str | None, list[str]]:
-    """Stub — read Windsurf's config to extract model and MCP server list.
+    """Stub - read Windsurf's config to extract model and MCP server list.
 
-    TODO: Windsurf stores its config at:
+    TODO: read the config, which Windsurf stores at:
       macOS: ~/Library/Application Support/Windsurf/User/settings.json
       Linux: ~/.config/Windsurf/User/settings.json
     Relevant keys: similar to Cursor's VSCode-derived layout.

@@ -1,10 +1,10 @@
 """Tests for the new gateway compatibility endpoints.
 
-  POST /v1/completions    — OpenAI legacy text-completion
-  POST /api/generate      — Ollama legacy generate
-  POST /v1/embeddings     — OpenAI embeddings (local)
-  POST /api/embeddings    — Ollama legacy embeddings (local)
-  POST /api/embed         — Ollama newer batch embeddings (local)
+  POST /v1/completions - OpenAI legacy text-completion
+  POST /api/generate - Ollama legacy generate
+  POST /v1/embeddings - OpenAI embeddings (local)
+  POST /api/embeddings - Ollama legacy embeddings (local)
+  POST /api/embed - Ollama newer batch embeddings (local)
 
 All tests use TestClient with client=('127.0.0.1', ...) so peer_access_middleware
 sees a loopback caller.  Gateway auth is bypassed by ensuring get_settings returns
@@ -72,7 +72,7 @@ class TestV1Completions:
     def test_no_model_loaded_returns_503(self, client) -> None:
         """When no model is loaded and no routing target is available, 503."""
         resp = client.post("/v1/completions", json={"prompt": "Hello"})
-        # 503 = no model, 404 = model not found — both acceptable when runtime is cold.
+        # 503 = no model, 404 = model not found - both acceptable when runtime is cold.
         assert resp.status_code in (503, 404, 422), resp.text
 
     def test_response_envelope_shape(self, client, monkeypatch) -> None:

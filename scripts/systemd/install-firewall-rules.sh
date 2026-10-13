@@ -5,7 +5,7 @@
 # Idempotently insert the nftables accept rules that let Potluck mesh
 # traffic survive in the presence of Tailscale and/or Mullvad VPN.
 #
-# WHY THIS EXISTS
+# Why this exists
 # ----------------
 # Both Tailscale and Mullvad install nftables rule chains that, by default,
 # drop traffic on interfaces they don't recognize:
@@ -19,8 +19,8 @@
 #     potluck0 interface falls into the default drop.
 #
 # The fix is a narrowly-scoped accept rule for the potluck0 interface,
-# inserted at the TOP of each chain. We do NOT modify the broader VPN
-# rule sets — they keep working exactly as they did.
+# inserted at the top of each chain. We do not modify the broader VPN
+# rule sets - they keep working unchanged.
 #
 # This script is called by potluck-firewall.service at boot, so the rules
 # get reinstalled every time. They live in the runtime-only ruleset (not
@@ -43,7 +43,7 @@
 # ----------------------
 # Mullvad/Proton/Nord recreate their entire nftables ruleset on every
 # (re)connect, silently wiping our accept rules. A one-shot install at boot
-# therefore breaks the moment the VPN cycles — the symptom is a mesh peer
+# therefore breaks the moment the VPN cycles - the symptom is a mesh peer
 # that was reachable suddenly going dark ("No reachable peers"). --watch
 # treats rule disappearance as the primary firewall-block signal: it polls
 # the ruleset and reapplies our accepts within a few seconds of them
@@ -117,7 +117,7 @@ mullvad_output_rule_present() {
 # `do_install || log ...` inside the watch loop, and bash suppresses errexit for
 # the whole body of a function called in a `||`/`&&`/`if` condition. Without
 # explicit tracking, an early `nft insert` failure would neither abort nor be
-# caught — and a later success would make the function return 0 and log "done"
+# caught - and a later success would make the function return 0 and log "done"
 # while a rule was actually missing. These let us attempt every rule, log each
 # failure by name, and return non-zero iff something genuinely failed.
 INSTALL_INSERTED=0
@@ -155,14 +155,14 @@ do_install() {
                 nft insert rule ip filter ts-input iifname "$POTLUCK_IFACE" accept || true
         fi
     else
-        log "tailscale: not detected (no ts-input chain) — skipping"
+        log "tailscale: not detected (no ts-input chain) - skipping"
     fi
 
     if mullvad_present; then
         if mullvad_input_rule_present; then
             log "mullvad: input accept for $POTLUCK_IFACE already present"
         else
-            # iifname (not iif) — string match, doesn't require the interface
+            # iifname (not iif) - string match, doesn't require the interface
             # to exist at insert time. At boot, potluck0 isn't up yet.
             try_insert "mullvad input accept for $POTLUCK_IFACE" \
                 nft insert rule inet mullvad input iifname "$POTLUCK_IFACE" accept || true
@@ -175,7 +175,7 @@ do_install() {
                 nft insert rule inet mullvad output oifname "$POTLUCK_IFACE" accept || true
         fi
     else
-        log "mullvad: not detected (no inet mullvad table) — skipping"
+        log "mullvad: not detected (no inet mullvad table) - skipping"
     fi
 
     if [ "$INSTALL_FAILED" -ne 0 ]; then
@@ -224,7 +224,7 @@ do_uninstall() {
     require_root
     require_nft
 
-    # Loop to clean up duplicates — a buggy earlier install may have
+    # Loop to clean up duplicates - a repeated install may have
     # inserted the same rule more than once.
     if tailscale_present; then
         while tailscale_rule_present; do
@@ -279,8 +279,8 @@ do_status() {
 # by this; 5s keeps a peer-dark window short without meaningful idle cost.
 WATCH_INTERVAL="${POTLUCK_FW_WATCH_INTERVAL:-5}"
 
-# Return 0 if every accept rule we OWE (for each VPN currently present) is in
-# place, 1 if any is missing. A VPN that isn't loaded owes nothing — so this
+# Return 0 if every accept rule we owe (for each VPN currently present) is in
+# place, 1 if any is missing. A VPN that isn't loaded owes nothing - so this
 # stays quiet when, e.g., Mullvad is disconnected, and fires the instant it
 # reconnects and recreates its table without our accept.
 rules_intact() {
@@ -306,7 +306,7 @@ do_watch() {
     while true; do
         sleep "$WATCH_INTERVAL"
         if ! rules_intact; then
-            log "watch: accept rule(s) missing (VPN likely reconnected) — reapplying"
+            log "watch: accept rule(s) missing (VPN likely reconnected) - reapplying"
             do_install || log "watch: reapply hit an error; will retry on next tick"
         fi
     done

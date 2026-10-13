@@ -20,7 +20,7 @@ hiddenimports = [
 
 # setuptools vendors jaraco.text / jaraco.context / backports.tarfile internally.
 # pkg_resources (used by setuptools runtime hook pyi_rth_pkgres) imports jaraco.text
-# at module level — without collect-all setuptools the frozen binary crashes with
+# at module level; without collect-all setuptools the frozen binary crashes with
 # ModuleNotFoundError: No module named 'backports'.
 tmp_ret = collect_all('setuptools')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
@@ -35,11 +35,11 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    # numpy stays IN the bundle: memory_retrieval.py and embeddings.py import it
-    # at module level for cosine similarity over stored embeddings. The brief's
-    # exclude list was stale on this point — without numpy the MCP entry fails
-    # with ModuleNotFoundError before reaching the optional embedder path.
-    # sentence_transformers / torch / llama_cpp / GPUtil remain excluded — they
+    # numpy stays in the bundle: memory_retrieval.py and embeddings.py import it
+    # at module level for cosine similarity over stored embeddings. Without
+    # numpy the MCP entry fails with ModuleNotFoundError before reaching the
+    # optional embedder path.
+    # sentence_transformers / torch / llama_cpp / GPUtil are excluded: they
     # are lazy-loaded and the embedder gracefully degrades (embed() returns None)
     # so semantic_search falls back to [] and callers fall back to keyword search.
     excludes=['llama_cpp', 'torch', 'sentence_transformers', 'GPUtil'],

@@ -31,7 +31,7 @@ apps/desktop/frontend/dist/
 apps/desktop/python/dist/
 apps/desktop/python/build/
 
-# Linux installer build (make installer-linux-docker) — build.py output, never committed
+# Linux installer build (make installer-linux-docker) - build.py output, never committed
 dist-linux/
 
 # IDE
@@ -74,19 +74,10 @@ docs/security/signed-releases/
 *.rpm
 release/
 
-# Agent / IDE tooling scratch state (per-user, not project-meaningful)
+# Local agent and editor state (per user)
 .agents/
-AGENTS.md
-.claude/scheduled_tasks.lock
 CLAUDE.md
-.claude/skills/
-
-# Internal strategy / marketing / fundraise material (kept locally, out of the shared repo)
-launch-post-localllama.md
-marketing/
-docs/grants/
-docs/governance/contributor-equity.md
-docs/concepts/cooperative-connection.md
+.claude/
 
 # Large public benchmark datasets (re-downloadable; kept on disk, not versioned)
 bench/longmemeval/data/
@@ -94,9 +85,6 @@ bench/longmemeval/data/
 apps/desktop/electron/resources/mesh/
 apps/desktop/electron/resources/mesh-helper/
 apps/desktop/electron/resources/python/
-# Archived to ~/Documents/potluck-archive (standalone learn page + unused landing video)
-/potluck-learn.html
-/web/landing/public/demo-c.mp4
 
 # Reproducible native split-engine build output (source pin and build script are tracked).
 /apps/desktop/python/native/

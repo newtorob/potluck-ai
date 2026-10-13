@@ -1,5 +1,5 @@
 /**
- * HardwarePanel — runtime inference settings.
+ * HardwarePanel - runtime inference settings.
  *
  * Sliders/selects for context_size, gpu_layers, threads, temperature, max_tokens.
  * Saves on blur (or debounced for sliders). Changes apply on next model load.

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * potluck — a terminal coding agent whose inference runs on the Potluck mesh.
+ * potluck - a terminal coding agent whose inference runs on the Potluck mesh.
  *
  * Modes:
  *   potluck                 interactive REPL (prompt-based ReAct loop)
@@ -70,7 +70,7 @@ const VERSION = (JSON.parse(readFileSync(new URL("../package.json", import.meta.
 function printHelp(): void {
   stdout.write(
     [
-      `${c.bold("potluck")} — local AI from your terminal`,
+      `${c.bold("potluck")} - local AI from your terminal`,
       "Inference runs on your own machines across the Potluck mesh.",
       "",
       `${c.bold("Usage")}`,
@@ -203,7 +203,7 @@ async function runOneShot(
   if (!opts.verifyCommand) {
     stderr.write(
       c.dim(
-        "no verify command — pass --verify '<test/build cmd>' so the agent checks its own edits.\n",
+        "no verify command: pass --verify '<test/build cmd>' so the agent checks its own edits.\n",
       ),
     );
   }
@@ -299,7 +299,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  // `potluck setup` — interactive wizard (or its help).
+  // `potluck setup` - interactive wizard (or its help).
   if (args.command === "setup") {
     if (args.help) {
       printSetupHelp((s) => stdout.write(s));
@@ -540,7 +540,7 @@ async function main(): Promise<void> {
       continue;
     }
     if (line === "/snapshot") {
-      // Ask the model for the brief on a COPY of the conversation so the
+      // Ask the model for the brief on a copy of the conversation so the
       // request does not linger in the real history, then write the file
       // ourselves: the store lives outside the workspace confinement and a
       // deterministic header (time, branch, commit, dirty count) goes on top.

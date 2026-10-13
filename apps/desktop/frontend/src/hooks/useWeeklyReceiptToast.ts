@@ -1,10 +1,10 @@
 /**
- * useWeeklyReceiptToast — surfaces the "what your machines did last week"
+ * useWeeklyReceiptToast - surfaces the "what your machines did last week"
  * toast once per completed week, on app start.
  *
  * Rules:
  *   - Only fires when contributionReceiptsEnabled() is true.
- *   - Uses the LAST COMPLETE week: weeks[weeks.length - 2] (the bucket
+ *   - Uses the last complete week: weeks[weeks.length - 2] (the bucket
  *     immediately before the current/partial final bucket).
  *   - Skips silently if the sidecar is unreachable, there are fewer than 2
  *     week buckets, or the prior week had zero activity.
@@ -53,7 +53,7 @@ export function useWeeklyReceiptToast(): {
         // Need at least 2 buckets: one complete prior week + the current partial.
         if (weeks.length < 2) return;
 
-        // The second-to-last bucket is the last COMPLETE week.
+        // The second-to-last bucket is the last complete week.
         const priorWeek = weeks[weeks.length - 2];
         if (!priorWeek) return;
 
@@ -75,7 +75,7 @@ export function useWeeklyReceiptToast(): {
           },
         });
       } catch {
-        // Sidecar / coordinator unreachable — skip silently.
+        // Sidecar / coordinator unreachable - skip silently.
       }
     })();
 

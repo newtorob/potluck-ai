@@ -31,7 +31,7 @@ def app():
 async def test_health_returns_200(app) -> None:
     """GET /health must return HTTP 200."""
     # ASGITransport runs the app in-process without a network socket.
-    # We pass app directly so that the lifespan is NOT triggered — the health
+    # We pass app directly so that the lifespan is not triggered - the health
     # endpoint has no lifespan dependencies.
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

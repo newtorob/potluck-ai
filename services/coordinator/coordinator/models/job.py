@@ -11,7 +11,7 @@ from coordinator.db.base import Base
 
 
 class Job(Base):
-    """Job metadata. Prompt content is NEVER stored — see manifesto §10.3."""
+    """Job metadata. Prompt content is never stored."""
 
     __tablename__ = "jobs"
 

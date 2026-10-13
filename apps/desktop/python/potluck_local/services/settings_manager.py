@@ -1,7 +1,7 @@
 """User settings manager.
 
 Reads and writes ~/.potluck/config.json using Pydantic models.
-Full implementation per guide §4.4 and §9.9 — small, self-contained, no heavy deps.
+Small, self-contained, no heavy deps.
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ class NetworkSettings(BaseModel):
     # with the coordinator's relay as the fallback. On, this machine borrows over
     # a direct link when it can and, while sharing with circles, lends over one.
     # Off, circle requests go through the relay only and nothing is listening:
-    # behaviour is exactly what it was before links existed.
+    # behaviour is the same as without direct links.
     direct_circle_links: bool = True
     # HTTP base of the coordinator this node talks to (e.g. "http://127.0.0.1:8400").
     # Synced from the frontend's connection setting so the sidecar can reach the
@@ -122,7 +122,7 @@ class GatewaySettings(BaseModel):
 
     When enabled with an api_key, external tools (Cursor, Continue, etc.) can
     point at http://127.0.0.1:8321/v1 using the api_key as their OpenAI key. The
-    key gates ONLY the /v1 gateway surface, never the rest of the sidecar. The
+    key gates only the /v1 gateway surface, never the rest of the sidecar. The
     middleware reads these live, so toggling on/rotating the key takes effect
     without a restart.
     """
@@ -132,12 +132,12 @@ class GatewaySettings(BaseModel):
     # Open-pool routing: when a gateway request asks for a model that is neither
     # local nor on a household peer, allow routing through the coordinator to the
     # open pool (other members' machines, blinded + single-turn). Off by default
-    # — household routing serves your own machines automatically, but reaching
+    # - household routing serves your own machines automatically, but reaching
     # strangers is the widest scope and stays an explicit opt-in.
     pool_routing: bool = False
     # Multi-turn for pool contributors: when True, send the full messages array
     # to pool contributors instead of only the last user message.
-    # Default OFF — pool contributors are strangers; sending conversation history
+    # Default off - pool contributors are strangers; sending conversation history
     # to strangers is a privacy widening that requires explicit user opt-in.
     # Circle-scope jobs always send the full messages array regardless of this
     # setting (trusted-member invariant). Key: gateway.pool_multiturn.
@@ -183,13 +183,13 @@ def _default_config_path() -> Path:
     """~/.potluck/config.json, honouring POTLUCK_DATA_DIR when set.
 
     Resolved lazily (at call time, not import time) via utils.paths.config_path
-    — the same POTLUCK_DATA_DIR-aware helper every other on-disk store
-    (memory.db, models/, logs/) routes through. Settings used to hardcode
-    Path.home() / ".potluck" as a *default argument value*, which is baked in
+ - the same POTLUCK_DATA_DIR-aware helper every other on-disk store
+    (memory.db, models/, logs/) routes through. A hardcoded
+    Path.home() / ".potluck" as a *default argument value* would be baked in
     at function-definition time; even a caller that set POTLUCK_DATA_DIR
     before importing this module would still get the real home directory's
     config.json (and its gateway.api_key) mixed into a supposedly-isolated
-    override instance. Computing it fresh on every call closes that gap.
+    override instance. Computing it fresh on every call avoids that.
     """
     from potluck_local.utils.paths import config_path as _config_path_helper
     return _config_path_helper()
@@ -221,7 +221,7 @@ def get_settings(config_path: Path | None = None) -> PotluckSettings:
             _settings_cache[key] = (mtime, settings)
             return settings
         except Exception:
-            # Corrupted config — fall back to defaults rather than crashing.
+            # Corrupted config - fall back to defaults rather than crashing.
             return PotluckSettings()
     return PotluckSettings()
 
@@ -233,7 +233,7 @@ def save_settings(
     """Persist settings to disk, creating the directory if needed.
 
     config.json holds secrets in cleartext (gateway.api_key), so the file is
-    chmod'd 0600 and its parent dir 0700 on every save — idempotent, cheap,
+    chmod'd 0600 and its parent dir 0700 on every save - idempotent, cheap,
     and closes the window where a freshly-created file was briefly
     world-readable before permissions were applied. os.chmod is a partial
     no-op on Windows (no POSIX mode bits); best-effort there, never fatal.

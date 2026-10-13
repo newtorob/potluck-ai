@@ -16,14 +16,14 @@ router = APIRouter(tags=["models"])
 # apps/desktop/python/potluck_local/data/models.json copy by
 # scripts/check_model_updates.py --write (see that script's header for the
 # sync mechanism). This file is what GET /models/catalog serves; the sidecar
-# fetches it, merges it with its OWN bundled copy (its offline floor), and
+# fetches it, merges it with its own bundled copy (its offline floor), and
 # never trusts this endpoint alone.
 _CATALOG_PATH = Path(__file__).resolve().parent.parent / "data" / "models.json"
 
 # Parsed-and-wrapped catalog, cached for the life of the process. The file
 # only changes via a redeploy (a new image built after --write regenerates
 # it), so there is nothing to invalidate at runtime -- unlike the sidecar's
-# merge cache, which does need runtime invalidation because it ALSO layers
+# merge cache, which does need runtime invalidation because it also layers
 # in a live network fetch.
 _catalog_cache: dict[str, Any] | None = None
 
@@ -78,10 +78,10 @@ async def get_catalog() -> dict[str, Any]:
 async def list_models() -> list[object]:
     """Return the curated model registry.
 
-    Returns an empty list until the model registry is seeded in Task 8
+    Returns an empty list until the model registry is seeded
     (model_service.py + seed script).
     """
-    # TODO (Task 8): return await ModelService.list_published()
+    # TODO: return await ModelService.list_published()
     return []
 
 
@@ -94,9 +94,9 @@ async def list_models() -> list[object]:
 async def get_model_manifest(slug: str) -> dict[str, object]:
     """Return a signed model manifest for download by the desktop app.
 
-    Full implementation in Task 8.
+    Not implemented yet.
     """
-    # TODO (Task 8): call ModelService.get_manifest(slug)
+    # TODO: call ModelService.get_manifest(slug)
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"Model {slug!r} not found",

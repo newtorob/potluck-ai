@@ -1,13 +1,12 @@
 """Compute-and-load aware peer selection.
 
 Verifies that pick_peer_for_model selects the peer most likely to answer
-fastest — weighted by tokens_per_second (primary), hardware-tier proxy
+fastest - weighted by tokens_per_second (primary), hardware-tier proxy
 (tps=null fallback), current_jobs (load), and reputation.
 
-Registration order is intentional in each test: where the new scoring
-behaviour differs from the old "most-recent-first" heuristic, the better
-peer is registered FIRST (so it would LOSE the old recency race) to prove
-the score is what drives the result.
+Registration order is intentional in each test: where scoring differs from
+a "most-recent-first" heuristic, the better peer is registered first (so it
+would lose a recency race) to prove the score is what drives the result.
 
 All tests use db_session (single rolled-back transaction) and a unique
 model slug so live DB peers cannot match.
@@ -34,7 +33,7 @@ _MODEL = "qwen3:4b-compute-routing-test"
 
 
 class _WS:
-    """Stub WebSocket — pick_peer_for_model stores but never calls it."""
+    """Stub WebSocket - pick_peer_for_model stores but never calls it."""
 
 
 async def _mk_peer(
@@ -81,14 +80,14 @@ async def _mk_peer(
 @pytest.mark.asyncio
 async def test_higher_tps_wins(db_session: AsyncSession) -> None:
     """Peer with higher tokens_per_second is selected even when it connected
-    earlier (would lose the old most-recent-first heuristic).
+    earlier (it would lose a most-recent-first heuristic).
 
     Scores (compute / (1 + jobs) * (0.5 + rep)):
       fast: 50.0 / 1 * 1.0 = 50.0
       slow: 10.0 / 1 * 1.0 = 10.0  -- registered second (most recent)
     """
     member = uuid.uuid4()
-    # fast registered first -> least recent -> old code would pick slow
+    # fast registered first -> least recent -> recency alone would pick slow
     fast = await _mk_peer(db_session, member, tps=50.0, current_jobs=0, reputation=0.5)
     slow = await _mk_peer(db_session, member, tps=10.0, current_jobs=0, reputation=0.5)
     try:

@@ -1,10 +1,10 @@
-// Package signal — Client maintains a persistent WebSocket to the coordinator.
+// Package signal - Client maintains a persistent WebSocket to the coordinator.
 //
 // Concurrency model:
 //   - sendCh is an atomic.Pointer[chan any]. Run/runOnce installs a fresh
 //     channel via Store on each connection and Stores nil after the read/write
 //     loops have exited. Callers (Send*) Load the pointer; a nil load means
-//     "no active connection — drop the message." The channel is never
+//     "no active connection - drop the message." The channel is never
 //     close()d while a sender could still see it: a sync.WaitGroup guarantees
 //     runOnce waits for both loops to exit before clearing the pointer.
 //   - Senders use `select { case ch <- msg; default: drop }` so a full buffer
@@ -29,8 +29,8 @@ import (
 
 const (
 	// pingInterval is how often we send a control-plane ping to the coordinator.
-	// Per design doc: 30s when active. (5min idle and network-transition immediate
-	// ping logic are deferred to later weeks when the app-state signal exists.)
+	// Per design doc: 30s when active. TODO: a 5min idle interval and an
+	// immediate ping on network transition, once an app-state signal exists.
 	pingInterval = 30 * time.Second
 
 	// maxBackoff caps the reconnect delay to avoid long waits.
@@ -66,7 +66,7 @@ type RosterHandler interface {
 // It reconnects automatically with exponential backoff on any failure.
 type Client struct {
 	// urlMu guards signalURL. A runtime coordinator-URL override (PATCH
-	// /settings on the local IPC socket — see internal/localapi's
+	// /settings on the local IPC socket - see internal/localapi's
 	// handleSettingsPatch, wired via cmd/potluck-mesh/main.go's
 	// applyCoordinatorURL) calls SetSignalURL live, which can race Run's
 	// read of the URL on its next (re)connect attempt.
@@ -75,22 +75,21 @@ type Client struct {
 	coordinatorToken string
 
 	// wgPublicKeyMu guards wgPublicKey. Same rationale as urlMu: a freshly
-	// enrolled key (from POST /pair on an already-running daemon — see
+	// enrolled key (from POST /pair on an already-running daemon - see
 	// cmd/potluck-mesh/main.go's handlePair-triggered signalRestart) must
-	// reach the NEXT (re)connect's hello without racing runOnce's read of it.
-	// Before this field existed, wgPublicKey was captured ONCE at NewClient
-	// time and never updated: a /pair on a process that started unenrolled
-	// (empty key) kept hello-ing with "" forever, so the coordinator closed
-	// every reconnect with node_not_enrolled until the whole process was
-	// restarted — see SetWGPublicKey's doc.
+	// reach the next (re)connect's hello without racing runOnce's read of it.
+	// Capturing the key once at NewClient time would leave a /pair on a
+	// process that started unenrolled (empty key) hello-ing with "" forever,
+	// so the coordinator would close every reconnect with node_not_enrolled
+	// until the whole process was restarted - see SetWGPublicKey's doc.
 	wgPublicKeyMu sync.RWMutex
 	wgPublicKey   string
 	// nodeTokenFn, when non-nil, is called on every (re)connect to fetch the
-	// CURRENT per-node bearer credential for the WS upgrade's Authorization
+	// current per-node bearer credential for the WS upgrade's Authorization
 	// header. A function rather than a static string so a token minted by a
 	// later /pair (main.go wires this to coordapi.Client.NodeToken, the
 	// single shared source of truth) is picked up automatically on the next
-	// reconnect — no separate propagation call needed. Returns "" before
+	// reconnect - no separate propagation call needed. Returns "" before
 	// enrollment; the header is simply omitted in that case.
 	nodeTokenFn func() string
 	handler     RosterHandler
@@ -114,7 +113,7 @@ type Client struct {
 // NewClient creates a Client. Call Run(ctx) to start the connection loop.
 //
 // nodeTokenFn is called on every dial to fetch the current per-node bearer
-// credential (may be nil — e.g. tests, or callers that only ever use the
+// credential (may be nil - e.g. tests, or callers that only ever use the
 // legacy coordinatorToken).
 func NewClient(signalURL, wgPublicKey, coordinatorToken string, nodeTokenFn func() string, handler RosterHandler) *Client {
 	return &Client{
@@ -127,7 +126,7 @@ func NewClient(signalURL, wgPublicKey, coordinatorToken string, nodeTokenFn func
 }
 
 // SignalURL returns the coordinator signal WebSocket URL that will be used
-// on the NEXT (re)connect attempt. Safe to call concurrently with
+// on the next (re)connect attempt. Safe to call concurrently with
 // Run/runOnce and SetSignalURL.
 func (c *Client) SignalURL() string {
 	c.urlMu.RLock()
@@ -135,9 +134,9 @@ func (c *Client) SignalURL() string {
 	return c.signalURL
 }
 
-// SetSignalURL updates the URL used on the NEXT (re)connect attempt. It does
-// NOT tear down an already-established connection — the currently active
-// session (if any) keeps talking to the OLD coordinator until it naturally
+// SetSignalURL updates the URL used on the next (re)connect attempt. It does
+// not tear down an already-established connection - the currently active
+// session (if any) keeps talking to the old coordinator until it naturally
 // disconnects or a caller prods a reconnect (see
 // cmd/potluck-mesh/main.go's signalRestart / applyCoordinatorURL, called
 // after this from the runtime coordinator-URL override path). Safe to call
@@ -148,7 +147,7 @@ func (c *Client) SetSignalURL(url string) {
 	c.urlMu.Unlock()
 }
 
-// WGPublicKey returns the WG public key that will be sent on the NEXT
+// WGPublicKey returns the WG public key that will be sent on the next
 // (re)connect's hello. Safe to call concurrently with Run/runOnce and
 // SetWGPublicKey.
 func (c *Client) WGPublicKey() string {
@@ -157,14 +156,14 @@ func (c *Client) WGPublicKey() string {
 	return c.wgPublicKey
 }
 
-// SetWGPublicKey updates the WG public key used on the NEXT (re)connect's
+// SetWGPublicKey updates the WG public key used on the next (re)connect's
 // hello. Call this immediately after a successful POST /pair (see
 // cmd/potluck-mesh/main.go's signalRestart) so a daemon that was already
 // running unenrolled (and therefore already mid-backoff-loop with an empty
-// key) picks up the freshly-minted key on its very next retry — no process
-// restart required. Does NOT tear down an already-established connection,
+// key) picks up the freshly-minted key on its very next retry - no process
+// restart required. Does not tear down an already-established connection,
 // mirroring SetSignalURL's contract exactly: the current session (if any)
-// keeps using the OLD key's identity until it naturally reconnects.
+// keeps using the old key's identity until it naturally reconnects.
 func (c *Client) SetWGPublicKey(pubKey string) {
 	c.wgPublicKeyMu.Lock()
 	c.wgPublicKey = pubKey
@@ -184,11 +183,11 @@ func (c *Client) loadSendCh() chan any {
 // SendEndpointUpdate enqueues an endpoint_update message to be sent over the
 // active signaling connection. It is safe to call from any goroutine. If there
 // is no active connection (e.g. during reconnect backoff), the message is
-// dropped with a debug log — the next STUN refresh will retry.
+// dropped with a debug log - the next STUN refresh will retry.
 //
 // local carries this node's private-LAN "ip:port" candidates (may be nil/empty)
-// so peers on the same LAN can later attempt a direct connection. Phase 0/1 is
-// plumbing only — distributing the list has no routing effect yet.
+// so peers on the same LAN can attempt a direct connection. Sending the list
+// has no routing effect by itself.
 func (c *Client) SendEndpointUpdate(endpoint string, local []string) {
 	ch := c.loadSendCh()
 	if ch == nil {
@@ -202,7 +201,7 @@ func (c *Client) SendEndpointUpdate(endpoint string, local []string) {
 		slog.Debug("signal: queued endpoint_update",
 			"endpoint", endpoint, "local_count", len(local))
 	default:
-		// Channel full — highly unlikely given the cap, but never block.
+		// Channel full - highly unlikely given the cap, but never block.
 		slog.Warn("signal: send channel full, dropping endpoint_update",
 			"endpoint", endpoint,
 		)
@@ -212,7 +211,7 @@ func (c *Client) SendEndpointUpdate(endpoint string, local []string) {
 // SendRequestPunch enqueues a request_punch message asking the coordinator to
 // broker a simultaneous-send hole-punch with the named peer. It is safe to
 // call from any goroutine. If there is no active connection the message is
-// dropped — the caller (main.go punch throttle) will retry on the next roster
+// dropped - the caller (main.go punch throttle) will retry on the next roster
 // event or after its 30-second cooldown expires.
 func (c *Client) SendRequestPunch(targetNodeID string) {
 	ch := c.loadSendCh()
@@ -255,24 +254,24 @@ func (c *Client) Run(ctx context.Context) error {
 		// returning, so callers see no active connection from this point on.
 
 		if ctx.Err() != nil {
-			// Normal shutdown — parent context cancelled.
+			// Normal shutdown - parent context cancelled.
 			return ctx.Err()
 		}
 
 		if established {
-			// Connection got past hello/welcome — reset backoff so the
+			// Connection got past hello/welcome - reset backoff so the
 			// next reconnect doesn't wait if this was a transient drop.
 			backoff = initialBackoff
 		}
 
 		if err != nil {
-			slog.Warn("signal: disconnected — will reconnect",
+			slog.Warn("signal: disconnected, will reconnect",
 				"attempt", attempt,
 				"backoff_ms", backoff.Milliseconds(),
 				"err", err,
 			)
 		} else {
-			slog.Info("signal: connection closed cleanly — reconnecting",
+			slog.Info("signal: connection closed cleanly, reconnecting",
 				"attempt", attempt,
 				"backoff_ms", backoff.Milliseconds(),
 			)
@@ -303,11 +302,11 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 
 	// Present auth on the WS upgrade so the /mesh/signal gate accepts us.
 	// Primary credential: Authorization: Bearer <node_token> (whenever
-	// nodeTokenFn returns one — fetched fresh on every dial so a token
+	// nodeTokenFn returns one - fetched fresh on every dial so a token
 	// minted by a /pair that happened after this Client was constructed is
 	// picked up on the very next reconnect). Legacy X-Potluck-Coordinator-Token
 	// is attached whenever configured, unconditionally alongside it
-	// (belt-and-suspenders / dev-fleet back-compat — never required). Both
+	// (back-compat for the legacy shared secret; never required). Both
 	// headers omitted (dialOpts stays nil) is the pre-enroll / full-dev-mode
 	// no-op case.
 	headers := http.Header{}
@@ -371,7 +370,7 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 	// Arm the outbound channel so SendEndpointUpdate can start writing.
 	sendCh := make(chan any, sendChanCap)
 	c.sendCh.Store(&sendCh)
-	// On any exit from this function, ensure the pointer is cleared AFTER
+	// On any exit from this function, ensure the pointer is cleared after
 	// the read/write loops have exited (we Wait below). This protects against
 	// late senders observing a stale channel that nothing will drain.
 	defer func() {
@@ -387,7 +386,7 @@ func (c *Client) runOnce(ctx context.Context) (established bool, _ error) {
 	// ---- message loops ---- //
 	// readLoop/writeLoop run for the lifetime of this connection. loopCtx
 	// is cancelled when either loop returns (or parent ctx is cancelled),
-	// which is how we unblock writeLoop — it would otherwise wait forever
+	// which is how we unblock writeLoop - it would otherwise wait forever
 	// on sendCh after the underlying conn has died. The WaitGroup ensures
 	// runOnce does not return (and the deferred Store(nil) does not fire)
 	// until both loops have actually exited.
@@ -457,7 +456,7 @@ func (c *Client) writeLoop(ctx context.Context, conn *websocket.Conn, sendCh <-c
 			return ctx.Err()
 		case msg, ok := <-sendCh:
 			if !ok {
-				return nil // channel closed — connection is going away
+				return nil // channel closed - connection is going away
 			}
 			if err := wsjson.Write(ctx, conn, msg); err != nil {
 				return fmt.Errorf("write: %w", err)
@@ -528,7 +527,7 @@ func (c *Client) readLoop(ctx context.Context, conn *websocket.Conn) error {
 // logRosterUpdate logs a summary of roster changes using only mesh-layer
 // metadata. Never logs peer content beyond mesh_ip and node_id.
 func logRosterUpdate(ru RosterUpdate) {
-	// Log counts + mesh_ip/node_id only — nothing privacy-sensitive.
+	// Log counts + mesh_ip/node_id only - nothing privacy-sensitive.
 	if len(ru.Added) > 0 {
 		added := make([]string, 0, len(ru.Added))
 		for _, p := range ru.Added {

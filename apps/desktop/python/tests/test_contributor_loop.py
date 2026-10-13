@@ -1,6 +1,6 @@
-"""The shared contributor loop against a fake coordinator (M2.5).
+"""The shared contributor loop against a fake coordinator.
 
-These tests drive the REAL loop code in contributor/client.py: the
+These tests drive the real loop code in contributor/client.py: the
 handshake, heartbeats, job dispatch, the in-flight cap, reject handling and
 the stop semantics. The coordinator is a small in-test websockets server
 that speaks the wire protocol from schemas.py.

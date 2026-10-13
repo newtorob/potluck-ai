@@ -63,12 +63,11 @@ func TestDecideSocketOwner_SudoUID_UnparseableFallsThroughToResolver(t *testing.
 	}
 }
 
-// TestDecideSocketOwner_RootNoSudoUID_UsesConsoleResolver is the core
-// SUDO_UID-gap regression test: euid==0 (a root LaunchDaemon/systemd
-// service), no SUDO_UID (launchd/systemd never sets it — only a `sudo`
+// TestDecideSocketOwner_RootNoSudoUID_UsesConsoleResolver is the core test
+// for the root-service case: euid==0 (a root LaunchDaemon/systemd
+// service), no SUDO_UID (launchd/systemd never sets it - only a `sudo`
 // invocation does), and the console-user resolver finds a logged-in user.
-// Before the fix this fell through to the no-op default and left the socket
-// root-owned.
+// The socket must be chown'd to that user rather than left root-owned.
 func TestDecideSocketOwner_RootNoSudoUID_UsesConsoleResolver(t *testing.T) {
 	resolver := func() (int, int, bool) { return 501, 20, true }
 	uid, gid, source, ok := decideSocketOwner(0, "", "", resolver)
@@ -124,8 +123,8 @@ func TestParseStatConsoleOutput(t *testing.T) {
 		wantUser string
 		wantOK   bool
 	}{
-		{"normal user", "rob\n", "rob", true},
-		{"trims whitespace", "  rob  \n", "rob", true},
+		{"normal user", "sam\n", "sam", true},
+		{"trims whitespace", "  sam  \n", "sam", true},
 		{"root means nobody logged in", "root\n", "", false},
 		{"empty output", "", "", false},
 		{"whitespace only", "   \n", "", false},
@@ -153,8 +152,8 @@ func TestParseLoginctlSessions(t *testing.T) {
 	}{
 		{
 			name:     "single seat0 session",
-			in:       "        1 1000 rob      seat0\n",
-			wantUser: "rob",
+			in:       "        1 1000 sam      seat0\n",
+			wantUser: "sam",
 			wantOK:   true,
 		},
 		{
@@ -178,8 +177,8 @@ func TestParseLoginctlSessions(t *testing.T) {
 		},
 		{
 			name:     "malformed line skipped",
-			in:       "garbage\n        1 1000 rob      seat0\n",
-			wantUser: "rob",
+			in:       "garbage\n        1 1000 sam      seat0\n",
+			wantUser: "sam",
 			wantOK:   true,
 		},
 	}
@@ -204,8 +203,8 @@ func TestParseWhoOutput(t *testing.T) {
 		wantUser string
 		wantOK   bool
 	}{
-		{"single session", "rob      pts/0        2026-07-17 10:00\n", "rob", true},
-		{"multiple sessions returns first", "rob      pts/0        2026-07-17 10:00\nalice    pts/1        2026-07-17 11:00\n", "rob", true},
+		{"single session", "sam      pts/0        2026-07-17 10:00\n", "sam", true},
+		{"multiple sessions returns first", "sam      pts/0        2026-07-17 10:00\nalice    pts/1        2026-07-17 11:00\n", "sam", true},
 		{"empty output", "", "", false},
 	}
 	for _, tc := range cases {

@@ -1,5 +1,5 @@
 /**
- * Memory domain types — mirrors the Python sidecar Memory model.
+ * Memory domain types - mirrors the Python sidecar Memory model.
  *
  * Single source of truth for the Memory shape across the frontend.
  * All memory-related components, stores, and hooks import from here.
@@ -30,14 +30,14 @@ export interface Memory {
   superseded_by: string | null;
   project?: string | null;
   /** Version of the extraction contract that produced this memory.
-   *  NULL for rows written before the 2026-05-20 contract-versioning rollout. */
+   *  NULL for rows written before contract versioning existed. */
   extraction_prompt_version?: string | null;
   /** Pinned: always injected into retrieval regardless of query (ambient context). */
   pinned?: boolean;
 }
 
 // ---------------------------------------------------------------------------
-// Project summary — returned by GET /memory/projects
+// Project summary - returned by GET /memory/projects
 // ---------------------------------------------------------------------------
 
 export interface ProjectSummary {
@@ -104,7 +104,7 @@ export interface RelatedMemory {
 }
 
 // ---------------------------------------------------------------------------
-// Keyword frequency — from GET /memory/keywords
+// Keyword frequency - from GET /memory/keywords
 // ---------------------------------------------------------------------------
 
 export interface KeywordFrequency {
@@ -114,7 +114,7 @@ export interface KeywordFrequency {
 }
 
 // ---------------------------------------------------------------------------
-// UMAP cluster types — from GET /memory/clusters
+// UMAP cluster types - from GET /memory/clusters
 // ---------------------------------------------------------------------------
 
 export interface ClusterPoint {

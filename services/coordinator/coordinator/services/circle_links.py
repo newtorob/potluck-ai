@@ -1,6 +1,6 @@
 """Direct circle links: brokering, renewing, ending and revoking.
 
-A circle request used to be relayed through the coordinator. A link lets the
+A circle request is relayed through the coordinator by default. A link lets the
 requester's machine and a lender's machine, in two different households, talk
 directly. The coordinator picks the lender, mints a short-lived token, and
 tells both machines' mesh sidecars to add the other as a restricted WireGuard
@@ -125,7 +125,7 @@ RETENTION = timedelta(hours=24)
 # room to skip a lender whose machine record turned out to be stale.
 MAX_LENDER_TRIES = 3
 # A link may be renewed at most once per this fraction of its lifetime (never
-# faster than once a second). A renewal sends a message to BOTH sidecars, one of
+# faster than once a second). A renewal sends a message to both sidecars, one of
 # which belongs to another household, so the rate has to be bounded here: an
 # honest engine renews at half the lifetime.
 RENEW_MIN_GAP_DIVISOR = 10

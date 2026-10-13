@@ -53,7 +53,7 @@ def probe_capacity() -> Capacity:
                     round(float(free_mb) / 1024.0, 1) if free_mb is not None else None
                 ),
             )
-    except Exception:  # noqa: BLE001 — GPUtil missing, nvidia-smi absent, parse error
+    except Exception:  # noqa: BLE001 - GPUtil missing, nvidia-smi absent, parse error
         logger.debug("gpu_probe_nvidia_unavailable", exc_info=True)
 
     if _platform.system() == "Darwin" and _platform.machine() == "arm64":
@@ -86,7 +86,7 @@ _DETECTED_KEYS = (
 
 
 def legacy_hardware_summary() -> dict[str, object]:
-    """The four keys every contributor has always sent. Kept verbatim so the
+    """The four keys every contributor sends. Kept verbatim so the
     coordinator's fleet view (groups by ``system``) and the tier score's
     fallback path keep working for a peer whose detection fails."""
     import os

@@ -1,16 +1,12 @@
 /**
- * Memory store — Zustand store for the persistent memory system.
+ * Memory store - Zustand store for the persistent memory system.
  *
  * Wraps the Python sidecar memory API via localApi.memory.*.
- * Falls back to a thin inline fetcher if the memory namespace
- * hasn't been added to localApi yet (Agent B coordination boundary).
  *
  * Optimistic updates with rollback:
  *   updateMemory / deleteMemory mutate the local array immediately,
  *   then call the API. On failure, the previous array is restored and
  *   the error surfaces in the component.
- *
- * See implementation guide §9.5, §9.9.
  */
 
 import { create } from 'zustand';
@@ -212,7 +208,7 @@ export const useMemoryStore = create<MemoryState>()((set, get) => ({
       throw new Error('Invalid import file format');
     }
 
-    // We trust the file came from our own export — cast is safe here
+    // We trust the file came from our own export - cast is safe here
     const result = await localApi.memory.import({ memories: memoriesArray as Memory[] });
     await get().fetchMemories();
     return result;

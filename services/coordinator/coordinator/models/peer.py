@@ -36,11 +36,10 @@ class Peer(Base):
     )
     # Optional per-peer concurrency cap: the most in-flight jobs this peer
     # will be dispatched at once. NULL (the default for every existing row,
-    # and for any peer that never sets it) means "uncapped" — the coordinator
-    # falls back to score-based load balancing only, exactly today's
-    # behaviour. Lives on `peers` (not `peer_heartbeats`) because it's a
-    # slow-moving, largely-static capacity fact about the machine — the same
-    # shape as `max_gpu_percent` above — rather than per-beat dynamic load
+    # and for any peer that never sets it) means "uncapped" - the coordinator
+    # falls back to score-based load balancing only. Lives on `peers` (not `peer_heartbeats`) because it's a
+    # slow-moving, largely-static capacity fact about the machine - the same
+    # shape as `max_gpu_percent` above - rather than per-beat dynamic load
     # (that's `peer_heartbeats.current_jobs` / the live in-flight counter).
     # See migration 0010_peer_max_concurrent_jobs.
     max_concurrent_jobs: Mapped[int | None] = mapped_column(Integer, nullable=True)

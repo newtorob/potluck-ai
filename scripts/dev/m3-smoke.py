@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
-"""m3-smoke — Phase G milestone 3 acceptance harness.
+"""m3-smoke - smoke test for network-routed inference.
 
-Drives the full network-routed inference path end-to-end and asserts the
-behaviours that mattered when m3 was specced:
+Drives the full network-routed inference path end-to-end and asserts:
 
   1. The coordinator is reachable and reports at least one online peer
-     advertising the requested model (capability-aware routing, task #18).
+     advertising the requested model (capability-aware routing).
   2. POST /jobs/stream returns Server-Sent Events the frontend understands:
      OpenAI-compatible delta chunks, a final meta envelope, then [DONE].
-  3. The meta envelope reports `served_by: "contributor"` — confirming the
+  3. The meta envelope reports `served_by: "contributor"` - confirming the
      prompt was actually served by a peer rather than a local fallback,
-     and exposing zero identifying fields (manifesto §10.3).
+     and exposing zero identifying fields.
   4. The streamed response contains non-empty content (catches the case
      where the peer accepts the job but produces no tokens before
      hitting finish_reason='stop' for whatever reason).
 
-It is NOT a replacement for the static privacy lint (task #20) or the
-in-memory-only invariant lint (task #21). Those guard the code paths;
+It is not a replacement for the static privacy lint or the
+in-memory-only invariant lint. Those guard the code paths;
 this harness validates that the code paths actually work end-to-end.
 
 Run from the repo root:
@@ -26,7 +25,7 @@ Run from the repo root:
             --prompt "say hello in five words"
 
 Exits 0 on full success, non-zero with a categorised failure on anything
-unexpected. Stdlib-only — runnable from any Python 3.11+ without pip.
+unexpected. Stdlib-only - runnable from any Python 3.11+ without pip.
 """
 from __future__ import annotations
 
@@ -60,7 +59,7 @@ def _http_get_json(url: str, timeout: float = 10.0) -> dict:
 def _check_fleet(coordinator_url: str, model_slug: str) -> tuple[int, list[str]]:
     """Return (online_peer_count, advertised_model_slugs).
 
-    /transparency/fleet is aggregate-only by design — no peer ids leak
+    /transparency/fleet is aggregate-only by design - no peer ids leak
     here, just counts and the union of advertised models. Schema:
         { peers: { online_now: int, ... }, models: [{slug, online_peer_count}], ... }
     """
@@ -93,7 +92,7 @@ def _stream_sse(url: str, body: dict, timeout: float = 180.0) -> Iterator[dict]:
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         # urllib's iteration is line-buffered when the server flushes
-        # cleanly — which our coordinator does (see X-Accel-Buffering:no
+        # cleanly - which our coordinator does (see X-Accel-Buffering:no
         # in /jobs/stream).
         for raw_line in resp:
             line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
@@ -155,7 +154,7 @@ def smoke(
             ),
         )
 
-    print(f"  ok — {online} peer(s) online" + (f", {len(models)} model(s) available" if models else ""), flush=True)
+    print(f"  ok - {online} peer(s) online" + (f", {len(models)} model(s) available" if models else ""), flush=True)
 
     # ---- Step 2: dispatch + stream ---- #
     print(f"→ POST {coordinator_url}/jobs/stream  model={model_slug!r}  prompt={prompt!r}", flush=True)
@@ -209,7 +208,7 @@ def smoke(
             duration_ms=elapsed_ms,
             finish_reason="",
             meta_served_by="",
-            failure_reason=f"peer reported error: {error.get('category')} — {error.get('message')}",
+            failure_reason=f"peer reported error: {error.get('category')} - {error.get('message')}",
         )
 
     # ---- Step 3: assertions ---- #
@@ -221,7 +220,7 @@ def smoke(
             duration_ms=elapsed_ms,
             finish_reason="",
             meta_served_by="",
-            failure_reason="empty response — peer accepted the job but returned no tokens",
+            failure_reason="empty response - peer accepted the job but returned no tokens",
         )
 
     if meta is None:
@@ -273,7 +272,7 @@ def smoke(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="End-to-end acceptance smoke for Phase G m3 (network-routed inference).",
+        description="End-to-end smoke test for network-routed inference.",
     )
     parser.add_argument(
         "--coordinator-url",
@@ -283,12 +282,12 @@ def main() -> int:
     parser.add_argument(
         "--model",
         default="qwen2.5:3b-instruct-q4_K_M",
-        help="Model slug to request — must be advertised by at least one online peer.",
+        help="Model slug to request - must be advertised by at least one online peer.",
     )
     parser.add_argument(
         "--prompt",
         default="Say hello in five words.",
-        help="Prompt to send. Keep it short — this is a smoke test, not a benchmark.",
+        help="Prompt to send. Keep it short - this is a smoke test, not a benchmark.",
     )
     parser.add_argument(
         "--timeout",

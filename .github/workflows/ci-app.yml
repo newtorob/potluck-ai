@@ -1,6 +1,6 @@
 name: CI - Desktop App
 
-on: []  # disabled — re-enable by restoring pull_request + push triggers
+on: []  # disabled: re-enable by restoring pull_request + push triggers
 
 permissions:
   contents: read

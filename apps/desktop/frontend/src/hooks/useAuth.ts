@@ -1,5 +1,5 @@
 /**
- * useAuth — manages the magic-link auth flow and session state.
+ * useAuth - manages the magic-link auth flow and session state.
  *
  * On mount, attempts to rehydrate session by calling cloudApi.getMe().
  * The session persists as an httpOnly cookie (dev) or a main-process bearer
@@ -35,17 +35,17 @@ interface UseAuthReturn {
    * a session token is persisted (packaged app only) but the getMe() probe
    * that would confirm it failed for a network reason (offline, timeout,
    * 5xx) rather than because the token itself is invalid. AuthGate treats
-   * this the same as signed-in — an offline blip must not lock a returning
+   * this the same as signed-in - an offline blip must not lock a returning
    * member out of their own local-first app. Always false on the dev/browser
    * cookie transport, where there is no client-readable "token exists".
    */
   hasCachedAccount: boolean;
   requestMagicLink: (email: string) => Promise<void>;
-  /** Exchanges the token but does NOT sign in — populates `pendingSession` for confirmation. */
+  /** Exchanges the token but does not sign in - populates `pendingSession` for confirmation. */
   verifyMagicLink: (token: string) => Promise<void>;
-  /** User confirmed the account shown for `pendingSession` — persist it and sign in. */
+  /** User confirmed the account shown for `pendingSession` - persist it and sign in. */
   confirmSignIn: () => Promise<void>;
-  /** User declined — discard `pendingSession` without ever persisting it. */
+  /** User declined - discard `pendingSession` without ever persisting it. */
   cancelSignIn: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -55,7 +55,7 @@ export function useAuth(): UseAuthReturn {
 
   // Attempt silent session rehydration on mount (once per app session).
   //
-  // The result is applied to the global auth store unconditionally — NOT gated
+  // The result is applied to the global auth store unconditionally, not gated
   // on a component-level "cancelled" flag. Under React.StrictMode the initiating
   // component is mounted, unmounted, and remounted immediately; the module-level
   // guard above stops the remount from re-fetching, so a cancel-on-unmount guard
@@ -83,14 +83,14 @@ export function useAuth(): UseAuthReturn {
       } catch (err) {
         if (err instanceof CloudApiError && (err.status === 401 || err.status === 403)) {
           // The cloud API was reached and said the token is invalid/expired
-          // — there is no legitimate cached account left, so drop it and
+          // - there is no legitimate cached account left, so drop it and
           // let AuthGate show the sign-in wall.
           store.setAuthFailureKind('auth');
           await cloudApi.clearToken();
           store.setHasPersistedToken(false);
         } else {
           // Unreachable cloud API (offline, timeout, 5xx) or anything else
-          // that isn't a definitive "your token is bad" — the account may
+          // that isn't a definitive "your token is bad" - the account may
           // still be good, just uncontactable right now.
           store.setAuthFailureKind('network');
         }
@@ -117,7 +117,7 @@ export function useAuth(): UseAuthReturn {
   // Exchanges the one-time token (consumes it server-side) but stops short of
   // signing in: the result lands in `pendingSession` for the caller to show
   // an explicit "Sign in as <email>?" prompt (SignInConfirmDialog) before
-  // anything is persisted. This is the login-CSRF fix — see cloudApi.verifyMagicLink.
+  // anything is persisted. This is the login-CSRF fix - see cloudApi.verifyMagicLink.
   const verifyMagicLink = useCallback(
     async (token: string) => {
       store.setAuthLoading(true);
@@ -136,7 +136,7 @@ export function useAuth(): UseAuthReturn {
   );
 
   // User confirmed the account shown in the prompt: persist the session
-  // (cloud.setToken) and fetch the profile. This is the ONLY path that turns
+  // (cloud.setToken) and fetch the profile. This is the only path that turns
   // a pendingSession into an active one.
   const confirmSignIn = useCallback(async () => {
     const pending = store.pendingSession;
@@ -158,7 +158,7 @@ export function useAuth(): UseAuthReturn {
 
   // User declined: drop the pending session without ever persisting it. For
   // the cookie transport (dev/browser) the exchange call already set an
-  // httpOnly cookie server-side, so also revoke it explicitly — "cancel"
+  // httpOnly cookie server-side, so also revoke it explicitly - "cancel"
   // must mean signed into nothing on every transport.
   const cancelSignIn = useCallback(async () => {
     if (!store.pendingSession) return;

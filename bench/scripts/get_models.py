@@ -8,7 +8,7 @@ bench/models/SHA256SUMS.txt, and refuses to use a mismatched file.
 
 The catalog entry for 70B tracks known OOM state: if the model has never
 been successfully tested (SHA256 unknown), the downloader marks it as
-'hash_pending' and still downloads — you need the file to OOM cleanly.
+'hash_pending' and still downloads - you need the file to OOM cleanly.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Model catalog — update SHA256 entries after first successful download
+# Model catalog - update SHA256 entries after first successful download
 # ---------------------------------------------------------------------------
 MODELS: dict[str, dict] = {
     "phi3-mini-3.8b-q4km": {
@@ -51,7 +51,7 @@ MODELS: dict[str, dict] = {
         "url": "https://huggingface.co/bartowski/Meta-Llama-3.1-70B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-70B-Instruct-Q4_K_M.gguf",
         "filename": "Meta-Llama-3.1-70B-Instruct-Q4_K_M.gguf",
         "approx_size_gb": 42.0,
-        # 70B at Q4_K_M is ~42GB — almost certainly OOM on 16GB unified.
+        # 70B at Q4_K_M is ~42GB - almost certainly OOM on 16GB unified.
         # We still download it to produce a clean OOM data point.
         "sha256": "hash_pending",
         "oom_expected": True,
@@ -172,7 +172,7 @@ def download_model(
 
     if expected == "hash_pending":
         # First time: record the hash as the canonical value
-        print(f"[{model_id}] First download — pinning SHA-256 to {actual[:16]}...")
+        print(f"[{model_id}] First download - pinning SHA-256 to {actual[:16]}...")
         known_hashes[entry["filename"]] = actual
         _save_known_hashes(known_hashes)
         print(f"[{model_id}] SHA256SUMS.txt updated.")

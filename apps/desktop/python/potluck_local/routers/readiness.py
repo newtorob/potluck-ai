@@ -1,13 +1,13 @@
-"""GPU/runtime self-test endpoint — proves the device path actually computes.
+"""GPU/runtime self-test endpoint - proves the device path actually computes.
 
 GET /readiness/gpu-test
 
 Two modes, chosen by what is available at call time:
   - inference  A model is loaded in the runtime: run a 1-token generation and time it.
   - compute    No model loaded: run a bounded tensor probe in a disposable process.
-  - none       torch is absent AND no model is loaded: nothing can be verified.
+  - none       torch is absent and no model is loaded: nothing can be verified.
 
-Response shape (never 500s on device error — a failed probe is a valid result):
+Response shape (never 500s on device error - a failed probe is a valid result):
   { "ok": bool, "device": str, "ran": "inference|compute|none",
     "latency_ms": float, "detail": str }
 """
@@ -87,7 +87,7 @@ async def gpu_test() -> dict:
     - Else: runs a tiny matmul in a bounded, isolated device-probe process.
     - If torch is absent and no model is loaded: returns ok=false with guidance.
 
-    Never 500s on a device failure — a failed probe is a valid, useful result.
+    Never 500s on a device failure - a failed probe is a valid, useful result.
     """
     from potluck_local.services.runtime import get_runtime
 
@@ -110,7 +110,7 @@ async def gpu_test() -> dict:
             "acceptance": runtime.acceptance_summary(),
         }
 
-    # No model loaded — try a raw compute probe.
+    # No model loaded - try a raw compute probe.
     device_str = await loop.run_in_executor(None, _detect_device_name)
 
     try:

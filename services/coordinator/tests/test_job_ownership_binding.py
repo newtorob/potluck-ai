@@ -1,27 +1,26 @@
 """job_token / job_complete / job_error must be bound to the connection's
-OWN peer identity (2026-07-17 security audit, MEDIUM).
+own peer identity.
 
-Before this fix, `routers/peers.py`'s job_token/job_complete/job_error
-handlers looked up the job via `get_job(job_id)` and acted on it with no
-check that the job was actually dispatched to the sending connection's
-peer.id -- unlike the `heartbeat` handler a few lines above, which already
-rejects a peer_id/session_id mismatch. Any connected peer that knew (or
-guessed) another peer's job_id could push tokens into that job's buffer,
-mark it complete (triggering billing), or abort it early with job_error.
+The job_token/job_complete/job_error handlers in `routers/peers.py` check
+that the job was actually dispatched to the sending connection's peer.id,
+like the `heartbeat` handler, which rejects a peer_id/session_id mismatch.
+Without that check, any connected peer that knew (or guessed) another
+peer's job_id could push tokens into that job's buffer, mark it complete
+(triggering billing), or abort it early with job_error.
 
-Not remotely exploitable today (job_id is a random UUID4 never disclosed to
-other peers), but the ownership gap is real and inconsistent with the
-sibling heartbeat check. This test drives the REAL /peers/connect WebSocket
+A job_id is a random UUID4 never disclosed to other peers, so this is not
+remotely exploitable, but the ownership check keeps the handlers consistent
+with the heartbeat check. This test drives the real /peers/connect WebSocket
 end-to-end (full attestation handshake, two independently-attested peers)
 and asserts:
 
   1. Peer B sending job_token/job_complete/job_error for a job assigned to
      Peer A is dropped: the buffer is untouched, `done` never fires, no
      billing/finalization side effect occurs.
-  2. Peer A acting on its OWN job still works exactly as before (regression
-     guard against over-tightening the check).
+  2. Peer A acting on its own job still works (regression guard against
+     over-tightening the check).
   3. A buffer with `peer_id=None` (legacy/canary path that didn't thread a
-     peer_id through register_job) is NOT gated -- back-compat, matches the
+     peer_id through register_job) is not gated -- back-compat, matches the
      documented "None case" carve-out.
 
 Requires the docker-compose Postgres (same live-DB convention as
@@ -155,7 +154,7 @@ def test_job_token_complete_error_are_bound_to_owning_peer(binary_hash, _release
             job_id, buf = client.portal.call(_mk_job)
 
             try:
-                # ---- Peer B (NOT the assignee) tries to push a token ----
+                # ---- Peer B (not the assignee) tries to push a token ----
                 ws_b.send_json(
                     {
                         "type": "job_token",
@@ -229,7 +228,7 @@ def test_job_token_complete_error_are_bound_to_owning_peer(binary_hash, _release
 
 def test_job_message_with_no_assigned_peer_is_not_gated(binary_hash, _release_row):
     """Back-compat: a JobBuffer with peer_id=None (legacy/canary path that
-    didn't thread a peer_id through register_job) is NOT subject to the
+    didn't thread a peer_id through register_job) is not subject to the
     ownership check -- any connected peer's message for it is still
     processed, matching pre-fix behaviour for that carve-out."""
     app = _make_app()

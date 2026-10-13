@@ -1,5 +1,5 @@
 /**
- * Settings store — mirrors the Python sidecar's PotluckSettings shape.
+ * Settings store - mirrors the Python sidecar's PotluckSettings shape.
  *
  * Mutations optimistically apply changes to the local store, then
  * call PATCH /settings. On error, the previous value is restored and
@@ -7,8 +7,6 @@
  *
  * Theme is applied to <html> as a class ("dark" / "light") by useSettings
  * so Tailwind's darkMode: 'class' picks it up.
- *
- * See guide §4.4.
  */
 
 import { create } from 'zustand';
@@ -33,8 +31,8 @@ interface SettingsState {
   fetch: () => Promise<void>;
   update: (patch: DeepPartial<PotluckSettings>) => Promise<void>;
   /** Seed the store from a GET /settings response someone else already made
-   *  (durablePrefs at App mount). Lets gates that read settings — notably
-   *  privacy.chat_history_enabled — have a real value before the first send,
+   *  (durablePrefs at App mount). Lets gates that read settings - notably
+   *  privacy.chat_history_enabled - have a real value before the first send,
    *  with no extra round-trip. Mirrors connectionStore.hydrateFromSidecar. */
   hydrateFromSidecar: (settings: PotluckSettings) => void;
 }
@@ -54,7 +52,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       const settings = await localApi.getSettings();
       set({ settings, isLoaded: true });
     } catch (err) {
-      // Sidecar may not be running during pure UI development — log and continue
+      // Sidecar may not be running during pure UI development - log and continue
       console.warn('[settingsStore] Could not load settings:', err);
     }
   },
@@ -63,7 +61,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     const previous = get().settings;
     if (!previous) return;
 
-    // Optimistic update — deep-merge the patch
+    // Optimistic update - deep-merge the patch
     const optimistic = deepMerge(previous, patch);
     set({ settings: optimistic, isSaving: true, saveError: null });
 
@@ -91,7 +89,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
 // ---------------------------------------------------------------------------
 
 function deepMerge<T extends object>(target: T, source: DeepPartial<T>): T {
-  // Cast both sides to Record<string, unknown> — the result is re-cast to T
+  // Cast both sides to Record<string, unknown> - the result is re-cast to T
   // at the call site. We avoid per-key generic narrowing which TS rejects under
   // exactOptionalPropertyTypes when iterating unknown generic keys.
   const tgt = target as Record<string, unknown>;

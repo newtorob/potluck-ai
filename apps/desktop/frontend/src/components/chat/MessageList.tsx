@@ -1,5 +1,5 @@
 /**
- * MessageList — scrollable conversation thread with smart auto-scroll.
+ * MessageList - scrollable conversation thread with smart auto-scroll.
  *
  * Auto-scrolls to bottom when new tokens arrive, but only if the user
  * hasn't manually scrolled up. A "New messages ↓" pill appears when the

@@ -4,9 +4,9 @@ Full implementation spec: guide Section 5.6.
 Task: 7
 
 Responsibilities:
-- create_checkout(member, plan) -> str  — returns Stripe Checkout URL
-- create_portal_session(member) -> str  — returns Stripe Billing Portal URL
-- handle_webhook(raw_body, signature) -> None  — verifies Stripe signature,
+- create_checkout(member, plan) -> str - returns Stripe Checkout URL
+- create_portal_session(member) -> str - returns Stripe Billing Portal URL
+- handle_webhook(raw_body, signature) -> None - verifies Stripe signature,
   dispatches to handlers for:
     - checkout.session.completed    -> create Membership, stamp founding badge
     - invoice.paid                  -> extend current_period_end, mark active
@@ -57,7 +57,7 @@ class BillingError(Exception):
 
 
 class BillingNotConfigured(BillingError):
-    """Stripe keys/prices are not set — the operation cannot proceed (503)."""
+    """Stripe keys/prices are not set - the operation cannot proceed (503)."""
 
 
 class BillingSignatureError(BillingError):
@@ -118,7 +118,7 @@ class BillingService:
         if not price:
             raise BillingNotConfigured(f"No Stripe price configured for plan {plan!r}")
 
-        import stripe  # lazy — only needed when actually talking to Stripe
+        import stripe  # lazy - only needed when actually talking to Stripe
 
         stripe.api_key = self.settings.stripe_secret_key
         customer_id = await self._ensure_customer(member, stripe)
@@ -186,7 +186,7 @@ class BillingService:
         """Verify the Stripe signature and return the parsed event.
 
         Raises BillingSignatureError on a missing secret, malformed payload, or
-        a signature mismatch — all of which the endpoint maps to HTTP 400.
+        a signature mismatch - all of which the endpoint maps to HTTP 400.
         """
         secret = self.settings.stripe_webhook_secret
         if not secret:

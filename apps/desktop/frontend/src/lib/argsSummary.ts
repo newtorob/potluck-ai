@@ -2,9 +2,9 @@
  * Agent-observability privacy whitelist for tool-call `args_summary`.
  *
  * Privacy invariant: `args_summary` is metadata-only. Prompt text and raw
- * argument *content* must NEVER reach the UI. This whitelist is the single
- * source of truth and MUST be applied at every render site (the activity feed
- * AND the session-detail drawer) — never render `args_summary` directly, even
+ * argument *content* must never reach the UI. This whitelist is the single
+ * source of truth and must be applied at every render site (the activity feed
+ * and the session-detail drawer) - never render `args_summary` directly, even
  * if the sidecar is expected to pre-filter it, so a backend regression can't
  * leak content through the client. See the agent-observability privacy rule.
  */

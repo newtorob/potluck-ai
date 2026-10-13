@@ -22,7 +22,7 @@ model a chat handler for them:
 * Meta's Llama 3.x template writes the tool instructions into the first user
   message unless ``tools_in_user_message`` is false. The user's question then
   reads "respond with a JSON for a function call" on every turn, the one after a
-  tool result included. Measured on Llama 3.1 8B Q4 (2026-10-10, 8 runs each):
+  tool result included. Measured on Llama 3.1 8B Q4 (8 runs each):
   the reply used the tool result 4 to 6 times in 8, and never after two results.
   With the instructions in the system message it was 8 in 8 for both, and the
   second of two different tools was still called 8 in 8. Leaving tools out after
@@ -147,7 +147,8 @@ def split_tool_calls(messages: list[dict]) -> list[dict]:
 def fitted_template(template: str, bos_token: str = "", eos_token: str = "") -> str:
     """The template to render with: the model file's own, or the same with its tool
     instructions moved to the system message (see the module text). The move is
-    kept only if a request without tools still renders exactly as before."""
+    kept only if a request without tools still renders exactly as it does under the
+    model file's own template."""
     if _TOOLS_IN_USER_SWITCH not in template:
         return template
     moved = _TOOLS_IN_SYSTEM + template

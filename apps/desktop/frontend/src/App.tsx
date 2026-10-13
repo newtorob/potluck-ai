@@ -41,7 +41,7 @@ import { WeeklyReceiptToast } from '@/components/household/WeeklyReceiptToast';
  * Root application shell.
  *
  * Layout: TitleBar (Mac drag region) + Sidebar (fixed left) + main content area.
- * AuthGate requires a signed-in account before Sidebar/routes render — see
+ * AuthGate requires a signed-in account before Sidebar/routes render - see
  * apps/desktop/frontend/src/components/auth/AuthGate.tsx for the loading /
  * sign-in-wall / offline-cached-account decision.
  *
@@ -52,14 +52,14 @@ import { WeeklyReceiptToast } from '@/components/household/WeeklyReceiptToast';
  * strip driven by the local auto-updater.
  *
  * Routes:
- *   /chat        — streaming chat interface
- *   /models      — model library: browse, install, delete
- *   /settings    — hardware, privacy, account, advanced tabs
- *   /membership  — founding member status + billing
+ *   /chat - streaming chat interface
+ *   /models - model library: browse, install, delete
+ *   /settings - hardware, privacy, account, advanced tabs
+ *   /membership - founding member status + billing
  *
  * --- First-Run gating ---
  * On mount we fetch the model catalog from the sidecar. We show the FirstRun
- * wizard only when ALL of the following are true after the fetch settles:
+ * wizard only when all of the following are true after the fetch settles:
  *   1. No installed models (none with installed === true)
  *   2. potluck.onboarding_completed is not true in uiPrefsStore (backed by
  *      localStorage + the sidecar durable config)
@@ -72,13 +72,13 @@ import { WeeklyReceiptToast } from '@/components/household/WeeklyReceiptToast';
  * who already have models installed never see the wizard on startup.
  *
  * The wizard marks completion via uiPrefsStore.setOnboardingCompleted(true),
- * which writes localStorage AND persists to the sidecar config so the flag
+ * which writes localStorage and persists to the sidecar config so the flag
  * survives reinstalls and dev-vs-packaged launches.
  */
 
 export default function App() {
 
-  // Weekly receipt toast — once per completed week, opt-out via Settings → Privacy.
+  // Weekly receipt toast - once per completed week, opt-out via Settings → Privacy.
   const { toast: weeklyToast, dismiss: dismissWeeklyToast } = useWeeklyReceiptToast();
 
   // Route path drives the per-view error boundary's reset: navigating to a
@@ -120,23 +120,23 @@ export default function App() {
   }, []);
 
   // Push the coordinator origin to the Electron main process (packaged app
-  // only — no-op in dev/browser) so its onBeforeSendHeaders injector knows
+  // only - no-op in dev/browser) so its onBeforeSendHeaders injector knows
   // which host to attach the member session bearer to for coordinator
   // requests that bypass the buffering IPC bridge (streamNetworkJob's SSE
-  // stream — see localApi.ts). Pushes once now, then again on every
+  // stream - see localApi.ts). Pushes once now, then again on every
   // subsequent coordinatorUrl change (user edit, sidecar adoption, durable
-  // hydration) via a store subscription — see connectionStore.ts.
+  // hydration) via a store subscription - see connectionStore.ts.
   useEffect(() => {
     initCoordinatorBaseSync();
   }, []);
 
   // Version handshake: GET /client/version and compare against the running
   // build. Below `minimum` sets updateStore.blocked, which the early return
-  // below turns into the full-screen UpdateRequiredGate — the backstop that
+  // below turns into the full-screen UpdateRequiredGate - the backstop that
   // stands in for whatever cryptic failure an old client would otherwise hit
   // against a changed backend. Below `latest` (but not blocked) nudges the
   // same "available" banner state UpdateBanner drives from the local
-  // auto-updater. Never blocks on a failed/absent response — see
+  // auto-updater. Never blocks on a failed/absent response - see
   // updateStore.checkVersionHandshake.
   useEffect(() => {
     void useUpdateStore.getState().checkVersionHandshake();
@@ -159,9 +159,9 @@ export default function App() {
       try {
         const health = await localApi.health();
         if (health.model_restore) return;
-        if (health.model_loaded) return; // already live — leave it
+        if (health.model_loaded) return; // already live - leave it
         const installed = useModelStore.getState().models.filter((m) => m.installed);
-        if (installed.length === 0) return; // nothing to load — FirstRun handles this
+        if (installed.length === 0) return; // nothing to load - FirstRun handles this
         const lastActive = health.active_model_id
           ? installed.find((m) => m.slug === health.active_model_id)
           : undefined;
@@ -169,7 +169,7 @@ export default function App() {
           lastActive ?? [...installed].sort((a, b) => a.size_bytes - b.size_bytes)[0];
         if (pick) void useModelStore.getState().load(pick.slug);
       } catch {
-        // Sidecar unreachable — nothing to auto-load.
+        // Sidecar unreachable - nothing to auto-load.
       }
     })();
   }, [fetchSettled]);
@@ -193,7 +193,7 @@ export default function App() {
   const showFirstRun = fetchSettled && !onboardingCompleted && wizardLatched.current;
 
   // Universal update backstop: a client below the server-reported `minimum`
-  // version blocks here, before anything else renders — including the
+  // version blocks here, before anything else renders - including the
   // magic-link bounce page below. Whatever changed on the backend, an old
   // client shows this one clear screen instead of a cryptic downstream
   // failure. See the version-handshake effect above / updateStore.ts.
@@ -201,7 +201,7 @@ export default function App() {
     return <UpdateRequiredGate />;
   }
 
-  // Standalone magic-link verify/bounce page — rendered outside the app shell
+  // Standalone magic-link verify/bounce page - rendered outside the app shell
   // (no sidebar/status bar). In a browser it bounces to the potluck:// scheme;
   // inside Electron it verifies in place. See AuthVerify + useDeepLinkAuth.
   if (location.pathname === '/auth/verify') {
@@ -221,7 +221,7 @@ export default function App() {
     );
   }
 
-  // First-run wizard (no sidebar, no routes — wizard owns the full viewport)
+  // First-run wizard (no sidebar, no routes - wizard owns the full viewport)
   if (showFirstRun) {
     return (
       <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
@@ -239,7 +239,7 @@ export default function App() {
   //   StatusBar (persistent "alive" strip)
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-background text-foreground">
-      {/* Mac-only drag region — zero height on other platforms */}
+      {/* Mac-only drag region - zero height on other platforms */}
       <TitleBar />
 
       {/* Thin strip shown only if the local engine drops after being up */}
@@ -281,10 +281,10 @@ export default function App() {
         </AuthGate>
       </div>
 
-      {/* Persistent bottom status strip — model loaded, sidecar, network mode */}
+      {/* Persistent bottom status strip - model loaded, sidecar, network mode */}
       <StatusBar />
 
-      {/* Weekly receipt toast — floats above the status bar */}
+      {/* Weekly receipt toast - floats above the status bar */}
       {weeklyToast.visible && weeklyToast.data !== null && (
         <WeeklyReceiptToast data={weeklyToast.data} onDismiss={dismissWeeklyToast} />
       )}

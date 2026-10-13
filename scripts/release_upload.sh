@@ -4,7 +4,7 @@
 #
 # The desktop app updates via electron-updater with a `generic` provider
 # pointed at https://releases.trypotluck.ai (apps/desktop/electron/package.json
-# -> build.publish). For that to work, the bucket ROOT must serve:
+# -> build.publish). For that to work, the bucket root must serve:
 #   - latest-mac.yml / latest.yml / latest-linux.yml   the update feed
 #                               electron-updater polls, one per platform
 #   - *-mac.zip (+ .blockmap)   the artifact the macOS updater applies
@@ -21,9 +21,9 @@
 #        make installer-mac
 #      (needs APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID in the
 #      environment + the "Developer ID Application" cert in the login keychain.
-#      Unsigned builds must NOT be published: macOS auto-update via Squirrel.Mac
-#      only applies SIGNED updates, and app-update.yml is only emitted by this
-#      full build, not the `--dir` dogfood build.)
+#      Unsigned builds must not be published: macOS auto-update via Squirrel.Mac
+#      only applies signed updates, and app-update.yml is only emitted by this
+#      full build, not the `--dir` build.)
 #   2. An rclone remote for R2 (configure once, with your Cloudflare R2 creds):
 #        rclone config create r2 s3 \
 #          provider=Cloudflare \
@@ -40,8 +40,8 @@
 # Idempotent: re-running re-uploads changed files. Safe to run for every release.
 set -euo pipefail
 
-REMOTE="${1:?rclone remote name (e.g. r2) — see PREREQS #2}"
-BUCKET="${2:?R2 bucket name mapped to releases.trypotluck.ai — see PREREQS #3}"
+REMOTE="${1:?rclone remote name (e.g. r2) - see PREREQS #2}"
+BUCKET="${2:?R2 bucket name mapped to releases.trypotluck.ai - see PREREQS #3}"
 DRY="${3:-}"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -53,10 +53,10 @@ if [ ! -d "$OUT" ]; then
   exit 1
 fi
 
-# Guard: refuse to publish if the feed file is missing (a --dir/dogfood build
+# Guard: refuse to publish if the feed file is missing (a --dir build
 # produces no latest-mac.yml, so publishing it would give users a broken feed).
 if [ -z "$(find "$OUT" -maxdepth 1 -name 'latest*.yml' -print -quit)" ]; then
-  echo "error: no updater feed in $OUT — this is not a complete release build." >&2
+  echo "error: no updater feed in $OUT - this is not a complete release build." >&2
   echo "       (a '--dir'/dogfood build cannot be published; it has no update feed.)" >&2
   exit 1
 fi
@@ -70,7 +70,7 @@ find "$OUT" -maxdepth 1 \( -name '*.dmg' -o -name '*.zip' -o -name '*.exe' -o -n
 DRY_FLAG=""
 if [ "$DRY" = "--dry-run" ]; then
   DRY_FLAG="--dry-run"
-  echo "==> DRY RUN — nothing will be uploaded."
+  echo "==> DRY RUN - nothing will be uploaded."
 fi
 
 # Two passes, on purpose. The update feed names an artifact by URL, so a feed

@@ -1,5 +1,5 @@
 /**
- * ContributionReceiptsCard — contributor side of the mesh, made visible.
+ * ContributionReceiptsCard - contributor side of the mesh, made visible.
  *
  * Shows:
  *   1. A plain headline summarising this week's totals.
@@ -7,7 +7,7 @@
  *      and a quiet reputation dot.
  *   3. A last-8-weeks bar chart (requests served per week).
  *
- * Privacy rule: aggregate counts only — no per-request detail, no indication
+ * Privacy rule: aggregate counts only - no per-request detail, no indication
  * of who asked what. The coordinator already enforces this at the API layer;
  * this component simply never attempts to display finer grain.
  *
@@ -43,7 +43,7 @@ function formatCount(n: number): string {
 }
 
 /**
- * "Jun 16" from "2026-06-16" — short and timezone-stable (treats the date
+ * "Jun 16" from "2026-06-16" - short and timezone-stable (treats the date
  * as local midnight so the label matches what the user sees on a calendar).
  */
 function shortDate(isoDate: string): string {
@@ -92,7 +92,7 @@ function ReputationDot({ score }: { score: number | null }) {
 // Weekly bar chart (hand-laid SVG)
 // ---------------------------------------------------------------------------
 
-/** 8-week bar chart — requests served per week, x-axis labelled by week_start. */
+/** 8-week bar chart - requests served per week, x-axis labelled by week_start. */
 function WeeklyChart({ weeks }: { weeks: ContributionWeek[] }) {
   if (weeks.length === 0) return null;
 
@@ -169,7 +169,7 @@ function WeeklyChart({ weeks }: { weeks: ContributionWeek[] }) {
 
 /**
  * Copies an aggregate-only, safe-to-share plain-text summary to the clipboard.
- * Contains only totals + the time period label — no per-request, per-peer, or
+ * Contains only totals + the time period label - no per-request, per-peer, or
  * requester detail.
  */
 function CopySummaryButton({
@@ -261,7 +261,7 @@ export function ContributionReceiptsCard() {
 
     void load();
 
-    // Light periodic refresh — same cadence neighbourhood as the health poll
+    // Light periodic refresh - same cadence neighbourhood as the health poll
     // (every 2 minutes). Not real-time; these numbers don't need to be live.
     const id = setInterval(() => void load(), 120_000);
 
@@ -271,7 +271,7 @@ export function ContributionReceiptsCard() {
     };
   }, []);
 
-  // Loading — show nothing rather than a skeleton for a non-critical card.
+  // Loading - show nothing rather than a skeleton for a non-critical card.
   // The card will appear once data arrives.
   if (state.status === 'loading') {
     return (
@@ -284,7 +284,7 @@ export function ContributionReceiptsCard() {
     );
   }
 
-  // Error or empty — calm, never a red wall.
+  // Error or empty - calm, never a red wall.
   if (state.status === 'error' || state.status === 'empty') {
     return (
       <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-hearth-sm">

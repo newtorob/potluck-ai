@@ -1,4 +1,4 @@
-"""M2.5, coordinator side.
+"""Contributor support, coordinator side.
 
 Covers what the in-process desktop contributor needs from the coordinator:
 a member session bearer on /peers/connect that binds the member, advertised

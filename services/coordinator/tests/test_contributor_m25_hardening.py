@@ -1,4 +1,4 @@
-"""M2.5 hardening before the coordinator ships it.
+"""Contributor hardening, coordinator side.
 
 Self-reported throughput steers routing, so it has to be finite and bounded;
 a present-but-invalid session bearer must not quietly fall back to the

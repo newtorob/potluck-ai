@@ -35,7 +35,7 @@ _USERNAME_STRIP = re.compile(r"[^A-Za-z0-9_.-]")
 class DiscourseConnectError(ValueError):
     """Raised when the inbound SSO payload is malformed or fails verification.
 
-    Callers map this to HTTP 400 — the message is safe to surface.
+    Callers map this to HTTP 400 - the message is safe to surface.
     """
 
 

@@ -1,21 +1,23 @@
-"""One terminal outcome per job (audit finding 5).
+"""One terminal outcome per job.
 
 Every path out of a dispatched job must settle the `jobs` row into exactly
-one terminal state, and only a genuinely COMPLETED job may mint credits.
-The bugs these tests pin down:
+one terminal state, and only a genuinely completed job may mint credits.
+The failure modes these tests pin down:
 
-  a. Stream timeout emitted an error envelope AND a meta envelope AND
-     [DONE], and the finalizer saw `error_category is None`, so the row was
-     recorded "completed" and minted credits for work that never finished.
-  b. Client disconnect mid-stream recorded "completed" for the same reason,
-     and spawned the finalize task only after an `await`, so a contended
-     lock during cancellation could skip finalization entirely.
-  c. A `ws.send_json` failure left the row at "dispatched" forever and blew
-     the streaming retry budget (the 502 escaped the failover loop).
-  d. The sync POST /jobs timeout branch raised 504 without touching the row.
-  e. A flat 5s first-token deadline fails over any peer that needs longer to
-     process a long prompt (a split 32B model measured ~22s to first token
-     on a 2048-token prompt).
+  a. A stream timeout emits an error envelope, not also a meta envelope,
+     and the finalizer must not see `error_category is None` and record the
+     row "completed" and mint credits for work that never finished.
+  b. A client disconnect mid-stream must not record "completed" for the
+     same reason, and the finalize task must be spawned before any `await`,
+     so a contended lock during cancellation cannot skip finalization.
+  c. A `ws.send_json` failure must not leave the row at "dispatched"
+     forever or blow the streaming retry budget (the 502 must not escape
+     the failover loop).
+  d. The sync POST /jobs timeout branch must settle the row, not only raise
+     504.
+  e. A flat 5s first-token deadline would fail over any peer that needs
+     longer to process a long prompt (a split 32B model takes ~22s to first
+     token on a 2048-token prompt).
 
 Conventions match tests/test_stream_first_token_failover.py: real dispatch
 path, real Job rows, real peer_registry state, stub peer WebSockets.
@@ -292,7 +294,7 @@ async def test_send_failure_fails_over_and_settles_the_row(fast_deadline) -> Non
 
     try:
         async with factory() as db:
-            # Equal scores tie-break to the MOST-recently-registered peer, so
+            # Equal scores tie-break to the most-recently-registered peer, so
             # register the good peer first and the broken one second: the
             # broken peer deterministically wins attempt 1.
             good_id, good_ws = await _mk_peer(db, contributor, behavior=_finish)

@@ -1,25 +1,23 @@
-"""Tests for POST /me/device-keys — the v0.5 device-key registration path.
+"""Tests for POST /me/device-keys - the device-key registration path.
 
-Closes the `require_registered_keys=true` onboarding trap: previously a
-MemberKey row could only be created via TOFU (disabled in strict mode),
-operator SQL backfill, or a seed script — so a brand-new device belonging to
-an already-signed-in member could never attest once strict allowlisting was
-turned on. `models/member_key.py` has documented the intended fix since it
-landed ("v0.5 member-auth ... a signed-in member registers their device key
-through the authenticated session, added_via='session'") but no route ever
-implemented it until now.
+Avoids the `require_registered_keys=true` onboarding trap: a MemberKey row
+can otherwise only be created via TOFU (disabled in strict mode), operator
+SQL backfill, or a seed script - so a brand-new device belonging to an
+already-signed-in member could never attest once strict allowlisting was
+turned on. A signed-in member registers their device key through the
+authenticated session (added_via='session'; see `models/member_key.py`).
 
 Coverage:
   - happy path: registers a key, added_via='session', bound to the caller.
   - 409 on a key already registered (to the caller, or to a different
-    member — either way, no disclosure of which).
+    member - either way, no disclosure of which).
   - 400 on a malformed (non-Ed25519) public_key.
   - end-to-end 401 when POTLUCK_SESSION_AUTH_ENABLED=1 and no session is
     presented (real HTTP request against the mounted router + live DB, so
     the actual `resolve_session_member_id` gate is exercised, not just the
     dependency in isolation).
-  - registering the key genuinely unblocks the attestation path that FIX 2
-    targets: `require_registered_keys=True` + a key registered via this
+  - registering the key genuinely unblocks the strict attestation path:
+    `require_registered_keys=True` + a key registered via this
     endpoint is accepted by `verify_attestation` without TOFU.
 """
 from __future__ import annotations
@@ -59,7 +57,7 @@ def _fresh_ed25519_pubkey() -> str:
 @pytest.mark.asyncio
 async def test_register_device_key_happy_path(db_session: AsyncSession) -> None:
     """register_device_key commits internally (matching create_circle /
-    add_circle_member's own convention), so — like those tests — this
+    add_circle_member's own convention), so - like those tests - this
     asserts on the returned response rather than re-querying db_session
     afterward: SQLAlchemy won't let the fixture's `session.begin()` wrapper
     be reused once the function under test has committed it closed."""
@@ -136,7 +134,7 @@ async def test_register_device_key_409_on_duplicate_same_member(
 async def test_register_device_key_409_on_duplicate_different_member(
     db_session: AsyncSession,
 ) -> None:
-    """A key already bound to ANOTHER member also 409s — the caller can't
+    """A key already bound to ANOTHER member also 409s - the caller can't
     tell from the response whether it's their own key or someone else's
     (no cross-member disclosure)."""
     other_member = uuid.uuid4()
@@ -181,7 +179,7 @@ async def test_register_device_key_400_on_wrong_length(db_session: AsyncSession)
 #
 # Uses the real router + a live DB (docker-compose Postgres on localhost,
 # matching every other coordinator test) so the request goes through FastAPI's
-# real dependency graph, not a hand-called function — this is what proves the
+# real dependency graph, not a hand-called function - this is what proves the
 # route is wired to `resolve_session_member_id` and not, e.g., accidentally
 # left on `STUB_MEMBER_ID` passthrough.
 
@@ -274,7 +272,7 @@ def test_register_device_key_201_with_valid_session(monkeypatch: pytest.MonkeyPa
             assert body["member_id"] == str(member_id)
             assert body["added_via"] == "session"
 
-            # Duplicate registration by the SAME session -> 409.
+            # Duplicate registration by the same session -> 409.
             resp2 = client.post("/me/device-keys", json={"public_key": pubkey})
             assert resp2.status_code == 409
         finally:
@@ -305,10 +303,10 @@ def test_register_device_key_201_with_valid_session(monkeypatch: pytest.MonkeyPa
 async def test_registered_key_satisfies_require_registered_keys(
     session_factory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The actual FIX 2 regression check: with require_registered_keys=True,
-    a key registered via /me/device-keys is accepted by verify_attestation
-    without ever going through TOFU — reproducing (and closing) the
-    onboarding trap described in services/attestation.py.
+    """With require_registered_keys=True, a key registered via
+    /me/device-keys is accepted by verify_attestation without ever going
+    through TOFU, so strict mode does not trap a new device (see
+    services/attestation.py).
 
     Uses session_factory (fresh sessions) throughout: register_device_key
     commits internally, and verify_attestation needs its own uncommitted
@@ -332,7 +330,7 @@ async def test_registered_key_satisfies_require_registered_keys(
         settings = get_settings()
         assert settings.require_registered_keys is True
 
-        # Register via the endpoint under test — this is the onboarding step.
+        # Register via the endpoint under test - this is the onboarding step.
         async with session_factory.factory() as db:
             await register_device_key(
                 DeviceKeyRegisterRequest(public_key=pubkey_b64),

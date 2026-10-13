@@ -1,5 +1,5 @@
 /**
- * Membership view — top-level route for /membership.
+ * Membership view - top-level route for /membership.
  *
  *   - Signed-out: editorial pitch + magic-link sign-in (MagicLinkForm ->
  *     VerifyingLink). The token itself returns via a potluck:// deep link
@@ -30,7 +30,7 @@ export function MembershipView() {
         {isSignedIn ? (
           <MembershipCard />
         ) : (
-          /* Sign-in state — editorial treatment */
+          /* Sign-in state - editorial treatment */
           <div className="relative z-10 flex w-full max-w-md flex-col items-center gap-10 text-center animate-fade-in-up">
             {/* Logo mark with ember halo */}
             <div className="relative h-16 w-16">

@@ -1,5 +1,5 @@
 """Public-facing fleet aggregates. No member_id, no peer_id, no
-individual peer details — only counts.
+individual peer details - only counts.
 
 This endpoint is intentionally low-fidelity: it should be safe to expose
 without authentication, and informative enough that a member or
@@ -71,7 +71,7 @@ async def fleet(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     last_release_at = await db.scalar(select(func.max(ContributorRelease.signed_at)))
 
     # Models the network can currently serve. JOIN peer_capabilities with
-    # online peers and group by slug — gives the desktop /network view a
+    # online peers and group by slug - gives the desktop /network view a
     # "Available models" chip rack with a count per slug. No peer_id, no
     # hostname; just slug + count, fully aggregate.
     online_subq = (
@@ -93,7 +93,7 @@ async def fleet(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     models = [{"slug": row.slug, "online_peer_count": row.count} for row in model_rows]
 
     # Activity totals over the last 24h. Counts completed jobs and sums
-    # output_tokens. No member_id grouping here — this is the public
+    # output_tokens. No member_id grouping here - this is the public
     # fleet-wide view. Per-member stats live at /jobs/stats.
     day_ago = now - timedelta(hours=24)
     jobs_24h = await db.scalar(

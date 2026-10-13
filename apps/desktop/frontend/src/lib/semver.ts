@@ -1,11 +1,11 @@
 /**
- * Minimal semver comparator — no dependency, just enough to gate the
+ * Minimal semver comparator - no dependency, just enough to gate the
  * client-version handshake (running vs `minimum`/`latest` from
  * GET /client/version). Handles plain "x.y.z" releases; anything after the
  * patch number (pre-release/build metadata, e.g. "0.1.0-beta.1") is ignored
  * for comparison purposes.
  *
- * Malformed input never throws and never claims an ordering — callers that
+ * Malformed input never throws and never claims an ordering - callers that
  * gate on the result (the "must update" block) always fail open (unknown =
  * "don't block") rather than closed.
  */
@@ -25,7 +25,7 @@ export function parseSemverTriplet(version: string): Triplet | null {
 
 /**
  * Compares two version strings: -1 if a < b, 1 if a > b, 0 if equal OR if
- * either string fails to parse (equal is the safe default — it never signals
+ * either string fails to parse (equal is the safe default - it never signals
  * an ordering the caller can't trust).
  */
 export function compareSemver(a: string, b: string): number {
@@ -41,8 +41,8 @@ export function compareSemver(a: string, b: string): number {
 }
 
 /**
- * True only when both `version` and `floor` parse AND `version` is strictly
- * below `floor`. Malformed input on either side resolves to false — a
+ * True only when both `version` and `floor` parse and `version` is strictly
+ * below `floor`. Malformed input on either side resolves to false - a
  * client we can't parse a version for is never blocked from launching.
  */
 export function isVersionBelow(version: string, floor: string): boolean {

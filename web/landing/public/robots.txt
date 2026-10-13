@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /dl/
+
+Sitemap: https://trypotluck.ai/sitemap.xml

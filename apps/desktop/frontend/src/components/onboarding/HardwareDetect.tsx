@@ -1,5 +1,5 @@
 /**
- * HardwareDetect — step 2 of the First Run wizard.
+ * HardwareDetect - step 2 of the First Run wizard.
  *
  * Fetches hardware from the sidecar and visualises detected specs with
  * a highlighted recommended tier card.
@@ -110,7 +110,7 @@ export function HardwareDetect({ hardware, isLoading, error }: HardwareDetectPro
         />
       </div>
 
-      {/* GPU-missing warning — surfaces when detection found nothing.
+      {/* GPU-missing warning - surfaces when detection found nothing.
           Keeps onboarding moving (CPU inference works for the small tier)
           but tells the user why their tier might not be what they expected. */}
       {hardware.gpu_name === null && (

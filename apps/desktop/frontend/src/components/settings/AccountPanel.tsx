@@ -1,5 +1,5 @@
 /**
- * AccountPanel — Settings → Account. Reflects real auth state:
+ * AccountPanel - Settings → Account. Reflects real auth state:
  *   - Signed in: identity + founding badge + link to Membership + sign out.
  *   - Signed out: a prompt to sign in (local chat needs no account).
  *
@@ -27,7 +27,7 @@ export function AccountPanel() {
     updatePhase === 'downloading'
       ? `Downloading update… ${updatePercent}%`
       : updatePhase === 'ready'
-        ? 'Update ready — restart to install'
+        ? 'Update ready, restart to install'
         : updatePhase === 'available'
           ? `Update available${updateVersion ? ` (v${updateVersion})` : ''}`
           : updatePhase === 'error'

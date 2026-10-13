@@ -1,5 +1,5 @@
 /**
- * ViewContainer — body region of a view.
+ * ViewContainer - body region of a view.
  *
  * Wraps the scrollable content area below ViewHeader. Provides:
  *   - Consistent horizontal padding (24px) matching ViewHeader
@@ -8,7 +8,7 @@
  *     `wide` = max-w-5xl for grid views like Agents & Models;
  *     `full` = no constraint, fills available width)
  *   - Vertical scroll on overflow
- *   - Optional `grain` atmospheric texture (Hearth's tactility layer —
+ *   - Optional `grain` atmospheric texture (Hearth's tactility layer -
  *     used on full-bleed surfaces like empty states; off by default for
  *     content density views)
  *

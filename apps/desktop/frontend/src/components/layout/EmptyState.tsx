@@ -1,5 +1,5 @@
 /**
- * EmptyState — shared empty/zero/error state primitive.
+ * EmptyState - shared empty/zero/error state primitive.
  *
  * Standardises the serif-greeting-with-grain treatment that ChatView,
  * MemoryView, and AgentsView already use ad-hoc, and gives Settings'
@@ -7,7 +7,7 @@
  *
  * Anatomy:
  *   - Optional ember-tinted icon square (56×56, rounded-2xl, ring-1 over
- *     bg-primary/12 — matches the Hearth "P" mark sizing pattern)
+ *     bg-primary/12 - matches the Hearth "P" mark sizing pattern)
  *   - Serif heading (font-serif text-2xl tracking-display)
  *   - Optional muted-foreground body copy (15px line-height-relaxed)
  *   - Primary CTA + optional secondary action slot
@@ -20,7 +20,7 @@
  *   - "Could not connect to the local sidecar" (Settings)
  *   - Any feature gate / coming-soon state
  *
- * Honesty rule: don't oversell empty states. "No memories yet — they'll
+ * Honesty rule: don't oversell empty states. "No memories yet - they'll
  * appear here as Potluck learns from your conversations." Not "Be the
  * first to create a memory!" That's hype-shaped.
  */
@@ -38,11 +38,11 @@ export interface EmptyStateProps {
   title: ReactNode;
   /** Optional body copy under the heading */
   description?: ReactNode;
-  /** Primary action button (already-styled element — slot, not props) */
+  /** Primary action button (already-styled element - slot, not props) */
   primaryAction?: ReactNode;
   /** Secondary action / link (rendered below the primary) */
   secondaryAction?: ReactNode;
-  /** Tone — affects icon-square color. Default 'neutral' (ember). */
+  /** Tone - affects icon-square color. Default 'neutral' (ember). */
   tone?: EmptyStateTone;
   /** Apply grain texture to the surface. Default true. */
   grain?: boolean;

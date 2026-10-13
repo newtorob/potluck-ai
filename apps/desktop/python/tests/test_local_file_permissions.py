@@ -1,4 +1,4 @@
-"""Tests for local file permissions (2026-07-17 security audit, MEDIUM).
+"""Tests for local file permissions.
 
 ~/.potluck/config.json holds the gateway API key in cleartext and
 ~/.potluck/data/memory.db holds the full content of every stored memory.
@@ -51,10 +51,11 @@ def test_config_dir_is_0700_after_save(tmp_path: Path) -> None:
 
 def test_config_permissions_reapplied_idempotently(tmp_path: Path) -> None:
     """A world-readable file left by an older build gets locked down on the
-    next save — the fix must self-heal existing installs, not just new ones."""
+    next save - permissions must self-heal on existing installs, not just new
+    ones."""
     cfg = tmp_path / "config.json"
     save_settings(PotluckSettings(), cfg)
-    cfg.chmod(0o644)  # simulate a pre-fix world-readable file
+    cfg.chmod(0o644)  # simulate a world-readable file left by an older build
     assert _mode(cfg) == 0o644
 
     save_settings(PotluckSettings(), cfg)

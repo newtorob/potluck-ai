@@ -2,7 +2,7 @@
 // mesh-state changes to subscribers (currently: the IPC server's WS /events
 // clients; future: metrics, logging hooks).
 //
-// Privacy: events carry only mesh-layer metadata — peer IPs, truncated pubkeys,
+// Privacy: events carry only mesh-layer metadata - peer IPs, truncated pubkeys,
 // hostnames, status strings. No inference content, no WG private keys, no
 // pairing tokens are ever placed in events.
 package events
@@ -130,7 +130,7 @@ func (b *Bus) Subscribe() (<-chan Event, func()) {
 	ch := make(chan Event, subscriberChanCap)
 
 	if b.closed {
-		// Already shut down — return a closed channel so the caller's range
+		// Already shut down - return a closed channel so the caller's range
 		// loop exits immediately.
 		close(ch)
 		return ch, func() {}
@@ -201,7 +201,7 @@ func (b *Bus) Close() {
 func (b *Bus) PublishWithTimeout(e Event, timeout time.Duration) {
 	b.Publish(e)
 	// Brief sleep to give async WS writers a chance to flush.
-	// Not a correctness requirement — just best-effort graceful drain.
+	// Not a correctness requirement - just best-effort graceful drain.
 	delay := timeout
 	if delay > 100*time.Millisecond {
 		delay = 100 * time.Millisecond

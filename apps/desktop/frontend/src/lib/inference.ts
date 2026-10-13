@@ -1,5 +1,5 @@
 /**
- * Inference routing abstraction — v1-ready.
+ * Inference routing abstraction - v1-ready.
  *
  * v0: only LocalProvider is active. NetworkProvider and FallbackProvider
  * are stubs that always return isAvailable() === false.
@@ -7,8 +7,6 @@
  * v1 plan: NetworkProvider will route to the contributor network for large
  * models that exceed local VRAM. FallbackProvider will offer a degraded
  * experience (smaller local model) if neither is available.
- *
- * See guide §4.6.
  */
 
 import type { ChatMessage, ChatOptions } from '@/types/chat';
@@ -49,12 +47,12 @@ class NetworkProvider implements InferenceProvider {
   readonly name = 'network';
 
   streamChat(_messages: ChatMessage[], _options: ChatOptions): Promise<Response> {
-    // TODO (v1): route through the contributor network coordinator
+    // TODO: route through the contributor network coordinator
     return Promise.reject(new Error('NetworkProvider not available in v0'));
   }
 
   isAvailable(): Promise<boolean> {
-    // Stubbed for v0 — always returns false
+    // Stubbed for v0 - always returns false
     return Promise.resolve(false);
   }
 }
@@ -63,12 +61,12 @@ class FallbackProvider implements InferenceProvider {
   readonly name = 'fallback';
 
   streamChat(_messages: ChatMessage[], _options: ChatOptions): Promise<Response> {
-    // TODO (v1): attempt a smaller local model if the primary is OOM
+    // TODO: attempt a smaller local model if the primary is OOM
     return Promise.reject(new Error('FallbackProvider not available in v0'));
   }
 
   isAvailable(): Promise<boolean> {
-    // Stubbed for v0 — always returns false
+    // Stubbed for v0 - always returns false
     return Promise.resolve(false);
   }
 }
@@ -87,9 +85,9 @@ const PROVIDERS: InferenceProvider[] = [
  * Route an inference request to the first available provider.
  *
  * Providers are tried in priority order:
- *   1. LocalProvider  — always preferred; zero latency, zero data egress
- *   2. NetworkProvider — contributor network (v1)
- *   3. FallbackProvider — degraded local fallback (v1)
+ *   1. LocalProvider - always preferred; zero latency, zero data egress
+ *   2. NetworkProvider - contributor network (v1)
+ *   3. FallbackProvider - degraded local fallback (v1)
  *
  * @throws if no provider is available
  */

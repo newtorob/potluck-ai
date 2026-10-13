@@ -28,17 +28,17 @@ var consolePollInterval = 3 * time.Second
 // platformListen creates a Windows named pipe listener whose DACL grants
 // access to the account the daemon itself runs as, PLUS the user signed in
 // at the active console, and keeps that second grant current for as long as
-// the listener lives. The socketPath parameter is ignored on Windows — the
+// the listener lives. The socketPath parameter is ignored on Windows - the
 // named pipe path is always pipeName.
 //
 // This is the Windows analog of listener_unix.go's SUDO_UID/console-user
 // socket-chown reconciliation: when this daemon runs as a Windows SERVICE
-// (LocalSystem via the app-driven install — see
+// (LocalSystem via the app-driven install - see
 // packaging/windows/mesh-install-helper.ps1) rather than as the
 // interactively logged-in user, user.Current() resolves to the SERVICE
 // ACCOUNT's SID (S-1-5-18 for LocalSystem), not the desktop user's. A DACL
 // granting access only to that SID would leave Electron (running as the
-// logged-in user) unable to connect to the pipe at all — the daemon would
+// logged-in user) unable to connect to the pipe at all - the daemon would
 // run, /status would work locally, but the desktop app would show "mesh
 // unavailable" forever.
 //
@@ -48,7 +48,7 @@ var consolePollInterval = 3 * time.Second
 // user -> user): see listenPipe and listener_accessfollow.go.
 //
 // buildPipeSDDL is factored out (pure, no Win32 calls) so the DACL string
-// construction is unit-testable without a real console session — see
+// construction is unit-testable without a real console session - see
 // listener_windows_test.go.
 func platformListen(_ string) (net.Listener, error) {
 	u, err := user.Current()
@@ -70,7 +70,7 @@ func listenPipe(name, ownerSID string, key func() string, interval time.Duration
 	current := key()
 	ln, err := winio.ListenPipe(name, &winio.PipeConfig{
 		SecurityDescriptor: buildPipeSDDL(ownerSID, current),
-		// MessageMode: false — byte stream (compatible with HTTP over the pipe).
+		// MessageMode: false - byte stream (compatible with HTTP over the pipe).
 	})
 	if err != nil {
 		return nil, fmt.Errorf("localapi: listen named pipe %s: %w", name, err)
@@ -174,17 +174,17 @@ func consoleKey() string {
 
 // buildPipeSDDL builds the pipe's security descriptor string:
 //
-//	D:P   — DACL, protected (no inheritance)
-//	A     — Allow ACE
-//	GA    — Generic All rights
+//	D:P - DACL, protected (no inheritance)
+//	A - Allow ACE
+//	GA - Generic All rights
 //
 // Always grants ownerSID (the account the daemon itself runs as). Also
-// grants consoleSID when it is non-empty and different from ownerSID — the
+// grants consoleSID when it is non-empty and different from ownerSID - the
 // common case being ownerSID = LocalSystem (running as a Windows Service)
 // and consoleSID = the interactively logged-in desktop user Electron runs
 // as. When they're equal (dev: running interactively as the same user that
 // will connect) or consoleSID is empty (no resolvable console session), a
-// single-ACE DACL is emitted, matching the pre-fix behavior.
+// single-ACE DACL is emitted for that one account.
 func buildPipeSDDL(ownerSID, consoleSID string) string {
 	if consoleSID == "" || consoleSID == ownerSID {
 		return fmt.Sprintf("D:P(A;;GA;;;%s)", ownerSID)
@@ -266,7 +266,7 @@ func (w *consoleWarnings) reset() {
 var consoleWarn consoleWarnings
 
 // defaultSocketPath returns the named pipe identifier on Windows. This value
-// is what Electron (Node.js) passes to net.createConnection({ path }) — Node
+// is what Electron (Node.js) passes to net.createConnection({ path }) - Node
 // accepts the \\.\pipe\... syntax directly.
 func defaultSocketPath() string {
 	return pipeName

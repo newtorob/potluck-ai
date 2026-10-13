@@ -1,7 +1,7 @@
 """Active first-token failover on the STREAMING job endpoint.
 
 `_dispatch_stream_with_failover` (routers/jobs.py) resolves a peer that has
-actually produced a first token (or an empty-but-complete result) BEFORE
+actually produced a first token (or an empty-but-complete result) before
 `dispatch_job_stream` hands a StreamingResponse to ASGI. A peer that hangs,
 black-holes, or errors before its first token is excluded and the next-best
 peer is tried instead -- entirely invisible to the client, who never sees a
@@ -22,10 +22,10 @@ Conventions:
     `db_session` fixture used elsewhere.
   - `FIRST_TOKEN_DEADLINE_S` is monkeypatched to a small value so DOA/timeout
     scenarios don't actually burn wall-clock seconds per test.
-  - Peers are owned by the SAME member_id as the requester ("My Machines"
+  - Peers are owned by the same member_id as the requester ("My Machines"
     tier, scope="pool" tries this first) so routing doesn't depend on the
     open-pool reputation gate -- keeps the fixtures focused on failover, not
-    trust-gating (out of scope per the task's scope note).
+    trust-gating.
 """
 from __future__ import annotations
 
@@ -260,7 +260,7 @@ async def test_second_peer_serves_when_first_hangs(fast_deadline) -> None:
     try:
         async with factory() as db:
             # `pick_peer_for_model`'s tiebreak (equal score) prefers the
-            # MOST-RECENTLY-registered peer, so register `good` first and
+            # most-recently-registered peer, so register `good` first and
             # `dead` second -- this deterministically makes `dead` win
             # attempt 1, proving failover (not lucky ordering) is what
             # lands the request on `good`.
@@ -369,7 +369,7 @@ async def test_exhausting_all_attempts_raises_503(fast_deadline) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 3. A peer that DID stream a token then dies mid-stream is NOT retried.
+# 3. A peer that did stream a token then dies mid-stream is not retried.
 # ---------------------------------------------------------------------------
 
 
@@ -383,7 +383,7 @@ async def test_committed_peer_is_not_retried_after_mid_stream_death(fast_deadlin
     try:
         async with factory() as db:
             # `first` streams one token then (simulated) dies -- error lands
-            # AFTER the token, i.e. after commitment.
+            # after the token, i.e. after commitment.
             async def _stream_then_die(buf) -> None:
                 await asyncio.sleep(0.01)
                 buf.tokens.append("partial")
@@ -412,7 +412,7 @@ async def test_committed_peer_is_not_retried_after_mid_stream_death(fast_deadlin
             await asyncio.sleep(0.1)
             assert buf.error_category == "peer_disconnected"
 
-            # The second peer was NEVER dispatched to -- no JobAssignedMessage,
+            # The second peer was never dispatched to -- no JobAssignedMessage,
             # no Job row. Once a token has been yielded/committed there is no
             # retry, ever, even though the committed peer subsequently failed.
             assert second_ws.sent == []
@@ -496,7 +496,7 @@ async def test_excluded_peer_never_repicked_across_attempts(fast_deadline) -> No
             # Two dead peers, then a good one -- exercises the exclusion set
             # growing across >1 retries. Registration order is REVERSED
             # relative to intended pick order: the tie-break prefers the
-            # MOST-RECENTLY-registered peer, so register `good` first,
+            # most-recently-registered peer, so register `good` first,
             # `dead_b` next, `dead_a` last -- making `dead_a` deterministically
             # win attempt 1, `dead_b` attempt 2, `good` attempt 3.
             good_id, ws_good = await _mk_peer(db, member_id, behavior=_stream_one_token)
@@ -512,7 +512,7 @@ async def test_excluded_peer_never_repicked_across_attempts(fast_deadline) -> No
             assert first_token == "hi"
             assert peer_conn.peer_id == good_id
 
-            # Each dead peer was dispatched to EXACTLY once -- never re-picked
+            # Each dead peer was dispatched to exactly once -- never re-picked
             # on a later attempt within the same request.
             assert len(ws_a.sent) == 1
             assert len(ws_b.sent) == 1

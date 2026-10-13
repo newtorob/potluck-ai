@@ -1,14 +1,14 @@
 'use strict';
 
 /**
- * generate-build-info.js — writes build-info.json into the electron package
+ * generate-build-info.js - writes build-info.json into the electron package
  * directory (apps/desktop/electron/) at build time.
  *
  * This is the source of the staleness-detection stamp: the git short SHA the
  * tree was built from, an ISO-8601 build timestamp, and a dirty flag (were
  * there uncommitted changes at build time). main.js reads this file when
  * app.isPackaged and exposes it to the renderer via preload's
- * window.potluck.app.buildInfo — see main.js's loadBuildInfo().
+ * window.potluck.app.buildInfo - see main.js's loadBuildInfo().
  *
  * Run this BEFORE electron-builder so build-info.json exists when the "files"
  * glob in package.json picks it up. Wired into:
@@ -17,7 +17,7 @@
  *
  * Never throws: a git failure (e.g. building from a tree with no .git, or a
  * shallow CI checkout without history) degrades to sha:"unknown" rather than
- * failing the whole build — a missing stamp is a much smaller problem than a
+ * failing the whole build - a missing stamp is a much smaller problem than a
  * blocked release build.
  */
 

@@ -6,8 +6,7 @@ absent the dependency is a no-op (dev mode passthrough). A one-shot
 WARNING is emitted at startup (in ``app.py``'s lifespan) so operators
 notice the unauthenticated posture before any network exposure.
 
-v0.5 will replace this with signed-nonce session auth per
-memory cba2143d.
+Signed-nonce session auth is planned to replace this.
 """
 from __future__ import annotations
 
@@ -41,7 +40,7 @@ def require_coordinator_token(
         alias="X-Potluck-Coordinator-Token",
     ),
 ) -> None:
-    """FastAPI dependency — enforces bearer-style token auth on HTTP routes.
+    """FastAPI dependency - enforces bearer-style token auth on HTTP routes.
 
     Dev-mode passthrough when ``POTLUCK_COORDINATOR_TOKEN`` is unset; otherwise
     the ``X-Potluck-Coordinator-Token`` header must match (constant-time).

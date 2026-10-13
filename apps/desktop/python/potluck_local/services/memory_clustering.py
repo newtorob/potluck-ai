@@ -1,16 +1,16 @@
-"""Memory clustering — UMAP 2D projection for the cluster-map view.
+"""Memory clustering - UMAP 2D projection for the cluster-map view.
 
 Results are cached in-memory keyed on (project, n_active_memories).  The
 cache is invalidated whenever a memory is saved, updated, or deleted.
 
 UMAP parameters chosen:
-  n_neighbors=15   — standard default; balances local vs global structure well
+  n_neighbors=15 - standard default; balances local vs global structure well
                      at the ~10-1000 memory scale we expect in v0.
-  min_dist=0.1     — keeps clusters tight enough to be visually useful without
+  min_dist=0.1 - keeps clusters tight enough to be visually useful without
                      collapsing neighbours into a single point.
-  metric='cosine'  — matches the cosine-similarity we use everywhere else;
+  metric='cosine' - matches the cosine-similarity we use everywhere else;
                      avoids re-normalising vectors for a different metric.
-  n_components=2   — we need 2D coords for the map canvas, nothing more.
+  n_components=2 - we need 2D coords for the map canvas, nothing more.
 
 Fallback: if fewer than 8 memories have embeddings, UMAP produces unreliable
 output (it needs at least n_neighbors+1 samples).  In that case we fall back
@@ -103,7 +103,7 @@ class ClusterCache:
         cached_sig, cached_resp = entry
         current_sig = await self._count_active(project)
         if current_sig != cached_sig:
-            # Memory count changed — stale.
+            # Memory count changed - stale.
             del self._store[project]
             return None
         return cached_resp
@@ -122,7 +122,7 @@ class ClusterCache:
         self._store.pop(project, None)
 
     async def invalidate_all(self) -> None:
-        """Clear the entire cache — call when a memory write affects all scopes."""
+        """Clear the entire cache - call when a memory write affects all scopes."""
         self._store.clear()
 
 
@@ -142,13 +142,13 @@ def _pca_2d(matrix: np.ndarray) -> np.ndarray:
     """Project (n, d) matrix to (n, 2) using truncated SVD (no sklearn needed)."""
     # Centre the data
     centred = matrix - matrix.mean(axis=0)
-    # SVD — we only need first 2 components
+    # SVD - we only need first 2 components
     try:
         _, _, vt = np.linalg.svd(centred, full_matrices=False)
         components = vt[:2]  # (2, d)
         projected = centred @ components.T  # (n, 2)
     except np.linalg.LinAlgError:
-        # Degenerate matrix — fall back to circle
+        # Degenerate matrix - fall back to circle
         projected = _circle_layout(len(matrix))
     return projected.astype(np.float32)
 
@@ -160,7 +160,7 @@ def _circle_layout(n: int) -> np.ndarray:
 
 
 def _umap_2d_sync(matrix: np.ndarray) -> np.ndarray:
-    """Blocking UMAP projection — call via run_in_executor."""
+    """Blocking UMAP projection - call via run_in_executor."""
     import umap  # type: ignore[import]
 
     reducer = umap.UMAP(
@@ -185,7 +185,7 @@ async def _project_2d(matrix: np.ndarray) -> np.ndarray:
         try:
             return await loop.run_in_executor(None, _umap_2d_sync, matrix)
         except Exception as exc:
-            logger.warning("umap_failed reason=%s — falling back to PCA", exc)
+            logger.warning("umap_failed reason=%s, falling back to PCA", exc)
 
     # PCA fallback: pure numpy, no executor needed for this scale
     return await loop.run_in_executor(None, _pca_2d, matrix)

@@ -1,10 +1,10 @@
 /**
- * useHealth — polls GET /health on a 10-second interval.
+ * useHealth - polls GET /health on a 10-second interval.
  *
  * Exposes the three values ChatView's top-bar chips need:
- *   modelLoaded   — whether any model is currently loaded into the runtime
- *   activeModelId — slug of the loaded model, or null
- *   nCtxLoaded    — context window the runtime was actually initialised with;
+ *   modelLoaded - whether any model is currently loaded into the runtime
+ *   activeModelId - slug of the loaded model, or null
+ *   nCtxLoaded - context window the runtime was actually initialised with;
  *                   null when no model is loaded
  *
  * Polling pauses while the document is hidden (tab backgrounded) and
@@ -80,7 +80,7 @@ export function useHealth(): UseHealthReturn {
         // Preserve the last known model and pipeline state on a transient
         // error so a single timeout or 5xx doesn't flip PipelineModeCard to
         // 'disabled' and briefly re-enable its Enable button. Only sidecarUp
-        // is authoritative from a failed poll — the model didn't unload.
+        // is authoritative from a failed poll - the model didn't unload.
         setState((prev) => ({ ...prev, sidecarUp: false }));
       }
     }

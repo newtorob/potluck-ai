@@ -1,35 +1,33 @@
 #!/usr/bin/env bash
 # Post-deploy smoke test against LIVE production Potluck infra.
 #
-# WHY THIS EXISTS: the coordinator has two independent auth gates —
+# Why this exists: the coordinator has two independent auth gates -
 # require_coordinator_token (a shared secret only the Python sidecar holds)
 # and resolve_session_member_id (the real per-member session gate). The
-# desktop frontend calls a set of coordinator routes DIRECTLY from the
+# desktop frontend calls a set of coordinator routes directly from the
 # Electron renderer and can never hold the coordinator's shared secret, so
-# those routes must depend ONLY on the session gate. We shipped a prod
-# incident where several frontend-direct routes (/me/circles,
-# /me/credit-balance, /me/contributions, /jobs/stream, /jobs/stats, etc.)
-# still carried the token dependency: it was invisible in dev (the token
-# gate no-ops when POTLUCK_COORDINATOR_TOKEN is unset) and only broke the
-# instant prod set a real token.
+# those routes must depend only on the session gate. A frontend-direct route
+# (/me/circles, /me/credit-balance, /me/contributions, /jobs/stream,
+# /jobs/stats, etc.) that still carried the token dependency would be
+# invisible in dev (the token gate no-ops when POTLUCK_COORDINATOR_TOKEN is
+# unset) and only break the instant prod set a real token.
 #
-# IMPORTANT — the two gates are NOT distinguishable from an unauthenticated
-# probe: require_coordinator_token ALSO raises 401 (middleware/auth.py:51),
+# Important: the two gates cannot be told apart by an unauthenticated
+# probe: require_coordinator_token also raises 401 (middleware/auth.py:51),
 # exactly like the session gate. So check 3 (no token, no session) can only
-# prove a route "requires auth"; a 401 there does NOT prove the token gate is
-# gone. The DEFINITIVE regression guard for this bug is check 6
+# prove a route "requires auth"; a 401 there does not prove the token gate is
+# gone. The regression guard for this is check 6
 # (--with-session): a route that still carries the token dependency will 401
-# even for a VALID session (token gate fires first, before the session is
+# even for a valid session (token gate fires first, before the session is
 # ever read), whereas a correctly session-only route returns 2xx. Run this
-# WITH a session after every coordinator deploy to actually confirm the fix.
+# with a session after every coordinator deploy to confirm.
 # See services/coordinator/tests/test_prod_auth_posture.py for the matching
-# unit-level guardrail (which CAN set both gates and assert directly).
+# unit-level guardrail (which can set both gates and assert directly).
 #
-# NOT WIRED TO CI (cost/simplicity — this is a solo-operator shop). This is a
-# manual "make smoke-prod" run after every coordinator/api deploy, and a
-# standing item on docs/launch/production-launch-checklist.md.
+# Not wired to CI (cost/simplicity). This is a
+# manual "make smoke-prod" run after every coordinator/api deploy.
 #
-# Default run is READ-ONLY / SAFE: no emails sent, no accounts created, no
+# Default run is read-only and safe: no emails sent, no accounts created, no
 # mutation of prod state. Everything below check 3's negative-auth probes and
 # the CORS preflight is a GET or an intentionally-pre-auth POST that the
 # coordinator rejects at the auth layer before touching the DB.
@@ -131,12 +129,12 @@ report "GET /health" "$code" "(expect 200)" "$ok"
 echo
 
 # ---------------------------------------------------------------------------
-# 3. Auth-posture BASELINE -- necessary but NOT sufficient. Frontend-direct
+# 3. Auth-posture baseline -- necessary but not sufficient. Frontend-direct
 #    routes (services/coordinator/tests/test_prod_auth_posture.py
-#    FRONTEND_DIRECT_ROUTES, lines 97-113) called with NO coordinator token and
-#    NO session must require auth. NOTE: both gates raise 401, so a 401 here
-#    only proves "the route requires auth" -- it does NOT prove the token gate
-#    was dropped. Check 6 (--with-session) is what actually confirms the fix.
+#    FRONTEND_DIRECT_ROUTES) called with no coordinator token and
+#    no session must require auth. Note: both gates raise 401, so a 401 here
+#    only proves "the route requires auth" -- it does not prove the token gate
+#    was dropped. Check 6 (--with-session) is what actually confirms it.
 #      401 = route requires auth (baseline OK; gate identity unknown from here)
 #      200 = auth is off entirely (BUG)
 #      403 = some other authz failure (unexpected -- investigate)
@@ -217,11 +215,11 @@ report "GET /models/catalog" "$code" "$note" "$ok"
 echo
 
 # ---------------------------------------------------------------------------
-# OPT-IN 6. --with-session: THE DEFINITIVE regression check. Prove the
+# OPT-IN 6. --with-session: the regression check. Prove the
 # frontend-direct routes return 2xx WITH a real session bearer and NO
 # coordinator token. A route that still carries require_coordinator_token
 # 401s here even for a valid session (the token gate fires before the session
-# is read) -- so a 401 in THIS check is the exact prod bug, caught for real.
+# is read) -- so a 401 in this check means a route still carries the token gate.
 # ---------------------------------------------------------------------------
 if [ -n "$WITH_SESSION_TOKEN" ]; then
   echo "== 6. [opt-in] DEFINITIVE: frontend-direct routes WITH session (no coordinator token) =="

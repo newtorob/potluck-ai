@@ -1,11 +1,10 @@
 /**
  * Pick the recovery action that matches a failed reply.
  *
- * The chat bubble used to treat any error text containing "503" as "no model
- * loaded" and offer a "Load a model" button. A 503 also covers every routing
- * failure: no peer matched, the contributor disconnected, no coordinator is
- * configured. In those cases the button sent people to the model library,
- * where nothing they did could fix the problem.
+ * A 503 can mean "no model loaded", but it also covers every routing failure:
+ * no peer matched, the contributor disconnected, no coordinator is
+ * configured. A "Load a model" button on those would send people to the model
+ * library, where nothing they did could fix the problem.
  *
  * So classify on what the message actually says, and offer nothing when the
  * text does not identify a cause. A button that leads somewhere useless is

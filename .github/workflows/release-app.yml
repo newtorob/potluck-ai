@@ -1,6 +1,6 @@
 name: Release - Desktop App
 
-on: []  # disabled — re-enable by restoring push tags + workflow_dispatch triggers
+on: []  # disabled: re-enable by restoring push tags + workflow_dispatch triggers
 
 permissions:
   contents: write

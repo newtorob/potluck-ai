@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""mesh-smoke — Phase G mesh week 1-2 acceptance harness.
+"""mesh-smoke - smoke test for the mesh control-plane.
 
 Drives the full mesh control-plane path end-to-end against a live
 coordinator:
@@ -89,7 +89,7 @@ def main() -> int:
         return 1
     household_id = body["id"]
     mesh_cidr = body["mesh_cidr"]
-    print(f"  ok — household_id={household_id} mesh_cidr={mesh_cidr}")
+    print(f"  ok - household_id={household_id} mesh_cidr={mesh_cidr}")
 
     # ---- 2. Issue a pairing token ---- #
     print(f"→ POST {base}/mesh/pairing-tokens", flush=True)
@@ -98,7 +98,7 @@ def main() -> int:
         print(f"✗ token issue failed: {status} {body}")
         return 1
     token = body["token"]
-    print(f"  ok — token={token[:8]}... expires_at={body['expires_at']}")
+    print(f"  ok - token={token[:8]}... expires_at={body['expires_at']}")
 
     # ---- 3. Enroll a node ---- #
     print(f"→ POST {base}/mesh/enroll", flush=True)
@@ -122,7 +122,7 @@ def main() -> int:
     node_id = body["node_id"]
     mesh_ip = body["mesh_ip"]
     roster = body["peers"]
-    print(f"  ok — node_id={node_id} mesh_ip={mesh_ip} roster_size={len(roster)}")
+    print(f"  ok - node_id={node_id} mesh_ip={mesh_ip} roster_size={len(roster)}")
 
     # ---- 3a. Re-enrolling with the same token must fail (409) ---- #
     print(f"→ POST {base}/mesh/enroll (duplicate token, expect 409)", flush=True)
@@ -138,7 +138,7 @@ def main() -> int:
     if status != 409:
         print(f"✗ expected 409 on consumed token, got {status} {body}")
         return 1
-    print(f"  ok — 409 as expected: {body.get('detail')}")
+    print(f"  ok - 409 as expected: {body.get('detail')}")
 
     # ---- 4. Fetch peer roster via wg_public_key ---- #
     print(f"→ GET  {base}/mesh/peers?wg_public_key=...", flush=True)
@@ -149,7 +149,7 @@ def main() -> int:
     if status != 200:
         print(f"✗ peer roster fetch failed: {status} {body}")
         return 1
-    print(f"  ok — roster has {len(body)} other peer(s)")
+    print(f"  ok - roster has {len(body)} other peer(s)")
 
     # ---- 5. Heartbeat ---- #
     print(f"→ POST {base}/mesh/heartbeat", flush=True)
@@ -165,14 +165,14 @@ def main() -> int:
     if status != 200:
         print(f"✗ heartbeat failed: {status} {body}")
         return 1
-    print(f"  ok — server_time={body['server_time']}")
+    print(f"  ok - server_time={body['server_time']}")
 
     # ---- 6. Signaling WebSocket ---- #
     try:
-        import websockets  # noqa: F401  — lazy import keeps the HTTP portion stdlib-only
+        import websockets  # noqa: F401 - lazy import keeps the HTTP portion stdlib-only
     except ImportError:
         print()
-        print("(skipping WS step — pip install websockets to exercise /mesh/signal)")
+        print("(skipping WS step - pip install websockets to exercise /mesh/signal)")
         print()
         print("✓ mesh acceptance (HTTP-only): PASS")
         return 0
@@ -207,7 +207,7 @@ async def _ws_smoke(ws_base: str, wg_key: str) -> bool:
                 print(f"✗ expected welcome, got: {msg}")
                 return False
             print(
-                f"  welcome ok — node_id={msg['node_id']} "
+                f"  welcome ok - node_id={msg['node_id']} "
                 f"mesh_ip={msg['mesh_ip']} roster_size={len(msg['roster'])}"
             )
 
@@ -229,7 +229,7 @@ async def _ws_smoke(ws_base: str, wg_key: str) -> bool:
             if msg.get("type") != "pong":
                 print(f"✗ expected pong, got: {msg}")
                 return False
-            print(f"  pong ok — server_time={msg['server_time']}")
+            print(f"  pong ok - server_time={msg['server_time']}")
         return True
     except Exception as e:
         print(f"✗ WS smoke failed: {type(e).__name__}: {e}")

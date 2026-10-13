@@ -1,4 +1,4 @@
-"""Governance — proposals and member voting.
+"""Governance - proposals and member voting.
 
 Task: 9
 

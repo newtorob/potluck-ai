@@ -1,4 +1,4 @@
-"""002 — memberships
+"""002 - memberships
 
 Revision ID: 0002_memberships
 Revises: 0001_initial

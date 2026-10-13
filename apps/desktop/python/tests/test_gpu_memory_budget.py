@@ -22,7 +22,7 @@ from potluck_local.services.windows_gpu import AdapterMemory, AdapterReading
 
 GIB = 1024 ** 3
 
-# Recorded on the machine above, 2026-10-09 (previous display driver).
+# Recorded on the machine above.
 MODEL_BYTES = 5_027_783_488
 BLOCKS, KV_HEADS, HEAD_DIM = 36, 8, 128
 KV_PER_TOKEN = BLOCKS * KV_HEADS * (HEAD_DIM + HEAD_DIM) * 2  # 147,456, as llama.cpp logs it

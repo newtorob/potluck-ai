@@ -1,17 +1,17 @@
-"""Cloud model-catalog feed — background refresh + validated disk cache.
+"""Cloud model-catalog feed - background refresh + validated disk cache.
 
 The bundled catalog (potluck_local/data/models.json) is the offline floor:
 it ships inside the packaged app and always works with zero network. This
-module is the sidecar's ONLY network-touching piece of the catalog story.
+module is the sidecar's only network-touching piece of the catalog story.
 It periodically GETs {POTLUCK_CLOUD_API_BASE}/models/catalog, validates the
-response, and writes it to a disk cache (utils.paths.catalog_cache_path()) —
+response, and writes it to a disk cache (utils.paths.catalog_cache_path()) -
 it never overwrites the bundled data file. model_registry._load_catalog()
-then picks the freshest VALID source between that cache and the bundled
+then picks the freshest valid source between that cache and the bundled
 file; request handlers never block on the network here.
 
 Never raises: every failure (offline, DNS, non-2xx, malformed JSON, missing
 required fields, the cloud endpoint not deployed yet) is caught, logged at
-info/warning, and simply means the refresh made no progress this cycle — the
+info/warning, and simply means the refresh made no progress this cycle - the
 cache keeps whatever it already had (or stays absent, and callers fall back
 to bundled).
 """
@@ -65,7 +65,7 @@ async def refresh_once() -> bool:
     """Fetch the cloud catalog feed once and write it to disk if valid.
 
     Returns True when a new valid catalog was written, False on any failure
-    (offline, non-2xx, malformed body, cache write error) — never raises
+    (offline, non-2xx, malformed body, cache write error) - never raises
     (except asyncio.CancelledError, which must propagate for shutdown).
     """
     base = get_local_settings().cloud_api_base.rstrip("/")

@@ -1,4 +1,4 @@
-"""005 — proposals + votes
+"""005 - proposals + votes
 
 Revision ID: 0005_governance
 Revises: 0004_models
@@ -101,7 +101,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.PrimaryKeyConstraint("id", name="pk_votes"),
-        # One vote per member per proposal — enforced here and via ON CONFLICT in upserts.
+        # One vote per member per proposal - enforced here and via ON CONFLICT in upserts.
         sa.UniqueConstraint(
             "proposal_id", "member_id", name="uq_votes_proposal_member"
         ),

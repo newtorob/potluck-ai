@@ -1,14 +1,14 @@
-"""Regression test — 2026-09-06 P1 sidecar audit: chat history ignored its own switch.
+"""Chat history writes must honor the privacy.chat_history_enabled switch.
 
-`PrivacySettings.chat_history_enabled` shipped defaulting to False and was read
-nowhere. Every content-writing chat endpoint (POST /chat/conversations, PATCH
-/chat/conversations/{id}, POST /chat/conversations/{id}/messages, PATCH
-/chat/messages/{id}) persisted the user's prompts and derived titles into
-memory.db regardless, so the default install wrote chat content to disk that
-the user had never opted into. Reproduced by POSTing with no config.json at all
-(the shipped default) and finding rows in `conversations` and `messages`.
+`PrivacySettings.chat_history_enabled` defaults to False. Every content-writing
+chat endpoint (POST /chat/conversations, PATCH /chat/conversations/{id},
+POST /chat/conversations/{id}/messages, PATCH /chat/messages/{id}) must not
+persist the user's prompts and derived titles into memory.db while it is off.
+Otherwise the default install would write chat content to disk that the user
+had never opted into (POSTing with no config.json at all, the shipped
+default, must leave `conversations` and `messages` empty).
 
-The fix is two gates. The router refuses the four write verbs with 403 and a
+There are two gates. The router refuses the four write verbs with 403 and a
 stable `chat_history_disabled` code. memory_db refuses the same writes at the
 persistence boundary with ChatHistoryDisabledError, fails closed if settings
 cannot be read, and raises before any SQL runs so a write is never silently
@@ -44,7 +44,7 @@ from potluck_local.services.memory_db import (
 
 # TestClient client= tuple that satisfies the peer_access_middleware loopback
 # check. Without it every request 403s for an unrelated reason, which would
-# make a status-only assertion pass against a broken gate — so the tests below
+# make a status-only assertion pass against a broken gate - so the tests below
 # assert on the detail string too.
 LOCAL = ("127.0.0.1", 50000)
 
@@ -143,7 +143,7 @@ def test_write_endpoints_are_refused_when_chat_history_disabled(client, isolated
 
 
 # ---------------------------------------------------------------------------
-# (b) Flag on: every write path works exactly as before.
+# (b) Flag on: every write path works.
 # ---------------------------------------------------------------------------
 
 
@@ -297,7 +297,7 @@ def test_memory_db_gate_fails_closed_when_settings_raise(isolated_env, monkeypat
 
 
 def test_escaping_memory_db_error_becomes_403(client, isolated_env, monkeypatch):
-    """Router gate on, persistence gate off — the HTTP answer stays the same."""
+    """Router gate on, persistence gate off - the HTTP answer stays the same."""
     from potluck_local.routers import chat as chat_router
 
     _set_chat_history(True)

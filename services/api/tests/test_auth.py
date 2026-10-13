@@ -58,7 +58,7 @@ async def test_bearer_fallback_authenticates(client, db):
 
 
 # ---------------------------------------------------------------------------
-# FIX 1 — magic links are single-use
+# Magic links are single-use
 # ---------------------------------------------------------------------------
 
 
@@ -72,12 +72,12 @@ async def test_magic_link_rejects_second_redemption(client, db):
     r2 = await client.get(f"/auth/callback?token={token}")
     assert r2.status_code == 400
 
-    # The first redemption's session is untouched — replay didn't revoke it.
+    # The first redemption's session is untouched - replay didn't revoke it.
     assert r1.json()["memberId"]
 
 
 # ---------------------------------------------------------------------------
-# FIX 2 — production cookie is SameSite=Lax (not None)
+# Production cookie is SameSite=Lax (not None)
 # ---------------------------------------------------------------------------
 
 
@@ -97,7 +97,7 @@ async def test_callback_prod_cookie_is_samesite_lax(client, db, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# FIX 3 — ADMIN_EMAILS is re-evaluated every sign-in; email lookup is
+# ADMIN_EMAILS is re-evaluated every sign-in; email lookup is
 # case-insensitive
 # ---------------------------------------------------------------------------
 
@@ -106,7 +106,7 @@ async def test_admin_allowlist_promotes_and_demotes_on_sign_in(client, db, monke
     settings = get_settings()
     monkeypatch.setattr(settings, "admin_emails", "council@example.com")
 
-    # First sign-in (mixed case) — creates the member and grants admin from
+    # First sign-in (mixed case) - creates the member and grants admin from
     # the allowlist.
     token1 = (
         AuthService(db).create_magic_link("Council@Example.com").split("token=", 1)[1]
@@ -121,7 +121,7 @@ async def test_admin_allowlist_promotes_and_demotes_on_sign_in(client, db, monke
     assert member.is_admin is True
 
     # Remove the address from the allowlist, then sign in again with a
-    # different case variant — must resolve to the SAME member row and
+    # different case variant - must resolve to the same member row and
     # demote it, not create a second one.
     monkeypatch.setattr(settings, "admin_emails", "")
     token2 = (
@@ -143,7 +143,7 @@ async def test_admin_allowlist_promotes_and_demotes_on_sign_in(client, db, monke
 
 
 # ---------------------------------------------------------------------------
-# FIX 4 — /auth/request-link caps per-recipient independent of the per-IP cap
+# /auth/request-link caps per-recipient independent of the per-IP cap
 # ---------------------------------------------------------------------------
 
 
@@ -160,7 +160,7 @@ async def test_request_link_caps_per_recipient(client, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# FIX 5 — /auth/callback returns the signed-in member's email
+# /auth/callback returns the signed-in member's email
 # ---------------------------------------------------------------------------
 
 

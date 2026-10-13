@@ -3,26 +3,26 @@
 # bootstrap-linux.sh
 #
 # OS-level preparation for running Potluck on an Ubuntu/Debian Linux box.
-# Run BEFORE setup-household.sh, with sudo:
+# Run before setup-household.sh, with sudo:
 #
 #     sudo ./scripts/bootstrap-linux.sh
 #     sudo ./scripts/bootstrap-linux.sh --with-tailscale     # also install Tailscale
 #     sudo ./scripts/bootstrap-linux.sh --with-sudo-tickets  # !tty_tickets sudoers fragment (advanced)
 #
 # Performs (idempotent where possible):
-#   1. Disconnect Mullvad if connected. The #1 reason yesterday's installs
-#      hung silently was an active VPN blackholing apt/pip endpoints.
+#   1. Disconnect Mullvad if connected. The most common reason installs
+#      hang silently is an active VPN blackholing apt/pip endpoints.
 #   2. Add deadsnakes PPA (Ubuntu 22.04 + earlier ship Python 3.10; we need 3.11+).
 #   3. Install Python 3.11 + venv + dev + git + build-essential + curl + wireguard-tools.
 #
 # Optional (flag-gated):
 #   --with-tailscale       Install the Tailscale CLI. Only useful if you're
-#                           NOT using Potluck's built-in WireGuard mesh
-#                           (the household contributor flow). Does NOT run
+#                           not using Potluck's built-in WireGuard mesh
+#                           (the household contributor flow). Does not run
 #                           'tailscale up' (needs interactive browser auth).
 #   --with-sudo-tickets    Install /etc/sudoers.d/99-no-tty-tickets so sudo
 #                           creds persist across ttys for the invoking user.
-#                           Useful for agent-driven (Claude Code etc.) installs
+#                           Useful for scripted or agent-driven installs
 #                           where sudo is called from non-interactive tool
 #                           calls. Modifying sudoers is invasive enough to
 #                           require explicit opt-in.
@@ -78,7 +78,7 @@ case "${ID:-} ${ID_LIKE:-}" in
 esac
 
 # ----------------------------------------------------------------------------
-# 1. VPN disconnect (yesterday's bug)
+# 1. VPN disconnect
 # ----------------------------------------------------------------------------
 
 step "disconnect Mullvad if connected"

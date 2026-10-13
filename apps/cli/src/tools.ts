@@ -2,10 +2,10 @@
  * Tool implementations for the agent loop.
  *
  * read_file / list_dir / search_files / glob are read-only and auto-run.
- * write_file / edit_file / run_command are side-effecting and MUST pass through
+ * write_file / edit_file / run_command are side-effecting and must pass through
  * an injectable confirm() gate (the default is a y/N prompt; tests stub it). All
  * paths resolve under the working directory and any path that escapes it is
- * refused. Containment is checked on the CANONICAL path (symlinks resolved),
+ * refused. Containment is checked on the canonical path (symlinks resolved),
  * not the lexical one; see resolveInCwd.
  */
 
@@ -32,7 +32,7 @@ import {
 
 export interface ConfirmContext {
   tool: "write_file" | "edit_file" | "run_command";
-  /** Human-readable body to show before asking — a diff, or the command. */
+  /** Human-readable body to show before asking - a diff, or the command. */
   summary: string;
   /** The target path (write_file/edit_file) or the command (run_command). */
   subject: string;
@@ -61,7 +61,7 @@ export const TOOL_NAMES = [
   "run_command",
 ] as const;
 
-/** A recoverable tool failure — surfaced back to the model as TOOL_RESULT. */
+/** A recoverable tool failure - surfaced back to the model as TOOL_RESULT. */
 class ToolError extends Error {}
 
 const MAX_FILE_BYTES = 64_000;
@@ -145,7 +145,7 @@ async function canonicalize(abs: string, raw: string): Promise<string> {
   }
 }
 
-/** True when `target` IS the canonical root or sits underneath it. */
+/** True when `target` is the canonical root or sits underneath it. */
 function withinRoot(root: string, target: string): boolean {
   // A plain string prefix compare would call /work2 a child of /work, so test
   // the relative path instead: "" is the root itself, ".." or "../x" climbs out
@@ -166,18 +166,18 @@ function canonicalRoot(cwd: string): Promise<string> {
 /**
  * Resolve `p` under `cwd`, refusing anything that escapes the directory.
  *
- * The check is on the CANONICAL path, not the lexical one. A lexically-inside
+ * The check runs on the canonical path (symlinks resolved). A lexically-inside
  * path can be a symlink (or sit under a symlinked directory) whose target is
  * outside the workspace, and every fs call after this check follows symlinks, so
- * a lexical-only check let read_file return arbitrary files (audit P1).
+ * a lexical-only check would let read_file return arbitrary files.
  *
  * Residual race: this is check-then-use. A symlink swapped between this check
  * and the open that follows would still be followed. Closing that needs an
  * O_NOFOLLOW walk of every segment against an open directory handle; accepted as
- * out of scope for this fix.
+ * out of scope.
  *
- * Async because realpath is async. It stays module-private, so the exported tool
- * API is unchanged; the five call sites simply await it.
+ * Async because realpath is async. It stays module-private; the five call sites
+ * simply await it.
  */
 async function resolveInCwd(cwd: string, p: string): Promise<string> {
   const root = await canonicalRoot(cwd);
@@ -218,7 +218,7 @@ async function listDirTool(
 }
 
 /**
- * search_files — grep-like search across the repo (read-only, auto-runs).
+ * search_files - grep-like search across the repo (read-only, auto-runs).
  * `query` is a regex by default; pass `regex: false` for a literal search. An
  * invalid regex falls back to a literal match. Honors .gitignore, skips binary
  * files, and caps at MAX_SEARCH_HITS hits (noting truncation).
@@ -290,7 +290,7 @@ async function searchFilesTool(
 }
 
 /**
- * glob — find files by name pattern (read-only, auto-runs). `**` crosses
+ * glob - find files by name pattern (read-only, auto-runs). `**` crosses
  * directories; `*` and `?` stay within a segment. Honors .gitignore and caps at
  * MAX_GLOB_MATCHES (noting truncation).
  */
@@ -345,8 +345,8 @@ async function writeFileTool(
   }
 
   // Guard against the classic weak-model mistake: overwriting an existing,
-  // non-empty file with empty content. Seen live -- a 3B model blanked a file
-  // with a pointless empty write AFTER it had already made the real edit. Refuse
+  // non-empty file with empty content. Weak models sometimes blank a file
+  // with a pointless empty write after already making the real edit. Refuse
   // hard so --yes can't auto-approve a destructive no-op.
   if (current.trim().length > 0 && content.trim().length === 0) {
     throw new ToolError(
@@ -356,8 +356,8 @@ async function writeFileTool(
   }
 
   // Guard against blind-overwrite: rewriting an existing, non-empty file the
-  // agent never read this task. Seen live -- a 7B rewrote a file from memory and
-  // silently dropped an existing function. Force a read first, and steer toward a
+  // agent never read this task. Weak models sometimes rewrite a file from memory
+  // and silently drop an existing function. Force a read first, and steer toward a
   // targeted edit_file over a whole-file overwrite.
   if (current.trim().length > 0 && deps.readPaths && !deps.readPaths.has(abs)) {
     throw new ToolError(
@@ -377,7 +377,7 @@ async function writeFileTool(
 
   await mkdir(dirname(abs), { recursive: true });
   await writeFile(abs, content, "utf8");
-  // After authoring the file, the agent knows its content — a later overwrite is
+  // After authoring the file, the agent knows its content - a later overwrite is
   // informed, not blind, so record it like a read.
   deps.readPaths?.add(abs);
   return `wrote ${content.length} bytes to ${path}`;
@@ -549,8 +549,8 @@ function resolveEdit(
   if (trailing.length > 1 && !replaceAll) return ambiguous(trailing.length, "trailing whitespace");
   if (trailing.length >= 1) return applySpans(trailing, () => repl);
 
-  // Tier 3: uniform-indent — the whole block written at a consistent wrong
-  // indent. We ONLY accept a single uniform offset (reject non-uniform drift
+  // Tier 3: uniform-indent - the whole block written at a consistent wrong
+  // indent. We only accept a single uniform offset (reject non-uniform drift
   // rather than silently apply mis-indented code), then re-indent new_string to
   // the file's actual indentation.
   const needleMin = commonLeadingWs(needle);
@@ -585,7 +585,7 @@ function editContext(path: string, content: string, anchor = ""): string {
 }
 
 /**
- * edit_file — replace `old_string` with `new_string` in an existing file. The
+ * edit_file - replace `old_string` with `new_string` in an existing file. The
  * preferred way to change existing files; write_file is for creating new ones.
  * Matching is a cascade (exact -> trailing-whitespace-flex -> indent-flex), so
  * small whitespace drift still lands. Fails clearly if the file is missing, the
@@ -613,7 +613,7 @@ async function editFileTool(
   }
 
   if (oldString === newString) {
-    throw new ToolError("old_string and new_string are identical — nothing to change. Inspect the actual file and make a different correction." + editContext(path, current, oldString));
+    throw new ToolError("old_string and new_string are identical: nothing to change. Inspect the actual file and make a different correction." + editContext(path, current, oldString));
   }
 
   const replaceAll = args.replace_all === true;
@@ -701,9 +701,9 @@ function tailCap(s: string): string {
 }
 
 /**
- * Run a FIXED verify command (build/tests) after an edit. Same child_process
- * spawn as run_command, but it is NOT gated (the user configured it) and the
- * captured output is tail-capped — build errors land at the end.
+ * Run the configured verify command (build/tests) after an edit. Same child_process
+ * spawn as run_command, but it is not gated (the user configured it) and the
+ * captured output is tail-capped - build errors land at the end.
  */
 export function runVerify(command: string, cwd: string): Promise<VerifyOutcome> {
   return new Promise((resolveExec) => {

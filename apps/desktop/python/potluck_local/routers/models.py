@@ -1,13 +1,13 @@
 """Model management router.
 
-GET    /models                              — list available/installed models
-GET    /models/{slug}/manifest              — fetch a single model's manifest
-POST   /models/{slug}/install               — start download (background task)
-DELETE /models/{slug}                       — delete installed model
-POST   /models/{slug}/load                  — load model into runtime
-POST   /models/{slug}/unload               — unload model from runtime
-GET    /models/{slug}/download-progress     — poll download progress
-POST   /models/{slug}/cancel-download      — cancel an active download
+GET    /models - list available/installed models
+GET    /models/{slug}/manifest - fetch a single model's manifest
+POST   /models/{slug}/install - start download (background task)
+DELETE /models/{slug} - delete installed model
+POST   /models/{slug}/load - load model into runtime
+POST   /models/{slug}/unload - unload model from runtime
+GET    /models/{slug}/download-progress - poll download progress
+POST   /models/{slug}/cancel-download - cancel an active download
 """
 
 from __future__ import annotations
@@ -41,21 +41,21 @@ router = APIRouter()
 
 def _safe_model_dir(slug: str) -> Path:
     """Resolve `slug` to a model directory strictly inside models_dir(), or
-    raise 400. This is the ONLY approved way to turn a caller-supplied slug
+    raise 400. This is the only approved way to turn a caller-supplied slug
     into a filesystem path in this router.
 
     delete_model shutil.rmtrees whatever this returns, so a slug that
     escapes models_dir() is destructive, not just a bad-request: a slug of
     ".." (e.g. from a URL-encoded "%2e%2e" path segment, which FastAPI/
     Starlette decode to ".." before the handler ever sees it) resolves to
-    models_dir()'s PARENT -- the whole ~/.potluck data directory -- and
+    models_dir()'s parent -- the whole ~/.potluck data directory -- and
     shutil.rmtree deletes it.
 
     Two independent checks, deliberately redundant:
       1. Reject slugs containing a path separator, "..", or a null byte
          outright -- catches the obvious cases without even touching the
          filesystem.
-      2. Resolve the candidate path and assert its parent is EXACTLY
+      2. Resolve the candidate path and assert its parent is exactly
          models_dir() (not merely "starts with" it, which a symlink or a
          cleverly-nested "a/../.." could defeat) -- catches anything the
          first check's blocklist didn't anticipate.
@@ -318,7 +318,7 @@ class PipelineConfig(BaseModel):
 
 class PipelineAutoConfig(BaseModel):
     """Auto pipeline-parallel: orchestrate a chain across this node + available household
-    peers, no explicit addresses. The sidecar queries the roster, runs TOPOLOGY-AWARE
+    peers, no explicit addresses. The sidecar queries the roster, runs topology-aware
     placement (layers proportional to each node's VRAM; nodes ordered by link latency;
     fewest hops that fit, capped at max_nodes), starts each peer's stage, then head-loads.
     If the model fits on this machine alone, the split is skipped (strategy='whole-model')
@@ -334,7 +334,7 @@ class LoadModelRequest(BaseModel):
 
     rpc_servers: when set, the model loads with one or more remote
     llama.cpp RPC servers participating as ggml-backend devices. This is
-    Big Model Mode — used to run a model too big to fit on this machine
+    Big Model Mode - used to run a model too big to fit on this machine
     alone, by spreading weights/KV/compute across household peers that
     are running `rpc-server`. Endpoints look like "100.64.0.6:50052".
     Requires the Potluck-patched llama-cpp-python wheel.
@@ -371,7 +371,7 @@ def _load_verify_reference(slug: str, manifest: dict | None, model_dir) -> tuple
     its sha256 is tamper-resistant -> prefer it. The model.gguf.sha256 written next
     to the weights lives in the user-writable ~/.potluck/models dir; anyone who can
     rewrite model.gguf can rewrite it too, so it only catches accidental corruption.
-    Use it ONLY as a fallback for a non-catalog model (which has no bundled hash).
+    Use it only as a fallback for a non-catalog model (which has no bundled hash).
 
     Returns (expected_hash_lowercased, source) where source is "catalog", "sidecar",
     or "none" when no reference hash is available.
@@ -427,9 +427,9 @@ async def _load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
                 logger.error("pipeline_orchestrate_error model_id=%s error=%s", model_id, exc)
                 raise HTTPException(status_code=502, detail=f"pipeline orchestration failed: {exc}")
 
-            # Topology-aware short-circuit: the planner found the model fits on THIS
+            # Topology-aware short-circuit: the planner found the model fits on this
             # machine's VRAM alone, so it declined to build a pipeline (no hop is faster
-            # than no hop, and no peer stages were started). Load the FULL model locally
+            # than no hop, and no peer stages were started). Load the full model locally
             # via the whole-model engine instead of forcing a split. Off the event loop
             # (multi-second blocking load) like load_pipeline.
             if chain.get("mode") == "whole":

@@ -1,9 +1,9 @@
 """Joining a trusted circle by invite, and what membership then allows.
 
-Before this, a circle was a list of machine keys its owner pasted in. The
-person behind a key was never asked, could not see the circle or leave it,
-and could not borrow from it. An invite is the consent step; a membership is
-what both sides hold afterwards.
+A circle starts as a list of machine keys its owner pasted in. The person
+behind a key is never asked, cannot see the circle or leave it, and cannot
+borrow from it. An invite is the consent step; a membership is what both
+sides hold afterwards.
 """
 from __future__ import annotations
 

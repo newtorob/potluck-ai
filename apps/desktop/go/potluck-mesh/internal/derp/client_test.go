@@ -18,8 +18,8 @@ import (
 // mockRelay is a minimal TCP server that mimics just enough of the DERP relay
 // to test the client: accepts auth, sends auth_ok, optionally delivers frames.
 type mockRelay struct {
-	ln       net.Listener
-	addr     string
+	ln   net.Listener
+	addr string
 	// handler is called with the conn after auth_ok is sent.
 	handler func(conn net.Conn)
 }
@@ -272,9 +272,9 @@ func TestSendEnqueuesFrame(t *testing.T) {
 
 	select {
 	case <-sendDone:
-		// Relay received something — good.
+		// Relay received something - good.
 	case <-time.After(2 * time.Second):
-		t.Log("relay did not receive send — acceptable if timing was tight")
+		t.Log("relay did not receive send, acceptable if timing was tight")
 	}
 	cancel()
 }

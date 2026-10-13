@@ -19,7 +19,7 @@ _CIRCLE_ID = '11111111-1111-4111-8111-111111111111'
 
 @pytest.mark.parametrize('path', ['/jobs', '/jobs/stream'])
 @pytest.mark.parametrize('routing', [
-    {'circle_id': _CIRCLE_ID},  # The previously leaking desktop request.
+    {'circle_id': _CIRCLE_ID},  # The desktop request: a circle_id with no scope.
     {'scope': 'pool', 'circle_id': _CIRCLE_ID},
     {'scope': 'mine', 'circle_id': _CIRCLE_ID},
     {'scope': 'circle'},

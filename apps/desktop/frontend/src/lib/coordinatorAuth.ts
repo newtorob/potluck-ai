@@ -24,25 +24,25 @@
  *   - GET  /jobs/stats             (own requester-side job counts, last 24h)
  *
  * All of these resolve identity via `resolve_session_member_id`, which accepts
- * an `Authorization: Bearer <session token>` header — the desktop app's
+ * an `Authorization: Bearer <session token>` header - the desktop app's
  * fallback for a cross-origin cookie (see coordinator's
  * `middleware/session_auth.py`).
  *
  * The session token itself lives wherever cloudApi.ts keeps it: the Electron
  * main process (any Electron window, dev or packaged) or an httpOnly cookie
- * (plain browser, no bridge) — see authStore.ts. It is never persisted in
+ * (plain browser, no bridge) - see authStore.ts. It is never persisted in
  * renderer state and main process never hands the raw value to renderer JS,
  * so whenever the bridge is present these calls are proxied through main via
  * `window.potluck.cloud.coordinatorRequest`, which attaches the bearer
  * itself and returns `{ status, body }`. This mirrors cloudApi.ts's
- * dual-path transport, except the coordinator origin is caller-supplied —
+ * dual-path transport, except the coordinator origin is caller-supplied -
  * the coordinator is a member-operated node the user points the app at (see
- * connectionStore.ts), not a fixed api.trypotluck.ai host — so main.js
+ * connectionStore.ts), not a fixed api.trypotluck.ai host - so main.js
  * allowlists the exact paths this module calls rather than fixing the
  * origin.
  *
  * In a bridge-less plain browser, the coordinator almost always runs with
- * `POTLUCK_SESSION_AUTH_ENABLED` unset (dev passthrough — see
+ * `POTLUCK_SESSION_AUTH_ENABLED` unset (dev passthrough - see
  * `session_auth.py`), so an absent/empty bearer is fine there; we still
  * attach the auth store's in-memory token when one happens to be present
  * (e.g. moments after a fresh sign-in) as a best effort.
@@ -69,7 +69,7 @@ interface CoordinatorBridge {
 
 /**
  * Return the main-process bridge whenever it's actually present on
- * `window.potluck` — true for both packaged (file://) and dev
+ * `window.potluck` - true for both packaged (file://) and dev
  * (`make desktop`, http://localhost:5173) Electron windows, since preload
  * exposes `potluck.cloud` unconditionally. Only a bridge-less plain browser
  * tab falls through to undefined, which routes the request to fetch +
@@ -94,10 +94,10 @@ export function detailOf(body: unknown, fallback = 'unknown error'): string {
  * Call a session-authed coordinator route. Attaches the member's session
  * bearer (any Electron window: via the main-process proxy; plain browser:
  * best-effort from the in-memory auth store). Never throws on a non-2xx HTTP
- * response — the caller inspects `status`/`body`; a transport failure
+ * response - the caller inspects `status`/`body`; a transport failure
  * resolves `status: 0`.
  *
- * `body` is ignored for GET/DELETE — those routes here take none.
+ * `body` is ignored for GET/DELETE - those routes here take none.
  */
 export async function coordinatorSessionRequest(
   method: CoordinatorSessionMethod,

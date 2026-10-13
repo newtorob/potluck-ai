@@ -1,14 +1,12 @@
-"""0012 — peer_capabilities.prompt_tokens_per_second.
+"""0012 - peer_capabilities.prompt_tokens_per_second.
 
 Adds a nullable prompt-processing rate next to the existing generation rate.
-Until now no real peer wrote either figure (attestation stored only slug and
-quantization), so the coordinator's first-token deadline always fell back
-to the hardware-tier guess. The contributor now reports both from the
-sidecar's benchmark; the deadline prefers this column, then
-tokens_per_second, then the tier fallback.
+The contributor reports both from the sidecar's benchmark; the coordinator's
+first-token deadline prefers this column, then tokens_per_second, then the
+hardware-tier fallback.
 
-Null semantics: NULL means "not measured", exactly today's behaviour for
-every existing row. Additive, coordinated-deploy-safe, no backfill.
+Null semantics: NULL means "not measured". Additive,
+coordinated-deploy-safe, no backfill.
 
 Revision ID: 0012_capability_prompt_tps
 Revises: 0011_job_terminal_reason

@@ -1,6 +1,6 @@
 // Package tunnel manages the userspace WireGuard device (wg-go).
 //
-// Week 3 additions:
+// Main operations:
 //   - SetMeshIP: assigns the mesh IP to the TUN interface.
 //   - SetPeers: wholesale-replaces the WG peer set via UAPI replace_peers=true.
 //   - AddPeer / RemovePeer / UpdatePeerEndpoint: delta peer management.
@@ -11,14 +11,11 @@
 //   - Windows: "Wintun"     (wintun.dll driver, admin required once at install time)
 //
 // SetMeshIP platform implementation:
-//   - Linux:   shells out to `ip addr add <ip>/32 dev <iface>` (v0 acceptable;
-//     netlink post-launch polish is tracked in TODO below).
+//   - Linux:   shells out to `ip addr add <ip>/32 dev <iface>` (acceptable for
+//     now; see the TODO in ifaddr_unix.go about native netlink).
 //   - macOS:   shells out to `ifconfig <iface> inet <ip> <ip>`.
-//   - Windows: NOT IMPLEMENTED in week 3 — IP assignment via iphlpapi/netsh is
-//     non-trivial in pure Go without cgo. The TUN device comes up without
-//     an address; WG session still initialises, but the mesh IP is not
-//     routable on Windows until this is resolved. A log.Warn is emitted.
-//     TODO(week4-windows): implement via netsh / iphlpapi or a small cgo shim.
+//   - Windows: shells out to `netsh interface ip add address` on the Wintun
+//     adapter (see ifaddr_windows.go), which avoids cgo / iphlpapi.
 //
 // Privacy: this package handles WireGuard encrypted packets only.
 // It never inspects payload bytes and never logs anything beyond
@@ -52,7 +49,7 @@ const (
 
 	// wgPort is the UDP port the WG device listens on for encrypted traffic.
 	// 51820 is the WireGuard default. Using a fixed port makes firewall rules
-	// predictable; random port is deferred to the STUN + hole-punch work in week 3.
+	// predictable.
 	wgPort = 51820
 )
 
@@ -67,10 +64,10 @@ type Peer struct {
 	// Empty means the peer is known but not yet reachable (no STUN endpoint).
 	Endpoint string
 	// PersistentKeepalive is the WG keepalive interval in seconds.
-	// MUST default to 0 — the design doc mandates keepalive=off by default
+	// Must default to 0 - the design doc mandates keepalive=off by default
 	// to protect battery on laptops and cellular. Only enable when the user
 	// explicitly opts into "stay reachable while idle."
-	// TODO(keepalive-toggle): wire a user setting that sets this to 60+.
+	// TODO: wire a user setting that sets this to 60+.
 	PersistentKeepalive int
 	// Private marks a peer that belongs to someone outside the household (a
 	// circle link). Its endpoint is another person's address, so the tunnel
@@ -251,7 +248,7 @@ func (t *Tunnel) WGPort() int {
 
 // AddPeerRoute installs a /32 host route for the given peer mesh IP via this
 // node's TUN interface. Required because the local mesh-IP /32 (installed by
-// SetMeshIP) only covers our own address — without explicit host routes for
+// SetMeshIP) only covers our own address - without explicit host routes for
 // each peer, the kernel falls back to the default gateway and drops the
 // packets before they ever reach WG (and therefore before DERP can relay
 // them). Idempotent.
@@ -287,7 +284,7 @@ func (t *Tunnel) RemovePeerRoute(peerMeshIP string) error {
 // Platform behaviour:
 //   - Linux: shells out to `ip addr add <ip>/32 dev <iface>`
 //   - macOS: shells out to `ifconfig <iface> inet <ip> <ip>` (point-to-point)
-//   - Windows: logs a warning and returns without error — see TODO above.
+//   - Windows: `netsh interface ip add address` on the Wintun adapter
 func (t *Tunnel) SetMeshIP(meshIP string) error {
 	ip := net.ParseIP(meshIP)
 	if ip == nil {
@@ -341,7 +338,7 @@ func (t *Tunnel) SetMeshIP(meshIP string) error {
 // truncateForLog returns s clipped to at most maxLogEndpointLen characters
 // (with a "..." suffix if clipped) so that a malicious/malformed endpoint
 // string (e.g. a newline-injection payload) never gets echoed into logs
-// verbatim — that would just relocate the injection risk from IpcSet's UAPI
+// verbatim - that would just relocate the injection risk from IpcSet's UAPI
 // stream to whatever consumes the structured log output.
 const maxLogEndpointLen = 64
 
@@ -360,38 +357,35 @@ func truncateForLog(s string) string {
 
 // validateEndpoint rejects any endpoint string that does not round-trip to a
 // clean "host:port" pair with a syntactically valid IP address and a port in
-// [1, 65535] — OR the synthetic "derp:<64-hex>" format written by
+// [1, 65535] - OR the synthetic "derp:<64-hex>" format written by
 // derp.SyntheticEndpointString for DERP-routed peers (see below).
 //
 // This is defense-in-depth against UAPI config injection: endpoint strings
 // originate from the coordinator/peer roster (untrusted wire data) and are
 // interpolated directly into newline-delimited UAPI directives sent to
 // wireguard-go via IpcSet. A value containing an embedded "\n" (e.g.
-// "1.1.1.1:1\nallowed_ip=0.0.0.0/0\n") would inject an extra UAPI directive —
-// e.g. widening a peer's allowed_ips past its intended /32 — because IpcSet
+// "1.1.1.1:1\nallowed_ip=0.0.0.0/0\n") would inject an extra UAPI directive -
+// e.g. widening a peer's allowed_ips past its intended /32 - because IpcSet
 // has no concept of a single "field"; it just parses whatever newline-
 // separated key=value lines it's given. net.SplitHostPort + net.ParseIP
 // reject embedded newlines/extra content because the host component would
 // then fail to parse as a valid IP.
 //
-// The coordinator is being hardened server-side in parallel, but this client
-// must never trust the wire regardless of what the server does.
+// This client must never trust the wire regardless of what the server does.
 //
 // The synthetic-endpoint carve-out is safe under the same threat model: it is
-// never peer/coordinator-supplied — main.go's flipToDERP constructs it
+// never peer/coordinator-supplied - main.go's flipToDERP constructs it
 // locally from a WG pubkey it already trusts (the roster's wg_public_key,
-// decoded to exactly 32 bytes and hex-encoded) — and
-// derp.IsSyntheticEndpointFormat requires an EXACT "derp:" + 64-hex-char
+// decoded to exactly 32 bytes and hex-encoded) - and
+// derp.IsSyntheticEndpointFormat requires an exact "derp:" + 64-hex-char
 // shape, which has no room for an embedded newline or any other injection
 // payload. Without this carve-out, every UpdatePeerEndpoint call that flips a
 // peer to DERP routing (the always-on relay floor, not just the opt-in
-// LAN-direct path) was rejected outright — "invalid IP host \"derp\"" — which
-// left EVERY peer with no endpoint configured on the WG device at all
-// (neither the synthetic DERP endpoint nor a raw direct one, since the
+// LAN-direct path) would be rejected outright - "invalid IP host \"derp\"" -
+// which would leave every peer with no endpoint configured on the WG device
+// at all (neither the synthetic DERP endpoint nor a raw direct one, since the
 // roster-update path also skips raw-endpoint writes for anything the mode
-// tracker / dBind consider DERP-managed). Regression introduced by commit
-// f5fd5ef ("fix(mesh): validate peer endpoints before WireGuard UAPI write"),
-// which predates this carve-out.
+// tracker / dBind consider DERP-managed).
 func validateEndpoint(endpoint string) error {
 	if derp.IsSyntheticEndpointFormat(endpoint) {
 		return nil
@@ -471,7 +465,7 @@ func (t *Tunnel) keptPeers(batch []Peer) []Peer {
 // list plus the peers named by SetKeptPeers. Uses the UAPI `replace_peers=true`
 // directive so stale peers are removed in the same transaction.
 //
-// Peers with an empty Endpoint are configured without an endpoint — they are
+// Peers with an empty Endpoint are configured without an endpoint - they are
 // known to WG (and will accept inbound traffic if they initiate) but we
 // cannot initiate outbound sessions to them until their endpoint arrives via
 // a roster_update.
@@ -590,7 +584,7 @@ func (t *Tunnel) UpdatePeerEndpoint(pubkey, endpoint string) error {
 
 	// Reject any endpoint that isn't a clean "host:port" before it ever
 	// reaches IpcSet. See validateEndpoint for the UAPI config-injection
-	// rationale. A rejected endpoint is a no-op for this peer, not a crash —
+	// rationale. A rejected endpoint is a no-op for this peer, not a crash -
 	// the roster-update loop that calls this per-peer must keep going for
 	// the rest of the roster.
 	if err := validateEndpoint(endpoint); err != nil {
@@ -623,7 +617,7 @@ func (t *Tunnel) UpdatePeerEndpoint(pubkey, endpoint string) error {
 //
 //	reachable := !lastHandshake.IsZero() && time.Since(lastHandshake) < 3*time.Minute
 //
-// Privacy: this method parses the raw UAPI GET output but never logs it — the
+// Privacy: this method parses the raw UAPI GET output but never logs it - the
 // output includes the device's own private key in hex form.
 func (t *Tunnel) PeerReachability(pubkeyBase64 string) (lastHandshake time.Time, rxBytes uint64, txBytes uint64, err error) {
 	pubkeyHex, err := base64ToHex(pubkeyBase64)
@@ -633,7 +627,7 @@ func (t *Tunnel) PeerReachability(pubkeyBase64 string) (lastHandshake time.Time,
 
 	// IpcGet returns the full UAPI GET response as a string. We hold the
 	// mutex because IpcGet + IpcSet must not race. The installed wg-go
-	// version signature is `IpcGet() (string, error)` — older versions of
+	// version signature is `IpcGet() (string, error)` - older versions of
 	// the API took an io.Writer; if the build breaks on a future wg-go
 	// bump, swap to whichever shape the new version exposes.
 	t.mu.Lock()
@@ -698,34 +692,34 @@ func (t *Tunnel) PeerReachability(pubkeyBase64 string) (lastHandshake time.Time,
 	return lastHandshake, rx, tx, nil
 }
 
-// PeerEndpoint returns the LIVE endpoint wireguard-go currently has configured
-// for the named peer, straight from the UAPI — i.e. what Send() will actually
+// PeerEndpoint returns the live endpoint wireguard-go currently has configured
+// for the named peer, straight from the UAPI - i.e. what Send() will actually
 // dispatch to next, not what we last told it to use via UpdatePeerEndpoint/
 // AddPeer. Returns "" if the peer has no endpoint configured (e.g. never
 // received a packet yet) or is not found.
 //
 // Caveat for DERP-routed peers: the UAPI serializes the endpoint via
 // conn.Endpoint.DstToString(), which for our synthetic DERP endpoint
-// (internal/derp/bind.go's syntheticEndpoint) returns the ABBREVIATED
+// (internal/derp/bind.go's syntheticEndpoint) returns the abbreviated
 // "derp:<8-char-hex-prefix>" logging form, not the full round-trippable
 // derp.SyntheticEndpointString() value. Callers that need to detect "is this
 // peer still DERP-routed" must check the "derp:" prefix, not compare for
 // equality against SyntheticEndpointString.
 //
-// Why this exists: wireguard-go performs UNCONDITIONAL endpoint roaming on
-// inbound packets (SetEndpointFromPacket) — it silently repoints a peer's
+// Why this exists: wireguard-go performs unconditional endpoint roaming on
+// inbound packets (SetEndpointFromPacket) - it silently repoints a peer's
 // active endpoint to wherever an authenticated inbound packet from that peer
-// last arrived FROM, with no way to opt a specific peer out. For a
+// last arrived from, with no way to opt a specific peer out. For a
 // DERP-managed peer (flipToDERP has pinned the synthetic "derp:<pubkey>"
-// endpoint), a single stray raw-UDP packet from the peer — e.g. a leftover
+// endpoint), a single stray raw-UDP packet from the peer - e.g. a leftover
 // hole-punch retry sent before both sides had converged on DERP, or an
-// occasional packet that slips through an otherwise-failing NAT hairpin —
-// is enough to silently roam the peer OFF the synthetic endpoint and onto a
+// occasional packet that slips through an otherwise-failing NAT hairpin -
+// is enough to silently roam the peer off the synthetic endpoint and onto a
 // real ip:port that may not reliably route (see internal/derp/bind.go's
 // DerpBind.Send doc: a non-synthetic endpoint falls straight through to raw
 // UDP). The peer then looks "reachable" (recent handshake, control traffic
-// flows) while application data silently black-holes — the wireguard-go
-// analogue of the same-key-rejoin bug (handshake succeeds, data doesn't).
+// flows) while application data silently black-holes (handshake succeeds,
+// data doesn't).
 // Callers use this to detect that drift and re-assert flipToDERP.
 func (t *Tunnel) PeerEndpoint(pubkeyBase64 string) (string, error) {
 	pubkeyHex, err := base64ToHex(pubkeyBase64)
@@ -766,9 +760,9 @@ func (t *Tunnel) PeerEndpoint(pubkeyBase64 string) (string, error) {
 
 // IsPeerConfigured reports whether the WG device currently has a peer with the
 // given public key configured. It lets callers distinguish "this peer's key
-// isn't provisioned on the tunnel" (a stale/drifted key after a re-pair — fixed
+// isn't provisioned on the tunnel" (a stale/drifted key after a re-pair - fixed
 // by a re-sync) from "the key is configured but no tunnel formed" (a firewall /
-// NAT / VPN block) — two unreachable cases with two different fixes.
+// NAT / VPN block) - two unreachable cases with two different fixes.
 //
 // Privacy: like PeerReachability, this parses the UAPI but never logs it (the
 // output contains the device's private key in hex).
@@ -802,7 +796,7 @@ func (t *Tunnel) IsPeerConfigured(pubkeyBase64 string) (bool, error) {
 // Format follows https://www.wireguard.com/xplatform/#configuration-protocol
 //
 // Returns an error (and writes nothing to sb) if the peer's fields cannot be
-// safely encoded — in particular, a non-empty Endpoint that fails
+// safely encoded - in particular, a non-empty Endpoint that fails
 // validateEndpoint is a hard reject: endpoint strings are untrusted
 // coordinator/peer-supplied data, and writing one straight into the
 // newline-delimited UAPI stream would let an embedded "\n" inject arbitrary
@@ -835,7 +829,7 @@ func appendPeerConfig(sb *strings.Builder, p Peer) error {
 	}
 
 	// When the peer carries allowed-ips, clear any existing set before listing
-	// them so re-adding an already-configured peer REPLACES its allowed-ips
+	// them so re-adding an already-configured peer replaces its allowed-ips
 	// rather than merging. This is the canonical wireguard UAPI idempotent-
 	// reconfig idiom: without it, a same-key rejoin (e.g. a peer that rebooted
 	// and re-paired) leaves stale allowed-ip entries behind and the data path
@@ -852,7 +846,7 @@ func appendPeerConfig(sb *strings.Builder, p Peer) error {
 	}
 
 	// Persistent keepalive: emit the directive only when non-zero.
-	// Default 0 means "off" per the design doc — critical for battery health.
+	// Default 0 means "off" per the design doc - critical for battery health.
 	if p.PersistentKeepalive > 0 {
 		fmt.Fprintf(sb, "persistent_keepalive_interval=%d\n", p.PersistentKeepalive)
 	}
@@ -875,11 +869,11 @@ func (t *Tunnel) applyBaseConfig(privateKeyBase64 string) error {
 
 // tunInterfaceName returns the platform-appropriate TUN interface name.
 //
-//   - Linux: "potluck0" — conventional naming, udev-friendly.
-//   - macOS: "utun9"  — the kernel may allocate a different index
+//   - Linux: "potluck0" - conventional naming, udev-friendly.
+//   - macOS: "utun9" - the kernel may allocate a different index
 //     (utun0..utun15 are common); we request utun9 to avoid
 //     clashing with VPN software that typically grabs utun0-utun3.
-//   - Windows: "Wintun" — fixed name expected by wintun.dll.
+//   - Windows: "Wintun" - fixed name expected by wintun.dll.
 func tunInterfaceName() string {
 	switch runtime.GOOS {
 	case "darwin":
@@ -894,7 +888,7 @@ func tunInterfaceName() string {
 // newWGLogger creates a wg-go device.Logger that forwards to slog.
 // Errors are logged at Error level; anything else at Debug to avoid log spam
 // from normal WG keepalive traffic.
-// Privacy: wg-go's logger never receives payload content — only control-plane
+// Privacy: wg-go's logger never receives payload content - only control-plane
 // events (peer handshake, key rotation, tunnel state changes).
 func newWGLogger() *device.Logger {
 	return &device.Logger{

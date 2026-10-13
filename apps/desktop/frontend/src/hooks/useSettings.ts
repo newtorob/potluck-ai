@@ -1,5 +1,5 @@
 /**
- * useSettings — loads and persists user settings via the Python sidecar.
+ * useSettings - loads and persists user settings via the Python sidecar.
  *
  * Also applies the `theme` setting to the <html> element so Tailwind's
  * darkMode: 'class' variant activates correctly.

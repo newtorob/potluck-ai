@@ -1,14 +1,14 @@
 /**
- * useProject — thin facade over projectStore.
+ * useProject - thin facade over projectStore.
  *
  * On mount, fetches the project list and seeds the active project from
  * settings (via the settingsStore snapshot) if it hasn't been set yet.
  *
  * Exposes:
- *   projects        — full ProjectSummary list from GET /memory/projects
- *   activeProject   — currently active project name (null = global)
- *   setActive       — PATCH settings + update local state
- *   refreshProjects — re-fetch project list (call after new memory/task created)
+ *   projects - full ProjectSummary list from GET /memory/projects
+ *   activeProject - currently active project name (null = global)
+ *   setActive - PATCH settings + update local state
+ *   refreshProjects - re-fetch project list (call after new memory/task created)
  */
 
 import { useEffect } from 'react';
@@ -33,7 +33,7 @@ export function useProject() {
       await fetchProjects();
     };
     void init();
-    // Run once on mount — all deps are stable Zustand action refs
+    // Run once on mount - all deps are stable Zustand action refs
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

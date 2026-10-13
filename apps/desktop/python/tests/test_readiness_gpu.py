@@ -1,7 +1,7 @@
 """Tests for GET /readiness/gpu-test.
 
-No model downloads, no fleet, no network — just the FastAPI TestClient.
-On this Mac (M3 Pro, Apple Silicon) we expect:
+No model downloads, no peers, no network - just the FastAPI TestClient.
+On Apple Silicon we expect:
   - device: "mps" (or "cpu" if MPS unavailable in CI)
   - ran:    "compute"  (no model loaded)
   - ok:     True when torch is present and the matmul runs cleanly

@@ -1,14 +1,13 @@
-"""Regression test — 2026-07-31 P1 security audit, finding #1.
+"""DELETE /models/{slug} must never delete anything outside the models directory.
 
-DELETE /models/{slug} built `models_dir() / slug` and shutil.rmtree'd it with
-NO validation. A slug of ".." (which is exactly what a URL-encoded "%2e%2e"
+The route builds `models_dir() / slug` and shutil.rmtree's it, so the slug has
+to be validated. A slug of ".." (which is exactly what a URL-encoded "%2e%2e"
 path segment decodes to before FastAPI/Starlette ever hand the string to the
-route function) resolves to models_dir()'s PARENT — the whole ~/.potluck data
-directory — and shutil.rmtree deletes it. The auditor reproduced this getting
-a 200 response while their whole ~/.potluck directory vanished.
+route function) resolves to models_dir()'s parent - the whole ~/.potluck data
+directory - and shutil.rmtree would delete it.
 
-The fix (_safe_model_dir in routers/models.py) rejects any slug that doesn't
-resolve to a direct child of models_dir(), applied to every slug -> filesystem
+_safe_model_dir in routers/models.py rejects any slug that doesn't resolve to
+a direct child of models_dir(), and is applied to every slug -> filesystem
 path use in the router (delete, install, load).
 
 Isolated via POTLUCK_DATA_DIR so this test can never touch a real ~/.potluck.
@@ -34,8 +33,8 @@ def isolated_data_dir(tmp_path, monkeypatch):
     models.mkdir(parents=True)
     monkeypatch.setenv("POTLUCK_DATA_DIR", str(data_dir))
 
-    # Sentinel content elsewhere in the data dir — the destructive bug
-    # deletes models_dir()'s PARENT, i.e. everything here, not just models/.
+    # Sentinel content elsewhere in the data dir - a traversal slug would
+    # delete models_dir()'s parent, i.e. everything here, not just models/.
     (data_dir / "config.json").write_text('{"sentinel": true}')
     installed = models / "real-model"
     installed.mkdir()
@@ -56,15 +55,15 @@ def client():
 
 
 def test_delete_percent_encoded_dotdot_slug_is_rejected(isolated_data_dir, client):
-    """The auditor's exact repro: DELETE /models/%2e%2e must NOT 200, and
-    ~/.potluck (here, the isolated data_dir) must survive completely intact."""
+    """DELETE /models/%2e%2e must not return 200, and ~/.potluck (here, the
+    isolated data_dir) must survive completely intact."""
     resp = client.delete("/models/%2e%2e")
 
     assert resp.status_code != 200
     assert resp.status_code == 400
 
-    # The whole data dir — not just models/ — must still exist with its
-    # original contents. Pre-fix this whole tree is gone.
+    # The whole data dir - not just models/ - must still exist with its
+    # original contents.
     assert isolated_data_dir.exists()
     assert (isolated_data_dir / "config.json").exists()
     assert (isolated_data_dir / "models" / "real-model" / "model.gguf").exists()
@@ -76,7 +75,7 @@ def test_delete_literal_dotdot_slug_is_rejected(isolated_data_dir, client):
     normalisation collapses a literal (unencoded) ".." before it even
     reaches routing (-> 404, never reaches the handler at all) -- still a
     safe outcome, just via a different layer than the %2e%2e case above,
-    which DOES reach the handler as a literal ".." slug and is what
+    which does reach the handler as a literal ".." slug and is what
     _safe_model_dir exists to reject (400)."""
     resp = client.delete("/models/..")
     assert resp.status_code in (400, 404)
@@ -94,7 +93,7 @@ def test_delete_nested_traversal_slug_is_rejected(isolated_data_dir, client):
 
 
 def test_delete_valid_installed_slug_still_works(isolated_data_dir, client):
-    """The fix must not collaterally break deleting a real, legitimately
+    """Slug validation must not break deleting a real, legitimately
     installed model."""
     resp = client.delete("/models/real-model")
     assert resp.status_code == 200
@@ -112,8 +111,8 @@ def test_delete_unknown_but_safe_slug_is_404_not_400(isolated_data_dir, client):
 
 
 # ---------------------------------------------------------------------------
-# Unit-level coverage of the shared helper, and of the OTHER slug -> path
-# uses in the router the auditor asked to be checked for the same bug class.
+# Unit-level coverage of the shared helper, and of the other slug -> path
+# uses in the router (the same bug class).
 # ---------------------------------------------------------------------------
 
 
@@ -138,6 +137,6 @@ def test_safe_model_dir_accepts_plain_slug(isolated_data_dir):
 
 def test_load_model_rejects_traversal_slug(isolated_data_dir, client):
     """POST /models/{slug}/load must not build a filesystem path from an
-    unvalidated slug either — same class of bug, different route."""
+    unvalidated slug either - same class of bug, different route."""
     resp = client.post("/models/%2e%2e/load")
     assert resp.status_code == 400

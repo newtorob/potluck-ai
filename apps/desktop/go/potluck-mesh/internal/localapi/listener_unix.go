@@ -41,27 +41,27 @@ func platformListen(socketPath string) (net.Listener, error) {
 	// Reconcile the daemon-user vs Electron-user split so a root IPC socket
 	// is still reachable by the logged-in desktop user.
 	//
-	// This only fires when we're ROOT: a non-root process can't chown to
+	// This only fires when we're root: a non-root process can't chown to
 	// another uid (EPERM), and when the mesh runs as a dedicated service user
 	// (systemd: User=potluck + CAP_NET_ADMIN) the socket is already owned by
 	// the running user, so the chown is both impossible and unnecessary.
-	// Crucially, a chown failure must NEVER be fatal: the socket already
-	// works (chmod 0600, owned by us). Treating it as fatal here is what
-	// crash-looped the IPC server on headless service nodes.
+	// Crucially, a chown failure must never be fatal: the socket already
+	// works (chmod 0600, owned by us). Treating it as fatal here would
+	// crash-loop the IPC server on headless service nodes.
 	//
 	// Two owner sources, tried in order via decideSocketOwner:
-	//  1. SUDO_UID/SUDO_GID — set only when launched via the `sudo` command
+	//  1. SUDO_UID/SUDO_GID - set only when launched via the `sudo` command
 	//     (dev-mode workaround: the sidecar needs root in dev to create
 	//     utun, but Electron runs as the logged-in user).
-	//  2. The active console/login-session user — the path that matters for
-	//     a ROOT LaunchDaemon (macOS) / systemd service (Linux) started by
-	//     launchd/systemd directly, NOT via `sudo`, where SUDO_UID is never
+	//  2. The active console/login-session user - the path that matters for
+	//     a root LaunchDaemon (macOS) / systemd service (Linux) started by
+	//     launchd/systemd directly, not via `sudo`, where SUDO_UID is never
 	//     set. Resolved via consoleUserResolver (platform-specific; see
 	//     consoleUsername below). Overridable in tests.
 	//
 	// If neither source resolves (e.g. a genuinely headless server with no
 	// one logged in), the socket is left root-owned and a warning is logged
-	// rather than failing — matches the non-fatal contract above.
+	// rather than failing - matches the non-fatal contract above.
 	if uid, gid, source, ok := decideSocketOwner(os.Geteuid(), os.Getenv("SUDO_UID"), os.Getenv("SUDO_GID"), consoleUserResolver); ok {
 		if err := os.Chown(socketPath, uid, gid); err != nil {
 			slog.Warn("localapi: could not chown socket to resolved owner (non-fatal); a same-user desktop app may not reach this socket",
@@ -71,7 +71,7 @@ func platformListen(socketPath string) (net.Listener, error) {
 				"source", source, "uid", uid, "gid", gid, "socket", socketPath)
 		}
 	} else if os.Geteuid() == 0 {
-		slog.Warn("localapi: running as root with no SUDO_UID and no resolvable console/login user — IPC socket remains root-owned; a same-user desktop app will not be able to connect (expected on a headless server)",
+		slog.Warn("localapi: running as root with no SUDO_UID and no resolvable console/login user, IPC socket remains root-owned; a same-user desktop app will not be able to connect (expected on a headless server)",
 			"socket", socketPath)
 	}
 
@@ -82,10 +82,10 @@ func platformListen(socketPath string) (net.Listener, error) {
 // chown'd to, and where that decision came from, given the current
 // process's effective uid, the SUDO_UID/SUDO_GID environment (set only
 // under a dev `sudo` invocation), and a console-user resolver (used for the
-// launchd/systemd ROOT-service case, where SUDO_UID is never set).
+// launchd/systemd root-service case, where SUDO_UID is never set).
 //
 // Factored out of platformListen so this decision is unit-testable without
-// actually running as root or having a real console/login session — see
+// actually running as root or having a real console/login session - see
 // listener_unix_test.go, which injects fake euid/env/resolver values.
 //
 // resolver may be nil (treated as "no console user found").
@@ -105,7 +105,7 @@ func decideSocketOwner(euid int, sudoUID, sudoGID string, resolver func() (uid, 
 			return parsedUID, g, "sudo_uid", true
 		}
 		// SUDO_UID set but unparseable (shouldn't happen under a real sudo
-		// invocation) — fall through to console-user resolution rather than
+		// invocation) - fall through to console-user resolution rather than
 		// silently leaving the socket root-owned.
 	}
 
@@ -119,13 +119,13 @@ func decideSocketOwner(euid int, sudoUID, sudoGID string, resolver func() (uid, 
 }
 
 // consoleUserResolver resolves the (uid, gid) of the currently active
-// console/login-session user for the launchd/systemd ROOT-service case
-// (SUDO_UID unset). A package-level var — not a plain function — so tests
+// console/login-session user for the launchd/systemd root-service case
+// (SUDO_UID unset). A package-level var - not a plain function - so tests
 // can inject a fake resolver without needing root, a real console session,
 // or platform CLI tools (stat/loginctl/who/logname) to be present.
 //
 // Returns ok=false when no console user can be determined (e.g. a headless
-// server with no one logged in) — a normal, expected outcome, not an error
+// server with no one logged in) - a normal, expected outcome, not an error
 // worth surfacing beyond platformListen's warning log.
 var consoleUserResolver = defaultConsoleUserResolver
 
@@ -155,8 +155,8 @@ func defaultConsoleUserResolver() (uid, gid int, ok bool) {
 
 // consoleUsername resolves the username of the currently active
 // console/login-session user via a platform-specific mechanism. Returns an
-// error when no such user can be determined — the normal outcome on a
-// headless server with no one logged in, NOT a bug.
+// error when no such user can be determined - the normal outcome on a
+// headless server with no one logged in, not a bug.
 func consoleUsername() (string, error) {
 	switch runtime.GOOS {
 	case "darwin":
@@ -168,7 +168,7 @@ func consoleUsername() (string, error) {
 	}
 }
 
-// consoleUsernameDarwin shells out to `stat -f%Su /dev/console` — the
+// consoleUsernameDarwin shells out to `stat -f%Su /dev/console` - the
 // standard way to ask "who owns the console device right now" on macOS,
 // which is the logged-in user at the physical console (or a
 // screen-sharing session). SCDynamicStoreCopyConsoleUser (via cgo) is the

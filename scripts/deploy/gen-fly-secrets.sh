@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Mint the strong secrets the Fly deploy needs and print ready-to-run
-# `fly secrets set` commands. Nothing is stored or transmitted — the values
+# `fly secrets set` commands. Nothing is stored or transmitted - the values
 # print to your terminal once. Copy them into a password manager, then run the
-# emitted commands (or pipe the STDIN-safe form). See docs/launch/fly-deploy.md.
+# emitted commands (or pipe the STDIN-safe form).
 #
 # Usage:
 #   ./scripts/deploy/gen-fly-secrets.sh            # print values + commands
@@ -30,7 +30,7 @@ fi
 
 cat <<EOF
 # ---------------------------------------------------------------------------
-# Generated secrets. Save these in a password manager NOW — they are shown once.
+# Generated secrets. Save these in a password manager NOW - they are shown once.
 # The DERP JWT key MUST be identical on the coordinator and the DERP relay.
 # ---------------------------------------------------------------------------
 
@@ -50,5 +50,4 @@ fly secrets set --app potluck-derp \\
 
 # Still needed, from your accounts (not generated here): DATABASE_URL (per app,
 # from the Postgres attach), RESEND_API_KEY, STRIPE_* , and optionally SENTRY_DSN.
-# See docs/launch/fly-deploy.md for the full per-app secret list.
 EOF

@@ -1,4 +1,4 @@
-"""0007 — Peer quality scores: per-(peer, model) quality observation log.
+"""0007 - Peer quality scores: per-(peer, model) quality observation log.
 
 Each row is one quality signal (determinism probe, coherence probe, latency
 measurement, or user feedback) for a specific peer and model slug. The service

@@ -1,6 +1,6 @@
 """0014: direct circle links.
 
-A circle request used to be relayed through the coordinator. A circle link
+A circle request is relayed through the coordinator by default. A circle link
 lets two machines in different households talk directly: the coordinator
 brokers a short-lived link, each machine's mesh sidecar adds the other as a
 restricted WireGuard peer, and the request goes machine to machine.

@@ -17,7 +17,7 @@ from coordinator.routers import circle_links, circles, health, jobs, me, mesh, p
 # endpoints (the Electron renderer hitting POST /jobs/stream). Curl + the WS
 # handshake are unaffected by CORS.
 #
-# The packaged Electron renderer loads from app://. / file:// in EVERY env, so
+# The packaged Electron renderer loads from app://. / file:// in every env, so
 # those are always allowed. The Vite dev server (localhost:5173) is a
 # development-only convenience and must not be shipped to staging/production.
 _BASE_CORS_ORIGINS: list[str] = ["app://.", "file://"]
@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Release-readiness preflight: logs the safety checklist every boot and, in
     # staging/production, refuses to start on an operator-fixable insecure
     # default (open token, TOFU keys, default DB creds). Advisory in development.
-    # Runs BEFORE init_db so a refusal doesn't open (and leak) the DB pool.
+    # Runs before init_db so a refusal doesn't open (and leak) the DB pool.
     from coordinator.services.preflight import enforce_preflight
 
     enforce_preflight(settings)

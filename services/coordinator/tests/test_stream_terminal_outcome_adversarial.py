@@ -1,13 +1,13 @@
-"""Adversarial review of the single-terminal-outcome contract (routers/jobs.py).
+"""Edge cases of the single-terminal-outcome contract (routers/jobs.py).
 
-The implementer's own suite (tests/test_stream_terminal_outcome.py plus the
-outcome matrix in tests/test_finalize_idempotency.py) proves the happy shape of
-each branch. This file attacks the seams BETWEEN the branches: the exact
-suspension points where the wire state and the recorded outcome can disagree,
-the ordering between the drain check and the deadline check, conflicting
-double finalizes, and the one exit that runs no code at all.
+The main suite (tests/test_stream_terminal_outcome.py plus the outcome matrix
+in tests/test_finalize_idempotency.py) covers the happy shape of each branch.
+This file attacks the seams between the branches: the exact suspension
+points where the wire state and the recorded outcome can disagree, the
+ordering between the drain check and the deadline check, conflicting double
+finalizes, and the one exit that runs no code at all.
 
-Claimed contract under test:
+Contract under test:
   * one terminal outcome per job decides status, token/duration writes and the
     single credit-minting gate; only COMPLETED mints
   * terminal_reason + error_category persist on the row for every path
@@ -20,14 +20,13 @@ Claimed contract under test:
     capped at 90 s
   * no Job row is left at 'dispatched' once the handler has returned
 
-Tests named `test_defect_*` FAIL against the current implementation and are the
-finding. Tests named `test_characterizes_*` pin down behaviour that the
-contract does not actually specify, so a future change to it is a deliberate
-choice rather than an accident.
+Tests named `test_defect_*` cover seams where a job could be misrecorded.
+Tests named `test_characterizes_*` pin down behaviour that the contract does
+not actually specify, so a future change to it is a deliberate choice rather
+than an accident.
 
 Fixtures are reused verbatim from tests/test_stream_first_token_failover.py and
-tests/test_stream_terminal_outcome.py; nothing under coordinator/ and no
-existing test is modified by this file.
+tests/test_stream_terminal_outcome.py.
 """
 from __future__ import annotations
 
@@ -128,7 +127,7 @@ def _envelopes(chunks: list[str]) -> list[dict]:
 # ===========================================================================
 # Vector 1 + 9. The terminal_wire_sent guard, probed from both sides.
 #
-# The guard is set AFTER the meta/error envelope is yielded and BEFORE the
+# The guard is set after the meta/error envelope is yielded and before the
 # DONE envelope. That leaves exactly one suspension point -- the meta yield --
 # at which the client has the whole answer but the job is still recorded as
 # though nothing finished.
@@ -195,7 +194,7 @@ async def test_aclose_at_the_done_yield_keeps_completed_and_credits(
 async def test_defect_aclose_at_the_meta_yield_relabels_a_completed_job(
     fast_deadline,
 ) -> None:
-    """Vector 1 (completed side): the SAME fully delivered answer, closed one
+    """Vector 1 (completed side): the same fully delivered answer, closed one
     yield earlier.
 
     `terminal_wire_sent` is assigned after `yield _sse_meta(...)` returns, so a
@@ -319,7 +318,7 @@ async def test_aclose_at_a_mid_loop_token_yield_cancels_and_mints_nothing(
 
 
 # ===========================================================================
-# Vector 8. Cancellation BEFORE the first byte -- the exit that runs no code.
+# Vector 8. Cancellation before the first byte -- the exit that runs no code.
 # ===========================================================================
 
 
@@ -454,7 +453,7 @@ async def test_characterizes_completed_peer_backlog_is_drained_past_the_deadline
     monkeypatch, fast_deadline
 ) -> None:
     """Vector 2: job_complete has already landed and the remaining tokens are
-    still queued when the deadline expires. Contract (item D of the fix): a peer
+    still queued when the deadline expires. Contract: a peer
     that already finished has its backlog drained even past the deadline, so the
     delivered answer is not discarded and relabeled a timeout. The row settles
     completed with the peer's honest totals and credits are minted.
@@ -647,7 +646,7 @@ async def test_characterizes_conflicting_double_finalize(first, second) -> None:
     output_tokens and its two minted ledger rows. The ledger said it was paid
     and the row still agrees.
 
-    cancelled -> completed: the settled failure is NOT promoted back, and the
+    cancelled -> completed: the settled failure is not promoted back, and the
     late COMPLETED mints nothing.
 
     This is what makes a second finalize site (the settle-on-disconnect
@@ -1136,7 +1135,7 @@ async def test_derived_deadline_clamp_holds_under_abuse() -> None:
             )
         # A 2-char prompt is 0.5 estimated tokens; the CPU tier proxy is
         # 1.0 * 25 tok/s, so the derived budget is floor + 0.02. Landing on
-        # EXACTLY the floor would be the tell that a NaN propagated all the way
+        # exactly the floor would be the tell that a NaN propagated all the way
         # through and was swallowed by `max(floor, nan)` -- which returns the
         # floor rather than raising, so the clamp hides the bad input instead
         # of rejecting it.

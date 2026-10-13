@@ -1,6 +1,6 @@
 [Unit]
 Description=Potluck WireGuard mesh sidecar (household)
-Documentation=https://github.com/newtorob/potluckai/blob/main/scripts/systemd/README.md
+Documentation=https://github.com/newtorob/potluck-ai/blob/main/scripts/systemd/README.md
 After=network-online.target potluck-firewall.service
 Wants=network-online.target
 # We don't strictly need the firewall unit (the mesh would still come up
@@ -25,8 +25,8 @@ RuntimeDirectoryMode=0755
 Environment=XDG_RUNTIME_DIR=/run/potluck-mesh
 
 # StateDirectory creates /var/lib/potluck/mesh (potluck:potluck, 0700) and
-# persists across reboots. This is where the WG private key lives now that
-# the service no longer runs as root with access to a real $HOME.
+# persists across reboots. This is where the WG private key lives, since
+# the service does not run as root with access to a real $HOME.
 # ProtectHome=read-only would otherwise block writes to $HOME/.local/state.
 StateDirectory=potluck/mesh
 StateDirectoryMode=0700
@@ -49,15 +49,15 @@ RestartSec=5
 
 # Capabilities: we run as non-root 'potluck', so we need to explicitly grant
 # the network privileges the sidecar requires.
-#   CAP_NET_ADMIN — create/configure the potluck0 TUN device, WG ops
-#   CAP_NET_RAW   — required by some kernel paths for raw socket fallback
+#   CAP_NET_ADMIN - create/configure the potluck0 TUN device, WG ops
+#   CAP_NET_RAW - required by some kernel paths for raw socket fallback
 # AmbientCapabilities passes them to the started process; CapabilityBoundingSet
-# is the hard ceiling — nothing this service can do can exceed these caps.
+# is the hard ceiling - nothing this service can do can exceed these caps.
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
 
-# Tighten where we can. Now that we're non-root, NoNewPrivileges is safe to
-# enable — the sidecar never needs to gain new privileges after startup.
+# Tighten where we can. Because we're non-root, NoNewPrivileges is safe to
+# enable - the sidecar never needs to gain new privileges after startup.
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=read-only

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sign-sidecars.sh — codesign every Mach-O inside a PyInstaller onedir bundle.
+# sign-sidecars.sh - codesign every Mach-O inside a PyInstaller onedir bundle.
 #
 # Usage:
 #   ./sign-sidecars.sh <bundle-dir>
@@ -8,11 +8,11 @@
 #   apps/desktop/python/dist/potluck-local/
 #
 # Environment:
-#   CODESIGN_IDENTITY  — the signing identity to use.
+#   CODESIGN_IDENTITY - the signing identity to use.
 #                        Default: "-" (ad-hoc, no network, no cert required).
 #                        Production: "Developer ID Application: Potluck AI, Inc. (TEAMID)"
 #
-#   ENTITLEMENTS_PLIST — path to the entitlements plist.
+#   ENTITLEMENTS_PLIST - path to the entitlements plist.
 #                        Default: <this script's dir>/../entitlements.plist
 #
 # The script is idempotent: re-signing an already-signed binary is safe.
@@ -27,7 +27,7 @@ set -euo pipefail
 # On Linux or Windows (Git Bash / WSL) this script is a no-op; CI stages
 # the sidecar directly and never calls prepack:python on non-Mac hosts.
 if [[ "$(uname)" != "Darwin" ]]; then
-  echo "[sign-sidecars] Non-macOS platform ($(uname)) — skipping codesign."
+  echo "[sign-sidecars] Non-macOS platform ($(uname)), skipping codesign."
   exit 0
 fi
 
@@ -85,7 +85,7 @@ echo "Found $TOTAL Mach-O file(s) to sign."
 echo ""
 
 if [ "$TOTAL" -eq 0 ]; then
-  echo "WARNING: no Mach-O files found in $BUNDLE_DIR — nothing signed." >&2
+  echo "WARNING: no Mach-O files found in $BUNDLE_DIR, nothing signed." >&2
   exit 0
 fi
 

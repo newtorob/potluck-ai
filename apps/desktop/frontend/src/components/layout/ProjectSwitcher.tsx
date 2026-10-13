@@ -1,5 +1,5 @@
 /**
- * ProjectSwitcher — compact pill in the Sidebar that shows the active project
+ * ProjectSwitcher - compact pill in the Sidebar that shows the active project
  * and opens a keyboard-navigable dropdown to switch projects.
  *
  * Dropdown options:

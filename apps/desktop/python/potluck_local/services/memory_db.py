@@ -1,4 +1,4 @@
-"""SQLite memory database — initialisation, schema, and path helpers.
+"""SQLite memory database - initialisation, schema, and path helpers.
 
 All other services import get_memory_db_path() and call init_memory_db()
 on startup; they must never create the schema themselves.
@@ -83,11 +83,11 @@ CREATE TABLE IF NOT EXISTS vault_files (
 )
 """
 
-# Chat conversations + messages — local-first history. Lives in the same
+# Chat conversations + messages - local-first history. Lives in the same
 # SQLite as memories/tasks because the chat surface is conceptually
 # adjacent (extracted memories come from these same conversations).
-# Cross-device sync is v0.5+ work; for now everything stays on the user's
-# machine, in line with the manifesto's local-first promise.
+# There is no cross-device sync; everything stays on the user's machine, in
+# line with the local-first design.
 _CREATE_CONVERSATIONS = """
 CREATE TABLE IF NOT EXISTS conversations (
     id TEXT PRIMARY KEY,
@@ -142,7 +142,7 @@ def get_memory_db_path() -> Path:
 
 # Explicit allowlist of (table, column, sql_type) triples that
 # _add_column_if_missing is permitted to create.  All values are hardcoded
-# string literals — nothing here comes from external input.  If a caller
+# string literals - nothing here comes from external input.  If a caller
 # passes a combination not in this set the function raises immediately so
 # the mistake is caught at development time rather than silently allowing
 # arbitrary DDL.
@@ -162,7 +162,7 @@ _ALLOWED_SCHEMA_ADDITIONS: frozenset[tuple[str, str, str]] = frozenset(
         # updated_at enables incremental sync, agent delta queries, and
         # export diffing. ISO-8601 TEXT matches the rest of the schema.
         ("memories", "updated_at", "TEXT"),
-        # pinned: standing/ambient memories that are ALWAYS injected into
+        # pinned: standing/ambient memories that are always injected into
         # retrieval regardless of query (the explicit "pinned instructions"
         # mechanism the always_budget heuristic only approximated).
         ("memories", "pinned", "INTEGER NOT NULL DEFAULT 0"),
@@ -178,7 +178,7 @@ def _add_column_if_missing(
 ) -> Coroutine[Any, Any, None]:
     """Return an awaitable that adds `column` to `table` only when absent.
 
-    Uses PRAGMA table_info to check — cleaner than catching OperationalError
+    Uses PRAGMA table_info to check - cleaner than catching OperationalError
     on duplicate-column, which masks real errors.
 
     Only (table, column, sql_type) combinations listed in
@@ -189,7 +189,7 @@ def _add_column_if_missing(
     if (table, column, sql_type) not in _ALLOWED_SCHEMA_ADDITIONS:
         raise ValueError(
             f"_add_column_if_missing: ({table!r}, {column!r}, {sql_type!r}) "
-            "is not in the allowlist — add it to _ALLOWED_SCHEMA_ADDITIONS "
+            "is not in the allowlist: add it to _ALLOWED_SCHEMA_ADDITIONS "
             "with a hardcoded literal to proceed."
         )
 
@@ -211,7 +211,7 @@ def _secure_memory_db_files(path: Path) -> None:
     siblings to owner-only. memory.db holds the full content of every stored
     memory in cleartext, so this must not be world-readable.
 
-    Idempotent — safe to call on every init_memory_db, including when the
+    Idempotent - safe to call on every init_memory_db, including when the
     file already existed from a previous run. os.chmod is a partial no-op on
     Windows (no POSIX mode bits); best-effort there, never fatal.
     """
@@ -246,7 +246,7 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         # Both the FastAPI sidecar and the MCP server process open this file
         # independently; without WAL, simultaneous writes produce "database is
         # locked" errors.  WAL is stored in the file header so this is a
-        # one-time flip — subsequent calls are no-ops.
+        # one-time flip - subsequent calls are no-ops.
         await db.execute("PRAGMA journal_mode=WAL")
         # NORMAL sync is the correct companion for WAL: safe (no data loss on
         # crash), and ~3x faster than FULL because WAL checkpoints are the
@@ -256,7 +256,7 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         # immediately raising "database is locked".
         await db.execute("PRAGMA busy_timeout=5000")
 
-        # Verify WAL actually took effect — SQLite ignores the PRAGMA if it
+        # Verify WAL actually took effect - SQLite ignores the PRAGMA if it
         # can't switch (e.g. in-memory DB or read-only filesystem).
         cursor = await db.execute("PRAGMA journal_mode")
         row = await cursor.fetchone()
@@ -282,7 +282,7 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         await db.execute(_CREATE_MESSAGES)
         await db.execute(_CREATE_USAGE_EVENTS)
 
-        # Schema migrations first — indexes below may reference added columns.
+        # Schema migrations first - indexes below may reference added columns.
         await _add_column_if_missing(db, "memories", "project", "TEXT")
         await _add_column_if_missing(db, "task_states", "project", "TEXT")
         # source_ref carries the originating identifier for ingested content,
@@ -308,9 +308,9 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         # AI contract versions (services/ai_contracts.py). Stamped at write
         # time so the debugger can answer "what prompt extracted this memory
         # / ranked this retrieval / shaped this tool call?" even after the
-        # underlying contract is bumped. NULL on rows older than 2026-05-20
-        # (pre-versioning era); the debugger renders that honestly rather
-        # than backfilling and lying about provenance.
+        # underlying contract is bumped. NULL on rows written before versions
+        # were stamped; the debugger renders that honestly rather than
+        # backfilling and lying about provenance.
         await _add_column_if_missing(db, "memories", "extraction_prompt_version", "TEXT")
         await _add_column_if_missing(db, "memory_access_log", "retrieval_profile_version", "TEXT")
         await _add_column_if_missing(db, "mcp_tool_calls", "tool_schema_version", "TEXT")
@@ -360,15 +360,15 @@ async def init_memory_db(db_path: Path | None = None) -> None:
 
 
 async def reset_memory_db(db_path: Path | None = None) -> None:
-    """Delete the DB file and re-initialise. Destructive — for tests only.
+    """Delete the DB file and re-initialise. Destructive - for tests only.
 
-    NOT used by the /memory/wipe route (see wipe_memory_tables): this drops
-    the WHOLE database file, including task_states, vault_files,
+    Not used by the /memory/wipe route (see wipe_memory_tables): this drops
+    the whole database file, including task_states, vault_files,
     conversations, messages, MCP observations, and provider-native agent runs,
     every other product surface that happens to share this SQLite file with
-    memory, not memory data. A prior version of /memory/wipe called this directly, which
-    silently deleted the user's chat history and tasks alongside their
-    memories. Kept here only for tests that want a fully blank DB.
+    memory, not memory data. Calling it from /memory/wipe would silently
+    delete the user's chat history and tasks alongside their memories. Kept
+    here only for tests that want a fully blank DB.
     """
     path = db_path or get_memory_db_path()
     if path.exists():
@@ -378,16 +378,16 @@ async def reset_memory_db(db_path: Path | None = None) -> None:
 
 
 async def wipe_memory_tables(db_path: Path | None = None) -> int:
-    """Delete every row from the memory-specific tables ONLY, in one transaction.
+    """Delete every row from the memory-specific tables only, in one transaction.
 
     Scope, enumerated against the schema above: `memories`, `memory_embeddings`,
-    and `memory_access_log` are memory data. Every other table in this file —
+    and `memory_access_log` are memory data. Every other table in this file -
     task_states (tasks), vault_files (vault), conversations/messages (chat),
-    MCP and provider-native agent observability tables — is a distinct product
-    surface that merely shares this SQLite file with memory, and MUST be left
-    untouched by a memory wipe. This is the fix for the launch-blocker where
-    POST /memory/wipe called reset_memory_db() and dropped the whole file,
-    taking the user's chats/tasks/vault state with it.
+    MCP and provider-native agent observability tables - is a distinct product
+    surface that merely shares this SQLite file with memory, and must be left
+    untouched by a memory wipe. Calling reset_memory_db() from
+    POST /memory/wipe would drop the whole file, taking the user's
+    chats/tasks/vault state with it.
 
     memory_embeddings and memory_access_log both FK-reference memories.id
     with no ON DELETE CASCADE, so the children are deleted before the parent
@@ -526,9 +526,9 @@ _AGENT_RUN_INDICES = [
 ]
 
 # usage_events powers the Usage dashboard (services/usage_store.py). One row per
-# completed inference request, written by each request path. METADATA ONLY:
-# model, token counts, latency, timestamp, scope, ok/fail. NEVER prompt or
-# response content, and NEVER peer identity on `served` rows (a served row means
+# completed inference request, written by each request path. Metadata only:
+# model, token counts, latency, timestamp, scope, ok/fail. Never prompt or
+# response content, and never peer identity on `served` rows (a served row means
 # "I served a request for the network", not "I served <peer>"). Same privacy
 # discipline as the /agents args_summary whitelist. All local, never uploaded.
 _CREATE_USAGE_EVENTS = """
@@ -808,7 +808,8 @@ async def session_tool_calls(
     """Return tool calls for a single session; ordered called_at desc.
 
     Includes tool_schema_version so the debugger can render which contract
-    version each call ran under (NULL for pre-2026-05-20 rows).
+    version each call ran under (NULL for rows written before versions were
+    stamped).
     """
     path = db_path or get_memory_db_path()
     async with aiosqlite.connect(path) as db:
@@ -893,7 +894,7 @@ async def save_embedding(
     Uses INSERT OR REPLACE so re-embedding with a new model version overwrites
     the old row cleanly.
     """
-    import numpy as np  # local import — numpy is a dep but not needed at module load
+    import numpy as np  # local import - numpy is a dep but not needed at module load
 
     path = db_path or get_memory_db_path()
     blob = np.array(vector, dtype=np.float32).tobytes()
@@ -956,7 +957,7 @@ async def load_all_embeddings(
     When project is None, loads embeddings for global memories only (project IS NULL).
 
     model filter: when `model` is given, only embeddings produced by that model
-    are returned. This is required — without it, a table containing vectors from
+    are returned. This is required - without it, a table containing vectors from
     two embedding models (after a model switch / partial backfill) would be
     stacked into one matrix with inconsistent dimensions and crash retrieval.
     """
@@ -998,7 +999,7 @@ async def memories_missing_embeddings(
 
     Without `model`: memories that have no embedding row at all.
     With `model`: also includes memories whose existing embedding was produced
-    by a *different* model — i.e. stale rows after an embedding-model switch.
+    by a *different* model - i.e. stale rows after an embedding-model switch.
     save_embedding uses INSERT OR REPLACE, so re-embedding these overwrites the
     stale row in place. This is what makes a model switch self-healing.
     """
@@ -1023,7 +1024,7 @@ async def memories_missing_embeddings(
 async def list_projects(db_path: Path | None = None) -> list[dict]:
     """Return [{project, memory_count, task_count}] for all named projects.
 
-    NULL and empty-string project values are excluded — only surfaced named
+    NULL and empty-string project values are excluded - only surfaced named
     projects are returned. Used by GET /memory/projects.
     """
     path = db_path or get_memory_db_path()
@@ -1063,14 +1064,14 @@ async def list_projects(db_path: Path | None = None) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Chat history — conversations + messages
+# Chat history - conversations + messages
 # ---------------------------------------------------------------------------
 #
 # privacy.chat_history_enabled is the user's switch over the two content
 # columns here: conversations.title (the frontend derives it from the first
 # prompt) and messages.content. The routers gate the HTTP surface; this is the
 # second gate, at the persistence boundary, so no future caller can write chat
-# content behind the switch's back. Reads and deletes are never gated — the
+# content behind the switch's back. Reads and deletes are never gated - the
 # user must always be able to see and erase what is already stored, and
 # turning the switch off deletes nothing.
 
@@ -1252,7 +1253,7 @@ async def update_conversation(
 ) -> bool:
     """Patch a conversation. Returns True if the row was found.
 
-    Only a title change is gated by privacy.chat_history_enabled — title is
+    Only a title change is gated by privacy.chat_history_enabled - title is
     the content column here. Metadata-only patches (network_mode, project)
     stay available with the switch off.
     """

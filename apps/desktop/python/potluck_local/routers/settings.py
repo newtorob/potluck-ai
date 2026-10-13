@@ -1,7 +1,7 @@
 """Settings router.
 
-GET   /settings  — read current settings
-PATCH /settings  — merge-update settings
+GET   /settings - read current settings
+PATCH /settings - merge-update settings
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ async def update_settings(patch: dict[str, Any]) -> dict[str, Any]:
                 )
                 raise HTTPException(
                     status_code=422,
-                    detail=f"Invalid value for settings key '{key}' — check sidecar logs",
+                    detail=f"Invalid value for settings key '{key}', check sidecar logs",
                 )
         elif key in _DICT_MERGE_FIELDS and isinstance(value, dict):
             # Plain-dict merge: graft incoming keys into the existing dict
@@ -95,7 +95,7 @@ async def update_settings(patch: dict[str, Any]) -> dict[str, Any]:
         )
         raise HTTPException(
             status_code=422,
-            detail="Settings update failed — check sidecar logs",
+            detail="Settings update failed, check sidecar logs",
         )
 
     save_settings(updated)

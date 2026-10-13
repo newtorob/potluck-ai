@@ -1,7 +1,5 @@
 """FastAPI app factory and CLI entrypoint for the Potluck local sidecar.
 
-Section reference: guide §4.2
-
 Usage:
     python -m potluck_local.app --port 8321
     POTLUCK_DEV=1 python -m potluck_local.app   # enables Swagger UI
@@ -45,9 +43,9 @@ _CORS_ORIGINS: list[str] = [
 
 
 # The WireGuard mesh subnet -- the trust boundary for /peer/* is "the caller is
-# on the household's WireGuard mesh", NOT merely "the caller isn't loopback".
+# on the household's WireGuard mesh", not merely "the caller isn't loopback".
 # main() below binds uvicorn to 0.0.0.0 so household peers can dial the mesh
-# IP, which means the bare socket is ALSO reachable from anything else on the
+# IP, which means the bare socket is also reachable from anything else on the
 # same LAN/Wi-Fi (coffee shop, dorm, apartment) -- "not loopback" and "on the
 # mesh" are not the same claim.
 #
@@ -55,9 +53,7 @@ _CORS_ORIGINS: list[str] = [
 # IPs from 100.64.0.0/10 (the CGNAT range -- chosen because it never collides
 # with home/corp RFC1918 ranges), carving one /24 per household. See
 # services/coordinator/coordinator/services/household_allocator.py
-# (HOUSEHOLD_POOL) and coordinator/models/household.py. A stale comment in
-# the 0001 migration says "10.42.0.0/16" -- that predates the CGNAT-range
-# decision and does not match the allocator code; 100.64.0.0/10 is correct.
+# (HOUSEHOLD_POOL) and coordinator/models/household.py.
 #
 # Override via POTLUCK_MESH_CIDR for non-default deployments (must remain a
 # superset of every household's allocated /24).
@@ -100,7 +96,7 @@ def _client_ip_in_network(
     """True when `client_host` parses as an IP address inside `network`.
 
     Unparseable input (empty string, hostnames, test-harness placeholders like
-    "testclient") is treated as NOT in the mesh -- fail closed. IPv4-mapped
+    "testclient") is treated as not in the mesh -- fail closed. IPv4-mapped
     IPv6 addresses (::ffff:a.b.c.d), which a dual-stack listen socket can
     report for an IPv4 peer, are unwrapped to their v4 form before the
     membership check so they still match a v4 mesh CIDR.
@@ -136,9 +132,9 @@ async def _lifespan(app: FastAPI):  # noqa: ARG001
     # Background tasks spawned below must be retained, not fire-and-forgotten:
     # an unreferenced asyncio.create_task() is only kept alive by the event
     # loop's internal weak bookkeeping, and a test run (or a fast shutdown)
-    # can close the loop while one is still scheduled — e.g. the stale-session
+    # can close the loop while one is still scheduled - e.g. the stale-session
     # sweeper waking up from asyncio.sleep(60) after the TestClient's loop is
-    # gone, which surfaced as an aiosqlite worker thread hitting a closed
+    # gone, which shows up as an aiosqlite worker thread hitting a closed
     # event loop. Every task we create here goes into background_tasks so the
     # shutdown path below can cancel + await (drain) all of them before the
     # model/DB teardown runs.
@@ -161,7 +157,7 @@ async def _lifespan(app: FastAPI):  # noqa: ARG001
 
     # Background model-catalog feed: refresh the cloud catalog once at startup,
     # then every 6h. Writes only a disk cache (never the bundled data file) and
-    # never blocks a request — model_registry falls back to bundled if the feed
+    # never blocks a request - model_registry falls back to bundled if the feed
     # is offline or not yet deployed. See services/catalog_feed.py.
     _track(asyncio.create_task(catalog_refresh_loop()))
 
@@ -248,7 +244,7 @@ async def _lifespan(app: FastAPI):  # noqa: ARG001
     except Exception:  # noqa: BLE001
         logger.exception("managed_agents_shutdown_failed")
 
-    # Cancel + drain every background task BEFORE touching the model or DB
+    # Cancel + drain every background task before touching the model or DB
     # below, so nothing still in flight (e.g. the sweeper mid-sleep, or the
     # embedding backfill mid-batch) can wake up after the loop this
     # lifespan belongs to has started closing.
@@ -284,7 +280,7 @@ def create_app() -> FastAPI:
     # local processes on the machine from reading the user's memory, chat,
     # tasks, and vault over the loopback socket. When unset (e.g. `make sidecar`
     # standalone in dev), the gate is off and loopback callers get the full
-    # surface as before.
+    # surface.
     sidecar_token = os.environ.get("POTLUCK_SIDECAR_TOKEN") or None
 
     # Separate opt-in key for the OpenAI-compatible gateway (/v1/*), so external
@@ -293,7 +289,7 @@ def create_app() -> FastAPI:
     # dev. Enforced in peer_access_middleware below.
     gateway_key = os.environ.get("POTLUCK_GATEWAY_API_KEY") or None
 
-    # Mesh CIDR — the trust boundary /peer/* enforces (see _resolve_mesh_network
+    # Mesh CIDR - the trust boundary /peer/* enforces (see _resolve_mesh_network
     # docstring for the source-of-truth rationale). Parsed once per app instance.
     mesh_network = _resolve_mesh_network()
 
@@ -323,7 +319,7 @@ def create_app() -> FastAPI:
     async def batch_error_handler(request: Request, error: BatchError):
         return JSONResponse(status_code=error.status, content={"detail": str(error), "code": error.code})
 
-    # Peer-access guard — when the sidecar is bound to 0.0.0.0 (required so
+    # Peer-access guard - when the sidecar is bound to 0.0.0.0 (required so
     # household peers can dial it over the mesh), the bare socket would
     # expose every endpoint. This middleware restricts non-loopback callers
     # to the explicit peer-facing surface (/peer/* + /health). /peer/* and the
@@ -340,7 +336,7 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def peer_access_middleware(request: Request, call_next):
         raw_path = request.url.path
-        # Reject null bytes — they can confuse downstream parsers.
+        # Reject null bytes - they can confuse downstream parsers.
         if "\x00" in raw_path:
             return JSONResponse(status_code=400, content={"detail": "invalid path"})
         # Normalise away any ../ traversal sequences once, up front, so both the
@@ -350,12 +346,12 @@ def create_app() -> FastAPI:
         # gateway prefix check and the exempt/peer checks see one canonical path.
         normalised = "/" + normalised.lstrip("/")
 
-        # Trust the socket peer IP, and ONLY the socket peer IP. We deliberately
+        # Trust the socket peer IP, and only the socket peer IP. We deliberately
         # do not honor X-Forwarded-For / X-Real-IP here: the sidecar is dialed
         # directly (Electron over loopback, peers over the raw WireGuard mesh IP),
         # never through a reverse proxy. If a proxy is ever placed in front of the
         # sidecar, every request would present the proxy's loopback IP and get the
-        # full local surface — so that must not happen without revisiting this gate.
+        # full local surface - so that must not happen without revisiting this gate.
         client_host = request.client.host if request.client else ""
         is_loopback = client_host in ("127.0.0.1", "::1", "localhost")
 
@@ -442,32 +438,32 @@ def create_app() -> FastAPI:
                 return _refusal(normalised, 404, "gateway disabled; enable it in Settings -> Connect tools")
             return await call_next(request)
 
-        # Shared-secret gate — applies to loopback callers too. When a token is
+        # Shared-secret gate - applies to loopback callers too. When a token is
         # configured, every non-exempt path must present a matching bearer token.
         # This is what stops a malicious local process from reading the user's
-        # data over 127.0.0.1. Exempt: liveness (/health) and /peer/* —
-        # but ONLY for a non-loopback caller.
+        # data over 127.0.0.1. Exempt: liveness (/health) and /peer/* -
+        # but only for a non-loopback caller.
         #
-        # NOTE on /peer/* exemption: peer routes are NOT per-request signature
-        # authenticated in v0. Their credential is household membership: a
+        # NOTE on /peer/* exemption: peer routes are not per-request signature
+        # authenticated. Their credential is household membership: a
         # caller reaches them only from a source address that this machine's
         # mesh sidecar lists as a reachable peer, on a connection accepted at
         # this machine's own mesh address (Gate 1 above 403s any non-loopback
         # path outside /peer/* + /health, and the membership check just above
         # that 403s every other /peer/* caller), and mesh enrollment is gated by
-        # the coordinator. Per-request signed-nonce attestation is a v0.5+
-        # item. See routers/peer.py "Trust model".
+        # the coordinator. TODO: per-request signed-nonce attestation. See
+        # routers/peer.py "Trust model".
         #
-        # That membership credential ONLY exists for a non-loopback caller:
+        # That membership credential only exists for a non-loopback caller:
         # the check above runs exclusively inside `if not is_loopback:`
         # (Gate 1), so a loopback caller hitting /peer/* never proves
         # membership at all. Exempting /peer/* from the token gate
-        # unconditionally therefore left it completely unauthenticated for any
-        # local process (no token, or the wrong token, both worked) — the
-        # private-memory leak this fixes. A loopback /peer/* caller has no mesh
+        # unconditionally would leave it completely unauthenticated for any
+        # local process (no token, or the wrong token, would both work) and
+        # leak private memory. A loopback /peer/* caller has no mesh
         # credential to fall back on, so it must present the sidecar token like
-        # every other loopback route; a mesh peer keeps its pre-existing
-        # token-free path since household membership already gated it above.
+        # every other loopback route; a mesh peer keeps its token-free path
+        # since household membership already gated it above.
         if normalised.startswith(("/account", "/batches", "/split", "/circles")) and sidecar_token is None:
             return JSONResponse(status_code=503, content={"detail": "Private control requires an authenticated runtime. Run potluck up."})
         if sidecar_token is not None:
@@ -486,7 +482,7 @@ def create_app() -> FastAPI:
 
         return await call_next(request)
 
-    # Routers — prefixes must match localApi.ts in the frontend
+    # Routers - prefixes must match localApi.ts in the frontend
     @app.exception_handler(SplitError)
     async def split_error_handler(request, exc):
         return JSONResponse(status_code=exc.status, content={"detail": str(exc)},
@@ -578,7 +574,7 @@ def main() -> None:
     app = create_app()
     # Bind to all interfaces so household-mesh peers can dial us over the
     # WireGuard mesh IP. The peer_access_middleware in create_app() is the
-    # access boundary — non-loopback callers can only reach /peer/* + /health,
+    # access boundary - non-loopback callers can only reach /peer/* + /health,
     # not the local user's memory / tasks / chat history. Override with
     # POTLUCK_BIND_HOST=127.0.0.1 to opt out (e.g. on a machine that should
     # never serve peer inference).

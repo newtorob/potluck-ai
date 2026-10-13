@@ -407,7 +407,7 @@ describe("edit_file", () => {
       { cwd, confirm: allow },
     );
     expect(out).toMatch(/not found/);
-    // File is unchanged — no mis-indented edit was applied.
+    // File is unchanged - no mis-indented edit was applied.
     expect(await readFile(join(cwd, "g.py"), "utf8")).toBe("def add(a, b):\n    return a\n");
   });
 });

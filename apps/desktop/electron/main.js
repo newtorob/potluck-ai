@@ -23,9 +23,9 @@ const {
 } = require('./mesh-service-update');
 
 // ─── App identity ────────────────────────────────────────────────────────────
-// Must be set BEFORE app.whenReady() so menu bar / app data path use the right
+// Must be set before app.whenReady() so menu bar / app data path use the right
 // name. The macOS Dock *label* in dev still reads "Electron" from the bundled
-// Electron.app's Info.plist — that's only fixable in packaged builds (where
+// Electron.app's Info.plist - that's only fixable in packaged builds (where
 // electron-builder writes our productName into the .app bundle).
 app.setName('Potluck AI');
 
@@ -62,12 +62,12 @@ let mainWindow = null;
 let restartAttempts = 0;
 
 // The coordinator origin the renderer is currently pointed at (Phase G control
-// plane — connectionStore.ts's coordinatorUrl). Runtime-mutable and user-
+// plane - connectionStore.ts's coordinatorUrl). Runtime-mutable and user-
 // overridable, so main can't hardcode it; the renderer pushes it via the
 // 'coordinator:set-base' IPC channel (see the handler near the coordinator
 // session-auth bridge below) on startup and on every change. Null until the
-// renderer's first push. Used ONLY to scope which requests the
-// onBeforeSendHeaders injector attaches the member session bearer to — see
+// renderer's first push. Used only to scope which requests the
+// onBeforeSendHeaders injector attaches the member session bearer to - see
 // that handler for why the scoping matters.
 let coordinatorOrigin = null;
 
@@ -81,8 +81,8 @@ let rendererReady = false;
 
 // True once the user has consented to an update download (via update:download /
 // updater:download). Gates the auto-updater 'error' event: a failed background
-// CHECK (feed unreachable, transient network, releases.* hiccup) must stay
-// silent — only an error during a user-initiated download/install surfaces a
+// check (feed unreachable, transient network, releases.* hiccup) must stay
+// silent - only an error during a user-initiated download/install surfaces a
 // banner. A released user must never see "update failed" for something they
 // did not do.
 let updateDownloadStarted = false;
@@ -100,20 +100,20 @@ log.transports.console.level = 'debug';
 // ─── Build stamp (staleness detection) ───────────────────────────────────────
 //
 // The bug this exists to prevent: a build pipeline step (e.g. only rebuilding
-// the frontend) can silently leave a WEEK-OLD compiled app installed while
+// the frontend) can silently leave a week-old compiled app installed while
 // looking like a fresh build, because nothing on disk told you which git
-// commit — or even which day — the running app was actually built from. This
+// commit - or even which day - the running app was actually built from. This
 // stamp makes that detectable: the frontend can render a badge, and it's
 // logged here on every launch so it's in the log file too.
 //
 // Packaged: scripts/generate-build-info.js writes build-info.json into this
 // same directory at build time (wired into package.json's prepack chain and
-// the root Makefile's installer-bundle target) — see that script for exactly
+// the root Makefile's installer-bundle target) - see that script for exactly
 // what it captures. Read once at startup; the file is static for the life of
 // a packaged build so there's no reason to re-read it.
 //
 // Dev (`make desktop`): there is no packaged bundle and no prepack step, so
-// compute the same shape live from git. Best-effort only — a dev checkout
+// compute the same shape live from git. Best-effort only - a dev checkout
 // with no .git (unlikely, but not our problem to hard-fail over) degrades to
 // sha:"unknown" rather than blocking app startup.
 function loadBuildInfo() {
@@ -157,12 +157,12 @@ log.info(
 
 // Synchronous by design: preload runs before any page script and assigns this
 // straight into the exposed object (see preload.js) so the renderer can read
-// window.potluck.app.buildInfo as a plain value with no await — a build
+// window.potluck.app.buildInfo as a plain value with no await - a build
 // stamp is static for the process lifetime, so there is nothing to be async
 // about. ipcRenderer.sendSync blocks only the preload script, not the page.
 // `version` (app.getVersion(), e.g. "0.1.0") rides alongside sha/builtAt so a
 // frontend agent can compare it against the server's minimum/latest without a
-// second round trip — shape is { version, sha, builtAt, packaged, dirty? }.
+// second round trip - shape is { version, sha, builtAt, packaged, dirty? }.
 ipcMain.on('app:get-build-info-sync', (event) => {
   event.returnValue = { version: app.getVersion(), ...BUILD_INFO };
 });
@@ -182,8 +182,8 @@ function extractDeepLink(argv) {
 
 // The only deep link this app understands today is the magic-link callback.
 // Restricting to the exact host/path (not just the scheme) matters: without
-// it, any potluck://...?token=... URL — however it arrives (argv on
-// Windows/Linux, the 'open-url' OS event on macOS, a cloned bounce page) —
+// it, any potluck://...?token=... URL - however it arrives (argv on
+// Windows/Linux, the 'open-url' OS event on macOS, a cloned bounce page) -
 // would reach the renderer's token extraction. See useDeepLinkAuth.ts for the
 // matching renderer-side check; this is defense in depth at the routing
 // choke point so a future non-auth deep link can't accidentally widen this.
@@ -202,7 +202,7 @@ function isAuthCallbackDeepLink(url) {
 
 /**
  * Deliver a deep link to the renderer, or buffer it until the renderer is ready.
- * Never logs the query string — it carries the one-time magic-link token.
+ * Never logs the query string - it carries the one-time magic-link token.
  * Silently drops anything that isn't the exact auth/callback path.
  */
 function handleDeepLink(url) {
@@ -250,7 +250,7 @@ app.on('second-instance', (_event, argv) => {
 });
 
 // macOS delivers deep links via open-url, which can fire before the window
-// (even before app.whenReady) exists — handleDeepLink buffers in that case.
+// (even before app.whenReady) exists - handleDeepLink buffers in that case.
 app.on('open-url', (event, url) => {
   event.preventDefault();
   handleDeepLink(url);
@@ -282,7 +282,7 @@ async function startPythonSidecar() {
   const sidecarPath = getSidecarPath();
 
   if (!sidecarPath) {
-    log.info('[sidecar] Dev mode — expecting Python sidecar started via dev:python script.');
+    log.info('[sidecar] Dev mode: expecting Python sidecar started via dev:python script.');
     return;
   }
 
@@ -337,7 +337,7 @@ async function startPythonSidecar() {
   });
 
   pythonProcess.on('exit', (code, signal) => {
-    log.warn(`[sidecar] Exited — code=${code} signal=${signal}`);
+    log.warn(`[sidecar] Exited: code=${code} signal=${signal}`);
     pythonProcess = null;
 
     if (app.isQuitting || attachedRuntime) {
@@ -430,19 +430,19 @@ async function waitForSidecar() {
 // Two independent gates apply to every URL the renderer tries to leave the
 // current page for:
 //
-//   1. In-window navigation (will-navigate — e.g. a clicked <a href> with no
-//      target) is allowed ONLY to the app's own origin: the exact packaged
+//   1. In-window navigation (will-navigate - e.g. a clicked <a href> with no
+//      target) is allowed only to the app's own origin: the exact packaged
 //      index.html in production, or the exact Vite dev-server origin in dev.
 //      There is deliberately no "local passthrough" exception for file:// or
-//      localhost/127.0.0.1 — a poisoned memory/chat markdown link
+//      localhost/127.0.0.1 - a poisoned memory/chat markdown link
 //      (`[x](file:///…)`) must not be able to replace the whole window (and
-//      its live preload contextBridge — window.potluck, carrying the cloud
+//      its live preload contextBridge - window.potluck, carrying the cloud
 //      bearer session + mesh access) with arbitrary local content. Everything
 //      else is denied in-window and, if it's an allowed external scheme,
 //      handed to the OS browser via safeOpenExternal instead.
 //   2. shell.openExternal() only ever receives http:/https: URLs. Anything
 //      else (file:, javascript:, custom schemes, UNC paths) is rejected and
-//      logged — openExternal on an arbitrary scheme can trigger OS-level
+//      logged - openExternal on an arbitrary scheme can trigger OS-level
 //      file/UNC handling outside our control.
 
 /**
@@ -465,7 +465,7 @@ function getExpectedAppURL() {
  * specifically because the packaged app is file:// (see frontend/src/main.tsx),
  * so route changes live in the fragment and never reach will-navigate as a
  * top-level navigation (same-document hash changes fire did-navigate-in-page
- * instead) — but we don't rely on that here, we just don't gate on it.
+ * instead) - but we don't rely on that here, we just don't gate on it.
  */
 function isAppOrigin(targetURL) {
   let expected;
@@ -486,8 +486,8 @@ function isAppOrigin(targetURL) {
 /**
  * The only path anything (renderer-triggered window.open, or a denied
  * will-navigate) may reach the OS shell through. Allowlists url.protocol to
- * exactly http:/https:; everything else — file:, javascript:, custom
- * schemes, UNC paths — is rejected and logged, never handed to
+ * exactly http:/https:; everything else - file:, javascript:, custom
+ * schemes, UNC paths - is rejected and logged, never handed to
  * shell.openExternal.
  */
 function safeOpenExternal(rawURL) {
@@ -495,11 +495,11 @@ function safeOpenExternal(rawURL) {
   try {
     parsed = new URL(rawURL);
   } catch (_) {
-    log.warn(`[nav] Rejected openExternal — unparseable URL.`);
+    log.warn(`[nav] Rejected openExternal: unparseable URL.`);
     return;
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    log.warn(`[nav] Rejected openExternal — disallowed scheme: ${parsed.protocol}`);
+    log.warn(`[nav] Rejected openExternal: disallowed scheme: ${parsed.protocol}`);
     return;
   }
   shell.openExternal(rawURL);
@@ -525,10 +525,10 @@ async function createWindow() {
       nodeIntegration: false,
       sandbox: true,
     },
-    // Icon path — the file is expected at apps/desktop/electron/icons/icon.png.
+    // Icon path - the file is expected at apps/desktop/electron/icons/icon.png.
     // If it does not exist yet, Electron will fall back to the default icon.
     icon: path.join(__dirname, 'icons', 'icon.png'),
-    show: false, // Prevent white flash — show after ready-to-show.
+    show: false, // Prevent white flash - show after ready-to-show.
   });
 
   mainWindow.once('ready-to-show', () => {
@@ -537,22 +537,22 @@ async function createWindow() {
 
   // Inject auth into renderer→{sidecar,coordinator} requests.
   //
-  // session.defaultSession.webRequest.onBeforeSendHeaders is a SINGLE-listener
-  // setter — calling it twice REPLACES the first registration. So this one
+  // session.defaultSession.webRequest.onBeforeSendHeaders is a single-listener
+  // setter - calling it twice replaces the first registration. So this one
   // handler does both jobs, branching on the request's origin, with an
   // independent packaged-only guard on the sidecar branch only:
   //   - sidecar origin (127.0.0.1/localhost:PYTHON_PORT) -> SIDECAR_TOKEN
-  //     bearer, PACKAGED ONLY. In dev the sidecar is started via `pnpm
+  //     bearer, packaged builds only. In dev the sidecar is started via `pnpm
   //     dev:python` with no token (its own auth gate is off), so injecting
   //     one there would be inert at best; the guard keeps that explicit
   //     rather than relying on it being a no-op.
   //   - the currently-configured coordinator origin (pushed from the
-  //     renderer over 'coordinator:set-base' — see the handler below, and
+  //     renderer over 'coordinator:set-base' - see the handler below, and
   //     connectionStore.ts for where the renderer tracks it) -> the member
   //     session bearer, so SSE requests like /jobs/stream (which cannot go
-  //     through the buffering coordinator:session-request bridge — that
+  //     through the buffering coordinator:session-request bridge - that
   //     reads the whole body with res.text(), which does not work for a
-  //     live stream) still carry a session. Runs in BOTH dev and packaged:
+  //     live stream) still carry a session. Runs in both dev and packaged:
   //     unlike the sidecar, dev's coordinator calls hit a real coordinator
   //     (local or hosted) that enforces the same session auth prod does, so
   //     the dev app's network-chat streaming needs the same bearer prod
@@ -565,7 +565,7 @@ async function createWindow() {
   // coordinator branch is even seen; that's fine because the else-branch
   // above forwards non-matching requests' headers unmodified. Registered
   // unconditionally (not gated on app.isPackaged) so the coordinator branch
-  // is live in dev too — the sidecar branch's own app.isPackaged check below
+  // is live in dev too - the sidecar branch's own app.isPackaged check below
   // keeps that half prod-only.
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: ['http://*/*', 'https://*/*'] },
@@ -594,7 +594,7 @@ async function createWindow() {
   );
 
   if (app.isPackaged) {
-    // Content-Security-Policy — defence-in-depth for the renderer. We already run
+    // Content-Security-Policy - defence-in-depth for the renderer. We already run
     // sandbox:true + contextIsolation, load only local file:// content, and send
     // external navigations to the OS browser, so a renderer compromise has a small
     // blast radius. The CSP closes the last gap: it stops any script that DID slip
@@ -609,7 +609,7 @@ async function createWindow() {
     //
     // Verified safe against the shipped bundle before enabling: dist/index.html has
     // no inline <script> (one external ./assets/*.js), and the bundle has no eval()/
-    // new Function()/runtime WebAssembly/web-workers — so script-src 'self' with no
+    // new Function()/runtime WebAssembly/web-workers - so script-src 'self' with no
     // 'unsafe-eval' or 'wasm-unsafe-eval' loads the app cleanly. Re-verify after any
     // dependency bump that could introduce those (re-run the static scan).
     //
@@ -617,8 +617,8 @@ async function createWindow() {
     // URL is user-editable to any LAN/mesh IP (frontend connectionStore.ts) and is
     // fetched directly by the renderer, so a fixed origin allowlist is impossible.
     // That is an acceptable v1 posture because script-src 'self' already prevents
-    // injected code from RUNNING to abuse the open connect-src.
-    // TODO(v0.5): once the coordinator is reached only via the sidecar (or its host
+    // injected code from running to abuse the open connect-src.
+    // TODO: once the coordinator is reached only via the sidecar (or its host
     // set is pinned), tighten connect-src to explicit origins.
     const CSP = [
       "default-src 'self'",
@@ -635,7 +635,7 @@ async function createWindow() {
     ].join('; ');
 
     session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-      // Stamp only the top-level document response — its policy then governs every
+      // Stamp only the top-level document response - its policy then governs every
       // subresource and fetch the page makes. Leave API/asset responses untouched
       // (a CSP header on a non-document response is ignored anyway). We must always
       // call callback, or every response in the session stalls.
@@ -659,13 +659,13 @@ async function createWindow() {
     return { action: 'deny' };
   });
 
-  // Gate ALL in-window navigation to the app's own origin (see isAppOrigin
-  // above). Anything else — including file:// and localhost/127.0.0.1, which
-  // used to pass through unchecked — is denied in-window and, if it's an
-  // allowed external scheme, sent to the OS browser instead.
+  // Gate all in-window navigation to the app's own origin (see isAppOrigin
+  // above). Anything else - including file:// and localhost/127.0.0.1 - is
+  // denied in-window and, if it's an allowed external scheme, sent to the OS
+  // browser instead.
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (isAppOrigin(url)) {
-      return; // Our own app shell — allow (e.g. a full reload).
+      return; // Our own app shell - allow (e.g. a full reload).
     }
     event.preventDefault();
     safeOpenExternal(url);
@@ -674,7 +674,7 @@ async function createWindow() {
   if (!app.isPackaged) {
     mainWindow.loadURL('http://localhost:5173');
     // Skip DevTools when POTLUCK_DISABLE_DEVTOOLS is set (demo-video capture
-    // sets it) — a detached DevTools window confuses Playwright's recordVideo
+    // sets it) - a detached DevTools window confuses Playwright's recordVideo
     // and gets filmed instead of the app. Normal `make desktop` is unaffected.
     if (!process.env.POTLUCK_DISABLE_DEVTOOLS) {
       mainWindow.webContents.openDevTools({ mode: 'detach' });
@@ -715,7 +715,7 @@ ipcMain.handle('show-notification', (_event, title, body) => {
 
 ipcMain.handle('get-app-version', () => app.getVersion());
 
-// True only when this build can actually self-update: it must be packaged AND
+// True only when this build can actually self-update: it must be packaged and
 // electron-builder must have emitted app-update.yml (the publish-feed config).
 // A `--dir` / dogfood / unsigned local build is packaged but omits that file,
 // so calling checkForUpdates/downloadUpdate would throw
@@ -747,7 +747,7 @@ ipcMain.handle('updater:quit-and-install', () => {
   setImmediate(() => autoUpdater.quitAndInstall());
 });
 
-// update:check / update:download / update:install — same three actions as
+// update:check / update:download / update:install - same three actions as
 // updater:download / updater:quit-and-install above, added under the
 // update:* names for the updater-namespaced preload API (window.potluck.
 // updater). Kept alongside the older channels rather than renaming them, so
@@ -806,16 +806,16 @@ ipcMain.handle('potluck:get-initial-deep-link', () => {
 // Renderer code can't dial Unix sockets directly, so main.js proxies the
 // HTTP request via ipcMain.handle('mesh:request').
 //
-// Status / peers / pair / unpair endpoints — all small JSON request/response
-// pairs. We deliberately do NOT forward the WS /events stream here: per the
+// Status / peers / pair / unpair endpoints - all small JSON request/response
+// pairs. We deliberately do not forward the WS /events stream here: per the
 // shipped /agents-view precedent, polling at 2–5s is cheaper to package and
 // keeps the architecture simple. If live push becomes necessary, add a
 // separate `mesh:subscribe-events` channel.
 //
 // Errors come in three flavours:
-//   * `unreachable`  — the sidecar isn't running / socket file doesn't exist
-//   * `timeout`      — the sidecar accepted but didn't reply in 10s
-//   * regular HTTP   — status >= 400 with a JSON `{ error: { code, message } }`
+//   * `unreachable` - the sidecar isn't running / socket file doesn't exist
+//   * `timeout` - the sidecar accepted but didn't reply in 10s
+//   * regular HTTP - status >= 400 with a JSON `{ error: { code, message } }`
 //                      body (the localapi server's contract).
 
 const MESH_REQUEST_TIMEOUT_MS = 10_000;
@@ -836,7 +836,7 @@ function meshSocketPath() {
   // XDG_RUNTIME_DIR/$UID path doesn't work for a system-level daemon: it
   // may start before first login (the dir doesn't exist yet) and gets torn
   // down + recreated on every relogin (the socket file would vanish even
-  // though the daemon is still running) — see the header comment in
+  // though the daemon is still running) - see the header comment in
   // mesh-install-helper.sh for the full reasoning. Fall back to the
   // per-user XDG path only when the fixed path isn't present, which covers
   // a manually-run dev binary (`go run ./cmd/potluck-mesh`, no root, no
@@ -937,43 +937,42 @@ ipcMain.handle('mesh:request', async (_evt, method, reqPath, body) => {
 // ─── Mesh daemon supervision (macOS: SMAppService root LaunchDaemon) ─────────
 //
 // This is the "app brings up the mesh" layer, distinct from the mesh:request
-// bridge above (which only talks to an ALREADY-running sidecar over its
+// bridge above (which only talks to an already-running sidecar over its
 // socket). The mesh binary needs root for the utun device, so on macOS it
-// runs as a root LaunchDaemon registered via SMAppService — never via `sudo`,
+// runs as a root LaunchDaemon registered via SMAppService - never via `sudo`,
 // never hand-run by the user. main.js never spawns/kills this daemon itself
-// (unlike the Python sidecar above): it is installed once, OUTLIVES the
+// (unlike the Python sidecar above): it is installed once, outlives the
 // Electron app across quits/relaunches/updates, and is only driven through
 // the signed mesh-helper Swift CLI (native/mesh-helper/), which wraps
-// SMAppService.daemon(plistName:) — see that file's header comment for why
+// SMAppService.daemon(plistName:) - see that file's header comment for why
 // it must be a sibling of the main executable at Contents/MacOS/mesh-helper
 // (electron-builder's mac.extraFiles in package.json), not Resources/.
 //
 // The static LaunchDaemon plist (packaging/daemons/ai.trypotluck.mesh.plist,
 // embedded the same way at Contents/Library/LaunchDaemons/) is baked in at
-// build time and can't be rewritten post-install — see its header comment.
+// build time and can't be rewritten post-install - see its header comment.
 //
 // Cross-platform shape: the renderer-facing contract (channel names + the
 // `state` enum) is the same on every OS so the frontend can be wired once.
 // Only macOS is implemented; Linux/Windows always resolve state:'unsupported'
-// with a TODO for now (systemd/pkexec on Linux, a Windows Service on
-// Windows — neither needs root/UAC-avoidance tricks the way macOS does, so
-// their mechanism will look different, not just a port of this one).
+// for now. TODO: systemd/pkexec on Linux and a Windows Service on Windows;
+// neither needs root/UAC-avoidance tricks the way macOS does, so their
+// mechanism will look different, not just a port of this one.
 //
-// State enum (superset of what the task spec listed — 'starting' added
-// below because SMAppService's 'enabled' means "registered + approved," NOT
-// "the socket is actually answering yet," and collapsing that into one of
-// the other four buckets would be actively misleading to the UI):
-//   'not_installed'    — never registered (or SMAppService lost track of it)
-//   'requires_approval'— registered, but the user must flip it on in
+// State enum ('starting' is its own state because SMAppService's 'enabled'
+// means "registered + approved," not "the socket is actually answering yet,"
+// and folding it into another bucket would mislead the UI):
+//   'not_installed' - never registered (or SMAppService lost track of it)
+//   'requires_approval' - registered, but the user must flip it on in
 //                        System Settings > Login Items & Extensions
-//   'starting'         — SMAppService says enabled, but GET /status on the
+//   'starting' - SMAppService says enabled, but GET /status on the
 //                        daemon's own IPC socket hasn't answered yet
 //                        (freshly registered, or the daemon is unhealthy)
-//   'running'          — enabled AND the socket answered 200 on /status
+//   'running' - enabled and the socket answered 200 on /status
 //   'outdated'         running, but not the sidecar binary this app shipped
 //                        (see "Mesh service version check" below); the mesh
 //                        works, the renderer offers a restart
-//   'unsupported'      — this platform's mechanism isn't implemented yet
+//   'unsupported' - this platform's mechanism isn't implemented yet
 
 /**
  * Absolute path to the signed mesh-helper CLI inside the packaged app, or
@@ -995,7 +994,7 @@ const MESH_HELPER_TIMEOUT_MS = 15_000;
 
 /**
  * Runs the mesh-helper CLI with a single subcommand and captures stdout.
- * Never rejects — callers get { ok: false, error } instead, since every
+ * Never rejects - callers get { ok: false, error } instead, since every
  * caller needs to turn a helper failure into a `state` value, not an
  * exception.
  */
@@ -1020,8 +1019,8 @@ function runMeshHelper(subcommand) {
 
 /**
  * Computes the full macOS daemon status: shells out to the helper's `status`
- * subcommand for the SMAppService.Status, then — only when that reports
- * 'enabled' — probes the daemon's own IPC socket (GET /status, via the
+ * subcommand for the SMAppService.Status, then - only when that reports
+ * 'enabled' - probes the daemon's own IPC socket (GET /status, via the
  * existing meshRequest() above) to confirm it's actually up, not just
  * registered. See the state-enum comment above for what each value means.
  */
@@ -1060,7 +1059,7 @@ async function computeMacDaemonStatus() {
       return { platform: 'darwin', state: 'starting', detail: code };
     }
   }
-  // Unrecognised token — a future SMAppService.Status case the helper
+  // Unrecognised token - a future SMAppService.Status case the helper
   // doesn't know how to map (see statusToken() in main.swift). Fail safe
   // toward "not installed" rather than silently claiming success.
   return { platform: 'darwin', state: 'not_installed', detail: `unrecognised helper status: ${token}` };
@@ -1436,11 +1435,11 @@ function startMeshServiceWatch() {
 // ─── Mesh daemon supervision (Linux: root systemd unit via polkit/pkexec) ───
 //
 // Mirrors the macOS section above, but there is no SMAppService-equivalent
-// "register once, OS handles consent + persistence" API on Linux — systemd
-// has no built-in user-consent step, so THIS layer has to (a) drive a
+// "register once, OS handles consent + persistence" API on Linux - systemd
+// has no built-in user-consent step, so this layer has to (a) drive a
 // polkit/pkexec authorization prompt itself and (b) poll systemd directly
 // for unit state (there's no separate "requires_approval" step the way
-// SMAppService has: pkexec's auth dialog is synchronous — either the user
+// SMAppService has: pkexec's auth dialog is synchronous - either the user
 // authenticates and the install proceeds, or it doesn't happen at all, so
 // Linux never reports 'requires_approval'; a cancelled/failed pkexec prompt
 // just reports 'not_installed' with a detail string, same shape as macOS's
@@ -1448,27 +1447,27 @@ function startMeshServiceWatch() {
 //
 // The privileged half (rendering + installing + starting the systemd unit)
 // lives entirely in packaging/linux/mesh-install-helper.sh, invoked via
-// pkexec against a FIXED path with a FIXED, whitelisted argument list — see
+// pkexec against a fixed path with a fixed, whitelisted argument list - see
 // that script's header comment for the full security model and
 // packaging/linux/polkit/ai.trypotluck.mesh.policy for the polkit action
 // that authorizes it. main.js never constructs a shell command from
 // renderer input for this: mesh:enable takes no arguments from the
-// renderer at all (see ipcMain.handle('mesh:enable') below) — every value
+// renderer at all (see ipcMain.handle('mesh:enable') below) - every value
 // passed to pkexec here is a fixed constant or a value main.js itself
 // computed (its own uid/gid), never renderer-supplied.
 //
 // Querying unit state (systemctl is-active/is-enabled) needs no privilege,
-// so computeLinuxDaemonStatus() never touches pkexec — only mesh:enable
+// so computeLinuxDaemonStatus() never touches pkexec - only mesh:enable
 // (the install path) does.
 
 /**
  * Absolute path to the polkit-authorized install helper. In a packaged
  * .deb/.rpm install this is /usr/lib/potluck/mesh-install-helper.sh (must
  * match the path baked into ai.trypotluck.mesh.policy's
- * org.freedesktop.policykit.exec.path annotation — pkexec will refuse to
+ * org.freedesktop.policykit.exec.path annotation - pkexec will refuse to
  * run anything else with this action's branded prompt). In dev (unpackaged,
  * app.isPackaged === false) there is no installed helper, so this returns
- * null and mesh:enable reports 'not_installed' with an explanatory detail —
+ * null and mesh:enable reports 'not_installed' with an explanatory detail -
  * same "no dev-mode daemon install" posture as getMeshHelperPath() on
  * macOS.
  */
@@ -1482,8 +1481,8 @@ function getLinuxMeshHelperPath() {
 /**
  * Absolute path to the mesh binary this install should point the systemd
  * unit's ExecStart at. Must land inside mesh-install-helper.sh's
- * ALLOWED_MESH_BIN_PREFIXES allowlist — see that script's validate_mesh_bin()
- * — or the privileged side will refuse it. Mirrors getSidecarPath()'s
+ * ALLOWED_MESH_BIN_PREFIXES allowlist - see that script's validate_mesh_bin()
+ * - or the privileged side will refuse it. Mirrors getSidecarPath()'s
  * resourcesPath resolution for the Python sidecar elsewhere in this file.
  */
 function getLinuxMeshBinPath() {
@@ -1493,7 +1492,7 @@ function getLinuxMeshBinPath() {
 
 const LINUX_MESH_INSTALL_TIMEOUT_MS = 30_000;
 
-// Production defaults — same values baked into the macOS LaunchDaemon plist
+// Production defaults - same values baked into the macOS LaunchDaemon plist
 // (packaging/daemons/ai.trypotluck.mesh.plist). A self-hosted/LAN
 // coordinator override goes through the runtime-settings PATCH /settings
 // mechanism after install, same as macOS; this is only the bootstrap value.
@@ -1502,7 +1501,7 @@ const LINUX_MESH_DERP_URL_DEFAULT = 'tcp+tls://derp.trypotluck.ai:443';
 
 /**
  * Runs the install helper via pkexec with a fixed subcommand + fixed
- * argument shape. Never rejects — same contract as runMeshHelper() above,
+ * argument shape. Never rejects - same contract as runMeshHelper() above,
  * for the same reason (every caller needs a `state`, not an exception).
  */
 function runLinuxMeshHelper(args) {
@@ -1514,7 +1513,7 @@ function runLinuxMeshHelper(args) {
     }
     const pkexecBin = '/usr/bin/pkexec';
     if (!fs.existsSync(pkexecBin)) {
-      resolve({ ok: false, error: 'pkexec not found — polkit is required for mesh install on Linux' });
+      resolve({ ok: false, error: 'pkexec not found: polkit is required for mesh install on Linux' });
       return;
     }
     execFile(
@@ -1553,7 +1552,7 @@ function runLinuxMeshHelper(args) {
 function systemctlIsActive(unitName) {
   return new Promise((resolve) => {
     execFile('systemctl', ['is-active', unitName], { timeout: 5_000 }, (err, stdout) => {
-      // is-active exits non-zero for every state except "active" — that is
+      // is-active exits non-zero for every state except "active" - that is
       // normal/expected here (e.g. "inactive", "failed", "unknown" for a
       // never-installed unit), not a failure to be logged.
       resolve(stdout.trim());
@@ -1576,7 +1575,7 @@ function unitFileExists(unitName) {
 // Reads a few machine-readable properties of a unit so we can tell a genuine
 // crash / crash-loop apart from a transient startup. NRestarts climbs when
 // systemd's Restart=on-failure keeps relaunching a unit that immediately dies
-// (e.g. a bad ExecStart) — the classic "stuck forever" case a user would
+// (e.g. a bad ExecStart) - the classic "stuck forever" case a user would
 // otherwise see as an endless "Starting…".
 function systemctlShow(unitName) {
   return new Promise((resolve) => {
@@ -1653,12 +1652,12 @@ async function computeLinuxDaemonStatus() {
 //
 // Mirrors the macOS/Linux sections above. Windows has neither an
 // SMAppService equivalent nor (for this binary) a real SCM-compliant
-// Windows Service — potluck-mesh.exe is a plain console binary and does not
+// Windows Service - potluck-mesh.exe is a plain console binary and does not
 // implement the Service Control protocol (StartServiceCtrlDispatcher), so
 // `sc.exe start` on it fails after ~30s ("Cannot start service"). Retrofitting
 // that is a real Go change (golang.org/x/sys/windows/svc), out of scope
-// here. Instead this drives a SYSTEM-run, "At startup" + "run with highest
-// privileges" Scheduled Task — Task Scheduler just launches the .exe
+// here. Instead this drives a System-run, "At startup" + "run with highest
+// privileges" Scheduled Task - Task Scheduler just launches the .exe
 // directly (no SCM handshake needed), which the existing binary already
 // satisfies, and covers "needs admin for the Wintun adapter" + "persist
 // across reboots" + "restart on crash" the same way the macOS LaunchDaemon
@@ -1671,7 +1670,7 @@ async function computeLinuxDaemonStatus() {
 // directory, and installing/starting the Scheduled Task) lives entirely in
 // packaging/windows/mesh-install-helper.ps1, elevated via a single
 // Start-Process -Verb RunAs prompt (the Windows equivalent of ShellExecute
-// 'runas') against a FIXED script path with a FIXED argument shape — see
+// 'runas') against a fixed script path with a fixed argument shape - see
 // that script's header comment for the full security model. As on Linux,
 // main.js never constructs anything from renderer input here: mesh:enable
 // takes no arguments from the renderer at all, and every value passed to
@@ -1679,13 +1678,13 @@ async function computeLinuxDaemonStatus() {
 // itself (getWindowsMeshBinPath()).
 //
 // Querying task state (Get-ScheduledTask) needs no elevation, so
-// computeWindowsDaemonStatus() never elevates — only mesh:enable (the
+// computeWindowsDaemonStatus() never elevates - only mesh:enable (the
 // install path) does.
 
 const WINDOWS_MESH_TASK_NAME = 'PotluckMesh';
 const WINDOWS_MESH_INSTALL_TIMEOUT_MS = 60_000; // includes the UAC prompt wait
 
-// Production defaults — same values baked into the macOS LaunchDaemon plist
+// Production defaults - same values baked into the macOS LaunchDaemon plist
 // and passed to the Linux install helper above.
 const WINDOWS_MESH_COORDINATOR_URL_DEFAULT = 'https://coordinator.trypotluck.ai';
 const WINDOWS_MESH_DERP_URL_DEFAULT = 'tcp+tls://derp.trypotluck.ai:443';
@@ -1695,7 +1694,7 @@ const WINDOWS_MESH_DERP_URL_DEFAULT = 'tcp+tls://derp.trypotluck.ai:443';
  * packaged build this is process.resourcesPath\mesh-install-helper.ps1 (see
  * the win.extraResources entry in package.json). In dev (unpackaged) there
  * is no packaged helper to elevate, so this returns null and mesh:enable
- * reports 'not_installed' with an explanatory detail — same "no dev-mode
+ * reports 'not_installed' with an explanatory detail - same "no dev-mode
  * daemon install" posture as getMeshHelperPath()/getLinuxMeshHelperPath().
  */
 function getWindowsMeshHelperPath() {
@@ -1706,9 +1705,9 @@ function getWindowsMeshHelperPath() {
 }
 
 /**
- * Absolute path to the SOURCE mesh binary this install should copy from
+ * Absolute path to the source mesh binary this install should copy from
  * (see mesh-install-helper.ps1's header comment for why it copies rather
- * than execing this path directly — electron-builder's NSIS default is a
+ * than execing this path directly - electron-builder's NSIS default is a
  * per-user install directory, not an admin-owned one). Mirrors
  * getLinuxMeshBinPath()'s resourcesPath resolution.
  */
@@ -1719,15 +1718,15 @@ function getWindowsMeshBinPath() {
 
 /**
  * Runs the install helper elevated via a single UAC prompt
- * (Start-Process -Verb RunAs — the Win32 ShellExecute 'runas' verb) and
- * waits for it to finish. Never rejects — same contract as
+ * (Start-Process -Verb RunAs - the Win32 ShellExecute 'runas' verb) and
+ * waits for it to finish. Never rejects - same contract as
  * runMeshHelper()/runLinuxMeshHelper() above.
  *
  * `args` must only ever contain fixed production constants or values
  * main.js computed itself; see the big security-model comment above. Each
  * arg is embedded as a single-quoted PowerShell string literal (with `'`
  * doubled per PowerShell's own escaping rule) inside the -Command passed to
- * the UNELEVATED launcher powershell.exe process — execFile invokes that
+ * the unelevated launcher powershell.exe process - execFile invokes that
  * launcher directly (no shell), so there is no separate shell-quoting layer
  * to worry about beyond PowerShell's own single-quote escaping.
  */
@@ -1741,7 +1740,7 @@ function runWindowsMeshHelperElevated(args) {
     const childArgs = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', helperPath, ...args];
     const psQuote = (s) => `'${String(s).replace(/'/g, "''")}'`;
     const psArgList = childArgs.map(psQuote).join(',');
-    // 1223 = ERROR_CANCELLED — the standard Win32 code for "the user declined
+    // 1223 = ERROR_CANCELLED - the standard Win32 code for "the user declined
     // the UAC prompt." Surfaced as a distinct, recognisable error string.
     const command =
       `$ErrorActionPreference='Stop'; try { `
@@ -1801,7 +1800,7 @@ async function computeWindowsDaemonStatus() {
   }
 
   if (task.state !== 'Running') {
-    // LastTaskResult 0 = success (previous run exited cleanly — shouldn't
+    // LastTaskResult 0 = success (previous run exited cleanly - shouldn't
     // happen for a long-running daemon, but not itself a failure signal),
     // 267009 (0x41301) = "task is currently running" (a race with our own
     // read), 267011 (0x41303) = "task has not yet run", SELF_RESTART_EXIT_CODE
@@ -1861,7 +1860,7 @@ ipcMain.handle('mesh:enable', async () => {
       };
     }
     // Every argument here is either a fixed production constant or a value
-    // main.js computed itself (this process's own uid/gid) — never
+    // main.js computed itself (this process's own uid/gid) - never
     // renderer-supplied. See the big comment above this section.
     const helperResult = await runLinuxMeshHelper([
       'install',
@@ -1888,7 +1887,7 @@ ipcMain.handle('mesh:enable', async () => {
       };
     }
     // Every argument here is a fixed production constant or a value main.js
-    // computed itself (getWindowsMeshBinPath()) — never renderer-supplied.
+    // computed itself (getWindowsMeshBinPath()) - never renderer-supplied.
     // See the big security-model comment above this section, and
     // mesh-install-helper.ps1's header comment for the elevated half.
     const helperResult = await runWindowsMeshHelperElevated([
@@ -1933,7 +1932,7 @@ ipcMain.handle('mesh:enable', async () => {
 
   const token = helperResult.output;
   if (token === 'requiresApproval') {
-    log.info('[mesh-daemon] registered — awaiting Login Items approval.');
+    log.info('[mesh-daemon] registered, awaiting Login Items approval.');
     return { platform: 'darwin', state: 'requires_approval' };
   }
   if (token === 'enabled') {
@@ -1958,8 +1957,8 @@ ipcMain.handle('mesh:open-login-items', async () => {
 // The packaged renderer loads from file:// (Origin: null), so browser CORS
 // blocks it from reading responses off api.trypotluck.ai even with a bearer
 // token. We proxy cloud calls through the main process (Node fetch, no CORS)
-// and keep the opaque session token HERE in the main process, never in renderer
-// JS — preserving the httpOnly-cookie security property the web client has. The
+// and keep the opaque session token here in the main process, never in renderer
+// JS - preserving the httpOnly-cookie security property the web client has. The
 // cloud API accepts `Authorization: Bearer <token>` (services/api
 // middleware/auth.py). In dev the renderer is http://localhost:5173, which is
 // CORS-allowlisted, so it uses plain fetch + cookie and never hits this bridge.
@@ -2079,7 +2078,7 @@ ipcMain.handle('cloud:set-token', async (_evt, token) => {
   cloudSessionToken = typeof token === 'string' && token.length > 0 ? token : null;
   try {
     if (cloudSessionToken) {
-      // 0600: readable only by the current user. TODO(v0.5+): wrap with
+      // 0600: readable only by the current user. TODO: wrap with
       // electron safeStorage where the OS keychain is available.
       fs.writeFileSync(cloudTokenPath(), cloudSessionToken, { mode: 0o600 });
     } else {
@@ -2159,7 +2158,7 @@ ipcMain.handle('cloud:request', async (_evt, method, reqPath, body) => {
 // A small, path-allowlisted proxy for the handful of coordinator routes that
 // require the member's login session rather than the (optional) coordinator
 // token: POST /mesh/households + POST /mesh/pairing-tokens (household
-// bootstrap — coordinator/routers/mesh.py), POST /me/device-keys (device key
+// bootstrap - coordinator/routers/mesh.py), POST /me/device-keys (device key
 // pre-registration for REQUIRE_REGISTERED_KEYS=true), the trusted-circle
 // + identity routes (GET /me/identity, GET/POST /me/circles, DELETE
 // /me/circles/{id}, POST /me/circles/{id}/members, DELETE
@@ -2169,31 +2168,31 @@ ipcMain.handle('cloud:request', async (_evt, method, reqPath, body) => {
 // DELETE /me/circles/{id}/membership, DELETE /me/circles/{id}/people/{id};
 // coordinator's routers/circles.py), and
 // the credit/contribution routes (GET /me/credit-balance, GET
-// /me/credit-history, GET /me/contributions, GET /me/contributions/weekly —
+// /me/credit-history, GET /me/contributions, GET /me/contributions/weekly -
 // coordinator's routers/me.py), and GET /jobs/stats (own requester-side job
-// counts — coordinator/routers/jobs.py). All of these resolve identity via
+// counts - coordinator/routers/jobs.py). All of these resolve identity via
 // `resolve_session_member_id`, which accepts
 // an `Authorization: Bearer <session token>` header as the desktop-app
 // fallback for a cross-origin cookie (see
 // coordinator/middleware/session_auth.py).
 //
-// Unlike `cloud:request` above, the target ORIGIN is caller-supplied: the
+// Unlike `cloud:request` above, the target origin is caller-supplied: the
 // coordinator is a member-operated node the user points the app at (LAN IP,
-// Tailscale IP, or the hosted default — see connectionStore.ts), not a fixed
+// Tailscale IP, or the hosted default - see connectionStore.ts), not a fixed
 // api.trypotluck.ai host. That's an intentional part of the mesh design, not
 // a new open-proxy hole: the renderer can already reach any coordinator URL
 // directly via plain fetch() (CORS on the coordinator allows file:///
 // localhost origins for exactly this). What this bridge protects is the
-// bearer token itself — it stays main-process-only, same as cloud:request,
+// bearer token itself - it stays main-process-only, same as cloud:request,
 // and is attached here rather than ever being handed to renderer JS. The
 // route allowlist below is defence in depth so this can't become a generic
 // "attach my session token to any request" primitive: static routes are
 // exact-matched (method + path), and the two circle routes with a dynamic
-// segment are matched by a tight pattern rather than a wildcard — no `*`,
+// segment are matched by a tight pattern rather than a wildcard - no `*`,
 // no free-form path-prefix check.
 const COORDINATOR_SESSION_METHODS = new Set(['GET', 'POST', 'DELETE']);
 
-// Static routes — exact `METHOD path` match.
+// Static routes - exact `METHOD path` match.
 const COORDINATOR_SESSION_EXACT_ROUTES = new Set([
   'POST /mesh/households',
   'GET /mesh/households/current',
@@ -2215,7 +2214,7 @@ const COORDINATOR_SESSION_EXACT_ROUTES = new Set([
 // Dynamic circle routes. `id` is the circle's Postgres UUID; `pubkey` is a
 // contributor device key, base64url-encoded with no padding (see
 // potluck_local/contributor/keys.py:public_key_b64), bounded to the
-// coordinator's _PUBKEY_MAX_LEN (512 — circles.py). Both are validated by
+// coordinator's _PUBKEY_MAX_LEN (512 - circles.py). Both are validated by
 // regex, not just split on `/`, so a crafted path segment (e.g. containing
 // `../` or another `/`) can't smuggle a different route through the proxy.
 // Invite and person ids are UUIDs: the patterns below accept only that shape
@@ -2313,10 +2312,10 @@ ipcMain.handle(
 );
 
 // Lets the renderer tell main which coordinator origin is currently active
-// (connectionStore.ts's coordinatorUrl — user-overridable and runtime-mutable
+// (connectionStore.ts's coordinatorUrl - user-overridable and runtime-mutable
 // via adoptSidecarUrl/hydrateFromSidecar, so main cannot hardcode it). Stores
-// the ORIGIN only, not the full URL, and only via new URL().origin — never a
-// raw string compare — so the onBeforeSendHeaders injector above can scope the
+// the ORIGIN only, not the full URL, and only via new URL().origin - never a
+// raw string compare - so the onBeforeSendHeaders injector above can scope the
 // member session bearer to exactly this host. Renderer calls this once at
 // startup and again on every coordinatorUrl change (see connectionStore.ts's
 // initCoordinatorBaseSync). Malformed/empty input is ignored, leaving the
@@ -2327,7 +2326,7 @@ ipcMain.handle('coordinator:set-base', (_evt, baseUrl) => {
   try {
     coordinatorOrigin = new URL(baseUrl).origin;
   } catch (_) {
-    // Ignore — keep whatever coordinatorOrigin was already set to.
+    // Ignore - keep whatever coordinatorOrigin was already set to.
   }
 });
 
@@ -2337,12 +2336,12 @@ const UPDATE_CHECK_INITIAL_DELAY_MS = 10_000; // 10s after startup
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 function setupAutoUpdater() {
-  // Only run the updater when this build can actually self-update: packaged AND
+  // Only run the updater when this build can actually self-update: packaged and
   // app-update.yml present (see isUpdaterConfigured). A `--dir` / dogfood /
   // unsigned local build is packaged but has no app-update.yml, so a check would
   // throw "ENOENT ... app-update.yml" and surface a bogus "update failed" banner.
   if (!isUpdaterConfigured()) {
-    log.info('[updater] Disabled for this build (no app-update.yml — dev/dir/unsigned).');
+    log.info('[updater] Disabled for this build (no app-update.yml; dev/dir/unsigned).');
     return;
   }
 
@@ -2373,7 +2372,7 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('update-downloaded', () => {
-    log.info('[updater] Update downloaded — ready to install on restart.');
+    log.info('[updater] Update downloaded, ready to install on restart.');
     updateDownloadStarted = false;
     if (mainWindow) {
       mainWindow.webContents.send('update-downloaded');
@@ -2381,8 +2380,8 @@ function setupAutoUpdater() {
   });
 
   // Only surface an error banner when the user actually started a download or
-  // install (updateDownloadStarted). A failed background CHECK — feed
-  // unreachable at launch, transient network, a releases.* hiccup — is logged
+  // install (updateDownloadStarted). A failed background check - feed
+  // unreachable at launch, transient network, a releases.* hiccup - is logged
   // but stays silent, so a released user is never nagged for something they did
   // not do.
   autoUpdater.on('error', (err) => {
@@ -2393,7 +2392,7 @@ function setupAutoUpdater() {
     }
   });
 
-  // Initial check shortly after startup, then re-check on a fixed interval —
+  // Initial check shortly after startup, then re-check on a fixed interval -
   // autoDownload stays false throughout, so these only ever surface an
   // 'update-available'/'update-not-available' event; the user consents to
   // the actual download from the UI (update:download / updater:download).
@@ -2447,7 +2446,7 @@ function killSidecar({ shutdownRequested = false } = {}) {
       catch (err) { log.warn(`[sidecar] SIGTERM failed: ${err.message}`); }
       killTimer = setTimeout(() => {
         if (settled) return;
-        log.warn('[sidecar] SIGTERM timeout — sending SIGKILL.');
+        log.warn('[sidecar] SIGTERM timeout, sending SIGKILL.');
         try {
           proc.kill('SIGKILL');
         } catch (err) {
@@ -2468,7 +2467,7 @@ function killSidecar({ shutdownRequested = false } = {}) {
 // ─── App lifecycle ───────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
-  // Secondary instance (lost the single-instance lock) is on its way out — do
+  // Secondary instance (lost the single-instance lock) is on its way out - do
   // not boot a sidecar or window. The primary already got our argv via
   // 'second-instance'.
   if (!gotSingleInstanceLock) return;
@@ -2478,7 +2477,7 @@ app.whenReady().then(async () => {
   // Cold start via deep link on Windows/Linux: the URL is in our own argv.
   // Buffer it before the window is created so the renderer pulls it on mount.
   // Goes through the same isAuthCallbackDeepLink gate as every other entry
-  // point — see handleDeepLink.
+  // point - see handleDeepLink.
   if (process.platform !== 'darwin') {
     const coldStartLink = extractDeepLink(process.argv);
     if (coldStartLink && isAuthCallbackDeepLink(coldStartLink)) {
@@ -2505,7 +2504,7 @@ app.whenReady().then(async () => {
   if (!sidecarReady) {
     const { response } = await dialog.showMessageBox({
       type: 'error',
-      title: 'Potluck AI — startup error',
+      title: 'Potluck AI: startup error',
       message: 'The local AI engine failed to start.',
       detail:
         'The backend did not respond within the startup timeout.\n\n' +
@@ -2539,7 +2538,7 @@ app.on('activate', async () => {
   // macOS: re-create the window when the dock icon is clicked and no windows are open.
   // Guard against a dead or restarting sidecar: if pythonProcess is null the sidecar
   // is mid-restart; opening a window against 127.0.0.1:8321 would get ECONNREFUSED
-  // for every API call until the restart completes. Skip window creation in that case —
+  // for every API call until the restart completes. Skip window creation in that case -
   // the restart handler will not re-open a window, but the next crash-free activate
   // (or the app.whenReady path after a future relaunch) will.
   if (BrowserWindow.getAllWindows().length === 0 && (pythonProcess || attachedRuntime || !app.isPackaged)) {
@@ -2586,7 +2585,7 @@ app.on('before-quit', async (event) => {
       ]);
       shutdownRequested = response?.ok === true;
     } catch (_) {
-      // Ignore — the sidecar may already be down.
+      // Ignore - the sidecar may already be down.
     }
 
     await killSidecar({ shutdownRequested });

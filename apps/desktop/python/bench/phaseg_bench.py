@@ -1,4 +1,4 @@
-"""Phase-G engine benchmark — whole-model, continuous batching, speculative decoding.
+"""Phase-G engine benchmark - whole-model, continuous batching, speculative decoding.
 
 Measures three concrete properties of the Phase-G engine on this machine:
   1. WholeModelEngine single-stream: prefill latency + decode tok/s.
@@ -6,7 +6,7 @@ Measures three concrete properties of the Phase-G engine on this machine:
   3. Speculative decoding round-trip reduction over a 2-node localhost loopback.
 
 All numbers are real; the script does not produce placeholders. Results are written
-to --out as Markdown (default: docs/phaseg-engine-bench-local.md).
+to --out as Markdown (default: ./phaseg-engine-bench-local.md).
 
 Usage:
     python bench/phaseg_bench.py [options]
@@ -401,7 +401,7 @@ def write_report(
     machine_desc = "Mac M-series cpu/fp32" if device == "cpu" and platform.machine() == "arm64" else f"{platform.machine()} {device}/{dtype_str}"
 
     lines = [
-        "# Phase-G Engine Benchmark — Local Run",
+        "# Phase-G Engine Benchmark: Local Run",
         "",
         f"**Label:** `{label}`  ",
         f"**Model:** `{model_id}`  ",
@@ -521,9 +521,8 @@ def write_report(
         ),
         "",
         (
-            "**Next steps for real numbers.** Re-run this script on the bench fleet "
-            "(Linux 2080 Ti CUDA + Mac M3 Pro Metal) against potluck-medium (8B Q4_K_M) "
-            "to get the numbers that matter for the product story."
+            "**Next steps for real numbers.** Re-run this script on GPU machines "
+            "against an 8B Q4_K_M model to get representative numbers."
         ),
         "",
     ]
@@ -553,7 +552,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dtype", default="float32",
                    help="Torch dtype: float32 | float16 | bfloat16")
     p.add_argument("--out", default="",
-                   help="Output markdown path (default: docs/phaseg-engine-bench-local.md)")
+                   help="Output markdown path (default: ./phaseg-engine-bench-local.md)")
     p.add_argument("--label", default="local",
                    help="Short label identifying this run (e.g. local-arm64)")
     p.add_argument("--spec-k", default="3,6",
@@ -582,8 +581,7 @@ def main() -> None:
     if args.out:
         out_path = args.out
     else:
-        pkg_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        out_path = os.path.join(pkg_root, "docs", "phaseg-engine-bench-local.md")
+        out_path = os.path.join(os.getcwd(), "phaseg-engine-bench-local.md")
 
     print("=" * 60)
     print("  Phase-G Engine Benchmark")

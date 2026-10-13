@@ -1,18 +1,15 @@
 /**
- * Sidebar — primary nav + conversation list + chrome controls.
+ * Sidebar - primary nav + conversation list + chrome controls.
  *
- * Behaviour overhaul (Hearth chrome refactor):
+ * Behaviour:
  *   - Width is user-controlled, not route-controlled. Default expanded
  *     (w-60). User can collapse to icon-only (w-16) via the toggle at
  *     the bottom-left or the global ⌘\ shortcut. Persists to localStorage.
- *   - Conversations panel ALWAYS shows on /chat regardless of width.
- *     When the sidebar is collapsed and the route is /chat, the panel
- *     hides and a single "show chats" button appears in its place — the
- *     user can pop the conversations into a temporary sheet without
- *     re-expanding the whole rail. (Sheet implementation is a follow-up;
- *     v1 simply hides the conversations when collapsed and the user can
- *     re-expand to access them — no jank, just a clean affordance.)
- *   - New bottom-left actions row: collapse toggle + theme toggle.
+ *   - Conversations panel shows only on /chat and only when expanded.
+ *     The user re-expands the rail to access the conversations.
+ *     TODO: when collapsed, offer a "show chats" button that pops the
+ *     conversations into a temporary sheet without re-expanding the rail.
+ *   - Bottom-left actions row: collapse toggle + theme toggle.
  *
  * Per-conversation actions (rename, delete) are exposed via a three-dot
  * menu button that appears on hover.
@@ -68,7 +65,7 @@ interface NavItem {
   children?: NavItem[];
 }
 
-// Primary: the product story in narrative order — chat → your own machines →
+// Primary: the product story in narrative order - chat → your own machines →
 // the wider network → models. "My Machines" (route /household) is the flagship
 // and sits at #2, not buried below the workspace tools.
 const PRIMARY_NAV: NavItem[] = [
@@ -111,7 +108,7 @@ export function Sidebar() {
   const setNavGroupCollapsed = useUiPrefsStore((s) => s.setNavGroupCollapsed);
   const { memberProfile } = useAuth();
 
-  // ⌘\ / Ctrl+\ — global collapse toggle
+  // ⌘\ / Ctrl+\ - global collapse toggle
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       const meta = e.metaKey || e.ctrlKey;
@@ -145,7 +142,7 @@ export function Sidebar() {
       )}
       aria-label="Main navigation"
     >
-      {/* Logo block — Potluck mark + wordmark */}
+      {/* Logo block - Potluck mark + wordmark */}
       <div className={cn(
         'flex shrink-0 items-center border-b border-border px-3 py-4',
         expanded ? 'justify-start gap-2.5' : 'justify-center',
@@ -164,7 +161,7 @@ export function Sidebar() {
       {expanded && <ProjectSwitcher />}
 
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-        {/* Primary nav — the product story. Collapsible so a chat-heavy user
+        {/* Primary nav - the product story. Collapsible so a chat-heavy user
             can reclaim vertical space for the Chats list below. */}
         <NavGroup
           id="navigate"
@@ -176,7 +173,7 @@ export function Sidebar() {
           className="pt-3 pb-2"
         />
 
-        {/* Workspace group — coding-agent / memory surfaces */}
+        {/* Workspace group - coding-agent / memory surfaces */}
         <NavGroup
           id="workspace"
           label="Workspace"
@@ -187,7 +184,7 @@ export function Sidebar() {
           className="border-t border-border/50 pt-2 pb-3"
         />
 
-        {/* Conversations — only on /chat AND only when expanded */}
+        {/* Conversations - only on /chat and only when expanded */}
         {isChat && expanded && (
           <ConversationList
             conversations={conversations}
@@ -218,7 +215,7 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* Chrome controls — collapse + theme */}
+      {/* Chrome controls - collapse + theme */}
       <ChromeControls
         expanded={expanded}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -228,7 +225,7 @@ export function Sidebar() {
 }
 
 // ---------------------------------------------------------------------------
-// NavGroup — a labelled cluster of nav items with a collapsible disclosure
+// NavGroup - a labelled cluster of nav items with a collapsible disclosure
 // header. Collapsing a group hides its items so the Chats list can grow.
 // In icon-only sidebar mode the header is dropped and every icon stays
 // visible (collapse only applies to the expanded rail).
@@ -255,7 +252,7 @@ function NavGroup({
   onToggle,
   className,
 }: NavGroupProps) {
-  // Icon rail: no header, no collapse — keep every destination reachable.
+  // Icon rail: no header, no collapse - keep every destination reachable.
   if (!sidebarExpanded) {
     return (
       <div className={cn('flex flex-col items-center gap-0.5 px-3', className)}>
@@ -303,7 +300,7 @@ function NavGroup({
 }
 
 // ---------------------------------------------------------------------------
-// NavItemLink — single primary or secondary nav item
+// NavItemLink - single primary or secondary nav item
 // ---------------------------------------------------------------------------
 
 interface NavItemLinkProps {
@@ -379,7 +376,7 @@ function NavItemLink({ item, expanded }: NavItemLinkProps) {
 }
 
 // ---------------------------------------------------------------------------
-// ChromeControls — collapse toggle + theme toggle, bottom-left of sidebar
+// ChromeControls - collapse toggle + theme toggle, bottom-left of sidebar
 // ---------------------------------------------------------------------------
 
 interface ChromeControlsProps {

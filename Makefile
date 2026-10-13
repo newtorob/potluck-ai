@@ -23,8 +23,7 @@ COMPOSE ?= $(shell \
         sidecar sidecar-setup sidecar-go installer-deps installer-bundle installer-mac installer-mac-dir installer-win installer-linux installer-linux-docker installer-clean \
         install-mac-app kill dogfood \
         coordinator coordinator-setup frontend-setup electron-setup ps status clean reset eval-retrieval bench \
-        bench-inference bench-inference-get-models \
-        demo-setup demo-capture demo-video
+        bench-inference bench-inference-get-models
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -97,7 +96,7 @@ tailnet-ip: ## Print this host's Tailscale IPv4 (used by the tailnet targets)
 	fi; \
 	echo "$$ip"
 
-up-tailnet: check-docker ## Start the backend with coordinator+DERP published on the Tailscale IP (for peers like newtorob)
+up-tailnet: check-docker ## Start the backend with coordinator+DERP published on the Tailscale IP (for peers on your tailnet)
 	@ip="$$(tailscale ip -4 2>/dev/null | head -1)"; \
 	if [ -z "$$ip" ]; then \
 		echo "error: 'tailscale ip -4' returned nothing. Is Tailscale up? (tailscale status)"; exit 1; \
@@ -122,8 +121,7 @@ tailnet-check: ## Verify coordinator(8400)+DERP(8443) are reachable on localhost
 	echo; \
 	echo "==> A tailnet PEER should also see 200/OPEN on $$ip. If the peer sees 000/CLOSED"; \
 	echo "    but localhost is 200/OPEN, the break is almost certainly on the PEER (a VPN"; \
-	echo "    like Mullvad hijacking the 100.64.0.0/10 tailnet range) — not this Mac."; \
-	echo "    Diagnose + fix: docs/runbooks/tailnet-coordinator-reachability.md"
+	echo "    like Mullvad hijacking the 100.64.0.0/10 tailnet range) — not this Mac."
 
 kill-stray-coordinator: ## Kill any NATIVE (non-Docker) uvicorn coordinator left running (e.g. the stray :8401)
 	@pids="$$(pgrep -f 'uvicorn coordinator.app:create_app' 2>/dev/null)"; \
@@ -282,7 +280,7 @@ lint: ## Run the privacy-invariant lint (member_id leaks + contributor in-memory
 	@python3 scripts/dev/lint_privacy.py
 
 smoke-prod: ## Post-deploy smoke test against LIVE prod (api.trypotluck.ai + coordinator.trypotluck.ai). Safe/read-only by default.
-	@echo "==> Not wired to CI -- run manually after every coordinator/api deploy (see docs/launch/production-launch-checklist.md)."
+	@echo "==> Not wired to CI -- run manually after every coordinator/api deploy."
 	@echo "==> Opt-in deeper checks: SMOKE_ARGS='--with-session TOKEN' or SMOKE_ARGS='--send-email you@example.com'"
 	@bash scripts/smoke_prod.sh $(SMOKE_ARGS)
 
@@ -576,16 +574,5 @@ reset: ## Full nuke: stop containers, drop db volume, wipe build artifacts (asks
 	rm -rf apps/desktop/frontend/dist apps/desktop/frontend/node_modules
 	rm -rf apps/desktop/electron/out apps/desktop/electron/resources/python apps/desktop/electron/node_modules
 	rm -rf apps/desktop/python/.venv apps/desktop/python/dist apps/desktop/python/build
-
-# ---------- demo video pipeline ----------
-
-demo-setup: ## Install Playwright + deps for the demo-video harness
-	cd tools/demo-video && pnpm install && pnpm exec playwright install chromium
-
-demo-capture: ## Capture Demo A silent .webm (requires sidecar + Vite dev server running)
-	cd tools/demo-video && pnpm run capture
-
-demo-video: ## Compose narrated mp4 (add audio/scene-NN.mp3 clips first; degrades to silent mp4 if absent)
-	cd tools/demo-video && bash compose.sh
 
 .DEFAULT_GOAL := help

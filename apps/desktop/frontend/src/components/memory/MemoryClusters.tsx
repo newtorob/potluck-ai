@@ -1,5 +1,5 @@
 /**
- * MemoryClusters — UMAP scatter plot rendered on native <canvas>.
+ * MemoryClusters - UMAP scatter plot rendered on native <canvas>.
  *
  * Data comes pre-computed from GET /memory/clusters so no client-side
  * dimensionality reduction is needed. The component handles:
@@ -126,7 +126,7 @@ export function MemoryClusters({ activeProject, refreshKey }: MemoryClustersProp
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Pan/zoom transform — mutable ref to avoid re-renders on every wheel tick
+  // Pan/zoom transform - mutable ref to avoid re-renders on every wheel tick
   const transformRef = useRef<Transform>({ scale: 1, offsetX: 0, offsetY: 0 });
   const [, forceRedraw] = useState(0);
 
@@ -235,7 +235,7 @@ export function MemoryClusters({ activeProject, refreshKey }: MemoryClustersProp
   }, [draw, points, canvasSize]);
 
   // ---------------------------------------------------------------------------
-  // Hit test — find the nearest point under cursor (in data space)
+  // Hit test - find the nearest point under cursor (in data space)
   // ---------------------------------------------------------------------------
 
   const hitTest = useCallback(
@@ -384,7 +384,7 @@ export function MemoryClusters({ activeProject, refreshKey }: MemoryClustersProp
         />
       )}
 
-      {/* Loading / error / empty overlays — container stays mounted so the
+      {/* Loading / error / empty overlays - container stays mounted so the
           ResizeObserver never loses its target. */}
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center">

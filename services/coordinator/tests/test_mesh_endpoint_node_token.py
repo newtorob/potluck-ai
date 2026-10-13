@@ -5,7 +5,7 @@ A WireGuard public key is not a secret, and the legacy way of naming a node on
 /mesh/signal and /mesh/heartbeat is that key. Without this rule anyone who knew a
 machine's key could set the endpoint the coordinator stores for it, and under
 the direct circle link policy that stored value is copied into the link message
-sent to the OTHER household's sidecar, so a third party could choose where that
+sent to the other household's sidecar, so a third party could choose where that
 sidecar sends its WireGuard handshake packets.
 
 What these tests pin:
@@ -13,12 +13,12 @@ What these tests pin:
 * every writer of last_endpoint, of the household's LAN candidates and of the
   endpoint reports the link broker reads, for both kinds of credential: the
   signal endpoint_update, POST /mesh/heartbeat and POST /mesh/enroll;
-* a node enrolled before tokens existed (no node_token_hash) is handled as it
-  always was, and so is a token-bound sidecar: roster updates, punch
-  coordination and LAN candidates reach its household as before;
+* a node enrolled without a token (no node_token_hash) keeps the legacy
+  behaviour, and so does a token-bound sidecar: roster updates, punch
+  coordination and LAN candidates reach its household;
 * the link broker takes a machine's addresses only from the endpoint report of
   its live, token-bound connection, so an address written through any other
-  path, or left from before this rule, is never put in a message to another
+  path is never put in a message to another
   household, including when the real sidecar reconnects and a link is made
   before it has sent its own endpoint_update;
 * a connection that another one displaced does not tell the household that the
@@ -524,7 +524,7 @@ async def test_the_direct_policy_ignores_everything_stored_that_the_live_connect
     make_world, monkeypatch
 ) -> None:
     """A stored row and LAN candidates for both machines, sitting behind one public
-    address (so the old code would have sent the LAN candidates too), and no
+    address (so the LAN candidates would be eligible), and no
     report: nothing is put in either message."""
     _direct(monkeypatch)
     w = await make_world()
@@ -624,7 +624,7 @@ async def test_a_stored_endpoint_is_never_sent_to_the_other_household_over_real_
 async def test_a_legacy_write_then_the_real_sidecar_then_a_link_before_its_endpoint_update(
     make_world, monkeypatch
 ) -> None:
-    """The order of events in the brief. A legacy connection for the lender writes
+    """A legacy connection for the lender writes
     an endpoint and LAN candidates; the lender's real sidecar connects with its
     token and takes the slot; a link is made before that sidecar has said anything.
     The legacy write is dropped, and even a value that had been stored is not what
@@ -661,7 +661,7 @@ async def test_a_legacy_write_then_the_real_sidecar_then_a_link_before_its_endpo
                         impostor.receive_json()
                     assert LINK in mesh.signal_node_features(w.lender.node_id)
 
-                    # Whatever a legacy path stored earlier, a row from before this rule included:
+                    # Whatever a legacy path stored earlier:
                     await _store_endpoint(w, w.lender.node_id, planted)
                     mesh._local_endpoints[w.lender.node_id] = [planted_lan]
 

@@ -13,7 +13,7 @@ Why in-process and not a second executable: Electron already supervises
 this process; the app's loaded model is the model the peer serves (no
 second copy in memory); the busy signal, benchmarks and rpc_servers
 support all live in the runtime; and cancelling one task is a stop the
-coordinator observes within a heartbeat. See the M2.5 contract.
+coordinator observes within a heartbeat.
 
 Direct circle links (lending): while this machine shares with circles, the
 owner has not turned direct links off and its mesh sidecar advertises

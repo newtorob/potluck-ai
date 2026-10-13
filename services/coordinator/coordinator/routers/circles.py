@@ -58,7 +58,7 @@ router = APIRouter(tags=["circles"])
 
 # Plausible key string bounds: non-empty, at most 512 chars (matches the
 # member_keys.public_key column; Ed25519 base64url is ~43 chars but we don't
-# over-validate format — accept anything in this range).
+# over-validate format - accept anything in this range).
 _PUBKEY_MAX_LEN = 512
 
 
@@ -285,8 +285,8 @@ async def add_circle_member(
     is not a machine key at all, 409 if the pubkey is already in the circle.
     """
     await _get_own_circle(db, circle_id, member_id)
-    # A mistyped or truncated key used to be stored and then never routed to,
-    # with nothing to tell the owner why their friend's machine never answered.
+    # A mistyped or truncated key would be stored and then never routed to,
+    # with nothing to tell the owner why their friend's machine never answers.
     try:
         decode_ed25519_public_key(req.member_pubkey, field_name="member_pubkey")
     except KeyDecodeError:
@@ -675,7 +675,7 @@ async def remove_person(
 
 
 # ---------------------------------------------------------------------------
-# Own-identity disclosure — "your key to share"
+# Own-identity disclosure - "your key to share"
 # ---------------------------------------------------------------------------
 
 
@@ -693,7 +693,7 @@ async def my_identity(
     Returns 404 if no key has been registered yet (the member hasn't
     enrolled a device).
 
-    Privacy: this endpoint is self-service only — a member reads only their
+    Privacy: this endpoint is self-service only - a member reads only their
     own pubkey, never another member's.
     """
     result = await db.execute(
@@ -712,27 +712,25 @@ async def my_identity(
 
 
 # ---------------------------------------------------------------------------
-# Device-key registration — v0.5 attestation onboarding path
+# Device-key registration - attestation onboarding path
 # ---------------------------------------------------------------------------
 #
-# `models/member_key.py` has documented since it landed that "v0.5 member-auth
-# replaces TOFU: a signed-in member registers their device key through the
-# authenticated session (added_via='session')" — but no route ever implemented
-# it. That's a real gap: with `require_registered_keys=true` (the strict
-# allowlist posture `services/attestation.py` expects for multi-member /
-# production coordinators), an unregistered device key hard-fails attestation
-# with no way to ever register one, since MemberKey rows were otherwise only
-# created via TOFU (disabled in strict mode), operator SQL backfill, or a seed
-# script. That's an onboarding trap that pressures an operator into disabling
-# `require_registered_keys` — this endpoint is the promised fix.
+# A signed-in member registers their device key through the authenticated
+# session (added_via='session'; see `models/member_key.py`). With
+# `require_registered_keys=true` (the strict allowlist posture
+# `services/attestation.py` expects for multi-member / production
+# coordinators), an unregistered device key hard-fails attestation, and
+# MemberKey rows are otherwise only created via TOFU (disabled in strict
+# mode), operator SQL backfill, or a seed script. Without this endpoint an
+# operator would have to disable `require_registered_keys` to onboard anyone.
 
 
 class DeviceKeyRegisterRequest(BaseModel):
     """Body of POST /me/device-keys.
 
-    `public_key` is the device's Ed25519 public key (base64url, no padding) —
+    `public_key` is the device's Ed25519 public key (base64url, no padding) -
     the same key the desktop sidecar will later present as `peer_public_key`
-    in its WS attestation handshake. This endpoint does NOT verify possession
+    in its WS attestation handshake. This endpoint does not verify possession
     of the matching private key (that proof happens at attestation time via
     the signed-nonce challenge in `services/attestation.verify_attestation`);
     it only pre-authorizes the key for the authenticated member, which is what
@@ -776,22 +774,22 @@ async def register_device_key(
     Auth: gated by `resolve_session_member_id` only (the real identity
     gate: with `POTLUCK_SESSION_AUTH_ENABLED=1` this 401s without a valid
     `potluck_session` cookie / bearer session token; in dev passthrough it
-    resolves to the fixture member). Deliberately NOT gated by
-    `require_coordinator_token` — this route is called directly by the
+    resolves to the fixture member). Deliberately not gated by
+    `require_coordinator_token` - this route is called directly by the
     desktop frontend, which can never hold the coordinator's shared secret
     (see the module docstring's "frontend-direct" invariant).
 
     Validates `public_key` decodes to a 32-byte Ed25519 key (same check the
     WS attestation handshake applies), then inserts a `member_keys` row with
-    `added_via='session'`. Returns 409 if the key is already registered — to
+    `added_via='session'`. Returns 409 if the key is already registered - to
     this member or to a different one; we don't disclose which, so this
     endpoint can't be used to fingerprint whether a guessed key belongs to
     someone else.
 
-    This endpoint only pre-authorizes the key; it is NOT the possession
+    This endpoint only pre-authorizes the key; it is not the possession
     proof. `services/attestation.verify_attestation` still requires the
     peer to sign the server's connection nonce with the matching private key
-    before it can attest as this member — registering a key here does not by
+    before it can attest as this member - registering a key here does not by
     itself let anyone impersonate the device.
     """
     try:

@@ -1,5 +1,5 @@
 /**
- * MagicLinkForm — email input for passwordless sign-in.
+ * MagicLinkForm - email input for passwordless sign-in.
  *
  * On submit, requests a magic link and calls onSent so the parent can switch to
  * the "check your email" state. Errors are shown inline. The token itself

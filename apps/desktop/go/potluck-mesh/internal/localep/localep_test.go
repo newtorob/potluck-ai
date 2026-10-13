@@ -12,17 +12,17 @@ import (
 func TestCandidatesFromIPs_FilterFormatDedupSort(t *testing.T) {
 	const wgPort = 51820
 	in := []net.IP{
-		net.ParseIP("10.0.0.5"),        // RFC1918 — keep
-		net.ParseIP("192.168.1.20"),    // RFC1918 — keep
-		net.ParseIP("172.16.4.4"),      // RFC1918 — keep
-		net.ParseIP("172.32.0.1"),      // 172.32 is OUTSIDE 172.16/12 — drop
-		net.ParseIP("100.101.102.103"), // 100.64/10 tailnet/CGNAT — drop
-		net.ParseIP("127.0.0.1"),       // loopback — drop
-		net.ParseIP("169.254.1.1"),     // link-local — drop
-		net.ParseIP("8.8.8.8"),         // public — drop
-		net.ParseIP("10.0.0.5"),        // duplicate of first — dedup
-		net.ParseIP("fe80::1"),         // IPv6 link-local — drop (not IPv4)
-		net.ParseIP("2606:4700::1111"), // IPv6 global — drop (not IPv4)
+		net.ParseIP("10.0.0.5"),        // RFC1918 - keep
+		net.ParseIP("192.168.1.20"),    // RFC1918 - keep
+		net.ParseIP("172.16.4.4"),      // RFC1918 - keep
+		net.ParseIP("172.32.0.1"),      // 172.32 is OUTSIDE 172.16/12 - drop
+		net.ParseIP("100.101.102.103"), // 100.64/10 tailnet/CGNAT - drop
+		net.ParseIP("127.0.0.1"),       // loopback - drop
+		net.ParseIP("169.254.1.1"),     // link-local - drop
+		net.ParseIP("8.8.8.8"),         // public - drop
+		net.ParseIP("10.0.0.5"),        // duplicate of first - dedup
+		net.ParseIP("fe80::1"),         // IPv6 link-local - drop (not IPv4)
+		net.ParseIP("2606:4700::1111"), // IPv6 global - drop (not IPv4)
 	}
 
 	got := candidatesFromIPs(in, wgPort)
@@ -82,7 +82,7 @@ func TestCandidatesFromIPs_NoTailnetEverAdvertised(t *testing.T) {
 }
 
 // TestIsVirtualInterfaceName covers the container/bridge/VM adapter prefixes
-// that must never contribute a LAN candidate — the reproduction case being
+// that must never contribute a LAN candidate - the typical case being
 // Docker's default bridge (docker0 at 172.17.0.1), which is a valid RFC1918
 // address that util.PrivateLAN alone cannot distinguish from a real LAN NIC.
 func TestIsVirtualInterfaceName(t *testing.T) {
@@ -107,13 +107,13 @@ func TestIsVirtualInterfaceName(t *testing.T) {
 }
 
 // TestCandidatesFromIPs_DoesNotFilterByIP verifies candidatesFromIPs itself
-// (the pure IP-list filter) has no interface-name awareness — the docker0
+// (the pure IP-list filter) has no interface-name awareness - the docker0
 // exclusion happens one layer up, in LocalCandidates' interface enumeration,
 // which candidatesFromIPs is deliberately decoupled from for testability.
 // This guards against a future refactor accidentally duplicating (or losing)
 // the virtual-interface filter in the wrong layer.
 func TestCandidatesFromIPs_DoesNotFilterByIP(t *testing.T) {
-	// 172.17.0.1 is docker0's typical default-bridge address — a plain
+	// 172.17.0.1 is docker0's typical default-bridge address - a plain
 	// RFC1918 IP with nothing to distinguish it at the IP-list level. The
 	// filter that excludes it lives in LocalCandidates (interface.Name), not
 	// here, so candidatesFromIPs must pass it through.
@@ -141,10 +141,10 @@ func TestLocalIPNets_HostInvariants(t *testing.T) {
 			t.Errorf("IPNet %v mask is not 4 bytes (got %d)", n, len(n.Mask))
 		}
 		if ip4.IsLoopback() || ip4.IsLinkLocalUnicast() {
-			t.Errorf("IPNet %v is loopback/link-local — must be excluded", n)
+			t.Errorf("IPNet %v is loopback/link-local, must be excluded", n)
 		}
 		if ip4[0] == 100 && ip4[1] >= 64 && ip4[1] <= 127 {
-			t.Errorf("IPNet %v is in tailnet/CGNAT range — must be excluded", n)
+			t.Errorf("IPNet %v is in tailnet/CGNAT range, must be excluded", n)
 		}
 		// Sanity: the IP must mask cleanly under its own mask (no panic, stable).
 		_ = ip4.Mask(n.Mask)
@@ -176,10 +176,10 @@ func TestLocalCandidates_HostInvariants(t *testing.T) {
 			continue
 		}
 		if ip.IsLoopback() || ip.IsLinkLocalUnicast() {
-			t.Errorf("candidate %q is loopback/link-local — must be excluded", ep)
+			t.Errorf("candidate %q is loopback/link-local, must be excluded", ep)
 		}
 		if ip4 := ip.To4(); ip4 != nil && ip4[0] == 100 && ip4[1] >= 64 && ip4[1] <= 127 {
-			t.Errorf("candidate %q is in tailnet/CGNAT range — must be excluded", ep)
+			t.Errorf("candidate %q is in tailnet/CGNAT range, must be excluded", ep)
 		}
 	}
 }

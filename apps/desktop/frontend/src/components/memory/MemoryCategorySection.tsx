@@ -1,5 +1,5 @@
 /**
- * MemoryCategorySection — collapsible accordion section for a single category.
+ * MemoryCategorySection - collapsible accordion section for a single category.
  *
  * Renders a group of MemoryCards under a category heading.
  * Collapsed by default only if there are more than 5 items; otherwise expanded.
@@ -28,7 +28,7 @@ export function MemoryCategorySection({ category, memories, onCardClick, onCardR
 
   return (
     <section aria-labelledby={headingId}>
-      {/* Accordion header — editorial small-caps style. The serif italic
+      {/* Accordion header - editorial small-caps style. The serif italic
           label sets the section as a chapter, not a row. */}
       <button
         type="button"
@@ -68,7 +68,7 @@ export function MemoryCategorySection({ category, memories, onCardClick, onCardR
         </span>
       </button>
 
-      {/* Accordion body — fade-in on expand */}
+      {/* Accordion body - fade-in on expand */}
       {expanded && (
         <div
           id={sectionId}

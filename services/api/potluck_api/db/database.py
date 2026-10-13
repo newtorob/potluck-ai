@@ -16,7 +16,7 @@ from potluck_api.config import get_settings
 
 logger = structlog.get_logger(__name__)
 
-# Module-level globals — set by init_db(), cleared by close_db().
+# Module-level globals - set by init_db(), cleared by close_db().
 # Never imported directly from other modules; use get_db() as a FastAPI dependency.
 _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
@@ -26,7 +26,7 @@ async def init_db() -> None:
     """Create the async engine and session factory.
 
     Called once from the lifespan context manager in app.py.
-    Does NOT create tables — Alembic owns the schema.
+    Does not create tables - Alembic owns the schema.
     """
     global _engine, _session_factory
 
@@ -79,7 +79,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             ...
     """
     if _session_factory is None:
-        raise RuntimeError("Database not initialised — init_db() was not called")
+        raise RuntimeError("Database not initialised - init_db() was not called")
 
     async with _session_factory() as session:
         yield session

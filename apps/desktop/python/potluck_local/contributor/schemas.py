@@ -1,4 +1,4 @@
-"""Wire-format schemas — peer side.
+"""Wire-format schemas - peer side.
 
 Mirrors services/coordinator/coordinator/schemas/peer.py. Keep these two
 in sync until we extract a shared library. Any new field added on the
@@ -89,17 +89,17 @@ class AttestationPayload(BaseModel):
     hostname: str | None = None
     hardware_summary: dict[str, Any] = Field(default_factory=dict)
     nonce_signature: str
-    # Capabilities (m3 step #18). Empty list = stub-echo peer that doesn't
+    # Capabilities. Empty list = stub-echo peer that doesn't
     # serve real inference; non-empty = list of models the coordinator can
     # route here.
     capabilities: list[CapabilityEntry] = Field(default_factory=list)
     # Who this peer agrees to serve beyond its owner's own requests: "circle"
-    # and/or "pool". None serves both (a peer from before audiences existed).
+    # and/or "pool". None serves both (older peers do not send this field).
     audiences: list[str] | None = None
     # Direct circle links: the mesh node this machine's sidecar is (its /status
     # node_id) and the port the circle listener is bound to. Sent only while the
-    # listener is up; left out of the message otherwise, so a coordinator from
-    # before links sees exactly what it always did.
+    # listener is up; left out of the message otherwise, so a coordinator that
+    # predates direct links sees an unchanged message.
     mesh_node_id: uuid.UUID | None = None
     circle_port: int | None = Field(default=None, ge=1, le=65535)
 
@@ -108,7 +108,7 @@ class HeartbeatMessage(BaseModel):
     """Sent every `heartbeat_interval_s` seconds after the handshake.
 
     Coordinator upserts peer_heartbeats with these values. None fields are
-    interpreted as "no measurement available" — reasonable when a peer
+    interpreted as "no measurement available" - reasonable when a peer
     has no GPU or hasn't probed yet.
     """
 
@@ -124,18 +124,18 @@ class HeartbeatMessage(BaseModel):
     max_concurrent_jobs: int | None = None
 
 
-# ---- Job dispatch (m3) ----------------------------------------------- #
+# ---- Job dispatch ---------------------------------------------------- #
 #
-# Mirrors services/coordinator/coordinator/schemas/peer.py — keep in sync.
+# Mirrors services/coordinator/coordinator/schemas/peer.py - keep in sync.
 #
-# Architectural invariant: this contributor process MUST NOT write prompt
+# Architectural invariant: this contributor process must not write prompt
 # content or generated tokens to disk, logs, or telemetry beyond the
 # minimal counters in JobCompleteMessage. CI lint enforces this; do not
 # reach for logger.info("prompt=%s", prompt) under any circumstances.
 
 
 class SamplingParams(BaseModel):
-    """Inference sampling parameters. Forward-compatible — older peers
+    """Inference sampling parameters. Forward-compatible - older peers
     ignore unknown fields."""
 
     max_tokens: int = 512
@@ -150,7 +150,7 @@ class SamplingParams(BaseModel):
 class ChatMessage(BaseModel):
     """One turn in a multi-turn conversation, on the contributor wire.
 
-    Mirrors coordinator/schemas/peer.py — keep in sync. The field order
+    Mirrors coordinator/schemas/peer.py - keep in sync. The field order
     (role, content) is stable; do not reorder without bumping the wire
     version. Extra fields are silently ignored (Pydantic default) so old
     contributors that receive an unknown field are unaffected.
@@ -162,12 +162,12 @@ class ChatMessage(BaseModel):
 
 class JobAssignedMessage(BaseModel):
     """Server → Peer (incoming on this side). Contains the prompt + sampling;
-    no member_id or conversation id by design — the coordinator strips
+    no member_id or conversation id by design - the coordinator strips
     them before forwarding.
 
     Multi-turn extension: `messages` carries the full conversation when the
     requesting scope permits it (circle: always; pool: only with explicit
-    opt-in). `prompt` is always populated as the backward-compat fallback —
+    opt-in). `prompt` is always populated as the backward-compat fallback -
     an old contributor that doesn't know `messages` ignores the field and
     uses `prompt`, which is the last user message.
     """
@@ -203,7 +203,7 @@ class JobCompleteMessage(BaseModel):
 
 
 class JobErrorMessage(BaseModel):
-    """Peer → Server (outgoing on this side). Sent INSTEAD of JobComplete
+    """Peer → Server (outgoing on this side). Sent instead of JobComplete
     when the peer can't fulfill the job. Categorical so the coordinator
     can decide reroute vs. fail."""
 

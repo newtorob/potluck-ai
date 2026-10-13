@@ -6,7 +6,7 @@ calls when a job completes successfully. It writes two rows (one
 both snapshotting the model-class multiplier at write time, and both
 chained via SHA-256 to the previous row for that member.
 
-Asymmetric earn/spend (memory `b408b3a5`):
+Asymmetric earn/spend:
 
     spent_credits = output_tokens × multiplier
     earned_credits = output_tokens × multiplier × CONTRIBUTION_BONUS_MULTIPLIER
@@ -21,7 +21,7 @@ the first row in a chain is the constant `GENESIS_HASH`.
 Idempotency (migration 0003):
 `credit_ledger` carries UNIQUE (job_id, direction). `record_job_credits`
 uses INSERT … ON CONFLICT (job_id, direction) DO NOTHING. Calling this
-function twice for the same job is a safe no-op — the second call
+function twice for the same job is a safe no-op - the second call
 returns the rows that were created by the first call, identical to what
 the first call returned.
 """
@@ -40,12 +40,11 @@ from coordinator.models.credit import CreditLedger, CreditModelMultiplier
 
 # Asymmetric earn/spend multiplier. The 1.5x reward for serving (vs.
 # consuming) is what makes "run a peer 24/7" the dominant strategy on
-# net balance. See memory `b408b3a5` for the cooperative-economics
-# reasoning + the torrent-ratio analogy.
+# net balance, as in a torrent share ratio.
 CONTRIBUTION_BONUS_MULTIPLIER = Decimal("1.5")
 
 # Fallback multiplier when a job ran on a model_slug we don't have in
-# `credit_model_multipliers`. Conservative — we'd rather under-credit
+# `credit_model_multipliers`. Conservative - we'd rather under-credit
 # than over-credit an unknown model. A warning is logged + the slug
 # should be added to the table.
 UNKNOWN_MODEL_MULTIPLIER = Decimal("1.0")
@@ -58,10 +57,10 @@ GENESIS_HASH = hashlib.sha256(b"potluck-credit-ledger-genesis").hexdigest()
 # A peer's reputation is a bounded streak score in [0, 1]: it starts at the
 # NEUTRAL prior, gains REPUTATION_STEP per clean canary, takes a soft
 # REPUTATION_STEP penalty on an ambiguous miss (timeout / delivery / peer-side
-# error), and HARD-RESETS to 0 on a confirmed wrong answer. Because a confirmed
+# error), and hard-resets to 0 on a confirmed wrong answer. Because a confirmed
 # fabrication zeroes it, reputation reflects an unbroken run of clean passes.
 #
-# The release threshold is DERIVED from a target accepted-error budget, not
+# The release threshold is derived from a target accepted-error budget, not
 # picked ad hoc. Sarmenta's worker credibility after k clean spot-checks is
 #       Cr(k) = 1 - (f/(1-f)) * 1/(k*e)
 # with f = the assumed fraction of bad peers. The Credibility-Threshold
@@ -73,9 +72,9 @@ GENESIS_HASH = hashlib.sha256(b"potluck-credit-ledger-genesis").hexdigest()
 #
 # We then size the streak scale so a *fresh* peer must show k* clean canaries
 # before its escrow releases. (A peer caught fabricating resets to 0 and faces a
-# steeper climb than a newcomer — intended: trust is cheap to lose, costly to
-# regain.) Reputation here is a streak accumulator, NOT a literal credibility
-# value — the curve is used only to choose how many clean passes we demand.
+# steeper climb than a newcomer - intended: trust is cheap to lose, costly to
+# regain.) Reputation here is a streak accumulator, not a literal credibility
+# value - the curve is used only to choose how many clean passes we demand.
 REPUTATION_STEP = 0.1
 NEUTRAL_REPUTATION = 0.5  # fresh-peer prior; must match PeerHeartbeat.reputation default
 
@@ -103,9 +102,9 @@ def nudge_reputation(current: float, outcome: str) -> float:
 
       "pass"  -> +REPUTATION_STEP toward 1.0 (one more clean canary in the streak)
       "infra" -> -REPUTATION_STEP toward 0.0 (ambiguous miss: timeout / delivery
-                 failure / peer-reported error — penalize lightly; do NOT nuke an
+                 failure / peer-reported error - penalize lightly; do not nuke an
                  honest-but-flaky peer for something that may be the network)
-      "wrong" -> HARD RESET to 0.0 (a clean completion with the WRONG answer is an
+      "wrong" -> hard reset to 0.0 (a clean completion with the wrong answer is an
                  unambiguous junk/fabrication signal; Sarmenta backtracking +
                  BOINC adaptive-replication CV-reset-to-0)
 
@@ -130,7 +129,7 @@ def _compute_row_hash(
 ) -> str:
     """Stable SHA-256 over the canonical row contents + previous hash.
 
-    Stability requires ordered-field serialization — never use a Python
+    Stability requires ordered-field serialization - never use a Python
     dict here, as the iteration order would silently shift across
     refactors and break the chain on existing rows."""
     canonical = "|".join(
@@ -213,7 +212,7 @@ async def record_job_credits(
     Idempotent: calling this function twice for the same job_id is safe.
     The second call detects the conflict via UNIQUE (job_id, direction),
     skips the insert, and returns the rows created by the first call.
-    The hash chain is unaffected — the no-op insert does not write a
+    The hash chain is unaffected - the no-op insert does not write a
     new row, so the chain state is identical to what the first call
     produced.
     """
@@ -226,16 +225,16 @@ async def record_job_credits(
 
     # --- Serialize per-member chain writes with Postgres advisory locks ------- #
     #
-    # Two concurrent _finalize_job_in_db tasks for the SAME member both read
+    # Two concurrent _finalize_job_in_db tasks for the same member both read
     # _latest_row_hash_for_member before either INSERT commits, then both insert
-    # rows with the same prev_row_hash — forking the hash chain. The (job_id,
-    # direction) UNIQUE constraint catches duplicate jobs but NOT two DIFFERENT
+    # rows with the same prev_row_hash - forking the hash chain. The (job_id,
+    # direction) UNIQUE constraint catches duplicate jobs but not two different
     # jobs racing on the same member's chain tip.
     #
     # pg_advisory_xact_lock is transaction-scoped: the lock is held until the
     # caller's transaction commits or rolls back (i.e. when the outer `async with
     # get_session_factory()() as db` block exits). Two tasks for the same member
-    # will serialize here — the second blocks until the first transaction
+    # will serialize here - the second blocks until the first transaction
     # completes, at which point it reads the now-correct chain tip.
     #
     # Acquire in sorted order to avoid deadlock when requester != contributor.
@@ -286,8 +285,8 @@ async def record_job_credits(
     spent_row = spent_result.scalar_one_or_none()
 
     # --- 'earned' row for the contributor's owner --- #
-    # Look up prev_row_hash AFTER the spent insert (which may have been a
-    # no-op) — if requester == contributor_owner (a self-served job), the
+    # Look up prev_row_hash after the spent insert (which may have been a
+    # no-op) - if requester == contributor_owner (a self-served job), the
     # spent row is the new latest and the earned row chains onto it.
     # When the spent insert was a genuine insert, the DB has the row but
     # the session hasn't flushed yet, so we construct the chain manually.
@@ -312,19 +311,19 @@ async def record_job_credits(
         prev_row_hash=earned_prev,
     )
 
-    # Escrow earned credits from cross-member (public-pool) jobs — they are not
+    # Escrow earned credits from cross-member (public-pool) jobs - they are not
     # spendable until a verification result releases them. Self-served /
     # household jobs (requester == contributor owner) are never escrowed: there
     # is no one to defraud when you serve yourself.
     is_public_pool = requester_member_id != contributor_owner_member_id
 
     # ...but a contributor that has already proven itself (reputation at/above
-    # the release threshold) does not need its credits held — escrowing them
+    # the release threshold) does not need its credits held - escrowing them
     # would just re-trap a trusted peer until the next canary cycle releases
     # them again. Skip escrow when the serving peer is already trusted. Falls
     # back to escrow-on when we weren't told which peer served the job, or the
     # peer has no heartbeat row yet (untrusted by default). The escrowed flag is
-    # operational and NOT part of the row hash, so this never affects the chain.
+    # operational and not part of the row hash, so this never affects the chain.
     escrow = is_public_pool
     if escrow and contributor_peer_id is not None:
         from coordinator.models.peer import PeerHeartbeat
@@ -353,13 +352,13 @@ async def record_job_credits(
     earned_result = await db.execute(earned_stmt)
     earned_row = earned_result.scalar_one_or_none()
 
-    # Both inserts were genuine — flush so the rows are visible.
+    # Both inserts were genuine - flush so the rows are visible.
     if spent_row is not None and earned_row is not None:
         await db.flush()
         return spent_row, earned_row
 
     # At least one insert was a no-op (conflict). The constraint guarantees
-    # both rows exist if either does — fetch and return them.
+    # both rows exist if either does - fetch and return them.
     existing = await _fetch_existing_rows(db, job_id)
     if existing is None:
         # Should be unreachable: the constraint fired but the rows are gone.
@@ -377,14 +376,14 @@ async def apply_verification_result(
     passed: bool,
     contributor_peer_id: uuid.UUID | None = None,
 ) -> bool:
-    """Apply a verification outcome for a completed public-pool job — the
+    """Apply a verification outcome for a completed public-pool job - the
     release/forfeit half of credit escrow.
 
     A verification *source* (sampled re-execution on a second peer, or a
     coordinator canary probe) decides pass/fail and calls this. That source is
     intentionally not wired yet; see the credit-verification design. Until it
     is, escrowed public-pool credits simply stay escrowed (the conservative
-    default — don't pay unverified work), which is safe because the public pool
+    default - don't pay unverified work), which is safe because the public pool
     is not live.
 
       pass -> release the job's escrowed 'earned' row (escrowed=False) so the
@@ -395,7 +394,7 @@ async def apply_verification_result(
               down.
 
     Returns True if an escrowed earned row was released, else False. Safe to
-    call more than once — releasing an already-released row is a no-op.
+    call more than once - releasing an already-released row is a no-op.
     """
     earned = (
         await db.execute(
@@ -412,7 +411,7 @@ async def apply_verification_result(
         released = True
 
     if contributor_peer_id is not None:
-        # reputation lives on the peer's heartbeat row (preserved across beats —
+        # reputation lives on the peer's heartbeat row (preserved across beats -
         # apply_heartbeat's upsert never touches it).
         from coordinator.models.peer import PeerHeartbeat
 

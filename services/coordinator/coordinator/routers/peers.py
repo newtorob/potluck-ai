@@ -1,7 +1,6 @@
 """Peer-facing endpoints. The /peers/connect WebSocket is the contributor
-sidecar's lifeline — the handshake gates entry into the network, and (once
-the heartbeat task lands) the same connection carries periodic health
-updates.
+sidecar's lifeline - the handshake gates entry into the network, and the
+same connection carries periodic health updates.
 """
 from __future__ import annotations
 
@@ -52,7 +51,7 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(tags=["peers"])
 
 # How long to wait for the peer's attestation response after sending the
-# challenge. 10s is generous for any real network — anything longer is
+# challenge. 10s is generous for any real network - anything longer is
 # likely a stuck or malicious client.
 HANDSHAKE_TIMEOUT_S = 10.0
 
@@ -72,7 +71,7 @@ def _new_nonce() -> tuple[bytes, str]:
 async def _reject(ws: WebSocket, reason: str, code: int = 1008) -> None:
     """Send a reject envelope and close the connection.
 
-    Best-effort — if the peer is already gone, log and move on.
+    Best-effort - if the peer is already gone, log and move on.
     """
     try:
         await ws.send_json(RejectMessage(reason=reason).model_dump(mode="json"))
@@ -93,15 +92,15 @@ async def peer_connect(
 
     # ---- credential gate ----
     # Two ways in, checked in this order (mirrors middleware/node_auth.py):
-    #   1. `Authorization: Bearer <member session>` — the desktop app's
+    #   1. `Authorization: Bearer <member session>` - the desktop app's
     #      contributor. Resolves to a member through the shared sessions
     #      table when POTLUCK_SESSION_AUTH_ENABLED=1; that member is then
-    #      BOUND to this connection and overrides whatever member_id the
+    #      bound to this connection and overrides whatever member_id the
     #      attestation payload claims, so the key binding and the
     #      member_keys allowlist apply to the real member.
-    #   2. `X-Potluck-Coordinator-Token` — the machine-wide shared token for
-    #      the dev fleet. No-op when POTLUCK_COORDINATOR_TOKEN is unset, so
-    #      tokenless household coordinators are unaffected.
+    #   2. `X-Potluck-Coordinator-Token` - the machine-wide shared token.
+    #      No-op when POTLUCK_COORDINATOR_TOKEN is unset, so tokenless
+    #      household coordinators are unaffected.
     # Neither: reject. The Ed25519 signed-nonce challenge below still runs
     # either way; this gate only decides who may attempt it.
     authorization = ws.headers.get("authorization")
@@ -167,7 +166,7 @@ async def peer_connect(
         await _reject(ws, str(e))
         return
     except Exception as e:
-        # Anything not an AttestationError is a server bug — don't leak details.
+        # Anything not an AttestationError is a server bug - don't leak details.
         logger.exception("peer_attestation_internal_error", member_id=str(payload.member_id))
         await db.rollback()
         await _reject(ws, "internal server error during attestation", code=1011)
@@ -272,7 +271,7 @@ async def peer_connect(
                     )
                     continue
                 if hb.peer_id != peer.id or hb.session_id != session_id:
-                    # Peer is heartbeating for the wrong session — bug or
+                    # Peer is heartbeating for the wrong session - bug or
                     # malice. Drop the message rather than corrupt state.
                     logger.warning(
                         "peer_heartbeat_session_mismatch",
@@ -314,7 +313,7 @@ async def peer_connect(
                     continue
                 if buf.peer_id is not None and buf.peer_id != peer.id:
                     # This job was dispatched to a DIFFERENT peer. Same
-                    # ownership check as the heartbeat handler above — drop
+                    # ownership check as the heartbeat handler above - drop
                     # the message rather than let one peer push tokens into
                     # another peer's buffer. buf.peer_id is None only for
                     # legacy/canary buffers that didn't thread a peer_id
@@ -364,7 +363,7 @@ async def peer_connect(
                 # peer's self-reported count. The peer is outside the trust
                 # boundary (threat-model A2): its claimed output_tokens is
                 # advisory only. len(buf.tokens) is the number of JobTokenMessages
-                # we received and relayed — authoritative and conservative (a
+                # we received and relayed - authoritative and conservative (a
                 # token the peer generated but failed to deliver to us shouldn't
                 # be paid for). Mirrors BOINC server-side credit: never trust
                 # client-claimed credit. A claim that exceeds what we counted is
@@ -448,14 +447,14 @@ async def peer_connect(
             session_id=str(session_id),
         )
     finally:
-        # Drain BEFORE unregistering, and gate both on `session_id` still
+        # Drain before unregistering, and gate both on `session_id` still
         # being the currently-registered connection for this peer_id. The
         # session_id guard matters on a same-key reconnect: register_peer
-        # already replaced `_peers[peer.id]` with the NEW connection and
-        # drained the OLD connection's jobs itself (see peer_registry.py) —
+        # already replaced `_peers[peer.id]` with the new connection and
+        # drained the old connection's jobs itself (see peer_registry.py) -
         # if this stale `finally` ran unguarded it would (a) wrongly drain
-        # the NEW connection's brand-new in-flight jobs and (b) evict the
-        # NEW connection from the registry entirely.
+        # the new connection's brand-new in-flight jobs and (b) evict the
+        # new connection from the registry entirely.
         drained = await drain_peer_jobs(peer.id, session_id=session_id)
         if drained:
             logger.info(

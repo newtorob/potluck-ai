@@ -86,7 +86,7 @@ async def verify_attestation(
         raise AttestationError("nonce_signature: does not verify") from e
 
     # binary_hash is a known-release gate, not proof the peer is actually
-    # running that binary — a peer can present any released hash it has seen.
+    # running that binary - a peer can present any released hash it has seen.
     # Treat it as advisory defence-in-depth; real binary attestation (TEE) is
     # a later hardening item.
     release = await db.scalar(
@@ -137,7 +137,7 @@ async def verify_attestation(
         await db.flush()
     elif get_settings().require_registered_keys:
         raise AttestationError(
-            "peer_public_key is not registered for any member — "
+            "peer_public_key is not registered for any member - "
             "register this device key before connecting"
         )
     else:
@@ -187,7 +187,7 @@ async def verify_attestation(
             release_version=release_version,
         )
 
-    # Upsert peer_heartbeats — primary key is peer_id, so on_conflict_do_update.
+    # Upsert peer_heartbeats - primary key is peer_id, so on_conflict_do_update.
     hb_stmt = (
         pg_insert(PeerHeartbeat)
         .values(

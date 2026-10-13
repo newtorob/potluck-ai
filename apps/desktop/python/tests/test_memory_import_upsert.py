@@ -1,23 +1,21 @@
-"""Regression test — 2026-07-31 P2 sidecar audit, finding #6.
+"""POST /memory/import must upsert, so importing the same export twice is idempotent.
 
-POST /memory/import checked whether the exported id already existed and, if
-not, called MemoryExtractor.extract_explicit() to insert it — which always
-mints a brand-new uuid4 id and fresh created_at/last_accessed_at/updated_at,
-and never carries over pinned or access_count. Re-importing the SAME export
-therefore never matched the (different, freshly-minted) id already in the
-DB, so it inserted a SECOND row every time — the auditor's repro: importing
-the same export twice produced two rows, with the original's pin state and
-timestamps lost.
+Inserting through MemoryExtractor.extract_explicit() would always mint a
+brand-new uuid4 id and fresh created_at/last_accessed_at/updated_at, and never
+carry over pinned or access_count. Re-importing the same export would then
+never match the (different, freshly-minted) id already in the DB and would
+insert a second row every time, losing the original's pin state and
+timestamps.
 
-The fix: MemoryExtractor.import_memory() upserts keyed on the exported id.
-An id that already exists locally is updated in place (id/created_at
-preserved); an id that doesn't exist is inserted with its original
+MemoryExtractor.import_memory() upserts keyed on the exported id. An id that
+already exists locally is updated in place (id/created_at preserved); an id
+that doesn't exist is inserted with its original
 id/created_at/pinned/access_count intact. Re-running the same import is
-idempotent — one row, not two.
+idempotent - one row, not two.
 
 Isolated via POTLUCK_MEMORY_DB_PATH + POTLUCK_DATA_DIR (settings/config.json
-also now honours POTLUCK_DATA_DIR per finding #10) so this test can never
-touch a real ~/.potluck.
+also honours POTLUCK_DATA_DIR) so this test can never touch a real
+~/.potluck.
 """
 from __future__ import annotations
 
@@ -70,7 +68,7 @@ async def _fetch_row(db_path, memory_id) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Route-level: the auditor's exact repro — export, import twice.
+# Route-level: export, import twice.
 # ---------------------------------------------------------------------------
 
 
@@ -96,13 +94,13 @@ def test_reimporting_the_same_export_does_not_duplicate(client, isolated_env):
 
     assert _run(_row_count(isolated_env)) == 1
 
-    # Import #1: same id already present -> update in place, still ONE row.
+    # Import #1: same id already present -> update in place, still one row.
     import_resp_1 = client.post("/memory/import", json={"memories": [exported_row]})
     assert import_resp_1.status_code == 200
     assert import_resp_1.json()["imported"] == 1
     assert _run(_row_count(isolated_env)) == 1
 
-    # Import #2 (the auditor's "import the same export twice"): still ONE row.
+    # Import #2 (the same export again): still one row.
     import_resp_2 = client.post("/memory/import", json={"memories": [exported_row]})
     assert import_resp_2.status_code == 200
     assert import_resp_2.json()["imported"] == 1
@@ -125,8 +123,8 @@ def test_reimporting_the_same_export_does_not_duplicate(client, isolated_env):
 
 def test_import_of_unknown_id_restores_original_id_and_pinned_state(client, isolated_env):
     """Restoring an export onto a fresh/other instance: the row didn't exist
-    locally yet, so import must INSERT it with the exported id/created_at/
-    pinned preserved — not a freshly minted id and reset metadata."""
+    locally yet, so import must insert it with the exported id/created_at/
+    pinned preserved - not a freshly minted id and reset metadata."""
     payload = {
         "id": "11111111-1111-1111-1111-111111111111",
         "content": "the vault lives at ~/notes",
@@ -170,7 +168,7 @@ def test_import_memory_service_upsert_is_idempotent(isolated_env):
     assert first.id == raw["id"]
     assert _run(_row_count(isolated_env)) == 1
 
-    # Re-import the identical payload — must update the same row, not insert
+    # Re-import the identical payload - must update the same row, not insert
     # a second one.
     second = _run(extractor.import_memory(raw))
     assert second.id == raw["id"]

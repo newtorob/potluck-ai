@@ -16,7 +16,7 @@ export function pickCircleModel(current: string, models: readonly CircleModel[])
   return first ? first.slug : null;
 }
 
-/** "qwen3-4b-q4 (2 machines)" — the count only when it adds something. */
+/** "qwen3-4b-q4 (2 machines)" - the count only when it adds something. */
 export function circleModelLabel(model: CircleModel): string {
   return model.machines > 1 ? `${model.slug} (${model.machines} machines)` : model.slug;
 }

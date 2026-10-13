@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# mesh-install-helper.sh — the ONE fixed script the Potluck desktop app is
+# mesh-install-helper.sh - the one fixed script the Potluck desktop app is
 # allowed to run as root via polkit/pkexec on Linux.
 #
-# SECURITY MODEL — READ THIS BEFORE CHANGING ANYTHING
+# Security model: read this before changing anything
 # ------------------------------------------------------
 # This script is the entire privilege boundary for "app-driven mesh install"
 # on Linux. Electron (running as the logged-in user, unprivileged) invokes:
@@ -17,57 +17,56 @@
 #
 #   1. pkexec itself refuses to run anything that isn't (a) an absolute
 #      path, (b) owned by root, (c) not writable by group/other. A
-#      compromised Electron process cannot substitute a different script —
-#      it can only ask pkexec to run THIS file, at THIS path, as shipped by
+#      compromised Electron process cannot substitute a different script -
+#      it can only ask pkexec to run this file, at this path, as shipped by
 #      the .deb/.rpm postinst (root:root, 0755, under /usr/lib/potluck/).
 #   2. Every argument this script accepts is validated below (subcommand
 #      whitelist, URL shape, numeric uid/gid, mesh-binary path pinned to an
-#      allowlist of trusted install prefixes) BEFORE it touches disk or
+#      allowlist of trusted install prefixes) before it touches disk or
 #      systemd. Nothing here is eval'd, sourced, or passed through a shell
-#      that could reinterpret metacharacters — see render_unit() below,
+#      that could reinterpret metacharacters - see render_unit() below,
 #      which writes the unit file with a fixed template and substituted
 #      values, never by executing caller-supplied text.
 #
-# This is a SEPARATE, simpler cousin of scripts/systemd/install-persistence.sh
-# (the headless dogfood/server installer): that script creates a dedicated
+# This is a separate, simpler cousin of scripts/systemd/install-persistence.sh
+# (the headless server installer): that script creates a dedicated
 # non-root 'potluck' user + CAP_NET_ADMIN/CAP_NET_RAW ambient capabilities,
 # which is the right minimum-privilege shape for an unattended server with
 # no GUI ever needing to reach the IPC socket. The app-driven path here
-# needs a DIFFERENT shape: a desktop user must be able to reach the mesh's
-# local IPC socket the moment the daemon starts, with NO extra "log out and
+# needs a different shape: a desktop user must be able to reach the mesh's
+# local IPC socket the moment the daemon starts, with no extra "log out and
 # back in" step (a shared-group model would require exactly that, because
 # Linux resolves a process's supplementary groups at login/session start,
-# not per file-open — see the long comment in this repo's Linux mesh plan
-# for why that was rejected). So this daemon runs as ROOT, same as the
-# macOS LaunchDaemon (ai.trypotluck.mesh.plist) — and reuses the EXACT SAME
-# already-tested reconciliation code that daemon relies on:
+# not per file-open). So this daemon runs as root, same as the
+# macOS LaunchDaemon (ai.trypotluck.mesh.plist) - and reuses the same
+# reconciliation code that daemon relies on:
 # internal/localapi/listener_unix.go's platformListen() chowns the IPC
 # socket to the active console/login-session user whenever it's running as
 # root and no SUDO_UID is set (see consoleUsernameLinux() in that file,
-# which shells out to loginctl/who/logname). Nothing in THIS script needs
-# to know or care who the console user is — the Go binary works it out at
+# which shells out to loginctl/who/logname). Nothing in this script needs
+# to know or care who the console user is - the Go binary works it out at
 # socket-bind time, every time it (re)starts, so it self-heals across
 # reboots/relogins without re-running this installer.
 #
-# FIXED SOCKET PATH
+# Fixed socket path
 # -------------------
-# We deliberately do NOT use a per-user XDG_RUNTIME_DIR-derived path (that
+# We deliberately do not use a per-user XDG_RUNTIME_DIR-derived path (that
 # breaks the moment this system-level unit starts before first login, or
 # survives a relogin that tears down /run/user/$UID). Instead we pin
-# POTLUCK_LOCAL_API_SOCKET=/run/potluck-mesh.sock — a flat path under /run,
+# POTLUCK_LOCAL_API_SOCKET=/run/potluck-mesh.sock - a flat path under /run,
 # which always exists once the OS has booted, independent of any login
-# session. This matches the path already declared (but not yet wired to an
-# actual reachability story) in packaging/daemons/potluck-mesh.service's
+# session. This matches the path declared in
+# packaging/daemons/potluck-mesh.service's
 # Environment=POTLUCK_LOCAL_API_SOCKET=/var/run/potluck-mesh.sock (/var/run
-# is a symlink to /run on every systemd distro) — same canonical location,
-# so a future .deb/.rpm unattended install and this app-driven install agree
+# is a symlink to /run on every systemd distro) - same canonical location,
+# so a .deb/.rpm unattended install and this app-driven install agree
 # on where the socket lives, and main.js's meshSocketPath() (Linux branch)
-# only has to check ONE fixed path.
+# only has to check one fixed path.
 #
-# WHAT THIS SCRIPT DOES NOT DO
+# What this script does not do
 # -------------------------------
 # - Does not create a 'potluck' system user (root needs none).
-# - Does not accept an arbitrary --mesh-bin path from the caller — see
+# - Does not accept an arbitrary --mesh-bin path from the caller - see
 #   ALLOWED_MESH_BIN_PREFIXES below. The renderer/Electron process cannot
 #   point ExecStart at an attacker-controlled binary.
 # - Does not run any caller-supplied string through a shell. Every
@@ -81,17 +80,17 @@
 #   mesh-install-helper.sh uninstall
 #   mesh-install-helper.sh status
 #
-# STDOUT CONTRACT (kept in sync with main.js's runLinuxHelper() parsing —
+# Stdout contract (kept in sync with main.js's runLinuxHelper() parsing -
 # see the big comment block in main.js's Linux mesh-daemon section):
 #   install    -> prints exactly "installed" on success, exit 0.
 #                 On failure: message to stderr, exit 1.
 #   uninstall  -> prints exactly "uninstalled" on success, exit 0.
 #   status     -> prints one of: active | inactive | not-installed
-#                 (this subcommand does NOT require root and is provided
+#                 (this subcommand does not require root and is provided
 #                 for operator/CLI convenience; main.js's daemon-status
 #                 handler queries systemctl directly instead of shelling
 #                 through pkexec, since reading unit state needs no
-#                 privilege — see computeLinuxDaemonStatus() in main.js).
+#                 privilege - see computeLinuxDaemonStatus() in main.js).
 
 set -euo pipefail
 
@@ -105,14 +104,13 @@ LOG_TAG="potluck-mesh-install-helper"
 
 # Trusted locations the mesh binary is allowed to live at. Anything outside
 # these prefixes is refused (see validate_mesh_bin below). The dev-checkout
-# prefix exists ONLY for local development/testing of this script before a
+# prefix exists only for local development/testing of this script before a
 # real .deb/.rpm packaging pipeline exists; a shipped build of this script
-# should have that entry removed (tracked as a packaging TODO — see the
-# report this script shipped with).
+# should have that entry removed.
 ALLOWED_MESH_BIN_PREFIXES=(
   "/opt/Potluck AI/resources/mesh/"
   "/usr/lib/potluck/mesh/"
-  # --- dev-only, remove before shipping a packaged build ---
+  # TODO: dev-only prefix, remove before shipping a packaged build
   "/usr/local/lib/potluck/"
 )
 
@@ -128,12 +126,12 @@ require_systemd() {
 }
 
 # ----------------------------------------------------------------------------
-# Argument validation — every value that ends up in the rendered unit file
-# or on disk is checked here BEFORE do_install runs. Fail closed.
+# Argument validation - every value that ends up in the rendered unit file
+# or on disk is checked here before do_install runs. Fail closed.
 # ----------------------------------------------------------------------------
 
 # Accepts http(s):// or tcp(+tls|+insecure):// URLs with a plain
-# host[:port][/path] — no shell metacharacters, no whitespace, no newlines.
+# host[:port][/path] - no shell metacharacters, no whitespace, no newlines.
 # This is deliberately conservative (rejects some technically-valid URLs)
 # rather than trying to be a complete URL grammar.
 validate_url() {
@@ -150,7 +148,7 @@ validate_uid_gid() {
 }
 
 # Node name ends up as a --node-name CLI argument and (via the mesh binary)
-# in roster data other households can see — keep it to a conservative
+# in roster data other households can see - keep it to a conservative
 # charset so it can never be mistaken for a flag or break the unit file.
 validate_node_name() {
   local val="$1"
@@ -159,7 +157,7 @@ validate_node_name() {
 
 # Refuses anything outside ALLOWED_MESH_BIN_PREFIXES, anything not owned by
 # root, and anything group/other-writable (mirrors pkexec's own rule for
-# THIS script, applied to the binary the rendered unit will exec).
+# this script, applied to the binary the rendered unit will exec).
 validate_mesh_bin() {
   local val="$1"
   [ -f "$val" ] || die "mesh binary not found: $val"
@@ -178,7 +176,7 @@ validate_mesh_bin() {
   local perm
   perm="$(stat -c '%a' -- "$resolved")"
   # Reject if group or other write bits are set (2nd/3rd octal digit odd/>=2
-  # in the write position — simplest robust check: forbid perm strings
+  # in the write position - simplest robust check: forbid perm strings
   # ending in a digit with the write bit, i.e. anything other than the
   # owner-write-only shapes we expect from an installed package).
   case "$perm" in
@@ -197,7 +195,7 @@ default_mesh_bin() {
 }
 
 # ----------------------------------------------------------------------------
-# Legacy-unit handoff — if the headless dogfood installer
+# Legacy-unit handoff - if the headless server installer
 # (scripts/systemd/install-persistence.sh) already has a potluck-mesh.service
 # running as the non-root 'potluck' user, stop+disable it before installing
 # the app-driven root unit, and reuse its WireGuard key so the machine keeps
@@ -207,18 +205,18 @@ default_mesh_bin() {
 handoff_legacy_unit_if_present() {
   [ -f "$UNIT_PATH" ] || return 0
   local existing_user
-  # NB: append '|| true' — grep exits 1 when the existing unit has no User=
+  # NB: append '|| true' - grep exits 1 when the existing unit has no User=
   # line (i.e. it already runs as root), and under `set -euo pipefail` that
   # failing command substitution would abort do_install before it re-renders
   # the unit. A rootless existing unit is the normal case, not an error.
   existing_user="$(grep -E '^User=' "$UNIT_PATH" 2>/dev/null | head -1 | cut -d= -f2 | tr -d '[:space:]' || true)"
   if [ "$existing_user" = "potluck" ]; then
-    log "found existing headless potluck-mesh.service (User=potluck) — stopping it before app-driven install; WG key at $KEY_PATH will be reused as-is (root can read it regardless of its potluck:potluck ownership)"
+    log "found existing headless potluck-mesh.service (User=potluck) - stopping it before app-driven install; WG key at $KEY_PATH will be reused as-is (root can read it regardless of its potluck:potluck ownership)"
     systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true
   elif [ -z "$existing_user" ]; then
-    log "found existing potluck-mesh.service already running as root — will be overwritten with the current rendered unit"
+    log "found existing potluck-mesh.service already running as root - will be overwritten with the current rendered unit"
   else
-    log "found existing potluck-mesh.service running as unexpected user '$existing_user' — overwriting"
+    log "found existing potluck-mesh.service running as unexpected user '$existing_user' - overwriting"
   fi
 }
 
@@ -267,7 +265,7 @@ do_install() {
     extra_args="--node-name ${node_name}"
   fi
 
-  # Rendered with a fixed heredoc + substituted, pre-validated values only —
+  # Rendered with a fixed heredoc + substituted, pre-validated values only -
   # no caller-controlled string is ever interpreted as shell syntax here.
   cat > "$UNIT_PATH" <<UNIT
 [Unit]
@@ -278,7 +276,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# Root — creates the potluck0 TUN device the same way the macOS
+# Root - creates the potluck0 TUN device the same way the macOS
 # LaunchDaemon (ai.trypotluck.mesh.plist) runs as root for utun. The IPC
 # socket below is then chowned to the active desktop user by
 # internal/localapi/listener_unix.go's platformListen() at bind time (no
@@ -288,7 +286,7 @@ Environment=POTLUCK_WG_PRIVATE_KEY_PATH=${KEY_PATH}
 Environment=POTLUCK_SIGNING_KEY_PATH=${SIGNING_KEY_PATH}
 Environment=POTLUCK_LOCAL_API_SOCKET=${SOCKET_PATH}
 # SUDO_UID/SUDO_GID are the invoking desktop user's own uid/gid, passed by
-# main.js's mesh:enable handler (its own process.getuid()/getgid() — the
+# main.js's mesh:enable handler (its own process.getuid()/getgid() - the
 # most authoritative source available, since that IS the user who clicked
 # "Enable mesh networking"). internal/localapi/listener_unix.go's
 # decideSocketOwner() checks these FIRST, before falling back to the
@@ -321,7 +319,7 @@ UNIT
   fi
 
   # Confirm it actually came up rather than optimistically declaring
-  # success — same discipline as computeMacDaemonStatus() on the app side.
+  # success - same discipline as computeMacDaemonStatus() on the app side.
   sleep 1
   systemctl is-active --quiet "$SERVICE_NAME" || die "$SERVICE_NAME is not active after start"
 

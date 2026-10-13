@@ -1,9 +1,9 @@
-"""WS coordinator-token gate on /mesh/signal (P0-3).
+"""WS coordinator-token gate on /mesh/signal.
 
-The signaling channel now requires the coordinator token (when configured),
-mirroring /peers/connect — previously anyone with any enrolled WG pubkey could
+The signaling channel requires the coordinator token (when configured),
+mirroring /peers/connect - without it anyone with any enrolled WG pubkey could
 join. These exercise the gate via a minimal app mounting the real handler. Both
-the rejection path and the hello-validation path run BEFORE any DB access, so
+the rejection path and the hello-validation path run before any DB access, so
 no Postgres is needed: a bad/absent token is rejected at the gate, and a
 malformed hello (used to prove the gate was passed) fails at hello-validation.
 """
@@ -52,7 +52,7 @@ def test_rejects_when_token_configured_but_wrong(client, monkeypatch):
 
 def test_correct_token_passes_gate(client, monkeypatch):
     """With the right token the gate passes; a malformed hello then fails at
-    hello-validation (NOT 'unauthorized'), proving we got past the gate."""
+    hello-validation (not 'unauthorized'), proving we got past the gate."""
     monkeypatch.setenv("POTLUCK_COORDINATOR_TOKEN", _TOKEN)
     with pytest.raises(WebSocketDisconnect):
         with client.websocket_connect(

@@ -1,12 +1,12 @@
 /**
- * AgentSessionCard — displays one agent session with status, model, peers, and sparkline.
+ * AgentSessionCard - displays one agent session with status, model, peers, and sparkline.
  *
  * Status dot semantics:
- *   green  — disconnected_at === null AND last_seen_at within last 60s
- *   amber  — disconnected_at === null but last_seen_at older than 60s (stale)
- *   grey   — disconnected_at is set
+ *   green - disconnected_at === null and last_seen_at within last 60s
+ *   amber - disconnected_at === null but last_seen_at older than 60s (stale)
+ *   grey - disconnected_at is set
  *
- * The whole card is a button — clicking opens the SessionDetailDrawer.
+ * The whole card is a button - clicking opens the SessionDetailDrawer.
  */
 
 import { useMemo } from 'react';
@@ -82,7 +82,7 @@ interface PeerMcpChipsProps {
 }
 
 function PeerMcpChips({ peers }: PeerMcpChipsProps) {
-  // Filter out "potluck" — we already know that one
+  // Filter out "potluck" - we already know that one
   const filtered = peers.filter((p) => p.toLowerCase() !== 'potluck');
 
   if (filtered.length === 0) {

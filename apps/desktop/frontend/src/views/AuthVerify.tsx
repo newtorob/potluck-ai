@@ -1,19 +1,19 @@
 /**
- * AuthVerify — the /auth/verify?token=... landing page the magic-link email
+ * AuthVerify - the /auth/verify?token=... landing page the magic-link email
  * points at. It is a bounce page, not part of the app shell.
  *
  * Opened in the user's browser, it redirects to potluck://auth/callback?token=…
  * so the OS hands the token to the running desktop app (see useDeepLinkAuth +
- * electron/main.js). If it happens to load INSIDE Electron, it just verifies in
+ * electron/main.js). If it happens to load inside Electron, it just verifies in
  * place. The desktop SPA carries this route mainly for dev (app_url is the Vite
  * server); production hosts the equivalent page on the marketing site.
  *
- * SECURITY (login CSRF fix): this route is reached by a ?token=... in the
- * URL, same as the deep-link path — verifyMagicLink()
+ * Security (login CSRF): this route is reached by a ?token=... in the
+ * URL, same as the deep-link path - verifyMagicLink()
  * exchanges the token but does not sign in on its own (see useAuth /
  * cloudApi.verifyMagicLink). This page renders its own "Sign in as <email>?"
  * confirm step (rather than relying on SignInConfirmDialog, which lives
- * inside AuthGate — a component tree this standalone route is rendered
+ * inside AuthGate - a component tree this standalone route is rendered
  * outside of) before calling confirmSignIn().
  */
 
@@ -43,14 +43,14 @@ export function AuthVerify() {
       return;
     }
     if (ipc.isElectron) {
-      // Already inside the app — exchange the token, then wait for the user
+      // Already inside the app - exchange the token, then wait for the user
       // to confirm the account below before it's persisted.
       setStatus('verifying');
       verifyMagicLink(token)
         .then(() => setStatus('confirming'))
         .catch(() => setStatus('error'));
     } else if (deepLink) {
-      // In a browser — bounce into the desktop app.
+      // In a browser - bounce into the desktop app.
       window.location.href = deepLink;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

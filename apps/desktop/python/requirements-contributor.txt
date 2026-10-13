@@ -1,9 +1,9 @@
-# Slim dependencies for running ONLY the contributor sidecar
+# Slim dependencies for running only the contributor sidecar
 # (potluck_local.contributor). Excludes llama-cpp-python, sentence-transformers,
-# and the full local-inference stack — the contributor doesn't need them yet.
+# and the full local-inference stack; the contributor doesn't need them yet.
 #
-# Use this on the LAN-test machines (Mac2, Linux box, Windows media server)
-# instead of the full requirements.txt:
+# Use this on machines that only contribute (for example a Mac, a Linux box
+# or a Windows PC on the LAN) instead of the full requirements.txt:
 #
 #   pip install -r requirements-contributor.txt
 #   pip install -e .
@@ -12,7 +12,7 @@
 # THROUGHPUT (Ollama backend): launch Ollama with OLLAMA_NUM_PARALLEL>=4 so it serves
 # concurrent requests via continuous batching. Default Ollama serializes -- a contributor
 # machine is multi-tenant (it serves many members at once), so serial serving is the main
-# throughput bottleneck. Measured 2026-06-28 (Apple Silicon, qwen2.5:0.5b): ~144 tok/s flat
+# throughput bottleneck. Measured on Apple Silicon with qwen2.5:0.5b: ~144 tok/s flat
 # under concurrency by default vs ~330 tok/s aggregate (2.3x) at NUM_PARALLEL=4. Bigger
 # models / more VRAM see a larger win. Set it where Ollama launches:
 #   OLLAMA_NUM_PARALLEL=4 ollama serve
@@ -26,7 +26,7 @@ platformdirs==4.*
 # extra_headers. Do not bump past 13.x without migrating client.py's _session().
 websockets==13.*
 cryptography==44.*
-# httpx for the Ollama inference backend (m3+). Small async HTTP client.
+# httpx for the Ollama inference backend. Small async HTTP client.
 # Always-present so the Ollama backend works without a separate install
 # step; llama-cpp-python is still optional/installed on demand.
 httpx==0.27.*

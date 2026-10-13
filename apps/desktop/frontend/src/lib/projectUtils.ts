@@ -14,10 +14,10 @@
 // Project filter discriminated union
 //
 // Used by MemoryView and TaskStateView to scope their data fetches.
-//   active  — resolved to the current activeProject from useProject()
-//   all     — fetch across all projects (include_all=true)
-//   global  — fetch only project-less memories/tasks
-//   project — fetch a specific named project
+//   active - resolved to the current activeProject from useProject()
+//   all - fetch across all projects (include_all=true)
+//   global - fetch only project-less memories/tasks
+//   project - fetch a specific named project
 // ---------------------------------------------------------------------------
 
 export type ProjectFilter =

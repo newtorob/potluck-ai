@@ -1,6 +1,6 @@
 [Unit]
 Description=Potluck main sidecar (FastAPI + memory + MCP)
-Documentation=https://github.com/newtorob/potluckai/blob/main/scripts/systemd/README.md
+Documentation=https://github.com/newtorob/potluck-ai/blob/main/scripts/systemd/README.md
 After=network-online.target
 Wants=network-online.target
 
@@ -24,7 +24,7 @@ ExecStart=@REPO_PATH@/apps/desktop/python/.venv/bin/python -m potluck_local.app 
 
 # CUDA runtime libs (LD_LIBRARY_PATH for GPU llama-cpp) and an optional model
 # auto-load are added by install-sidecar.sh as a drop-in
-# (potluck-sidecar.service.d/10-cuda-autoload.conf), not inline here — so the
+# (potluck-sidecar.service.d/10-cuda-autoload.conf), not inline here - so the
 # base unit stays generic and re-install can re-detect the CUDA path.
 
 # Restart on crash. The Electron app does its own restart-and-bail dance
@@ -32,8 +32,8 @@ ExecStart=@REPO_PATH@/apps/desktop/python/.venv/bin/python -m potluck_local.app 
 Restart=on-failure
 RestartSec=5
 
-# Tighten where we can. The sidecar reads/writes ~/.potluck — under $HOME —
-# so ProtectHome must NOT be read-only. ProtectSystem=strict blocks writes
+# Tighten where we can. The sidecar reads/writes ~/.potluck - under $HOME -
+# so ProtectHome must not be read-only. ProtectSystem=strict blocks writes
 # to /etc, /usr, /boot which the sidecar never needs.
 NoNewPrivileges=yes
 ProtectSystem=strict

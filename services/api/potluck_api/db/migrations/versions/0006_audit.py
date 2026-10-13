@@ -1,4 +1,4 @@
-"""006 — audit_log
+"""006 - audit_log
 
 Revision ID: 0006_audit
 Revises: 0005_governance

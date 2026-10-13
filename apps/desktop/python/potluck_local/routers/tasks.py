@@ -3,7 +3,7 @@
 CRUD endpoints for agent task state.
 Mounted at /tasks by app.py.
 
-No privacy gate in v0 — task state is workflow metadata, not user facts.
+No privacy gate in v0 - task state is workflow metadata, not user facts.
 
 Project scoping:
 - Pass project= to scope reads/writes to a named project.

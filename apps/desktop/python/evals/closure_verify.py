@@ -1,19 +1,19 @@
 """Closure-quantity verification: scoring-challenge foundation test (Mac, CPU).
 
-Tests the quantity the scoring-challenge mechanism depends on (see
-~/Documents/potluck-docs/potluck-closure-verification-mechanism-2026-06-15.md):
+Tests the quantity the scoring-challenge mechanism depends on:
 
-    For the SAME fixed sequence O, do a genuine model X and a cheaper model Y
+    For the same fixed sequence O, do a genuine model X and a cheaper model Y
     assign measurably different log-probability? If yes, a verifier can send a
     peer a scoring challenge ("score O under your loaded model") and catch a peer
     that claims X but runs Y, because logprob_Y(O) won't match an anchor's
-    logprob_X(O). The margin must beat the honest cross-backend band (fleet, TODO).
+    logprob_X(O). The margin must beat the honest cross-backend band.
+    TODO: measure that band across machines.
 
-Scoring is done LOW-LEVEL (log-softmax over per-position logits, logits_all=True).
-The high-level create_completion(logprobs=...) token_logprobs were verified WRONG
-in this llama-cpp-python build (they returned ~-10 nats for common words like
+Scoring is done low-level (log-softmax over per-position logits, logits_all=True).
+The high-level create_completion(logprobs=...) token_logprobs are wrong in the
+llama-cpp-python build tested (they returned ~-10 nats for common words like
 "of"/"is"); the low-level path gives sane values (bpb ~0.5-1 for English, correct
-argmax next-token predictions), so we use it exclusively.
+argmax next-token predictions), so it is used exclusively.
 
 Run (from apps/desktop/python):
     ./.venv/bin/python -m evals.closure_verify
@@ -126,7 +126,7 @@ def main() -> int:
     del x
     print("outputs generated + self-scored under X; X unloaded.\n")
 
-    # --- 2. Y scores the SAME outputs O. ------------------------------------
+    # --- 2. Y scores the same outputs O. ------------------------------------
     print("loading Y to score the same outputs...")
     y = load_model(args.cheaper, n_ctx=args.n_ctx, n_gpu_layers=args.n_gpu_layers)
     for d in data:

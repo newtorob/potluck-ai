@@ -8,7 +8,7 @@ const errorHints = {
   split_engine_mismatch: "Update both computers to the same split-capable Potluck runtime.",
   split_model_loaded: "Unload the local model with potluck models unload <model-id> before enabling a worker.",
   split_model_missing: "Install this project’s pinned model with potluck models sync.",
-  split_pin_mismatch: "Installed model does not match potluck.lock. Run potluck models check, then potluck models sync.",
+  split_pin_mismatch: "Installed model does not match potluck.lock. Run potluck models lock to see the pin, then potluck models sync.",
   split_peer_missing: "Worker is absent or ambiguous in the live mesh. Run potluck household list and use its mesh IP.",
   split_peer_unavailable: "On each selected worker, unload any model and run potluck split worker on. Check potluck split status on both computers.",
   split_busy: "Stop the current split with potluck split stop before starting another.",

@@ -21,7 +21,7 @@ export function snapshotDir(env: NodeJS.ProcessEnv = process.env): string {
   return dir ? dir : DEFAULT_SNAPSHOT_DIR;
 }
 
-/** "/Users/sam/Documents/potluckai" -> "Users-rob-Documents-potluckai". */
+/** "/Users/sam/code/app" -> "Users-sam-code-app". */
 export function projectKey(root: string): string {
   return root.replace(/^\/+/, "").replace(/\//g, "-");
 }

@@ -1,9 +1,9 @@
-"""MCP memory tools — search, save, list, delete.
+"""MCP memory tools - search, save, list, delete.
 
 All four tools honour the same privacy gate as the HTTP router:
 both privacy.memory_enabled and memory.enabled must be True.
 If the gate is closed, tools return empty results and log a warning rather
-than raising errors — an agent calling blindly should degrade gracefully.
+than raising errors - an agent calling blindly should degrade gracefully.
 
 Project scoping:
 All tools accept an optional `project` parameter. Pass project=None (the
@@ -64,7 +64,7 @@ def register_memory_tools(mcp: FastMCP) -> None:
         project: scope filter. None = global-only. Named project = scoped + globals.
         project=None means 'global memory, applies across all projects.'
         category: when given, restricts results to that category. The filter is
-        pushed to the DB query — results are not post-filtered, so max_results
+        pushed to the DB query - results are not post-filtered, so max_results
         is honored correctly even when a category is specified.
         """
         if not _memory_active():
@@ -168,7 +168,7 @@ def register_memory_tools(mcp: FastMCP) -> None:
         include_all: bypass project filter entirely (browse mode).
         project=None means 'global memory, applies across all projects.'
         since: ISO-8601 string. When given, restricts to rows with updated_at > since.
-               Pushed to SQL — not post-filtered.
+               Pushed to SQL - not post-filtered.
         """
         if not _memory_active():
             logger.warning("memory_list_skipped reason=memory_disabled")

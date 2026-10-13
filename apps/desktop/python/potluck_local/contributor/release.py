@@ -1,7 +1,7 @@
 """Which build is this contributor? The ``binary_hash`` the coordinator sees.
 
 Resolution order (first hit wins):
-  1. ``POTLUCK_BINARY_HASH`` in the environment (bench fleet, tests).
+  1. ``POTLUCK_BINARY_HASH`` in the environment (test machines, tests).
   2. ``contributor-release.json`` next to the frozen sidecar executable,
      written by ``build.py`` after PyInstaller finishes.
   3. ``unreleased-dev`` for a source checkout with neither.

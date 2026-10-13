@@ -86,7 +86,7 @@ async def test_pool_excludes_peer_in_quarantine_band(
     db_session: AsyncSession, reputation: float
 ) -> None:
     # Hysteresis: a peer climbing back from the floor but still below NEUTRAL is
-    # NOT yet allowed into the pool -- one or two clean passes off 0.0 must not
+    # not yet allowed into the pool -- one or two clean passes off 0.0 must not
     # re-admit a peer that was proven bad.
     member = uuid.uuid4()
     recovering = await _mk_peer(db_session, member, reputation=reputation)

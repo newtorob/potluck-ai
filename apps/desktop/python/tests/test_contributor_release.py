@@ -1,4 +1,4 @@
-"""binary_hash resolution and the build-time bundle hash (M2.5)."""
+"""binary_hash resolution and the build-time bundle hash."""
 from __future__ import annotations
 
 import json

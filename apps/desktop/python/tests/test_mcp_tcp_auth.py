@@ -1,12 +1,12 @@
-"""Tests for the MCP TCP/SSE transport auth gate (2026-07-17 security audit, MEDIUM).
+"""Tests for the MCP TCP/SSE transport auth gate.
 
 Covers:
 1. _TokenAuthMiddleware rejects requests with no/wrong token, accepts the
-   right one — the actual enforcement mechanism.
+   right one - the actual enforcement mechanism.
 2. main(["--tcp", ...]) refuses to start (SystemExit) when neither
-   POTLUCK_MCP_TOKEN nor POTLUCK_SIDECAR_TOKEN is set — the fail-safe.
+   POTLUCK_MCP_TOKEN nor POTLUCK_SIDECAR_TOKEN is set - the fail-safe.
 3. stdio transport is completely unaffected (no token required, no auth
-   middleware involved) — the back-compat requirement.
+   middleware involved) - the back-compat requirement.
 """
 
 from __future__ import annotations
@@ -91,7 +91,7 @@ def test_main_accepts_sidecar_token_fallback(monkeypatch: pytest.MonkeyPatch, tm
 
     We don't want to actually bind a socket in a unit test, so we patch
     _serve_sse_authenticated (the function main() hands the token to) with a
-    stand-in that records the token and raises a sentinel — proving main()
+    stand-in that records the token and raises a sentinel - proving main()
     got past the fail-safe guard and resolved the fallback env var correctly,
     without spinning up uvicorn.
     """

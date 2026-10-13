@@ -1,7 +1,7 @@
 """Wire-format schemas for the contributor → coordinator handshake.
 
 Mirrored on the contributor sidecar side (apps/desktop/python/potluck_local/
-contributor/schemas.py — built in the next task). Keep these two in sync
+contributor/schemas.py - built in the next task). Keep these two in sync
 until we extract a shared library.
 """
 from __future__ import annotations
@@ -93,16 +93,16 @@ class AttestationPayload(BaseModel):
     """The peer's response to the server's challenge.
 
     Identity proof:
-      - `peer_public_key` — the peer's per-peer Ed25519 public key
+      - `peer_public_key` - the peer's per-peer Ed25519 public key
         (distinct from the release-signing key)
-      - `nonce_signature` — Ed25519 signature of the server's nonce bytes,
+      - `nonce_signature` - Ed25519 signature of the server's nonce bytes,
         computed with the per-peer private key
     Binary attestation:
-      - `binary_hash` — SHA256 of the contributor release artifact the peer
+      - `binary_hash` - SHA256 of the contributor release artifact the peer
         is running. Coordinator looks this up in `contributor_releases` and
         rejects unknown hashes.
-    Capability advertisement (m3 step #18):
-      - `capabilities` — list of (model_slug, quantization) the peer can
+    Capability advertisement:
+      - `capabilities` - list of (model_slug, quantization) the peer can
         serve. Coordinator uses this to populate peer_capabilities and
         route jobs by model. Default empty for backwards compat with
         stub-echo peers that don't run inference.
@@ -174,9 +174,9 @@ class HeartbeatMessage(BaseModel):
     max_concurrent_jobs: int | None = Field(default=None, ge=0, le=64)
 
 
-# ---- Job dispatch (m3) ----------------------------------------------- #
+# ---- Job dispatch ---------------------------------------------------- #
 #
-# Privacy invariant (manifesto §10.3, memory 42a7e671):
+# Privacy invariant:
 #   - JobAssignedMessage MUST NOT carry member_id, source_conversation_id,
 #     or any identifier that links the prompt back to its requester. The
 #     coordinator strips these before sending. CI lint enforces this on
@@ -185,16 +185,16 @@ class HeartbeatMessage(BaseModel):
 #     telemetry. In-memory only.
 
 
-# Hard ceiling on tokens a single job may request OR a peer may claim to have
-# served. Bounds requester-side resource exhaustion (A3) and caps the headline
-# number a peer can self-report toward credits (A2). This is a coarse guard, not
+# Hard ceiling on tokens a single job may request or a peer may claim to have
+# served. Bounds requester-side resource exhaustion and caps the headline
+# number a peer can self-report toward credits. This is a coarse guard, not
 # verification: a peer can still over-report up to this ceiling for a short job.
 # Real anti-fraud (sampled re-execution + reputation) is tracked separately.
 MAX_OUTPUT_TOKENS = 4096
 
 
 class SamplingParams(BaseModel):
-    """Inference sampling parameters. Forward-compatible — add fields here
+    """Inference sampling parameters. Forward-compatible - add fields here
     rather than to JobAssignedMessage so older peers ignore unknown ones."""
 
     max_tokens: int = Field(default=512, ge=1, le=MAX_OUTPUT_TOKENS)
@@ -209,7 +209,7 @@ class SamplingParams(BaseModel):
 class ChatMessage(BaseModel):
     """One conversation turn forwarded verbatim to the serving peer.
 
-    Contains ONLY role + content — no turn id, no timestamp, no requester
+    Contains only role + content - no turn id, no timestamp, no requester
     metadata. The same blindness invariant as `prompt`: the peer learns
     the conversation text but nothing about who sent it."""
 
@@ -220,17 +220,17 @@ class ChatMessage(BaseModel):
 class JobAssignedMessage(BaseModel):
     """Server → Peer: 'run inference on this prompt and stream tokens back.'
 
-    Carries ONLY the routing-blind subset: job id, model slug, prompt,
+    Carries only the routing-blind subset: job id, model slug, prompt,
     optional multi-turn messages, and sampling params. No member_id, no
     conversation id, no anything that could identify the requester.
 
     Fields:
-      prompt   — single-turn text (always present for backward compat with
+      prompt - single-turn text (always present for backward compat with
                  peers that don't support messages).
-      messages — OPTIONAL ordered list of conversation turns (role + content
+      messages - optional ordered list of conversation turns (role + content
                  only). When present the peer should prefer messages over
-                 prompt for context. MUST carry ONLY conversation turns —
-                 NEVER member_id / source_conversation_id / any requester
+                 prompt for context. Must carry only conversation turns -
+                 never member_id / source_conversation_id / any requester
                  identifier. Same blindness invariant as prompt."""
 
     type: Literal["job_assigned"] = "job_assigned"

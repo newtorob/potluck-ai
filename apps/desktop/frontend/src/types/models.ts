@@ -2,7 +2,7 @@
  * Model domain types.
  *
  * Shapes mirror the Python sidecar model registry and cloud API registry.
- * See guide §4.2 and apps/desktop/python/potluck_local/routers/models.py.
+ * See apps/desktop/python/potluck_local/routers/models.py.
  */
 
 export type ModelTier = 'small' | 'medium' | 'large';
@@ -25,7 +25,7 @@ export interface Model {
   installed: boolean;
   /**
    * Slugs of installed models this entry supersedes. Non-empty means a newer
-   * model is available for something the user already has. Optional — older
+   * model is available for something the user already has. Optional - older
    * sidecar builds won't send it.
    */
   upgrade_from?: string[];

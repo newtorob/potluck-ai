@@ -1,8 +1,8 @@
 /**
- * Sparkline — hand-rolled SVG sparkline for tool call activity.
+ * Sparkline - hand-rolled SVG sparkline for tool call activity.
  *
  * Renders up to N=20 values as a filled path. Pads with zeros if fewer.
- * No tooltips — pure visual indicator.
+ * No tooltips - pure visual indicator.
  * Redraws on values change; no animation.
  */
 

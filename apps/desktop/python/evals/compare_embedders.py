@@ -1,4 +1,4 @@
-"""Embedder comparison experiment — eval whether a stronger 384-dim embedder
+"""Embedder comparison experiment - eval whether a stronger 384-dim embedder
 beats all-MiniLM-L6-v2 on recall@5 for Potluck's memory retrieval.
 
 Candidates:
@@ -7,7 +7,7 @@ Candidates:
   3. thenlper/gte-small                       (symmetric)
 
 STRETCH (only prints a note, not run by default):
-  4. sentence-transformers/all-mpnet-base-v2  (768-dim — breaks DIM=384 storage)
+  4. sentence-transformers/all-mpnet-base-v2  (768-dim - breaks DIM=384 storage)
 
 Usage:
     cd apps/desktop/python
@@ -16,13 +16,13 @@ Usage:
 Design:
   - Each candidate gets its own fresh temp SQLite DB (isolated from production).
   - Embeddings are regenerated per candidate using the candidate model.
-  - query-side: embed_query() — applies BGE instruction prefix where configured.
-  - document-side: embed_many() — no prefix for any model.
+  - query-side: embed_query() - applies BGE instruction prefix where configured.
+  - document-side: embed_many() - no prefix for any model.
   - All candidates share the same CORPUS, QUERIES, and recall@{3,5,10,20}+MRR
     metrics, so results are directly comparable.
   - The singleton is reset between candidates via _reset_embedder() so
     POTLUCK_EMBED_MODEL changes take effect.
-  - Production default is NOT changed. The env var is restored after the run.
+  - The production default is left unchanged. The env var is restored after the run.
 """
 
 from __future__ import annotations
@@ -112,7 +112,7 @@ async def _seed_corpus(db_path: str) -> None:
 async def _generate_embeddings(db_path: str, embedder_obj: Any) -> tuple[bool, float]:
     """Generate embeddings for all corpus documents.
 
-    Uses embed_many() (document side — no query prefix).
+    Uses embed_many() (document side - no query prefix).
     Returns (success, elapsed_seconds).
     """
     contents = [m["content"] for m in CORPUS]
@@ -164,8 +164,8 @@ def _aggregate(results: list[dict]) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Per-query retrieval run (RRF mode only — we are testing the embedder, not the
-# keyword vs RRF question which was already settled).
+# Per-query retrieval run (RRF mode only - we are testing the embedder, not
+# keyword vs RRF).
 # ---------------------------------------------------------------------------
 
 async def _run_queries(queries: list[dict], retriever: MemoryRetriever) -> list[dict]:
@@ -232,7 +232,7 @@ async def _run_candidate(candidate: dict) -> dict:
     # Get the (now-fresh) embedder
     embedder = emb_module.get_embedder()
 
-    print(f"  Asymmetric query prefix: {repr(embedder._query_prefix) if embedder._query_prefix else '(none — symmetric)'}")
+    print(f"  Asymmetric query prefix: {repr(embedder._query_prefix) if embedder._query_prefix else '(none, symmetric)'}")
 
     # Generate document-side embeddings
     print("  Generating document embeddings...")
@@ -271,7 +271,7 @@ async def _run_candidate(candidate: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Qualitative analysis — which queries did a model rescue vs baseline
+# Qualitative analysis - which queries did a model rescue vs baseline
 # ---------------------------------------------------------------------------
 
 def _find_rescued_queries(
@@ -319,7 +319,7 @@ async def main() -> None:
     print(f"Corpus: {len(CORPUS)} memories | Queries: {len(QUERIES)}")
     print(f"Headline metric: recall@{HEADLINE_K}")
     print(f"Candidates: {[c['id'] for c in CANDIDATES]}")
-    print("\nNOTE: BGE asymmetric handling — query side uses embed_query()")
+    print("\nNOTE: BGE asymmetric handling: query side uses embed_query()")
     print("      which prepends 'Represent this sentence for searching relevant passages:'")
     print("      Document/memory side uses embed_many() with NO prefix.")
 
@@ -350,7 +350,7 @@ async def main() -> None:
     for run in all_runs:
         c = run["candidate"]
         if not run["ok"]:
-            print(f"  {c['label']:<30}  ERROR — model unavailable")
+            print(f"  {c['label']:<30}  ERROR: model unavailable")
             continue
         agg = run["agg"]
         r3 = agg["recalls"][3]
@@ -371,7 +371,7 @@ async def main() -> None:
     # Per-candidate qualitative diff vs baseline
     # ---------------------------------------------------------------------------
     if baseline_run is None:
-        print("\nCould not find baseline run — skipping qualitative diff.")
+        print("\nCould not find baseline run, skipping qualitative diff.")
         return
 
     baseline_results = baseline_run["results"]
@@ -455,12 +455,12 @@ async def main() -> None:
         from potluck_local.services.embeddings import _MODEL_CONFIGS
         cfg = _MODEL_CONFIGS.get("BAAI/bge-small-en-v1.5")
         print(f"  Query prefix applied:    {repr(cfg.query_prefix) if cfg else 'UNKNOWN'}")
-        print("  Document prefix applied: (none) — embed_many() used, no prefix")
+        print("  Document prefix applied: (none), embed_many() used, no prefix")
         print("  Wiring: semantic_search() -> embedder.embed_query() for queries")
         print("          _generate_embeddings() -> embedder.embed_many() for documents")
         print("  Conclusion: asymmetry correctly implemented; BGE result is fair.")
     else:
-        print("  BGE run failed — cannot confirm prefix handling.")
+        print("  BGE run failed, cannot confirm prefix handling.")
 
     # ---------------------------------------------------------------------------
     # Recommendation
@@ -481,9 +481,9 @@ async def main() -> None:
         print("    - Re-backfill all stored embeddings (~263 production rows)")
         print("    - The model_used column + INSERT OR REPLACE already supports this")
         print("    - A re-embed-on-startup-if-model-changed check is recommended")
-        print("    - DIM stays 384 — no schema change needed for these candidates")
+        print("    - DIM stays 384, no schema change needed for these candidates")
     elif winner_id:
-        print(f"  Marginal lift ({winner_lift:+.2f}) from {winner_id} — not enough to justify migration.")
+        print(f"  Marginal lift ({winner_lift:+.2f}) from {winner_id}, not enough to justify migration.")
         print("  Recommend: explore reranking (cross-encoder) on top of current embedder.")
     else:
         print(f"  No candidate beat the baseline at recall@{HEADLINE_K}.")
@@ -492,11 +492,11 @@ async def main() -> None:
         print("  without the cost of re-embedding production data.")
 
     print()
-    print("NOTE on all-mpnet-base-v2 (768-dim stretch candidate — NOT run):")
+    print("NOTE on all-mpnet-base-v2 (768-dim stretch candidate, not run):")
     print("  Would require DIM=384 -> 768 schema change + re-backfilling all embeddings.")
     print("  BLOB round-trip is already dim-agnostic (frombuffer + reshape) but")
     print("  the load_all_embeddings query would return mismatched vectors vs any")
-    print("  existing 384-dim rows — a full re-backfill is mandatory before enabling.")
+    print("  existing 384-dim rows, so a full re-backfill is mandatory before enabling.")
     print("  Only worth testing if the 384-dim candidates show negligible improvement.")
 
 

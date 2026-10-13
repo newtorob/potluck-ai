@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-_CHUNK = 8 * 1024  # 8 KB — keeps memory flat for multi-GB model files
+_CHUNK = 8 * 1024  # 8 KB - keeps memory flat for multi-GB model files
 
 
 def sha256_file(path: Path) -> str:

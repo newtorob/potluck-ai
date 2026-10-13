@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bootstrap.sh — run once after cloning to fetch Go dependencies.
+# bootstrap.sh - run once after cloning to fetch Go dependencies.
 # Requires: Go 1.22+
 set -euo pipefail
 

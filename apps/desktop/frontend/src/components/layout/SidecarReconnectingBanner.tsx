@@ -1,6 +1,6 @@
 /**
- * SidecarReconnectingBanner — a thin top strip shown only when the local Python
- * engine drops AFTER it has been healthy at least once this session.
+ * SidecarReconnectingBanner - a thin top strip shown only when the local Python
+ * engine drops after it has been healthy at least once this session.
  *
  * Why the latch: useHealth starts sidecarUp=false and only flips true on the
  * first successful /health poll, so a banner keyed on !sidecarUp alone would

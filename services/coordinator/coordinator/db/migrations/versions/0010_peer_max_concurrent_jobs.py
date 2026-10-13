@@ -1,19 +1,18 @@
-"""0010 — peers.max_concurrent_jobs: optional per-peer concurrency cap.
+"""0010 - peers.max_concurrent_jobs: optional per-peer concurrency cap.
 
 Adds a nullable `max_concurrent_jobs` column to `peers`. This is the
 capacity half of the pool-reliability spine (the other half is the
 process-local live in-flight counter in services/peer_registry.py):
-`pick_peer_for_model` HARD-EXCLUDES a peer from `eligible_ids` once its
-LIVE in-flight job count reaches this cap, rather than merely dampening
+`pick_peer_for_model` hard-excludes a peer from `eligible_ids` once its
+live in-flight job count reaches this cap, rather than merely dampening
 its score.
 
 Null semantics (the default-when-null contract this migration commits to):
     max_concurrent_jobs IS NULL  ->  uncapped. The peer is never removed
     from candidacy on capacity grounds; only the existing load-aware score
     term (compute / (1 + max(live_in_flight, heartbeat_current_jobs))) still
-    penalises a busy peer. This is exactly today's behaviour for every row
-    that predates this migration — additive and coordinated-deploy-safe, no
-    backfill required.
+    penalises a busy peer. This holds for every row that predates this
+    migration - additive and coordinated-deploy-safe, no backfill required.
 
     max_concurrent_jobs = N (N >= 0) -> the peer is excluded from
     `eligible_ids` whenever live_in_flight(peer) >= N. N=0 takes a peer out
@@ -23,13 +22,10 @@ Null semantics (the default-when-null contract this migration commits to):
 Placement rationale: `max_concurrent_jobs` lives on `peers` (not
 `peer_heartbeats`) because it is a slow-moving, largely-static capacity fact
 about the machine (how much concurrent work its operator is willing to let
-it take), the same shape as the pre-existing `peers.max_gpu_percent` — not a
-per-beat dynamic value like `peer_heartbeats.current_jobs`. Nothing writes
-this column yet (no wire-protocol change in this migration); it is set
-today only by direct operator/DB action. Wiring a peer-declared value in
-through AttestationPayload (or a settings endpoint) is a deliberate
-follow-on, not scope here — keeping this migration purely additive to the
-schema with zero protocol surface change.
+it take), the same shape as the pre-existing `peers.max_gpu_percent` - not a
+per-beat dynamic value like `peer_heartbeats.current_jobs`. The column is
+set from the peer's own heartbeat (see services/peer_state.py) or by direct
+operator/DB action. The migration itself is purely additive to the schema.
 
 Revision ID: 0010_peer_max_concurrent_jobs
 Revises: 0009_mesh_node_token

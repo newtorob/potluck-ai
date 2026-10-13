@@ -8,8 +8,7 @@ import "net"
 // (169.254/16), and the tailnet/CGNAT range (100.64.0.0/10) are excluded so a
 // Tailscale address is never mistaken for a physical-LAN endpoint.
 //
-// This is the single source of truth for the RFC1918 predicate. It was extracted
-// from internal/lanpair (where it was the unexported `sweepable`) so LAN-pairing
+// This is the single source of truth for the RFC1918 predicate, so LAN-pairing
 // broadcast and LAN direct-path discovery share exactly the same filter.
 func PrivateLAN(ip net.IP) bool {
 	ip4 := ip.To4()

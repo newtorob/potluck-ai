@@ -1,5 +1,5 @@
 /**
- * NewMemoryForm — inline form for creating a new memory.
+ * NewMemoryForm - inline form for creating a new memory.
  *
  * Rendered inline below the header when the "+ New" button is clicked.
  * Submitting or pressing Escape closes the form.

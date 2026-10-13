@@ -13,7 +13,7 @@
 # USAGE
 # ------
 #   sudo ./install-sidecar.sh --install                 # uses ./.venv + port 8321
-#   sudo ./install-sidecar.sh --install --port 8321 --user rob
+#   sudo ./install-sidecar.sh --install --port 8321 --user alice
 #   sudo ./install-sidecar.sh --install --autoload-model llama-3.1-8b-instruct-q5
 #   sudo ./install-sidecar.sh --uninstall
 #   sudo ./install-sidecar.sh --status

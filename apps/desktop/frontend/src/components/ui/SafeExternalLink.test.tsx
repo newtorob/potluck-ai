@@ -5,7 +5,7 @@ import { SafeExternalLink } from './SafeExternalLink';
 // Manual check this test encodes (see FIX 1-3, apps/desktop/electron/main.js):
 //   (a) a file:// href in memory/chat markdown must not navigate the window
 //   (b) an http(s) link opens externally (via window.open, never in-window)
-//   (c) a javascript:/file: href is inert — no <a>, no click handler that fires
+//   (c) a javascript:/file: href is inert - no <a>, no click handler that fires
 
 describe('SafeExternalLink', () => {
   let openSpy: ReturnType<typeof vi.spyOn>;

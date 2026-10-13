@@ -1,14 +1,14 @@
 /**
- * UsageView — /usage route.
+ * UsageView - /usage route.
  *
  * A local, privacy-preserving "your usage at a glance" view. Everything shown
  * is computed and stored on-device in the sidecar (services/usage_store.py);
  * nothing is ever uploaded, and only metadata is recorded (tokens, latency,
  * scope, model, ok/fail), never prompt or response content.
  *
- * Two jobs (per docs/specs/usage-dashboard.md):
- *   1. Retention — the streak + activity heatmap pull people back.
- *   2. Measurement — the consumed-vs-served split by scope answers "do people
+ * Two jobs:
+ *   1. Retention - the streak + activity heatmap pull people back.
+ *   2. Measurement - the consumed-vs-served split by scope answers "do people
  *      leave local-only for the network scopes?"
  *
  * The UI leads with the two things no cloud or CLI competitor can match:
@@ -178,7 +178,7 @@ export function UsageView() {
               </div>
             </section>
 
-            {/* Consumed vs Served — the differentiator, led with */}
+            {/* Consumed vs Served - the differentiator, led with */}
             {split && (
               <section aria-label="Consumed versus served">
                 <SectionHeader>What you used vs what you served</SectionHeader>

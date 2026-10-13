@@ -22,11 +22,11 @@
   "models": [
     {
       "model": "Phi-3-mini-4k-instruct-Q4_K_M.gguf",
-      "model_path": "/Users/sam/Documents/potluckai/bench/models/Phi-3-mini-4k-instruct-Q4_K_M.gguf",
+      "model_path": "bench/models/Phi-3-mini-4k-instruct-Q4_K_M.gguf",
       "status": "ok",
       "load_time_s": 2.44,
       "load_meta": {
-        "model_path": "/Users/sam/Documents/potluckai/bench/models/Phi-3-mini-4k-instruct-Q4_K_M.gguf",
+        "model_path": "bench/models/Phi-3-mini-4k-instruct-Q4_K_M.gguf",
         "n_ctx": 8192,
         "n_gpu_layers": -1,
         "n_threads": 6,
@@ -677,11 +677,11 @@
     },
     {
       "model": "Qwen2.5-7B-Instruct-Q4_K_M.gguf",
-      "model_path": "/Users/sam/Documents/potluckai/bench/models/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
+      "model_path": "bench/models/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
       "status": "ok",
       "load_time_s": 2.99,
       "load_meta": {
-        "model_path": "/Users/sam/Documents/potluckai/bench/models/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
+        "model_path": "bench/models/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
         "n_ctx": 8192,
         "n_gpu_layers": -1,
         "n_threads": 6,
@@ -1332,11 +1332,11 @@
     },
     {
       "model": "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
-      "model_path": "/Users/sam/Documents/potluckai/bench/models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+      "model_path": "bench/models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
       "status": "ok",
       "load_time_s": 3.75,
       "load_meta": {
-        "model_path": "/Users/sam/Documents/potluckai/bench/models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+        "model_path": "bench/models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
         "n_ctx": 8192,
         "n_gpu_layers": -1,
         "n_threads": 6,

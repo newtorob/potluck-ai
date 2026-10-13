@@ -1,4 +1,4 @@
-"""Capacity and hardware facts the contributor reports (M2.5)."""
+"""Capacity and hardware facts the contributor reports."""
 from __future__ import annotations
 
 import types
@@ -66,11 +66,11 @@ def test_full_hardware_summary_merges_detected_over_legacy() -> None:
     detected = {
         "os": "Darwin",
         "arch": "arm64",
-        "cpu_name": "Apple M2 Pro",  # must NOT be forwarded
+        "cpu_name": "Apple M2 Pro",  # must not be forwarded
         "cpu_cores_physical": 10,
         "cpu_cores_logical": 10,
         "ram_total_gb": 16.0,
-        "ram_available_gb": 3.2,  # dynamic, must NOT be forwarded
+        "ram_available_gb": 3.2,  # dynamic, must not be forwarded
         "gpu_name": "Apple M2 Pro",
         "gpu_vram_gb": 16.0,
         "recommended_tier": "medium",

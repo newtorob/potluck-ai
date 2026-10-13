@@ -1,4 +1,4 @@
-"""link_detect.detect_link_type() — contract: it always returns a known literal and
+"""link_detect.detect_link_type() - contract: it always returns a known literal and
 never raises, on any OS, with any (mis)behaving system tool.
 
 This sits on the /peer/capabilities hot path, so it must be cheap and crash-proof: a
@@ -39,7 +39,7 @@ def test_detect_link_type_is_cached() -> None:
 
 def test_detect_link_type_degrades_to_unknown_on_failure(monkeypatch) -> None:
     """If the uncached detector raises, detect_link_type swallows it and returns
-    'unknown' — it must never propagate an exception onto the capabilities path."""
+    'unknown' - it must never propagate an exception onto the capabilities path."""
     _reset_cache()
 
     def _boom() -> str:

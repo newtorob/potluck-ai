@@ -2,7 +2,7 @@
  * Chat domain types.
  *
  * Shapes mirror the Python sidecar's Pydantic models so serialisation
- * round-trips without transformation. See guide §4.5 and
+ * round-trips without transformation. See
  * apps/desktop/python/potluck_local/routers/chat.py.
  */
 

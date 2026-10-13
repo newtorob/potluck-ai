@@ -1,6 +1,6 @@
 import { getConnectedPeers } from '@/lib/meshDiagnostics';
 /**
- * Chat store — conversations, streaming state, and send/abort actions.
+ * Chat store - conversations, streaming state, and send/abort actions.
  *
  * Local-first persistence: conversations + messages live in the sidecar's
  * SQLite (memory_db). Local component state mirrors what's on disk and
@@ -42,7 +42,7 @@ import { networkRefusalCopy } from '@/lib/networkRefusal';
 const ROUTING_MODE_KEY = 'potluck.household_routing_mode';
 
 // ---------------------------------------------------------------------------
-// RoutingScope — the four-tier trust gradient
+// RoutingScope - the four-tier trust gradient
 // ---------------------------------------------------------------------------
 
 /** The user-facing routing tier. This is the primary setting; networkMode /
@@ -51,8 +51,8 @@ const ROUTING_MODE_KEY = 'potluck.household_routing_mode';
  *
  *  local       → local sidecar, nothing leaves this machine.
  *  household   → direct to a paired peer over the WireGuard mesh.
- *  circle      → reserved for Phase 2 trusted-circle membership infra.
- *                Selectable in the UI but NOT wired; falls back to local.
+ *  circle      → coordinator dispatch restricted to the selected trusted
+ *                circle (activeCircleId).
  *  cooperative → coordinator blinded-dispatch to the open pool.
  */
 export type RoutingScope = 'local' | 'household' | 'circle' | 'cooperative';
@@ -81,9 +81,7 @@ function readBootstrapRoutingScope(): RoutingScope {
   if (typeof window === 'undefined') return 'local';
   const v = window.localStorage.getItem(ROUTING_SCOPE_KEY);
   if (v === 'local' || v === 'household' || v === 'circle' || v === 'cooperative') return v;
-  // Migrate from the old boolean pair: if networkMode was on, map to cooperative;
-  // if householdMode was on, map to household; otherwise local.
-  // (These keys are no longer written, so this handles first-run-after-upgrade.)
+  // No valid stored scope: default to local.
   return 'local';
 }
 
@@ -108,9 +106,9 @@ export type MessageStatus = 'complete' | 'streaming' | 'partial' | 'error';
  *  MessageBubble as a small footer ("Served by a verified contributor
  *  ... duration / token count") under network-mode responses. */
 export interface MessageMeta {
-  // 'local'       — this machine's sidecar.
-  // 'household'   — one of YOUR machines, direct over the WireGuard mesh.
-  // 'contributor' — through the coordinator (open pool, or your own machine
+  // 'local' - this machine's sidecar.
+  // 'household' - one of your machines, direct over the WireGuard mesh.
+  // 'contributor' - through the coordinator (open pool, or your own machine
   //                 when served_scope === 'mine').
   served_by: 'contributor' | 'local' | 'household';
   /** Coordinator routing tier for the network path: 'mine' = one of your own
@@ -175,36 +173,36 @@ interface ChatState {
   activeConversationId: string | null;
   isStreaming: boolean;
   streamingMessageId: string | null;
-  /** Not serialised — held only for abort() */
+  /** Not serialised - held only for abort() */
   abortController: AbortController | null;
 
-  // ---- Four-tier routing scope (Phase 1 / Phase 2) ---- //
-  // Primary setting — persisted to localStorage. The legacy networkMode /
+  // ---- Four-tier routing scope ---- //
+  // Primary setting - persisted to localStorage. The legacy networkMode /
   // householdMode fields below are kept for backward-compat with existing
   // readers (StatusBar, NetworkView, HouseholdView …) and are always
   // consistent with routingScope via the setRoutingScope setter.
   routingScope: RoutingScope;
 
-  // ---- Circle routing (Phase 2) ---- //
+  // ---- Circle routing ---- //
   // When routingScope === 'circle', this is the circle id passed to
   // streamNetworkJob. Null means no circle selected yet (the UI must gate
   // the send button on this being set when the scope is 'circle').
   activeCircleId: string | null;
 
-  // ---- Phase G m3 #19: contributor-network routing ---- //
+  // ---- Contributor-network routing ---- //
   // Derived from routingScope === 'cooperative'. Kept as explicit state so
   // all existing readers (StatusBar etc.) work without changes.
   networkMode: boolean;
   networkModelSlug: string;
 
-  // ---- Household routing (post-mesh-launch addition) ---- //
+  // ---- Household routing ---- //
   // Derived from routingScope === 'household'. Mutually exclusive with
   // networkMode; setRoutingScope enforces consistency.
   householdMode: boolean;
 
   // How to pick which household peer serves the request. 'capability'
   // (default) scores peers by hardware + load + model fit. 'round_robin'
-  // rotates evenly across eligible peers — useful when the user wants
+  // rotates evenly across eligible peers - useful when the user wants
   // to keep multiple machines warm rather than concentrate load on the
   // best one. Persisted to localStorage; per-machine setting.
   routingMode: RoutingMode;
@@ -219,11 +217,11 @@ interface ChatState {
   restartMessage: (messageId: string) => Promise<void>;
   abort: () => void;
   clearConversations: () => void;
-  /** Primary setter — persists scope and keeps networkMode/householdMode in sync. */
+  /** Primary setter - persists scope and keeps networkMode/householdMode in sync. */
   setRoutingScope: (scope: RoutingScope) => void;
-  /** Phase 2: set the active circle for the 'circle' routing scope. */
+  /** Set the active circle for the 'circle' routing scope. */
   setActiveCircleId: (id: string | null) => void;
-  /** Legacy setters — kept for backward-compat; delegate to setRoutingScope. */
+  /** Legacy setters - kept for backward-compat; delegate to setRoutingScope. */
   setNetworkMode: (on: boolean) => void;
   setNetworkModelSlug: (slug: string) => void;
   setHouseholdMode: (on: boolean) => void;
@@ -334,7 +332,7 @@ function streamFailureText(failure: StreamFailure, scope: RoutingScope): string 
 /** A stream that ended without the [DONE] sentinel was cut off, not finished. */
 const TRUNCATED_STREAM_TEXT = 'The connection closed before the reply finished.';
 
-/** Best-effort fire-and-forget — wraps a Promise so a sidecar outage
+/** Best-effort fire-and-forget - wraps a Promise so a sidecar outage
  *  doesn't kill the chat UX. We log the error and move on; in-memory
  *  state remains the user's source of truth for the session. */
 function persist<T>(p: Promise<T>, label: string): void {
@@ -358,7 +356,7 @@ function historyEnabled(): boolean {
  *  historyEnabled() read catches a flag flipped mid-turn. `run` is a thunk on
  *  purpose: the request must not even be constructed when the gate is closed.
  *
- *  Metadata-only writes (usage counters) and reads/deletes are NOT gated —
+ *  Metadata-only writes (usage counters) and reads/deletes are not gated -
  *  turning history off hides nothing that is already on disk and must not
  *  destroy it. */
 function persistContent<T>(allowed: boolean, run: () => Promise<T>, label: string): void {
@@ -371,7 +369,7 @@ function persistContent<T>(allowed: boolean, run: () => Promise<T>, label: strin
  *
  * createConversation() returns the optimistic id immediately so the UI can
  * switch chats without waiting on the network, but message/title persists
- * MUST wait for the matching create — otherwise SQLite rejects the insert
+ * must wait for the matching create - otherwise SQLite rejects the insert
  * with FOREIGN KEY constraint failed (messages.conversation_id → conversations).
  *
  * The promise resolves to true on success, false on failure (so callers can
@@ -380,7 +378,7 @@ function persistContent<T>(allowed: boolean, run: () => Promise<T>, label: strin
 const pendingCreates = new Map<string, Promise<boolean>>();
 
 /** Conversation ids known to exist on disk (hydrated or successfully created).
- *  ensureConversationPersisted must NOT re-POST create for these — that
+ *  ensureConversationPersisted must not re-POST create for these - that
  *  produces UNIQUE constraint failed on every subsequent send. */
 const knownPersistedIds = new Set<string>();
 
@@ -457,8 +455,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
   activeCircleId: readBootstrapActiveCircle(),
   networkMode: _initNetworkMode,
   // Default slug until the user picks from the models the network advertises
-  // (the selectable chip rack in /network). qwen2.5:3b-instruct-q4_K_M is what
-  // both the Linux media server and the Windows gaming PC serve via Ollama.
+  // (the selectable chip rack in /network). qwen2.5:3b-instruct-q4_K_M is a
+  // small model that Ollama-backed machines commonly serve.
   networkModelSlug: 'qwen2.5:3b-instruct-q4_K_M',
   householdMode: _initHouseholdMode,
   routingMode: readBootstrapRoutingMode(),
@@ -519,7 +517,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       persisted: allowed,
     };
 
-    // Optimistic local insert — the UI reflects the new chat immediately.
+    // Optimistic local insert - the UI reflects the new chat immediately.
     set((s) => ({
       conversations: { ...s.conversations, [id]: optimistic },
       activeConversationId: id,
@@ -724,7 +722,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     );
     if (controller.signal.aborted || get().abortController !== controller) return;
 
-    // The row may have been created just now (history was already on) — keep
+    // The row may have been created just now (history was already on) - keep
     // the sidebar's "Not saved" marker honest either way.
     const rowExists = knownPersistedIds.has(conversationId);
     if (get().conversations[conversationId]?.persisted !== rowExists) {
@@ -741,7 +739,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     }
 
     // Persist user message immediately. The first-message title rename
-    // piggybacks here as a separate update — small extra round-trip but
+    // piggybacks here as a separate update - small extra round-trip but
     // keeps the API surface minimal (no compound endpoint).
     if (!recovery) persistContent(
       historyAllowed,
@@ -805,7 +803,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       .filter((m) => m.id !== assistantId && (m.role !== 'assistant' || m.status === 'complete'))
       .map((m): ChatMessage => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt }));
 
-    // Usage dashboard (metadata only, never content): the NETWORK scopes stream
+    // Usage dashboard (metadata only, never content): the network scopes stream
     // renderer -> coordinator/peer and never touch this machine's sidecar, so
     // the renderer is the only place that can record them. Local turns are
     // recorded server-side in chat.py, so they stay null here to avoid double
@@ -821,14 +819,14 @@ export const useChatStore = create<ChatState>()((set, get) => {
 
     try {
       // Branch on routing scope. Four tiers, three active dispatch paths:
-      //   household   — direct to a household peer over the mesh
+      //   household - direct to a household peer over the mesh
       //                 (full history forwarded; trusted machines we own)
-      //   cooperative — through the coordinator to an open-pool peer
+      //   cooperative - through the coordinator to an open-pool peer
       //                 (this desktop path sends only the latest prompt)
-      //   circle      — dispatch restricted to the selected circle, through the
+      //   circle - dispatch restricted to the selected circle, through the
       //                 local engine (a direct link, else the coordinator);
       //                 fail if no circle was selected when the user sent.
-      //   local       — this machine's Python sidecar (default)
+      //   local - this machine's Python sidecar (default)
       let response: Response;
       // Name of the household machine that served this turn (My Machines path),
       // captured so MessageBubble can render "Ran on <your machine>".
@@ -906,7 +904,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           if (typeof body.detail === 'string') detail = body.detail;
           else if (typeof body.error === 'string') detail = body.error;
         } catch {
-          // Body wasn't JSON — fall through to statusText.
+          // Body wasn't JSON - fall through to statusText.
         }
         throw new Error(
           detail
@@ -916,7 +914,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
       }
 
       // The household path has no SSE meta envelope (the peer streams plain
-      // OpenAI deltas), so attach the routing meta ourselves — this is what
+      // OpenAI deltas), so attach the routing meta ourselves - this is what
       // renders "Ran on <your machine>" under the response.
       if (householdPeerName) {
         const peerName = householdPeerName;
@@ -967,7 +965,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
         }
 
         if (event.type === 'meta') {
-          // Coordinator-only — attach to the in-flight assistant message
+          // Coordinator-only - attach to the in-flight assistant message
           // so MessageBubble can render the "served by" footer when the
           // stream finishes. No-op for local-sidecar streams.
           set((s) => {
@@ -1081,7 +1079,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
                 role: 'assistant',
                 content: finalMsg.content,
                 status: terminalStatus,
-                // 'household' is session-only — persist only the coordinator-known
+                // 'household' is session-only - persist only the coordinator-known
                 // values so the history column stays 'contributor' | 'local' | null.
                 served_by:
                   finalMsg.meta?.served_by === 'contributor' || finalMsg.meta?.served_by === 'local'
@@ -1123,7 +1121,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
     } catch (err) {
       if (controller.signal.aborted || get().abortController !== controller ||
           (err instanceof Error && err.name === 'AbortError')) {
-        // abort() handled state + persistence — nothing to do here.
+        // abort() handled state + persistence - nothing to do here.
         return;
       }
 
@@ -1256,7 +1254,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
 
   clearConversations() {
     get().abort();
-    // State-only reset — does NOT delete persisted conversations from disk.
+    // State-only reset - does not delete persisted conversations from disk.
     // Use deleteConversation() per-id for that. This action exists for
     // tests and future "panic clear" UI; not currently bound to any view.
     knownPersistedIds.clear();
@@ -1302,7 +1300,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
   },
 
   setNetworkMode(on) {
-    // Legacy compat — delegates to setRoutingScope so the scope field stays
+    // Legacy compat - delegates to setRoutingScope so the scope field stays
     // the canonical source of truth.
     get().setRoutingScope(on ? 'cooperative' : 'local');
   },

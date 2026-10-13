@@ -6,7 +6,7 @@ tight machine doesn't try to allocate a KV cache that won't fit. Uses only
 catalog data (context window, layer count, on-disk size) plus total RAM. No
 GGUF parsing.
 
-The KV-cost estimate is deliberately CONSERVATIVE (it over-estimates per-token
+The KV-cost estimate is deliberately conservative (it over-estimates per-token
 cost): over-allocating the KV cache risks an OOM at load, while under-allocating
 only shortens the usable context. When the math is uncertain we pick the
 smaller, safe context.
@@ -38,7 +38,7 @@ def auto_context_size(
     num_layers: int,
     ram_total_gb: float,
 ) -> int:
-    """Largest sensible n_ctx that the model supports AND fits in RAM alongside
+    """Largest sensible n_ctx that the model supports and fits in RAM alongside
     its weights, rounded down to a standard size. Never below _MIN_CTX."""
     model_max = model_max_ctx if model_max_ctx and model_max_ctx > 0 else _DEFAULT_MAX_CTX
     weights_gb = max(0.0, size_bytes / 1e9)

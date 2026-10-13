@@ -1,5 +1,5 @@
 /**
- * useAgents — facade over the agent store with polling lifecycle.
+ * useAgents - facade over the agent store with polling lifecycle.
  *
  * Polling strategy:
  *   - Sessions: every 5 seconds (live "active now" feel)
@@ -21,7 +21,7 @@ export function useAgents() {
   const store = useAgentStore();
   const { filter } = store;
 
-  // Stable refs to the latest store actions — avoids stale closure in interval callbacks
+  // Stable refs to the latest store actions - avoids stale closure in interval callbacks
   const fetchSessionsRef = useRef(store.fetchSessions);
   const fetchActivityRef = useRef(store.fetchActivity);
   fetchSessionsRef.current = store.fetchSessions;
@@ -38,7 +38,7 @@ export function useAgents() {
   const filterKey = JSON.stringify(filter);
   useEffect(() => {
     void fetchActivityRef.current();
-    // filterKey is a stable JSON string — safe dep
+    // filterKey is a stable JSON string - safe dep
   }, [filterKey]);
 
   // ---- Polling loops -------------------------------------------------------
@@ -79,7 +79,7 @@ export function useAgents() {
     scheduleSessions();
     scheduleActivity();
 
-    // Pause on hidden, resume on visible — refetch immediately on resume
+    // Pause on hidden, resume on visible - refetch immediately on resume
     function handleVisibilityChange() {
       if (!document.hidden) {
         // Refetch right away when coming back into focus

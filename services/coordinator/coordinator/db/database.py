@@ -24,7 +24,7 @@ async def init_db() -> None:
     """Create the async engine and session factory.
 
     Called once from the lifespan context manager in app.py.
-    Does NOT create tables — Alembic owns the schema.
+    Does not create tables - Alembic owns the schema.
     """
     global _engine, _session_factory
 
@@ -69,7 +69,7 @@ async def check_database(timeout: float = 2.0) -> None:
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     if _session_factory is None:
-        raise RuntimeError("Database not initialised — init_db() was not called")
+        raise RuntimeError("Database not initialised - init_db() was not called")
 
     async with _session_factory() as session:
         yield session
@@ -78,8 +78,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 def get_session_factory() -> async_sessionmaker[AsyncSession]:
     """Return the session factory for code paths that outlive the request
     lifecycle (e.g. background tasks, streaming-response finalizers that
-    need to update DB rows AFTER the StreamingResponse has consumed the
+    need to update DB rows after the StreamingResponse has consumed the
     request-scoped session)."""
     if _session_factory is None:
-        raise RuntimeError("Database not initialised — init_db() was not called")
+        raise RuntimeError("Database not initialised - init_db() was not called")
     return _session_factory

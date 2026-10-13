@@ -1,13 +1,13 @@
 """App-factory tests: route registration, /health shape, and the lazy-torch invariant.
 
-These are the first sidecar tests over create_app() itself. They are FAST: no model
-downloads, no fleet, no network — just the FastAPI TestClient over the in-process app.
+These are tests over create_app() itself. They are fast: no model
+downloads, no peers, no network - just the FastAPI TestClient over the in-process app.
 
-The load-bearing assertion here is that create_app() does NOT import torch. The base
+The key assertion here is that create_app() does not import torch. The base
 sidecar/bundle must stay light; torch + transformers are only ever imported lazily, on
 the path that actually runs a pipeline stage. A regression that top-imports the engine
 (or anything that drags torch in) from a router module would bloat the bundle and slow
-cold start — this guards that discipline.
+cold start - this guards that discipline.
 """
 
 from __future__ import annotations
@@ -46,12 +46,12 @@ def test_create_app_registers_expected_routes() -> None:
 
 
 def test_create_app_does_not_import_torch() -> None:
-    """create_app() must stay torch-free — the engine is imported lazily.
+    """create_app() must stay torch-free - the engine is imported lazily.
 
-    Asserted in a FRESH subprocess on purpose: pytest collects every test module in
+    Asserted in a fresh subprocess on purpose: pytest collects every test module in
     one interpreter, and a sibling test (e.g. the placement tests) top-imports torch,
     which would poison a `'torch' in sys.modules` check in this shared process. The
-    subprocess proves the property in isolation — exactly the state a cold sidecar
+    subprocess proves the property in isolation - exactly the state a cold sidecar
     boot is in.
     """
     code = (
@@ -90,7 +90,7 @@ def test_health_shape() -> None:
         # RPC / pipeline toggles, so their absence is a contract break.
         assert "loaded_pipeline" in body
         assert "loaded_rpc_servers" in body
-        # Shared (continuous) batching flag — the frontend reads it as the source of
+        # Shared (continuous) batching flag - the frontend reads it as the source of
         # truth for the shared-batching toggle. False when nothing is loaded that way.
         assert "continuous_batch" in body
         assert body["continuous_batch"] is False
@@ -98,7 +98,7 @@ def test_health_shape() -> None:
 
 def test_load_request_accepts_continuous_batch() -> None:
     """The load request body model accepts continuous_batch without a validation
-    error and defaults it to False — the wire contract the frontend depends on.
+    error and defaults it to False - the wire contract the frontend depends on.
 
     Validated at the Pydantic-model boundary (not by actually loading a model, which
     needs torch + a model on disk): a malformed/absent field would 422 the request

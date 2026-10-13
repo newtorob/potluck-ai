@@ -1,19 +1,19 @@
 /**
- * MeshEnablePanel — the "app brings up the mesh" onboarding flow for the
- * Household view. Replaces the old dead-end "sidecar isn't running,
- * reinstall" message with the real enable → approve → running sequence,
+ * MeshEnablePanel - the "app brings up the mesh" onboarding flow for the
+ * Household view. Walks through the enable → approve → running sequence
+ * instead of a dead-end "sidecar isn't running, reinstall" message,
  * backed by window.potluck.mesh.{daemonStatus,enable,openLoginItems}
  * (main.js's SMAppService bridge on macOS today; a plain "not available
  * yet" message on other platforms, which aren't wired up).
  *
- * This component doesn't poll on its own — meshStore already refreshes
+ * This component doesn't poll on its own - meshStore already refreshes
  * daemon status on its normal 2s cadence whenever the mesh socket isn't
  * reachable (see refineBridgeOnUnreachable in stores/meshStore.ts). Button
  * handlers here just trigger one immediate refresh via `onChanged` so the
  * UI doesn't sit and wait out the rest of the current tick.
  *
  * Once the daemon reaches 'running', the socket answers and HouseholdView's
- * bridge flips straight to 'reachable' — this panel stops rendering and the
+ * bridge flips straight to 'reachable' - this panel stops rendering and the
  * normal unpaired/paired views (BeFirstPanel, JoinExistingPanel,
  * AddMachineWizard) take over with no extra wiring needed here.
  */
@@ -99,7 +99,7 @@ export function MeshEnablePanel({ bridge, daemonStatus, onChanged }: MeshEnableP
 }
 
 // ---------------------------------------------------------------------------
-// failed — the service is installed but crashed / is crash-looping. Give the
+// failed - the service is installed but crashed / is crash-looping. Give the
 // user a Retry (re-runs the same enable/install path) instead of leaving them
 // on an indefinite "Starting…" spinner with no way out.
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ function FailedPanel({ detail, onChanged }: { detail?: string; onChanged: () => 
 
 /** Platform-specific wording for the one-time approval prompt the user will
  *  see when they click "Enable." macOS asks via System Settings > Login
- *  Items (a separate approval step — see RequiresApprovalPanel below);
+ *  Items (a separate approval step - see RequiresApprovalPanel below);
  *  Linux asks via a single polkit/pkexec password prompt with no separate
  *  approval step. Falls back to generic wording if platform is unknown
  *  (daemonStatus hasn't loaded yet). */

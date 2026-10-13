@@ -1,5 +1,5 @@
 /**
- * AddMachineWizard — modal dialog for issuing a pairing token from an
+ * AddMachineWizard - modal dialog for issuing a pairing token from an
  * already-enrolled machine.
  *
  * Flow:
@@ -10,7 +10,7 @@
  *
  * Out of scope for v0 of this wizard (follow-ups):
  *   - QR rendering. Token paste-from-clipboard is the dominant flow when
- *     both machines are desktops. QR is nice when one is a phone — skip
+ *     both machines are desktops. QR is nice when one is a phone - skip
  *     until we have a phone client.
  *   - Live "peer just joined" celebration. The HouseholdView's roster
  *     refresh picks up the new peer within 5s of pairing on the other
@@ -66,7 +66,7 @@ export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
         if (!cancelled) setToken(res);
         // Best-effort: also push a fingerprint of the token onto the local
         // network so a machine on the same LAN can discover it without
-        // copy-paste. The raw token never goes on the wire — the sidecar
+        // copy-paste. The raw token never goes on the wire - the sidecar
         // returns a confirmation_pin instead, which we display here for the
         // user to read aloud to whoever is joining. Failure (no mesh
         // sidecar, no LAN) just falls back to manual paste.
@@ -86,7 +86,7 @@ export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
       } catch (err) {
         if (cancelled) return;
         // Covers a stale coordinator override the same way BeFirstPanel's
-        // "Set up household" does — see describeCoordinatorAuthError.
+        // "Set up household" does - see describeCoordinatorAuthError.
         const info = describeCoordinatorAuthError(err, {
           coordinatorUrl: useConnectionStore.getState().coordinatorUrl,
           sidecarReportedUrl: useConnectionStore.getState().sidecarReportedUrl,
@@ -348,7 +348,7 @@ export function AddMachineWizard({ open, onClose }: AddMachineWizardProps) {
                     {confirmationPin}
                   </p>
                   <p className="text-center text-[11px] text-muted-foreground/70">
-                    This PIN is never sent over the network — read it aloud or
+                    This PIN is never sent over the network. Read it aloud or
                     show this screen to whoever is joining.
                   </p>
                 </div>

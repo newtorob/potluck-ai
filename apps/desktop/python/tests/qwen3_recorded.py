@@ -1,4 +1,4 @@
-"""Exact replies of qwen3-1.7b-q4 (llama-cpp-python 0.3.23, Metal, temperature 0), recorded 2026-10-10.
+"""Exact replies of qwen3-1.7b-q4 (llama-cpp-python 0.3.23, Metal, temperature 0).
 
 Each constant is (raw text, finish_reason, completion_tokens). The prompts:
   TOOLS_*      "What's the weather in Paris right now? Use the tool." with a get_weather tool, with and without " /no_think"

@@ -1,5 +1,5 @@
 /**
- * VerifyingLink — the "check your email" state shown after a magic link is sent.
+ * VerifyingLink - the "check your email" state shown after a magic link is sent.
  *
  * The actual token arrives out-of-band via a potluck:// deep link handled
  * globally by useDeepLinkAuth, so this screen is presentational: it tells the

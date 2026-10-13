@@ -1,5 +1,5 @@
 /**
- * TaskCard — renders a single TaskState with full inline editing.
+ * TaskCard - renders a single TaskState with full inline editing.
  *
  * Sections:
  *   - Header: name, status pill, relative timestamp, actions menu

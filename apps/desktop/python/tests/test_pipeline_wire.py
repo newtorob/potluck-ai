@@ -3,14 +3,14 @@
 Two properties matter here and neither needs a GPU or a real model:
 
   1. The wire-key error path. The programmatic entry points (the engine, the /peer
-     stage worker) reach the codec WITHOUT the CLI main() that historically loaded
+     stage worker) reach the codec without the CLI main() that loads
      SHARD_PSK. _ensure_wire_key() exists to turn the codec's fail-fast SystemExit
      into a clean RuntimeError, so the HTTP layer returns a readable 500 instead of
      the sidecar process exiting. A SystemExit escaping here would kill the worker.
 
   2. The frame codec round-trips a (tensor, int) message exactly through
-     pack -> seal -> open -> unpack — the actual payload shape _send_recv puts on
-     the wire — and a tampered/wrong-key frame is rejected, not trusted.
+     pack -> seal -> open -> unpack - the actual payload shape _send_recv puts on
+     the wire - and a tampered/wrong-key frame is rejected, not trusted.
 
 Everything in this module imports torch, so the whole file is gated on
 `pytest.importorskip("torch")`: in a torch-free base environment the suite still
@@ -45,7 +45,7 @@ def _isolate_wire_key(monkeypatch):
 
 
 def test_ensure_wire_key_raises_runtimeerror_when_psk_unset(monkeypatch) -> None:
-    """With SHARD_PSK unset, _ensure_wire_key() raises a clean RuntimeError — NOT a
+    """With SHARD_PSK unset, _ensure_wire_key() raises a clean RuntimeError, not a
     SystemExit. A SystemExit would tear down the sidecar instead of returning an error."""
     monkeypatch.delenv("SHARD_PSK", raising=False)
     with pytest.raises(RuntimeError):
@@ -71,7 +71,7 @@ def test_ensure_wire_key_loads_key_when_psk_set(monkeypatch) -> None:
 
 
 def test_wire_frame_roundtrip_tensor_and_int() -> None:
-    """A (tensor, int) message — the exact shape _send_recv frames — round-trips
+    """A (tensor, int) message - the exact shape _send_recv frames - round-trips
     byte-exact through pack -> seal -> open -> unpack."""
     wire.use_key("test-swarm-secret")
     h = torch.randn(1, 4, 8, dtype=torch.bfloat16)
@@ -84,7 +84,7 @@ def test_wire_frame_roundtrip_tensor_and_int() -> None:
 
 
 def test_wire_tampered_frame_rejected() -> None:
-    """A single flipped byte fails the auth tag — a forged/tampered frame is rejected,
+    """A single flipped byte fails the auth tag - a forged/tampered frame is rejected,
     never decoded and trusted."""
     from cryptography.exceptions import InvalidTag
 
@@ -98,7 +98,7 @@ def test_wire_tampered_frame_rejected() -> None:
 def test_send_recv_roundtrip_over_socketpair() -> None:
     """End-to-end framing round-trip over an in-memory socket pair: send_msg on one
     end, recv_msg on the other, recovering the (tensor, abs_start) payload exactly.
-    No real network, no model — just the framing layer the stages speak."""
+    No real network, no model - just the framing layer the stages speak."""
     wire.use_key("test-swarm-secret")
     a, b = socket.socketpair()
     try:

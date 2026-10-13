@@ -1,15 +1,14 @@
-"""RRF k-constant sweep — find the k that maximizes recall@5.
+"""RRF k-constant sweep - find the k that maximizes recall@5.
 
 Reuses Eval B's corpus, embeddings, retrieval, and scoring. Seeds + embeds
-ONCE, then re-runs RRF retrieval across a range of POTLUCK_RRF_K values
-(the constant get_relevant_memories now reads per-call from the env), so we
+once, then re-runs RRF retrieval across a range of POTLUCK_RRF_K values
+(the constant get_relevant_memories reads per-call from the env), so we
 can see how the headline metric moves with k.
 
 Run:  cd apps/desktop/python && .venv/bin/python -m evals.sweep_rrf_k
 
-This is the first eval-driven tuning loop. The point: at a tight budget
-(recall@5) the v1 default k=60 produced ZERO lift over keyword, because
-1/(60+rank) is nearly flat — strong hits can't dominate. Lower k should let
+At a tight budget (recall@5) k=60 gives no lift over keyword, because
+1/(60+rank) is nearly flat - strong hits can't dominate. Lower k lets
 the semantically-rescued memories climb into the top-5.
 """
 from __future__ import annotations
@@ -40,7 +39,7 @@ async def main() -> int:
     await _seed_corpus(_EVAL_DB)
     print("Generating embeddings once...")
     if not await _generate_embeddings(_EVAL_DB):
-        print("Embedder unavailable — sweep is meaningless without the semantic arm. Aborting.")
+        print("Embedder unavailable: sweep is meaningless without the semantic arm. Aborting.")
         return 2
 
     retriever = MemoryRetriever()
@@ -75,7 +74,7 @@ async def main() -> int:
     print(f"\nBEST recall@5: k={best_k} → recall@5={best_r5:.2f} "
           f"(keyword-only baseline {kw['recalls'][5]:.2f}, lift {best_r5 - kw['recalls'][5]:+.2f})")
     if best_r5 <= kw['recalls'][5]:
-        print("NOTE: no k beat keyword-only at recall@5 — ranking, not fusion-k, is the bottleneck.")
+        print("NOTE: no k beat keyword-only at recall@5: ranking, not fusion-k, is the bottleneck.")
         print("      Next lever: a rerank pass over the fused candidates, or a better embedder.")
     else:
         print(f"ACTION: set POTLUCK_RRF_K={best_k} as the new default in memory_retrieval.py,")

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# scripts/setup.sh — the friendly entrypoint.
+# scripts/setup.sh - the friendly entrypoint.
 #
 # Asks what you're trying to do and runs the right script for you. If you
 # already know what you want, run that script directly:

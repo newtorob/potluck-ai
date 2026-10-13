@@ -1,4 +1,4 @@
-// Package derp — DerpBind wires the DERP relay client into the wg-go
+// Package derp - DerpBind wires the DERP relay client into the wg-go
 // conn.Bind interface so that:
 //
 //  1. Packets received from the DERP relay are injected into the WireGuard
@@ -17,21 +17,21 @@
 // purely in Go.
 //
 // DstToString() returns "derp:<8-char-hex-prefix>" for logging. DstIP() /
-// SrcIP() return the zero netip.Addr — they are only used by the OS network
+// SrcIP() return the zero netip.Addr - they are only used by the OS network
 // stack path which is bypassed for synthetic endpoints.
 //
 // # Concurrency
 //
-// - injectCh is a buffered channel (injectChanCap). The DERP read-loop goroutine
-//   calls Inject(); the wg-go receive-func goroutine drains it.
-// - derpPeers is guarded by derpMu. SetPeerRouting is called from the main
-//   goroutine; Send is called from one of wg-go's send-loop goroutines.
-// - closeState is held in atomic.Pointer so Open and Close can race safely.
-//   Each Open installs a fresh *closeState (its own channel + sync.Once), and
-//   Close atomically loads-and-clears the current state, running its Once at
-//   most once. No mutex is involved on the close path, eliminating the
-//   prior write-write race on the sync.Once value.
-// - The inner StdNetBind handles all its own concurrency.
+//   - injectCh is a buffered channel (injectChanCap). The DERP read-loop goroutine
+//     calls Inject(); the wg-go receive-func goroutine drains it.
+//   - derpPeers is guarded by derpMu. SetPeerRouting is called from the main
+//     goroutine; Send is called from one of wg-go's send-loop goroutines.
+//   - closeState is held in atomic.Pointer so Open and Close can race safely.
+//     Each Open installs a fresh *closeState (its own channel + sync.Once), and
+//     Close atomically loads-and-clears the current state, running its Once at
+//     most once. No mutex is involved on the close path, eliminating the
+//     prior write-write race on the sync.Once value.
+//   - The inner StdNetBind handles all its own concurrency.
 //
 // # Lifecycle
 //
@@ -67,7 +67,7 @@ const (
 )
 
 // ---------------------------------------------------------------------------
-// syntheticEndpoint — implements conn.Endpoint for DERP-routed peers
+// syntheticEndpoint - implements conn.Endpoint for DERP-routed peers
 // ---------------------------------------------------------------------------
 
 // syntheticEndpoint encodes a WireGuard peer pubkey as a conn.Endpoint.
@@ -80,23 +80,23 @@ type syntheticEndpoint struct {
 }
 
 // DstToString returns a human-readable string for logging / UAPI display.
-// Format: "derp:<8-char-hex-prefix>" — never includes full key material.
+// Format: "derp:<8-char-hex-prefix>" - never includes full key material.
 func (e syntheticEndpoint) DstToString() string {
 	return fmt.Sprintf("derp:%x", e.pubkey[:4])
 }
 
-// SrcToString returns an empty string — source address has no meaning for
+// SrcToString returns an empty string - source address has no meaning for
 // a relay-routed packet.
 func (e syntheticEndpoint) SrcToString() string { return "" }
 
-// DstIP returns a zero AddrPort — synthetic endpoints have no IP address.
+// DstIP returns a zero AddrPort - synthetic endpoints have no IP address.
 func (e syntheticEndpoint) DstIP() netip.Addr { return netip.Addr{} }
 
-// SrcIP returns a zero Addr — no source IP for relay-routed traffic.
+// SrcIP returns a zero Addr - no source IP for relay-routed traffic.
 func (e syntheticEndpoint) SrcIP() netip.Addr { return netip.Addr{} }
 
 // DstToBytes returns the raw destination address bytes. wg-go uses this for
-// fast endpoint-equality checks. We return the WG pubkey itself — the stable
+// fast endpoint-equality checks. We return the WG pubkey itself - the stable
 // identity for a synthetic endpoint, uniquely identifying the routing target.
 func (e syntheticEndpoint) DstToBytes() []byte {
 	out := make([]byte, len(e.pubkey))
@@ -123,27 +123,27 @@ func SyntheticEndpointString(pubkey [32]byte) string {
 // endpoint string (as produced by SyntheticEndpointString): the "derp:"
 // prefix followed by exactly 64 hex characters. Exported so
 // internal/tunnel's validateEndpoint can recognize (and accept) this format
-// at the UAPI-injection defense-in-depth check — see that function's doc for
-// why a blanket host:port requirement there was wrongly rejecting this
+// at the UAPI-injection defense-in-depth check - see that function's doc for
+// why a blanket host:port requirement there would reject this
 // locally-constructed, injection-safe format (fixed-length hex, no
-// whitespace/newlines possible) and silently breaking the entire DERP
+// whitespace/newlines possible) and silently break the entire DERP
 // fallback path for every peer.
 func IsSyntheticEndpointFormat(s string) bool {
 	_, ok := parseSyntheticEndpoint(s)
 	return ok
 }
 
-// IsSyntheticEndpointPrefix reports whether s LOOKS like a synthetic DERP
-// endpoint by prefix alone — "derp:" followed by anything. Unlike
+// IsSyntheticEndpointPrefix reports whether s looks like a synthetic DERP
+// endpoint by prefix alone - "derp:" followed by anything. Unlike
 // IsSyntheticEndpointFormat (which requires the full 64-hex-char round-trip
-// form written by SyntheticEndpointString), this also matches the ABBREVIATED
+// form written by SyntheticEndpointString), this also matches the abbreviated
 // "derp:<8-char-hex-prefix>" form that syntheticEndpoint.DstToString()
 // produces, which is what wireguard-go's UAPI GET actually echoes back for a
 // peer's live endpoint (uapi.go serializes via DstToString(), not the
 // original ParseEndpoint input string). Callers reading UAPI's endpoint=
 // field to check "is this peer still DERP-routed" (e.g. detecting
 // wireguard-go's automatic endpoint-roaming silently knocking a peer off the
-// relay — see internal/tunnel's Tunnel.PeerEndpoint doc) must use this, not
+// relay - see internal/tunnel's Tunnel.PeerEndpoint doc) must use this, not
 // IsSyntheticEndpointFormat, or a genuinely-still-DERP-routed peer would
 // false-positive as "drifted."
 func IsSyntheticEndpointPrefix(s string) bool {
@@ -196,7 +196,7 @@ func hexNibble(c byte) (byte, error) {
 }
 
 // ---------------------------------------------------------------------------
-// injectedPacket — unit of work queued from Inject → ReceiveFunc
+// injectedPacket - unit of work queued from Inject → ReceiveFunc
 // ---------------------------------------------------------------------------
 
 type injectedPacket struct {
@@ -205,7 +205,7 @@ type injectedPacket struct {
 }
 
 // ---------------------------------------------------------------------------
-// DerpBind — conn.Bind implementation
+// DerpBind - conn.Bind implementation
 // ---------------------------------------------------------------------------
 
 // closeState bundles a closeCh and the sync.Once that closes it for a single
@@ -229,7 +229,7 @@ type DerpBind struct {
 	injectCh chan injectedPacket // Inject → wg-go receive-func
 
 	// cs holds the *closeState for the current Open cycle. Nil means
-	// "no active Open" — Close on a nil pointer is a safe no-op.
+	// "no active Open" - Close on a nil pointer is a safe no-op.
 	cs atomic.Pointer[closeState]
 
 	derpMu    sync.RWMutex
@@ -255,7 +255,7 @@ func NewDerpBind(inner conn.Bind, client *Client) *DerpBind {
 // WireGuard device. Called by the DERP read-loop goroutine; must not block.
 // Drops the packet with a warning if the inject channel is full.
 func (b *DerpBind) Inject(src [32]byte, payload []byte) {
-	// Copy payload — the DERP read loop reuses its buffer across calls.
+	// Copy payload - the DERP read loop reuses its buffer across calls.
 	pkt := injectedPacket{src: src, payload: make([]byte, len(payload))}
 	copy(pkt.payload, payload)
 
@@ -304,7 +304,7 @@ func (b *DerpBind) IsPeerDERPRouted(pubkey [32]byte) bool {
 // wg-go spawns one goroutine per ReceiveFunc and calls it in a loop.
 //
 // Note on lifecycle: wg-go's BindUpdate calls bind.Close() before calling
-// bind.Open() — even on first startup, because closeBindLocked runs
+// bind.Open() - even on first startup, because closeBindLocked runs
 // unconditionally and is a no-op only when netc.bind is nil (it isn't, since
 // the bind was attached at device construction). That means by the time we
 // get here, the previous closeState may have had its Once consumed. Install
@@ -401,13 +401,13 @@ func (b *DerpBind) SetMark(mark uint32) error {
 // Send routes each buffer to either DERP (synthetic endpoint) or UDP (inner bind).
 //
 // wg-go batches sends: one ep but potentially multiple bufs. For DERP we send
-// each buffer individually — the relay framing handles one WG packet per frame.
+// each buffer individually - the relay framing handles one WG packet per frame.
 // Errors from individual DERP sends are logged but not propagated; DERP is
 // best-effort and WG's own retry/rekeying logic will handle retransmit.
 func (b *DerpBind) Send(bufs [][]byte, ep conn.Endpoint) error {
 	se, ok := ep.(syntheticEndpoint)
 	if !ok {
-		// Not a synthetic endpoint — delegate to the inner UDP bind.
+		// Not a synthetic endpoint - delegate to the inner UDP bind.
 		// Log at INFO so we can SEE when WG is falling through to direct UDP
 		// despite our DERP flip. If this fires for a peer we expect to be
 		// DERP-routed, the endpoint got reverted somewhere upstream.
@@ -418,28 +418,28 @@ func (b *DerpBind) Send(bufs [][]byte, ep conn.Endpoint) error {
 		return b.inner.Send(bufs, ep)
 	}
 
-	// The endpoint type itself is sufficient authorization to relay via DERP —
+	// The endpoint type itself is sufficient authorization to relay via DERP -
 	// mirror the receive side (derpRecv above), which already trusts a
 	// syntheticEndpoint without ever consulting derpPeers.
 	//
-	// Requiring derpPeers[pubkey] to ALSO be pre-set here (the previous
-	// behavior) created a startup race that black-holed the handshake
+	// Requiring derpPeers[pubkey] to also be pre-set here would create a
+	// startup race that black-holes the handshake
 	// response for every DERP-relayed handshake: the vendored wireguard-go
-	// does UNCONDITIONAL endpoint roaming on inbound packets
-	// (SetEndpointFromPacket, disableRoaming=false on desktop) — the instant
+	// does unconditional endpoint roaming on inbound packets
+	// (SetEndpointFromPacket, disableRoaming=false on desktop) - the instant
 	// this node's derpRecv delivers a peer's DERP-relayed handshake-init with
 	// a syntheticEndpoint, wg-go roams that peer's session onto the synthetic
 	// endpoint and immediately tries to Send() the handshake-response through
-	// it. That can happen before THIS node's own reachability
-	// ticker/roster-flip has called SetPeerRouting(peer, true) — the two
-	// nodes' flip timers are not synchronized. The old code dropped the
-	// response in that window ("peer not in DERP map, dropping"), so the
-	// handshake never converged even though the relay, framing, and auth all
-	// worked.
+	// it. That can happen before this node's own reachability
+	// ticker/roster-flip has called SetPeerRouting(peer, true) - the two
+	// nodes' flip timers are not synchronized. Dropping the
+	// response in that window ("peer not in DERP map, dropping") would leave
+	// the handshake unable to converge even though the relay, framing, and
+	// auth all work.
 	//
 	// Only two things can ever produce a syntheticEndpoint value in the first
 	// place: a legitimate local flip (SetPeerRouting, via flipToDERP /
-	// SetPeerRouting in main.go — out of scope here) or an inbound
+	// SetPeerRouting in main.go - out of scope here) or an inbound
 	// DERP-delivered packet (via derpRecv, itself gated by the DERP client's
 	// own peer/session validation upstream). So trusting the endpoint type
 	// here is exactly as safe as trusting it on the receive side, and closes
@@ -454,7 +454,7 @@ func (b *DerpBind) Send(bufs [][]byte, ep conn.Endpoint) error {
 	b.derpMu.Unlock()
 
 	if !alreadyRouted {
-		slog.Info("derp_bind: Send to synthetic endpoint ahead of local DERP flip — opportunistically marking peer DERP-routed",
+		slog.Info("derp_bind: Send to synthetic endpoint ahead of local DERP flip, opportunistically marking peer DERP-routed",
 			"dst_prefix", util.TruncatePubkeyBytes(se.pubkey),
 			"bufs", len(bufs),
 		)

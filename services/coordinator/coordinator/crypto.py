@@ -53,7 +53,7 @@ def decode_ed25519_public_key(b64: str, *, field_name: str = "public_key") -> Ed
 def verify_ed25519_signature(public_key_b64: str, signature_b64: str, message: bytes) -> bool:
     """Verify `signature_b64` (base64url) over `message` using the base64url
     Ed25519 public key `public_key_b64`. Returns False on any decode error
-    or signature mismatch — never raises."""
+    or signature mismatch - never raises."""
     try:
         pub = decode_ed25519_public_key(public_key_b64)
         sig = b64url_decode(signature_b64)

@@ -1,5 +1,5 @@
 /**
- * TaskStateView — /tasks route.
+ * TaskStateView - /tasks route.
  *
  * Lists all agent task states with status filtering.
  * Inline form to create new tasks.
@@ -405,7 +405,7 @@ export function TaskStateView() {
             aria-label="Filter tasks by project"
             className="flex flex-wrap items-center gap-1.5 border-b border-border px-6 py-2.5"
           >
-        {/* Active-project default — distinguished as the resting filter */}
+        {/* Active-project default - distinguished as the resting filter */}
         <button
           type="button"
           aria-pressed={projectFilter.kind === 'active'}

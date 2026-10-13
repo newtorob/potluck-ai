@@ -136,15 +136,15 @@ def _make_engine(tail_port):
 
 # ---------------------------------------------------------------------------
 # 1. GREEDY UNCHANGED GATE
-#    Temperature=0 through the 2-node pipeline loopback must produce the SAME
+#    Temperature=0 through the 2-node pipeline loopback must produce the same
 #    tokens as the current greedy pipeline (the unchanged tuple wire).
 # ---------------------------------------------------------------------------
 
 def test_greedy_unchanged_single_stream() -> None:
-    """THE GATE. temperature=0 must be byte-for-byte identical to the existing
+    """The gate. temperature=0 must be byte-for-byte identical to the existing
     greedy decode over the same 2-node chain.
 
-    Verification approach: run the engine twice with the same messages — once
+    Verification approach: run the engine twice with the same messages - once
     with the default greedy path (temperature=0, the existing tuple wire), once
     with the same params explicitly. Both must match.  We also compare against
     a fresh engine call to guard against any state contamination."""
@@ -367,6 +367,6 @@ def test_sample_from_topk_no_top_level_torch_import() -> None:
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             names = [alias.name for alias in node.names]
             assert "torch" not in names, (
-                "sampling.py imports torch at module top level — "
+                "sampling.py imports torch at module top level: "
                 "breaks create_app torch-free invariant"
             )

@@ -60,9 +60,9 @@ def sample_from_topk(
     top_p: float = 1.0,
     generator=None,
 ) -> int:
-    """Sample one token from a PRE-REDUCED top-K set (values, indices).
+    """Sample one token from a pre-reduced top-K set (values, indices).
 
-    Called on the HEAD after the tail returns the top-K logits for a sampling
+    Called on the head after the tail returns the top-K logits for a sampling
     step.  The tail returns the K largest logit values with their real vocab
     positions (indices); this function reapplies temperature/top_k/top_p
     filtering over those K entries and maps the sampled position back to the
@@ -133,7 +133,7 @@ def sample_from_topk(
 
     # --- softmax + multinomial sample ----------------------------------------
     probs = torch.softmax(logits, dim=-1)
-    # Sample a LOCAL position (0..K-1) within the reduced set.
+    # Sample a local position (0..K-1) within the reduced set.
     local_pos = int(torch.multinomial(probs, num_samples=1, generator=generator).item())
     # Map back to the real vocab token id.
     return int(indices[local_pos].item())
@@ -177,7 +177,7 @@ def sample_token(
         probs_sorted = torch.softmax(sorted_logits, dim=-1)
         cumprobs = torch.cumsum(probs_sorted, dim=-1)
 
-        # Tokens BEYOND the nucleus: cumprob of the token BEFORE this one
+        # Tokens beyond the nucleus: cumprob of the token before this one
         # already >= top_p.  We shift cumprobs right by one so the token
         # that pushes cumprob over the threshold is still included.
         beyond_nucleus = cumprobs - probs_sorted >= top_p

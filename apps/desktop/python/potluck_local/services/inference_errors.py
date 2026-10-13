@@ -120,7 +120,7 @@ def describe_failure(exc: BaseException, *, gpu_offload: bool) -> FailureDescrip
     """Category plus the text for the machine's own user.
 
     Only the GPU out-of-memory failure gets a fixed sentence; every other
-    failure keeps the engine's own message, as before.
+    failure keeps the engine's own message.
     """
     category = classify_inference_error(exc, gpu_offload=gpu_offload)
     if category == GPU_OUT_OF_MEMORY:

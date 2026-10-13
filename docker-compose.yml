@@ -58,7 +58,7 @@ services:
       DISCOURSE_URL: http://localhost:4200
       DISCOURSE_SSO_SECRET: dev-only-discourse-sso-secret-change-me-0000000000000000000000
       DISCOURSE_API_KEY: dev-placeholder
-      ADMIN_EMAILS: admin@example.com
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-admin@example.com}
       SENTRY_DSN: ""
     volumes:
       - ./services/api:/app
@@ -96,7 +96,7 @@ services:
       DISCOURSE_URL: http://localhost:4200
       DISCOURSE_SSO_SECRET: dev-only-discourse-sso-secret-change-me-0000000000000000000000
       DISCOURSE_API_KEY: dev-placeholder
-      ADMIN_EMAILS: admin@example.com
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-admin@example.com}
       SENTRY_DSN: ""
     volumes:
       - ./services/api:/app
@@ -131,7 +131,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      # Run AFTER the api's migrate finishes — it drops the v0 peers +
+      # Run AFTER the api's migrate finishes - it drops the v0 peers +
       # compute_credits stubs in 0008. Running in parallel races with that
       # drop and the coordinator's create.
       migrate:
@@ -162,13 +162,12 @@ services:
       coordinator-migrate:
         condition: service_completed_successfully
     # Bind 0.0.0.0 so other LAN machines can hit the coordinator during
-    # cross-machine peer-handshake testing (Phase G m1).
+    # cross-machine peer-handshake testing.
     #
     # NOTE: on macOS with the Tailscale *cask* (Network-Extension build),
-    # 0.0.0.0 does NOT make this reachable on the host's tailnet IP — inbound
+    # 0.0.0.0 does not make this reachable on the host's tailnet IP - inbound
     # TCP to 100.x is dropped before it hits the published port. For tailnet
-    # peers, use the override + admin step: see docker-compose.tailnet.yml and
-    # docs/runbooks/tailnet-coordinator-reachability.md (or `make up-tailnet`).
+    # peers, use the override in docker-compose.tailnet.yml (or `make up-tailnet`).
     ports:
       - "0.0.0.0:8400:8400"
     environment:
@@ -197,7 +196,7 @@ services:
       retries: 10
       start_period: 10s
 
-  # DERP relay — TCP packet-forwarding fallback for symmetric NAT / hairpin NAT
+  # DERP relay - TCP packet-forwarding fallback for symmetric NAT / hairpin NAT
   # scenarios where direct UDP hole-punch between WG peers fails. The relay sees
   # only encrypted WG packets (no plaintext); JWT auth via the symmetric key
   # shared with the coordinator. Dev mode uses cleartext (--insecure-cleartext);
@@ -207,12 +206,12 @@ services:
       context: ./services/derp
       dockerfile: Dockerfile
     container_name: potluck-derp
-    # Bind 0.0.0.0 so LAN / Tailscale machines (media server, gaming PC) can
-    # reach the relay during cross-machine mesh testing.
+    # Bind 0.0.0.0 so other LAN / Tailscale machines can reach the relay
+    # during cross-machine mesh testing.
     #
-    # NOTE: same macOS-cask caveat as the coordinator above — 0.0.0.0 is not
+    # NOTE: same macOS-cask caveat as the coordinator above - 0.0.0.0 is not
     # enough for tailnet peers on the macsys Tailscale build. See
-    # docker-compose.tailnet.yml + the reachability runbook (`make up-tailnet`).
+    # docker-compose.tailnet.yml (`make up-tailnet`).
     ports:
       - "0.0.0.0:8443:8443"
       - "0.0.0.0:8444:8444"

@@ -1,10 +1,10 @@
 /**
- * ModelCard — "Update available" badge.
+ * ModelCard - "Update available" badge.
  *
  * The sidecar optionally sends `upgrade_from` on a catalog entry when it
  * supersedes something the user already has installed. The badge must only
  * render when that field is a non-empty array, and must never show a raw
- * slug — only a resolved display name or generic fallback copy.
+ * slug - only a resolved display name or generic fallback copy.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -46,7 +46,7 @@ function renderCard(model: CatalogModel, upgradeFromName?: string) {
   );
 }
 
-describe('ModelCard — update available badge', () => {
+describe('ModelCard: update available badge', () => {
   it('renders no update badge when upgrade_from is absent', () => {
     renderCard(BASE_MODEL);
     expect(screen.queryByText(/update available/i)).not.toBeInTheDocument();

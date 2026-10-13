@@ -9,7 +9,7 @@ Also runs a self-served-job path (requester == contributor_owner) to
 confirm the in-transaction chain construction still works correctly
 after the ON CONFLICT change.
 
-These tests require a live Postgres — they use the `db_session` fixture
+These tests require a live Postgres - they use the `db_session` fixture
 from conftest.py which wraps each test in a SAVEPOINT that is rolled
 back afterward.
 """
@@ -105,7 +105,7 @@ async def test_second_call_is_no_op_returns_same_rows(db_session: AsyncSession) 
     # Still only two rows in the DB.
     count = await _count_ledger_rows_for_job(db_session, job_id)
     assert count == 2, (
-        f"duplicate record_job_credits created new rows — expected 2, got {count}"
+        f"duplicate record_job_credits created new rows - expected 2, got {count}"
     )
 
     # Returned data is identical across both calls.
@@ -212,7 +212,7 @@ async def test_hash_chain_unchanged_after_no_op_second_call(
 @pytest.mark.asyncio
 async def test_self_served_job_chain_construction(db_session: AsyncSession) -> None:
     """When requester == contributor_owner (self-served), earned.prev_row_hash
-    must equal spent.row_hash — verifying the in-transaction chain ordering
+    must equal spent.row_hash - verifying the in-transaction chain ordering
     still works after the ON CONFLICT change."""
     job_id = await _insert_job(db_session)
     member = uuid.uuid4()
@@ -237,7 +237,7 @@ async def test_self_served_job_chain_construction(db_session: AsyncSession) -> N
 
 @pytest.mark.asyncio
 async def test_self_served_job_idempotency(db_session: AsyncSession) -> None:
-    """Self-served jobs must also be idempotent — second call returns the
+    """Self-served jobs must also be idempotent - second call returns the
     same rows and does not create additional links in the member's chain."""
     job_id = await _insert_job(db_session)
     member = uuid.uuid4()

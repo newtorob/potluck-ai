@@ -1,4 +1,4 @@
-# Multi-stage build. Final image is distroless/static — no shell, no libc,
+# Multi-stage build. Final image is distroless/static - no shell, no libc,
 # minimal attack surface. Binary is statically linked.
 #
 # Target platforms: linux/amd64, linux/arm64.

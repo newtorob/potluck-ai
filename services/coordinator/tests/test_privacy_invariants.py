@@ -1,16 +1,15 @@
 """Privacy-invariant tests for the contributor-network protocol.
 
-These pin the architectural rule from manifesto §10.3 (memory 42a7e671):
-the coordinator must NEVER forward member-identifying information to a
-contributor peer. The enforcement mechanism is structural — the
-`JobAssignedMessage` schema simply has no field for it — and these tests
-codify that so a future schema change can't accidentally re-introduce
-the leak without breaking CI.
+These pin the architectural rule that the coordinator must never forward
+member-identifying information to a contributor peer. The enforcement
+mechanism is structural - the `JobAssignedMessage` schema simply has no
+field for it - and these tests codify that so a future schema change can't
+accidentally re-introduce the leak without breaking CI.
 
 If one of these fails, you're either (a) intentionally redesigning
-blinded routing (in which case update the manifesto + memory 42a7e671
-first, then loosen the test) or (b) about to ship a privacy bug. There
-is no third option.
+blinded routing (in which case update the privacy documentation first,
+then loosen the test) or (b) about to ship a privacy bug. There is no
+third option.
 """
 from __future__ import annotations
 
@@ -19,10 +18,10 @@ import uuid
 from coordinator.schemas.peer import ChatMessage, JobAssignedMessage, SamplingParams
 
 # Fields that JobAssignedMessage is allowed to carry. Anything outside
-# this set is a privacy regression — review the schema diff carefully.
+# this set is a privacy regression - review the schema diff carefully.
 #
-# `messages` was added for multi-turn pool/circle jobs (2026-06-29). It
-# carries ChatMessage(role, content) turns only — no requester identity.
+# `messages` supports multi-turn pool/circle jobs. It
+# carries ChatMessage(role, content) turns only - no requester identity.
 # ChatMessage has no id / timestamp / metadata fields; the invariant holds.
 _ALLOWED_FIELDS: frozenset[str] = frozenset(
     {"type", "job_id", "model_slug", "prompt", "messages", "sampling"}
@@ -44,7 +43,7 @@ _FORBIDDEN_KEY_SUBSTRINGS: tuple[str, ...] = (
 def test_job_assigned_field_set_is_locked_down() -> None:
     """JobAssignedMessage carries only the routing-blind subset.
 
-    Adding a field requires updating _ALLOWED_FIELDS. That is the point —
+    Adding a field requires updating _ALLOWED_FIELDS. That is the point -
     every addition forces a code review on a privacy-critical surface."""
     actual = set(JobAssignedMessage.model_fields.keys())
     extras = actual - _ALLOWED_FIELDS
@@ -52,7 +51,7 @@ def test_job_assigned_field_set_is_locked_down() -> None:
     assert not extras, (
         f"JobAssignedMessage gained unexpected fields: {sorted(extras)}. "
         "If this is intentional, update _ALLOWED_FIELDS in this test AND "
-        "update memory 42a7e671 / manifesto §10.3 to reflect the new "
+        "update the privacy documentation to reflect the new "
         "privacy posture."
     )
     assert not missing, (
@@ -64,7 +63,7 @@ def test_job_assigned_field_set_is_locked_down() -> None:
 def test_job_assigned_serialised_payload_has_no_identifying_keys() -> None:
     """A serialised JobAssignedMessage carries no identifying keys.
 
-    Belt-and-suspenders for the structural test — catches the case where
+    Belt-and-suspenders for the structural test - catches the case where
     somebody adds a field with a benign-looking name but that smuggles
     member identity (e.g. ``ctx.requester_uuid``)."""
     msg = JobAssignedMessage(
@@ -93,7 +92,7 @@ def test_job_assigned_serialised_payload_has_no_identifying_keys() -> None:
     assert not leaks, (
         f"JobAssignedMessage payload contains identifier-shaped keys: {leaks}. "
         f"Forbidden substrings: {_FORBIDDEN_KEY_SUBSTRINGS}. "
-        "Routing is supposed to be blinded — peers must never see who the "
+        "Routing is supposed to be blinded - peers must never see who the "
         "requester is."
     )
 
@@ -104,14 +103,14 @@ def test_job_assigned_serialised_payload_has_no_identifying_keys() -> None:
 
 
 def test_chat_message_field_set_is_role_and_content_only() -> None:
-    """ChatMessage carries ONLY role + content — no id, timestamp, or metadata.
+    """ChatMessage carries only role + content - no id, timestamp, or metadata.
 
     The moment a metadata field is added (e.g. turn_id, created_at) a peer
     can start correlating turns across jobs. The field set is pinned here."""
     actual = set(ChatMessage.model_fields.keys())
     assert actual == {"role", "content"}, (
         f"ChatMessage field set changed: {sorted(actual)}. "
-        "ChatMessage must have ONLY role + content — no metadata that could "
+        "ChatMessage must have only role + content - no metadata that could "
         "let a peer correlate turns across jobs or identify the requester."
     )
 
@@ -119,8 +118,8 @@ def test_chat_message_field_set_is_role_and_content_only() -> None:
 def test_job_assigned_messages_none_by_default() -> None:
     """Backward-compat: a prompt-only JobAssignedMessage has messages=None.
 
-    Peers running older code that don't understand messages receive None and
-    behave exactly as before. This test pins that the default never changes."""
+    Peers that don't understand messages receive None and
+    behave as for a single-turn prompt. This test pins that the default never changes."""
     msg = JobAssignedMessage(
         job_id=uuid.uuid4(),
         model_slug="stub-echo",
@@ -193,13 +192,13 @@ def test_job_request_accepts_messages_array() -> None:
     assert req_with.messages[0].role == "user"
     assert req_with.messages[0].content == "What is 2+2?"
 
-    # Without messages — backward-compat
+    # Without messages - backward-compat
     req_without = JobRequest(prompt="hello")
     assert req_without.messages is None
 
 
 def test_job_request_messages_default_is_none() -> None:
-    """Prompt-only JobRequest has messages=None — identical behavior to today."""
+    """Prompt-only JobRequest has messages=None - identical single-turn behavior."""
     from coordinator.routers.jobs import JobRequest
 
     req = JobRequest(prompt="single turn prompt")
@@ -212,7 +211,7 @@ def test_job_request_messages_default_is_none() -> None:
 # ---------------------------------------------------------------------------
 #
 # A link joins two households that are not each other's. The messages that set
-# it up are sent to BOTH sidecars, and each must learn only what its tunnel
+# it up are sent to both sidecars, and each must learn only what its tunnel
 # needs about the other machine: its WireGuard key, mesh address, the port, a
 # hash of the token, and (under the direct transport policy) its endpoints. No
 # member id, node id, node name, hostname or circle name, ever. As with

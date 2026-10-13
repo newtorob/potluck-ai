@@ -9,7 +9,7 @@
  * lib/sidecarPersist.ts for the merge semantics.
  *
  * The two ephemeral keys (weeklyReceiptToastShownFor, active_conversation_id)
- * are intentionally NOT persisted to the sidecar — they are per-session/per-week
+ * are intentionally not persisted to the sidecar - they are per-session/per-week
  * tracking state, not cross-surface preferences.
  */
 
@@ -30,7 +30,7 @@ export function setAutoLoadOnStartup(on: boolean): void {
 }
 
 // ---------------------------------------------------------------------------
-// Contribution receipts — opt-out UI preference
+// Contribution receipts - opt-out UI preference
 // ---------------------------------------------------------------------------
 
 const RECEIPTS_KEY = 'potluck.contribution_receipts_enabled';
@@ -50,7 +50,7 @@ export function setContributionReceiptsEnabled(on: boolean): void {
 }
 
 // ---------------------------------------------------------------------------
-// Weekly receipt toast — once-per-week shown tracking (ephemeral, not durable)
+// Weekly receipt toast - once-per-week shown tracking (ephemeral, not durable)
 // ---------------------------------------------------------------------------
 
 const WEEKLY_TOAST_KEY = 'potluck.weekly_receipt_toast_shown_for';

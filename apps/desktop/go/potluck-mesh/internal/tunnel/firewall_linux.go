@@ -9,41 +9,41 @@ import (
 	"strings"
 )
 
-// allowMeshInbound ensures a Linux mesh node is reachable for actual DATA, not
-// just the WireGuard control channel. It opens TWO things, mirroring
-// firewall_windows.go's rationale exactly:
+// allowMeshInbound ensures a Linux mesh node is reachable for actual data, not
+// just the WireGuard control channel. It opens two things, mirroring
+// firewall_windows.go's rationale:
 //
-//  1. The mesh TUN INTERFACE (potluck0). Every packet that arrives on it has
+//  1. The mesh TUN interface (potluck0). Every packet that arrives on it has
 //     already been authenticated + decrypted by WireGuard, so the interface
-//     itself is the trust boundary — no value in enumerating ports.
-//  2. The WG TRANSPORT port (UDP wgPort) inbound on the PHYSICAL NIC, so an
+//     itself is the trust boundary - no value in enumerating ports.
+//  2. The WG transport port (UDP wgPort) inbound on the physical NIC, so an
 //     encrypted handshake/data packet from a direct LAN/WAN peer with no prior
 //     conntrack state isn't dropped before it reaches wireguard-go's socket.
-//     THIS is what lets a same-LAN peer connect DIRECT instead of falling back
-//     to the DERP relay — without it, inbound WG on the wire is dropped and the
+//     This is what lets a same-LAN peer connect direct instead of falling back
+//     to the DERP relay - without it, inbound WG on the wire is dropped and the
 //     only path that survives is the node's own outbound-initiated DERP
-//     connection (observed live: reachable=true but ~140ms relayed instead of
-//     <5ms LAN-direct, household 00000000).
+//     connection (reachable=true but ~140ms relayed instead of <5ms
+//     LAN-direct).
 //
-// Why direct iptables and NOT ufw (the previous implementation): a stock
+// Why direct iptables rather than ufw: a stock
 // Ubuntu/Pop!_OS box commonly has a default-deny INPUT policy (`:INPUT DROP`),
 // sometimes with ufw *disabled* (the policy is left behind, or set by another
-// manager). `ufw allow` only takes effect while ufw is active AND its chains
-// are traversed before the drop — verified live that it does NOT reliably
-// override the drop on such a box (ping stayed 100% loss with the ufw rule
-// present). Inserting an ACCEPT at the TOP of the kernel INPUT chain is the
+// manager). `ufw allow` only takes effect while ufw is active and its chains
+// are traversed before the drop, so it does not reliably
+// override the drop on such a box (ping stays at 100% loss with the ufw rule
+// present). Inserting an ACCEPT at the top of the kernel INPUT chain is the
 // one thing that always wins, regardless of ufw/firewalld state. On modern
 // distros `iptables` is the iptables-nft shim, so this programs nftables under
 // the hood; we also touch ip6tables for v6 transport. The ufw calls are kept
 // as a best-effort secondary so a purely-ufw-managed host also records the
-// intent, but correctness no longer depends on them.
+// intent, but correctness does not depend on them.
 //
 // Idempotent: each rule is `-C`-checked before `-I`, so re-running on every
-// mesh bring-up (which is also what makes it survive a reboot — the daemon
+// mesh bring-up (which is also what makes it survive a reboot - the daemon
 // re-applies on start) never stacks duplicates.
 //
 // Requires root, which the sidecar already has on Linux (creating potluck0
-// needs it — see the systemd unit's lack of User=).
+// needs it - see the systemd unit's lack of User=).
 func allowMeshInbound(ifName string, wgPort int) error {
 	portSpec := fmt.Sprintf("%d", wgPort)
 
@@ -56,8 +56,8 @@ func allowMeshInbound(ifName string, wgPort int) error {
 
 	var firstErr error
 	applied := 0
-	// v4 is the load-bearing one (mesh IPs are 100.64.0.0/10 v4); v6 is
-	// belt-and-suspenders for a v6 WG transport and is non-fatal if absent.
+	// v4 is the one that matters (mesh IPs are 100.64.0.0/10 v4); v6 covers
+	// a v6 WG transport and is non-fatal if absent.
 	for _, bin := range []string{"iptables", "ip6tables"} {
 		path, err := exec.LookPath(bin)
 		if err != nil {
@@ -94,7 +94,7 @@ func allowMeshInbound(ifName string, wgPort int) error {
 	if firstErr != nil {
 		return firstErr
 	}
-	// Nothing to do (no iptables/ip6tables present) — not an error.
+	// Nothing to do (no iptables/ip6tables present) - not an error.
 	return nil
 }
 

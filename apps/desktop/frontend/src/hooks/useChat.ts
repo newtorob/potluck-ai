@@ -1,5 +1,5 @@
 /**
- * useChat — thin facade over chatStore.
+ * useChat - thin facade over chatStore.
  *
  * Keeps components clean by selecting only what they need and exposing
  * a stable action API. Components should import this hook rather than

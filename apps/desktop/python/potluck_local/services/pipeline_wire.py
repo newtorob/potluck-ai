@@ -1,19 +1,19 @@
 """shard wire: authenticated, pickle-free framing for every inter-stage edge.
 
-phase 0 sent each message as raw pickle over plaintext TCP. on a WAN swarm that is
-two separate problems:
+sending each message as raw pickle over plaintext TCP would be two separate problems
+on a WAN swarm:
 
-  1. `recv_msg` ran `pickle.loads` on bytes straight off an untrusted socket -- an
+  1. `recv_msg` running `pickle.loads` on bytes straight off an untrusted socket -- an
      unauthenticated peer (or anyone who can reach the port) gets remote code
      execution, not just a malformed message.
-  2. the activation tensor crossed the public internet in cleartext, so a passive
-     observer on the path saw the same hidden states a malicious node would.
+  2. the activation tensor would cross the public internet in cleartext, so a passive
+     observer on the path would see the same hidden states a malicious node would.
 
-this module fixes the *wire*, not the *endpoints*. a participating node still has to
+this module secures the *wire*, not the *endpoints*. a participating node still has to
 decrypt to run its layer, so it necessarily sees the activations it processes -- that
-trust is unavoidable and is documented as such (see README "Private"). what changes:
+trust is unavoidable and is documented as such (see README "Private"). what it does:
 
-  - NO pickle. a message is a typed frame: a JSON header (control fields, tensor
+  - no pickle. a message is a typed frame: a JSON header (control fields, tensor
     dtype/shape) + raw little-endian tensor bytes. the receive path never constructs
     an arbitrary object, so a hostile frame is at worst a parse error -- never code
     execution, from any sender.
@@ -25,10 +25,10 @@ trust is unavoidable and is documented as such (see README "Private"). what chan
 
 key distribution here is a pre-shared secret -- right for a trusted/known deployment.
 a permissionless swarm needs per-node identities and a handshake (Noise / QUIC-TLS
-keyed by `cwt_` worker tokens); that is the transport's phase-1 follow-up, not this.
+keyed by `cwt_` worker tokens). TODO: per-node identities and handshake.
 
-drop-in: `send_msg`/`recv_msg` keep their phase-0 signatures, so call sites are
-unchanged. each entry point calls `wire.key_from_env()` once at startup.
+drop-in: `send_msg`/`recv_msg` have plain send/recv signatures, so call sites need
+no special handling. each entry point calls `wire.key_from_env()` once at startup.
 """
 import hashlib, json, os, socket, struct
 from json import JSONDecodeError
@@ -128,7 +128,7 @@ def _open(frame):
     return ChaCha20Poly1305(_KEY).decrypt(frame[:_NONCE], frame[_NONCE:], None)
 
 
-# ---- length-prefixed, sealed message transport (drop-in for the phase-0 pickle pair) ----
+# ---- length-prefixed, sealed message transport (drop-in for a plain pickle send/recv pair) ----
 def _recvall(sock, n):
     buf = b""
     while len(buf) < n:
@@ -148,10 +148,10 @@ def send_msg(sock, obj):
 def recv_msg(sock):
     (n,) = struct.unpack("!Q", _recvall(sock, 8))
     frame = _recvall(sock, n)
-    # any frame we can't authenticate AND parse into a message is a dead edge: re-raise as
+    # any frame we can't authenticate and parse into a message is a dead edge: re-raise as
     # ConnectionError so the existing `except EDGE_ERRORS` supervision resets the connection
     # instead of trusting it or crashing the node. an unauthenticated sender never gets past
-    # _open (the RCE that pickle.loads exposed is gone); a buggy authenticated peer can at
+    # _open (nothing here calls pickle.loads, so there is no RCE); a buggy authenticated peer can at
     # worst produce a parse error, never code execution.
     try:
         return _unpack(_open(frame))

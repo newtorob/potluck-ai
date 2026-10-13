@@ -1,4 +1,4 @@
-"""007 — peers + compute_credits (v1 stubs)
+"""007 - peers + compute_credits (v1 stubs)
 
 Schema is created in v0 so that:
   - Future v1 migrations can ALTER TABLE rather than CREATE TABLE (safer).
@@ -27,7 +27,7 @@ depends_on: str | None = None
 
 def upgrade() -> None:
     # ------------------------------------------------------------------
-    # peers — contributor network peer nodes.
+    # peers - contributor network peer nodes.
     # ------------------------------------------------------------------
     op.create_table(
         "peers",
@@ -44,7 +44,7 @@ def upgrade() -> None:
         ),
         # Ed25519 public key (base64-encoded). Used for job signing in v1.
         sa.Column("public_key", sa.String(512), nullable=False),
-        # GPU model, VRAM, CPU, RAM — opaque dict, indexed later if needed.
+        # GPU model, VRAM, CPU, RAM - opaque dict, indexed later if needed.
         sa.Column(
             "hardware_summary",
             postgresql.JSONB(astext_type=sa.Text()),
@@ -93,7 +93,7 @@ def upgrade() -> None:
     op.create_index("ix_peers_member_id", "peers", ["member_id"])
 
     # ------------------------------------------------------------------
-    # compute_credits — double-entry credit ledger.
+    # compute_credits - double-entry credit ledger.
     # Positive amount_cents = earned; negative = spent.
     # ------------------------------------------------------------------
     op.create_table(

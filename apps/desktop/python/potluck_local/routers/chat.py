@@ -1,8 +1,8 @@
 """Chat completions router.
 
-POST /chat/completions — OpenAI-compatible streaming/non-streaming chat.
+POST /chat/completions - OpenAI-compatible streaming/non-streaming chat.
 
-Memory + task integration (guide §9.7, §9.8):
+Memory + task integration:
 - Retrieves relevant memories and active tasks; injects them into the system
   prompt before sending to the model.
 - After the response, fires memory extraction as a fire-and-forget asyncio task
@@ -10,7 +10,7 @@ Memory + task integration (guide §9.7, §9.8):
 
 Streaming extraction strategy:
   The upstream runtime.stream_chat() is an async generator.  We wrap it in
-  _accumulating_stream(), which both yields each SSE chunk to the client AND
+  _accumulating_stream(), which both yields each SSE chunk to the client and
   concatenates the assistant content.  When the generator is exhausted (or
   cancelled), it schedules extraction via asyncio.create_task().  Using
   asyncio.create_task rather than FastAPI BackgroundTasks means the work
@@ -130,7 +130,7 @@ async def _build_enhanced_messages(
     non_system: list[dict] = []
     for msg in raw_messages:
         if msg["role"] == "system":
-            # User-supplied system content — keep it at the top.
+            # User-supplied system content - keep it at the top.
             existing_system = msg["content"]
         else:
             non_system.append(msg)
@@ -350,10 +350,10 @@ async def _accumulating_stream(
                             first_ms = int((_time.monotonic() - started) * 1000)
                         accumulated.append(delta_content)
                 except Exception:
-                    pass  # non-JSON data lines — skip silently
+                    pass  # non-JSON data lines - skip silently
             yield chunk
     except asyncio.CancelledError:
-        # Client disconnected mid-stream — still attempt extraction with
+        # Client disconnected mid-stream - still attempt extraction with
         # whatever we accumulated.
         raise
     finally:
@@ -493,8 +493,8 @@ async def chat_completions(request: ChatRequest) -> object:
 # SQLite file as memories/tasks. No third party ever sees this data
 # unless the user explicitly exports it.
 #
-# Sync across the user's own machines is v0.5+ (membership + cloud
-# sync layer). Schema is designed so sync is purely additive —
+# TODO: sync across the user's own machines (membership + cloud
+# sync layer). Schema is designed so sync is purely additive -
 # conversations + messages each carry their own UUID and updated_at,
 # enough for last-writer-wins or CRDT later.
 # =====================================================================
@@ -552,7 +552,7 @@ class ConversationUpdateRequest(BaseModel):
     network_mode: bool | None = None
     network_model_slug: str | None = None
     project: str | None = None
-    # Sentinel to distinguish "unchanged" from "set to NULL" — pydantic
+    # Sentinel to distinguish "unchanged" from "set to NULL" - pydantic
     # treats explicit None and absent identically by default.
     project_set: bool = False
 
@@ -577,7 +577,7 @@ class MessageAppendRequest(BaseModel):
 
 
 class MessageUpdateRequest(BaseModel):
-    """Patch an in-flight message — used to finalize an assistant message
+    """Patch an in-flight message - used to finalize an assistant message
     after streaming completes (status flips, meta lands)."""
 
     content: str | None = None

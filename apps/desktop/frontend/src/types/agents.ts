@@ -1,18 +1,18 @@
 /**
- * Agent observability types — mirrors the Python pydantic models in routers/agents.py.
+ * Agent observability types - mirrors the Python pydantic models in routers/agents.py.
  *
  * These types are the single source of truth for the /agents dashboard.
- * Never widen these — keep them in sync with the backend contract exactly.
+ * Never widen these - keep them in sync with the backend contract exactly.
  */
 
 export type Transport = 'stdio' | 'tcp' | 'internal';
 export type ModelSource = 'self-reported' | 'inferred';
 
 /** Computed server-side from last_seen_at + disconnected_at.
- *  - 'live'         — heartbeat within the last 60s (connected now)
- *  - 'idle'         — last_seen 60s–5min (connected, quiet)
- *  - 'stale'        — last_seen >5min, not yet swept to disconnected
- *  - 'disconnected' — disconnected_at is set
+ *  - 'live' - heartbeat within the last 60s (connected now)
+ *  - 'idle' - last_seen 60s–5min (connected, quiet)
+ *  - 'stale' - last_seen >5min, not yet swept to disconnected
+ *  - 'disconnected' - disconnected_at is set
  *  The AgentsView renders these in distinct sections. */
 export type Liveness = 'live' | 'idle' | 'stale' | 'disconnected';
 
@@ -41,13 +41,13 @@ export interface ToolCall {
   id: string;
   session_id: string;
   tool_name: string;                  // "memory_search", "task_create", etc.
-  args_summary: Record<string, unknown> | null; // metadata only — never prompt content
+  args_summary: Record<string, unknown> | null; // metadata only - never prompt content
   result_count: number | null;
   duration_ms: number | null;
   error: string | null;
   called_at: string;
   /** Version of the MCP tool-schema contract this call ran under.
-   *  NULL for rows written before the 2026-05-20 contract-versioning rollout. */
+   *  NULL for rows written before contract versioning existed. */
   tool_schema_version: string | null;
   /** IDs of the memories this call read or wrote, when applicable. NULL on
    *  non-memory tools, and on pre-debugger rows. The debugger calls
@@ -55,7 +55,7 @@ export interface ToolCall {
   memory_ids_touched: string[] | null;
 }
 
-/** Lightweight memory preview returned by POST /agents/memory-previews —
+/** Lightweight memory preview returned by POST /agents/memory-previews -
  *  never includes full content, just the first 200 chars. */
 export interface MemoryPreview {
   id: string;

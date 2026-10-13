@@ -1,13 +1,13 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    One-shot Windows bootstrap for the Potluck contributor sidecar (Phase G m1).
+    One-shot Windows bootstrap for the Potluck contributor sidecar.
 
 .DESCRIPTION
     Run once per Windows machine after `git clone`. Idempotent - safe to re-run.
 
-    Auto-detects whether to use the Mac's LAN IP or its Tailscale IP based on
-    what's reachable from this box. No need to hand-edit the URL per machine.
+    Probes the coordinator host for reachability from this box. No need to
+    hand-edit the URL per machine.
 
     What it does:
       1. Checks Python 3.11 + Git are present
@@ -19,29 +19,25 @@
          (double-click it to launch the sidecar; close the window to stop)
 
 .NOTES
-    Hardcoded for Rob's network. Edit CandidateHosts at the top if the Mac's
-    LAN or Tailscale IP changes, or rotate the dev seed.
+    The coordinator host comes from $env:POTLUCK_COORDINATOR_HOST. Edit
+    CandidateHosts at the top to probe more than one host, or to rotate the
+    dev seed.
 #>
 
 param(
     [switch]$NoDesktopShortcut
 )
 
-# ---------- HARDCODED CONFIG (edit if IPs / keys change) ---------------------
+# ---------- CONFIG -----------------------------------------------------------
 
-# In probe order - first one to answer /transparency/fleet wins.
-# Override with POTLUCK_COORDINATOR_HOST (host or host:port) when the
-# coordinator moves to Fly.io or the Mac's DHCP-assigned LAN IP rotates:
-#   $env:POTLUCK_COORDINATOR_HOST = "potluck-coordinator.fly.dev"
+# Coordinator to connect to (host or host:port). Set it before running:
+#   $env:POTLUCK_COORDINATOR_HOST = "192.168.1.20"
 #   .\setup-windows-contributor.ps1
-$CandidateHosts = if ($env:POTLUCK_COORDINATOR_HOST) {
-    @($env:POTLUCK_COORDINATOR_HOST)
-} else {
-    @(
-        "192.168.4.74",     # dev Mac LAN IP (DHCP — set a static lease or use the env override above)
-        "100.101.102.103"      # dev Mac Tailscale IP (inbound to the Mac is currently broken; Fly.io is the fix)
-    )
+if (-not $env:POTLUCK_COORDINATOR_HOST) {
+    Write-Host "Set POTLUCK_COORDINATOR_HOST to the coordinator's LAN IP or hostname." -ForegroundColor Red
+    exit 1
 }
+$CandidateHosts = @($env:POTLUCK_COORDINATOR_HOST)
 $CoordinatorPort = "8400"
 $BinaryHash      = "59b74f2ea0e8b6f23f3672336f90c97435b1dfa13ef7aabc1994b61c54c7d65a"
 $MemberId        = "00000000-0000-0000-0000-000000000001"
@@ -55,7 +51,7 @@ function Pass($msg) { Write-Host "    [ok]   $msg" -ForegroundColor Green }
 function Warn($msg) { Write-Host "    [warn] $msg" -ForegroundColor Yellow }
 function Fail($msg) { Write-Host "    [fail] $msg" -ForegroundColor Red; exit 1 }
 
-# Script lives at scripts\dev\ — repo root is two levels up, not one.
+# Script lives at scripts\dev\ - repo root is two levels up, not one.
 $RepoRoot   = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $SidecarDir = Join-Path $RepoRoot "apps\desktop\python"
 $VenvPython = Join-Path $SidecarDir ".venv\Scripts\python.exe"
@@ -125,7 +121,7 @@ foreach ($host_ in $CandidateHosts) {
 if (-not $CoordinatorHost) {
     $tailscaleHint = ""
     if (-not (Get-Command tailscale -ErrorAction SilentlyContinue)) {
-        $tailscaleHint = "`n  - Tailscale isn't installed on this box. If the dev Mac isn't on your LAN,`n    install Tailscale (https://tailscale.com/download/windows) and sign in to`n    the same account as the Mac, then re-run this script."
+        $tailscaleHint = "`n  - Tailscale isn't installed on this box. If the coordinator machine isn't on your LAN,`n    install Tailscale (https://tailscale.com/download/windows) and sign in to`n    the same account as the Mac, then re-run this script."
     }
     Fail @"
 Coordinator unreachable on any candidate host.
@@ -133,8 +129,8 @@ Coordinator unreachable on any candidate host.
 Tried: $($CandidateHosts -join ', ')
 
 Common causes:
-  - Coordinator container stopped on the dev Mac: check 'docker ps' there.
-  - Dev Mac IPs changed. On the dev Mac:
+  - Coordinator container stopped on the coordinator machine: check 'docker ps' there.
+  - The coordinator machine's IPs changed. On that machine:
       LAN:       'ipconfig getifaddr en0'
       Tailscale: 'tailscale ip -4'
     Edit `$CandidateHosts at the top of this script with the new value(s).

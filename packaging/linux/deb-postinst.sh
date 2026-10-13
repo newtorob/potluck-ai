@@ -1,19 +1,19 @@
 #!/bin/bash
 #
-# deb-postinst.sh — Debian package postinst for Potluck AI, run as root by
+# deb-postinst.sh - Debian package postinst for Potluck AI, run as root by
 # dpkg after the app files are unpacked.
 #
 # electron-builder generates its own default postinst (CLI symlink + SUID
 # chrome-sandbox + mime/desktop db refresh). Supplying deb.afterInstall
 # REPLACES that generated script, so those standard steps are replicated
-# below verbatim — do not drop them or the app's launcher/sandbox break.
+# below verbatim - do not drop them or the app's launcher/sandbox break.
 #
 # The Potluck-specific part stages the two files the app-driven mesh install
 # needs (see packaging/linux/README.md):
 #   /usr/lib/potluck/mesh-install-helper.sh          (root:root 0755)
 #   /usr/share/polkit-1/actions/ai.trypotluck.mesh.policy  (root:root 0644)
 # pkexec refuses to run the helper unless it is root-owned and not
-# group/other-writable, so the install modes here are load-bearing.
+# group/other-writable, so the install modes here must be kept.
 
 APP_DIR="/opt/Potluck AI"
 RES_DIR="${APP_DIR}/resources"

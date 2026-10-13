@@ -380,7 +380,7 @@ func TestOnRosterUpdate_AddedMixedOnlyValidEntriesConfigured(t *testing.T) {
 	}
 }
 
-// The case the task calls out: a peer that was valid, then arrives invalid in a
+// A peer that was valid, then arrives invalid in a
 // roster update, must stop being a tunnel peer, lose its route, and stop being
 // listed. Covered for both ways an update can carry it.
 func TestOnRosterUpdate_PeerThatBecomesInvalidIsTornDown(t *testing.T) {
@@ -606,9 +606,8 @@ func TestOnRosterUpdate_UpdatedEntryForNeverHeldNodeIsAdded(t *testing.T) {
 	}
 }
 
-// 3. An Updated entry for a held node with a new endpoint is exactly what it
-// was before: one endpoint update, nothing else, with the full call sequence
-// pinned.
+// 3. An Updated entry for a held node with a new endpoint is one endpoint
+// update, nothing else, with the full call sequence pinned.
 func TestOnRosterUpdate_UpdatedEntryForHeldNodeIsEndpointOnly(t *testing.T) {
 	captureSlog(t)
 	f := newRosterFixture(t)
@@ -639,8 +638,7 @@ func TestOnRosterUpdate_UpdatedEntryForHeldNodeIsEndpointOnly(t *testing.T) {
 
 // 4. The same new node in Added and in Updated of one message is added once,
 // from the later entry (the one the store keeps). Twice in Updated: once too.
-// Held node in both lists: exactly the old behaviour (rejoin re-sync, then the
-// endpoint update).
+// Held node in both lists: rejoin re-sync, then the endpoint update.
 func TestOnRosterUpdate_SameNodeInAddedAndUpdatedIsAddedOnce(t *testing.T) {
 	later := rp("linux", "100.64.0.7", 1)
 	laterEp := "198.51.100.9:41000"

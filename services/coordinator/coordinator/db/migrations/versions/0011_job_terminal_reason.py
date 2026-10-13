@@ -12,12 +12,12 @@ not just that it settled:
                         ("first_token_timeout", "peer_disconnected",
                         "dispatch_failed"). Diagnostic only.
 
-Why this exists: before the single-terminal-outcome contract, several exits
-never touched the row at all (the sync timeout branch raised 504 and left it
-at 'dispatched' forever; a failed WebSocket send did the same), and several
-others settled it as "completed" because the finalizer only inspected
-error_category, which a stream timeout or a client disconnect never set.
-That mis-recorded jobs AND minted consumption credits for work that never
+Why this exists: without a single-terminal-outcome contract, some exits
+would never touch the row at all (a sync timeout that raised 504 would leave
+it at 'dispatched' forever; so would a failed WebSocket send), and others
+would settle it as "completed" because the finalizer only inspected
+error_category, which a stream timeout or a client disconnect never sets.
+That would mis-record jobs and mint consumption credits for work that never
 finished. Persisting the outcome makes the terminal state auditable rather
 than inferred.
 
@@ -30,7 +30,7 @@ Null semantics (the default-when-null contract this migration commits to):
     error_category IS NULL -> either the job succeeded, or the failure
     carried no category. Same reading as terminal_reason.
 
-Deliberately NOT changed: the `jobs.status` vocabulary stays exactly
+Deliberately unchanged: the `jobs.status` vocabulary stays exactly
 {dispatched, completed, failed}. Every aggregate in the service filters on
 status == "completed" (routers/me.py contributions + earnings,
 routers/transparency.py public counts, routers/jobs.py::my_job_stats), so

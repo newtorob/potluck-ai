@@ -115,7 +115,6 @@ type RosterUpdate struct {
 }
 
 // PunchCoord is delivered by the coordinator to both parties in a hole-punch.
-// Scaffolded here for later weeks; not acted on in week 2.
 type PunchCoord struct {
 	Type            string  `json:"type"`
 	PeerNodeID      string  `json:"peer_node_id"`
@@ -131,7 +130,7 @@ type Pong struct {
 }
 
 // ServerError carries a categorical error code + human-readable message.
-// The connection may or may not be closed after this — the client treats
+// The connection may or may not be closed after this - the client treats
 // it as advisory logging unless the WS closes.
 type ServerError struct {
 	Type    string `json:"type"`

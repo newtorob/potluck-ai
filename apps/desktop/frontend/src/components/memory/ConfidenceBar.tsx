@@ -1,5 +1,5 @@
 /**
- * ConfidenceBar — horizontal progress bar visualizing a 0-1 confidence score.
+ * ConfidenceBar - horizontal progress bar visualizing a 0-1 confidence score.
  */
 
 import { cn } from '@/components/ui/cn';

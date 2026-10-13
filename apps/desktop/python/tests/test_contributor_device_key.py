@@ -1,7 +1,7 @@
 """Tests for GET /contributor/device-key.
 
-Covers the desktop-side half of the device-key registration gap: the
-sidecar must expose the SAME Ed25519 public key `contributor.client`
+Covers the desktop side of device-key registration: the
+sidecar must expose the same Ed25519 public key `contributor.client`
 presents in its WS attestation handshake, so the frontend can pre-register
 it with the coordinator's session-authed POST /me/device-keys before
 REQUIRE_REGISTERED_KEYS=true rejects a fresh machine's attestation.
@@ -28,7 +28,7 @@ def _decode(pubkey_b64url: str) -> bytes:
 
 def test_device_key_endpoint_returns_valid_ed25519_pubkey(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("POTLUCK_KEY_DIR", str(tmp_path / "contributor"))
-    # Settings is lru_cache'd — clear so the env var above actually takes effect.
+    # Settings is lru_cache'd - clear so the env var above actually takes effect.
     from potluck_local.contributor.config import get_settings as get_contributor_settings
 
     get_contributor_settings.cache_clear()
@@ -63,8 +63,8 @@ def test_device_key_is_stable_across_calls(tmp_path, monkeypatch) -> None:
 
 def test_device_key_matches_contributor_client_identity(tmp_path, monkeypatch) -> None:
     """The key this endpoint returns is exactly what `ensure_keypair` on the
-    same key_dir would hand `contributor.client` — i.e. registering THIS key
-    with the coordinator actually unblocks THAT attestation handshake."""
+    same key_dir would hand `contributor.client` - i.e. registering this key
+    with the coordinator actually unblocks that attestation handshake."""
     key_dir = tmp_path / "contributor"
     monkeypatch.setenv("POTLUCK_KEY_DIR", str(key_dir))
     from potluck_local.contributor.config import get_settings as get_contributor_settings

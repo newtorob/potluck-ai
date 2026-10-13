@@ -1,5 +1,5 @@
 /**
- * useMemories — facade over memoryStore.
+ * useMemories - facade over memoryStore.
  *
  * Auto-fetches on mount. Refetches when the window regains focus
  * so stale memory state is refreshed after the user switches away
@@ -61,7 +61,7 @@ export function useMemories(opts: UseMemoriesOptions = {}): UseMemoriesReturn {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [refetch]);
 
-  // Debounced search — 300ms; cancels in-flight debounce on each new call
+  // Debounced search - 300ms; cancels in-flight debounce on each new call
   const performSearch = useCallback(
     (query: string, searchOpts?: { project?: string | null; min_confidence?: number }) => {
       if (debounceRef.current !== null) {

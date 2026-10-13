@@ -9,16 +9,16 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
 # ---------------------------------------------------------------------------
-# Import Base and ALL models so that Base.metadata is populated.
+# Import Base and all models so that Base.metadata is populated.
 # The models __init__.py re-exports every mapped class.
 # ---------------------------------------------------------------------------
 from potluck_api.db.base import Base
-import potluck_api.models  # noqa: F401 — side-effect import to register all tables
+import potluck_api.models  # noqa: F401 - side-effect import to register all tables
 
 from potluck_api.config import get_settings
 
 # ---------------------------------------------------------------------------
-# Alembic Config object — provides access to values in alembic.ini.
+# Alembic Config object - provides access to values in alembic.ini.
 # ---------------------------------------------------------------------------
 config = context.config
 

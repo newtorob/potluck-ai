@@ -1,6 +1,6 @@
-"""Pipeline-parallel distributed inference — Potluck's WAN-viable "big model" engine.
+"""Pipeline-parallel distributed inference - Potluck's WAN-viable "big model" engine.
 
-Each node holds a RESIDENT contiguous block of transformer layers (meta-loaded, so a
+Each node holds a resident contiguous block of transformer layers (meta-loaded, so a
 node never materializes the whole model) and only small activation tensors cross the
 wire per token. This is the sibling of the shipped llama.cpp "Big Model Mode" (RPC
 weight-streaming, LAN-only): pipeline-parallel moves activations not weights, so it
@@ -19,11 +19,11 @@ Backends: cuda | mps | cpu | dml (DirectML, AMD/any DX12 GPU). Modes: single-str
 (one batched forward per step, uniform/lockstep).
 
 Scope: my-machines / trusted-circle only. Activation privacy is unsolved, so this must
-stay OUT of the open pool (intermediate activations leak a fraction of a user's tokens
+stay out of the open pool (intermediate activations leak a fraction of a user's tokens
 to a malicious mid/tail node).
 
 torch + transformers are imported at module top, so callers that must stay light
-(the base sidecar) should import THIS module lazily — only when a pipeline run is
+(the base sidecar) should import this module lazily - only when a pipeline run is
 actually requested.
 
 Run standalone for testing (same swarm secret on every node first):
@@ -61,8 +61,8 @@ logger = logging.getLogger(__name__)
 def _ensure_wire_key():
     """Load the swarm key (SHARD_PSK) for the wire codec if not already set. The
     programmatic entry points (runtime.load_pipeline -> PipelineParallelEngine, the /peer
-    stage endpoint -> PipelineStageWorker) reach the engine WITHOUT going through the CLI
-    main(), which is the only place that previously loaded the key -- so without this the
+    stage endpoint -> PipelineStageWorker) reach the engine without going through the CLI
+    main(), which is the only place that loads the key -- so without this the
     first send/recv raises 'wire key not set'. Converts the CLI's fail-fast SystemExit
     into a RuntimeError so the HTTP layer returns a readable error instead of dying."""
     try:
@@ -149,7 +149,7 @@ def resolve_device(name=""):
 
 def default_dtype(dev):
     """fp16 on Metal (bf16 is slower there) and on DirectML (no bf16 support);
-    bf16 elsewhere. NOTE: every node in a chain MUST use the same dtype -- the
+    bf16 elsewhere. NOTE: every node in a chain must use the same dtype -- the
     activation tensor on the wire has to match each node's weight dtype."""
     if dev == "mps" or "privateuseone" in str(dev):
         return torch.float16
@@ -181,7 +181,7 @@ def _mem_gb(device):
 
 
 def load_parts(model_id, split, role, device="cuda", dtype=torch.bfloat16, split2=0):
-    """META-LOAD: place ONLY this node's layer block on `device`; everything else is
+    """META-LOAD: place only this node's layer block on `device`; everything else is
     mapped to "meta" so it is never materialized. This is what lets a node hold a slice
     of a model far too big for it -- no node ever loads the full model.
 
@@ -307,11 +307,11 @@ def _send_recv(sock, h, abs_start):
 
 
 def _send_recv_verify(sock, h, abs_start, crop):
-    """One SPECULATIVE round-trip: send the K+1 candidate activations plus the prior
+    """One speculative round-trip: send the K+1 candidate activations plus the prior
     round's rollback length (`crop`), receive the tail's K+1 argmax tokens. This is a
     keyed dict message ({"op": "verify", ...}) distinct from the legacy positional
     (h, abs_start) tuple _send_recv sends, so a spec head and a greedy head can hit the
-    SAME tail and the tail dispatches on shape -- the default greedy wire is untouched.
+    same tail and the tail dispatches on shape -- the default greedy wire is untouched.
     Returns (toks, tail_compute_ms, bytes_sent); toks is a python list of K+1 ints."""
     nbytes = send_msg(sock, {"op": "verify", "h": h.cpu(), "start": abs_start, "crop": crop})
     resp = recv_msg(sock)
@@ -321,14 +321,14 @@ def _send_recv_verify(sock, h, abs_start, crop):
 
 
 def accept_prefix(drafts, targets):
-    """Greedy speculative acceptance (PURE). drafts = the K tokens the draft proposed for
+    """Greedy speculative acceptance (pure). drafts = the K tokens the draft proposed for
     positions pos+1..pos+K; targets = the tail's K+1 argmax tokens for positions
     pos..pos+K (targets[j] is the model's own next-token given the first j candidates).
 
     Accept the longest prefix where draft[j] == target[j] (the target would itself have
     produced that token), then take target[n] as the correction. The committed tokens are
     drafts[:n] + [targets[n]] -- exactly what plain greedy decode would have emitted, which
-    is why speculative decoding is EXACT, not approximate. Returns (n_accepted, committed)."""
+    is why speculative decoding is exact, not approximate. Returns (n_accepted, committed)."""
     n = 0
     for j in range(len(drafts)):
         if drafts[j] == targets[j]:
@@ -354,7 +354,7 @@ def generate_one(parts, tok, peer, port, prompt, max_new, dev, timeout=30.0):
     Returns the decoded text plus timing + edge health. Opens and closes its own socket
     so it can be called in a loop against a persistent tail.
 
-    Every edge round-trip is bounded by `timeout`: a dead OR frozen tail raises
+    Every edge round-trip is bounded by `timeout`: a dead or frozen tail raises
     TransportError with context (which step, why) instead of hanging forever."""
     enc = tok.apply_chat_template(
         [{"role": "user", "content": prompt}],
@@ -427,12 +427,12 @@ def generate_one(parts, tok, peer, port, prompt, max_new, dev, timeout=30.0):
 
 
 def generate_batch(parts, tok, peer, port, prompt, batch, max_new, dev, timeout=30.0):
-    """Continuous-batching PRIMITIVE: drive `batch` sequences through the pipeline in
-    ONE batched forward per step, vs concurrency's N separate batch=1 forwards that take
+    """Continuous-batching primitive: drive `batch` sequences through the pipeline in
+    one batched forward per step, vs concurrency's N separate batch=1 forwards that take
     turns on the GPU. The win: a batched matmul serves N rows at far less than N x the
     single-row cost, so aggregate throughput climbs past the GPU-serialized ceiling.
 
-    Scope honesty: this uses a UNIFORM-LENGTH lockstep batch (same prompt x batch), so a
+    Scope honesty: this uses a uniform-length lockstep batch (same prompt x batch), so a
     single shared KV cache with broadcast positions/mask is correct with no padding, and
     all rows finish together. Ragged-length inputs + dynamic in-flight admission/eviction
     (paged-attention KV, vLLM-style) is the real follow-on; this measures the compute
@@ -518,10 +518,10 @@ class PipelineParallelEngine:
                                 device=self.device, dtype=self.dtype, split2=split2)
         self.n_layers = self.parts["n_layers"]
         self.tokenizer = AutoTokenizer.from_pretrained(model_id)
-        # OPT-IN speculative decoding. draft_model unset => the greedy path runs
+        # Opt-in speculative decoding. draft_model unset => the greedy path runs
         # byte-for-byte unchanged. When set, a small local draft proposes draft_k tokens
-        # per round and the chain verifies all K+1 in ONE round-trip; output is identical
-        # to greedy (exact speculative decoding). The draft loads WHOLE locally on this
+        # per round and the chain verifies all K+1 in one round-trip; output is identical
+        # to greedy (exact speculative decoding). The draft loads whole locally on this
         # node (it is small), independent of the head's layer split.
         self.draft_k = max(1, int(draft_k))
         self.draft = None
@@ -597,12 +597,12 @@ class PipelineParallelEngine:
         produced, start, emitted = [], 0, 0
 
         def step_greedy(h, abs_start):
-            """Greedy: legacy tuple wire — tail argmaxes, returns int."""
+            """Greedy: legacy tuple wire - tail argmaxes, returns int."""
             tok_id, _, _ = _send_recv(sock, h, abs_start)
             return tok_id
 
         def step_sample(h, abs_start):
-            """Sampling: op=sample_step — tail returns top-K; head samples."""
+            """Sampling: op=sample_step - tail returns top-K; head samples."""
             nbytes = send_msg(sock, {
                 "op": "sample_step",
                 "h": h.cpu(),
@@ -650,14 +650,14 @@ class PipelineParallelEngine:
     def _stream_tokens_spec(self, messages, *, max_new=512, _stats=None):
         """SPECULATIVE-DECODING stream (opt-in). Per round: the local draft proposes K
         tokens greedily; the head embeds [cur, d_1..d_K] (K+1 positions) and the chain
-        verifies them in ONE round-trip; accept the longest matching prefix and take the
+        verifies them in one round-trip; accept the longest matching prefix and take the
         target's correction. Output is token-for-token identical to the greedy path --
         exact speculative decoding (accept_prefix only commits tokens the target itself
-        would have produced). Yields the SAME text-delta contract as stream_tokens.
+        would have produced). Yields the same text-delta contract as stream_tokens.
 
         KV rollback: after verifying K+1 positions every node's cache grew by K+1 but only
-        (accepted+1) are real. The head + draft crop their caches LOCALLY each round; the
-        downstream chain crops LAZILY -- the next verify message carries crop=committed_pos
+        (accepted+1) are real. The head + draft crop their caches locally each round; the
+        downstream chain crops lazily -- the next verify message carries crop=committed_pos
         and each node (mid, tail) truncates before running, so a round still costs exactly
         one round-trip (no extra rollback trip). _stats: optional dict the caller passes to
         collect round-trip + acceptance counters (used by tests; never affects output)."""
@@ -714,7 +714,7 @@ class PipelineParallelEngine:
                                         past_key_values=draft_cache, use_cache=True).logits
                         dtok = int(dl[0, -1].argmax())
                         drafts.append(dtok)
-                    # 2. verify [cur, d_1..d_K] (K+1 positions) in ONE chain round-trip,
+                    # 2. verify [cur, d_1..d_K] (K+1 positions) in one chain round-trip,
                     #    carrying the prior round's lazy rollback
                     h = _head_forward(self.parts, torch.tensor([[cur] + drafts], device=self.device),
                                       head_cache, pos, self.device, sync=True)
@@ -723,8 +723,8 @@ class PipelineParallelEngine:
                     # 3. greedy acceptance: longest prefix where draft[j] == target[j],
                     #    then the target's correction -- identical to plain greedy output
                     n, committed = accept_prefix(drafts, targets)
-                    # 4. roll caches back to the committed length: head + draft NOW
-                    #    (local, no round-trip), downstream LAZILY on the next verify
+                    # 4. roll caches back to the committed length: head + draft now
+                    #    (local, no round-trip), downstream lazily on the next verify
                     pos += n + 1
                     head_cache.crop(pos)
                     draft_cache.crop(pos)
@@ -760,12 +760,12 @@ class PipelineParallelEngine:
 
 
 class WholeModelEngine:
-    """Head-side engine for WHOLE-MODEL LOCAL LOAD: the model fits on this machine's own
+    """Head-side engine for whole-model local load: the model fits on this machine's own
     VRAM, so there is no pipeline split and no peer chain -- plain local transformers
     inference. It exists so the topology-aware planner's mode=="whole" short-circuit has
     something real to load instead of merely signalling "load it elsewhere".
 
-    It presents the SAME surface as PipelineParallelEngine -- stream_tokens(messages,
+    It presents the same surface as PipelineParallelEngine -- stream_tokens(messages,
     *, max_new) (a blocking generator of text deltas) + describe() -- so LLMRuntime can
     serve it through the identical slot/machinery with no special-casing (see
     runtime.load_whole_model). The whole HF model is materialized here (no meta-load, no
@@ -809,7 +809,7 @@ class WholeModelEngine:
 
     def stream_tokens(self, messages, *, max_new=512,
                       temperature=0.0, top_k=0, top_p=1.0, seed=None):
-        """Blocking generator yielding text DELTAS as each token is decoded -- the SAME
+        """Blocking generator yielding text deltas as each token is decoded -- the same
         interface PipelineParallelEngine.stream_tokens exposes, so LLMRuntime serves it
         identically. Manual decode loop emitting only the newly-decoded suffix each step.
 
@@ -891,7 +891,7 @@ def _cb_build_batched_cache(row_ids: list, cb_cache: dict,
                 k = row_cache.layers[li].keys    # [1, H, actual_depth, D]
                 v = row_cache.layers[li].values
             else:
-                # Layer not yet in cache — this is a prefill bug if it ever triggers.
+                # Layer not yet in cache - this is a prefill bug if it ever triggers.
                 raise RuntimeError(
                     f"row_id {rid} has no cache entry for layer {li}; "
                     "this is a prefill bug (cb_cache was not populated before _step)"
@@ -918,7 +918,7 @@ def _cb_slice_back(out_cache: "DynamicCache", row_ids: list, cb_cache: dict,
 
     out_cache.layers[li].keys has shape [B, H, kv_max+1, D] after the decode step.
     For row i, real tokens start at index (kv_max - kv_depths_pre[i]) in the padded
-    axis; kv_depths_pre[i] is the row's tail-side KV depth BEFORE this step.
+    axis; kv_depths_pre[i] is the row's tail-side KV depth before this step.
     Mirrors ContinuousBatcher._step()'s slice-back logic."""
     for i, rid in enumerate(row_ids):
         real_start = kv_max - kv_depths_pre[i]
@@ -981,7 +981,7 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
                         op = msg.get("op") if isinstance(msg, dict) else None
 
                         if op == "cb_prefill":
-                            # DISTRIBUTED CB — new row prefill. The head has already run
+                            # DISTRIBUTED CB - new row prefill. The head has already run
                             # its layers; h [1, q, H] are the head's output activations.
                             # We run our layer block to build this row's tail-side KV,
                             # run norm+lm_head on the last position, return the first token.
@@ -1013,10 +1013,10 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
                             continue
 
                         if op == "cb_step":
-                            # DISTRIBUTED CB — one decode step over the active batch.
+                            # DISTRIBUTED CB - one decode step over the active batch.
                             # h [B, 1, H]: the head's batched decode activations (left-padded,
                             # attention_mask and position_ids already applied on the head side).
-                            # kv_depths[i]: the real KV depth of row i BEFORE this step
+                            # kv_depths[i]: the real KV depth of row i before this step
                             # (== number of tokens the tail has seen for that row, i.e.
                             # prompt_len + decode_steps_so_far).
                             # kv_max: max across active rows (used to build the batched cache).
@@ -1029,7 +1029,7 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
                             h = msg["h"].to(dev, dtype=stage_dtype)
                             kv_max = int(msg["kv_max"])
 
-                            # Capture actual tail KV depths BEFORE the forward so
+                            # Capture actual tail KV depths before the forward so
                             # _cb_slice_back can compute the real_start slice offset.
                             tail_kv_depths_pre = [
                                 cb_cache[rid].get_seq_length() for rid in row_ids
@@ -1079,7 +1079,7 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
                                 h = parts["norm"](h)
                                 logits_all = parts["lm_head"](h[:, -1, :])  # [B, vocab]
                                 # sample_k: list of per-row K (0 = greedy argmax for that row).
-                                # When ALL rows are greedy (or sample_k not present), we fall
+                                # When all rows are greedy (or sample_k not present), we fall
                                 # back to the identical all-argmax path.
                                 sample_k = msg.get("sample_k")
                                 if sample_k and any(k > 0 for k in sample_k):
@@ -1144,7 +1144,7 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
                             # argmax token we return the top-K (values + indices) of the
                             # final logits so the head can run sample_from_topk.
                             # K is chosen by the head to fit top_k and the nucleus; typical
-                            # value is 64.  The greedy tuple wire is NOT used for this path
+                            # value is 64.  The greedy tuple wire is not used for this path
                             # so legacy tails that don't know this op would raise -- which is
                             # the correct behavior (they cannot do head-side sampling anyway).
                             h_in = msg["h"]
@@ -1212,7 +1212,7 @@ def serve_tail(parts, dev, *, port, timeout=30.0, host="0.0.0.0", stop_event=Non
 
 def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", stop_event=None, ready_event=None):
     """Run a mid stage of a 3+ node chain. A mid speaks the tail's wire protocol upstream
-    and the head's downstream: recv activations from the head, run THIS node's block,
+    and the head's downstream: recv activations from the head, run this node's block,
     forward downstream to the tail, relay the tail's token back up. Each upstream stream
     gets its own downstream socket so the tail keeps a separate KV cache per stream.
     Blocks forever (accept loop)."""
@@ -1239,7 +1239,7 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
         logger.info("pipeline mid: head %s connected; downstream tail open", addr)
         cache = DynamicCache()
         # Per-row KV for distributed continuous batching (op="cb_prefill"/"cb_step").
-        # The mid maintains its OWN per-row KV for ITS layer block, exactly like the
+        # The mid maintains its own per-row KV for its layer block, exactly like the
         # tail does for its layers. Keyed by row_id, populated on cb_prefill, evicted
         # via the drop list in cb_step.
         cb_cache: dict = {}  # row_id -> DynamicCache (this node's layers only)
@@ -1253,7 +1253,7 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
                         op = msg.get("op") if isinstance(msg, dict) else None
 
                         if op == "cb_prefill":
-                            # DISTRIBUTED CB relay — mid path.
+                            # DISTRIBUTED CB relay - mid path.
                             # 1. Run the mid's layer block on the head's prefill activations,
                             #    building this node's per-row KV for row_id.
                             # 2. Forward the mid's output activations downstream as cb_prefill.
@@ -1277,12 +1277,12 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
                             continue
 
                         if op == "cb_step":
-                            # DISTRIBUTED CB relay — mid path.
+                            # DISTRIBUTED CB relay - mid path.
                             # 1. Apply the drop list to the mid's own cb_cache.
                             # 2. Build mid's batched cache; run each layer with the forwarded
                             #    attn_mask + pos_ids (same pattern as serve_tail's cb_step).
                             # 3. Forward the mid's output activations downstream as cb_step
-                            #    with the SAME metadata (rows, kv_depths, kv_max, drop,
+                            #    with the same metadata (rows, kv_depths, kv_max, drop,
                             #    attn_mask, pos_ids) so the tail's handler is unchanged.
                             # 4. Relay the tail's [B] toks response back upstream.
                             # 5. Slice mid's output cache back to per-row caches.
@@ -1294,11 +1294,11 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
                             pos_ids = msg.get("pos_ids")
 
                             # Evict dropped rows from the mid's own cache first (same step
-                            # they are dropped from head and tail — keep all three in sync).
+                            # they are dropped from head and tail - keep all three in sync).
                             for rid in drop:
                                 cb_cache.pop(rid, None)
 
-                            # Capture mid's actual KV depths BEFORE the forward so
+                            # Capture mid's actual KV depths before the forward so
                             # _cb_slice_back can compute the correct real_start offset.
                             mid_kv_depths_pre = [
                                 cb_cache[rid].get_seq_length() for rid in row_ids
@@ -1355,9 +1355,9 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
                             continue
 
                         if op == "verify":
-                            # SPECULATIVE relay: crop THIS node's cache to the prior round's
+                            # Speculative relay: crop this node's cache to the prior round's
                             # committed length, run our block on the K+1 candidates, forward
-                            # downstream carrying the SAME crop (so the tail rolls back too),
+                            # downstream carrying the same crop (so the tail rolls back too),
                             # relay the tail's K+1 tokens back up. crop=None on the prefill /
                             # first round, which both sides treat as "no rollback".
                             crop = msg.get("crop")
@@ -1429,7 +1429,7 @@ def serve_mid(parts, dev, *, port, peer2, port2, timeout=30.0, host="0.0.0.0", s
 
 
 class PipelineStageWorker:
-    """Runs ONE pipeline stage (tail or mid) on this node, started PROGRAMMATICALLY (by the
+    """Runs one pipeline stage (tail or mid) on this node, started programmatically (by the
     /peer pipeline-stage endpoint) rather than the CLI. Loads the assigned layer block and
     serves an upstream head over the mesh. A node hosts at most one active stage at a time
     (a pipeline run binds the device); start() raises if one is already running."""
@@ -1525,8 +1525,8 @@ def plan_pipeline_chain(n_layers: int, n_nodes: int) -> tuple[int, int]:
 # has and how far away it is. On a real household the nodes are heterogeneous (a
 # 24GB 3090 next to a 8GB laptop next to a Mac) and the links are heterogeneous
 # (a wired LAN peer vs a DERP-relayed one). Every pipeline hop is on the per-token
-# critical path, so two things matter: put the model on the FEWEST, LOWEST-LATENCY
-# nodes that can hold it, and give the big/fast node MORE layers. This planner does
+# critical path, so two things matter: put the model on the fewest, lowest-latency
+# nodes that can hold it, and give the big/fast node more layers. This planner does
 # both, while staying a pure function so it's testable without a mesh.
 
 # Conservative runtime overhead factor on top of raw weight bytes. A transformer
@@ -1534,12 +1534,12 @@ def plan_pipeline_chain(n_layers: int, n_nodes: int) -> tuple[int, int]:
 # context, activations are live during a forward, and the framework (CUDA context,
 # cuDNN workspaces, allocator fragmentation) reserves a slab. 1.3x is deliberately
 # pessimistic -- under-claiming a fit only costs us an unnecessary hop, while
-# OVER-claiming a fit wedges a node mid-load. When unsure we prefer to split.
+# over-claiming a fit wedges a node mid-load. When unsure we prefer to split.
 _VRAM_OVERHEAD = 1.3
 
 # Fallback per-node-tier VRAM weight estimate (GB) when a node advertises no
 # usable vram number (e.g. a CPU-only or detection-failed peer). Used both as the
-# capacity ceiling AND as the proportional weight, so a "high" node still pulls
+# capacity ceiling and as the proportional weight, so a "high" node still pulls
 # more layers than a "low" one even without a hard VRAM reading. Conservative.
 _TIER_VRAM_GB = {"large": 16.0, "high": 16.0, "mid": 8.0, "medium": 8.0, "low": 4.0, "small": 4.0}
 _DEFAULT_TIER_VRAM_GB = 6.0
@@ -1552,19 +1552,19 @@ _DEFAULT_TIER_VRAM_GB = 6.0
 _TIER_MODEL_GB = {"large": 20.0, "high": 20.0, "mid": 14.0, "medium": 14.0, "low": 8.0, "small": 8.0}
 _DEFAULT_MODEL_GB = 14.0
 
-# ---- Link cost (used for BOTH peer selection and chain ordering) ----------
+# ---- Link cost (used for both peer selection and chain ordering) -----------
 #
 # Every pipeline hop is on the per-token critical path, and a token relays through that
-# hop on EVERY step. So a link's cost isn't just its mean latency: jitter compounds (one
+# hop on every step. So a link's cost isn't just its mean latency: jitter compounds (one
 # slow sample stalls that whole token) and a WiFi link -- especially a USB WiFi adapter
-# -- is both higher-latency AND jittery. We fold all three into one scalar so selection
+# -- is both higher-latency and jittery. We fold all three into one scalar so selection
 # and ordering use the same notion of "good link":
 #
 #     cost = median_rtt_ms + Kj * jitter_ms + link_penalty
 #
 # Kj weights jitter heavily because a jittery link hurts streaming smoothness out of
 # proportion to its median (a chain is only as steady as its worst hop). The penalties
-# are ADDITIVE constants in the same ms unit as RTT, sized so that on a typical LAN
+# are additive constants in the same ms unit as RTT, sized so that on a typical LAN
 # (single-digit ms RTT) the wired/wifi distinction dominates ordering, while two wired
 # peers still sort by their actual measured RTT.
 _JITTER_WEIGHT = 2.0          # Kj: each ms of p90-p50 jitter counts as 2ms of cost
@@ -1580,7 +1580,7 @@ _LINK_PENALTY_MS = {
 
 
 def link_cost(node: dict) -> float:
-    """Scalar link cost for ordering + selecting pipeline nodes. PURE.
+    """Scalar link cost for ordering + selecting pipeline nodes. Pure.
 
         cost = median_rtt_ms + _JITTER_WEIGHT * jitter_ms + link penalty
 
@@ -1625,7 +1625,7 @@ def estimate_model_vram_bytes(n_params: int | None, *, dtype_bytes: int = 2,
 
 
 def _node_capacity_gb(node: dict) -> float:
-    """USABLE VRAM (GB) for placing layers on a node. Prefer the advertised GPU
+    """Usable VRAM (GB) for placing layers on a node. Prefer the advertised GPU
     VRAM; fall back to the tier estimate when a node advertises none (CPU-only or
     detection-failed peer). Never trusts a 0/None vram as 'tons of room'."""
     vram = node.get("vram_gb")
@@ -1641,12 +1641,12 @@ def plan_pipeline_placement(
     *,
     max_nodes: int = 3,
 ) -> dict:
-    """Topology-aware placement for an AUTO pipeline run. PURE + DETERMINISTIC.
+    """Topology-aware placement for an auto pipeline run. Pure and deterministic.
 
     Inputs:
       n_layers   -- the model's transformer layer count.
       model_bytes-- conservative inference VRAM footprint (see estimate_model_vram_bytes).
-      nodes      -- candidate nodes, HEAD FIRST then peers. Each:
+      nodes      -- candidate nodes, head first then peers. Each:
                     {"id": str, "vram_gb": float|None, "tier": str|None,
                      "median_rtt_ms": float, "jitter_ms": float, "link_type": str}.
                     The head's median_rtt_ms/jitter_ms are 0 (no link to itself), but its
@@ -1667,15 +1667,15 @@ def plan_pipeline_placement(
     Decision rules:
       1. fits-on-one-box: if the head's own capacity >= model_bytes, return whole-model.
          No hop is faster than no hop.
-      2. otherwise build a chain: head first, then peers ordered by LINK COST ascending
+      2. otherwise build a chain: head first, then peers ordered by link cost ascending
          (see link_cost): cost = median_rtt + Kj*jitter + wifi/unknown penalty. Lowest-
          cost links sit adjacent to the head -- every hop relays every token, so this
          prefers wired + low-jitter peers and pushes WiFi/jittery ones to the far end.
       3. add only as many peers as needed for the cumulative capacity to cover the
          model (fewest hops), capped at max_nodes. Because peers are pre-sorted by link
          cost, a WiFi peer is admitted only when a cheaper-link peer can't make the fit.
-      4. split layers PROPORTIONAL to each chosen node's capacity (big/fast node holds
-         more), then CAP each node at what its VRAM can hold and spill the remainder to
+      4. split layers proportional to each chosen node's capacity (big/fast node holds
+         more), then cap each node at what its VRAM can hold and spill the remainder to
          nodes with slack. Blocks stay contiguous: head=[0:a], mid=[a:b], tail=[b:n]."""
     if not nodes:
         raise ValueError("plan_pipeline_placement: need at least the head node")
@@ -1689,7 +1689,7 @@ def plan_pipeline_placement(
     if head_cap_bytes >= model_bytes:
         return {"mode": "whole", "nodes": [_annotate_link(head)]}
 
-    # Rule 2 -- order peers by LINK COST ascending (prefer wired/low-jitter, deprioritize
+    # Rule 2 -- order peers by link cost ascending (prefer wired/low-jitter, deprioritize
     # WiFi/jittery), id as a deterministic tiebreak; head stays pinned at position 0.
     peers = sorted(nodes[1:], key=lambda p: (link_cost(p), str(p.get("id", ""))))
 
@@ -1730,8 +1730,8 @@ def _annotate_link(node: dict) -> dict:
 
 
 def _proportional_contiguous_split(n_layers: int, caps_gb: list[float]) -> list[int]:
-    """Split n_layers across len(caps_gb) nodes PROPORTIONAL to capacity, with each
-    node getting >=1 layer and the counts summing EXACTLY to n_layers. Pure.
+    """Split n_layers across len(caps_gb) nodes proportional to capacity, with each
+    node getting >=1 layer and the counts summing exactly to n_layers. Pure.
 
     Largest-remainder (Hamilton) apportionment keeps the proportions honest and the
     rounding deterministic; we then nudge the floor up so no node is starved of a
@@ -1765,7 +1765,7 @@ def _proportional_contiguous_split(n_layers: int, caps_gb: list[float]) -> list[
 
 
 def estimate_params_from_config(cfg) -> int | None:
-    """Best-effort parameter count from a HF config WITHOUT downloading weights.
+    """Best-effort parameter count from a HF config without downloading weights.
 
     Standard decoder-only transformer accounting: embeddings + per-layer (attention
     projections + MLP) + final norm/head. Handles GQA (num_key_value_heads) and tied
@@ -1815,20 +1815,20 @@ def _stop_peer_stage(mesh_ip: str, timeout: float = 10.0) -> None:
 
 
 def _probe_peer(mesh_ip: str, timeout: float = 5.0, samples: int = 7) -> tuple[dict | None, float, float]:
-    """GET a peer's /peer/capabilities N times and characterize the LINK, not just one
+    """GET a peer's /peer/capabilities N times and characterize the link, not just one
     sample. Returns (caps, median_rtt_ms, jitter_ms); (None, inf, inf) on any failure.
 
-    Why N samples: a single RTT can't see JITTER, and jitter is what wrecks pipeline-
+    Why N samples: a single RTT can't see jitter, and jitter is what wrecks pipeline-
     parallel -- every token relays through every hop, so one peer with occasional 60ms+
-    stalls makes the whole stream uneven even if its MEDIAN looks fine. We take a small
-    burst (default 7), use the MEDIAN as the central tendency (robust to a single outlier,
-    unlike the mean) and p90 - p50 as the JITTER metric (the size of the slow tail a token
+    stalls makes the whole stream uneven even if its median looks fine. We take a small
+    burst (default 7), use the median as the central tendency (robust to a single outlier,
+    unlike the mean) and p90 - p50 as the jitter metric (the size of the slow tail a token
     can hit -- directly what hurts streaming, and bounded below by 0). Reusing the
     capabilities call keeps this endpoint-free; first request also warms the connection.
 
     Kept fast: small N, the caller's short timeout per request. A request that errors is
     skipped (not counted as inf), so a transient blip doesn't poison the median; only a
-    peer that fails EVERY sample returns (None, inf, inf)."""
+    peer that fails every sample returns (None, inf, inf)."""
     import httpx
 
     rtts: list[float] = []
@@ -1883,25 +1883,25 @@ def _collect_household_peers() -> list[dict]:
 
 def orchestrate_household_pipeline(model_id, *, device="", dtype="float16",
                                    max_nodes=3, stage_port=29900, timeout=30.0) -> dict:
-    """Build a pipeline chain across THIS node (head) + available household peers using
-    TOPOLOGY-AWARE placement (plan_pipeline_placement), start each peer's stage, and
+    """Build a pipeline chain across this node (head) + available household peers using
+    topology-aware placement (plan_pipeline_placement), start each peer's stage, and
     return the chain config for runtime.load_pipeline:
     {split, split2, peer, port, dtype, n_layers, nodes:[...]}.
 
     Whole-model signal: when the head's own VRAM fits the model, the planner returns
     mode="whole" and there is no fast path in placing a pipeline at all -- this function
     returns {"mode": "whole", ...} (no split/peer/stage_peers). The caller (load_model)
-    sees mode=="whole" and loads the model LOCALLY instead of forcing a split.
+    sees mode=="whole" and loads the model locally instead of forcing a split.
 
     Selection: peers from the live roster whose /peer/capabilities reports
-    available_for_pipeline. Layers are placed PROPORTIONAL to each node's VRAM and the
-    chain is ORDERED + SELECTED by LINK COST (median RTT + jitter + a WiFi/unknown-link
+    available_for_pipeline. Layers are placed proportional to each node's VRAM and the
+    chain is ordered + selected by link cost (median RTT + jitter + a WiFi/unknown-link
     penalty), so wired, low-jitter peers sit adjacent to the head and a WiFi peer is only
     pulled in when needed to fit. Uses only as many peers as needed to fit (fewest hops;
     capped at max_nodes). dtype is forced uniform
     across the chain (default float16 -- the only dtype every backend including DirectML
     supports; bf16 is better for large models on non-DirectML chains). Stages start in
-    REVERSE order (tail first) so a mid can dial its downstream tail. Raises if a split
+    reverse order (tail first) so a mid can dial its downstream tail. Raises if a split
     is required but no peer is eligible. Scope: my-machines / trusted-circle (never the
     open pool)."""
     from transformers import AutoConfig
@@ -1916,7 +1916,7 @@ def orchestrate_household_pipeline(model_id, *, device="", dtype="float16",
         from potluck_local.services.hardware_detect import detect_hardware
     hw = detect_hardware()
     head_tier = hw.get("recommended_tier")
-    # The head has no link to itself (rtt/jitter 0) but DOES record its own link type --
+    # The head has no link to itself (rtt/jitter 0) but does record its own link type --
     # carried through to the chain summary so an operator can see the head's link too.
     try:
         from .link_detect import detect_link_type
@@ -1934,7 +1934,7 @@ def orchestrate_household_pipeline(model_id, *, device="", dtype="float16",
     n_params = estimate_params_from_config(cfg)
     model_bytes = estimate_model_vram_bytes(n_params, dtype_bytes=2, fallback_tier=head_tier)
 
-    # Eligible peers + per-peer LINK characterization (N-sample capabilities probe; no
+    # Eligible peers + per-peer link characterization (N-sample capabilities probe; no
     # new endpoint). We capture the median RTT, the jitter (p90-p50) and the peer's
     # self-advertised link_type so the planner can prefer wired/low-jitter peers.
     candidates = [head_node]
@@ -1971,7 +1971,7 @@ def orchestrate_household_pipeline(model_id, *, device="", dtype="float16",
 
     def _link_summary(nid: str) -> dict:
         """Surface the chosen node's link characterization in the chain summary so an
-        operator/UI can see WHY the chain was ordered this way (wired vs wifi, jitter)."""
+        operator/UI can see why the chain was ordered this way (wired vs wifi, jitter)."""
         nd = by_id.get(nid, {})
         return {
             "link_type": nd.get("link_type", "unknown"),
@@ -2023,7 +2023,7 @@ def orchestrate_household_pipeline(model_id, *, device="", dtype="float16",
 
 
 def main(argv=None):
-    # Standalone CLI: surface the module's log lines (load/serve) like the old prints.
+    # Standalone CLI: surface the module's log lines (load/serve).
     # No-op inside the sidecar, which already configures logging.
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     ap = argparse.ArgumentParser(description="Potluck pipeline-parallel inference node")
@@ -2098,7 +2098,7 @@ def main(argv=None):
     if args.concurrency > 1:
         # N simultaneous streams against one tail. Each stream is an independent
         # generate_one (own socket => own KV cache on the tail). Report per-stream tok/s
-        # AND aggregate (all tokens / wall-clock): if aggregate beats a single stream,
+        # and aggregate (all tokens / wall-clock): if aggregate beats a single stream,
         # concurrency is hiding the wire leg.
         n = args.concurrency
         prompts = [f"{args.prompt} (request {i + 1})" for i in range(n)]
@@ -2135,7 +2135,7 @@ def main(argv=None):
         return
 
     if args.draft:
-        # SPECULATIVE head: drive generation through the engine's spec path (loads the
+        # Speculative head: drive generation through the engine's spec path (loads the
         # small draft locally). Reuse the already-loaded head block by attaching it.
         print(f"[head] speculative decode: draft={args.draft} K={args.draft_k} against tail "
               f"{args.peer}:{args.port} ...", flush=True)

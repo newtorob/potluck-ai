@@ -1,14 +1,14 @@
 /**
- * SettingsView — /settings route.
+ * SettingsView - /settings route.
  *
  * Tabbed interface with query-string persistence (?tab=account, ?tab=hardware, etc.).
  * Refreshing the page restores the selected tab.
  *
  * Tabs:
- *   account   — placeholder / coming soon
- *   hardware  — runtime sliders (context, gpu_layers, threads, temperature, max_tokens)
- *   privacy   — telemetry and history toggles
- *   advanced  — model storage path
+ *   account - sign-in state, version and update status
+ *   hardware - runtime sliders (context, gpu_layers, threads, temperature, max_tokens)
+ *   privacy - telemetry and history toggles
+ *   advanced - model storage path
  */
 
 import { useSearchParams } from 'react-router-dom';

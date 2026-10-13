@@ -11,9 +11,9 @@ Architecture:
 
 Both are module-level singletons protected by an asyncio.Lock. This is
 fine for v0 (single coordinator process); when we shard the coordinator
-horizontally we'll need a Redis-backed equivalent (m4+ work).
+horizontally we'll need a Redis-backed equivalent.
 
-Privacy: this module ONLY traffics in routing metadata (peer_id, job_id,
+Privacy: this module only traffics in routing metadata (peer_id, job_id,
 session_id) and the streaming token text in JobBuffer. Token text lives
 in process memory for the duration of a job and is dropped after the
 caller pulls the result. No persistence, no logging of token content.
@@ -26,28 +26,27 @@ Peer selection (pick_peer_for_model):
   compute_score = PeerCapability.tokens_per_second for this model_slug when
   available; otherwise a coarse hardware-tier proxy derived from
   Peer.hardware_summary (see _hardware_tier_score). current_jobs is
-  max(live in-flight count, heartbeat-reported current_jobs) — the live
+  max(live in-flight count, heartbeat-reported current_jobs) - the live
   count is process-authoritative and updated at dispatch time, so it can't
   go stale the way the heartbeat alone can (up to ~30s between beats); see
   `live_in_flight_counts`. reputation comes from the latest PeerHeartbeat
   row; missing heartbeat defaults to 0 jobs / neutral reputation.  quality
   comes from the sliding-window aggregate in services/peer_quality.py
   (default 1.0 for new peers). Stable tiebreak on equal scores:
-  most-recently-connected peer wins (preserves pre-scoring behaviour when
-  all signals are absent or equal).
+  most-recently-connected peer wins when all signals are absent or equal.
 
   Liveness TTL exclude: before scoring, any peer whose latest heartbeat is
   older than HEARTBEAT_TTL_SECONDS (60s = 2x the 30s heartbeat interval) is
-  dropped from eligible_ids outright — its heartbeat isn't just stale for
+  dropped from eligible_ids outright - its heartbeat isn't just stale for
   load purposes, it's stale enough that the peer may be black-holed. A peer
-  with NO heartbeat row yet (just connected) is exempt and stays eligible.
+  with no heartbeat row yet (just connected) is exempt and stays eligible.
 
   Quality hard-exclude: before scoring, pick_peer_for_model removes any peer
   with >= QUALITY_CONSECUTIVE_FAIL_THRESHOLD (default 3) consecutive trailing
-  failures from eligible_ids.  A single bad signal NEVER triggers exclusion.
+  failures from eligible_ids.  A single bad signal never triggers exclusion.
 
   Capacity hard-exclude: a peer with Peer.max_concurrent_jobs set is dropped
-  from eligible_ids once its LIVE in-flight count reaches that cap — a
+  from eligible_ids once its live in-flight count reaches that cap - a
   saturated peer is removed from candidacy entirely, not merely
   score-dampened. NULL (the default) means uncapped.
 
@@ -74,12 +73,12 @@ from coordinator.services.credit_ledger import NEUTRAL_REPUTATION
 logger = structlog.get_logger(__name__)
 
 # Heartbeat liveness TTL: 2x the peer's heartbeat_interval_s (30s, see
-# schemas/peer.py AcceptMessage.heartbeat_interval_s). A peer that HAS a
+# schemas/peer.py AcceptMessage.heartbeat_interval_s). A peer that has a
 # heartbeat row but hasn't beaten in this long is excluded from routing
 # eligibility (pick_peer_for_model) and is fair game for the reaper
-# (services/peer_reaper.py) to drain + unregister. A peer with NO heartbeat
-# row yet (just connected, hasn't sent its first beat) is NOT covered by
-# this — it gets a grace period and stays eligible, matching the existing
+# (services/peer_reaper.py) to drain + unregister. A peer with no heartbeat
+# row yet (just connected, hasn't sent its first beat) is not covered by
+# this - it gets a grace period and stays eligible, matching the existing
 # "missing heartbeat -> neutral defaults" behaviour in _score_peers.
 HEARTBEAT_TTL_SECONDS = 60
 
@@ -89,7 +88,7 @@ class PeerConnection:
     peer_id: uuid.UUID
     session_id: uuid.UUID
     ws: WebSocket
-    member_id: uuid.UUID  # used for OUR-side job creation only — never forwarded
+    member_id: uuid.UUID  # used for our-side job creation only - never forwarded
     # Who this peer agreed to serve beyond its owner's own requests (see
     # AttestationPayload.audiences). Both true for a peer that named none.
     serves_circle: bool = True
@@ -122,13 +121,12 @@ class JobBuffer:
     - **Streaming /jobs/stream**: reads `token_stream` (an asyncio.Queue) as
       tokens arrive and yields them as SSE chunks.
 
-    The peer-side message handler in routers/peers.py pushes to BOTH on
+    The peer-side message handler in routers/peers.py pushes to both on
     every JobTokenMessage so either consumer works without coordination.
     The queue is bounded (maxsize=512) so a runaway peer can't drive
     coordinator memory unbounded; if it fills up `put_nowait` raises
     QueueFull and the handler logs + drops, which the streaming consumer
-    sees as a brief gap (acceptable; backpressure on the peer side comes
-    in m4+).
+    sees as a brief gap (acceptable; no backpressure reaches the peer).
     """
 
     job_id: uuid.UUID
@@ -172,14 +170,14 @@ async def register_peer(conn: PeerConnection) -> None:
     a registered connection, replace it (the old one is presumed dead or
     being replaced by a reconnect).
 
-    Reconnect-race guard: replacing the registry entry alone used to leave
-    the OLD connection's in-flight jobs (`_peer_jobs`) pointing at a socket
-    that can never deliver another JobTokenMessage/JobCompleteMessage —
+    Reconnect-race guard: replacing the registry entry alone would leave
+    the old connection's in-flight jobs (`_peer_jobs`) pointing at a socket
+    that can never deliver another JobTokenMessage/JobCompleteMessage -
     those jobs would hang until JOB_TIMEOUT_S with no failover signal. So on
-    a same-key reconnect, drain the old connection's jobs FIRST (marking
+    a same-key reconnect, drain the old connection's jobs first (marking
     them `error_category="peer_disconnected"`), then swap in the new
     connection. See `drain_peer_jobs` and the session_id guard on
-    `unregister_peer` for the other half of this race (the OLD socket's
+    `unregister_peer` for the other half of this race (the old socket's
     later `finally:` must not evict the connection we just registered here).
     """
     async with _lock:
@@ -204,12 +202,12 @@ async def unregister_peer(
     """Remove a peer's connection from the registry.
 
     If `session_id` is given, only unregister when the connection currently
-    registered for `peer_id` is STILL this session. Without this guard, a
-    same-key reconnect races the OLD connection's WS handler: `register_peer`
-    already swapped in the NEW connection (and drained the old one's jobs —
-    see above), but the OLD handler's `finally:` runs sometime after that
-    with the OLD session_id and would otherwise evict the freshly-registered
-    NEW connection. Returns True if a connection was actually removed.
+    registered for `peer_id` is still this session. Without this guard, a
+    same-key reconnect races the old connection's WS handler: `register_peer`
+    already swapped in the new connection (and drained the old one's jobs -
+    see above), but the old handler's `finally:` runs sometime after that
+    with the old session_id and would otherwise evict the freshly-registered
+    new connection. Returns True if a connection was actually removed.
     """
     async with _lock:
         current = _peers.get(peer_id)
@@ -240,7 +238,7 @@ async def pick_peer() -> PeerConnection | None:
 
 # A peer's reputation (0..1, neutral 0.5) hard-resets to 0.0 on a wrong-answer
 # canary (an unambiguous fabrication signal) and decays toward 0 on sustained
-# failures. Open-pool serving uses HYSTERESIS: a peer is dropped from the pool
+# failures. Open-pool serving uses hysteresis: a peer is dropped from the pool
 # once it falls below NEUTRAL, and must climb all the way back to NEUTRAL before
 # it can serve strangers again, not merely clear the 0.0 floor with one clean
 # canary. The span from the fabrication floor (0.0) up to the re-entry bar
@@ -277,7 +275,7 @@ def measured_compute_score(tps: float) -> float:
 def _hardware_tier_score(hw: dict[str, Any]) -> float:
     """Derive a coarse compute-tier score from a Peer.hardware_summary dict.
 
-    Primary path (extended hardware_summary — not yet sent by the coordinator
+    Primary path (extended hardware_summary - not yet sent by the coordinator
     attestation path, but will be once the sidecar upgrades detect_hardware_summary
     to forward full detect_hardware() output):
       recommended_tier: "large" | "medium" | "small"
@@ -323,7 +321,7 @@ def _hardware_tier_score(hw: dict[str, Any]) -> float:
 
 
 async def _score_peers(
-    db,  # AsyncSession — typed loosely to avoid sqlalchemy at module load
+    db,  # AsyncSession - typed loosely to avoid sqlalchemy at module load
     peer_ids: list[uuid.UUID],
     model_slug: str,
 ) -> list[float]:
@@ -345,13 +343,13 @@ async def _score_peers(
         rtt_factor = 1 / (1 + rtt_ms / REF_RTT_MS)
     once a coordinator<->peer RTT measurement is available.  The geography
     term is small (~+15 ms cross-country per measurement) so it intentionally
-    has no weight here yet.  Do NOT invent a latency signal.
+    has no weight here yet.  Do not invent a latency signal.
     """
     from sqlalchemy import select
     from coordinator.models.peer import Peer, PeerCapability, PeerHeartbeat
     from coordinator.services.peer_quality import QUALITY_NEUTRAL, batch_quality_scores
 
-    # Live in-flight counts (authoritative, updated at dispatch time — not the
+    # Live in-flight counts (authoritative, updated at dispatch time - not the
     # up-to-30s-stale heartbeat current_jobs). One lock acquisition, no DB hit.
     live_counts = await live_in_flight_counts(peer_ids)
 
@@ -397,14 +395,14 @@ async def _score_peers(
         else:
             compute_score = _hardware_tier_score(hw_summary or {})
 
-        # Load signal: the LIVE (process-authoritative, updated at dispatch)
+        # Load signal: the live (process-authoritative, updated at dispatch)
         # in-flight count, floored against the heartbeat's self-reported
-        # current_jobs so a peer's own report can only push the load term UP
+        # current_jobs so a peer's own report can only push the load term up
         # (e.g. it's also serving something outside coordinator-dispatched
         # jobs), never mask a dispatch we just made that the peer hasn't
         # beaten about yet. This is what closes the "dispatch herd" gap: the
         # heartbeat alone can be up to ~30s stale, so two requests arriving
-        # within that window used to both see current_jobs=0 and pile onto
+        # within that window would both see current_jobs=0 and pile onto
         # the same idle-looking peer.
         heartbeat_jobs = raw_jobs if raw_jobs is not None else 0
         current_jobs = max(live_counts.get(pid, 0), heartbeat_jobs)
@@ -415,7 +413,7 @@ async def _score_peers(
         # Quality signal: default to neutral (1.0) for peers with no history.
         quality = quality_map.get(pid, QUALITY_NEUTRAL)
 
-        # TODO RTT: score *= 1 / (1 + rtt_ms / REF_RTT_MS)  when RTT is measured.
+        # TODO: score *= 1 / (1 + rtt_ms / REF_RTT_MS) once RTT is measured.
         score = compute_score / (1 + current_jobs) * (0.5 + reputation) * quality
         scores.append(score)
 
@@ -458,12 +456,12 @@ async def pick_peer_for_model(
     whose member's public_key is in that set are eligible. The filter is
     applied via a DB join against member_keys (one row per enrolled device
     key, keyed by public_key -> member_id). No extra trust gating is applied
-    for circle peers — the owner chose them; trust is the owner's to grant.
+    for circle peers - the owner chose them; trust is the owner's to grant.
 
     When exclude_peer_ids is set (first-token failover, routers/jobs.py's
     `_dispatch_stream_with_failover`), those peer_ids are dropped from
-    eligibility up front, alongside the TTL/quality/capacity excludes below —
-    a peer that already proved dead-on-arrival for THIS request must never be
+    eligibility up front, alongside the TTL/quality/capacity excludes below -
+    a peer that already proved dead-on-arrival for this request must never be
     re-picked on a retry attempt. Default None = current behavior (no
     exclusion), so every existing caller is unaffected.
 
@@ -499,14 +497,14 @@ async def pick_peer_for_model(
 
     # Liveness TTL exclude: a peer whose latest heartbeat is older than
     # HEARTBEAT_TTL_SECONDS (60s = 2x the 30s heartbeat interval) is dropped
-    # from eligibility outright, regardless of routing scope — dispatching to
+    # from eligibility outright, regardless of routing scope - dispatching to
     # it would otherwise just hang the requester out to JOB_TIMEOUT_S (120s)
     # with no signal, because a black-holed peer (no ping on /peers/connect)
-    # never fires WebSocketDisconnect on its own. This is the READ-side half
+    # never fires WebSocketDisconnect on its own. This is the read-side half
     # of the liveness backstop; services/peer_reaper.py is the write-side
     # half (actively drains + unregisters the same stale peers on a timer).
-    # A peer with NO heartbeat row yet (just connected, hasn't sent its first
-    # beat) is exempt — same "missing heartbeat -> neutral defaults" grace
+    # A peer with no heartbeat row yet (just connected, hasn't sent its first
+    # beat) is exempt - same "missing heartbeat -> neutral defaults" grace
     # _score_peers already gives it.
     from coordinator.models.peer import PeerHeartbeat as _PeerHeartbeatTTL
 
@@ -525,7 +523,7 @@ async def pick_peer_for_model(
     # Quality hard-exclude: a peer with >= QUALITY_CONSECUTIVE_FAIL_THRESHOLD
     # consecutive trailing failures is removed from eligibility regardless of
     # routing scope (My Machines, circle, pool).  Requires N failures in a row
-    # (default N=3) — a single bad signal NEVER triggers exclusion.  Batch
+    # (default N=3) - a single bad signal never triggers exclusion.  Batch
     # query over the candidate set so there is no per-peer round-trip.
     from coordinator.services.peer_quality import batch_consecutive_fail_excluded
 
@@ -538,8 +536,8 @@ async def pick_peer_for_model(
             return None
 
     # Capacity hard-exclude: a peer with Peer.max_concurrent_jobs set is
-    # removed from candidacy entirely once its LIVE in-flight count reaches
-    # that cap — not merely score-dampened (a saturated peer that still has
+    # removed from candidacy entirely once its live in-flight count reaches
+    # that cap - not merely score-dampened (a saturated peer that still has
     # the highest score would otherwise keep winning dispatch and queue up
     # behind itself). NULL (the default) means uncapped; nothing changes for
     # a peer that never sets it.
@@ -603,7 +601,7 @@ async def pick_peer_for_model(
             circle_member_ids |= {row[0] for row in mk_rows}
 
         if not circle_member_ids:
-            # No enrolled members match any of the pubkeys — no eligible peer.
+            # No enrolled members match any of the pubkeys - no eligible peer.
             return None
 
         # Keep only peers whose member_id is in the circle.
@@ -618,7 +616,7 @@ async def pick_peer_for_model(
             return None
 
     # Collect candidates in most-recent-first order (the stable tiebreak when
-    # scores are equal — preserves pre-scoring behaviour for identical peers).
+    # scores are equal).
     # Apply the owner_member_id filter here; it is an in-memory check against
     # PeerConnection.member_id with no extra DB round-trip.
     async with _lock:
@@ -647,7 +645,7 @@ async def pick_peer_for_model(
 
     # Score all candidates with batched DB queries (2 round-trips regardless
     # of candidate count).  Pick the highest score; tiebreak = smallest index
-    # in `candidates` (= most-recently-connected, matching the old behaviour).
+    # in `candidates` (= most-recently-connected).
     scores = await _score_peers(db, candidates, model_slug)
     best_idx = max(range(len(candidates)), key=lambda i: (scores[i], -i))
     return peer_map[candidates[best_idx]]
@@ -678,7 +676,7 @@ async def select_peer_for_request(
     already validated that the circle belongs to the requester.
 
     `exclude_peer_ids`, when set, is forwarded to every `pick_peer_for_model`
-    call at every tier — a peer excluded because it was dead-on-arrival on a
+    call at every tier - a peer excluded because it was dead-on-arrival on a
     failover retry must stay excluded whether the retry re-checks My Machines,
     Circle, or Pool. Default None = current behavior.
 
@@ -689,7 +687,7 @@ async def select_peer_for_request(
     """
     if scope == "circle":
         # Circle scope: dispatch strictly to peers in the circle. No fallback
-        # to My Machines or Pool — the caller explicitly chose circle isolation.
+        # to My Machines or Pool - the caller explicitly chose circle isolation.
         # The caller resolves the circle to the members who may lend
         # (circle_member_ids). circle_pubkeys is the older form, a set of
         # machine keys, resolved to their members here.
@@ -708,7 +706,7 @@ async def select_peer_for_request(
             return peer, "circle"
         return None, None
 
-    # Tier 1 — My Machines (tried first for mine and pool scopes).
+    # Tier 1 - My Machines (tried first for mine and pool scopes).
     peer = await pick_peer_for_model(
         db,
         model_slug,
@@ -720,7 +718,7 @@ async def select_peer_for_request(
         return peer, "mine"
     if scope == "mine":
         return None, None
-    # Tier 3 — Open Pool. Gate on reputation: a peer that fell below neutral
+    # Tier 3 - Open Pool. Gate on reputation: a peer that fell below neutral
     # (fabrication, or sustained failures) must earn its way back before it can
     # serve strangers again.
     peer = await pick_peer_for_model(
@@ -785,7 +783,7 @@ async def online_peer_sessions() -> dict[uuid.UUID, uuid.UUID]:
     """Snapshot of peer_id -> session_id for every currently-connected peer.
 
     Used by the reaper (services/peer_reaper.py) so it can pass `session_id`
-    to `drain_peer_jobs`/`unregister_peer` — without it, a reap racing a
+    to `drain_peer_jobs`/`unregister_peer` - without it, a reap racing a
     same-key reconnect could evict the peer's brand-new connection instead
     of the stale one it actually meant to remove (same hazard the
     reconnect-race guard on `unregister_peer` documents).
@@ -798,17 +796,17 @@ async def online_peer_sessions() -> dict[uuid.UUID, uuid.UUID]:
 #
 # `_peer_jobs` (below) is already an atomic, `_lock`-protected map of
 # peer_id -> set of job_ids currently dispatched to that peer: register_job()
-# adds to it at THE moment of dispatch assignment, and complete_job() /
+# adds to it at the moment of dispatch assignment, and complete_job() /
 # drain_peer_jobs() remove from it on every terminal path (normal finish,
 # peer-reported error, disconnect-drain, same-key-reconnect-drain). Its size
-# per peer IS the live in-flight counter this module needs — reusing it
+# per peer is the live in-flight counter this module needs - reusing it
 # (rather than introducing a second, separately-mutated counter) means there
 # is no second lock, no ordering hazard, and no way for the two to drift out
 # of sync, by construction. `live_in_flight_count`/`live_in_flight_counts`
 # below just expose read access to that existing state.
 #
 # Note this also (correctly) counts canary probe jobs (services/verification.py
-# also calls register_job/complete_job with peer_id set) — a canary occupies
+# also calls register_job/complete_job with peer_id set) - a canary occupies
 # real capacity on the peer's connection exactly like a real job does, so it
 # should count toward both the load-aware score term and the capacity cap.
 
@@ -823,7 +821,7 @@ async def live_in_flight_count(peer_id: uuid.UUID) -> int:
 async def live_in_flight_counts(
     peer_ids: list[uuid.UUID],
 ) -> dict[uuid.UUID, int]:
-    """Batch form of `live_in_flight_count` — one lock acquisition for the
+    """Batch form of `live_in_flight_count` - one lock acquisition for the
     whole candidate set instead of one per peer."""
     async with _lock:
         return {pid: len(_peer_jobs.get(pid, ())) for pid in peer_ids}
@@ -887,18 +885,18 @@ async def drain_peer_jobs(
     JOB_TIMEOUT_S (120s) with no signal that the contributor is gone.
 
     If `session_id` is given, only drains when the connection currently
-    registered for `peer_id` is still this session — guards against a stale
+    registered for `peer_id` is still this session - guards against a stale
     disconnect handler draining a freshly-reconnected session's brand-new
     jobs (see the reconnect-race note on `register_peer`/`unregister_peer`).
 
-    NOTE — reputation/quality: "peer_disconnected" is a COORDINATOR-
-    SYNTHESIZED sentinel error_category, not a peer-reported one. It must
-    NEVER feed a reputation or quality-score slash: a dropped connection is
+    NOTE - reputation/quality: "peer_disconnected" is a coordinator-
+    synthesized sentinel error_category, not a peer-reported one. It must
+    never feed a reputation or quality-score slash: a dropped connection is
     not evidence the peer fabricated or mishandled the job (could be a
     laptop lid closing, wifi flap, etc). Today neither the disconnect path
     nor `_finalize_job_in_db`'s error branch writes any reputation/quality
-    row for a failed job, so this is safe by construction — but if a future
-    "penalize peers for job failures" signal is added, it MUST filter this
+    row for a failed job, so this is safe by construction - but if a future
+    "penalize peers for job failures" signal is added, it must filter this
     sentinel out explicitly rather than assume every error_category is a
     peer-caused fault.
     """

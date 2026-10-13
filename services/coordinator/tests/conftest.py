@@ -8,11 +8,11 @@ after the test, leaving the live DB clean.
 
 Two session fixtures are provided:
 
-  db_session — yields an AsyncSession inside a single open transaction that
+  db_session - yields an AsyncSession inside a single open transaction that
     is rolled back unconditionally at the end. Use for tests that stay within
     one session (record_canary_result, release_escrow_for_peer, etc.).
 
-  session_factory — yields an async_sessionmaker plus a cleanup coroutine
+  session_factory - yields an async_sessionmaker plus a cleanup coroutine
     list. Use for tests that call functions which open their own sessions
     (run_canary_probe, probe_due_peers). Tests commit fixture data so the
     function-under-test can read it via a fresh session, then register peer
@@ -56,7 +56,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         async with factory() as session:
             async with session.begin():
                 yield session
-                # Unconditional rollback — leave DB clean regardless of
+                # Unconditional rollback - leave DB clean regardless of
                 # pass/fail.
                 await session.rollback()
     finally:

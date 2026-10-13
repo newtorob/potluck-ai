@@ -25,7 +25,7 @@ from fastapi.testclient import TestClient
 from coordinator.middleware.auth import require_coordinator_token
 
 # ---------------------------------------------------------------------------
-# Minimal test app — exercises the dependency in isolation
+# Minimal test app - exercises the dependency in isolation
 # ---------------------------------------------------------------------------
 
 
@@ -50,7 +50,7 @@ def client() -> TestClient:
 
 
 # ---------------------------------------------------------------------------
-# Dev mode — env var unset
+# Dev mode - env var unset
 # ---------------------------------------------------------------------------
 
 
@@ -76,7 +76,7 @@ def test_dev_mode_whitespace_only_env_allows_all(client: TestClient, monkeypatch
 
 
 # ---------------------------------------------------------------------------
-# Auth enforced — correct token
+# Auth enforced - correct token
 # ---------------------------------------------------------------------------
 
 
@@ -97,7 +97,7 @@ def test_correct_token_with_leading_whitespace_passes(
 
 
 # ---------------------------------------------------------------------------
-# Auth enforced — wrong or missing token
+# Auth enforced - wrong or missing token
 # ---------------------------------------------------------------------------
 
 
@@ -123,14 +123,14 @@ def test_empty_header_value_returns_401(client: TestClient, monkeypatch: pytest.
 
 
 def test_partial_token_returns_401(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Partial token (prefix of expected) returns 401 — no substring match."""
+    """Partial token (prefix of expected) returns 401 - no substring match."""
     monkeypatch.setenv("POTLUCK_COORDINATOR_TOKEN", "supersecret")
     resp = client.post("/protected", headers={"X-Potluck-Coordinator-Token": "super"})
     assert resp.status_code == 401
 
 
 # ---------------------------------------------------------------------------
-# /health is always reachable — no auth, any env var state
+# /health is always reachable - no auth, any env var state
 # ---------------------------------------------------------------------------
 
 
@@ -146,7 +146,7 @@ def test_health_reachable_with_token_configured(
 ) -> None:
     """Health endpoint is reachable without auth even when token env var is set.
 
-    /health deliberately has no auth dependency — it's a liveness probe.
+    /health deliberately has no auth dependency - it's a liveness probe.
     """
     monkeypatch.setenv("POTLUCK_COORDINATOR_TOKEN", "supersecret")
     resp = client.get("/health")
@@ -156,7 +156,7 @@ def test_health_reachable_with_token_configured(
 def test_health_reachable_without_header_when_token_configured(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Health is unauthenticated — no header needed even with token configured."""
+    """Health is unauthenticated - no header needed even with token configured."""
     monkeypatch.setenv("POTLUCK_COORDINATOR_TOKEN", "supersecret")
     resp = client.get("/health")
     assert resp.status_code == 200

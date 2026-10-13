@@ -1,33 +1,33 @@
 #!/usr/bin/env bash
-# build.sh — compile + codesign the mesh-helper Swift CLI.
+# build.sh - compile + codesign the mesh-helper Swift CLI.
 #
 # Produces a universal (arm64 + x86_64) Mach-O binary at
 # apps/desktop/electron/resources/mesh-helper/mesh-helper, matching the two
 # mac architectures electron-builder targets (see package.json's
 # mac.target arch list). electron-builder's mac.extraFiles then places it at
-# Contents/MacOS/mesh-helper — a REQUIRED sibling location of the main
+# Contents/MacOS/mesh-helper - a required sibling location of the main
 # Electron executable; see the header comment in main.swift for why.
 #
 # Invoked from the electron prepack step (package.json's prepack:mesh-helper).
 #
 # Environment:
-#   CODESIGN_IDENTITY — signing identity. Default: the Potluck Developer ID
-#                        Application identity. Set to "-" for an ad-hoc dev
+#   CODESIGN_IDENTITY - signing identity. Default: the first "Developer ID
+#                        Application" certificate in the keychain, or ad-hoc
+#                        when there is none. Set to "-" for an ad-hoc dev
 #                        build (no cert required, but SMAppService will refuse
 #                        to register a daemon whose Team ID doesn't match the
-#                        calling app's — ad-hoc builds cannot register a real
+#                        calling app's - ad-hoc builds cannot register a real
 #                        LaunchDaemon, only compile/run `status` locally).
 #
 # Non-fatal signing: if codesign fails (locked keychain, missing cert, CI
 # host without the identity), this script logs a loud warning and leaves the
-# unsigned/ad-hoc binary in place rather than failing the whole prepack step
-# — matches the "leave the signing step wired but document that it runs at
-# package time" instruction. A real release build MUST have this succeed.
+# unsigned/ad-hoc binary in place rather than failing the whole prepack step.
+# A real release build must have signing succeed.
 
 set -euo pipefail
 
 if [[ "$(uname)" != "Darwin" ]]; then
-  echo "[mesh-helper] Non-macOS platform ($(uname)) — skipping (macOS-only mechanism for now)."
+  echo "[mesh-helper] Non-macOS platform ($(uname)), skipping (macOS-only mechanism for now)."
   exit 0
 fi
 
@@ -36,7 +36,12 @@ OUT_DIR="$SCRIPT_DIR/../../resources/mesh-helper"
 BIN_NAME="mesh-helper"
 MIN_MACOS="13.0"  # SMAppService requires macOS 13+.
 
-IDENTITY="${CODESIGN_IDENTITY:-Developer ID Application: Example (TEAMID)}"
+IDENTITY="${CODESIGN_IDENTITY:-}"
+if [[ -z "$IDENTITY" ]]; then
+  IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null \
+    | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -n 1 || true)"
+fi
+IDENTITY="${IDENTITY:--}"
 
 mkdir -p "$OUT_DIR"
 
@@ -78,7 +83,7 @@ else
   echo "  no UI session to unlock it). Leaving an UNSIGNED binary in place." >&2
   echo "  This is fine for a local ad-hoc test of the 'status' subcommand, but" >&2
   echo "  SMAppService.register() will be REJECTED for an unsigned/mismatched-" >&2
-  echo "  Team-ID helper in a real packaged build — this MUST succeed before" >&2
+  echo "  Team-ID helper in a real packaged build. This MUST succeed before" >&2
   echo "  producing a release artifact. Re-run this script on a machine with the" >&2
   echo "  Developer ID identity unlocked in Keychain Access." >&2
   echo "" >&2

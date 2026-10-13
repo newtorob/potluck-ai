@@ -1,11 +1,11 @@
 /**
- * CirclesView — /circles route.
+ * CirclesView - /circles route.
  *
  * A trusted circle is a named group of members who lend each other spare
  * compute. People get in by invite: the owner makes a one-time code, the
  * other person pastes it here, sees what they are joining, and chooses to
- * join. Nobody is added without being asked. This is Phase 2 of four-tier
- * routing.
+ * join. Nobody is added without being asked. Circles are one of the routing
+ * scopes for a chat request.
  *
  * Layout:
  *   Header: "Trusted circles" with a live count, then one line pointing to
@@ -28,11 +28,11 @@
  *   can remove them. Nothing here adds a key.
  *
  * Error handling policy:
- *   A failed load never shows one misleading catch-all message — it's
+ *   A failed load never shows one misleading catch-all message - it's
  *   classified (coordinatorError.ts) into what actually happened: signed
  *   out (401) gets a sign-in prompt, a coordinator misconfiguration (403)
  *   gets a diagnosable message, and unreachable/server-error get a calm
- *   empty state with a Retry button. None of these bubble past this view —
+ *   empty state with a Retry button. None of these bubble past this view -
  *   the app shell (Sidebar/StatusBar) stays up regardless.
  *   A failed action shows the coordinator's own sentence next to the control
  *   that was used (circleErrorMessage).
@@ -148,7 +148,7 @@ export function CirclesView() {
   }, [load]);
 
   if (!loading && errorState !== null) {
-    // Signed out — this is not "the coordinator is down," it's "you need to
+    // Signed out - this is not "the coordinator is down," it's "you need to
     // sign in." Distinct empty state, no error tone, wired to the app's
     // existing sign-in flow (the /membership route's magic-link form).
     if (errorState.kind === 'unauthenticated') {
@@ -169,7 +169,7 @@ export function CirclesView() {
       );
     }
 
-    // Coordinator misconfiguration (403), unreachable, or a 5xx — calm
+    // Coordinator misconfiguration (403), unreachable, or a 5xx - calm
     // state with a Retry, not a wall. Copy is classified, not guessed.
     const copy = defaultCoordinatorErrorCopy(errorState);
     return (
@@ -1280,7 +1280,7 @@ function InlineRemove({
 }
 
 // ---------------------------------------------------------------------------
-// Section header — matches NetworkView / HouseholdView pattern
+// Section header - matches NetworkView / HouseholdView pattern
 // ---------------------------------------------------------------------------
 
 function SectionHeader({ children }: { children: React.ReactNode }) {

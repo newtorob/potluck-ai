@@ -28,7 +28,7 @@ class BillingEvent(Base):
         nullable=True,
         index=True,
     )
-    # Stripe event ID — used as idempotency key to deduplicate retries.
+    # Stripe event ID - used as idempotency key to deduplicate retries.
     stripe_event_id: Mapped[str] = mapped_column(
         String(64), unique=True, nullable=False
     )

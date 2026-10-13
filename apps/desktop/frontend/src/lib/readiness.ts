@@ -1,16 +1,15 @@
 /**
- * readiness — "is this machine ready?" netcheck, composed from signals we
+ * readiness - "is this machine ready?" netcheck, composed from signals we
  * already collect: local health (sidecar + loaded model), hardware detection,
  * and the mesh diagnostics engine (deriveDiagnostics).
  *
- * This is the product surface the multi-hour two-machine bring-up should have
- * had: one glance that says whether this box can run locally, and whether it's
- * reachable on the mesh — each gap named with a fix, not a generic "offline".
+ * One glance says whether this box can run locally, and whether it's
+ * reachable on the mesh - each gap named with a fix, not a generic "offline".
  *
- * v1 composes what's already exposed. Deeper probes flagged by the product scan
- * (an actual GPU-inference test, port/firewall scan, direct VPN-conflict probe,
- * sidecar-token validity) need new backend endpoints and are a tracked follow-on;
- * we deliberately show only checks backed by real data rather than stubs.
+ * v1 composes what's already exposed. We deliberately show only checks backed
+ * by real data rather than stubs.
+ * TODO: deeper probes (an actual GPU-inference test, port/firewall scan,
+ * direct VPN-conflict probe, sidecar-token validity) need new backend endpoints.
  *
  * Privacy: metadata only (model name, GPU name, peer reachability). No prompt or
  * inference content.
@@ -35,7 +34,7 @@ export interface ReadinessCheck {
 export interface ReadinessReport {
   checks: ReadinessCheck[];
   overall: DiagSeverity;
-  /** True when no machine-group check is warn/error — i.e. this box can run
+  /** True when no machine-group check is warn/error - i.e. this box can run
    *  inference locally. The network group is optional and never gates this. */
   machineReady: boolean;
   headline: string;
@@ -55,14 +54,14 @@ export interface ReadinessInput {
   /** Peer roster, used to label per-peer network checks by name. */
   peers: MeshPeer[];
   /**
-   * VPN-conflict probe from the mesh status poll. Optional — when absent
+   * VPN-conflict probe from the mesh status poll. Optional - when absent
    * (sidecar offline, older sidecar, mesh not enrolled) the check is omitted
    * rather than shown as an error.
    */
   vpnConflict?: { conflict: boolean; detail: string };
   /**
    * Whether the WireGuard listen port is bound and accepting connections.
-   * Optional — omitted when mesh sidecar hasn't reported it yet.
+   * Optional - omitted when mesh sidecar hasn't reported it yet.
    */
   wgPortListening?: boolean;
 }
@@ -110,7 +109,7 @@ export function deriveReadiness(input: ReadinessInput): ReadinessReport {
     });
   }
 
-  // Hardware — detection only (not an inference-time GPU test; see follow-on).
+  // Hardware - detection only (not an inference-time GPU test; see follow-on).
   const hw = input.hardware;
   if (!hw) {
     checks.push({
@@ -121,7 +120,7 @@ export function deriveReadiness(input: ReadinessInput): ReadinessReport {
       detail: "Still reading this machine's CPU/GPU.",
     });
   } else if (hw.gpu_name) {
-    // Apple Silicon shares one unified-memory pool between CPU and GPU — calling
+    // Apple Silicon shares one unified-memory pool between CPU and GPU - calling
     // it "VRAM" (a dedicated discrete-GPU concept) would be wrong.
     const memLabel = /apple/i.test(hw.gpu_name) ? 'unified memory' : 'VRAM';
     const mem = hw.gpu_vram_gb ? ` · ${hw.gpu_vram_gb} GB ${memLabel}` : '';
@@ -142,10 +141,10 @@ export function deriveReadiness(input: ReadinessInput): ReadinessReport {
     });
   }
 
-  // ---- Network passive probes — drawn from the mesh status poll -----------
+  // ---- Network passive probes - drawn from the mesh status poll -----------
   // These are emitted regardless of enrollment: a VPN conflict matters even
   // before pairing, and the port check is the first thing to fix when pairing
-  // fails. Both are gated on the signal being present — an absent field (sidecar
+  // fails. Both are gated on the signal being present - an absent field (sidecar
   // offline, older version) renders nothing rather than a false alarm.
 
   if (input.vpnConflict !== undefined) {
@@ -190,7 +189,7 @@ export function deriveReadiness(input: ReadinessInput): ReadinessReport {
     }
   }
 
-  // ---- Network (mesh) — optional ------------------------------------------
+  // ---- Network (mesh) - optional ------------------------------------------
   if (!input.enrolled) {
     checks.push({
       code: 'MESH',

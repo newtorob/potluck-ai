@@ -2,7 +2,7 @@
  * Agent observability store.
  *
  * Holds sessions, activity feed, and selected-session detail.
- * Polling control lives in useAgents — the store is pure state + actions.
+ * Polling control lives in useAgents - the store is pure state + actions.
  *
  * Design notes:
  * - `activity` is prepend-merged on each fetch so new calls slide in at

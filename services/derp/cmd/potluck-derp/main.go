@@ -1,4 +1,4 @@
-// potluck-derp — Potluck DERP relay server.
+// potluck-derp - Potluck DERP relay server.
 //
 // Listens on a TLS (or cleartext-dev) TCP port and relays WireGuard encrypted
 // packets between authenticated peers. See internal/relay for the wire format.
@@ -11,7 +11,7 @@
 //
 //	potluck-derp --tls-cert /path/to/cert.pem --tls-key /path/to/key.pem
 //
-// Environment variables (all optional — flags take precedence):
+// Environment variables (all optional - flags take precedence):
 //
 //	POTLUCK_DERP_PORT        TCP port for the relay (default 8443)
 //	POTLUCK_DERP_HEALTH_PORT HTTP port for /health   (default 8444)
@@ -43,7 +43,7 @@ func main() {
 func run() int {
 	// ---- flags ---- //
 	var (
-		insecure   = flag.Bool("insecure-cleartext", false, "Skip TLS — for localhost dev only")
+		insecure   = flag.Bool("insecure-cleartext", false, "Skip TLS (for localhost dev only)")
 		tlsCert    = flag.String("tls-cert", "", "Path to TLS certificate file")
 		tlsKey     = flag.String("tls-key", "", "Path to TLS key file")
 		port       = flag.Int("port", envInt("POTLUCK_DERP_PORT", 8443), "Relay TCP port (env: POTLUCK_DERP_PORT)")
@@ -84,7 +84,7 @@ func run() int {
 	var listenErr error
 
 	if *insecure {
-		slog.Warn("derp: RUNNING IN INSECURE CLEARTEXT MODE — dev only", "addr", listenAddr)
+		slog.Warn("derp: RUNNING IN INSECURE CLEARTEXT MODE, dev only", "addr", listenAddr)
 		ln, listenErr = net.Listen("tcp", listenAddr)
 	} else {
 		if *tlsCert == "" || *tlsKey == "" {

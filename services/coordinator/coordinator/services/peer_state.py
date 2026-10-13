@@ -31,7 +31,7 @@ async def apply_heartbeat(
 
     `binary_hash` and `client_version` are passed in from the session
     (captured at handshake) rather than trusting whatever the peer puts
-    in the heartbeat envelope — they don't change mid-session, and
+    in the heartbeat envelope - they don't change mid-session, and
     revalidating them per-heartbeat would just be churn.
     """
     now = datetime.now(timezone.utc)

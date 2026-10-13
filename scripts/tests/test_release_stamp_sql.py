@@ -1,9 +1,9 @@
 """emit-sql-stamp registers the hash a shipped engine presents.
 
 The engine attests with the digest stamped into contributor-release.json at
-build time. The older emit-sql hashed one file, so its row never matched a
-real build and production (which requires a registered release) would have
-refused every shipped app.
+build time. emit-sql hashes one file, so its row would never match a
+real build and production (which requires a registered release) would
+refuse every shipped app.
 """
 from __future__ import annotations
 

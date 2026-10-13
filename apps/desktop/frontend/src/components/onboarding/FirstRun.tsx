@@ -1,13 +1,13 @@
 /**
- * FirstRun — 5-step onboarding wizard.
+ * FirstRun - 5-step onboarding wizard.
  *
  * Steps:
- *   1. Welcome       — product intro
- *   2. Hardware      — detect specs + recommend tier
- *   3. ModelPick     — choose and install a model
- *   4. Loading       — wait for model to load into runtime
- *   5. Connect       — mesh / machines
- *   6. Ready         — compact readiness netcheck + navigate to /chat
+ *   1. Welcome - product intro
+ *   2. Hardware - detect specs + recommend tier
+ *   3. ModelPick - choose and install a model
+ *   4. Loading - wait for model to load into runtime
+ *   5. Connect - mesh / machines
+ *   6. Ready - compact readiness netcheck + navigate to /chat
  *
  * Completion flag: localStorage key `potluck.onboarding_completed = 'true'`
  * This key is read by App.tsx to gate whether to show FirstRun.
@@ -78,7 +78,7 @@ function markOnboardingComplete() {
 // ---------------------------------------------------------------------------
 
 interface FirstRunProps {
-  /** Full model catalog — passed from App so the store is shared */
+  /** Full model catalog - passed from App so the store is shared */
   models: CatalogModel[];
 }
 
@@ -95,7 +95,7 @@ export function FirstRun({ models }: FirstRunProps) {
   const meshPeers = useMeshStore((s) => s.peers);
   const meshBridge = useMeshStore((s) => s.bridge);
 
-  // Select stable slices/actions — never subscribe to the whole store.
+  // Select stable slices/actions - never subscribe to the whole store.
   // A whole-store dep in the download-complete effect re-fired load() on every
   // zustand write and hit React's maximum update depth during onboarding.
   const install = useModelStore((s) => s.install);
@@ -213,11 +213,11 @@ export function FirstRun({ models }: FirstRunProps) {
   const downloadComplete =
     selectedProgress?.status === 'complete' || selectedModel?.installed === true;
 
-  // Compute readiness for the ready step — mirrors ReadinessView's useMemo
+  // Compute readiness for the ready step - mirrors ReadinessView's useMemo
   // exactly, including exactOptionalPropertyTypes-safe conditional spreads.
   const readinessReport: ReadinessReport = useMemo(() => {
     const mesh = deriveDiagnostics({ bridge: meshBridge, status: meshStatus, peers: meshPeers });
-    // Only spread optional fields when the signal is present — passing
+    // Only spread optional fields when the signal is present - passing
     // `prop: undefined` fails exactOptionalPropertyTypes.
     const vpnConflict =
       meshStatus !== null
@@ -461,7 +461,7 @@ export function FirstRun({ models }: FirstRunProps) {
 function WelcomeStep() {
   return (
     <div className="space-y-5 text-center animate-fade-in-up">
-      {/* Ember-tinted square with a soft glow halo — telegraphs warmth + alive */}
+      {/* Ember-tinted square with a soft glow halo - telegraphs warmth + alive */}
       <div className="relative mx-auto h-16 w-16">
         <div className="absolute inset-0 rounded-2xl bg-primary/15 blur-xl" aria-hidden="true" />
         <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/20">
@@ -602,7 +602,7 @@ function LoadingStep({ error }: { error: string | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// Severity style map for compact readiness rows — a minimal subset of the
+// Severity style map for compact readiness rows - a minimal subset of the
 // full SEV table in ReadinessView (which is file-private there).
 // ---------------------------------------------------------------------------
 
@@ -637,7 +637,7 @@ function ReadyStep({
   const machineChecks = report.checks.filter((c) => c.group === 'machine');
   const networkChecks = report.checks.filter((c) => c.group === 'network');
 
-  // Gaps are any check that isn't 'ok' — shown with label + fix.
+  // Gaps are any check that isn't 'ok' - shown with label + fix.
   const hasGaps = report.checks.some((c) => c.severity === 'warn' || c.severity === 'error');
 
   function handleViewReadiness() {
@@ -670,7 +670,7 @@ function ReadyStep({
           <p className="text-sm leading-relaxed text-muted-foreground reading-measure mx-auto">
             {report.machineReady && !hasGaps
               ? 'Inference runs locally by default. Your conversations stay on this device unless you choose to use the network.'
-              : 'Inference runs locally by default. Any gaps below are non-blocking — you can fix them after you start.'}
+              : 'Inference runs locally by default. Any gaps below are non-blocking, and you can fix them after you start.'}
           </p>
         </div>
       </div>
@@ -716,7 +716,7 @@ function ReadyStep({
         </div>
       </div>
 
-      {/* Pointer to full Readiness view — only after onboarding completes */}
+      {/* Pointer to full Readiness view - only after onboarding completes */}
       <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
         Run a full netcheck anytime from{' '}
         <button

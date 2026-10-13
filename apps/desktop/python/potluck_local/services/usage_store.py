@@ -4,8 +4,8 @@ One row per completed inference request, written by each request path (see the
 insertion points in routers/gateway.py, routers/peer.py, contributor/client.py,
 and the frontend-driven POST /usage/record for in-app network chat).
 
-PRIVACY INVARIANT (non-negotiable): metadata only. model, token counts, latency,
-timestamp, scope, ok/fail. NEVER prompt or response content, and NEVER peer
+Privacy invariant: metadata only. model, token counts, latency,
+timestamp, scope, ok/fail. Never prompt or response content, and never peer
 identity on `served` rows. Everything here is computed and stored on-device in
 the same sidecar SQLite file as memory; nothing is ever uploaded. This mirrors
 the /agents args_summary metadata-only whitelist.

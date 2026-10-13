@@ -1,5 +1,5 @@
 /**
- * useModels — facade over modelStore.
+ * useModels - facade over modelStore.
  *
  * Auto-fetches on mount. Re-fetches on window visibility change (tab/focus
  * restored) so stale installed/progress state is refreshed automatically.

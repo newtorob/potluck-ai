@@ -1,27 +1,27 @@
 /**
- * Connection store — runtime-editable coordinator URL.
+ * Connection store - runtime-editable coordinator URL.
  *
- * Why this exists: the coordinator URL was previously a compile-time
+ * Why this exists: users in a multi-machine setup need to point at a
+ * coordinator on another machine in their fleet (over LAN or Tailscale)
+ * without rebuilding the app, so the URL cannot be only a compile-time
  * constant (`VITE_COORDINATOR_URL` env var with a `http://127.0.0.1:8400`
- * fallback). That broke the multi-machine workflow where users want to
- * point at a coordinator on another machine in their fleet (over LAN
- * or Tailscale) without rebuilding the app.
+ * fallback).
  *
- * This store persists explicit user overrides to BOTH localStorage and the
+ * This store persists explicit user overrides to both localStorage and the
  * Python sidecar's durable config (~/.potluck/config.json →
  * network.coordinator_url). On startup, App.tsx reads the durable config
  * and calls `hydrateFromSidecar()` so the setting survives localStorage
  * wipes, reinstalls, and cross-surface launches (dev vs packaged app).
  *
  * Bootstrap + runtime precedence:
- *   1. Explicit user override — a value the user typed + saved. Written to
- *      localStorage (fast-path cache) AND the Python sidecar's durable
+ *   1. Explicit user override - a value the user typed + saved. Written to
+ *      localStorage (fast-path cache) and the Python sidecar's durable
  *      config. Wins over everything. Restored from the durable config on
  *      startup if localStorage was wiped.
- *   2. Sidecar-reported URL — `coordinator_url` from the Go mesh sidecar's
+ *   2. Sidecar-reported URL - `coordinator_url` from the Go mesh sidecar's
  *      live /status response. Adopted via `adoptSidecarUrl()` only when
- *      there is no explicit override. NOT written to localStorage or the
- *      durable config — it is a transient, lower-precedence signal.
+ *      there is no explicit override. Not written to localStorage or the
+ *      durable config - it is a transient, lower-precedence signal.
  *   3. VITE_COORDINATOR_URL build-time env (CI / dev override).
  *   4. http://127.0.0.1:8400 default (matches the docker-compose binding).
  *
@@ -32,7 +32,7 @@
  *   value is durable across restarts and localhost wipes.
  *
  *   `adoptSidecarUrl()` updates `coordinatorUrl` in memory and sets
- *   `sidecarReportedUrl` but does NOT touch localStorage or the durable
+ *   `sidecarReportedUrl` but does not touch localStorage or the durable
  *   config. It is the lower-precedence mesh-status signal; conflating it
  *   with the user's durable override would corrupt the config on reset.
  */
@@ -42,7 +42,7 @@ import { create } from 'zustand';
 const STORAGE_KEY = 'potluck.coordinator_url';
 const DEFAULT_URL = 'http://127.0.0.1:8400';
 
-// Python sidecar base — same constant as localApi.ts, duplicated here to
+// Python sidecar base - same constant as localApi.ts, duplicated here to
 // avoid a circular import (localApi.ts imports coordinatorBase from this
 // module). Only used inside function bodies (after both modules are fully
 // evaluated), so the cross-module ordering is safe.
@@ -87,7 +87,7 @@ function readStoredOverride(): string | null {
 }
 
 interface ConnectionState {
-  /** The coordinator URL currently in use — read by all consumers. */
+  /** The coordinator URL currently in use - read by all consumers. */
   coordinatorUrl: string;
 
   /**
@@ -105,7 +105,7 @@ interface ConnectionState {
 
   /**
    * Called by the user (via CooperativeConnectionPanel) when they type and
-   * save a coordinator URL. Persists to localStorage (fast-path cache) AND
+   * save a coordinator URL. Persists to localStorage (fast-path cache) and
    * fires a durable write to the Python sidecar config so the value
    * survives localStorage wipes and reinstalls. Marks the override explicit.
    * This value wins over the sidecar-reported URL.
@@ -122,9 +122,9 @@ interface ConnectionState {
 
   /**
    * Called by meshStore whenever a /status response arrives. Updates
-   * `sidecarReportedUrl` always, and — if there is no explicit user
-   * override — also updates `coordinatorUrl` so all consumers see the
-   * sidecar's actual target. Does NOT write to localStorage or the durable
+   * `sidecarReportedUrl` always, and - if there is no explicit user
+   * override - also updates `coordinatorUrl` so all consumers see the
+   * sidecar's actual target. Does not write to localStorage or the durable
    * sidecar config (lower-precedence transient signal only).
    */
   adoptSidecarUrl: (url: string) => void;
@@ -158,7 +158,7 @@ export const useConnectionStore = create<ConnectionState>()((set, get) => {
       }
       set({ coordinatorUrl: cleaned, hasExplicitOverride: true });
       // Durable write: survives localStorage wipe, reinstall, cross-surface
-      // launch. Fire-and-forget — localStorage already guards this session.
+      // launch. Fire-and-forget - localStorage already guards this session.
       persistToSidecar(cleaned);
     },
 
@@ -182,7 +182,7 @@ export const useConnectionStore = create<ConnectionState>()((set, get) => {
         // Record what the sidecar says but keep the user's choice active.
         set({ sidecarReportedUrl: cleaned });
       } else {
-        // No user override — use the sidecar's actual target.
+        // No user override - use the sidecar's actual target.
         set({ coordinatorUrl: cleaned, sidecarReportedUrl: cleaned });
       }
     },
@@ -207,7 +207,7 @@ export const useConnectionStore = create<ConnectionState>()((set, get) => {
  *
  *     fetch(`${coordinatorBase()}/health`)
  *
- * Do NOT cache the result across calls — the value is mutable.
+ * Do not cache the result across calls - the value is mutable.
  */
 export function coordinatorBase(): string {
   return useConnectionStore.getState().coordinatorUrl;
@@ -216,13 +216,13 @@ export function coordinatorBase(): string {
 /**
  * True when the app's active coordinatorUrl disagrees with what this
  * machine's mesh daemon actually reports itself connected to
- * (sidecarReportedUrl — populated from the Go mesh daemon's own live
- * GET /status via meshStore's adoptSidecarUrl calls, NOT the Python
+ * (sidecarReportedUrl - populated from the Go mesh daemon's own live
+ * GET /status via meshStore's adoptSidecarUrl calls, not the Python
  * sidecar despite the name inherited from that field).
  *
  * Per this file's precedence, `adoptSidecarUrl` keeps `coordinatorUrl` and
- * `sidecarReportedUrl` in sync whenever there's no explicit user override —
- * so a divergence here can only mean there IS an explicit override, and
+ * `sidecarReportedUrl` in sync whenever there's no explicit user override -
+ * so a divergence here can only mean there is an explicit override, and
  * it's stale relative to what the daemon is actually dialing (e.g. a
  * coordinator URL saved during dev testing, still active in a prod
  * session). This is exactly the "app knew the right answer and didn't use
@@ -231,7 +231,7 @@ export function coordinatorBase(): string {
  * through the app's own `coordinatorUrl` and get rejected by a coordinator
  * that never saw the user's session.
  *
- * `sidecarReportedUrl === null` (no daemon status yet — not started, dev
+ * `sidecarReportedUrl === null` (no daemon status yet - not started, dev
  * without the bridge, or a platform without daemon supervision) is never a
  * mismatch; there's nothing to compare against.
  */
@@ -248,14 +248,14 @@ export function isCoordinatorMismatched(
 //
 // main.js's onBeforeSendHeaders injector attaches the member session bearer
 // to renderer→coordinator requests that can't go through the buffering
-// coordinator:session-request IPC bridge — chiefly streamNetworkJob's SSE
+// coordinator:session-request IPC bridge - chiefly streamNetworkJob's SSE
 // POST to /jobs/stream (see localApi.ts). That injector scopes the bearer to
 // an exact origin for security, and origin is user-overridable/runtime-
 // mutable (setCoordinatorUrl, adoptSidecarUrl, hydrateFromSidecar all change
-// it), so main can't hardcode it — the renderer has to push it over.
+// it), so main can't hardcode it - the renderer has to push it over.
 
 /** Best-effort push of `url` to main via window.potluck.cloud.setCoordinatorBase.
- *  No-op outside the packaged app (that bridge only exists there — preload.js). */
+ *  No-op outside the packaged app (that bridge only exists there - preload.js). */
 function pushCoordinatorBaseToMain(url: string): void {
   if (typeof window === 'undefined') return;
   const setBase = (
@@ -269,8 +269,8 @@ function pushCoordinatorBaseToMain(url: string): void {
 /**
  * Wires this store to the main process: pushes the current coordinatorUrl
  * immediately, then again on every subsequent change (user override, sidecar
- * adoption, durable-config hydration — anything that calls `set()` here).
- * Call once, on app mount. Safe in dev/browser — pushCoordinatorBaseToMain
+ * adoption, durable-config hydration - anything that calls `set()` here).
+ * Call once, on app mount. Safe in dev/browser - pushCoordinatorBaseToMain
  * no-ops when window.potluck is absent.
  */
 export function initCoordinatorBaseSync(): void {

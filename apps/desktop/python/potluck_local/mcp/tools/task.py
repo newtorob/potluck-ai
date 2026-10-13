@@ -1,6 +1,6 @@
-"""MCP task tools — create, get, list, update, complete_step, add_error.
+"""MCP task tools - create, get, list, update, complete_step, add_error.
 
-No privacy gate — task state is workflow metadata, not personal facts.
+No privacy gate - task state is workflow metadata, not personal facts.
 
 Project scoping:
 All tools that create or list tasks accept an optional `project` parameter.

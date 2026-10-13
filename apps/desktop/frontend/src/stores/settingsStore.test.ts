@@ -1,5 +1,5 @@
 /**
- * settingsStore — hydrateFromSidecar seeds the store from the single
+ * settingsStore - hydrateFromSidecar seeds the store from the single
  * GET /settings that durablePrefs already makes at startup, so privacy
  * gates that read settings have a real value before the first send.
  */

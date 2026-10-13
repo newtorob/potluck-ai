@@ -1,7 +1,7 @@
-"""0008 — drop peers + compute_credits stubs (moving to coordinator).
+"""0008 - drop peers + compute_credits stubs (moving to coordinator).
 
 The v0 stubs from migration 0007 were never written to. Phase G makes the
-coordinator service the owner of all peer/job/credit tables — the api keeps
+coordinator service the owner of all peer/job/credit tables - the api keeps
 members/sessions/billing/governance, the coordinator gets peers/jobs/credits.
 
 The coordinator's first migration (`0001_phase_g_foundations` in

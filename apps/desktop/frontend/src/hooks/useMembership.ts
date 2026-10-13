@@ -1,5 +1,5 @@
 /**
- * useMembership — fetches membership details and exposes billing portal action.
+ * useMembership - fetches membership details and exposes billing portal action.
  *
  * Only called when the user is signed in (check useAuth().isSignedIn first).
  */

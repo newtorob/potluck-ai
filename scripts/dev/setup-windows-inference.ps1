@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    One-shot Windows inference setup for the Potluck contributor (Phase G m3).
+    One-shot Windows inference setup for the Potluck contributor.
     Auto-detects your GPU vendor and picks the right backend:
 
       - NVIDIA   -> llama-cpp-python with CUDA wheels (in-process inference)
@@ -10,7 +10,7 @@
       - No GPU   -> Ollama (CPU build, slow but works)
 
 .DESCRIPTION
-    Run AFTER scripts\setup-windows-contributor.ps1. Idempotent.
+    Run after scripts\setup-windows-contributor.ps1. Idempotent.
 
     What it does:
       1. Detects GPU vendor from Get-CimInstance Win32_VideoController.
@@ -233,7 +233,7 @@ function Install-Ollama {
     # PATH only refreshes for new shells, so Get-Command may miss an
     # Ollama installed in this same session. Probe the standard install
     # locations too, and prepend to PATH if found - lets a re-run in the
-    # SAME shell skip the winget step instead of trying to re-install.
+    # same shell skip the winget step instead of trying to re-install.
     $ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
     if (-not $ollamaCmd) {
         $candidatePaths = @(
@@ -438,7 +438,7 @@ To activate: restart the contributor sidecar.
    - Double-click it again from the Desktop
    - First job: cold-load model (15-60s). Subsequent jobs are fast.
 
-To verify from the dev Mac after restart:
+To verify from the coordinator machine after restart:
    curl -X POST http://<mac-ip>:8400/jobs -H 'Content-Type: application/json' \
      -d '{"prompt":"Hello","model_slug":"$ModelSlug","sampling":{"max_tokens":20}}'
 

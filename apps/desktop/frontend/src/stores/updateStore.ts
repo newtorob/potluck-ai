@@ -1,12 +1,12 @@
 /**
- * updateStore — shared state for the whole "stale client can never happen"
+ * updateStore - shared state for the whole "stale client can never happen"
  * flow. Two independent signals feed the same phase machine:
  *
  *   1. The local auto-updater (electron-updater via window.potluck.updater):
  *      onAvailable/onProgress/onDownloaded/onError events, driven by
- *      UpdateBanner's subscription. Task 1.
+ *      UpdateBanner's subscription.
  *   2. The cloud version handshake (GET /client/version): a semver compare
- *      against `minimum` (blocking) and `latest` (soft nudge). Task 2.
+ *      against `minimum` (blocking) and `latest` (soft nudge).
  *
  * They share one store so the handshake can drive the *same* "available"
  * banner the local updater would show (`checkVersionHandshake` calls
@@ -16,7 +16,7 @@
  *
  * Everything here is defensive by construction: ipc.* and cloudApi.* already
  * no-op / fail safely when window.potluck (or its `updater` sub-bridge) or
- * the cloud endpoint aren't present yet — this store never assumes either
+ * the cloud endpoint aren't present yet - this store never assumes either
  * exists.
  */
 
@@ -28,7 +28,7 @@ import { isVersionBelow } from '@/lib/semver';
 export type UpdatePhase = 'idle' | 'available' | 'downloading' | 'ready' | 'error';
 
 interface UpdateState {
-  // ── Local auto-updater state (Task 1) ──────────────────────────────────
+  // ── Local auto-updater state ───────────────────────────────────────────
   phase: UpdatePhase;
   /** The version the current phase refers to (available/ready), if known. */
   version: string | null;
@@ -38,11 +38,11 @@ interface UpdateState {
    *  version becomes available so a later nudge isn't suppressed forever. */
   dismissed: boolean;
 
-  // ── Cloud version handshake state (Task 2) ─────────────────────────────
+  // ── Cloud version handshake state ──────────────────────────────────────
   minimumVersion: string | null;
   latestVersion: string | null;
   notesUrl: string | null;
-  /** True when the running version is below `minimum` — blocks the app. */
+  /** True when the running version is below `minimum` - blocks the app. */
   blocked: boolean;
   /** True once the handshake has settled (success, absence, or failure). */
   versionCheckDone: boolean;
@@ -62,7 +62,7 @@ interface UpdateState {
   install: () => void;
 
   /** GET /client/version, compare against the running version, set
-   *  `blocked` and (optionally) nudge `phase` to 'available'. Never throws —
+   *  `blocked` and (optionally) nudge `phase` to 'available'. Never throws -
    *  any failure (404, offline, malformed body) leaves state untouched
    *  beyond marking the check done. */
   checkVersionHandshake: () => Promise<void>;
@@ -142,7 +142,7 @@ export const useUpdateStore = create<UpdateState>()((set, get) => ({
         get().setAvailable(info.latest);
       }
     } catch {
-      // 404 (not deployed yet), offline, malformed body — all the same:
+      // 404 (not deployed yet), offline, malformed body - all the same:
       // no version info, never block on it.
       set({ versionCheckDone: true });
     }

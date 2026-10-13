@@ -1,14 +1,14 @@
 /**
- * PreflightBanner — the global connectivity health strip for My Machines.
+ * PreflightBanner - the global connectivity health strip for My Machines.
  *
- * VPN-resilience Pillar #1, UX half (a): instead of a single "offline", show a
- * named, root-cause-suppressed read on the mesh — local → coordinator → peers.
+ * Instead of a single "offline", show a named, root-cause-suppressed read on
+ * the mesh - local → coordinator → peers.
  * When everything's healthy it's a slim, calm one-liner; when something's
  * wrong it surfaces the specific cause and the fix, worst-first.
  *
  * Flicker control: connectivity flaps on a single poll. We debounce
  * *escalations* (apply a worse state only if it persists ~4s) but apply
- * *improvements* immediately — never nag on a blip, always clear good news fast.
+ * *improvements* immediately - never nag on a blip, always clear good news fast.
  */
 
 import { useEffect, useRef, useState } from 'react';

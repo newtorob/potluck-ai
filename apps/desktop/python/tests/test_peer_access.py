@@ -1,20 +1,20 @@
 """Locks the sidecar's #1 security guarantee.
 
 The sidecar binds 0.0.0.0 so household peers can dial it over the WireGuard
-mesh, so peer_access_middleware (potluck_local/app.py) is the ENTIRE access
+mesh, so peer_access_middleware (potluck_local/app.py) is the entire access
 boundary: a non-loopback caller may reach only /peer/* and /health, never the
 local user's memory / tasks / chat / agents / settings / vault.
 
-That boundary was previously unlocked by tests (every other test uses a loopback
-client to get PAST the guard). These tests impersonate a peer by handing the
-TestClient a non-loopback client address, and assert the deny/allow split — so a
-future refactor of the middleware can't silently open the private surface.
+Every other test uses a loopback client to get past the guard. These tests
+impersonate a peer by handing the TestClient a non-loopback client address, and
+assert the deny/allow split - so a future refactor of the middleware can't
+silently open the private surface.
 
 "Non-loopback" is not the same claim as "on the WireGuard mesh": 0.0.0.0 binds
 the bare socket to every interface, so a bystander on the same LAN/Wi-Fi is also
 "non-loopback" without ever having joined the household's mesh. /peer/* requires
 a source IP inside the mesh CIDR (default 100.64.0.0/10, see app.py's
-_resolve_mesh_network / _DEFAULT_MESH_CIDR) AND household membership as this
+_resolve_mesh_network / _DEFAULT_MESH_CIDR) and household membership as this
 machine's mesh sidecar reports it (services/peer_trust.py). These tests cover
 the member allow case and the LAN deny case; tests/test_peer_trust.py covers
 the membership rules in depth. The `fake_mesh` fixture stands in for the sidecar.
@@ -29,7 +29,7 @@ from potluck_local.app import create_app
 # TestClient lets us set the simulated socket peer address; the middleware keys
 # its trust decision off exactly this.
 MESH_PEER = ("100.64.0.9", 40000)  # inside the default mesh CIDR (100.64.0.0/10) -- a real household peer
-LAN_PEER = ("192.168.1.50", 40000)  # non-loopback, but NOT on the mesh -- e.g. a coffee-shop/dorm neighbor
+LAN_PEER = ("192.168.1.50", 40000)  # non-loopback, but not on the mesh -- e.g. a coffee-shop/dorm neighbor
 LOCAL = ("127.0.0.1", 50000)  # the local user (Electron / dev tools)
 
 # A representative sample of the private, loopback-only surface. The middleware
@@ -38,8 +38,8 @@ PRIVATE_PATHS = ["/memory/projects", "/tasks", "/agents", "/settings", "/vault",
 
 # The peer-facing surface that must be mesh-CIDR gated (not merely non-loopback
 # gated) -- capabilities probe, stateless inference dispatch, and (opt-in)
-# full-content memory search are the exact endpoints the launch-blocker bug
-# exposed to any device on the LAN.
+# full-content memory search are the exact endpoints that would be exposed to
+# any device on the LAN without the gate.
 PEER_SURFACE_PATHS = ["/peer/capabilities"]
 
 
@@ -87,8 +87,7 @@ def test_mesh_peer_can_reach_health(mesh_peer_client):
 def test_lan_peer_gets_only_liveness_from_health(lan_peer_client):
     # /health stays open to any caller as a liveness probe, but a caller that
     # is not a household member gets nothing else: no version, no loaded model,
-    # no other machines' mesh addresses (loaded_rpc_servers). This replaces the
-    # old "any LAN device gets the full /health body" behaviour.
+    # no other machines' mesh addresses (loaded_rpc_servers).
     resp = lan_peer_client.get("/health")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
@@ -96,22 +95,21 @@ def test_lan_peer_gets_only_liveness_from_health(lan_peer_client):
 
 def test_mesh_peer_can_reach_peer_surface(mesh_peer_client):
     # May be 200 or 503 depending on hardware/serving state, but crucially the
-    # boundary does NOT block it -- the source IP is inside the mesh CIDR.
+    # boundary does not block it -- the source IP is inside the mesh CIDR.
     assert mesh_peer_client.get("/peer/capabilities").status_code != 403
 
 
 @pytest.mark.parametrize("path", PEER_SURFACE_PATHS)
 def test_lan_peer_cannot_reach_peer_surface(lan_peer_client, path):
-    # LAUNCH-BLOCKER regression guard: a non-mesh LAN caller (dorm/apartment/
-    # coffee-shop neighbor) must be rejected before reaching any /peer/*
-    # handler, even though it's non-loopback and would have passed the old
-    # "not loopback" check.
+    # A non-mesh LAN caller (dorm/apartment/coffee-shop neighbor) must be
+    # rejected before reaching any /peer/* handler, even though it's
+    # non-loopback and would pass a plain "not loopback" check.
     assert lan_peer_client.get(path).status_code == 403
 
 
 def test_lan_peer_cannot_reach_peer_memory_search(lan_peer_client, monkeypatch):
-    # Full-content memory search is the highest-severity leak the launch-blocker
-    # exposed (peer.py returns m.model_dump() -- complete memory rows). Confirm
+    # Full-content memory search is the highest-severity leak if the gate
+    # fails (peer.py returns m.model_dump() -- complete memory rows). Confirm
     # the mesh-CIDR gate 403s it in the middleware, before the router even runs
     # (so this must 403 regardless of POTLUCK_PEER_MEMORY_ENABLED).
     monkeypatch.setenv("POTLUCK_PEER_MEMORY_ENABLED", "1")
@@ -120,7 +118,7 @@ def test_lan_peer_cannot_reach_peer_memory_search(lan_peer_client, monkeypatch):
 
 
 def test_mesh_peer_memory_search_not_blocked_by_mesh_gate(mesh_peer_client, monkeypatch):
-    # A genuine mesh peer must NOT be 403'd by the mesh-CIDR gate itself. It may
+    # A genuine mesh peer must not be 403'd by the mesh-CIDR gate itself. It may
     # still get a different status from the router (e.g. 403 disabled-memory,
     # 503 opted out) depending on other settings, but never the mesh-boundary 403.
     monkeypatch.setenv("POTLUCK_PEER_MEMORY_ENABLED", "1")
@@ -170,7 +168,7 @@ def test_mesh_cidr_env_override(monkeypatch, fake_mesh):
     )
 
     assert custom_mesh_client.get("/peer/capabilities").status_code != 403
-    # Under the override, the DEFAULT mesh CIDR is no longer trusted.
+    # Under the override, the default mesh CIDR is no longer trusted.
     assert default_mesh_client.get("/peer/capabilities").status_code == 403
 
 

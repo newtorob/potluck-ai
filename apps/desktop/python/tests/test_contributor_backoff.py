@@ -7,7 +7,7 @@ Two rules, both small:
   * A session that was accepted and lasted HEALTHY_SESSION_S starts the backoff
     over when it ends, instead of continuing from where earlier failures left it.
 
-Failures keep doubling up to the maximum, as before.
+Failures keep doubling up to the maximum.
 """
 from __future__ import annotations
 
@@ -160,7 +160,7 @@ async def test_several_reattestations_in_a_row_each_come_straight_back_and_the_b
         await finish(task, stop)
     gaps = coord.gaps()
     assert len(coord.attestations) == 6 and len(gaps) >= 5
-    # The old behaviour waited 0.3, 0.6, 1.2, 2.4 s here, doubling each time.
+    # A backoff that doubled each time would wait 0.3, 0.6, 1.2, 2.4 s here.
     assert max(gaps[:5]) < 0.25, gaps
     assert [c["model_slug"] for c in coord.attestations[-1]["capabilities"]] == ["m5"]
     assert "disconnected" not in events, "a re-attestation is not reported as a failure"

@@ -3,7 +3,7 @@ and /v1/completions.
 
 Contract:
   "local"  -> serve this node only; 503 when no local model is loaded.
-  "mine"   -> local first, then household peer; pool is NEVER reached.
+  "mine"   -> local first, then household peer; pool is never reached.
   absent / any other value -> existing fall-through (local->household->pool).
 
 All tests use TestClient with a loopback client address so peer_access_middleware
@@ -75,7 +75,7 @@ class _LocalRuntime:
 
 
 # ---------------------------------------------------------------------------
-# Scope absent — existing behavior unchanged
+# Scope absent - existing behavior unchanged
 # ---------------------------------------------------------------------------
 
 class TestScopeAbsent:

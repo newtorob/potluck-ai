@@ -1,6 +1,6 @@
 """Windows hardware detection reports the real dedicated VRAM.
 
-Recorded on the RX 6600 XT machine, 2026-10-09 (previous display driver):
+Recorded on an RX 6600 XT machine:
 
     Win32_VideoController   {"Name":"AMD Radeon RX 6600 XT","AdapterRAM":4293918720}
     registry qwMemorySize   8573157376   (HardwareInformation.qwMemorySize)

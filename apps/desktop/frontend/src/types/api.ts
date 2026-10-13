@@ -1,5 +1,5 @@
 /**
- * Shared API types — used by both localApi and cloudApi clients.
+ * Shared API types - used by both localApi and cloudApi clients.
  */
 
 export interface ApiError {
@@ -13,7 +13,7 @@ export interface ApiError {
   detail?: unknown;
 }
 
-/** Discriminated union for API call results — avoids try/catch at call sites */
+/** Discriminated union for API call results - avoids try/catch at call sites */
 export type ApiResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: ApiError };
@@ -63,14 +63,14 @@ export interface Session {
   memberId: string;
   /**
    * The account email, when the server includes it on /auth/callback.
-   * Older API responses may omit this — callers must not assume it's
+   * Older API responses may omit this - callers must not assume it's
    * present (see the sign-in confirmation prompt in useAuth/authStore,
    * which falls back to a generic message when it's absent).
    */
   email?: string;
 }
 
-/** GET /client/version — public, unauthenticated version handshake. */
+/** GET /client/version - public, unauthenticated version handshake. */
 export interface ClientVersionInfo {
   /** Newest published desktop version. */
   latest: string;

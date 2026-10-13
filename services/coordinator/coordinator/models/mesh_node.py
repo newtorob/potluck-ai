@@ -34,31 +34,31 @@ class MeshNode(Base):
     node_name: Mapped[str] = mapped_column(String(128), nullable=False)
     mesh_ip: Mapped[str] = mapped_column(INET, nullable=False, unique=True)
     wg_public_key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
-    # OPTIONAL Ed25519 key (base64url, no padding) used only for the
+    # Optional Ed25519 key (base64url, no padding) used only for the
     # DERP-token proof-of-possession challenge (POST /mesh/derp-token). This
-    # is deliberately NOT the wg_public_key: WireGuard keys are Curve25519,
+    # is a separate key from wg_public_key: WireGuard keys are Curve25519,
     # used only for the WG DH handshake, and are not usable for Ed25519
-    # signature verification — so PoP needs a distinct signing key. Nullable
-    # and additive: nodes enrolled before this shipped (or by a mesh client
-    # that hasn't been updated yet) simply have none, and DERP-token issuance
+    # signature verification - so PoP needs a distinct signing key. Nullable
+    # and additive: nodes enrolled by a mesh client that does not send one
+    # simply have none, and DERP-token issuance
     # falls back to the legacy wg_public_key-possession-only check (see
     # `routers/mesh.py::issue_derp_token`). Set at enrollment time
-    # (`EnrollRequest.signing_public_key`, optional) — there is no separate
+    # (`EnrollRequest.signing_public_key`, optional) - there is no separate
     # rotation endpoint yet (matches the WG key's own "post-launch" rotation
     # note above).
     signing_public_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # SHA-256 hex digest of the per-node bearer credential ("node_token")
     # minted once at successful POST /mesh/enroll and returned to the caller
-    # exactly then — the coordinator never stores or logs the raw value.
-    # Lets an app-spawned sidecar authorize its OWN ongoing calls
+    # exactly then - the coordinator never stores or logs the raw value.
+    # Lets an app-spawned sidecar authorize its own ongoing calls
     # (heartbeat, peers, derp-token, node delete, the /mesh/signal WS
-    # upgrade) WITHOUT ever holding the machine-wide
-    # POTLUCK_COORDINATOR_TOKEN. Nullable + additive: nodes enrolled before
-    # this migration (or by a mesh client that hasn't picked up node-token
-    # support yet) simply have none, and every machine route keeps accepting
+    # upgrade) without ever holding the machine-wide
+    # POTLUCK_COORDINATOR_TOKEN. Nullable + additive: nodes enrolled by a mesh
+    # client without node-token support
+    # simply have none, and every machine route keeps accepting
     # the legacy coordinator token unchanged (see
     # `middleware/node_auth.py::resolve_node_from_token`). No rotation
-    # endpoint yet — matches the wg_public_key/signing_public_key
+    # endpoint yet - matches the wg_public_key/signing_public_key
     # "post-launch" rotation note above.
     node_token_hash: Mapped[str | None] = mapped_column(
         String(64), nullable=True, unique=True

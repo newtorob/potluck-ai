@@ -1,8 +1,8 @@
-"""MCP session metadata tools — self-reporting model and peer MCPs.
+"""MCP session metadata tools - self-reporting model and peer MCPs.
 
 These tools let the calling agent tell Potluck what model is running it and
 which other MCP servers it has configured.  They write through AgentObserver
-and never touch memory content — no privacy gate needed.
+and never touch memory content - no privacy gate needed.
 """
 
 import logging

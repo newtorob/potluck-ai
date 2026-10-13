@@ -1,10 +1,10 @@
 /**
- * CategoryPill — color-coded label for a MemoryCategory.
+ * CategoryPill - color-coded label for a MemoryCategory.
  *
  * Each category gets a token-driven color pair: a darker swatch for the
  * light theme (AA contrast on cream) and a lighter swatch for dark.
  * The hue stays stable across themes so a "fact" always reads green-ish,
- * a "decision" always reads ember, etc. — themable without re-learning.
+ * a "decision" always reads ember, etc. - themable without re-learning.
  *
  * Border uses the same hue at low opacity to keep the pill quiet.
  */

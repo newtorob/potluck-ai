@@ -3,7 +3,7 @@
 Companion to `middleware/auth.py` (the machine-wide coordinator token) and
 `middleware/session_auth.py` (the member-session cookie/bearer). This module
 closes the third leg: an app-spawned mesh sidecar should never need the
-machine-wide `POTLUCK_COORDINATOR_TOKEN` for its OWN ongoing calls — it gets
+machine-wide `POTLUCK_COORDINATOR_TOKEN` for its own ongoing calls - it gets
 a `node_token` once, at `POST /mesh/enroll`, and uses that from then on.
 
 Storage + lookup mirrors `session_auth.py`'s pattern exactly: the coordinator
@@ -12,23 +12,23 @@ presented token is hashed and matched against that column. The raw token is
 shown to the caller exactly once, in the enroll response, and is never
 logged.
 
-Wire contract (exact — the Go sidecar must match byte-for-byte):
+Wire contract (exact - the Go sidecar must match byte-for-byte):
 
-  * Header: ``Authorization: Bearer <node_token>`` — both on ordinary HTTP
+  * Header: ``Authorization: Bearer <node_token>`` - both on ordinary HTTP
     requests to the machine routes (POST /mesh/heartbeat, GET /mesh/peers,
-    POST /mesh/derp-token, DELETE /mesh/nodes/{id}) AND on the `/mesh/signal`
+    POST /mesh/derp-token, DELETE /mesh/nodes/{id}) and on the `/mesh/signal`
     WebSocket upgrade request (same header name/format, sent as one of the
     upgrade request's HTTP headers).
   * The legacy ``X-Potluck-Coordinator-Token`` header keeps working,
-    unchanged, on every one of those routes (back-compat for the dev fleet,
-    which has no per-node token and is not going away).
+    unchanged, on every one of those routes (back-compat for machines that
+    have no per-node token).
   * A request MAY present either credential. If ``Authorization: Bearer``
     resolves to an enrolled node, that node's identity is bound to the
-    request — the caller may only act as THAT node (any wg_public_key/
+    request - the caller may only act as that node (any wg_public_key/
     node_id supplied elsewhere in the request must match, or the route
     returns 403). If it doesn't resolve (missing, malformed, unknown, or
-    revoked), the request falls back to the coordinator-token check exactly
-    as before this change. If neither is valid, 401.
+    revoked), the request falls back to the coordinator-token check. If
+    neither is valid, 401.
 """
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ from coordinator.models.mesh_node import MeshNode
 
 
 def hash_node_token(raw_token: str) -> str:
-    """SHA-256 hex digest of a raw node_token — the only form persisted in
+    """SHA-256 hex digest of a raw node_token - the only form persisted in
     `mesh_nodes.node_token_hash`. Shared by the enroll-time mint (which
     stores the hash) and every lookup here (which hashes the presented
     bearer token before querying), so the two never drift."""
@@ -73,28 +73,28 @@ async def resolve_node_from_token(
     """FastAPI dependency gating the mesh machine-plumbing routes.
 
     Returns:
-      * a `MeshNode` — the caller presented a valid `Authorization: Bearer
+      * a `MeshNode` - the caller presented a valid `Authorization: Bearer
         <node_token>` that resolved (by hash) to exactly that enrolled node.
         Callers MUST enforce that any node identity supplied elsewhere in
-        the request (wg_public_key, node_id, ...) matches THIS node — a
+        the request (wg_public_key, node_id, ...) matches this node - a
         node_token must only ever act as its own node.
-      * `None` — the caller authenticated via the legacy
+      * `None` - the caller authenticated via the legacy
         `X-Potluck-Coordinator-Token` (or dev-mode passthrough, when
         `POTLUCK_COORDINATOR_TOKEN` is unset). No node identity is bound;
         the route falls back to trusting the wg_public_key/node_id supplied
-        in the request body/query, exactly as it did before this change.
+        in the request body/query.
 
     Raises:
-        HTTPException 401 — neither credential is valid.
+        HTTPException 401 - neither credential is valid.
 
-    Deliberately does NOT take `db: AsyncSession = Depends(get_db)` — that
-    would make FastAPI resolve a live database session on EVERY call to a
+    Deliberately does not take `db: AsyncSession = Depends(get_db)` - that
+    would make FastAPI resolve a live database session on every call to a
     gated route, even a bare "no credentials at all" 401, which breaks the
     no-DB auth-rejection tests every other coordinator auth dependency
     supports (`require_coordinator_token`, `resolve_session_member_id`'s
     dev-passthrough path). Instead this opens its own short-lived session
     via `get_session_factory()` (mirrors `/mesh/signal`'s own pattern),
-    and ONLY when a bearer token is actually present to look up.
+    and only when a bearer token is actually present to look up.
     """
     bearer = extract_bearer_token(authorization)
     if bearer:
@@ -106,7 +106,7 @@ async def resolve_node_from_token(
             node = result.scalar_one_or_none()
         if node is not None:
             return node
-        # Bearer present but doesn't resolve to any enrolled node — don't
+        # Bearer present but doesn't resolve to any enrolled node - don't
         # hard-fail here, fall through to the coordinator-token check below.
         # (A caller that races enroll/rotation, or simply hasn't upgraded to
         # sending its node_token correctly yet, still gets a fair shot at
@@ -122,10 +122,10 @@ async def resolve_node_from_token(
 
 
 def enforce_node_scope(auth_node: MeshNode | None, caller_node_id: uuid.UUID) -> None:
-    """Raise 403 if a resolved node_token is trying to act as a DIFFERENT
+    """Raise 403 if a resolved node_token is trying to act as a different
     node than the one the request otherwise identifies (by wg_public_key or
     node_id). No-op when `auth_node` is None (coordinator-token / dev-mode
-    caller — unchanged back-compat behaviour, no per-node binding to
+    caller - unchanged back-compat behaviour, no per-node binding to
     enforce)."""
     if auth_node is not None and auth_node.id != caller_node_id:
         raise HTTPException(

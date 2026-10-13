@@ -1,12 +1,12 @@
 /**
- * Household capacity — "what can your network actually run, right now?"
+ * Household capacity - "what can your network actually run, right now?"
  *
  * Takes the live peer roster + their advertised capabilities (`/peer/capabilities`)
  * and bins each model-size class into a speed bucket: fast / good / slow /
  * unavailable. This is what powers the CapacityCard on the Household view.
  *
- * Honesty rule (memory 20fd8d9f): the buckets here are computed from a
- * conservative static table. They MUST NOT pretend a peer can do something
+ * Honesty rule: the buckets here are computed from a
+ * conservative static table. They must not pretend a peer can do something
  * it can't (e.g. running a 70B model on an 11GB GPU). When in doubt,
  * downgrade. The user trusting "8B good" and then watching it stall at
  * 0.3 tok/s erodes trust faster than honest "unavailable."
@@ -39,7 +39,7 @@ export interface SizeBucketSpec {
   bucket: SizeBucket;
   /** Human label for the UI ("3B", "8B", "32B", "70B", ">70B"). */
   label: string;
-  /** Approximate parameter count in billions — used for VRAM math. */
+  /** Approximate parameter count in billions - used for VRAM math. */
   paramsB: number;
 }
 
@@ -49,7 +49,7 @@ export const SIZE_BUCKETS: SizeBucketSpec[] = [
   { bucket: 'large', label: '32B', paramsB: 32 },
   { bucket: 'xl', label: '70B', paramsB: 70 },
 ];
-// Note: 'xxl' (>70B) is intentionally omitted from the default render —
+// Note: 'xxl' (>70B) is intentionally omitted from the default render -
 // almost no consumer hardware can run those even with multi-peer pooling,
 // and showing it would be honesty-violating noise. Add back when there's
 // a peer in the wild that can actually serve a 100B+ model.
@@ -60,7 +60,7 @@ export const SIZE_BUCKETS: SizeBucketSpec[] = [
 
 // Rough VRAM cost in GB for Q4-Q5 quantized weights.
 // 4-bit quant ≈ 0.5 GB per billion parameters; plus ~25% for KV cache + overhead.
-// This is intentionally a coarse heuristic — we'd rather flag a peer as
+// This is intentionally a coarse heuristic - we'd rather flag a peer as
 // "can't run" and be wrong by a small margin than the other way around.
 function approxVRAMForModel(paramsB: number): number {
   return paramsB * 0.5 * 1.25;
@@ -96,16 +96,16 @@ function peerFitMode(caps: PeerCapabilities, paramsB: number): FitMode {
 
 // Lookup: (hardware tier, model-size bucket) → expected tok/s bucket.
 // Numbers represent reasonable Q4-Q5 throughput on typical hardware in each
-// tier. They're conservative — most users will see at-or-above these speeds.
+// tier. They're conservative - most users will see at-or-above these speeds.
 //
 // Tiers come from /peer/capabilities → hardware.recommended_tier, which the
 // hardware-detect service computes from (GPU model, VRAM, CPU cores, RAM).
-//   low    = no dedicated GPU OR <8GB VRAM (CPU-bound)
+//   low    = no dedicated GPU or <8GB VRAM (CPU-bound)
 //   medium = 8-16GB VRAM (RTX 2080 Ti, M2/M3 base, etc.)
 //   high   = 16GB+ VRAM (RTX 3090/4090, M3 Max, M2 Ultra)
 //
-// TODO(c2e13a86): replace with real benchmark data once bench/ is wired
-// (paired with task 7aaac77f). For now: conservative-but-not-fake estimates.
+// TODO: replace with real benchmark data once bench/ is wired.
+// For now these are conservative-but-not-fake estimates.
 const SPEED_TABLE: Record<string, Record<SizeBucket, SpeedBucket>> = {
   low: {
     small: 'good',
@@ -139,29 +139,29 @@ function speedFor(tier: string | null | undefined, bucket: SizeBucket): SpeedBuc
 // labels rendered in the card (and ModelCard's speedGrade): fast > 20,
 // good 8-20, slow under 8. A peer that has actually benchmarked a model
 // can definitionally run it, so a positive measurement is never
-// 'unavailable' — the floor is 'slow'.
+// 'unavailable' - the floor is 'slow'.
 function measuredSpeedBucket(tps: number): SpeedBucket {
   if (tps >= 20) return 'fast';
   if (tps >= 8) return 'good';
   return 'slow';
 }
 
-// Honesty guard (memory 20fd8d9f). A measured model's speed is attributed
-// only to the LARGEST bucket whose representative size it actually meets
+// Honesty guard. A measured model's speed is attributed
+// only to the largest bucket whose representative size it actually meets
 // (within a small tolerance below). Because a model at least as big as the
 // bucket runs no faster than the bucket's representative model, this can
-// only ever UNDER-claim a bucket, never over-claim it. A smaller/faster
+// only ever under-claim a bucket, never over-claim it. A smaller/faster
 // model (e.g. 0.5B, or a 21B that would otherwise be pulled toward the 32B
 // bucket) maps to a smaller bucket or to null, and the unmeasured bucket
 // falls back to the conservative table.
 //
 // The tolerance lets a model up to 15% under a bucket's representative size
 // still speak for it (so a real 7B counts for the "8B" bucket). A 21B will
-// NOT clear the 32B bucket's threshold (27.2B) and is attributed to medium
-// instead — the safe direction.
+// not clear the 32B bucket's threshold (27.2B) and is attributed to medium
+// instead - the safe direction.
 const BUCKET_TOLERANCE = 0.15;
 
-/** The rendered size bucket to attribute a model of `paramsB` to — the
+/** The rendered size bucket to attribute a model of `paramsB` to - the
  *  largest bucket whose representative size (minus tolerance) the model
  *  meets, or null when the model is too small for even the smallest
  *  bucket. SIZE_BUCKETS is ascending, so the last qualifying spec wins. */
@@ -176,11 +176,11 @@ function bucketForParams(paramsB: number): SizeBucket | null {
 }
 
 /** The size bucket a peer's loaded model belongs to, plus its measured
- *  speed — or null when we can't size the model or the peer hasn't
+ *  speed - or null when we can't size the model or the peer hasn't
  *  benchmarked. `slugParamsB` comes from the requester's own catalog
  *  (all household machines ship the same models.json), so an unknown
  *  slug (custom model) just falls through to the static table. The
- *  measurement is mapped to a bucket by the model's REAL parameter count,
+ *  measurement is mapped to a bucket by the model's real parameter count,
  *  never its coarse tier, so a tiny model can't speak for a larger one. */
 function measuredForPeer(
   caps: PeerCapabilities,
@@ -202,7 +202,7 @@ function measuredForPeer(
 // ---------------------------------------------------------------------------
 
 /** Ordinal rank of each speed bucket, so the higher (better) speed wins when
- *  comparing peers — dispatch picks the best available peer for a request. */
+ *  comparing peers - dispatch picks the best available peer for a request. */
 const SPEED_RANK: Record<SpeedBucket, number> = {
   unavailable: 0,
   slow: 1,
@@ -230,7 +230,7 @@ export interface CapacityResult {
    *  loaded model in this bucket, rather than the conservative static
    *  table. Lets the UI mark a bucket as ground-truth vs estimate. */
   measured: boolean;
-  /** Best peer hostname for this bucket — used only in click-through. NOT
+  /** Best peer hostname for this bucket - used only in click-through. Not
    *  rendered on the card. Null if no peer can run this size. */
   bestPeerHost: string | null;
   /** Big Model Mode pooling could unlock this bucket. Surfaced in the UI as
@@ -247,11 +247,11 @@ export interface CapacitySnapshot {
 }
 
 /** Probe every reachable peer once and compute the capacity snapshot.
- *  Cheap — one GET /peer/capabilities per peer in parallel.
+ *  Cheap - one GET /peer/capabilities per peer in parallel.
  *
  *  `slugParamsB` maps a model slug to its real parameter count (billions)
  *  using the requester's own catalog. When supplied, a peer that has
- *  benchmarked its loaded model contributes a REAL measured speed for the
+ *  benchmarked its loaded model contributes a real measured speed for the
  *  bucket that model actually belongs to (ground truth, overrides the
  *  static table in either direction). When omitted, behaviour is the
  *  original conservative-estimate path. */
@@ -286,7 +286,7 @@ export async function computeCapacity(
     }
   }
 
-  // Big Model Mode eligibility — separate query because it has additional
+  // Big Model Mode eligibility - separate query because it has additional
   // gating (rpc_endpoint + available_for_big_model). The pool size informs
   // the xl/xxl "with pooling" hint.
   const bigModelPeers = await getBigModelEligiblePeers(reachable);
@@ -301,10 +301,10 @@ export async function computeCapacity(
       let measured = false;
 
       // Ground truth first: if this peer has benchmarked a loaded model
-      // that lands in THIS bucket, use the measurement. It already
+      // that lands in this bucket, use the measurement. It already
       // reflects the real fit mode (GPU vs CPU offload), so we neither
       // apply the static table nor the CPU downgrade, and we never skip
-      // the peer — a benchmarked model is by definition runnable.
+      // the peer - a benchmarked model is by definition runnable.
       const m = measuredForPeer(caps, slugParamsB);
       if (m && m.bucket === spec.bucket) {
         speed = m.speed;
@@ -334,9 +334,9 @@ export async function computeCapacity(
     }
 
     // Big Model pooling: an xl/xxl model that no single peer can fit might
-    // be unlockable by pooling. Honesty-rule: "slow" only — never claim
+    // be unlockable by pooling. Honesty-rule: "slow" only - never claim
     // pooled inference is fast. The capacity-not-speed framing is the
-    // honest one (memory 20fd8d9f).
+    // honest one.
     let bigModelEligible = false;
     if (best === 'unavailable' && bigModelPoolSize >= 2 && (spec.bucket === 'xl' || spec.bucket === 'xxl')) {
       bigModelEligible = true;
@@ -396,7 +396,7 @@ export function speedColorClasses(speed: SpeedBucket): string {
   }
 }
 
-/** Unused but kept for potential expanded view — what hardware the user
+/** Unused but kept for potential expanded view - what hardware the user
  *  would need to unlock the next bucket. */
 export function upgradeHint(speed: SpeedBucket, bucket: SizeBucket): string | null {
   if (speed !== 'unavailable') return null;

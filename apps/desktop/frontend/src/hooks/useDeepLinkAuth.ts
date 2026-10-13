@@ -1,19 +1,19 @@
 /**
- * useDeepLinkAuth — starts magic-link sign-in when the OS hands the app a
+ * useDeepLinkAuth - starts magic-link sign-in when the OS hands the app a
  * potluck://auth/callback?token=... deep link.
  *
  * The email link opens a web verify page which bounces to the potluck:// scheme;
  * Electron routes that back to this running app (see electron/main.js). The
- * token can arrive on ANY view, so this listener is mounted once globally (in
+ * token can arrive on any view, so this listener is mounted once globally (in
  * AuthGate), not tied to the sign-in screen being open.
  *
  * Cold start (app launched by the link) is covered by getInitialDeepLink();
  * links that arrive while the app runs are covered by onDeepLink().
  *
- * SECURITY (login CSRF): this hook only EXCHANGES the token — it does not
+ * Security (login CSRF): this hook only exchanges the token - it does not
  * sign in on its own. A deep link is not proof the person who clicked it
  * requested this app's sign-in: an attacker can request a magic link to
- * THEIR OWN email, wrap the token as potluck://auth/callback?token=..., and
+ * their own email, wrap the token as potluck://auth/callback?token=..., and
  * get a victim to click it. verifyMagicLink() populates `pendingSession`;
  * SignInConfirmDialog (mounted alongside this hook in AuthGate) is what
  * shows "Sign in as <email>?" and gates the actual persist/navigate on the
@@ -25,8 +25,8 @@ import { ipc } from '@/lib/ipc';
 import { useAuth } from '@/hooks/useAuth';
 
 /**
- * Pull the one-time token out of a deep link, but ONLY when it's exactly
- * potluck://auth/callback — never from any other potluck:// URL. Scoping
+ * Pull the one-time token out of a deep link, but only when it's exactly
+ * potluck://auth/callback - never from any other potluck:// URL. Scoping
  * extraction to this one path keeps every other potluck:// route (and any
  * scheme the OS mis-routes to us) from being able to trigger a token
  * exchange at all, regardless of query string.

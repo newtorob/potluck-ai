@@ -1,5 +1,5 @@
 /**
- * ADVERSARIAL review of the filesystem-confinement fix (audit P1, 2026-09-06).
+ * Adversarial tests for filesystem confinement.
  *
  * Companion to tools.confinement.test.ts. That file pins the intended behavior;
  * this one tries to break it. Tests are grouped by attack vector and named for
@@ -114,7 +114,7 @@ describe("vector 1: symlink chains", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Vector 2: symlinked directory in the MIDDLE of a path
+// Vector 2: symlinked directory in the middle of a path
 // ---------------------------------------------------------------------------
 
 describe("vector 2: symlinked directory mid-path", () => {

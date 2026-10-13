@@ -1,5 +1,5 @@
 /**
- * Composer — auto-growing textarea with send/stop controls.
+ * Composer - auto-growing textarea with send/stop controls.
  *
  * - Enter → send; Shift+Enter → newline; Cmd/Ctrl+Enter → also sends
  * - Esc → abort streaming
@@ -10,7 +10,7 @@
  *
  * Hearth chrome: lifted card surface, ember focus ring on focus-within,
  * subdued helper hint with keyboard glyphs. The composer is the most-
- * touched control in the app — it earns its visual weight.
+ * touched control in the app - it earns its visual weight.
  */
 
 import {
@@ -28,10 +28,10 @@ interface ComposerProps {
   onSend: (content: string) => void;
   onStop: () => void;
   isStreaming: boolean;
-  /** Disable sending when no inference path is available (no local model AND
+  /** Disable sending when no inference path is available (no local model and
    *  no remote scope active). */
   modelLoaded: boolean;
-  /** Active routing scope — drives the privacy-honesty footer copy. */
+  /** Active routing scope - drives the privacy-honesty footer copy. */
   routingScope: RoutingScope;
 }
 
@@ -113,7 +113,7 @@ export function Composer({ onSend, onStop, isStreaming, modelLoaded, routingScop
 
   return (
     <div className="border-t border-border bg-card/40 px-4 py-3 sm:px-6">
-      {/* Lifted card surface — anchors the composer to the page instead
+      {/* Lifted card surface - anchors the composer to the page instead
           of floating in a void. focus-within drives the ember ring. */}
       <div
         className={cn(
@@ -192,7 +192,7 @@ export function Composer({ onSend, onStop, isStreaming, modelLoaded, routingScop
 }
 
 // ---------------------------------------------------------------------------
-// ComposerHint — small line of editorial copy under the composer
+// ComposerHint - small line of editorial copy under the composer
 // ---------------------------------------------------------------------------
 
 interface ComposerHintProps {
@@ -203,7 +203,7 @@ interface ComposerHintProps {
 
 function ComposerHint({ isStreaming, modelLoaded, routingScope }: ComposerHintProps) {
   // The hint switches voice depending on routing scope. The privacy line
-  // accurately describes where the prompt actually goes — never overclaims.
+  // accurately describes where the prompt actually goes - never overclaims.
   // When no inference path is ready, fall back to a "pick a model" nudge.
   let body: React.ReactNode;
   if (!modelLoaded) {

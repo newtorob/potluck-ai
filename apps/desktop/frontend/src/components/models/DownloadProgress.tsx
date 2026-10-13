@@ -1,5 +1,5 @@
 /**
- * DownloadProgress — progress bar with MB downloaded, speed, and ETA.
+ * DownloadProgress - progress bar with MB downloaded, speed, and ETA.
  *
  * Handles all terminal states: verifying, error, cancelled.
  * "Cancel" button is shown during active download/verify states.

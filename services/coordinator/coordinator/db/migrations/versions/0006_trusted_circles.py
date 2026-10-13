@@ -1,4 +1,4 @@
-"""0006 — Trusted circles: named allow-lists for 'circle' routing scope.
+"""0006 - Trusted circles: named allow-lists for 'circle' routing scope.
 
 A TrustedCircle is owned by one member and contains a set of cooperative
 member pubkeys. The routing layer restricts 'circle' scope dispatch to peers
@@ -22,7 +22,7 @@ depends_on: str | None = None
 
 def upgrade() -> None:
     # ------------------------------------------------------------------
-    # trusted_circles — one named allow-list per member.
+    # trusted_circles - one named allow-list per member.
     # ------------------------------------------------------------------
     op.create_table(
         "trusted_circles",
@@ -47,7 +47,7 @@ def upgrade() -> None:
     )
 
     # ------------------------------------------------------------------
-    # circle_members — per-circle member pubkey entries.
+    # circle_members - per-circle member pubkey entries.
     # ------------------------------------------------------------------
     op.create_table(
         "circle_members",

@@ -1,13 +1,11 @@
 /**
  * HTTP client for the Python sidecar running at 127.0.0.1:8321.
  *
- * ALL inference and model management goes through this client.
- * Prompts never leave the machine — this API is strictly local.
+ * All inference and model management goes through this client.
+ * Prompts never leave the machine - this API is strictly local.
  *
  * Base URL is configurable via VITE_LOCAL_API_URL for testing,
  * defaulting to the sidecar's hard-coded address.
- *
- * See guide §4.5 for the full contract.
  */
 
 import type { ChatMessage, ChatOptions } from '@/types/chat';
@@ -52,7 +50,7 @@ import type { ContributorStatus } from './contributorStatus';
 const LOCAL_BASE =
   (import.meta.env['VITE_LOCAL_API_URL'] as string | undefined) ?? 'http://127.0.0.1:8321';
 
-// Coordinator URL — the Phase G control plane (separate from the local
+// Coordinator URL - the Phase G control plane (separate from the local
 // sidecar). Read from the runtime connection store (settings UI +
 // localStorage) rather than a compile-time constant, so users can point
 // at a coordinator on another machine in their fleet (LAN / Tailscale /
@@ -107,7 +105,7 @@ function fromSessionResult<T>(res: CoordinatorSessionResult): T {
 }
 
 // ---------------------------------------------------------------------------
-// Timed fetch — bounds every non-streaming sidecar/coordinator call
+// Timed fetch - bounds every non-streaming sidecar/coordinator call
 // ---------------------------------------------------------------------------
 
 // Captured before any rewrite so the wrapper always calls the real global.
@@ -124,7 +122,7 @@ const EXTRACT_TIMEOUT_MS = 120_000;
 
 /**
  * Wraps the native global with an automatic timeout. Streaming endpoints (SSE)
- * MUST NOT use this — they are long-lived and call nativeFetch() directly with
+ * must not use this - they are long-lived and call nativeFetch() directly with
  * their own caller-provided abort signal. A signal passed in init is composed
  * with the timeout: whichever aborts first wins.
  */
@@ -160,7 +158,7 @@ async function timedFetch(
 function streamViaCoordinator(init: RequestInit): Promise<Response> {
   // coordinator-bare-fetch-ok: SSE stream, so it can't route through the
   // buffering coordinatorSessionRequest bridge (res.text() can't consume a
-  // live stream). Authenticated at the NETWORK layer instead: main.js's
+  // live stream). Authenticated at the network layer instead: main.js's
   // onBeforeSendHeaders injector (packaged app only) attaches the member
   // session bearer to requests matching the coordinator origin the
   // renderer pushes via 'coordinator:set-base'; see connectionStore.ts.
@@ -264,8 +262,8 @@ async function streamCircleJob(init: RequestInit): Promise<Response> {
  * Response from GET /readiness/gpu-test.
  *
  * Runs a real device op (matrix multiply or equivalent) on the selected
- * runtime. ok=true means the GPU/runtime actually computed — not just
- * "a GPU is detected". This is an ACTION, not a passive poll: it may take
+ * runtime. ok=true means the GPU/runtime actually computed - not just
+ * "a GPU is detected". This is an action, not a passive poll: it may take
  * a moment and should never be called on a polling interval.
  */
 export interface GpuTestResult {
@@ -488,7 +486,7 @@ export interface PersistedConversationDetail extends PersistedConversation {
 // Network (coordinator) shapes
 // ---------------------------------------------------------------------------
 
-// ---- Trusted circles (Phase 2) -------------------------------------------
+// ---- Trusted circles -----------------------------------------------------
 
 /** A machine key pasted into a circle by an older app version. Only the owner sees these. */
 export interface CircleMember {
@@ -576,7 +574,7 @@ export interface MyIdentityResponse {
   member_pubkey: string;
 }
 
-// ---- Credit ledger (Phase G m4) ------------------------------------------
+// ---- Credit ledger -------------------------------------------------------
 
 /**
  * Per-model credit breakdown from GET /me/credit-balance.
@@ -624,7 +622,7 @@ export interface CreditHistory {
 }
 
 /** Aggregate fleet summary returned by GET /transparency/fleet. Privacy
- *  invariant: NO peer_id / hostname / hardware fields here, by design.
+ *  invariant: no peer_id / hostname / hardware fields here, by design.
  *  Per-peer identity is the line we don't cross in the requester UI. */
 export interface FleetSummary {
   as_of: string;
@@ -659,7 +657,7 @@ export interface ContributionMachine {
   reputation: number | null;
 }
 
-/** GET /me/contributions — per-machine weekly served + earned, own machines. */
+/** GET /me/contributions - per-machine weekly served + earned, own machines. */
 export interface ContributionsResponse {
   member_id: string;
   window_days: number;
@@ -685,7 +683,7 @@ export interface ContributionWeek {
   credits_earned: string;
 }
 
-/** GET /me/contributions/weekly — week-by-week history, oldest-first. */
+/** GET /me/contributions/weekly - week-by-week history, oldest-first. */
 export interface ContributionsWeeklyResponse {
   member_id: string;
   window_weeks: number;
@@ -749,7 +747,7 @@ export interface UsageSplit {
 
 /** Metadata-only completion record posted for in-app requests the sidecar
  *  could not observe itself (circle / pool / my_machines chat routes renderer
- *  -> coordinator directly). NEVER carries prompt or response content. */
+ *  -> coordinator directly). Never carries prompt or response content. */
 export interface UsageRecordInput {
   direction?: 'consumed' | 'served';
   scope?: UsageScope;
@@ -786,7 +784,7 @@ export const localApi = {
   splitStop(): Promise<SplitStatus> {
     return timedFetch(`${LOCAL_BASE}/split/stop`, { method: 'POST' }).then(handleResponse<SplitStatus>);
   },
-  /** GET /health — liveness check; also tells us if a model is loaded */
+  /** GET /health - liveness check; also tells us if a model is loaded */
   health(): Promise<HealthResponse> {
     return timedFetch(`${LOCAL_BASE}/health`).then((r) => handleResponse<HealthResponse>(r));
   },
@@ -822,17 +820,17 @@ export const localApi = {
       }),
     };
     if (options.abortSignal) init.signal = options.abortSignal;
-    // Streaming SSE — raw fetch, no timeout (long-lived); caller owns the abort.
+    // Streaming SSE - raw fetch, no timeout (long-lived); caller owns the abort.
     return nativeFetch(`${LOCAL_BASE}/chat/completions`, init);
   },
 
   /**
-   * POST /jobs/stream against the coordinator (NOT the local sidecar), or for
+   * POST /jobs/stream against the coordinator (not the local sidecar), or for
    * a circle chat POST /chat/circle on the local engine, which answers with
    * the coordinator's own shapes and falls back to the coordinator when the
    * engine cannot take it (see streamCircleJob).
    * Returns a Response whose body is an OpenAI-compatible SSE stream
-   * — same shape /chat/completions emits, so streamTokens() consumes
+   * - same shape /chat/completions emits, so streamTokens() consumes
    *   it without any modification.
    *
    * Routing scope is always explicit: a selected circle must never inherit
@@ -922,15 +920,15 @@ export const localApi = {
     // Two distributed strategies share this endpoint; an empty body loads locally.
     const body: Record<string, unknown> = {};
     if (options.pipeline) {
-      // Pipeline-parallel — the sidecar orchestrates the household chain itself.
+      // Pipeline-parallel - the sidecar orchestrates the household chain itself.
       body['pipeline_auto'] = options.pipeline === true ? {} : options.pipeline;
     } else if (options.rpc_servers && options.rpc_servers.length > 0) {
-      // Big Model Mode — remote llama.cpp RPC backends as ggml devices. Requires
+      // Big Model Mode - remote llama.cpp RPC backends as ggml devices. Requires
       // the Potluck-patched llama-cpp-python wheel; the sidecar surfaces a 501 if not.
       body['rpc_servers'] = options.rpc_servers;
     }
-    // Opt-in only — when off, omit it so a plain local load still sends NO body
-    // (byte-for-byte the previous behaviour). The sidecar ignores it on the GGUF path.
+    // Opt-in only - when off, omit it so a plain local load still sends no body.
+    // The sidecar ignores it on the GGUF path.
     if (options.continuousBatch) body['continuous_batch'] = true;
     const hasBody = Object.keys(body).length > 0;
     return timedFetch(`${LOCAL_BASE}/models/${encodeURIComponent(id)}/load`, {
@@ -972,11 +970,11 @@ export const localApi = {
   },
 
   /**
-   * GET /readiness/gpu-test — run a real device op and return whether the
+   * GET /readiness/gpu-test - run a real device op and return whether the
    * GPU/runtime actually computed. Uses LOAD_TIMEOUT_MS because an inference
    * test can take several seconds on a cold runtime.
    *
-   * This is an ACTION: call only on explicit user gesture, never on a poll.
+   * This is an action: call only on explicit user gesture, never on a poll.
    */
   gpuTest(): Promise<GpuTestResult> {
     return timedFetch(`${LOCAL_BASE}/readiness/gpu-test`, {}, LOAD_TIMEOUT_MS).then((r) =>
@@ -990,7 +988,7 @@ export const localApi = {
     return timedFetch(`${LOCAL_BASE}/settings`).then((r) => handleResponse<PotluckSettings>(r));
   },
 
-  /** GET /contributor/status — what the Contribute compute toggle is doing
+  /** GET /contributor/status - what the Contribute compute toggle is doing
    *  (state, this machine's own peer id, counters). Never lists other peers. */
   getContributorStatus(): Promise<ContributorStatus> {
     return timedFetch(`${LOCAL_BASE}/contributor/status`).then((r) =>
@@ -1402,7 +1400,7 @@ export const localApi = {
 
     /** Resolve a batch of memory ids to lightweight previews for the
      *  debugger's memory-overlay panel. Capped server-side at 100 ids per
-     *  call. Missing ids are silently dropped — the panel renders that as
+     *  call. Missing ids are silently dropped - the panel renders that as
      *  "memory deleted since this call". */
     memoryPreviews(ids: string[]): Promise<MemoryPreview[]> {
       if (ids.length === 0) return Promise.resolve([]);
@@ -1572,10 +1570,10 @@ export const localApi = {
   // ---- Network (coordinator-side fleet + per-member stats) ---------------
 
   network: {
-    /** GET /transparency/fleet on the coordinator. Aggregate-only — no
-     *  peer_id / hostname / individual peer fields, by manifesto rule.
+    /** GET /transparency/fleet on the coordinator. Aggregate-only - no
+     *  peer_id / hostname / individual peer fields, by design.
      *  coordinator-bare-fetch-ok: no auth dependency server-side (see
-     *  coordinator/routers/transparency.py) — a public transparency route,
+     *  coordinator/routers/transparency.py) - a public transparency route,
      *  aggregate fleet stats only, no per-member data. */
     fleet(): Promise<FleetSummary> {
       return timedFetch(`${coordinatorBase()}/transparency/fleet`).then((r) =>
@@ -1587,10 +1585,10 @@ export const localApi = {
      *  to gate UI affordances that depend on the coordinator (e.g. the
      *  chat composer's Network-mode toggle). Resolves to `true` only when
      *  the response is a 2xx; any other outcome (5xx, network error,
-     *  timeout) resolves to `false` rather than throwing — callers should
+     *  timeout) resolves to `false` rather than throwing - callers should
      *  not need a try/catch for this.
      *  coordinator-bare-fetch-ok: /health has no auth dependency server-side
-     *  (see coordinator/routers/health.py) — a public liveness probe, and
+     *  (see coordinator/routers/health.py) - a public liveness probe, and
      *  the only way to gate the toggle before a session may even exist. */
     health(timeoutMs = 2000): Promise<boolean> {
       const controller = new AbortController();
@@ -1603,29 +1601,28 @@ export const localApi = {
 
     /** GET /jobs/stats on the coordinator. Returns this member's
      *  requester-side counts + average latency for the last 24h.
-     *  Session-authenticated — see coordinatorAuth.ts. (Was previously also
-     *  gated by the coordinator token server-side; that dependency was
-     *  dropped since this route is called directly by the frontend, which
-     *  can never hold the coordinator's shared secret — see
-     *  coordinator/routers/jobs.py.) */
+     *  Session-authenticated - see coordinatorAuth.ts. The server does not
+     *  also gate this route on the coordinator token, since it is called
+     *  directly by the frontend, which can never hold the coordinator's
+     *  shared secret - see coordinator/routers/jobs.py. */
     myStats(): Promise<MyJobStats> {
       return coordinatorSessionRequest('GET', '/jobs/stats').then((r) =>
         fromSessionResult<MyJobStats>(r),
       );
     },
 
-    /** GET /me/contributions — per-machine served + earned for the member's
+    /** GET /me/contributions - per-machine served + earned for the member's
      *  own machines over the last `days` (default 7). Own-machine data only.
-     *  Session-authenticated — see coordinatorAuth.ts. */
+     *  Session-authenticated - see coordinatorAuth.ts. */
     myContributions(days = 7): Promise<ContributionsResponse> {
       return coordinatorSessionRequest('GET', `/me/contributions?days=${days}`).then((r) =>
         fromSessionResult<ContributionsResponse>(r),
       );
     },
 
-    /** GET /me/contributions/weekly — week-by-week history, oldest-first.
+    /** GET /me/contributions/weekly - week-by-week history, oldest-first.
      *  Returns `weeks` weeks of data (zero-filled); default 8.
-     *  Session-authenticated — see coordinatorAuth.ts. */
+     *  Session-authenticated - see coordinatorAuth.ts. */
     myContributionsWeekly(weeks = 8): Promise<ContributionsWeeklyResponse> {
       return coordinatorSessionRequest('GET', `/me/contributions/weekly?weeks=${weeks}`).then((r) =>
         fromSessionResult<ContributionsWeeklyResponse>(r),
@@ -1633,22 +1630,22 @@ export const localApi = {
     },
   },
 
-  // ---- Credits (coordinator — Phase G m4 ledger) -------------------------
-  // Session-authenticated (not the optional coordinator token) — see
+  // ---- Credits (coordinator ledger) --------------------------------------
+  // Session-authenticated (not the optional coordinator token) - see
   // coordinatorAuth.ts. Both routes are under /me/*, which the prod
   // coordinator requires a member session for.
 
   credits: {
-    /** GET /me/credit-balance — aggregated earned / spent / net plus
+    /** GET /me/credit-balance - aggregated earned / spent / net plus
      *  per-model breakdown. Decimal fields arrive as strings; keep them
-     *  that way — parse/format only at the render layer. */
+     *  that way - parse/format only at the render layer. */
     balance(): Promise<CreditBalance> {
       return coordinatorSessionRequest('GET', '/me/credit-balance').then((r) =>
         fromSessionResult<CreditBalance>(r),
       );
     },
 
-    /** GET /me/credit-history — newest-first ledger entries.
+    /** GET /me/credit-history - newest-first ledger entries.
      *  `direction` filters to 'earned' or 'spent'; omit for all.
      *  `limit` defaults to 50 server-side; pass 10 for the glance widget. */
     history(opts: { direction?: 'earned' | 'spent'; limit?: number } = {}): Promise<CreditHistory> {
@@ -1662,9 +1659,9 @@ export const localApi = {
     },
   },
 
-  // ---- Trusted circles (coordinator — Phase 2) ----------------------------
+  // ---- Trusted circles (coordinator) ---------------------------------------
 
-  // Session-authenticated (not the optional coordinator token) — see
+  // Session-authenticated (not the optional coordinator token) - see
   // coordinatorAuth.ts. The prod coordinator requires a member session for
   // every /me/* route, so these go through the bearer-attaching bridge
   // rather than a bare fetch.
@@ -1677,7 +1674,7 @@ export const localApi = {
       });
     },
 
-    /** POST /me/circles { name } — create a new trusted circle. */
+    /** POST /me/circles { name } - create a new trusted circle. */
     create(name: string): Promise<Circle> {
       return coordinatorSessionRequest('POST', '/me/circles', { name }).then((r) =>
         normalizeCircle(fromSessionResult<RawCircle>(r)),
@@ -1702,7 +1699,7 @@ export const localApi = {
       ).then((r) => fromSessionResult<CircleMember>(r));
     },
 
-    /** GET /me/circles/{circle_id}/availability — models the circle can run right now. */
+    /** GET /me/circles/{circle_id}/availability - models the circle can run right now. */
     availability(circleId: string): Promise<CircleAvailability> {
       return coordinatorSessionRequest(
         'GET',
@@ -1781,10 +1778,10 @@ export const localApi = {
     },
   },
 
-  // ---- Identity (coordinator — Phase 2) -----------------------------------
+  // ---- Identity (coordinator) ----------------------------------------------
 
-  /** GET /me/identity — the calling member's own public key.
-   *  Session-authenticated — see coordinatorAuth.ts. */
+  /** GET /me/identity - the calling member's own public key.
+   *  Session-authenticated - see coordinatorAuth.ts. */
   getMyIdentity(): Promise<MyIdentityResponse> {
     return coordinatorSessionRequest('GET', '/me/identity').then((r) =>
       fromSessionResult<MyIdentityResponse>(r),

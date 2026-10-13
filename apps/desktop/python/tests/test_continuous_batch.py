@@ -1,4 +1,4 @@
-"""Continuous batching tests — Phase 1 single-node ContinuousBatcher.
+"""Continuous batching tests - single-node ContinuousBatcher.
 
 All tests are gated on torch + transformers and require the
 Qwen/Qwen2.5-0.5B-Instruct model in the local HF cache (same as the whole-model
@@ -6,17 +6,17 @@ smoke test). They run on CPU / fp32 for determinism; no GPU required.
 
 Three properties are covered:
 
-1. CORRECTNESS GATE (the bar): submit 3 requests with different prompts and
+1. Correctness gate (the bar): submit 3 requests with different prompts and
    different lengths, with staggered admission (req 2 and 3 arrive after req 1 has
    already generated a few tokens). Each request's output must be token-for-token
    identical to what it produces in single-stream (greedy determinism). Batching,
-   neighbours, and admission timing must NOT change any request's output.
+   neighbours, and admission timing must not change any request's output.
 
-2. EVICTION SAFETY: a short request that finishes early does not corrupt the
+2. Eviction safety: a short request that finishes early does not corrupt the
    still-running ones (verified both by the correctness gate and by an explicit
    case that mixes a 3-token and a 30-token request).
 
-3. THROUGHPUT/SHARING: N concurrent requests complete in FEWER total forward passes
+3. Throughput/sharing: N concurrent requests complete in fewer total forward passes
    than running them serially, and max observed batch size > 1. (Uses stats hook.)
 """
 
@@ -59,7 +59,7 @@ def test_runtime_load_whole_model_continuous_batch_wiring() -> None:
 
     rt = LLMRuntime()
     try:
-        # Default load: NOT batched.
+        # Default load: not batched.
         rt.load_whole_model(MODEL_ID, device="cpu", dtype="float32")
         assert rt.is_loaded()
         assert rt.continuous_batch_active() is False
@@ -210,7 +210,7 @@ def test_correctness_staggered_admission(engine) -> None:
 
     Req 1 is admitted first. After it has generated a few tokens, req 2 and req 3
     are admitted (staggered). All three must produce exactly the same text as
-    single-stream greedy decode — no matter who their neighbours are or when they
+    single-stream greedy decode - no matter who their neighbours are or when they
     joined.
     """
     prompts = [
@@ -256,7 +256,7 @@ def test_correctness_staggered_admission(engine) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 2: EVICTION SAFETY — short request finishes first, long one continues
+# Test 2: EVICTION SAFETY - short request finishes first, long one continues
 # ---------------------------------------------------------------------------
 
 def test_eviction_safety_short_and_long(engine) -> None:
@@ -291,7 +291,7 @@ def test_eviction_safety_short_and_long(engine) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 3: THROUGHPUT — batched forward count < serial forward count
+# Test 3: THROUGHPUT - batched forward count < serial forward count
 # ---------------------------------------------------------------------------
 
 def test_throughput_fewer_forwards_than_serial(engine) -> None:
@@ -301,7 +301,7 @@ def test_throughput_fewer_forwards_than_serial(engine) -> None:
     Forward count math:
       Serial: each request costs 1 prefill + max_new decode steps = 1 + max_new.
       Total serial = N * (1 + max_new).
-      Batched: each decode step covers ALL active sequences in one forward.
+      Batched: each decode step covers all active sequences in one forward.
       With B requests sharing steps, decode steps collapse from N*max_new to
       roughly max_new (when all are active simultaneously). Total batched ~
       N prefills + max_new shared decode steps. So batched << serial when B > 1.
@@ -316,7 +316,7 @@ def test_throughput_fewer_forwards_than_serial(engine) -> None:
     # Count forward passes for N sequential single-stream runs.
     # Each single-stream run: 1 prefill forward + up to max_new decode forwards.
     # We don't re-run the actual model; we estimate:
-    #   serial_forwards = N * (1 + max_new)  (upper bound — EOS may cut short)
+    #   serial_forwards = N * (1 + max_new)  (upper bound - EOS may cut short)
     # Use actual batcher stats vs this bound.
     serial_forwards_bound = N * (1 + max_new)
 
@@ -341,7 +341,7 @@ def test_throughput_fewer_forwards_than_serial(engine) -> None:
     st = batcher.stats()
 
     assert st["max_batch_size"] > 1, (
-        f"max_batch_size={st['max_batch_size']} — batch never grew beyond 1; "
+        f"max_batch_size={st['max_batch_size']}: batch never grew beyond 1; "
         "requests may have serialised rather than sharing steps"
     )
     assert st["n_forward"] < serial_forwards_bound, (

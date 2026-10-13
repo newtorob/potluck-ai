@@ -14,7 +14,7 @@ import (
 
 // TestEnrollRequest_SigningPublicKey_OmittedWhenNil pins the back-compat
 // shape: a node that couldn't produce a signing key (or predates PoP
-// support) must send NO signing_public_key key at all — not null — matching
+// support) must send NO signing_public_key key at all - not null - matching
 // coordinator/schemas/mesh.py::EnrollRequest.signing_public_key being
 // Optional (Pydantic accepts a missing key the same as an explicit null, but
 // omitting it entirely is the more conservative wire shape and what
@@ -40,7 +40,7 @@ func TestEnrollRequest_SigningPublicKey_OmittedWhenNil(t *testing.T) {
 }
 
 // TestEnrollRequest_SigningPublicKey_IncludedWhenSet pins the field name and
-// value used when a signing key IS present — must be exactly
+// value used when a signing key IS present - must be exactly
 // "signing_public_key" (coordinator/schemas/mesh.py::EnrollRequest field
 // name) carrying the base64url-no-padding string produced by
 // internal/signingkey.KeyPair.PublicKeyB64.
@@ -75,7 +75,7 @@ func TestEnrollRequest_SigningPublicKey_IncludedWhenSet(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// BaseURL / SetBaseURL — runtime coordinator-URL override support
+// BaseURL / SetBaseURL - runtime coordinator-URL override support
 // ---------------------------------------------------------------------------
 
 func TestClient_BaseURL_ReturnsConstructorValue(t *testing.T) {
@@ -94,7 +94,7 @@ func TestClient_SetBaseURL_UpdatesLiveValue(t *testing.T) {
 }
 
 // TestClient_SetBaseURL_ConcurrentWithListPeers is the concurrency-safety
-// regression test for the SUDO_UID-gap-adjacent runtime coordinator-URL
+// test for the runtime coordinator-URL
 // override: a live SetBaseURL call can race an in-flight ListPeers call from
 // the roster-reconcile loop (cmd/potluck-mesh/main.go's
 // runRosterRefreshLoop). Run under -race; a bare string field here would
