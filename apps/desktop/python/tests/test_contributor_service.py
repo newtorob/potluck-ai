@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import functools
 import json
+import logging
+import traceback
 import uuid
 
 import pytest
@@ -474,6 +476,62 @@ async def test_runtime_error_becomes_internal_job_error_without_detail_leak():
     err = ws.sent[-1]
     assert err["type"] == "job_error" and err["error_category"] == "internal"
     assert err["error_message"] == "RuntimeError"
+
+
+class RaisingRuntime(FakeRuntime):
+    """Streams one token, then fails the way an engine can mid-generation."""
+
+    def __init__(self, error):
+        super().__init__()
+        self.error = error
+
+    async def stream_chat_raw(self, messages, *, temperature, max_tokens, stop):
+        yield {"choices": [{"delta": {"content": "x"}}]}
+        raise self.error
+
+
+# Stands for prompt or output text that an engine error can quote.
+CONTENT_MARKER = "marker-7f3a-private-content"
+
+
+def _error_chunk_runtime():
+    return FakeRuntime(chunks=[{"choices": [{"delta": {"content": "x"}}]},
+                               {"__error__": f"context overflow near {CONTENT_MARKER}"}])
+
+
+def _raising_runtime():
+    return RaisingRuntime(ValueError(f"cannot sample after {CONTENT_MARKER}"))
+
+
+@pytest.mark.parametrize("make_runtime,type_name", [
+    (_error_chunk_runtime, "RuntimeError"),
+    (_raising_runtime, "ValueError"),
+], ids=["engine_error_chunk", "exception_in_stream"])
+@run_async
+async def test_internal_job_error_log_has_no_traceback_and_no_exception_text(
+    caplog, make_runtime, type_name,
+):
+    caplog.set_level(logging.DEBUG)
+    rt = make_runtime()
+    svc = cs.ContributorService(runtime_getter=lambda: rt, loop_runner=FakeLoopRunner())
+    ws = FakeWS()
+    job = JobAssignedMessage(type="job_assigned", job_id=uuid.uuid4(),
+                             model_slug="qwen3-4b-instruct-2507-q4", prompt="hi")
+    await svc._serve_job(ws, job)
+
+    assert ws.sent[-1]["error_category"] == "internal"
+    failures = [r for r in caplog.records if "contributor_job_internal_error" in r.getMessage()]
+    assert len(failures) == 1
+    assert str(job.job_id) in failures[0].getMessage()
+    assert type_name in failures[0].getMessage()
+    assert failures[0].exc_info is None and failures[0].exc_text is None
+
+    for record in caplog.records:
+        shown = [record.getMessage(), repr(record.args), record.exc_text or ""]
+        if record.exc_info:
+            shown.append("".join(traceback.format_exception(*record.exc_info)))
+        assert CONTENT_MARKER not in "\n".join(shown), record.getMessage()
+    assert CONTENT_MARKER not in caplog.text
 
 
 # ---- status from loop events -----------------------------------------------

@@ -554,7 +554,12 @@ async def _handle_real_job(
     except websockets.ConnectionClosed:
         logger.warning("real_job_aborted_connection_closed job_id=%s", job.job_id)
     except Exception as exc:  # pragma: no cover - defensive
-        logger.exception("real_job_internal_error job_id=%s", job.job_id)
+        # The type name only. A traceback or the message can quote the
+        # prompt or the output of the member whose job this is.
+        logger.error(
+            "real_job_internal_error job_id=%s error=%s",
+            job.job_id, type(exc).__name__,
+        )
         try:
             category, message = _job_error_fields(exc, gpu_offload=settings.n_gpu_layers != 0)
             err = JobErrorMessage(job_id=job.job_id, error_category=category, error_message=message)
@@ -602,7 +607,12 @@ async def _handle_stub_job(
     except websockets.ConnectionClosed:
         logger.warning("stub_job_aborted_connection_closed job_id=%s", job.job_id)
     except Exception as exc:  # pragma: no cover - defensive
-        logger.exception("stub_job_internal_error job_id=%s", job.job_id)
+        # The type name only. A traceback or the message can quote the
+        # prompt or the output of the member whose job this is.
+        logger.error(
+            "stub_job_internal_error job_id=%s error=%s",
+            job.job_id, type(exc).__name__,
+        )
         try:
             category, message = _job_error_fields(exc, gpu_offload=False)
             err = JobErrorMessage(job_id=job.job_id, error_category=category, error_message=message)

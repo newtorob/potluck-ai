@@ -901,7 +901,12 @@ class ContributorService:
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001
-            logger.exception("contributor_job_internal_error job_id=%s", job.job_id)
+            # The type name only. A traceback or the message can quote the
+            # prompt or the output of the member whose job this is.
+            logger.error(
+                "contributor_job_internal_error job_id=%s error=%s",
+                job.job_id, type(exc).__name__,
+            )
             await self._send(ws, JobErrorMessage(
                 job_id=job.job_id, error_category="internal",
                 error_message=type(exc).__name__,
