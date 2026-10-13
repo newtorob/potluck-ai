@@ -44,11 +44,10 @@ const config: Config = {
         'surface-2': 'hsl(var(--surface-2))',
       },
       fontFamily: {
-        // Living Mesh faces, shared with the landing page so the whole site
-        // reads as one artifact. Old broadsheet faces kept as fallbacks.
-        serif: ['var(--font-newsreader)', 'var(--font-serif)', 'Iowan Old Style', 'Georgia', 'serif'],
-        sans: ['var(--font-familjen-grotesk)', 'var(--font-sans)', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-spline-mono)', 'var(--font-mono)', 'ui-monospace', 'monospace'],
+        // Bundled marketing fonts; every variable is defined in fonts.css.
+        serif: ['var(--font-newsreader)', 'Iowan Old Style', 'Georgia', 'serif'],
+        sans: ['var(--font-body)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-spline-mono)', 'ui-monospace', 'monospace'],
       },
       letterSpacing: {
         display: '-0.02em',
