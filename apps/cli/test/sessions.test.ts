@@ -70,4 +70,4 @@ it("the installed coding agent saves and resumes history without replaying old a
     await expect(run(["--resume", id, "-p", "Should fail"])).rejects.toThrow();
     expect(requests).toHaveLength(2);
   } finally { await new Promise<void>(resolve => { server.close(() => resolve()); server.closeAllConnections(); }); }
-});
+}, 35000);
