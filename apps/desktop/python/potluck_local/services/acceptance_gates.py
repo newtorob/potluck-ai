@@ -28,11 +28,17 @@ This module is called by acceptance.run_checks and does not import acceptance.
 The ``ask_*`` functions return ``(raw, visible, finish_reason, tokens)``, the
 fields of acceptance.Reply. Model output is data: it is judged here and kept as
 a short excerpt by the caller, never logged.
+
+Run after a load, these checks give way to real work (acceptance.RecordedPlan).
+The ``ask_*`` functions then take an ``interrupt`` event and read the reply from
+a stream, so a request that arrives can stop a reply between two tokens. Without
+an interrupt the call is the one these checks have always made.
 """
 
 from __future__ import annotations
 
 import json
+import threading
 from typing import Any
 
 from potluck_local.services.model_traits import TemplateTraits
@@ -77,10 +83,49 @@ def tools_skip(traits: TemplateTraits | None, *, slow: bool) -> str | None:
     return SKIP_SLOW if slow else None
 
 
-def _complete(model: Any, messages: list[dict], max_tokens: int, **extra: Any) -> tuple[str, str | None, int]:
-    result = model.create_chat_completion(
-        messages=messages, temperature=0.0, max_tokens=max_tokens, stream=False, **extra
-    )
+class Interrupted(Exception):
+    """A reply was abandoned between two tokens because real work is waiting for the model."""
+
+
+def chat_result(model: Any, interrupt: threading.Event | None, **kwargs: Any) -> dict:
+    """``model.create_chat_completion(**kwargs)`` as one non-streaming result.
+
+    With no ``interrupt`` that is the plain call, ``stream=False``. With one, the
+    reply is read from a stream and put together here, and the stream is closed
+    and Interrupted raised as soon as the event is set, before the reply is
+    complete. Closing a stream early is what a client that disconnects does to
+    the runtime, so the model is left in the state it is in then. The text is
+    the same as the non-streaming one. ``completion_tokens`` counts the chunks
+    that carried text, which is the token count for this wrapper's streams.
+    """
+    if interrupt is None:
+        return model.create_chat_completion(stream=False, **kwargs)
+    chunks = model.create_chat_completion(stream=True, **kwargs)
+    text: list[str] = []
+    finish: str | None = None
+    count = 0
+    try:
+        for chunk in chunks:
+            choice = (chunk.get("choices") or [{}])[0]
+            piece = (choice.get("delta") or {}).get("content")
+            if isinstance(piece, str) and piece:
+                text.append(piece)
+                count += 1
+            if choice.get("finish_reason"):
+                finish = choice["finish_reason"]
+            if finish is None and interrupt.is_set():
+                raise Interrupted()
+    finally:
+        close = getattr(chunks, "close", None)
+        if callable(close):
+            close()
+    return {"choices": [{"message": {"content": "".join(text)}, "finish_reason": finish}],
+            "usage": {"completion_tokens": count}}
+
+
+def _complete(model: Any, messages: list[dict], max_tokens: int, interrupt: threading.Event | None = None,
+              **extra: Any) -> tuple[str, str | None, int]:
+    result = chat_result(model, interrupt, messages=messages, temperature=0.0, max_tokens=max_tokens, **extra)
     choice = (result.get("choices") or [{}])[0]
     text = (choice.get("message") or {}).get("content")
     tokens = (result.get("usage") or {}).get("completion_tokens")
@@ -92,8 +137,10 @@ def _complete(model: Any, messages: list[dict], max_tokens: int, **extra: Any) -
 # ---------------------------------------------------------------------------
 
 
-def ask_reasoning(model: Any, traits: TemplateTraits) -> tuple[str, str, str | None, int]:
-    raw, finish, tokens = _complete(model, [{"role": "user", "content": REASONING_PROMPT}], REASONING_TOKENS)
+def ask_reasoning(model: Any, traits: TemplateTraits,
+                  interrupt: threading.Event | None = None) -> tuple[str, str, str | None, int]:
+    raw, finish, tokens = _complete(model, [{"role": "user", "content": REASONING_PROMPT}], REASONING_TOKENS,
+                                    interrupt)
     _, content = split_reasoning(raw, starts_in_reasoning=traits.opens_reasoning)
     return raw, content, finish, tokens
 
@@ -125,12 +172,13 @@ def _first_turn_calls(raw: str, traits: TemplateTraits) -> tuple[str, list]:
     return extract_tool_calls(answer, [TOOL_NAME])
 
 
-def ask_tools(model: Any, traits: TemplateTraits, *, think_off: bool) -> tuple[str, str, str | None, int]:
+def ask_tools(model: Any, traits: TemplateTraits, *, think_off: bool,
+              interrupt: threading.Event | None = None) -> tuple[str, str, str | None, int]:
     """Both turns. ``visible`` is the second reply, or "" when the first turn did
     not make the right call (then ``raw`` is what the model said instead)."""
     prompt = f"{TOOLS_PROMPT} /no_think" if think_off else TOOLS_PROMPT
     messages: list[dict] = [{"role": "user", "content": prompt}]
-    raw, finish, tokens = _complete(model, messages, FIRST_TURN_TOKENS, tools=[WEATHER_TOOL])
+    raw, finish, tokens = _complete(model, messages, FIRST_TURN_TOKENS, interrupt, tools=[WEATHER_TOOL])
     before, calls = _first_turn_calls(raw, traits)
     if not _right_call(calls):
         return raw, "", finish, tokens
@@ -142,7 +190,7 @@ def ask_tools(model: Any, traits: TemplateTraits, *, think_off: bool) -> tuple[s
                          "function": {"name": call.name, "arguments": json.loads(call.arguments)}}]},
         {"role": "tool", "tool_call_id": call.id, "content": json.dumps(TOOL_RESULT)},
     ]
-    second, finish, more = _complete(model, second_turn, SECOND_TURN_TOKENS, tools=[WEATHER_TOOL])
+    second, finish, more = _complete(model, second_turn, SECOND_TURN_TOKENS, interrupt, tools=[WEATHER_TOOL])
     _, reply = split_reasoning(second, starts_in_reasoning=traits.opens_reasoning)
     return raw, reply, finish, tokens + more
 

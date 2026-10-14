@@ -258,12 +258,10 @@ async def peer_capabilities() -> PeerCapabilities:
             tokens_per_sec=(bench or {}).get("tokens_per_sec"),
         )
 
-    # "busy" reflects whether the runtime's inference lock is currently
-    # held (i.e. an inference is in flight). asyncio.Lock.locked() returns
-    # True while held; safe to call without acquiring.
-    inference_load = PeerInferenceLoad(
-        busy=runtime._inference_lock.locked(),  # noqa: SLF001 — intentional, single-process state
-    )
+    # "busy" reflects whether a request is using the model or waiting for it.
+    # The answer check's recorded checks run under the same lock after a load
+    # and give way to a request, so they do not count (runtime.busy()).
+    inference_load = PeerInferenceLoad(busy=runtime.busy())
 
     # Big Model Mode advertisement. The peer's rpc-server endpoint comes
     # from an env var the contributor setup script writes when it starts

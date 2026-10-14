@@ -1,0 +1,315 @@
+{
+ "cpu": {
+  "proofs": {
+   "2f58fc565516e57da1af4ca0989046cb": {
+    "checked_at": "2026-10-11T03:34:51Z",
+    "checked_at_epoch": 1791689691.105759,
+    "checks": [
+     {
+      "excerpt": "58213",
+      "finish_reason": "stop",
+      "id": "copy",
+      "ms": 0,
+      "passed": true,
+      "required": true,
+      "tokens": 1
+     },
+     {
+      "excerpt": "4",
+      "finish_reason": "stop",
+      "id": "arithmetic",
+      "ms": 0,
+      "passed": true,
+      "required": true,
+      "tokens": 1
+     },
+     {
+      "excerpt": "The ocean is a vast and mysterious body of water that covers over 70% of the Ear",
+      "finish_reason": "stop",
+      "id": "repeats",
+      "ms": 0,
+      "passed": true,
+      "required": true,
+      "tokens": 35
+     },
+     {
+      "excerpt": "Paris",
+      "finish_reason": "stop",
+      "id": "fact",
+      "ms": 0,
+      "passed": true,
+      "required": false,
+      "tokens": 1
+     },
+     {
+      "excerpt": "",
+      "finish_reason": "stop",
+      "id": "stops",
+      "ms": 0,
+      "passed": true,
+      "required": false,
+      "tokens": 0
+     },
+     {
+      "excerpt": "",
+      "finish_reason": null,
+      "id": "reasoning",
+      "ms": 0,
+      "passed": true,
+      "required": false,
+      "skipped": "not a thinking model",
+      "tokens": 0
+     },
+     {
+      "excerpt": "",
+      "finish_reason": null,
+      "id": "tools",
+      "ms": 0,
+      "passed": true,
+      "required": false,
+      "skipped": "the chat template has no tool section",
+      "tokens": 0
+     }
+    ],
+    "duration_ms": 0,
+    "key": {
+     "backend": "cpu",
+     "cpu_only": false,
+     "device": "CPU",
+     "device_kind": "cpu",
+     "driver": "31.0.21025.10 (2-11-2025)",
+     "level": "quick",
+     "library": "siglib01",
+     "llama_cpp": "0.3.36",
+     "model_sha256": "13e35c44395f6cade670c076230362267c5288989d3498e207877d62b859a6d8",
+     "n_gpu_layers": 0,
+     "suite": 2,
+     "total_layers": 32
+    },
+    "level": "quick",
+    "model": {
+     "id": "qwen-test",
+     "mtime_ns": 1791686091105512857,
+     "size": 10
+    },
+    "output_tokens": 38,
+    "verdict": "ok"
+   }
+  },
+  "schema_version": 1
+ },
+ "gpu": {
+  "proofs": {
+   "e26537169b13c81810b80b2f88153325": {
+    "checked_at": "2026-10-11T03:34:51Z",
+    "checked_at_epoch": 1791689691.000725,
+    "checks": [
+     {
+      "excerpt": "58213",
+      "finish_reason": "stop",
+      "id": "copy",
+      "ms": 0,
+      "passed": true,
+      "required": true,
+      "tokens": 1
+     },
+     {
+      "excerpt": "4",
+      "finish_reason": "stop",
+      "id": "arithmetic",
+      "ms": 0,
+      "passed": true,
+      "required": true,
+      "tokens": 1
+     },
+     {
+      "excerpt": "The ocean is a vast and mysterious body of water that covers over 70% of the Ear",
+      "finish_reason": "stop",
+      "id": "repeats",
+      "ms": 0,
+      "passed": true,
+      "required": true,
+      "tokens": 35
+     },
+     {
+      "excerpt": "Paris",
+      "finish_reason": "stop",
+      "id": "fact",
+      "ms": 0,
+      "passed": true,
+      "required": false,
+      "tokens": 1
+     },
+     {
+      "excerpt": "",
+      "finish_reason": "stop",
+      "id": "stops",
+      "ms": 0,
+      "passed": true,
+      "required": false,
+      "tokens": 0
+     },
+     {
+      "excerpt": "73941",
+      "finish_reason": "stop",
+      "id": "long_prompt",
+      "ms": 0,
+      "passed": true,
+      "required": false,
+      "tokens": 1
+     },
+     {
+      "excerpt": "",
+      "finish_reason": null,
+      "id": "reasoning",
+      "ms": 0,
+      "passed": true,
+      "required": false,
+      "skipped": "not a thinking model",
+      "tokens": 0
+     },
+     {
+      "excerpt": "",
+      "finish_reason": null,
+      "id": "tools",
+      "ms": 0,
+      "passed": true,
+      "required": false,
+      "skipped": "the chat template has no tool section",
+      "tokens": 0
+     }
+    ],
+    "duration_ms": 0,
+    "key": {
+     "backend": "vulkan",
+     "cpu_only": false,
+     "device": "AMD Radeon RX 6600 XT",
+     "device_kind": "gpu",
+     "driver": "31.0.21025.10 (2-11-2025)",
+     "level": "quick",
+     "library": "siglib01",
+     "llama_cpp": "0.3.36",
+     "model_sha256": "13e35c44395f6cade670c076230362267c5288989d3498e207877d62b859a6d8",
+     "n_gpu_layers": -1,
+     "suite": 2,
+     "total_layers": 32
+    },
+    "level": "quick",
+    "model": {
+     "id": "qwen-test",
+     "mtime_ns": 1791686090999950170,
+     "size": 10
+    },
+    "output_tokens": 39,
+    "verdict": "ok"
+   }
+  },
+  "schema_version": 1
+ },
+ "gpu_thinking": {
+  "proofs": {
+   "e26537169b13c81810b80b2f88153325": {
+    "checked_at": "2026-10-11T03:34:51Z",
+    "checked_at_epoch": 1791689691.104168,
+    "checks": [
+     {
+      "excerpt": "58213",
+      "finish_reason": "stop",
+      "id": "copy",
+      "ms": 0,
+      "passed": true,
+      "required": true,
+      "tokens": 1
+     },
+     {
+      "excerpt": "4",
+      "finish_reason": "stop",
+      "id": "arithmetic",
+      "ms": 0,
+      "passed": true,
+      "required": true,
+      "tokens": 1
+     },
+     {
+      "excerpt": "The ocean is a vast and mysterious body of water that covers over 70% of the Ear",
+      "finish_reason": "stop",
+      "id": "repeats",
+      "ms": 0,
+      "passed": true,
+      "required": true,
+      "tokens": 35
+     },
+     {
+      "excerpt": "Paris",
+      "finish_reason": "stop",
+      "id": "fact",
+      "ms": 0,
+      "passed": true,
+      "required": false,
+      "tokens": 1
+     },
+     {
+      "excerpt": "",
+      "finish_reason": "stop",
+      "id": "stops",
+      "ms": 0,
+      "passed": true,
+      "required": false,
+      "tokens": 0
+     },
+     {
+      "excerpt": "73941",
+      "finish_reason": "stop",
+      "id": "long_prompt",
+      "ms": 0,
+      "passed": true,
+      "required": false,
+      "tokens": 1
+     },
+     {
+      "excerpt": "391",
+      "finish_reason": "stop",
+      "id": "reasoning",
+      "ms": 0,
+      "passed": true,
+      "required": false,
+      "tokens": 9
+     },
+     {
+      "excerpt": "It is 17 degrees in Paris.",
+      "finish_reason": "stop",
+      "id": "tools",
+      "ms": 0,
+      "passed": true,
+      "required": false,
+      "tokens": 18
+     }
+    ],
+    "duration_ms": 57,
+    "key": {
+     "backend": "vulkan",
+     "cpu_only": false,
+     "device": "AMD Radeon RX 6600 XT",
+     "device_kind": "gpu",
+     "driver": "31.0.21025.10 (2-11-2025)",
+     "level": "quick",
+     "library": "siglib01",
+     "llama_cpp": "0.3.36",
+     "model_sha256": "13e35c44395f6cade670c076230362267c5288989d3498e207877d62b859a6d8",
+     "n_gpu_layers": -1,
+     "suite": 2,
+     "total_layers": 32
+    },
+    "level": "quick",
+    "model": {
+     "id": "qwen-test",
+     "mtime_ns": 1791686091047258853,
+     "size": 10
+    },
+    "output_tokens": 66,
+    "verdict": "ok"
+   }
+  },
+  "schema_version": 1
+ }
+}

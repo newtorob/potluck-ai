@@ -29,6 +29,13 @@ therefore takes the largest of the readings that are the model's own cost.
 The sampler never raises into a load, always ends (stop(), the context manager,
 or its own time limit), and a window can be extended over the checks that follow
 the load by passing the load's result as `previous`.
+
+The window covers the load and the required answer checks, which include the first
+answer (that is when weights the OS has not yet paged in are read). The recorded
+checks run later, in the background, so each is measured on its own (Increment) and
+widen() adds what it saw to the stored figure. On an Apple M2 Pro, in three runs of
+small Qwen models, the largest reading was the long-prompt check at 47 to 87 MiB of
+free memory and under 1 MiB on the GPU, a few percent of the figure.
 """
 
 from __future__ import annotations
@@ -298,6 +305,96 @@ class MemorySampler:
                 "samples": self._samples,
                 "seconds": round(self._carried_seconds + max(0.0, ended - self._started), 2),
             }
+
+
+# ---------------------------------------------------------------------------
+# Work done after the window closed
+# ---------------------------------------------------------------------------
+
+
+class Increment:
+    """What one more piece of work (a recorded answer check, run in the background after the
+    load) added to a measurement that was already taken.
+
+    The load's window cannot simply be reopened for it: that window began minutes
+    earlier, and anything another program did to free memory or to the GPU in the
+    meantime would be counted as the model's. This one has its own baseline, taken as
+    the work starts, and reports only the movement during it: the fall in free memory,
+    the engine's resident peak (which is absolute), and the GPU growth against the
+    reading at the start. widen() adds it to the stored measurement. Start and stop it
+    from the thread that runs the work, the same thread that reads ggml's device figure.
+    """
+
+    def __init__(self, gpu: Any = None, **sampler: Any) -> None:
+        """`sampler`: the MemorySampler options (a test passes its own readers and threaded=False)."""
+        self._gpu = gpu
+        self._sampler = MemorySampler(gpu=gpu, **sampler)
+        self._gpu_before: int | None = None
+        self._result: dict | None = None
+
+    def start(self) -> "Increment":
+        if self._gpu is not None:
+            self._gpu_before = MemorySampler._call(None, self._gpu.used)
+        self._sampler.start()
+        return self
+
+    def stop(self) -> dict:
+        if self._result is None:
+            window = self._sampler.stop()
+            after, before = window.get("gpu_bytes"), self._gpu_before
+            self._result = {
+                "host_fall_bytes": window["host_fall_bytes"],
+                "rss_peak_bytes": window["rss_peak_bytes"],
+                "gpu_added_bytes": max(0, after - before) if after is not None and before is not None else None,
+                "samples": window["samples"],
+                "seconds": window["seconds"],
+            }
+        return self._result
+
+
+def widen(measurement: dict | None, increments: list[dict]) -> dict | None:
+    """A stored measurement with work done after it added in, never smaller than it was.
+
+    Free memory and the GPU figure grow by the largest increment, on top of the lowest
+    point the load reached. That can read a little high when the load's peak was a
+    passing one, and it is the safe side for a figure that says whether a model fits.
+    The resident peak is the larger of the two. A figure that was not measured stays
+    null. The window is then labelled as covering the checks.
+
+    Widening the same measurement again adds only what is new. The amount already
+    added is kept in ``checks_added``, and a later call grows the figure only by how
+    far its largest increment exceeds that. Without this, a proof whose recorded
+    checks are run again on a later load (they were cut short, or the engine stopped
+    first) would gain the same few dozen MiB every time and drift upwards.
+    """
+    if not isinstance(measurement, dict) or not increments:
+        return measurement
+    out = dict(measurement)
+
+    def largest(name: str) -> int:
+        return max((v for i in increments if isinstance(v := i.get(name), int) and not isinstance(v, bool)), default=0)
+
+    def already(name: str) -> int:
+        added = out.get("checks_added")
+        value = added.get(name) if isinstance(added, dict) else None
+        return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else 0
+
+    fall, gpu = max(largest("host_fall_bytes"), already("host_fall_bytes")), max(largest("gpu_added_bytes"), already("gpu_bytes"))
+    more_fall, more_gpu = fall - already("host_fall_bytes"), gpu - already("gpu_bytes")
+    if isinstance(out.get("host_fall_bytes"), int):
+        out["host_fall_bytes"] += more_fall
+        if isinstance(out.get("available_min_bytes"), int):
+            out["available_min_bytes"] = max(0, out["available_min_bytes"] - more_fall)
+    if isinstance(out.get("gpu_bytes"), int):
+        out["gpu_bytes"] += more_gpu
+    out["checks_added"] = {"host_fall_bytes": fall, "gpu_bytes": gpu}
+    peak = largest("rss_peak_bytes")
+    if peak and (not isinstance(out.get("rss_peak_bytes"), int) or peak > out["rss_peak_bytes"]):
+        out["rss_peak_bytes"] = peak
+    out["samples"] = int(out.get("samples") or 0) + sum(int(i.get("samples") or 0) for i in increments)
+    out["seconds"] = round(float(out.get("seconds") or 0.0) + sum(float(i.get("seconds") or 0.0) for i in increments), 2)
+    out["window"] = "load+checks"
+    return out
 
 
 # ---------------------------------------------------------------------------

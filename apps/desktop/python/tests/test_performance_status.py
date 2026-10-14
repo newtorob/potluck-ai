@@ -26,7 +26,7 @@ def test_household_metrics_are_aggregated_and_incomplete_probes_are_explicit(mon
 def test_local_metrics_do_not_generate_or_probe_household_and_keep_unknowns_null(monkeypatch):
     runtime = SimpleNamespace(current_model_id=lambda: 'coder', benchmarks=lambda: {},
         loaded_n_ctx=lambda: 4096, continuous_batch_active=lambda: False,
-        _inference_lock=SimpleNamespace(locked=lambda: True))
+        busy=lambda: True)
     monkeypatch.setattr(perf, 'get_runtime', lambda: runtime)
     monkeypatch.setattr(perf.psutil, 'virtual_memory', lambda: SimpleNamespace(available=2 * 1024 ** 3))
     monkeypatch.setattr(perf.usage_store, 'performance_summary', AsyncMock(side_effect=RuntimeError('db unavailable')))

@@ -57,6 +57,9 @@ class Rig:
         return {"name": "Vulkan0", "description": self.device_name, "type": "gpu",
                 "free_bytes": 7 * GIB, "total_bytes": 8 * GIB}
 
+    def make_model(self, mode: str):
+        return FakeModel(mode)
+
     def set_weights(self, data: bytes) -> None:
         self.path.write_bytes(data)
         old = time.time() - 3600
@@ -71,7 +74,7 @@ class Rig:
             raise self.refuse_cpu_load
         used = 0 if (cpu_only or self.backend == "cpu") else n_gpu_layers
         self.loads.append((used, cpu_only))
-        model = FakeModel(self.gpu if used else self.cpu)
+        model = self.make_model(self.gpu if used else self.cpu)
         self.models.append(model)
         gpu = used != 0
         rt._model, rt._model_path, rt._model_id = model, str(path), Path(path).parent.name
@@ -86,9 +89,21 @@ class Rig:
         }
         return {"model_id": rt._model_id, "n_ctx": n_ctx, "n_gpu_layers": used, "inference": rt.inference_summary()}
 
-    def load(self, *, verify=True, n_gpu_layers=-1, rpc_servers=None) -> dict:
-        return self.rt._load_with_check(str(self.path), verify=verify, n_ctx=4096, n_gpu_layers=n_gpu_layers,
-                                        n_threads=None, rpc_servers=rpc_servers)
+    def load(self, *, verify=True, n_gpu_layers=-1, rpc_servers=None, settle=True) -> dict:
+        """The load, and then the recorded checks it left to run, as load_model_async starts them.
+        settle=False stops at the verdict, which is what a load returns."""
+        result = self.rt._load_with_check(str(self.path), verify=verify, n_ctx=4096, n_gpu_layers=n_gpu_layers,
+                                          n_threads=None, rpc_servers=rpc_servers)
+        if settle:
+            self.settle()
+        return result
+
+    def settle(self) -> None:
+        async def run() -> None:
+            self.rt._launch_recorded()
+            await self.rt.wait_for_recorded()
+
+        asyncio.run(run())
 
     def check(self, level="quick", force=False):
         return self.rt._accept_loaded(SLUG, None, level, force)
@@ -663,7 +678,7 @@ def test_answers_are_verified_only_when_the_status_is_passed(rig):
 def test_the_contract_object_has_exactly_these_keys(rig):
     rig.load()
     assert list(rig.summary()) == ["schema_version", "status", "model_id", "level", "checked_at", "from_proof",
-                                   "ran_on", "checks", "verdict", "fallback", "message"]
+                                   "ran_on", "checks", "verdict", "fallback", "message", "recorded"]
     assert list(rig.summary()["ran_on"]) == ["device_kind", "backend", "device_name", "driver"]
     assert list(rig.summary()["checks"][0]) == ["id", "passed", "required"]
     assert list(a.summary()) == list(rig.summary())

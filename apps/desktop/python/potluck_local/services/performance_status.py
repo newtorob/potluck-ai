@@ -60,7 +60,7 @@ async def performance_status(include_household: bool = False) -> dict:
     try: usage = await usage_store.performance_summary()
     except Exception: usage = None
     return {'schemaVersion': 1, 'sampledAt': datetime.now(timezone.utc).isoformat(),
-            'local': {'model': model, 'busy': runtime._inference_lock.locked(),
+            'local': {'model': model, 'busy': runtime.busy(),
                       'contextTokens': runtime.loaded_n_ctx(), 'continuousBatch': runtime.continuous_batch_active(),
                       'memoryAvailableGiB': round(memory.available / 1024 ** 3, 2),
                       'benchmarkTokensPerSecond': number(benchmark.get('tokens_per_sec')),

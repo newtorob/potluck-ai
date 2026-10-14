@@ -118,9 +118,18 @@ class Rig:
         old = time.time() - 3600
         os.utime(self.path, (old, old))
 
-    def load(self, *, verify=True, n_ctx=4096, rpc_servers=None, runtime=None) -> dict:
-        return (runtime or self.rt)._load_with_check(str(self.path), verify=verify, n_ctx=n_ctx, n_gpu_layers=-1,
-                                                      n_threads=None, rpc_servers=rpc_servers)
+    def load(self, *, verify=True, n_ctx=4096, rpc_servers=None, runtime=None, settle=True) -> dict:
+        """The load, and then the recorded checks it left to run (settle=False stops at the verdict)."""
+        rt = runtime or self.rt
+        result = rt._load_with_check(str(self.path), verify=verify, n_ctx=n_ctx, n_gpu_layers=-1,
+                                     n_threads=None, rpc_servers=rpc_servers)
+        if settle:
+            async def run() -> None:
+                rt._launch_recorded()
+                await rt.wait_for_recorded()
+
+            asyncio.run(run())
+        return result
 
     def proofs(self) -> dict:
         path = a.get_store().path()
@@ -290,7 +299,7 @@ def test_the_measurement_does_not_change_what_the_summary_reports(rig):
     rig.load()
     s = rig.rt.acceptance_summary()
     assert set(s) == {"schema_version", "status", "model_id", "level", "checked_at", "from_proof", "ran_on", "checks",
-                      "verdict", "fallback", "message"}
+                      "verdict", "fallback", "message", "recorded"}
 
 
 # ---- benchmarks outlive a restart --------------------------------------------------------

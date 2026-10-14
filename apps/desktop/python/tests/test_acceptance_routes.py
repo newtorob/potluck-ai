@@ -28,7 +28,7 @@ GPU_WRONG = ("The GPU gave wrong answers for this model, so it is running on the
 MODEL_FAILED = ("This model did not pass its answer check on this machine. You can still use it yourself. "
                 "It is not offered to other people.")
 ACCEPTANCE_KEYS = ["schema_version", "status", "model_id", "level", "checked_at", "from_proof", "ran_on",
-                   "checks", "verdict", "fallback", "message"]
+                   "checks", "verdict", "fallback", "message", "recorded"]
 
 
 @pytest.fixture()
@@ -53,6 +53,7 @@ def test_health_inference_has_an_acceptance_block_even_with_nothing_loaded(rig, 
     assert body["acceptance"] == {
         "schema_version": 1, "status": "not_run", "model_id": None, "level": None, "checked_at": None,
         "from_proof": False, "ran_on": None, "checks": [], "verdict": None, "fallback": None, "message": None,
+        "recorded": None,
     }
     assert list(body["acceptance"]) == ACCEPTANCE_KEYS
 

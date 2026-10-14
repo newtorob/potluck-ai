@@ -22,6 +22,14 @@ def doubled(text: str) -> str:
     return " ".join(word for word in text.split() for _ in (0, 1))
 
 
+def stream_of(text: str, finish: str):
+    """The reply as llama-cpp-python streams it: a role chunk, one chunk per word, then the finish chunk."""
+    yield {"choices": [{"delta": {"role": "assistant"}, "finish_reason": None}]}
+    for piece in re.findall(r"\S+\s*", text):
+        yield {"choices": [{"delta": {"content": piece}, "finish_reason": None}]}
+    yield {"choices": [{"delta": {}, "finish_reason": finish}]}
+
+
 class FakeModel:
     """Answers the suite's prompts. `mode` picks how it misbehaves, if it does."""
 
@@ -47,6 +55,8 @@ class FakeModel:
         prompt = messages[0]["content"]
         self.asked.append({"prompt": prompt, "temperature": temperature, "max_tokens": max_tokens, "stream": stream})
         text, finish = self.answer(prompt, max_tokens)
+        if stream:  # the checks that run after a load read the reply from a stream
+            return stream_of(text, finish)
         return {"choices": [{"message": {"content": text}, "finish_reason": finish}],
                 "usage": {"completion_tokens": max(1, len(text.split()))}}
 

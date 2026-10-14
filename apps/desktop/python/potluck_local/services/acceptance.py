@@ -34,6 +34,21 @@ the same key, and only on those entries (see public_checks).
 Only the required checks decide the result. Changing any prompt or rule means
 bumping SUITE_VERSION, which makes every stored proof stale.
 
+When they run
+-------------
+A load waits for the required checks only: they take a few seconds, and once
+they have passed the model is lent and the proof is stored. The recorded checks
+(the reasoning one can run for 512 tokens) are not part of that wait. After a
+load they run in the background, one at a time, each only while no request is
+using the model, and a request that arrives stops the one that is running
+(RecordedPlan, runtime.py). They are added to the result and to the proof as
+they finish, and `recorded` says where that stands: "running", "done", or
+"stopped" when they did not all run and will not now. A proof without them (the
+background was stopped, or the engine stopped first) gives its verdict at once
+and the missing ones run in the background on the next load. `POST
+/models/{slug}/test` and `potluck models test` run the whole suite and wait for
+it, as they always did.
+
 The repeats rule
 ----------------
 A broken kernel that doubles tokens ("A A mesh mesh network network") makes about
@@ -99,6 +114,13 @@ LEVELS = ("quick", "full")
 
 PASSED, FAILED, RUNNING, NOT_RUN, SKIPPED = "passed", "failed", "running", "not_run", "skipped"
 OK, GPU_WRONG_OUTPUT, MODEL_FAILED = "ok", "gpu_wrong_output", "model_failed"
+# Where the recorded checks stand. RUNNING is also one of these.
+DONE, STOPPED = "done", "stopped"
+# Why a recorded check was cut short: a request came in while it was generating.
+BUSY = "the machine was busy"
+# The order of the checks in a result and in a proof.
+REQUIRED_CHECKS = ("copy", "arithmetic", "repeats")
+RECORDED_CHECKS = ("fact", "stops", "long_prompt", "reasoning", "tools")
 
 # For this machine's own user. These sentences are part of the HTTP contract.
 GPU_WRONG_TEXT = (
@@ -248,6 +270,10 @@ class CheckRun:
     outcomes: list[Outcome] = field(default_factory=list)
     started_at: float = field(default_factory=time.time)
     duration_ms: int = 0
+    # Set by run_checks(defer_recorded=True): the recorded checks were left out. `pending` says how to
+    # run them when the required ones passed; it is None when they failed, and the recorded ones never run.
+    deferred: bool = False
+    pending: "RecordedPlan | None" = None
 
     @property
     def passed(self) -> bool:
@@ -269,13 +295,14 @@ def _excerpt(text: str) -> str:
     return " ".join(text.split())[:80]
 
 
-def _ask(model: Any, prompt: str, max_tokens: int, think_off: bool) -> tuple[Reply, bool]:
+def _ask(model: Any, prompt: str, max_tokens: int, think_off: bool,
+         interrupt: threading.Event | None = None) -> tuple[Reply, bool]:
     content = f"{prompt} /no_think" if think_off else prompt
-    result = model.create_chat_completion(
+    result = acceptance_gates.chat_result(
+        model, interrupt,
         messages=[{"role": "user", "content": content}],
         temperature=0.0,
         max_tokens=max_tokens,
-        stream=False,
     )
     choice = (result.get("choices") or [{}])[0]
     message = choice.get("message") or {}
@@ -287,10 +314,11 @@ def _ask(model: Any, prompt: str, max_tokens: int, think_off: bool) -> tuple[Rep
     return Reply(raw, text, choice.get("finish_reason"), tokens if isinstance(tokens, int) else 0), cut
 
 
-def _ask_checked(model: Any, prompt: str, max_tokens: int, think_off: bool) -> Reply:
-    reply, cut = _ask(model, prompt, max_tokens, think_off)
+def _ask_checked(model: Any, prompt: str, max_tokens: int, think_off: bool,
+                 interrupt: threading.Event | None = None) -> Reply:
+    reply, cut = _ask(model, prompt, max_tokens, think_off, interrupt)
     if cut and reply.finish_reason == "length":
-        reply, _ = _ask(model, prompt, max(max_tokens, THINK_RETRY_TOKENS), think_off)
+        reply, _ = _ask(model, prompt, max(max_tokens, THINK_RETRY_TOKENS), think_off, interrupt)
     return reply
 
 
@@ -325,93 +353,232 @@ def long_prompt_text(count_tokens: Callable[[str], int], target_tokens: int) -> 
     return "\n".join(lines) + "\n\nWhat is the vault code? Reply with only the number."
 
 
-def run_checks(model: Any, level: str, *, n_ctx: int | None, on_cpu: bool) -> CheckRun:
-    """Run the suite against a loaded llama.cpp model. A model that misbehaves
-    does not raise: a check that throws has failed. The one exception is a GPU
-    that ran out of memory, which raises InferenceFailure because it says
-    nothing about the answers. The caller holds exclusive access to the model."""
-    run = CheckRun(level=level)
-    started = time.monotonic()
-    think_off = has_no_think_switch(model)
-    replies: dict[str, Reply] = {}
+class _Suite:
+    """The checks against one loaded model, run one at a time. It keeps what a later
+    check reads from an earlier one (the arithmetic reply, for "stops")."""
 
-    def check(check_id: str, required: bool, prompt: str, max_tokens: int, judge: Callable[[Reply], bool],
-              ask: Callable[[], Reply] | None = None) -> None:
+    def __init__(self, model: Any, level: str, *, n_ctx: int | None, on_cpu: bool) -> None:
+        self.model, self.level, self.n_ctx, self.on_cpu = model, level, n_ctx, on_cpu
+        self.think_off = has_no_think_switch(model)
+        self.replies: dict[str, Reply] = {}
+        self.interrupt: threading.Event | None = None
+        # (the answer had text, its finish_reason): all that "stops" needs of the arithmetic check.
+        self.arithmetic: tuple[bool, str | None] | None = None
+        self._traits: Any = None
+        self._have_traits = False
+
+    @property
+    def traits(self) -> Any:
+        if not self._have_traits:
+            self._traits, self._have_traits = model_traits.traits_of_model(self.model), True
+        return self._traits
+
+    def check(self, check_id: str, required: bool, prompt: str, max_tokens: int, judge: Callable[[Reply], bool],
+              ask: Callable[[], Reply] | None = None) -> Outcome:
         t0 = time.monotonic()
         outcome = Outcome(check_id, required, False)
         try:
-            reply = ask() if ask else _ask_checked(model, prompt, max_tokens, think_off)
-            replies[check_id] = reply
+            reply = ask() if ask else _ask_checked(self.model, prompt, max_tokens, self.think_off, self.interrupt)
+            self.replies[check_id] = reply
             outcome.finish_reason, outcome.tokens = reply.finish_reason, reply.tokens
             outcome.excerpt = _excerpt(reply.visible or reply.raw)
             outcome.passed = bool(judge(reply))
+        except acceptance_gates.Interrupted:
+            raise
         except Exception as exc:  # noqa: BLE001 - a throwing model has failed the check
-            failure = inference_errors.describe_failure(exc, gpu_offload=not on_cpu)
+            failure = inference_errors.describe_failure(exc, gpu_offload=not self.on_cpu)
             if failure.category == inference_errors.GPU_OUT_OF_MEMORY:
                 # Not an answer at all: the card ran out of room. Say that, not "wrong".
                 raise inference_errors.InferenceFailure(failure.category, failure.message) from exc
             outcome.error = type(exc).__name__
         outcome.ms = round((time.monotonic() - t0) * 1000)
-        run.outcomes.append(outcome)
+        return outcome
 
-    def repeats(reply: Reply) -> bool:
-        # The reasoning counts too (a broken device repeats there as well), the markers do not.
-        text = without_think_tags(reply.raw)
-        return len(text.strip()) >= MIN_CHARS and not is_degenerate(text, _pieces(model, text))
+    def required(self) -> list[Outcome]:
+        model = self.model
 
-    check("copy", True, f"Reply with only this number: {_CODE}", 24, lambda r: _CODE in r.visible)
-    check("arithmetic", True, "What is 2 + 2? Reply with only the number.", 24, lambda r: _standalone_four(r.visible))
-    check("repeats", True, "Write two short sentences about the ocean.", 48, repeats)
-    check("fact", False, "What is the capital of France? Reply with one word.", 24, lambda r: "paris" in r.visible.lower())
-    stop = replies.get("arithmetic")
-    run.outcomes.append(Outcome("stops", False, bool(stop and stop.visible and stop.finish_reason == "stop"),
-                                finish_reason=stop.finish_reason if stop else None))
+        def repeats(reply: Reply) -> bool:
+            # The reasoning counts too (a broken device repeats there as well), the markers do not.
+            text = without_think_tags(reply.raw)
+            return len(text.strip()) >= MIN_CHARS and not is_degenerate(text, _pieces(model, text))
 
-    if level == "full" or not on_cpu:
+        found = [
+            self.check("copy", True, f"Reply with only this number: {_CODE}", 24, lambda r: _CODE in r.visible),
+            self.check("arithmetic", True, "What is 2 + 2? Reply with only the number.", 24,
+                       lambda r: _standalone_four(r.visible)),
+            self.check("repeats", True, "Write two short sentences about the ocean.", 48, repeats),
+        ]
+        stop = self.replies.get("arithmetic")
+        self.arithmetic = (bool(stop and stop.visible), stop.finish_reason if stop else None)
+        return found
+
+    def long_prompt_target(self) -> int | None:
+        """Tokens in the long prompt, or None when this setup does not run that check."""
+        if not (self.level == "full" or not self.on_cpu):
+            return None
         target = QUICK_PROMPT_TOKENS
-        if level == "full" and n_ctx:
-            target = min(int(n_ctx * FULL_CONTEXT_FRACTION) - 64, FULL_PROMPT_CAP)
-        if n_ctx is None or target + 64 <= n_ctx:
+        if self.level == "full" and self.n_ctx:
+            target = min(int(self.n_ctx * FULL_CONTEXT_FRACTION) - 64, FULL_PROMPT_CAP)
+        if self.n_ctx is None or target + 64 <= self.n_ctx:
+            return target
+        return None
+
+    def steps(self) -> list[str]:
+        """The recorded checks that apply here, in the order they run."""
+        return [s for s in RECORDED_CHECKS if s != "long_prompt" or self.long_prompt_target() is not None]
+
+    def inconclusive(self, outcome: Outcome) -> Outcome:
+        """A recorded check the engine cut off at its token budget is skipped, not failed."""
+        reply = self.replies.get(outcome.id)
+        if reply is not None and not outcome.passed:
+            why = acceptance_gates.out_of_budget(outcome.id, reply.raw, reply.visible, reply.finish_reason, self.traits)
+            if why:
+                outcome.passed, outcome.skipped = True, why
+        return outcome
+
+    def step(self, step_id: str, *, broken: bool = False) -> Outcome | None:
+        """One recorded check. None when it does not apply or its prompt could not be built.
+        `broken`: a required check failed, so the model-heavy ones are not worth asking."""
+        model = self.model
+        if step_id == "fact":
+            return self.check("fact", False, "What is the capital of France? Reply with one word.", 24,
+                              lambda r: "paris" in r.visible.lower())
+        if step_id == "stops":
+            answered, finish = self.arithmetic or (False, None)
+            return Outcome("stops", False, bool(answered and finish == "stop"), finish_reason=finish)
+        if step_id == "long_prompt":
+            target = self.long_prompt_target()
+            if target is None:
+                return None
             try:
                 prompt = long_prompt_text(lambda s: len(model.tokenize(s.encode("utf-8"), add_bos=False)), max(target, 200))
             except Exception:  # noqa: BLE001
-                prompt = None
-            if prompt is not None:
-                check("long_prompt", False, prompt, 24, lambda r: _VAULT_CODE in r.visible)
-
-    def inconclusive(check_id: str) -> None:
-        """A recorded check the engine cut off at its token budget is skipped, not failed."""
-        reply, outcome = replies.get(check_id), run.outcomes[-1]
-        if reply is not None and outcome.id == check_id and not outcome.passed:
-            why = acceptance_gates.out_of_budget(check_id, reply.raw, reply.visible, reply.finish_reason, traits)
+                return None
+            return self.check("long_prompt", False, prompt, 24, lambda r: _VAULT_CODE in r.visible)
+        traits, slow = self.traits, self.on_cpu and self.level != "full"
+        if step_id == "reasoning":
+            why = acceptance_gates.SKIP_FAILED if broken else acceptance_gates.reasoning_skip(traits, slow=slow)
             if why:
-                outcome.passed, outcome.skipped = True, why
+                return Outcome("reasoning", False, True, skipped=why)
+            return self.inconclusive(self.check(
+                "reasoning", False, "", acceptance_gates.REASONING_TOKENS,
+                lambda r: acceptance_gates.judge_reasoning(r.raw, traits),
+                ask=lambda: Reply(*acceptance_gates.ask_reasoning(model, traits, self.interrupt))))
+        if step_id == "tools":
+            why = acceptance_gates.SKIP_FAILED if broken else acceptance_gates.tools_skip(traits, slow=slow)
+            if why:
+                return Outcome("tools", False, True, skipped=why)
+            return self.inconclusive(self.check(
+                "tools", False, "", acceptance_gates.FIRST_TURN_TOKENS, lambda r: acceptance_gates.judge_tools(r.visible),
+                ask=lambda: Reply(*acceptance_gates.ask_tools(model, traits, think_off=self.think_off,
+                                                              interrupt=self.interrupt))))
+        raise ValueError(f"unknown check {step_id!r}")
 
-    slow = on_cpu and level != "full"
-    broken = any(o.required and not o.passed for o in run.outcomes)  # no point probing further
-    traits = model_traits.traits_of_model(model)
-    why = acceptance_gates.SKIP_FAILED if broken else acceptance_gates.reasoning_skip(traits, slow=slow)
-    if why:
-        run.outcomes.append(Outcome("reasoning", False, True, skipped=why))
-    else:
-        check("reasoning", False, "", acceptance_gates.REASONING_TOKENS,
-              lambda r: acceptance_gates.judge_reasoning(r.raw, traits),
-              ask=lambda: Reply(*acceptance_gates.ask_reasoning(model, traits)))
-        inconclusive("reasoning")
-    why = acceptance_gates.SKIP_FAILED if broken else acceptance_gates.tools_skip(traits, slow=slow)
-    if why:
-        run.outcomes.append(Outcome("tools", False, True, skipped=why))
-    else:
-        check("tools", False, "", acceptance_gates.FIRST_TURN_TOKENS, lambda r: acceptance_gates.judge_tools(r.visible),
-              ask=lambda: Reply(*acceptance_gates.ask_tools(model, traits, think_off=think_off)))
-        inconclusive("tools")
 
+class RecordedPlan:
+    """The recorded checks of a model whose required checks have passed, to run later.
+
+    They run one at a time, from a worker thread that owns the model (runtime.py
+    takes the model the way a request does). `run_step` with an `interrupt`
+    event reads the reply from a stream and gives the check up, recorded as
+    skipped with the reason BUSY, as soon as the event is set. The rest of the
+    plan is not affected.
+    """
+
+    def __init__(self, suite: _Suite, steps: list[str]) -> None:
+        self._suite = suite
+        self.steps = steps
+
+    @property
+    def model(self) -> Any:
+        return self._suite.model
+
+    def run_step(self, step_id: str, interrupt: threading.Event | None = None) -> Outcome | None:
+        """Run one check of the plan. None when the check does not apply here. Raises
+        InferenceFailure when the GPU ran out of memory, like the required checks."""
+        suite, t0 = self._suite, time.monotonic()
+        suite.interrupt = interrupt
+        try:
+            return suite.step(step_id)
+        except acceptance_gates.Interrupted:
+            return Outcome(step_id, False, True, skipped=BUSY, ms=round((time.monotonic() - t0) * 1000))
+        finally:
+            suite.interrupt = None
+            try:
+                self._suite.model.reset()  # leave no checked prompt in the cache for the next request
+            except Exception:  # noqa: BLE001
+                pass
+
+
+def run_checks(model: Any, level: str, *, n_ctx: int | None, on_cpu: bool, defer_recorded: bool = False) -> CheckRun:
+    """Run the suite against a loaded llama.cpp model. A model that misbehaves
+    does not raise: a check that throws has failed. The one exception is a GPU
+    that ran out of memory, which raises InferenceFailure because it says
+    nothing about the answers. The caller holds exclusive access to the model.
+
+    defer_recorded runs the required checks only. When they passed, `pending` of
+    the result holds the recorded ones, to run later (RecordedPlan); when they
+    failed it is None and the recorded ones are never run.
+    """
+    run = CheckRun(level=level)
+    started = time.monotonic()
+    suite = _Suite(model, level, n_ctx=n_ctx, on_cpu=on_cpu)
+    run.outcomes.extend(suite.required())
+    broken = any(not o.passed for o in run.outcomes)  # no point probing further
+    if defer_recorded:
+        run.deferred = True
+        if not broken:
+            run.pending = RecordedPlan(suite, suite.steps())
+    else:
+        for step_id in suite.steps():
+            outcome = suite.step(step_id, broken=broken)
+            if outcome is not None:
+                run.outcomes.append(outcome)
     try:
         model.reset()  # leave no checked prompt in the cache for the next request
     except Exception:  # noqa: BLE001
         pass
     run.duration_ms = round((time.monotonic() - started) * 1000)
     return run
+
+
+def missing_steps(records: list[dict] | None, steps: list[str]) -> list[str]:
+    """The recorded checks of `steps` that stored `records` do not have, in order.
+
+    One counts as missing when it is absent and no later one is stored (the
+    checks run in order, so a stored `tools` means `long_prompt` was done or did
+    not apply), and when it was cut short because the machine was busy.
+    """
+    stored = {c.get("id"): c for c in records or [] if isinstance(c, dict)}
+    last = max((i for i, s in enumerate(steps) if s in stored), default=-1)
+    return [s for i, s in enumerate(steps)
+            if i > last or (s in stored and stored[s].get("skipped") == BUSY)]
+
+
+def recorded_done(records: list[dict] | None) -> bool:
+    """Whether stored `records` hold every recorded check, as the suite since version 2 always wrote."""
+    return not missing_steps(records, [s for s in RECORDED_CHECKS if s != "long_prompt"])
+
+
+def resume_plan(model: Any, level: str, *, n_ctx: int | None, on_cpu: bool, records: list[dict] | None) -> RecordedPlan | None:
+    """The recorded checks a stored passing result lacks, as a plan to run on `model`.
+    None when it has them all, or when its required checks did not pass."""
+    stored = {c.get("id"): c for c in records or [] if isinstance(c, dict)}
+    arithmetic = stored.get("arithmetic")
+    if not arithmetic or arithmetic.get("passed") is not True:
+        return None
+    suite = _Suite(model, level, n_ctx=n_ctx, on_cpu=on_cpu)
+    suite.arithmetic = (True, arithmetic.get("finish_reason"))  # it passed, so it had an answer
+    steps = missing_steps(records, suite.steps())
+    return RecordedPlan(suite, steps) if steps else None
+
+
+def merge_records(stored: list[dict] | None, new: list[dict]) -> list[dict]:
+    """Stored check records with `new` ones added, in suite order. A new record replaces a stored one of the same id."""
+    by_id = {c["id"]: c for c in stored or [] if isinstance(c, dict) and "id" in c}
+    by_id.update({c["id"]: c for c in new})
+    order = REQUIRED_CHECKS + RECORDED_CHECKS
+    return sorted(by_id.values(), key=lambda c: order.index(c["id"]) if c["id"] in order else len(order))
 
 
 # ---------------------------------------------------------------------------
@@ -578,6 +745,25 @@ class ProofStore:
                 entry.update(missing)
                 self._write(proofs)
 
+    def extend(self, key: dict, records: list[dict], *, duration_ms: int = 0, output_tokens: int = 0,
+               widen: Callable[[dict | None], dict | None] | None = None) -> bool:
+        """Add recorded-check results to the passing entry for exactly this key. The verdict and the
+        time of the check do not move; a result of the same id replaces the stored one. `widen` is given
+        the stored measurement and returns the one to keep. False when there is no such entry (it aged
+        out, was replaced by another verdict, or was never stored)."""
+        with self._lock:
+            proofs = self._read()
+            entry = proofs.get(key_id(key))
+            if entry is None or entry.get("key") != key or entry.get("verdict") != OK:
+                return False
+            entry["checks"] = merge_records(entry.get("checks"), records)
+            entry["duration_ms"] = int(entry.get("duration_ms") or 0) + duration_ms
+            entry["output_tokens"] = int(entry.get("output_tokens") or 0) + output_tokens
+            if widen is not None and isinstance(entry.get("measurement"), dict):
+                entry["measurement"] = widen(entry["measurement"])
+            self._write(proofs)
+        return True
+
     def put(self, key: dict, record: dict) -> None:
         stamp = time.time()
         entry = {**record, "key": key, "checked_at_epoch": stamp, "checked_at": iso(stamp)}
@@ -651,7 +837,10 @@ def summary(
     verdict: str | None = None,
     fallback: dict | None = None,
     message: str | None = None,
+    recorded: str | None = None,
 ) -> dict:
+    """`recorded` says where the recorded checks stand: RUNNING (more will be added to `checks`),
+    DONE, or STOPPED (they did not all run and will not now). None when no check ran."""
     return {
         "schema_version": SCHEMA_VERSION,
         "status": status,
@@ -664,6 +853,7 @@ def summary(
         "verdict": verdict,
         "fallback": fallback,
         "message": message,
+        "recorded": recorded,
     }
 
 
