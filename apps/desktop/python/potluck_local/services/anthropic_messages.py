@@ -16,7 +16,9 @@ results and text becomes the tool messages first, then one user message with the
 text. An image inside a tool result becomes a line of text saying so; an image or
 document anywhere else is refused, as is any block type the engine cannot read.
 Assistant ``thinking`` and ``redacted_thinking`` blocks are dropped. ``cache_control``
-is ignored everywhere.
+is ignored everywhere. Neighbouring plain-text messages of the same role are joined
+with a blank line, because some chat templates refuse anything but strict user and
+assistant turns; a message with tool calls and a tool message are left alone.
 
 Only tools that carry an ``input_schema`` (the client's own) can run here.
 Anthropic's server tools and built-in client tools have none and are refused, by
@@ -64,6 +66,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from potluck_local.services.gateway_request import Prepared, RequestError, normalise_message, prepare
+from potluck_local.services.token_estimate import engine_count as _count
+from potluck_local.services.token_estimate import prompt_text as _prompt_text
+from potluck_local.services.token_estimate import tokens_for_chars
 from potluck_local.services.tool_calls import new_call_id
 
 MAX_BODY_BYTES = 32 * 1024 * 1024
@@ -73,7 +78,6 @@ IMAGE_LEFT_OUT = "[image left out: this model reads text only]"
 
 _JOIN = "\n\n"
 _NAME = re.compile(r"[A-Za-z0-9_.-]{1,64}")
-_CHARS_PER_TOKEN = 4
 
 
 def _shown(value: object) -> str:
@@ -85,20 +89,6 @@ def shown_name(value: object) -> str:
     """A client-supplied name that is safe to log: itself when it is a short plain
     name, otherwise "unknown"."""
     return _shown(value)
-
-
-def tokens_for_chars(chars: int) -> int:
-    """About four characters a token, rounded up."""
-    return -(-chars // _CHARS_PER_TOKEN)
-
-
-def estimate_tokens(text: str) -> int:
-    return tokens_for_chars(len(text))
-
-
-def _count(value: object) -> int | None:
-    """An engine token count: a whole number, zero or more. Anything else is no count."""
-    return value if type(value) is int and value >= 0 else None
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +213,27 @@ def _assistant_message(content: Any) -> dict | None:
     return normalise_message("assistant", text, tool_calls_=calls or None)
 
 
+def _plain(message: dict) -> bool:
+    """A user or assistant message that holds text only."""
+    return message["role"] in ("user", "assistant") and "tool_calls" not in message
+
+
+def _join_neighbours(messages: list[dict]) -> list[dict]:
+    """Neighbouring plain-text messages of the same role as one message, joined with a
+    blank line. Some chat templates refuse anything but strict user and assistant
+    turns, and a client can send two in a row, or leave two in a row by dropping an
+    assistant message that held only thinking. A message with tool calls and a tool
+    message are never joined."""
+    out: list[dict] = []
+    for message in messages:
+        last = out[-1] if out else None
+        if last is not None and _plain(last) and _plain(message) and last["role"] == message["role"]:
+            out[-1] = {**last, "content": _JOIN.join(t for t in (last["content"], message["content"]) if t)}
+        else:
+            out.append(message)
+    return out
+
+
 def _messages(raw: Any) -> tuple[list[dict], list[str]]:
     """``(messages, texts of the role "system" entries)``."""
     if not isinstance(raw, list) or not raw:
@@ -242,7 +253,7 @@ def _messages(raw: Any) -> tuple[list[dict], list[str]]:
                 out.append(message)
         else:
             raise RequestError("invalid_role", "Each message needs the role 'user' or 'assistant'.")
-    return out, system
+    return _join_neighbours(out), system
 
 
 def _tools(raw: Any) -> list[dict] | None:
@@ -346,15 +357,7 @@ def prompt_text(request: MessagesRequest) -> str:
     """The text a prompt token count is taken over: the system and message text, the
     calls in the history, and the tools the model is shown, as JSON. The chat
     template's own markup is not in it."""
-    parts = []
-    for message in request.prepared.messages:
-        parts.append(message.get("content") or "")
-        for call in message.get("tool_calls") or ():
-            parts.append(call["function"]["name"])
-            parts.append(json.dumps(call["function"]["arguments"]))
-    if request.prepared.tools:
-        parts.append(json.dumps(request.prepared.tools))
-    return "\n".join(parts)
+    return _prompt_text(request.prepared.messages, request.prepared.tools)
 
 
 # ---------------------------------------------------------------------------

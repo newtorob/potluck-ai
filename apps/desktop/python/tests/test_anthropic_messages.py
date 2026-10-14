@@ -70,10 +70,11 @@ class TestSystem:
 
 class TestUserMessages:
     def test_a_string_and_text_blocks(self):
-        out = messages_of(messages=[{"role": "user", "content": "one"},
+        out = messages_of(messages=[{"role": "user", "content": "one"}, {"role": "assistant", "content": "ok"},
                                     {"role": "user", "content": [{"type": "text", "text": "two", "cache_control": {"type": "ephemeral"}},
                                                                   {"type": "text", "text": "three"}]}])
-        assert out == [{"role": "user", "content": "one"}, {"role": "user", "content": "two\n\nthree"}]
+        assert out == [{"role": "user", "content": "one"}, {"role": "assistant", "content": "ok"},
+                       {"role": "user", "content": "two\n\nthree"}]
 
     def test_tool_results_come_first_then_one_user_message_with_the_text(self):
         content = [{"type": "text", "text": "before"},
@@ -154,7 +155,8 @@ class TestAssistantMessages:
     def test_a_turn_with_only_thinking_is_dropped(self):
         out = messages_of(messages=[{"role": "user", "content": "q"}, {"role": "assistant", "content": [{"type": "thinking", "thinking": "x", "signature": ""}]},
                                     {"role": "user", "content": "r"}])
-        assert [m["role"] for m in out] == ["user", "user"]
+        # the two user messages it leaves next to each other become one
+        assert out == [{"role": "user", "content": "q\n\nr"}]
 
     def test_a_string(self):
         assert messages_of(messages=[{"role": "assistant", "content": "hello"}]) == [{"role": "assistant", "content": "hello"}]
@@ -166,6 +168,61 @@ class TestAssistantMessages:
     ])
     def test_blocks_the_engine_cannot_use_are_refused(self, block):
         assert refused(messages=[{"role": "assistant", "content": [block]}]).code in ("unsupported_content_block", "invalid_tool_use")
+
+
+class TestNeighbouringMessages:
+    """Some chat templates refuse anything but strict user and assistant turns."""
+
+    CALL = {"type": "tool_use", "id": "c1", "name": "get_weather", "input": {"city": "Paris"}}
+
+    @pytest.mark.parametrize("role", ["user", "assistant"])
+    def test_plain_messages_of_one_role_are_joined_with_a_blank_line(self, role):
+        out = messages_of(messages=[{"role": role, "content": "a"}, {"role": role, "content": "b"}, {"role": role, "content": "c"}])
+        assert out == [{"role": role, "content": "a\n\nb\n\nc"}]
+
+    def test_text_blocks_and_strings_join_alike(self):
+        out = messages_of(messages=[{"role": "user", "content": "a"},
+                                    {"role": "user", "content": [{"type": "text", "text": "b"}, {"type": "text", "text": "c"}]}])
+        assert out == [{"role": "user", "content": "a\n\nb\n\nc"}]
+
+    def test_turns_that_alternate_are_left_alone(self):
+        msgs = [{"role": "user", "content": "a"}, {"role": "assistant", "content": "b"}, {"role": "user", "content": "c"}]
+        assert messages_of(messages=msgs) == msgs
+
+    def test_a_system_message_stays_apart_from_the_user_message_after_it(self):
+        out = messages_of(system="rule", messages=[{"role": "user", "content": "a"}, {"role": "user", "content": "b"}])
+        assert out == [{"role": "system", "content": "rule"}, {"role": "user", "content": "a\n\nb"}]
+
+    def test_an_empty_message_adds_no_blank_line(self):
+        out = messages_of(messages=[{"role": "user", "content": "a"}, {"role": "user", "content": ""}, {"role": "user", "content": "b"}])
+        assert out == [{"role": "user", "content": "a\n\nb"}]
+
+    def test_a_message_with_tool_calls_is_never_joined(self):
+        msgs = [{"role": "user", "content": "q"},
+                {"role": "assistant", "content": "before"},
+                {"role": "assistant", "content": [{"type": "text", "text": "Looking."}, self.CALL]},
+                {"role": "assistant", "content": "after"}]
+        out = messages_of(messages=msgs)
+        assert [(m["role"], m["content"], "tool_calls" in m) for m in out] == [
+            ("user", "q", False), ("assistant", "before", False), ("assistant", "Looking.", True), ("assistant", "after", False)]
+
+    def test_tool_messages_are_never_joined(self):
+        results = [{"type": "tool_result", "tool_use_id": "c1", "content": "sunny"},
+                   {"type": "tool_result", "tool_use_id": "c2", "content": "rainy"}]
+        msgs = [{"role": "user", "content": "q"},
+                {"role": "assistant", "content": [self.CALL, {**self.CALL, "id": "c2"}]},
+                {"role": "user", "content": results}, {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "c3", "content": "x"}]}]
+        out = messages_of(messages=msgs)
+        assert [m["role"] for m in out] == ["user", "assistant", "tool", "tool", "tool"]
+        assert [m["content"] for m in out[2:]] == ["sunny", "rainy", "x"]
+
+    def test_text_next_to_tool_results_is_not_pulled_across_them(self):
+        results = [{"type": "tool_result", "tool_use_id": "c1", "content": "sunny"}, {"type": "text", "text": "thanks"}]
+        msgs = [{"role": "user", "content": "q"}, {"role": "assistant", "content": [self.CALL]},
+                {"role": "user", "content": results}, {"role": "user", "content": "and tomorrow?"}]
+        out = messages_of(messages=msgs)
+        assert [(m["role"], m["content"]) for m in out] == [
+            ("user", "q"), ("assistant", ""), ("tool", "sunny"), ("user", "thanks\n\nand tomorrow?")]
 
 
 # ---------------------------------------------------------------------------

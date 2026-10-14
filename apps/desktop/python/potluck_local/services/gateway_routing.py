@@ -11,6 +11,11 @@ How it gets the roster: the Go mesh sidecar serves GET /peers over a unix socket
 absent or unreadable (mesh not running, or Windows where we don't speak the
 named pipe yet), household routing simply degrades to local-only.
 
+Capabilities: each machine's /peer/capabilities is read at the same time as the
+others. A request for a model that no answering machine has asks the machines that
+gave no reply once more, with a longer limit, before it is refused (see _search).
+GET /v1/models never asks twice.
+
 Privacy: this stays entirely within the user's own machines over the mesh. The
 coordinator is not involved on this path. Open-pool routing is a separate, later
 slice.
@@ -24,6 +29,7 @@ import logging
 import os
 import platform
 import sys
+from collections.abc import Callable
 from contextlib import aclosing
 
 import httpx
@@ -36,6 +42,9 @@ logger = logging.getLogger(__name__)
 PEER_SIDECAR_PORT = 8321
 _ROSTER_TIMEOUT_S = 2.0
 _CAPS_TIMEOUT_S = 2.0
+# The second ask, only for the machines that did not answer the first in time. A
+# machine whose mesh service has just restarted can take longer than the first limit.
+_CAPS_RETRY_TIMEOUT_S = 6.0
 _DISPATCH_CONNECT_TIMEOUT_S = 5.0
 MAX_DISPATCH_ATTEMPTS = 3
 FIRST_TOKEN_TIMEOUT_S = 90.0
@@ -50,23 +59,76 @@ class PeerDispatchError(RemoteStreamError):
                          "peer_unavailable")
 
 
+class HouseholdSilent(RuntimeError):
+    """No household machine that answered has the model, and a reachable machine did
+    not answer even when asked a second time, so the model may be on that machine.
+    The text is fit to show a caller and does not name the machine."""
+
+    def __init__(self, model: str) -> None:
+        super().__init__(f"A household machine did not answer in time, so model '{model}' could not be found. "
+                         "The request can be tried again.")
+
+
+async def _read_caps(peers: list[dict], timeout: float) -> list[dict | None]:
+    """Each machine's /peer/capabilities, asked at the same time, so one slow machine
+    delays only its own answer. None for a machine that did not answer in time."""
+    if not peers:
+        return []
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        return list(await asyncio.gather(*(_peer_caps(client, peer) for peer in peers)))
+
+
+def _first_match(peers: list[dict], caps: list[dict | None], wanted: Callable[[dict], bool]) -> dict | None:
+    for peer, cap in zip(peers, caps):
+        if cap and wanted(cap):
+            return {**peer, "_capabilities": cap}
+    return None
+
+
+async def _search(peers: list[dict], wanted: Callable[[dict], bool], model: str, *,
+                  ask_again: bool) -> dict | None:
+    """The first machine, in roster order, whose capabilities satisfy ``wanted``.
+
+    A machine that did not answer in time is silent. A silent machine may have the
+    model; a machine that answered without it, or that has no engine listening, does
+    not. When nothing matches and some machines are silent, ``ask_again`` asks just
+    those once more with a longer limit. If the model is still not found and one of
+    them is still silent, ``HouseholdSilent`` is raised; None means every machine
+    answered and none has the model.
+    """
+    caps = await _read_caps(peers, _CAPS_TIMEOUT_S)
+    found = _first_match(peers, caps, wanted)
+    silent = [i for i, cap in enumerate(caps) if cap is None]
+    if found is not None or not silent or not ask_again:
+        return found
+    logger.info("household_caps_second_ask silent=%d asked=%d", len(silent), len(peers))
+    for i, cap in zip(silent, await _read_caps([peers[i] for i in silent], _CAPS_RETRY_TIMEOUT_S)):
+        caps[i] = cap
+    found = _first_match(peers, caps, wanted)
+    if found is None and any(cap is None for cap in caps):
+        logger.warning("household_caps_unanswered silent=%d asked=%d", sum(1 for cap in caps if cap is None), len(peers))
+        raise HouseholdSilent(model)
+    return found
+
+
 async def _replacement_peer(model: str, excluded: set[str], sha256: str | None = None, *,
-                            tools: bool = False) -> dict | None:
+                            tools: bool = False, ask_again: bool = False) -> dict | None:
     # Read current membership on every retry. Never route through the pool or
     # relax the requested model because an earlier household machine failed.
     # A request with tools only goes to a machine that says it supports them.
+    # ask_again is for the first lookup of a request, which can refuse (see _search);
+    # a retry in the middle of a stream does not wait for a silent machine.
     peers = [p for p in await household_peers() if p["mesh_ip"] not in excluded]
-    async with httpx.AsyncClient(timeout=_CAPS_TIMEOUT_S) as client:
-        caps = await asyncio.gather(*(_peer_caps(client, peer) for peer in peers))
-    for peer, cap in zip(peers, caps):
-        if cap and cap.get("available_for_inference") and cap.get("loaded_model") == model and (
+
+    def wanted(cap: dict) -> bool:
+        return bool(cap.get("available_for_inference") and cap.get("loaded_model") == model and (
             not tools or cap.get("supports_tools") is True
         ) and (
             sha256 is None or (cap.get("model_lock_version") == 1
                                and (cap.get("loaded_model_detail") or {}).get("sha256") == sha256)
-        ):
-            return {**peer, "_capabilities": cap}
-    return None
+        ))
+
+    return await _search(peers, wanted, model, ask_again=ask_again)
 
 
 def mesh_socket_path() -> str | None:
@@ -113,42 +175,60 @@ async def household_peers() -> list[dict]:
 
 
 async def _peer_caps(client: httpx.AsyncClient, peer: dict) -> dict | None:
+    """The machine's capabilities. None when it did not answer in time: it is silent,
+    and may answer if asked again. An empty dict when it did answer and has nothing to
+    offer: the connection was refused (no engine is listening there), the reply was
+    not a 200, or it was not a JSON object. Asking such a machine again changes
+    nothing, so it is not silent."""
     try:
         r = await client.get(f"http://{peer['mesh_ip']}:{PEER_SIDECAR_PORT}/peer/capabilities")
-        if r.status_code != 200:
-            return None
-        return r.json()
-    except Exception:
+    except httpx.TimeoutException:
         return None
+    except Exception:
+        return {}
+    if r.status_code != 200:
+        return {}
+    try:
+        data = r.json()
+    except ValueError:
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 async def household_model_map() -> dict[str, dict]:
     """Map of {model_slug: peer} for models loaded on reachable peers that are
-    serving inbound jobs (contributor mode on). Used for /v1/models aggregation
-    and for routing. Excludes peers that have a model loaded but opted out."""
+    serving inbound jobs (contributor mode on). Used for /v1/models aggregation.
+    Excludes peers that have a model loaded but opted out. Reads every machine at
+    the same time with the short limit and never asks a silent machine again, so
+    it stays quick."""
     peers = await household_peers()
-    if not peers:
-        return {}
     out: dict[str, dict] = {}
-    async with httpx.AsyncClient(timeout=_CAPS_TIMEOUT_S) as c:
-        for peer in peers:
-            caps = await _peer_caps(c, peer)
-            if not caps:
-                continue
-            slug = caps.get("loaded_model")
-            if slug and caps.get("available_for_inference"):
-                # First peer wins for a given slug (stable).
-                out.setdefault(slug, {"node_name": peer["node_name"], "mesh_ip": peer["mesh_ip"], "_capabilities": caps})
+    for peer, caps in zip(peers, await _read_caps(peers, _CAPS_TIMEOUT_S)):
+        if not caps:
+            continue
+        slug = caps.get("loaded_model")
+        if slug and caps.get("available_for_inference"):
+            # First peer wins for a given slug (stable).
+            out.setdefault(slug, {"node_name": peer["node_name"], "mesh_ip": peer["mesh_ip"], "_capabilities": caps})
     return out
 
 
 async def peer_for_model(model: str, sha256: str | None = None) -> dict | None:
-    """The household peer serving `model`, or None."""
+    """The household peer serving `model`, or None when every reachable machine
+    answered and none has it. Raises HouseholdSilent when none that answered has it
+    and a reachable machine still had not answered after a second ask."""
     if not model:
         return None
-    if sha256 is not None:
-        return await _replacement_peer(model, set(), sha256)
-    return (await household_model_map()).get(model)
+    return await _replacement_peer(model, set(), sha256, ask_again=True)
+
+
+async def find_peer(model: str) -> tuple[dict | None, HouseholdSilent | None]:
+    """``peer_for_model`` for a caller that may fall through to something else: the
+    silent-machine case comes back as the second item and is not raised."""
+    try:
+        return await peer_for_model(model), None
+    except HouseholdSilent as silent:
+        return None, silent
 
 
 def _peer_url(peer: dict) -> str:

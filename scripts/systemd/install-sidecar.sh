@@ -195,7 +195,11 @@ do_install() {
             fi
             if [ -n "$AUTOLOAD_MODEL" ]; then
                 echo "# Best-effort: load a model on start so a headless node is inference-ready."
-                echo "ExecStartPost=-/usr/bin/bash -c 'for i in \$(seq 1 30); do curl -sf -m 8 -X POST http://127.0.0.1:$PORT/models/$AUTOLOAD_MODEL/load -H \"Content-Type: application/json\" -d \"{}\" && exit 0; sleep 2; done'"
+                echo "# Waits for the engine to answer, then asks for the load once. A load with"
+                echo "# its answer check takes longer than a short limit allows, and a second ask"
+                echo "# while the first is still running loads the model twice."
+                echo "TimeoutStartSec=360"
+                echo "ExecStartPost=-/usr/bin/bash -c 'for i in \$(seq 1 30); do curl -sf -m 2 http://127.0.0.1:$PORT/health >/dev/null && break; sleep 2; done; curl -sf -m 180 -X POST http://127.0.0.1:$PORT/models/$AUTOLOAD_MODEL/load -H \"Content-Type: application/json\" -d \"{}\" >/dev/null'"
             fi
         } > "$dropin"
         chmod 0644 "$dropin"

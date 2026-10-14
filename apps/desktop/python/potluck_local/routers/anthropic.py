@@ -45,7 +45,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from potluck_local.routers import gateway
 from potluck_local.services import anthropic_messages as am
-from potluck_local.services import gateway_request, inference_errors
+from potluck_local.services import gateway_request, inference_errors, token_estimate
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ async def _parse(request: Request) -> am.MessagesRequest:
 
 
 def _too_long(cause: BaseException | None) -> HTTPException | None:
-    found = inference_errors.prompt_overflow(cause)
+    found = gateway.context_overflow(cause)
     if found is None:
         return None
     return HTTPException(400, {"code": "prompt_too_long", "message": am.prompt_too_long(*found)})
@@ -96,12 +96,12 @@ def _too_long(cause: BaseException | None) -> HTTPException | None:
 
 def _describe(failure: object, plan: gateway.ChatPlan) -> am.Failure:
     """A failure of the engine, as the status and message to tell the client."""
+    found = gateway.context_overflow(failure)
+    if found is not None:
+        return am.Failure(400, am.prompt_too_long(*found), "prompt_too_long")
     if isinstance(failure, dict):
         # This machine's own model: the chunk carries its message and category.
         text = str(failure.get("__error__") or "inference failed")
-        found = inference_errors.prompt_overflow(text)
-        if found is not None:
-            return am.Failure(400, am.prompt_too_long(*found), "prompt_too_long")
         category = failure.get("__category__")
         category = category if isinstance(category, str) else None
         status = 503 if category == inference_errors.GPU_OUT_OF_MEMORY else 500
@@ -131,7 +131,7 @@ async def _input_tokens(plan: gateway.ChatPlan, text: str) -> int:
         counted = await _counted(plan.runtime, text)
         if counted is not None:
             return counted
-    return am.estimate_tokens(text)
+    return token_estimate.estimate_tokens(text)
 
 
 async def _metered(events: AsyncIterator[str], plan: gateway.ChatPlan) -> AsyncIterator[str]:
@@ -164,7 +164,7 @@ async def _create_message(request: Request, x_potluck_scope: str | None, x_potlu
         plan = await gateway.plan_chat(
             gateway.ChatJob(
                 parsed.prepared, parsed.model, parsed.temperature, parsed.max_tokens, parsed.stream,
-                stop=parsed.stop or None, stop_when_blocking=True,
+                stop=parsed.stop or None,
             ),
             x_potluck_scope, x_potluck_circle,
         )
@@ -180,7 +180,7 @@ async def _create_message(request: Request, x_potluck_scope: str | None, x_potlu
     text = am.prompt_text(parsed)
     options = am.ReplyOptions(
         model=parsed.model or plan.served_model or "", show_thinking=parsed.show_thinking,
-        first_call_only=parsed.first_call_only, input_estimate=am.estimate_tokens(text),
+        first_call_only=parsed.first_call_only, input_estimate=token_estimate.estimate_tokens(text),
     )
     served_by = {"X-Potluck-Served-By": plan.served_by}
 
@@ -249,7 +249,7 @@ async def count_message_tokens(request: Request):
             counted = await _counted(runtime, text)
         if counted is not None:
             return JSONResponse({"input_tokens": counted})
-        return JSONResponse({"input_tokens": am.estimate_tokens(text)}, headers={"X-Potluck-Usage": "estimated"})
+        return JSONResponse({"input_tokens": token_estimate.estimate_tokens(text)}, headers={"X-Potluck-Usage": "estimated"})
     except HTTPException as exc:
         return _error_response(exc.status_code, exc.detail, exc.headers)
     except Exception:  # noqa: BLE001

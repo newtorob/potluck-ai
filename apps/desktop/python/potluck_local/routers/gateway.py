@@ -22,6 +22,11 @@ reasoning_format "none") and support function tools: tools, tool_choice,
 assistant tool_calls and role "tool" messages. See services/gateway_reply.py,
 services/tool_calls.py and services/reasoning_split.py for the rules.
 
+A reply names the model id it was served under, never the model file's path. A prompt
+that does not fit this machine's model is a 400 with the code context_length_exceeded.
+A whole reply from another machine carries estimated token counts when that machine
+gave none, and X-Potluck-Usage: estimated says so.
+
 Auth: the app-level middleware gates /v1 with POTLUCK_GATEWAY_API_KEY (a separate
 opt-in key for external tools), NOT the internal sidecar token. See app.py.
 """
@@ -39,7 +44,9 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from potluck_local.services import gateway_reply, gateway_request, gateway_routing, pool_routing
+from potluck_local.services import (
+    gateway_reply, gateway_request, gateway_routing, inference_errors, pool_routing, token_estimate,
+)
 from potluck_local.services.inference_errors import InferenceFailure
 from potluck_local.services.model_traits import traits_of_runtime
 from potluck_local.services.remote_stream import RemoteStreamError
@@ -168,7 +175,10 @@ async def _locked_route(runtime, model: str | None, digest: str, scope: str):
         return None
     except ModelIdentityError as exc:
         if scope == "mine":
-            peer = await gateway_routing.peer_for_model(model, digest)
+            try:
+                peer = await gateway_routing.peer_for_model(model, digest)
+            except gateway_routing.HouseholdSilent as silent:
+                raise HTTPException(503, str(silent)) from silent
             if peer:
                 return peer
         raise HTTPException(409, str(exc)) from exc
@@ -192,7 +202,9 @@ async def model_readiness(req: ReadinessRequest) -> dict:
         peer = await _locked_route(get_runtime(), req.model, req.sha256, req.scope)
         route = "household" if peer else "local"
     except HTTPException as exc:
-        if exc.status_code != 409:
+        # 409: the identity does not match. 503: a household machine did not answer.
+        # Either way the route is not ready right now.
+        if exc.status_code not in (409, 503):
             raise
     return {"schemaVersion": 1, "model_lock_version": 1, "ready": route is not None,
             "model": req.model, "scope": req.scope, "route": route}
@@ -200,6 +212,44 @@ async def model_readiness(req: ReadinessRequest) -> dict:
 
 def _refusal(exc: gateway_request.RequestError) -> HTTPException:
     return HTTPException(status_code=400, detail={"code": exc.code, "message": exc.message})
+
+
+def model_not_found(model: str, silent: gateway_routing.HouseholdSilent | None) -> HTTPException:
+    """The refusal for a model that is not here and not on a household machine: 404 when
+    every reachable machine answered, 503 when one did not and the request can be retried."""
+    if silent is not None:
+        return HTTPException(status_code=503, detail=str(silent))
+    return HTTPException(status_code=404, detail=f"model '{model}' is not loaded here or on a reachable household peer")
+
+
+def context_overflow(failure: object) -> tuple[int, int] | None:
+    """``(prompt tokens, context window)`` when ``failure`` is this machine's own model
+    refusing a prompt that does not fit, else None. ``failure`` is the exception, or the
+    ``__error__`` chunk the runtime streams. What another machine reports is never this."""
+    if isinstance(failure, dict):
+        failure = failure.get("__error__")
+    elif isinstance(failure, (RemoteStreamError, pool_routing.PoolDispatchError)):
+        return None
+    return inference_errors.prompt_overflow(failure)
+
+
+def _context_length(found: tuple[int, int]) -> dict:
+    tokens, window = found
+    return {"code": "context_length_exceeded",
+            "message": f"This model's maximum context length is {window} tokens. The prompt is {tokens} tokens."}
+
+
+def _stream_error(failure: object) -> dict:
+    """The error object of a stream that failed after it began (the route sends it in a
+    ``data:`` line, then ``[DONE]``). ``failure`` is the exception or the ``__error__`` chunk."""
+    found = context_overflow(failure)
+    if found is not None:
+        detail = _context_length(found)
+        return {"message": detail["message"], "type": "invalid_request_error", "code": detail["code"]}
+    if isinstance(failure, dict):
+        return {"message": failure["__error__"], "type": "inference_error",
+                "code": failure.get("__category__", "inference_error")}
+    return {"message": str(failure), "type": "inference_error", "code": getattr(failure, "category", "inference_error")}
 
 
 def _tool_route_error(prepared: gateway_request.Prepared, runtime, peer: dict | None,
@@ -225,9 +275,10 @@ def _tool_route_error(prepared: gateway_request.Prepared, runtime, peer: dict | 
 
 
 def _shape_options(split_reasoning: bool, prepared: gateway_request.Prepared, runtime,
-                   remote: bool) -> gateway_reply.ShapeOptions:
+                   remote: bool, model: str | None) -> gateway_reply.ShapeOptions:
     """How to shape this reply. Reply text from another machine does not say whether
-    its template opened the reasoning block; this machine's own template does."""
+    its template opened the reasoning block; this machine's own template does. The
+    reply names ``model`` as its model, never the model file's path."""
     starts: bool | None = None
     if not remote:
         traits = traits_of_runtime(runtime)
@@ -236,6 +287,7 @@ def _shape_options(split_reasoning: bool, prepared: gateway_request.Prepared, ru
         split_reasoning=split_reasoning,
         starts_in_reasoning=starts,
         offered=prepared.offered_names or None,
+        model=model,
     )
 
 
@@ -252,9 +304,6 @@ class ChatJob:
     stop: list[str] | None = None
     split_reasoning: bool = True
     digest: str | None = None
-    # The OpenAI route has never passed `stop` to a reply it does not stream; the
-    # Messages route does.
-    stop_when_blocking: bool = False
 
 
 @dataclass(frozen=True)
@@ -333,12 +382,9 @@ async def plan_chat(job: ChatJob, x_potluck_scope: str | None, x_potluck_circle:
     elif scope == "mine":
         # Local first, then household peer. Pool is never reached.
         if job.model and job.model != local:
-            peer = await gateway_routing.peer_for_model(job.model)
+            peer, silent = await gateway_routing.find_peer(job.model)
             if peer is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"model '{job.model}' is not loaded here or on a reachable household peer",
-                )
+                raise model_not_found(job.model, silent)
         if peer is None and local is None:
             raise HTTPException(
                 status_code=503,
@@ -354,15 +400,12 @@ async def plan_chat(job: ChatJob, x_potluck_scope: str | None, x_potluck_circle:
         # Default: local -> household peer -> open pool (if opted in). Existing
         # behavior preserved byte-for-byte when the header is absent.
         if job.model and job.model != local:
-            peer = await gateway_routing.peer_for_model(job.model)
+            peer, silent = await gateway_routing.find_peer(job.model)
             if peer is None:
                 if pool_routing.pool_enabled():
                     use_pool = True
                 else:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"model '{job.model}' is not loaded here or on a reachable household peer",
-                    )
+                    raise model_not_found(job.model, silent)
         if not use_pool and peer is None and local is None:
             raise HTTPException(
                 status_code=503,
@@ -373,8 +416,8 @@ async def plan_chat(job: ChatJob, x_potluck_scope: str | None, x_potluck_circle:
     if refusal is not None:
         raise refusal
 
-    options = _shape_options(job.split_reasoning, prepared, runtime, remote=bool(peer or use_pool))
     served_model = job.model if (peer or use_pool) else local
+    options = _shape_options(job.split_reasoning, prepared, runtime, remote=bool(peer or use_pool), model=served_model)
     if use_pool:
         served_by = coordinator_scope  # "pool" or "circle"
     elif peer:
@@ -439,13 +482,17 @@ def http_failure(exc: BaseException, plan: ChatPlan) -> HTTPException:
             status_code=status,
             detail=pool_routing.refusal_message(exc, plan.coordinator_scope, plan.served_model),
         )
+    found = context_overflow(exc)
+    if found is not None:
+        # The prompt does not fit this machine's model: the caller's request is at fault.
+        return HTTPException(status_code=400, detail=_context_length(found))
     logger.error("gateway_chat_failed", exc_info=exc)
     return HTTPException(status_code=500, detail=f"inference failed: {type(exc).__name__}")
 
 
-async def complete_chat(plan: ChatPlan) -> dict:
-    """The whole reply to ``plan``, as a shaped OpenAI chat.completion. Records the
-    usage row. Raises HTTPException; the exception that caused it is its __cause__."""
+async def infer_chat(plan: ChatPlan) -> dict:
+    """The whole reply to ``plan``, as a shaped OpenAI chat.completion. Records nothing.
+    Raises HTTPException; the exception that caused it is its __cause__."""
     job = plan.job
     try:
         if plan.use_pool:
@@ -459,21 +506,30 @@ async def complete_chat(plan: ChatPlan) -> dict:
                 **plan.peer_identity, **plan.tool_kwargs
             )
         else:
-            stop = {"stop": plan.stop} if (job.stop_when_blocking and plan.stop) else {}
+            stop = {"stop": plan.stop} if plan.stop else {}
             result = await plan.runtime.chat(plan.messages, temperature=job.temperature,
                                              max_tokens=plan.max_tokens, **plan.identity,
                                              **plan.tool_kwargs, **stop)
-            if isinstance(result, dict):
-                result.setdefault("model", plan.local)
     except Exception as exc:  # noqa: BLE001
         raise http_failure(exc, plan) from exc
-    result = gateway_reply.shape_completion(result, plan.options)
-    _usage = result.get("usage", {}) if isinstance(result, dict) else {}
+    return gateway_reply.shape_completion(result, plan.options)
+
+
+async def record_reply(plan: ChatPlan, result: dict) -> None:
+    """Record the usage row of a whole reply, from the token counts it carries."""
+    usage = result.get("usage", {}) if isinstance(result, dict) else {}
     await record_usage(
         plan,
-        input_tokens=int(_usage.get("prompt_tokens", 0) or 0),
-        output_tokens=int(_usage.get("completion_tokens", 0) or 0),
+        input_tokens=int(usage.get("prompt_tokens", 0) or 0),
+        output_tokens=int(usage.get("completion_tokens", 0) or 0),
     )
+
+
+async def complete_chat(plan: ChatPlan) -> dict:
+    """The whole reply to ``plan`` (see infer_chat), with the usage row recorded from
+    the counts the engine gave."""
+    result = await infer_chat(plan)
+    await record_reply(plan, result)
     return result
 
 
@@ -515,7 +571,7 @@ async def chat_completions_openai(
             try:
                 async for chunk in shaped_chunks(plan):
                     if isinstance(chunk, dict) and "__error__" in chunk:
-                        yield f'data: {json.dumps({"error": {"message": chunk["__error__"], "type": "inference_error", "code": chunk.get("__category__", "inference_error")}})}\n\n'
+                        yield f'data: {json.dumps({"error": _stream_error(chunk)})}\n\n'
                         break
                     yield f"data: {json.dumps(chunk)}\n\n"
                 # Terminator on normal completion. Not in finally: a client
@@ -531,7 +587,7 @@ async def chat_completions_openai(
                 yield "data: [DONE]\n\n"
             except Exception as exc:  # noqa: BLE001
                 logger.exception("gateway_stream_failed")
-                yield f'data: {json.dumps({"error": {"message": str(exc), "type": "inference_error", "code": getattr(exc, "category", "inference_error")}})}\n\n'
+                yield f'data: {json.dumps({"error": _stream_error(exc)})}\n\n'
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(
@@ -543,9 +599,15 @@ async def chat_completions_openai(
             },
         )
 
-    # Non-streaming.
-    result = await complete_chat(plan)
-    return JSONResponse(result, headers={"X-Potluck-Served-By": plan.served_by, **lock_headers(digest)})
+    # Non-streaming. A reply from another machine carries no token counts: they are
+    # estimated from text length, and the reply says so.
+    result = await infer_chat(plan)
+    estimated = gateway_reply.fill_usage(result, token_estimate.prompt_text(plan.messages, plan.job.prepared.tools))
+    await record_reply(plan, result)
+    return JSONResponse(result, headers={
+        "X-Potluck-Served-By": plan.served_by, **lock_headers(digest),
+        **({"X-Potluck-Usage": "estimated"} if estimated else {}),
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -605,12 +667,9 @@ async def text_completions(
             raise HTTPException(409, "Requested model is not loaded locally. Load that model or use mine scope.")
     elif scope == "mine":
         if req.model and req.model != local:
-            peer = await gateway_routing.peer_for_model(req.model)
+            peer, silent = await gateway_routing.find_peer(req.model)
             if peer is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
-                )
+                raise model_not_found(req.model, silent)
         if peer is None and local is None:
             raise HTTPException(
                 status_code=503,
@@ -622,15 +681,12 @@ async def text_completions(
         coordinator_scope = pool_routing._CIRCLE_SCOPE
     else:
         if req.model and req.model != local:
-            peer = await gateway_routing.peer_for_model(req.model)
+            peer, silent = await gateway_routing.find_peer(req.model)
             if peer is None:
                 if pool_routing.pool_enabled():
                     use_pool = True
                 else:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
-                    )
+                    raise model_not_found(req.model, silent)
         if not use_pool and peer is None and local is None:
             raise HTTPException(
                 status_code=503,
@@ -677,7 +733,7 @@ async def text_completions(
                     )
                 async for chunk in source:
                     if isinstance(chunk, dict) and "__error__" in chunk:
-                        yield f'data: {json.dumps({"error": {"message": chunk["__error__"], "type": "inference_error", "code": chunk.get("__category__", "inference_error")}})}\n\n'
+                        yield f'data: {json.dumps({"error": _stream_error(chunk)})}\n\n'
                         break
                     if chunk.get("choices") and chunk["choices"][0].get("finish_reason"):
                         finish_reason = chunk["choices"][0]["finish_reason"]
@@ -718,7 +774,7 @@ async def text_completions(
                 yield "data: [DONE]\n\n"
             except Exception as exc:  # noqa: BLE001
                 logger.exception("gateway_completions_stream_failed")
-                yield f'data: {json.dumps({"error": {"message": str(exc), "type": "inference_error", "code": getattr(exc, "category", "inference_error")}})}\n\n'
+                yield f'data: {json.dumps({"error": _stream_error(exc)})}\n\n'
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(
@@ -756,6 +812,9 @@ async def text_completions(
         status = exc.status_code if exc.status_code in (401, 404, 503) else 502
         raise HTTPException(status_code=status, detail=pool_routing.refusal_message(exc, coordinator_scope, served_model))
     except Exception as exc:  # noqa: BLE001
+        found = context_overflow(exc)
+        if found is not None:
+            raise HTTPException(status_code=400, detail=_context_length(found)) from exc
         logger.exception("gateway_completions_failed")
         raise HTTPException(status_code=500, detail=f"inference failed: {type(exc).__name__}")
 

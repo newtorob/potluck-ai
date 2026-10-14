@@ -947,8 +947,8 @@ class StrictRuntime:
     def is_loaded(self): return True
     def current_model_id(self): return "local-model"
 
-    async def chat(self, messages, *, temperature, max_tokens, expected_model, expected_sha256):
-        self.seen.append(("chat", messages, temperature, max_tokens))
+    async def chat(self, messages, *, temperature, max_tokens, expected_model, expected_sha256, stop=None):
+        self.seen.append(("chat", messages, temperature, max_tokens, stop))
         return completion(self.text)
 
     def stream_chat_raw(self, messages, *, temperature, max_tokens, stop, expected_model, expected_sha256):
@@ -966,8 +966,8 @@ class TestOpenAIRouteUnchanged:
         resp = client.post("/v1/chat/completions", json={"messages": [USER], "stop": ["END"], "max_tokens": 9, "temperature": 0.3})
         assert resp.status_code == 200 and resp.json() == completion("pong")
         assert resp.headers["x-potluck-served-by"] == "local"
-        # stop is still not passed to a reply that is not streamed
-        assert rt.seen == [("chat", [USER], 0.3, 9)]
+        # stop reaches a reply that is not streamed, as it reaches a streamed one
+        assert rt.seen == [("chat", [USER], 0.3, 9, ["END"])]
 
     def test_a_stream_is_the_raw_chunks_and_a_done(self, client, monkeypatch):
         rt = serve(monkeypatch, StrictRuntime("Hello there, friend."))
@@ -980,17 +980,49 @@ class TestOpenAIRouteUnchanged:
         rt = serve(monkeypatch, StrictRuntime("pong"))
         assert post(client, body(messages=[USER], temperature=0.3, max_tokens=9)).status_code == 200
         assert post(client, body(messages=[USER], temperature=0.3, max_tokens=9, stream=True)).status_code == 200
-        assert rt.seen[0] == ("chat", [USER], 0.3, 9) and rt.seen[1] == ("stream", [USER], 0.3, 9, None)
+        assert rt.seen[0] == ("chat", [USER], 0.3, 9, None) and rt.seen[1] == ("stream", [USER], 0.3, 9, None)
 
     def test_errors_keep_the_old_shape(self, client, monkeypatch):
-        serve(monkeypatch, FakeRuntime(chat_error=ValueError("Requested tokens (5000) exceed context window of 4096")))
+        serve(monkeypatch, FakeRuntime(chat_error=ValueError("something else")))
         resp = client.post("/v1/chat/completions", json={"messages": [USER]})
         assert resp.status_code == 500 and resp.json() == {"detail": "inference failed: ValueError"}
-        serve(monkeypatch, FakeRuntime(items=[OVERFLOW_ITEM]))
+        serve(monkeypatch, FakeRuntime(items=[ERROR_ITEM]))
         resp = client.post("/v1/chat/completions", json={"messages": [USER], "stream": True})
         assert resp.status_code == 200
-        assert resp.text == ('data: {"error": {"message": "Requested tokens (5000) exceed context window of 4096", '
+        assert resp.text == ('data: {"error": {"message": "the engine broke", '
                              '"type": "inference_error", "code": "inference_error"}}\n\ndata: [DONE]\n\n')
+
+
+class TestNeighbouringMessagesReachTheModelJoined:
+    """Some chat templates refuse anything but strict user and assistant turns."""
+
+    def test_two_user_messages_in_a_row_reach_the_model_as_one(self, client, monkeypatch):
+        rt = serve(monkeypatch, FakeRuntime())
+        resp = post(client, body(messages=[{"role": "user", "content": "first"}, {"role": "user", "content": "second"}]))
+        assert resp.status_code == 200
+        assert rt.calls[0]["messages"] == [{"role": "user", "content": "first\n\nsecond"}]
+
+    def test_a_dropped_thinking_only_turn_does_not_leave_two_user_messages(self, client, monkeypatch):
+        rt = serve(monkeypatch, FakeRuntime())
+        thinking_only = {"role": "assistant", "content": [{"type": "thinking", "thinking": "hm", "signature": ""}]}
+        sse(post(client, body(stream=True, messages=[{"role": "user", "content": "q"}, thinking_only,
+                                                     {"role": "user", "content": "r"}])))
+        assert rt.calls[0]["messages"] == [{"role": "user", "content": "q\n\nr"}]
+
+    def test_a_tool_round_is_sent_as_it_was(self, client, monkeypatch):
+        rt = serve(monkeypatch, FakeRuntime())
+        call = {"type": "tool_use", "id": "c1", "name": "get_weather", "input": {"city": "Paris"}}
+        result = {"type": "tool_result", "tool_use_id": "c1", "content": "sunny"}
+        post(client, body(tools=[WEATHER], messages=[
+            {"role": "user", "content": "q"}, {"role": "assistant", "content": [call]},
+            {"role": "user", "content": [result]}, {"role": "user", "content": "thanks"}]))
+        assert [m["role"] for m in rt.calls[0]["messages"]] == ["user", "assistant", "tool", "user"]
+
+    def test_the_openai_route_sends_what_it_is_given(self, client, monkeypatch):
+        rt = serve(monkeypatch, FakeRuntime())
+        two = [{"role": "user", "content": "first"}, {"role": "user", "content": "second"}]
+        assert client.post("/v1/chat/completions", json={"messages": two}).status_code == 200
+        assert rt.calls[0]["messages"] == two
 
 
 # ---------------------------------------------------------------------------

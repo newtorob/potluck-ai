@@ -8,11 +8,13 @@ the only place that knows what the client asked for:
      (``delta.reasoning_content`` when streaming), unless the request opted out
      with ``reasoning_format: "none"``;
   2. when the request offered tools, tool-call text in the answer becomes
-     ``tool_calls`` and the finish reason becomes ``tool_calls``.
+     ``tool_calls`` and the finish reason becomes ``tool_calls``;
+  3. ``model`` is the model id the gateway serves under, in a whole reply and in
+     every chunk. llama-cpp-python puts the model file's path there.
 
-With neither in play the reply is returned untouched. Streamed chunks that need
-no change are passed on as the same objects, so a plain reply is identical to
-what it was before this module existed.
+With none of these in play the reply is returned untouched. Streamed chunks that
+need no change are passed on as the same objects, so a plain reply is identical
+to what it was before this module existed.
 
 A reply from another machine is untrusted. Nothing here raises on it: if the
 shaping itself fails, the reply goes on unshaped.
@@ -26,6 +28,7 @@ from contextlib import aclosing
 from dataclasses import dataclass
 
 from potluck_local.services.reasoning_split import CONTENT, REASONING, ReasoningSplitter, split_reasoning
+from potluck_local.services.token_estimate import engine_count, estimate_tokens, tokens_for_chars
 from potluck_local.services.tool_calls import CallDetector, ToolCall, ToolCallScanner, extract_tool_calls
 
 logger = logging.getLogger(__name__)
@@ -37,6 +40,7 @@ class ShapeOptions:
     # True/False when the loaded model's template says; None for a remote reply.
     starts_in_reasoning: bool | None = False
     offered: frozenset[str] | None = None  # tool names; None when no tools were offered
+    model: str | None = None  # the id a reply names as its model; None leaves the engine's own
 
     @property
     def active(self) -> bool:
@@ -50,6 +54,8 @@ class ShapeOptions:
 
 def shape_completion(result: dict, options: ShapeOptions) -> dict:
     """Shape a non-streaming chat.completion in place and return it."""
+    if options.model is not None and isinstance(result, dict):
+        result["model"] = options.model
     if not options.active or not isinstance(result, dict):
         return result
     try:
@@ -78,6 +84,48 @@ def shape_completion(result: dict, options: ShapeOptions) -> dict:
     except Exception as exc:  # noqa: BLE001 - never turn a reply into an error
         logger.warning("reply_shaping_failed error=%s", type(exc).__name__)
     return result
+
+
+def _reply_chars(result: dict) -> int:
+    """Characters in the reply: the answer, the reasoning, and the name and arguments of each call."""
+    choices = result.get("choices")
+    choice = choices[0] if isinstance(choices, list) and choices else None
+    message = choice.get("message") if isinstance(choice, dict) else None
+    if not isinstance(message, dict):
+        return 0
+    chars = sum(len(text) for text in (message.get("content"), message.get("reasoning_content")) if isinstance(text, str))
+    for call in message.get("tool_calls") or ():
+        function = call.get("function") if isinstance(call, dict) else None
+        if isinstance(function, dict):
+            chars += sum(len(text) for text in (function.get("name"), function.get("arguments")) if isinstance(text, str))
+    return chars
+
+
+def fill_usage(result: dict, prompt: str) -> bool:
+    """Give a whole reply whole-number token counts, in place. A count the engine gave
+    stays as it is; one it did not give (a reply from another machine has none) is
+    estimated from text length: the prompt from ``prompt``, the reply from its own text.
+    Returns True when any count is an estimate, so the caller can say so. A total the
+    engine left out is the sum of the other two, and is not an estimate by itself."""
+    if not isinstance(result, dict):
+        return False
+    try:
+        usage = result["usage"] if isinstance(result.get("usage"), dict) else {}
+        given_in, given_out = engine_count(usage.get("prompt_tokens")), engine_count(usage.get("completion_tokens"))
+        total = engine_count(usage.get("total_tokens"))
+        estimated = given_in is None or given_out is None
+        if not estimated and total is not None:
+            return False
+        prompt_tokens = estimate_tokens(prompt) if given_in is None else given_in
+        completion_tokens = tokens_for_chars(_reply_chars(result)) if given_out is None else given_out
+        if estimated or total is None:
+            total = prompt_tokens + completion_tokens
+        result["usage"] = {**usage, "prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens,
+                           "total_tokens": total}
+        return estimated
+    except Exception as exc:  # noqa: BLE001 - never turn a reply into an error
+        logger.warning("reply_usage_failed error=%s", type(exc).__name__)
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +171,13 @@ class _Pipeline:
         return pieces, calls
 
 
+def _named(chunk: object, model: str | None) -> object:
+    """``chunk`` with ``model`` as its model: the same object when it already is."""
+    if model is None or not isinstance(chunk, dict) or "choices" not in chunk or chunk.get("model") == model:
+        return chunk
+    return {**chunk, "model": model}
+
+
 def _derive(chunk: dict, choice: dict, delta: dict, finish: str | None, *, last: bool) -> dict:
     out = {k: v for k, v in chunk.items() if k != "choices" and (last or k != "usage")}
     out["choices"] = [{**choice, "delta": delta, "finish_reason": finish}]
@@ -134,13 +189,14 @@ async def shape_stream(source: AsyncIterator, options: ShapeOptions) -> AsyncIte
 
     Chunk dicts with an ``__error__`` key, and anything that is not a normal
     chunk, pass through unchanged. If shaping fails, the rest of the stream
-    passes through unshaped.
+    passes through unshaped. Every chunk dict names ``options.model`` as its model.
     """
     pipe: _Pipeline | None = _Pipeline(options) if options.active else None
     last_seen: tuple[dict, dict] | None = None
     finished = False
     async with aclosing(source) as chunks:
         async for chunk in chunks:
+            chunk = _named(chunk, options.model)
             if pipe is None or finished or not isinstance(chunk, dict) or "__error__" in chunk:
                 yield chunk
                 continue

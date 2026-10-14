@@ -24,6 +24,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from potluck_local import __version__
+from potluck_local.routers.gateway import model_not_found
 from potluck_local.services import gateway_routing, pool_routing
 from potluck_local.services.remote_stream import RemoteStreamError
 from potluck_local.services.model_registry import list_models
@@ -151,15 +152,12 @@ async def chat(req: OllamaChatRequest):
     peer = None
     use_pool = False
     if req.model and req.model != local:
-        peer = await gateway_routing.peer_for_model(req.model)
+        peer, silent = await gateway_routing.find_peer(req.model)
         if peer is None:
             if pool_routing.pool_enabled():
                 use_pool = True
             else:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
-                )
+                raise model_not_found(req.model, silent)
     if not use_pool and peer is None and local is None:
         raise HTTPException(status_code=503, detail="No model loaded on this node, and no household peer matched.")
 
@@ -261,15 +259,12 @@ async def generate(req: OllamaGenerateRequest):
     peer = None
     use_pool = False
     if req.model and req.model != local:
-        peer = await gateway_routing.peer_for_model(req.model)
+        peer, silent = await gateway_routing.find_peer(req.model)
         if peer is None:
             if pool_routing.pool_enabled():
                 use_pool = True
             else:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"model '{req.model}' is not loaded here or on a reachable household peer",
-                )
+                raise model_not_found(req.model, silent)
     if not use_pool and peer is None and local is None:
         raise HTTPException(status_code=503, detail="No model loaded on this node, and no household peer matched.")
 

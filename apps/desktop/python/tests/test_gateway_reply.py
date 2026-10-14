@@ -188,3 +188,116 @@ def test_a_hostile_stream_of_tiny_chunks_is_shaped_without_blowing_up():
     items = [chunk({"content": p}) for p in pieces] + [chunk({}, "stop")]
     out = run(collect(agen(items), ShapeOptions(offered=TOOLS)))
     assert out[-1]["choices"][0]["finish_reason"] in ("stop", "tool_calls")
+
+
+# ---- the model a reply names ----------------------------------------------------
+
+MODEL_PATH = "/Users/someone/.potluck/models/x/model.gguf"
+
+
+def test_a_whole_reply_names_the_model_id_and_not_the_file_path():
+    result = {"model": MODEL_PATH, "choices": [{"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}]}
+    for options in (ShapeOptions(model="x"), ShapeOptions(model="x", split_reasoning=False)):  # shaped, and not shaped
+        assert gr.shape_completion(dict(result), options)["model"] == "x"
+
+
+def test_a_whole_reply_without_a_model_gets_one():
+    assert gr.shape_completion({"choices": []}, ShapeOptions(model="x"))["model"] == "x"
+
+
+def test_without_a_model_to_name_the_engines_own_stays():
+    result = {"model": MODEL_PATH, "choices": []}
+    assert gr.shape_completion(result, ShapeOptions())["model"] == MODEL_PATH
+
+
+@pytest.mark.parametrize("options", [
+    ShapeOptions(model="x"), ShapeOptions(model="x", split_reasoning=False), ShapeOptions(model="x", offered=TOOLS),
+])
+def test_every_streamed_chunk_names_the_model_id_whatever_the_shaping(options):
+    items = [chunk({"role": "assistant"}, model=MODEL_PATH), chunk({"content": "<think>a</think>"}, model=MODEL_PATH),
+             chunk({"content": HERMES}, model=MODEL_PATH), chunk({}, "stop", model=MODEL_PATH, usage={"total_tokens": 3})]
+    out = run(collect(agen(items), options))
+    assert out and all(c["model"] == "x" for c in out)
+    assert out[-1]["usage"] == {"total_tokens": 3}
+
+
+def test_a_chunk_that_already_names_the_model_is_passed_on_as_the_same_object():
+    items = [chunk({"content": "a"}, model="x"), chunk({}, "stop", model="x")]
+    out = run(collect(agen(items), ShapeOptions(model="x", split_reasoning=False)))
+    assert out[0] is items[0] and out[1] is items[1]
+
+
+def test_the_chunk_the_source_made_is_not_changed_when_it_is_renamed():
+    items = [chunk({"content": "a"}, model=MODEL_PATH)]
+    run(collect(agen(items), ShapeOptions(model="x", split_reasoning=False)))
+    assert items[0]["model"] == MODEL_PATH
+
+
+def test_an_error_chunk_and_a_chunk_without_choices_are_not_renamed():
+    items = [{"__error__": "boom", "__category__": "inference_error"}, {"usage": {"total_tokens": 2}}]
+    assert run(collect(agen(items), ShapeOptions(model="x", split_reasoning=False))) == items
+
+
+# ---- token counts of a whole reply ----------------------------------------------
+
+
+def reply(text="hello from peer", usage=None, **message):
+    out = {"choices": [{"message": {"role": "assistant", "content": text, **message}, "finish_reason": "stop"}]}
+    if usage is not False:
+        out["usage"] = usage if usage is not None else {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None}
+    return out
+
+
+def test_counts_the_engine_did_not_give_are_estimated_from_text_length_rounded_up():
+    result = reply("hello from peer")  # 15 characters
+    assert gr.fill_usage(result, "abcdefghij") is True  # 10 characters
+    assert result["usage"] == {"prompt_tokens": 3, "completion_tokens": 4, "total_tokens": 7}
+
+
+def test_a_reply_with_no_usage_at_all_is_filled_in():
+    result = reply("abcd", usage=False)
+    assert gr.fill_usage(result, "abcde") is True
+    assert result["usage"] == {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3}
+
+
+def test_counts_the_engine_gave_stay_and_nothing_says_estimated():
+    result = reply(usage={"prompt_tokens": 7, "completion_tokens": 5, "total_tokens": 12, "extra": 1})
+    before = json.dumps(result)
+    assert gr.fill_usage(result, "a prompt that is not counted") is False
+    assert json.dumps(result) == before
+
+
+def test_a_total_the_engine_left_out_is_the_sum_and_is_not_an_estimate():
+    result = reply(usage={"prompt_tokens": 7, "completion_tokens": 5, "total_tokens": None})
+    assert gr.fill_usage(result, "x") is False
+    assert result["usage"] == {"prompt_tokens": 7, "completion_tokens": 5, "total_tokens": 12}
+
+
+def test_one_count_given_and_one_not_keeps_the_given_one_and_says_estimated():
+    result = reply("abcdefgh", usage={"prompt_tokens": None, "completion_tokens": 3, "total_tokens": None})
+    assert gr.fill_usage(result, "abcd") is True
+    assert result["usage"] == {"prompt_tokens": 1, "completion_tokens": 3, "total_tokens": 4}
+    result = reply("abcdefgh", usage={"prompt_tokens": 9, "completion_tokens": None, "total_tokens": 99})
+    assert gr.fill_usage(result, "abcd") is True
+    assert result["usage"] == {"prompt_tokens": 9, "completion_tokens": 2, "total_tokens": 11}
+
+
+@pytest.mark.parametrize("bad", [-1, True, 2.5, "3", [], {}])
+def test_a_figure_that_is_not_a_whole_number_is_no_count(bad):
+    result = reply("abcd", usage={"prompt_tokens": bad, "completion_tokens": bad, "total_tokens": bad})
+    assert gr.fill_usage(result, "abcd") is True
+    assert result["usage"] == {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}
+
+
+def test_the_reply_estimate_counts_reasoning_and_the_name_and_arguments_of_calls():
+    calls = [{"id": "c", "type": "function", "function": {"name": "get_weather", "arguments": '{"city": "Paris"}'}}]
+    result = reply("", reasoning_content="abcd", tool_calls=calls)
+    gr.fill_usage(result, "")
+    assert result["usage"]["completion_tokens"] == -(-(4 + len("get_weather") + len('{"city": "Paris"}')) // 4)
+
+
+@pytest.mark.parametrize("result", [None, 5, "text", [], {}, {"choices": None}, {"choices": [None]}, {"choices": [{"message": None}]}])
+def test_an_odd_result_never_raises(result):
+    gr.fill_usage(result, "abcd")
+    if isinstance(result, dict):
+        assert result["usage"]["prompt_tokens"] == 1 and result["usage"]["completion_tokens"] == 0
