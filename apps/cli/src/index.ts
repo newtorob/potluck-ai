@@ -64,6 +64,7 @@ import { plainText } from "./logs.js";
 import { RuntimeError } from "./runtime.js";
 import { ControlError } from "./control.js";
 import { beginSession, loadSession, saveSession, type SavedSession } from "./sessions.js";
+import { ProjectInstructions } from "./projectInstructions.js";
 
 const VERSION = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
 
@@ -170,9 +171,11 @@ interface BriefState {
 /** The generated file map is optional navigation data, not project instructions. */
 async function prepareAgentContext(
   history: ChatMessage[], repoMap: string, cfg: GatewayConfig, model: string, scope: Scope,
+  instructions: ProjectInstructions, announce: (line: string) => void,
   signal?: AbortSignal,
 ): Promise<number | undefined> {
   const window = await modelContextWindow(cfg, model, scope, signal);
+  await instructions.refresh(history, announce, signal);
   const existing = history.findIndex(m => m.role === "system" && m.content === repoMap);
   if (existing !== -1) history.splice(existing, 1);
   // Small windows need room for the task and actual tool feedback. The agent
@@ -215,8 +218,10 @@ async function runOneShot(
     { role: "system", content: systemPrompt(opts.cwd, opts.verifyCommand, brief) },
   ];
   const repoMap = await buildRepoMap(opts.cwd, 200, 512);
+  const instructions = new ProjectInstructions(opts.cwd);
   if (opts.session) conversation.push(...opts.session.history);
-  const contextWindowTokens = await prepareAgentContext(conversation, repoMap, opts.cfg, opts.model, opts.scope);
+  const contextWindowTokens = await prepareAgentContext(conversation, repoMap, opts.cfg, opts.model, opts.scope,
+    instructions, line => stderr.write(`${line}\n`));
   if (!opts.verifyCommand) {
     stderr.write(
       c.dim(
@@ -486,6 +491,7 @@ async function main(): Promise<void> {
     { role: "system", content: systemPrompt(cwd, verify.command, briefState.brief) },
   ];
   const repoMap = await buildRepoMap(cwd, 200, 512);
+  const instructions = new ProjectInstructions(cwd);
   if (session) {
     conversation.push(...session.history);
     stdout.write(`Session ${session.id}${previousSession ? ` (continued from ${previousSession.id})` : ""}. Completed turns will be saved privately.\n`);
@@ -565,7 +571,8 @@ async function main(): Promise<void> {
       active = new AbortController();
       stdout.write(`\n${c.dim("potluck ▸ ")}`);
       try {
-        const contextWindowTokens = await prepareAgentContext(draft, repoMap, cfg, model, scope, active.signal);
+        const contextWindowTokens = await prepareAgentContext(draft, repoMap, cfg, model, scope,
+          instructions, message => stdout.write(`${message}\n`), active.signal);
         await runTask(draft, snapshotRequest(), {
           cfg,
           model,
@@ -619,12 +626,11 @@ async function main(): Promise<void> {
     }
     if (line === "/clear") {
       const fresh = await loadBrief(cwd, (l) => stdout.write(`${l}\n`));
+      const cleared: ChatMessage[] = [{ role: "system", content: systemPrompt(cwd, verify.command, fresh.brief) }];
+      try { await instructions.refresh(cleared, message => stdout.write(`${message}\n`)); }
+      catch (error) { stdout.write(`${c.red((error as Error).message)}\n`); continue; }
       briefState.brief = fresh.brief;
-      conversation.length = 0;
-      conversation.push({
-        role: "system",
-        content: systemPrompt(cwd, verify.command, briefState.brief),
-      });
+      conversation.splice(0, conversation.length, ...cleared);
       stdout.write(
         `${c.dim("context cleared")}${briefState.brief ? c.dim(" · briefed from the snapshot above") : ""}\n`,
       );
@@ -659,7 +665,8 @@ async function main(): Promise<void> {
     stdout.write(`\n${c.dim("potluck ▸ ")}`);
 
     try {
-      const contextWindowTokens = await prepareAgentContext(conversation, repoMap, cfg, model, scope, active.signal);
+      const contextWindowTokens = await prepareAgentContext(conversation, repoMap, cfg, model, scope,
+        instructions, message => stdout.write(`${message}\n`), active.signal);
       snapshot = conversation.length;
       await runTask(conversation, line, {
         cfg,

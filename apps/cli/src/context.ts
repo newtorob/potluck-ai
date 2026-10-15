@@ -8,7 +8,7 @@ const FEEDBACK_MARKER = "\n[Tool output truncated to fit context. This is a part
 
 export class ContextBudgetError extends Error {
   constructor() {
-    super("Task incomplete: the system instructions, current request, or latest action cannot fit the available context. Use a model with a larger context window, shorten the request/project brief, or ask for smaller targeted edits.");
+    super("Task incomplete: the system instructions, current request, or latest action cannot fit the available context. Use a model with a larger context window, shorten the request/project brief or project instructions (AGENTS.md), or ask for smaller targeted edits.");
     this.name = "ContextBudgetError";
   }
 }

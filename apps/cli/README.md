@@ -58,6 +58,34 @@ To use the `potluck` command globally, link the built package:
 pnpm link --global   # then: potluck
 ```
 
+## Project instructions
+
+The built-in coding agent automatically reads `AGENTS.md` from the repository
+root through the current working directory, in that order. A more specific file
+applies within its directory subtree. Discovery stops at the nearest `.git`
+directory or worktree marker; outside a repository, only the working directory's
+`AGENTS.md` is loaded. Files above that boundary, siblings and descendants are
+not loaded automatically. The agent is instructed to inspect additional
+descendant `AGENTS.md` files before editing there; that discovery depends on the
+model following the instruction.
+
+The CLI names the loaded files before sending a task. It rereads them before
+each new REPL task and `/snapshot`, on `/clear`, and when starting or resuming a
+one-shot run. Changed instructions replace the previous copy. Saved sessions
+reload current files instead of restoring old system instructions. A failed
+refresh stops the next task; it never silently reuses stale rules.
+
+Instruction files must be regular UTF-8 files, not symlinks. Each file is limited
+to 8 KiB; the combined message, including source labels, is limited to 16 KiB.
+Oversized, unreadable or invalid files stop the task with a correction message.
+Instructions are never silently truncated or dropped to fit the model. If they
+leave insufficient context for the request, shorten the applicable `AGENTS.md`
+files or load a model with a larger context window.
+
+The user's explicit request takes precedence over project guidance. Project
+files cannot bypass edit/command approval, workspace containment, the fixed
+verification command, routing scope or the project's exact model pin.
+
 ## Project model pinning
 
 `potluck models pin <installed-model-id>` creates a portable `potluck.lock` with
