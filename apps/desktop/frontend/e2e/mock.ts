@@ -65,6 +65,8 @@ const DEFAULT_MEMBERSHIP = {
 };
 
 interface MockOpts {
+  onboarding?: boolean;
+  theme?: 'dark' | 'light';
   /** /me response; pass null to simulate a signed-out 401. */
   me?: Record<string, unknown> | null;
   membership?: Record<string, unknown>;
@@ -112,10 +114,10 @@ function fulfillJson(
  *  - sidecar (:8321) is aborted; the app degrades gracefully by design.
  */
 export async function mockBackends(page: Page, opts: MockOpts = {}): Promise<void> {
-  await page.addInitScript(() => {
-    localStorage.setItem('potluck.onboarding_completed', 'true');
-    localStorage.setItem('potluck.theme', 'dark');
-  });
+  await page.addInitScript(({ onboarding, theme }) => {
+    localStorage.setItem('potluck.onboarding_completed', onboarding ? 'true' : 'false');
+    localStorage.setItem('potluck.theme', theme);
+  }, { onboarding: opts.onboarding ?? true, theme: opts.theme ?? 'dark' });
 
   // Match the cloud endpoints by path on any host, so the mock works whether the
   // client's base URL resolves to localhost:8080 (dev override) or the prod host.

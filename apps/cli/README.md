@@ -102,6 +102,8 @@ potluck service stop          # stop the background engine
 potluck service uninstall     # remove startup service, retain your data
 potluck serve                 # foreground engine for a process supervisor
 potluck gateway enable        # enable gateway access, preserving an existing key
+potluck models recommend      # up to three picks for this machine, with reasons
+potluck models recommend --use coding  # tailor picks to the work you plan to do
 potluck models list           # catalog and installed models
 potluck models install <id>   # start/resume a verified download
 potluck models progress <id>  # check download progress
@@ -266,6 +268,25 @@ isolated instance; the desktop currently requires the default port. Set
 Enable preserves an existing key; rotate explicitly invalidates it. Commands
 never print the key. Shared settings changes go through the engine, which saves
 them atomically; CLI preferences remain in `cli.json`.
+
+`models recommend [--use coding|writing|reasoning|general] [--json]` inspects this computer's CPU, GPU, available RAM and
+model disk space, then shows up to three fitting models. Local answer checks and
+benchmarks lead the ranking. Without that evidence, catalog tiers and GPU memory
+headroom guide the choice; CPU-only machines start with smaller models. Apple
+unified memory counts as one pool. Estimates do not promise speed or a particular
+context length. The command does not download, load or change your selected model.
+Run `potluck setup --model <id>` to install if needed, load and test a choice.
+Guided setup asks what you plan to do: coding, writing and brainstorming, analysis
+and reasoning, or general use. Enter/skip chooses general. `setup --use coding`
+skips that question; unattended setup also needs `--with-model` or `--model`.
+The choice applies to that setup or recommendation command. General is the default
+when no use is supplied. Ordered catalog `use_cases` tags guide ranking within the
+same evidence and hardware classes; they are editorial guidance, not measured task
+scores or a guarantee of tool reliability. Untagged imports remain eligible as
+fallbacks. Search still requires a search tool; choosing a model does not enable it.
+Setup defaults to the first recommendation; an explicit model or project pin takes
+precedence. The local runtime must be running (`potluck up`). These
+picks describe this computer, even if coding-agent traffic uses another gateway.
 
 `models list|install|load|unload|progress|cancel` uses the engine's existing model
 APIs. Every action except list takes a catalog model ID. Install starts a

@@ -503,12 +503,12 @@ def test_every_old_key_is_still_there_with_its_old_type_and_the_new_ones_are_add
     assert out["schemaVersion"] == 1
     for key, kind in OLD_TOP.items():
         assert isinstance(out[key], kind), key
-    assert set(out["hardware"]) == OLD_HARDWARE
+    assert set(out["hardware"]) == OLD_HARDWARE | {"gpu_vram_gb", "inference_gpu_available", "inference_gpu_vram_gb"}
     for model in out["models"]:
         for key, kind in OLD_MODEL.items():
             assert isinstance(model[key], kind) and not (kind is int and isinstance(model[key], bool)), key
-    assert set(out) == set(OLD_TOP) | {"recommended"}
-    assert all(set(m) == set(OLD_MODEL) | {"fitBasis", "measured", "checked"} for m in out["models"])
+    assert set(out) == set(OLD_TOP) | {"recommended", "useCase"}
+    assert all(set(m) == set(OLD_MODEL) | {"fitBasis", "measured", "checked", "recommendationReason", "useCases"} for m in out["models"])
     assert json.loads(json.dumps(out)) == out, "everything in it is plain JSON"
 
 

@@ -61,6 +61,16 @@ def _load_catalog() -> list[dict]:
         if schema_ok and fresh_ok and cached_models:
             chosen = cached_models
 
+    # Older feeds may predate task guidance. Retain bundled tags only for the
+    # exact catalog artifact; new/imported weights never inherit guesses by name.
+    bundled_by_slug = {entry['slug']: entry for entry in bundled.get('models', [])}
+    chosen = [dict(entry) for entry in chosen]
+    for entry in chosen:
+        original = bundled_by_slug.get(entry['slug'], {})
+        if ('use_cases' not in entry and original.get('use_cases')
+                and entry.get('sha256') and entry['sha256'] == original.get('sha256')):
+            entry['use_cases'] = list(original['use_cases'])
+
     _catalog = chosen
     logger.info("catalog_loaded count=%d", len(_catalog))
     return _catalog

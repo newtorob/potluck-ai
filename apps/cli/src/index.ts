@@ -89,6 +89,7 @@ function printHelp(): void {
       "  potluck service install        start the runtime automatically at login",
       "  potluck service status         inspect the background service",
       "  potluck serve                  run the runtime in the foreground",
+      "  potluck models recommend       find fitting models for this machine",
       "  potluck models list            list/install/load/unload/test local models",
       "  potluck benchmark              measure the model on this machine, or switch to another",
       '  potluck run "prompt"           plain inference, with optional piped stdin',

@@ -1,186 +1,167 @@
-/**
- * ModelPick — step 3 of the First Run wizard.
- *
- * Shows three tier cards (small / medium / large), pre-selecting the
- * hardware-recommended tier. User confirms → parent triggers install.
- * Shows live DownloadProgress inline on the selected card.
- */
-
-import { CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { DownloadProgress } from '@/components/models/DownloadProgress';
-import type { CatalogModel, ModelTier } from '@/stores/modelStore';
-import type { HardwareInfo } from '@/hooks/useHardware';
-import { inferenceVram } from '@/lib/modelFit';
+import {
+  MODEL_USES,
+  MODEL_USE_LABELS,
+  type ModelSuggestion,
+  type ModelUse,
+} from '@/lib/modelRecommendations';
 import type { DownloadProgressRecord } from '@/stores/modelStore';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const TIER_LABELS: Record<ModelTier, string> = {
-  small: 'Small',
-  medium: 'Medium',
-  large: 'Large',
-};
-
-const TIER_COLORS: Record<ModelTier, string> = {
-  small: 'border-emerald-500/50 bg-emerald-500/5',
-  medium: 'border-blue-500/50 bg-blue-500/5',
-  large: 'border-violet-500/50 bg-violet-500/5',
-};
-
-const TIER_BADGE: Record<ModelTier, string> = {
-  small: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-  medium: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  large: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
-};
-
-function formatSize(bytes: number): string {
-  if (bytes >= 1_073_741_824) return `${(bytes / 1_073_741_824).toFixed(1)} GB`;
-  return `${(bytes / 1_048_576).toFixed(1)} MB`;
-}
-
-type Sufficiency = 'ok' | 'borderline' | 'insufficient';
-
-function getSufficiency(model: CatalogModel, hardware: HardwareInfo | null): Sufficiency {
-  if (!hardware) return 'ok'; // assume ok when hardware unknown
-  const ramOk = hardware.ram_total_gb >= model.min_ram_gb;
-  const usableVram = inferenceVram(hardware);
-  const vramOk =
-    usableVram === null || usableVram >= model.min_vram_gb;
-  if (ramOk && vramOk) return 'ok';
-  const ramBorder = hardware.ram_total_gb >= model.min_ram_gb * 0.8;
-  const vramBorder =
-    usableVram === null || usableVram >= model.min_vram_gb * 0.8;
-  if (ramBorder && vramBorder) return 'borderline';
-  return 'insufficient';
-}
-
-const SUFFICIENCY_ICON: Record<Sufficiency, React.ReactNode> = {
-  ok: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />,
-  borderline: <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />,
-  insufficient: <XCircle className="h-3.5 w-3.5 text-destructive" />,
-};
-
-// ---------------------------------------------------------------------------
-// Props
-// ---------------------------------------------------------------------------
-
 interface ModelPickProps {
-  /** Catalog models filtered to one per tier */
-  tierModels: Record<ModelTier, CatalogModel | undefined>;
-  /** The currently selected slug */
+  models: ModelSuggestion[];
+  use: ModelUse;
+  onUse: (use: ModelUse) => void;
   selectedSlug: string | null;
-  /** Hardware info for suitability rendering */
-  hardware: HardwareInfo | null;
-  /** Download progress for the selected model (if downloading) */
-  downloadProgress: DownloadProgressRecord | undefined;
-  /** Whether install is pending (before polling starts) */
-  isInstalling: boolean;
   onSelect: (slug: string) => void;
+  isLoading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+  downloadProgress: DownloadProgressRecord | undefined;
+  isInstalling: boolean;
 }
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
-const TIERS: ModelTier[] = ['small', 'medium', 'large'];
 
 export function ModelPick({
-  tierModels,
+  models,
+  use,
+  onUse,
   selectedSlug,
-  hardware,
+  onSelect,
+  isLoading,
+  error,
+  onRefresh,
   downloadProgress,
   isInstalling,
-  onSelect,
 }: ModelPickProps) {
   return (
     <div className="space-y-3">
-      {TIERS.map((tier) => {
-        const model = tierModels[tier];
-        if (!model) return null;
-
-        const isSelected = model.slug === selectedSlug;
-        const sufficiency = getSufficiency(model, hardware);
-        const isActiveDownload =
-          isSelected &&
-          (isInstalling ||
-            (downloadProgress !== undefined &&
-              (downloadProgress.status === 'downloading' ||
-                downloadProgress.status === 'verifying')));
-
-        return (
+      <fieldset disabled={isInstalling} className="space-y-2">
+        <legend className="text-sm font-medium">What will you mainly use it for?</legend>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {MODEL_USES.map((value) => (
+            <label
+              key={value}
+              className={cn(
+                'flex items-center gap-2 rounded-lg border px-3 py-2 text-xs cursor-pointer',
+                use === value ? 'border-primary bg-primary/10' : 'border-border hover:bg-accent',
+              )}
+            >
+              <input
+                type="radio"
+                name="model-use"
+                value={value}
+                checked={use === value}
+                onChange={() => onUse(value)}
+                className="accent-primary focus-visible:outline-ring"
+              />
+              {MODEL_USE_LABELS[value]}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      {isLoading ? (
+        <p role="status" className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+          <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> Checking models for this
+          machine…
+        </p>
+      ) : error || models.length === 0 ? (
+        <div
+          role={error ? 'alert' : 'status'}
+          className="rounded-xl border border-border bg-muted/30 p-4 space-y-2"
+        >
+          <p className="text-sm font-medium">
+            {error ? 'Could not get recommendations' : 'No suitable model right now'}
+          </p>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {error ??
+              'No model passed the memory, disk space and local check requirements. Free memory or disk space and check again, or choose a model later.'}
+          </p>
           <button
-            key={tier}
             type="button"
-            role="radio"
-            aria-checked={isSelected}
-            onClick={() => onSelect(model.slug)}
-            disabled={isActiveDownload}
-            className={cn(
-              'w-full rounded-xl border-2 p-4 text-left transition-all',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-              'disabled:cursor-default',
-              isSelected
-                ? cn('ring-2 ring-primary', TIER_COLORS[tier])
-                : 'border-border bg-card hover:border-primary/30 hover:bg-accent/50',
-            )}
+            onClick={onRefresh}
+            className="text-sm underline rounded focus-visible:outline-ring"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1 space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span
-                    className={cn(
-                      'rounded-full px-2 py-0.5 text-xs font-medium',
-                      TIER_BADGE[tier],
-                    )}
-                  >
-                    {TIER_LABELS[tier]}
-                  </span>
-                  <span className="text-sm font-semibold text-foreground truncate">{model.name}</span>
-                </div>
-                <p className="text-xs text-muted-foreground line-clamp-2">{model.description}</p>
-
-                <div className="flex items-center gap-2 pt-0.5">
-                  <span className="text-xs text-muted-foreground">{formatSize(model.size_bytes)}</span>
-                  <span className="text-muted-foreground/40">·</span>
-                  <div className="flex items-center gap-1">
-                    {SUFFICIENCY_ICON[sufficiency]}
-                    <span className="text-xs text-muted-foreground">
-                      {model.min_ram_gb} GB RAM
-                      {model.min_vram_gb > 0 ? ` · ${model.min_vram_gb} GB VRAM` : ''}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Selection indicator */}
-              <div
-                className={cn(
-                  'mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 transition-all',
-                  isSelected
-                    ? 'border-primary bg-primary'
-                    : 'border-muted-foreground/40 bg-transparent',
-                )}
-              >
-                {isSelected && (
-                  <div className="flex h-full w-full items-center justify-center">
-                    <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Download progress inline on selected card */}
-            {isSelected && downloadProgress && (
-              <div className="mt-3 border-t border-border/50 pt-3">
-                <DownloadProgress progress={downloadProgress} />
-              </div>
-            )}
+            Check again
           </button>
-        );
-      })}
+        </div>
+      ) : (
+        <fieldset disabled={isInstalling} className="space-y-2">
+          <legend className="sr-only">Suggested models, in recommended order</legend>
+          {models.map((model, index) => (
+            <label
+              key={model.id}
+              className={cn(
+                'flex items-start gap-3 rounded-xl border px-3 py-2 cursor-pointer',
+                selectedSlug === model.id
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:bg-accent/50',
+              )}
+            >
+              <input
+                type="radio"
+                name="first-model"
+                value={model.id}
+                aria-label={model.name}
+                aria-describedby={`suggestion-${model.id}`}
+                checked={selectedSlug === model.id}
+                onChange={() => onSelect(model.id)}
+                className="mt-1 accent-primary focus-visible:outline-ring"
+              />
+              <span id={`suggestion-${model.id}`} className="min-w-0 space-y-1 block">
+                <span className="flex flex-wrap gap-x-2 items-baseline">
+                  <span className="font-semibold text-sm break-words">{model.name}</span>
+                  {index === 0 && (
+                    <span className="text-xs text-primary-text">Suggested first</span>
+                  )}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {(model.sizeBytes / 1024 ** 3).toFixed(1)} GiB{' '}
+                  {model.installed ? 'on disk' : 'download'}
+                  {' · '}
+                  {model.checked ? 'Answer check passed here' : 'Estimated fit · Not checked here'}
+                </span>
+                {model.checked ? (
+                  <span className="block text-xs text-muted-foreground">
+                    {model.tokensPerSecond !== null
+                      ? `${model.tokensPerSecond.toFixed(1)} tokens/s measured`
+                      : 'Speed not measured'}
+                    {' · '}
+                    {model.contextTokens !== null
+                      ? `Checked at ${model.contextTokens.toLocaleString()} context tokens`
+                      : 'Context not measured'}
+                  </span>
+                ) : (
+                  selectedSlug === model.id &&
+                  model.reason && (
+                    <span className="block text-xs leading-relaxed text-muted-foreground">
+                      {model.reason}
+                    </span>
+                  )
+                )}
+                {use !== 'general' && (
+                  <span className="block text-xs text-muted-foreground">
+                    {model.taskMatch
+                      ? `Catalog match for ${MODEL_USE_LABELS[use].toLowerCase()}`
+                      : 'General fallback for this machine'}
+                  </span>
+                )}
+              </span>
+            </label>
+          ))}
+        </fieldset>
+      )}
+      {!isLoading && !error && models.length > 0 && (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Task matches are catalog guidance, not measured quality scores. Untested models need a
+          local check for speed, usable context and tool reliability.
+        </p>
+      )}
+      {downloadProgress && (
+        <div aria-live="polite">
+          <DownloadProgress progress={downloadProgress} />
+        </div>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { plainText } from "./logs.js";
 import { pinnedModel, readProjectModelLock } from "./model-lock.js";
 import { runtimeRequest, RuntimeError } from "./runtime.js";
 import type { OnboardingIO } from "./operational-setup.js";
+import { askModelUse, type ModelUse } from "./model-use.js";
 
 /** What the engine measured for a model on this machine. Absent from engines that do not measure. */
 export interface Measured { hostGiB: number | null; gpuGiB: number | null; contextTokens: number | null; tokensPerSecond: number | null; checkedAt: string | null }
@@ -15,14 +16,18 @@ export interface SetupModel {
   fits: boolean; reasons: string[]; estimatedWorkingGiB: number;
   /** Whether `fits` was judged from a measurement on this machine or from the size-based estimate. */
   fitBasis?: "measured" | "estimate"; measured?: Measured | null; checked?: "passed" | "failed" | null;
+  recommendationReason?: string | null;
+  useCases?: ModelUse[];
 }
 /** One of the engine's (at most three) picks for this machine, best first. */
 export interface Recommendation { id: string; basis: string; tokensPerSecond: number | null }
 export interface SetupOptions {
-  schemaVersion: number; hardware: { ram_total_gb: number; ram_available_gb: number; gpu_name?: string; cpu_name?: string; os?: string; arch?: string };
+  schemaVersion: number; hardware: { ram_total_gb: number | null; ram_available_gb: number | null; gpu_name?: string | null; cpu_name?: string | null; os?: string | null; arch?: string | null;
+    gpu_vram_gb?: number | null; inference_gpu_available?: boolean | null; inference_gpu_vram_gb?: number | null };
   diskFreeBytes: number; currentModel: string | null; recommendedModel: string | null; models: SetupModel[];
   /** Absent from an engine that does not rank models. */
   recommended?: Recommendation[];
+  useCase?: ModelUse;
 }
 export const gib = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
 export const validID = (id: unknown): id is string => typeof id === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}$/.test(id);
@@ -36,7 +41,7 @@ export function parseRecommended(value: unknown, models: SetupModel[]): Recommen
   const seen = new Set<string>(), picks: Recommendation[] = [];
   for (const item of value) {
     const r = item && typeof item === "object" && !Array.isArray(item) ? item as Record<string, unknown> : {};
-    if (!validID(r.id) || seen.has(r.id) || !models.some(m => m.id === r.id)) continue;
+    if (!validID(r.id) || seen.has(r.id) || !models.some(m => m.id === r.id && m.fits === true && m.checked !== "failed")) continue;
     seen.add(r.id);
     const speed = typeof r.tokensPerSecond === "number" && Number.isFinite(r.tokensPerSecond) && r.tokensPerSecond >= 0 ? r.tokensPerSecond : null;
     picks.push({ id: r.id, basis: label(r.basis, 40) ?? "", tokensPerSecond: speed });
@@ -51,14 +56,16 @@ function whyPicked(pick: Recommendation, model: SetupModel): string {
     : pick.basis === "proven_speed_unknown" ? "passed its answer check here, speed not measured yet"
     : pick.basis === "estimate" ? "not measured on this machine yet" : "";
   const need = model.fitBasis === "measured" && typeof model.measured?.hostGiB === "number" ? `needs ${model.measured.hostGiB.toFixed(1)} GiB, measured here` : "";
-  return [proof, need].filter(Boolean).join("; ");
+  const estimate = pick.basis === "estimate" ? label(model.recommendationReason, 200) : null;
+  return [proof, need, estimate].filter(Boolean).join("; ");
 }
 /** The "Recommended for this machine" block shown ahead of the full list. Empty when the engine gave no picks. */
-export function recommendedLines(picks: Recommendation[], models: SetupModel[]): string[] {
+export function recommendedLines(picks: Recommendation[], models: SetupModel[], useCase: ModelUse = "general"): string[] {
   const rows = picks.flatMap(pick => {
     const model = models.find(m => m.id === pick.id);
     if (!model) return [];
-    const why = whyPicked(pick, model);
+    const task = useCase === "general" ? "" : model.useCases?.includes(useCase) ? `catalog match for ${useCase}` : `no catalog guidance for ${useCase}`;
+    const why = [whyPicked(pick, model), task].filter(Boolean).join("; ");
     return [`  ${pick.id} (${gib(model.sizeBytes)}${model.loaded ? ", loaded" : model.installed ? ", installed" : ", download"})${why ? ": " + why : ""}`];
   });
   return rows.length ? ["Recommended for this machine:", ...rows] : [];
@@ -82,14 +89,16 @@ export function testFailure(error: unknown): unknown {
 }
 
 /** The engine's hardware, disk and model list. `feature` names the command in the upgrade message. */
-export async function readSetupOptions(timeout: number, feature: string, signal?: AbortSignal): Promise<SetupOptions> {
+export async function readSetupOptions(timeout: number, feature: string, signal?: AbortSignal, useCase: ModelUse = "general"): Promise<SetupOptions> {
   let options: SetupOptions;
-  try { options = await runtimeRequest<SetupOptions>("/models/setup-options", { timeout, ...(signal ? { signal } : {}) }); }
+  const route = "/models/setup-options" + (useCase === "general" ? "" : `?use=${useCase}`);
+  try { options = await runtimeRequest<SetupOptions>(route, { timeout, ...(signal ? { signal } : {}) }); }
   catch (error) {
     if (error instanceof ControlError && error.status === 404) throw new RuntimeError(`Upgrade the Potluck runtime to use ${feature}.`);
     throw error;
   }
   if (options.schemaVersion !== 1 || !Array.isArray(options.models) || !options.hardware) throw new RuntimeError("Runtime returned invalid model setup options.");
+  if (useCase !== "general" && options.useCase !== useCase) throw new RuntimeError("Upgrade the Potluck runtime for recommendations by intended use.");
   return options;
 }
 
@@ -152,14 +161,15 @@ export async function setupModel(args: CliArgs, io?: OnboardingIO, deps: ModelDe
 }): Promise<Record<string, unknown>> {
   const lock = await readProjectModelLock(process.cwd());
   const selected = pinnedModel(lock, args.model);
-  const options = await readSetupOptions(args.timeout, "guided model setup");
+  const useCase = args.use ?? (io && !selected && !args.withModel ? await askModelUse(io) : "general");
+  const options = await readSetupOptions(args.timeout, "guided model setup", io?.signal, useCase);
   io?.progress(plainText(`Memory: ${options.hardware.ram_available_gb} GiB available / ${options.hardware.ram_total_gb} GiB total. Model disk space: ${gib(options.diskFreeBytes)}.\n`));
   // A pinned model may be absent from a refreshed catalog. Keep its identity and
   // source, using its recorded size for the conservative fit estimate.
   if (lock) {
     const existing = options.models.find(m => m.id === lock.model.id);
     const working = lock.model.sizeBytes / 1024 ** 3 * 1.2 + 1.5;
-    const memoryFits = existing?.loaded || options.hardware.ram_available_gb >= working;
+    const memoryFits = existing?.loaded || (options.hardware.ram_available_gb !== null && options.hardware.ram_available_gb >= working);
     const diskFits = existing?.installed || options.diskFreeBytes >= lock.model.sizeBytes + 256 * 1024 ** 2;
     const pinned = { id: lock.model.id, name: lock.model.id, sizeBytes: lock.model.sizeBytes,
       installed: existing?.installed ?? false, loaded: existing?.loaded ?? false, estimatedWorkingGiB: working,
@@ -167,10 +177,12 @@ export async function setupModel(args: CliArgs, io?: OnboardingIO, deps: ModelDe
       reasons: ["Free more memory or disk space to install this project's pinned model."] };
     options.models = [...options.models.filter(m => m.id !== lock.model.id), pinned];
   }
-  let id = selected ?? options.currentModel ?? options.recommendedModel;
-  const picks = parseRecommended(options.recommended, options.models), found = picks.length ? { recommended: picks } : {};
+  const picks = parseRecommended(options.recommended, options.models), found = { ...(picks.length ? { recommended: picks } : {}), ...(useCase !== "general" ? { useCase } : {}) };
+  // Use the same first choice as `models recommend`. Only older engines without
+  // ranked picks fall back to the legacy default; an empty ranking means no fit.
+  let id = selected ?? picks[0]?.id ?? (options.recommended === undefined ? options.currentModel ?? options.recommendedModel : null);
   if (io && !selected && !args.withModel) {
-    for (const line of recommendedLines(picks, options.models)) io.progress(plainText(line + "\n"));
+    for (const line of recommendedLines(picks, options.models, useCase)) io.progress(plainText(line + "\n"));
     const choices = [...options.models].sort((a, b) => Number(b.fits) - Number(a.fits) || Number(b.installed) - Number(a.installed) || a.sizeBytes - b.sizeBytes);
     for (const m of choices.slice(0, 8)) io.progress(plainText(`  ${m.id}: ${gib(m.sizeBytes)}${m.loaded ? ", loaded" : m.installed ? ", installed" : " download"}${m.fits ? "" : ", " + m.reasons.join(" ")}\n`));
     const answer = await io.ask(`Model ID${id ? ` [${id}]` : ""}, or skip: `);

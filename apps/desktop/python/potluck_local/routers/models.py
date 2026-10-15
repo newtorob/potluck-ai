@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Literal
 
 import psutil
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from potluck_local.services import model_registry
@@ -93,9 +93,9 @@ async def list_models() -> list[dict]:
 
 
 @router.get("/setup-options")
-async def get_setup_options() -> dict:
+async def get_setup_options(use_case: Literal['general', 'coding', 'writing', 'reasoning'] = Query('general', alias='use')) -> dict:
     from potluck_local.services.model_setup import setup_options
-    return await asyncio.to_thread(setup_options)
+    return await asyncio.to_thread(setup_options, use_case)
 
 
 @router.get("/available")

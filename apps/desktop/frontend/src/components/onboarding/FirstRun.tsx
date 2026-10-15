@@ -1,9 +1,9 @@
 /**
- * FirstRun - 5-step onboarding wizard.
+ * FirstRun - 6-step onboarding wizard.
  *
  * Steps:
  *   1. Welcome - product intro
- *   2. Hardware - detect specs + recommend tier
+ *   2. Hardware - detect specs
  *   3. ModelPick - choose and install a model
  *   4. Loading - wait for model to load into runtime
  *   5. Connect - mesh / machines
@@ -36,12 +36,14 @@ import { HardwareDetect } from './HardwareDetect';
 import { ModelPick } from './ModelPick';
 import { ConnectStep } from './ConnectStep';
 import { useHardware } from '@/hooks/useHardware';
+import { useModelRecommendations } from '@/hooks/useModelRecommendations';
+import type { ModelUse } from '@/lib/modelRecommendations';
 import { useHealth } from '@/hooks/useHealth';
 import { useModelStore } from '@/stores/modelStore';
 import { useMeshStore } from '@/stores/meshStore';
 import { deriveDiagnostics } from '@/lib/meshDiagnostics';
 import { deriveReadiness, type ReadinessReport } from '@/lib/readiness';
-import type { CatalogModel, ModelTier } from '@/stores/modelStore';
+import type { CatalogModel } from '@/stores/modelStore';
 import type { DownloadProgressRecord } from '@/stores/modelStore';
 
 // ---------------------------------------------------------------------------
@@ -100,64 +102,60 @@ export function FirstRun({ models }: FirstRunProps) {
   // zustand write and hit React's maximum update depth during onboarding.
   const install = useModelStore((s) => s.install);
   const load = useModelStore((s) => s.load);
-  const activeModelSlug = useModelStore((s) => s.activeModelSlug);
   const installing = useModelStore((s) => s.installing);
 
   const [step, setStep] = useState<Step>('welcome');
-  const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+  const [use, setUse] = useState<ModelUse>('general');
+  const recommendations = useModelRecommendations(use);
+  const [chosenSlug, setChosenSlug] = useState<string | null>(null);
+  const selectedSuggestion =
+    recommendations.models.find((m) => m.id === chosenSlug) ?? recommendations.models[0] ?? null;
+  const selectedSlug = selectedSuggestion?.id ?? null;
+  const installErrors = useModelStore((s) => s.loadError);
+  const downloadRequested = useRef<string | null>(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   // Guard so download-complete only kicks load() once per slug.
   const loadStartedForSlug = useRef<string | null>(null);
 
-  // Pre-select the recommended tier when hardware and models are both available
-  useEffect(() => {
-    if (hardware && models.length > 0 && selectedSlug === null) {
-      const tier = hardware.recommended_tier;
-      const match = models.find((m) => m.tier === tier) ?? models[0];
-      if (match) setSelectedSlug(match.slug);
-    }
-  }, [hardware, models, selectedSlug]);
-
-  // Build per-tier model map (first model per tier from catalog)
-  const tierModels: Record<ModelTier, CatalogModel | undefined> = {
-    small: models.find((m) => m.tier === 'small'),
-    medium: models.find((m) => m.tier === 'medium'),
-    large: models.find((m) => m.tier === 'large'),
-  };
-
   const selectedModel = models.find((m) => m.slug === selectedSlug) ?? null;
   const selectedProgress: DownloadProgressRecord | undefined = selectedModel?.download_progress;
   const downloadStatus = selectedProgress?.status;
-  const isInstalling = selectedSlug !== null && (installing[selectedSlug] ?? false);
+  const isInstalling =
+    selectedSlug !== null &&
+    ((installing[selectedSlug] ?? false) ||
+      downloadStatus === 'downloading' ||
+      downloadStatus === 'verifying');
 
-  // Advance from 'pick' to 'loading' once download completes and model is installed
-  useEffect(() => {
-    if (step !== 'pick') return;
-    if (!selectedSlug) return;
-    if (downloadStatus !== 'complete') return;
-    if (loadStartedForSlug.current === selectedSlug) return;
-
+  const handleLoad = useCallback(() => {
+    if (!selectedSlug || loadStartedForSlug.current === selectedSlug) return;
     loadStartedForSlug.current = selectedSlug;
+    downloadRequested.current = null;
     setStep('loading');
     setLoadError(null);
     void load(selectedSlug)
       .then(() => {
+        // The shared store records failures instead of rejecting its promise.
+        const error = useModelStore.getState().loadError[selectedSlug];
+        if (error) throw new Error(error);
         setStep('connect');
       })
-      .catch((err) => {
-        // Allow retry from the loading-step error UI
+      .catch((err: unknown) => {
         loadStartedForSlug.current = null;
         setLoadError(err instanceof Error ? err.message : 'Failed to load model');
       });
-  }, [step, selectedSlug, downloadStatus, load]);
+  }, [selectedSlug, load]);
 
-  // Auto-advance from loading to connect when activeModelSlug is set
+  // Only a download explicitly requested in this wizard may auto-load.
   useEffect(() => {
-    if (step === 'loading' && activeModelSlug === selectedSlug && selectedSlug !== null) {
-      setStep('connect');
-    }
-  }, [step, activeModelSlug, selectedSlug]);
+    if (
+      step === 'pick' &&
+      downloadStatus === 'complete' &&
+      selectedSlug !== null &&
+      downloadRequested.current === selectedSlug
+    )
+      handleLoad();
+  }, [step, selectedSlug, downloadStatus, handleLoad]);
 
   // Keyboard: Enter advances, Esc triggers confirm exit
   useEffect(() => {
@@ -167,7 +165,7 @@ export function FirstRun({ models }: FirstRunProps) {
         return;
       }
       // Only handle Enter when no interactive element is focused
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' && !e.isComposing && !showExitConfirm) {
         const tag = document.activeElement?.tagName;
         if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
         handleAdvance();
@@ -178,17 +176,17 @@ export function FirstRun({ models }: FirstRunProps) {
   });
 
   const handleAdvance = useCallback(() => {
-    const idx = STEP_ORDER.indexOf(step);
-    if (idx < STEP_ORDER.length - 1) {
-      const nextStep = STEP_ORDER[idx + 1];
-      if (nextStep !== undefined) setStep(nextStep);
-    }
-  }, [step]);
+    if (step === 'welcome') setStep('hardware');
+    if (step === 'hardware' && !hwLoading) setStep('pick');
+  }, [step, hwLoading]);
 
   const handleInstall = useCallback(() => {
-    if (!selectedSlug) return;
+    if (!selectedSlug || isInstalling) return;
+    downloadRequested.current = selectedSlug;
+    useModelStore.getState()._setLoadError(selectedSlug, null);
+    useModelStore.getState()._clearProgress(selectedSlug);
     void install(selectedSlug);
-  }, [selectedSlug, install]);
+  }, [selectedSlug, isInstalling, install]);
 
   const handleSkip = useCallback(() => {
     markOnboardingComplete();
@@ -207,11 +205,13 @@ export function FirstRun({ models }: FirstRunProps) {
 
   const canAdvanceFromPick =
     selectedSlug !== null &&
-    selectedModel?.installed === true &&
+    (selectedModel?.installed === true || selectedSuggestion?.installed === true) &&
     !isInstalling;
 
   const downloadComplete =
-    selectedProgress?.status === 'complete' || selectedModel?.installed === true;
+    selectedProgress?.status === 'complete' ||
+    selectedModel?.installed === true ||
+    selectedSuggestion?.installed === true;
 
   // Compute readiness for the ready step - mirrors ReadinessView's useMemo
   // exactly, including exactOptionalPropertyTypes-safe conditional spreads.
@@ -283,7 +283,7 @@ export function FirstRun({ models }: FirstRunProps) {
       )}
 
       {/* Wizard card */}
-      <div className="relative w-full max-w-lg rounded-2xl border border-border bg-card shadow-hearth-lg animate-fade-in-up">
+      <div className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col rounded-2xl border border-border bg-card shadow-hearth-lg animate-fade-in-up">
         {/* Close button */}
         <button
           type="button"
@@ -299,12 +299,12 @@ export function FirstRun({ models }: FirstRunProps) {
         </button>
 
         {/* Step indicator */}
-        <div className="flex items-center justify-center gap-2 border-b border-border px-6 py-4">
+        <div className="flex shrink-0 items-center justify-center gap-1 sm:gap-2 border-b border-border px-6 py-4">
           {STEP_ORDER.map((s, i) => {
             const isCurrent = s === step;
             const isComplete = STEP_ORDER.indexOf(step) > i;
             return (
-              <div key={s} className="flex items-center gap-2">
+              <div key={s} className="flex items-center gap-1 sm:gap-2">
                 <div
                   className={cn(
                     'flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-medium tabular-nums',
@@ -323,7 +323,7 @@ export function FirstRun({ models }: FirstRunProps) {
                 {i < STEP_ORDER.length - 1 && (
                   <div
                     className={cn(
-                      'h-px w-6 transition-colors duration-base',
+                      'h-px w-3 sm:w-6 transition-colors duration-base',
                       isComplete ? 'bg-primary/40' : 'bg-border/70',
                     )}
                   />
@@ -334,31 +334,51 @@ export function FirstRun({ models }: FirstRunProps) {
         </div>
 
         {/* Step content */}
-        <div className="px-6 py-6">
+        <div className="min-h-0 overflow-y-auto px-6 py-6">
           {step === 'welcome' && <WelcomeStep />}
           {step === 'hardware' && (
             <HardwareStep hardware={hardware} isLoading={hwLoading} error={hwError} />
           )}
           {step === 'pick' && (
-            <PickStep
-              tierModels={tierModels}
-              selectedSlug={selectedSlug}
-              hardware={hardware}
-              downloadProgress={selectedProgress}
-              isInstalling={isInstalling}
-              onSelect={setSelectedSlug}
-              downloadComplete={downloadComplete}
-            />
+            <div className="space-y-4 animate-fade-in">
+              <div className="space-y-1.5">
+                <h2 className="font-serif text-2xl tracking-display leading-tight text-foreground">
+                  Choose your first model
+                </h2>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Suggestions for this machine and the work you plan to do. You can change models
+                  later.
+                </p>
+              </div>
+              <ModelPick
+                models={recommendations.models}
+                use={use}
+                onUse={(value) => {
+                  setUse(value);
+                  setChosenSlug(null);
+                }}
+                selectedSlug={selectedSlug}
+                onSelect={setChosenSlug}
+                isLoading={recommendations.isLoading}
+                error={recommendations.error}
+                onRefresh={recommendations.refresh}
+                downloadProgress={selectedProgress}
+                isInstalling={isInstalling}
+              />
+              {selectedSlug && installErrors[selectedSlug] && (
+                <p role="alert" className="text-xs text-destructive">
+                  {installErrors[selectedSlug]}
+                </p>
+              )}
+            </div>
           )}
           {step === 'loading' && <LoadingStep error={loadError} />}
           {step === 'connect' && <ConnectStep />}
-          {step === 'ready' && (
-            <ReadyStep report={readinessReport} onFinish={handleFinish} />
-          )}
+          {step === 'ready' && <ReadyStep report={readinessReport} onFinish={handleFinish} />}
         </div>
 
         {/* Footer actions */}
-        <div className="flex items-center justify-between border-t border-border px-6 py-4">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-6 py-4">
           <button
             type="button"
             onClick={step === 'connect' ? () => setStep('ready') : handleSkip}
@@ -368,11 +388,7 @@ export function FirstRun({ models }: FirstRunProps) {
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
             )}
           >
-            {step === 'ready'
-              ? ''
-              : step === 'connect'
-                ? 'Skip for now'
-                : 'Skip, I\'ll pick later'}
+            {step === 'ready' ? '' : step === 'connect' ? 'Skip for now' : "Skip, I'll pick later"}
           </button>
 
           {step === 'welcome' && (
@@ -391,29 +407,16 @@ export function FirstRun({ models }: FirstRunProps) {
             <>
               {!isInstalling && !downloadComplete && (
                 <PrimaryButton onClick={handleInstall} disabled={!selectedSlug}>
-                  Install model <ArrowRight className="h-4 w-4" />
+                  Download and load <ArrowRight className="h-4 w-4" />
                 </PrimaryButton>
               )}
-              {(isInstalling || (selectedProgress && selectedProgress.status === 'downloading')) && (
-                <span className="text-xs text-muted-foreground">Downloading…</span>
-              )}
-              {selectedProgress?.status === 'verifying' && (
-                <span className="text-xs text-muted-foreground">Verifying…</span>
+              {isInstalling && (
+                <span className="text-xs text-muted-foreground">
+                  {selectedProgress?.status === 'verifying' ? 'Verifying…' : 'Downloading…'}
+                </span>
               )}
               {canAdvanceFromPick && (
-                <PrimaryButton onClick={() => {
-                  setStep('loading');
-                  setLoadError(null);
-                  if (selectedSlug) {
-                    loadStartedForSlug.current = selectedSlug;
-                    void load(selectedSlug).then(() => {
-                      setStep('connect');
-                    }).catch((err) => {
-                      loadStartedForSlug.current = null;
-                      setLoadError(err instanceof Error ? err.message : 'Failed to load model');
-                    });
-                  }
-                }}>
+                <PrimaryButton onClick={handleLoad}>
                   Load model <ArrowRight className="h-4 w-4" />
                 </PrimaryButton>
               )}
@@ -421,20 +424,7 @@ export function FirstRun({ models }: FirstRunProps) {
           )}
 
           {step === 'loading' && loadError && (
-            <PrimaryButton onClick={() => {
-              if (selectedSlug) {
-                setLoadError(null);
-                loadStartedForSlug.current = selectedSlug;
-                void load(selectedSlug).then(() => {
-                  setStep('connect');
-                }).catch((err) => {
-                  loadStartedForSlug.current = null;
-                  setLoadError(err instanceof Error ? err.message : 'Failed to load model');
-                });
-              }
-            }}>
-              Retry
-            </PrimaryButton>
+            <PrimaryButton onClick={handleLoad}>Retry</PrimaryButton>
           )}
 
           {step === 'connect' && (
@@ -474,8 +464,8 @@ function WelcomeStep() {
         </h1>
         <p className="text-sm text-muted-foreground leading-relaxed reading-measure mx-auto">
           Local-first AI that runs open-source models entirely on your device. By default your
-          prompts stay on your machine: no subscriptions to corporate labs, no data harvesting,
-          just fast private inference you own and control. Using the network is always opt-in.
+          prompts stay on your machine: no subscriptions to corporate labs, no data harvesting, just
+          fast private inference you own and control. Using the network is always opt-in.
         </p>
         <p className="text-xs italic text-muted-foreground/80 leading-relaxed">
           This setup detects your hardware and installs a model. Takes about 2–10 minutes.
@@ -501,55 +491,10 @@ function HardwareStep({
           Your hardware
         </h2>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          We detected your system specs and selected the best model tier for your machine.
+          Your available memory and local test results help us suggest models on the next step.
         </p>
       </div>
       <HardwareDetect hardware={hardware} isLoading={isLoading} error={error} />
-    </div>
-  );
-}
-
-function PickStep({
-  tierModels,
-  selectedSlug,
-  hardware,
-  downloadProgress,
-  isInstalling,
-  onSelect,
-  downloadComplete,
-}: {
-  tierModels: Record<ModelTier, CatalogModel | undefined>;
-  selectedSlug: string | null;
-  hardware: ReturnType<typeof useHardware>['hardware'];
-  downloadProgress: DownloadProgressRecord | undefined;
-  isInstalling: boolean;
-  onSelect: (slug: string) => void;
-  downloadComplete: boolean | undefined;
-}) {
-  return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="space-y-1.5">
-        <h2 className="font-serif text-2xl tracking-display leading-tight text-foreground">
-          Choose your first model
-        </h2>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Select a tier. You can install additional models later from the Models page.
-          {downloadComplete && (
-            <span className="ml-1 inline-flex items-center gap-1 font-medium text-sage">
-              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-              Download complete
-            </span>
-          )}
-        </p>
-      </div>
-      <ModelPick
-        tierModels={tierModels}
-        selectedSlug={selectedSlug}
-        hardware={hardware}
-        downloadProgress={downloadProgress}
-        isInstalling={isInstalling}
-        onSelect={onSelect}
-      />
     </div>
   );
 }
@@ -625,13 +570,7 @@ const COMPACT_SEV = {
   },
 } as const;
 
-function ReadyStep({
-  report,
-  onFinish,
-}: {
-  report: ReadinessReport;
-  onFinish: () => void;
-}) {
+function ReadyStep({ report, onFinish }: { report: ReadinessReport; onFinish: () => void }) {
   const navigate = useNavigate();
 
   const machineChecks = report.checks.filter((c) => c.group === 'machine');
@@ -701,8 +640,8 @@ function ReadyStep({
               Bring your coding agents
             </p>
             <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Potluck can serve your memory and tools to agents like Claude Code and
-              Cursor over MCP. Set it up any time in{' '}
+              Potluck can serve your memory and tools to agents like Claude Code and Cursor over
+              MCP. Set it up any time in{' '}
               <button
                 type="button"
                 onClick={handleOpenConnect}
@@ -756,14 +695,9 @@ function ReadinessGroup({
           const Icon = sev.Icon;
           return (
             <li key={check.code} className="flex items-start gap-2.5 px-3 py-2">
-              <Icon
-                className={cn('mt-0.5 size-3.5 shrink-0', sev.tone)}
-                aria-hidden
-              />
+              <Icon className={cn('mt-0.5 size-3.5 shrink-0', sev.tone)} aria-hidden />
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-foreground leading-snug">
-                  {check.title}
-                </p>
+                <p className="text-xs font-medium text-foreground leading-snug">{check.title}</p>
                 {(check.severity === 'warn' || check.severity === 'error') && check.fix && (
                   <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
                     <span className="text-foreground/60">Fix: </span>

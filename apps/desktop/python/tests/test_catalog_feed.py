@@ -43,6 +43,20 @@ def test_load_catalog_falls_back_to_bundled_when_no_cache(
     assert all("slug" in m for m in models)
 
 
+@pytest.mark.parametrize('same_hash,explicit_tags,expected', [
+    (True, None, ['writing']), (False, None, None), (True, [], []), (True, ['coding'], ['coding']),
+])
+def test_task_guidance_survives_older_feeds_only_for_identical_weights(monkeypatch, same_hash, explicit_tags, expected):
+    original = {'slug': 'model', 'sha256': 'a' * 64, 'use_cases': ['writing']}
+    remote = {'slug': 'model', 'sha256': ('a' if same_hash else 'b') * 64}
+    if explicit_tags is not None:
+        remote['use_cases'] = explicit_tags
+    monkeypatch.setattr(model_registry, '_load_bundled_catalog', lambda: {'schema_version': 1, 'models': [original]})
+    monkeypatch.setattr(catalog_feed, 'read_cached_catalog', lambda: {'schema_version': 1, 'models': [remote]})
+    assert model_registry._load_catalog()[0].get('use_cases') == expected
+    assert original['use_cases'] == ['writing']
+
+
 def test_cached_remote_wins_when_fresher(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

@@ -4,6 +4,7 @@ import type { CliArgs } from "./args.js";
 import { ControlError } from "./control.js";
 import { runtimeRequest } from "./runtime.js";
 import { testModel } from "./model-test.js";
+import { recommendModels } from "./model-recommendations.js";
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new ControlError("invalid_response", "Service returned an invalid response.");
@@ -22,6 +23,7 @@ export async function manageGateway(args: CliArgs): Promise<Record<string, unkno
 }
 
 export async function manageModels(args: CliArgs): Promise<Record<string, unknown>> {
+  if (args.action === "recommend") return { ...await recommendModels(args.timeout, args.use) };
   if (args.action === "available") return { ...await availableModels(args.timeout) };
   if (["pin", "lock", "sync", "unpin"].includes(args.action!)) return manageModelLock(args);
   if (args.action === "test") return { ...await testModel(args) };

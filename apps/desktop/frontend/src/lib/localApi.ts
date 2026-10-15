@@ -11,6 +11,7 @@
 import type { ChatMessage, ChatOptions } from '@/types/chat';
 import type { ModelAvailability, SplitModelPin, SplitSelection, SplitStatus } from '@/types/modelAvailability';
 import type { Model, DownloadProgress } from '@/types/models';
+import type { ModelUse } from '@/lib/modelRecommendations';
 import type {
   Memory,
   MemoryCategory,
@@ -877,6 +878,14 @@ export const localApi = {
   },
 
   // ---- Models --------------------------------------------------------------
+
+  modelSetupOptions(use: ModelUse, signal: AbortSignal): Promise<unknown> {
+    return timedFetch(`${LOCAL_BASE}/models/setup-options?use=${encodeURIComponent(use)}`, { signal })
+      .then((r) => {
+        if (r.status === 404) throw new Error('Update the Potluck engine to get model recommendations.');
+        return handleResponse<unknown>(r);
+      });
+  },
 
   listModels(): Promise<Model[]> {
     return timedFetch(`${LOCAL_BASE}/models`).then((r) => handleResponse<Model[]>(r));

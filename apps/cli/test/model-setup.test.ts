@@ -17,7 +17,7 @@ beforeEach(() => { vi.mocked(loadCliPrefs).mockResolvedValue({ scope: "mine", ve
 afterEach(() => vi.resetAllMocks());
 function serve(options = base, states = ["downloading", "verifying", "complete"]) {
   request.mockImplementation(async (route, opts) => {
-    if (route === "/models/setup-options") return options as never;
+    if (route.startsWith("/models/setup-options")) return options as never;
     if (route.endsWith("/install")) return { status: "downloading" } as never;
     if (route.endsWith("/download-progress")) return { status: states.shift() ?? "complete", bytes_downloaded: 1024 ** 3, bytes_total: 1024 ** 3 } as never;
     if (route.endsWith("/test")) return { status: "passed", model: "small", scope: "local", durationMs: 25 } as never;
@@ -33,7 +33,7 @@ it("takes an explicit unattended request through download, verification, loading
   expect(saveCliPrefs).toHaveBeenCalledWith({ scope: "mine", verify: "npm test", model: "small" });
 });
 it("declining a download changes neither model nor preferences", async () => {
-  serve(); const ask = vi.fn().mockResolvedValueOnce("").mockResolvedValueOnce("no");
+  serve(); const ask = vi.fn().mockResolvedValueOnce("").mockResolvedValueOnce("").mockResolvedValueOnce("no");
   expect(await setupModel(parseArgs(["setup"]), { ask, progress: vi.fn() }, deps)).toEqual({ status: "skipped" });
   expect(request).toHaveBeenCalledTimes(1); expect(saveCliPrefs).not.toHaveBeenCalled();
 });
@@ -99,7 +99,7 @@ it("shows the engine's picks before the list in a terminal, and returns them in 
   const picks = [{ id: "big", basis: "proven_fast", tokensPerSecond: 45 }, { id: "small", basis: "estimate", tokensPerSecond: null }];
   serve({ ...base, recommended: picks, models: [sized("big", 5, { installed: true, fitBasis: "measured", checked: "passed",
     measured: { hostGiB: 5.2, gpuGiB: null, contextTokens: 4096, tokensPerSecond: 45, checkedAt: null } }), sized("small", 1)] } as never);
-  const said: string[] = [], ask = vi.fn().mockResolvedValueOnce("small").mockResolvedValueOnce("n");
+  const said: string[] = [], ask = vi.fn().mockResolvedValueOnce("").mockResolvedValueOnce("small").mockResolvedValueOnce("n");
   const result = await setupModel(parseArgs(["setup"]), { ask, progress: m => { said.push(m); } }, deps);
   expect(result).toEqual({ status: "skipped", recommended: picks });
   const out = said.join("");
@@ -108,12 +108,51 @@ it("shows the engine's picks before the list in a terminal, and returns them in 
   expect(out).toContain("  small (1.0 GiB, download): not measured on this machine yet\n");
   expect(out.indexOf("Recommended for this machine:")).toBeLessThan(out.indexOf("  big: 5.0 GiB, installed"));
 });
-it("keeps the model prompt default as it was: the loaded model, else the engine's single recommendedModel", async () => {
+it("defaults to the first ranked pick, matching models recommend", async () => {
   serve({ ...base, recommendedModel: "small", recommended: [{ id: "big", basis: "proven_fast", tokensPerSecond: 45 }],
     models: [sized("big", 5, { installed: true }), sized("small", 1)] } as never);
-  const ask = vi.fn().mockResolvedValueOnce("").mockResolvedValueOnce("n");
+  const ask = vi.fn().mockResolvedValueOnce("").mockResolvedValueOnce("").mockResolvedValueOnce("n");
   await setupModel(parseArgs(["setup"]), { ask, progress: vi.fn() }, deps);
-  expect(ask.mock.calls[0][0]).toBe("Model ID [small], or skip: ");
+  expect(ask.mock.calls[1][0]).toBe("Model ID [big], or skip: ");
+});
+it("does not fall back to a failed legacy default when ranked picks are empty", async () => {
+  serve({ ...base, recommended: [], models: [{ ...model, checked: "failed" }] } as never);
+  await expect(setupModel(parseArgs(["setup", "--with-model"]), undefined, deps)).rejects.toThrow("No fitting model");
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(saveCliPrefs).not.toHaveBeenCalled();
+});
+it("honors an explicit choice over a different recommendation", async () => {
+  serve({ ...base, recommended: [{ id: "big", basis: "estimate" }], models: [sized("big", 5), model] } as never);
+  expect(await setupModel(parseArgs(["setup", "--model", "small"]), undefined, deps)).toMatchObject({ model: "small", status: "ready" });
+  expect(request.mock.calls.some(c => c[0].includes("/big/"))).toBe(false);
+});
+it("asks intended use before recommendations and uses that ranking as the model default", async () => {
+  serve({ ...base, useCase: "coding", recommended: [{ id: "small", basis: "estimate" }], models: [{ ...model, useCases: ["coding"] }] } as never);
+  const ask = vi.fn().mockResolvedValueOnce("1").mockResolvedValueOnce("").mockResolvedValueOnce("n");
+  const progress = vi.fn();
+  expect(await setupModel(parseArgs(["setup"]), { ask, progress }, deps)).toMatchObject({ status: "skipped", useCase: "coding" });
+  expect(ask.mock.calls.map(c => c[0])).toEqual(["Use [4], or skip: ", "Model ID [small], or skip: ", expect.stringContaining("Download")]);
+  expect(request).toHaveBeenCalledExactlyOnceWith("/models/setup-options?use=coding", { timeout: 30000 });
+  expect(progress.mock.calls.flat().join("")).toContain("catalog match for coding");
+  expect(saveCliPrefs).not.toHaveBeenCalled();
+});
+it.each(["", "skip", "4", "general"])("accepts %j as general use without extra requests", async answer => {
+  serve();
+  const ask = vi.fn().mockResolvedValueOnce(answer).mockResolvedValueOnce("skip");
+  expect(await setupModel(parseArgs(["setup"]), { ask, progress: vi.fn() }, deps)).toMatchObject({ status: "skipped" });
+  expect(request).toHaveBeenCalledExactlyOnceWith("/models/setup-options", { timeout: 30000 });
+});
+it("does not interpret an invalid purpose or EOF as consent to install", async () => {
+  serve(); const ask = vi.fn().mockResolvedValueOnce("anything").mockResolvedValueOnce(null);
+  await expect(setupModel(parseArgs(["setup"]), { ask, progress: vi.fn() }, deps)).rejects.toThrow("interrupted");
+  expect(request).not.toHaveBeenCalled(); expect(saveCliPrefs).not.toHaveBeenCalled();
+});
+it("uses --use without asking the purpose again", async () => {
+  serve({ ...base, useCase: "writing" } as never);
+  const ask = vi.fn().mockResolvedValueOnce("skip");
+  await setupModel(parseArgs(["setup", "--use", "writing"]), { ask, progress: vi.fn() }, deps);
+  expect(ask).toHaveBeenCalledExactlyOnceWith("Model ID [small], or skip: ");
+  expect(request).toHaveBeenCalledExactlyOnceWith("/models/setup-options?use=writing", { timeout: 30000 });
 });
 it("adds the picks to a finished setup's result and leaves the result alone for an engine without them", async () => {
   serve({ ...base, recommended: [{ id: "small", basis: "estimate", tokensPerSecond: null }] } as never);
@@ -123,7 +162,7 @@ it("adds the picks to a finished setup's result and leaves the result alone for 
   expect(await setupModel(parseArgs(["setup", "--model", "small", "--no-input"]), undefined, deps)).not.toHaveProperty("recommended");
 });
 it("prints no list and no new line for an engine without picks", async () => {
-  serve(); const said: string[] = [], ask = vi.fn().mockResolvedValueOnce("small").mockResolvedValueOnce("n");
+  serve(); const said: string[] = [], ask = vi.fn().mockResolvedValueOnce("").mockResolvedValueOnce("small").mockResolvedValueOnce("n");
   await setupModel(parseArgs(["setup"]), { ask, progress: m => { said.push(m); } }, deps);
   expect(said.join("")).not.toContain("Recommended");
 });
@@ -148,4 +187,9 @@ it("words each kind of pick, and names the measurement only where the fit came f
     "  nospeed (1.0 GiB, download): passed its answer check here, speed not measured yet; needs 1.0 GiB, measured here",
     "  new (3.0 GiB, download): not measured on this machine yet"]);
   expect(recommendedLines([], models)).toEqual([]);
+});
+
+it("requires explicit fit rather than truthy unknown hardware", () => {
+  const models = [sized("unknown", 1, { fits: "unknown" as unknown as boolean }), sized("failed", 1, { checked: "failed" })];
+  expect(parseRecommended(models.map(m => ({ id: m.id, basis: "estimate" })), models)).toEqual([]);
 });

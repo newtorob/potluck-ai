@@ -81,13 +81,15 @@ The first time you open Potluck it walks you through a short setup. It takes a c
 
 ![The Potluck welcome screen](images/getting-started/01-welcome.jpg)
 
-**Your hardware.** Potluck checks your machine and recommends a model tier that will run well on it. You do not have to understand any of it; the recommendation is the point.
+**Your hardware.** Potluck checks your CPU, GPU and available memory. These readings help determine which models can fit. Speed and answer quality still need a local check.
 
-![Hardware detection showing CPU, RAM, GPU, and a recommended tier](images/getting-started/02-hardware.jpg)
+**Choose your first model.** Choose general use, coding, writing or analysis. Potluck suggests up to three models using the same ranking as `potluck models recommend --use coding`. Local answer checks come first; untested models are ranked by estimated capacity and catalog task guidance. The first suggestion is selected, and you can choose another.
 
-**Choose your first model.** Pick one and click **Install model**. Each option shows its download size and whether it fits your machine (a green check means it fits, a red mark means it is too big). If you are not sure, take the recommended one. You can add more models later from the Models page.
+Each option shows its size and whether its fit is estimated or its answers were checked here. Measured speed and checked context are shown only when available. Task matches are catalog guidance, not coding-quality or tool-reliability scores. If no model qualifies, free memory or disk space and **Check again**, or **Skip, I'll pick later**.
 
-![The model picker with small, medium, and large options and fit indicators](images/getting-started/03-choose-model.jpg)
+Click **Download and load** to begin. An already installed model needs an explicit **Load model** click. Choosing a task or viewing suggestions does not download or load anything. You can add more models later from the Models page.
+
+![Model recommendations by intended use, with estimated fit and download size](images/getting-started/03-model-recommendations.png)
 
 The model downloads with a visible progress bar and is checked against a known hash before it loads. This is the one part that can take a few minutes, depending on your connection and the model size.
 

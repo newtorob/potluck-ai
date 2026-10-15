@@ -1,4 +1,5 @@
 /** Parse commands before touching config, starting a REPL, or making requests. */
+import { isModelUse, type ModelUse } from "./model-use.js";
 export class UsageError extends Error {}
 
 export type Command = "circle" | "usage" | "split" | "batch" | "sessions" | "run" | "contribute" | "launch" | "setup" | "status" | "doctor" | "logs" | "up" | "down" | "serve" | "service" | "models" | "gateway" | "login" | "logout" | "whoami" | "household" | "connect" | "disconnect" | "benchmark";
@@ -10,6 +11,7 @@ export interface CliArgs {
   noVerify: boolean;
   json: boolean;
   model?: string;
+  use?: ModelUse;
   scope?: string;
   /** Which trusted circle a circle-scoped run goes to: a name or an ID. */
   circle?: string;
@@ -150,6 +152,11 @@ export function parseArgs(argv: string[]): CliArgs {
     else if (flag === "--output") out.output = value();
     else if (flag === "--invite-file") out.inviteFile = value();
     else if (flag === "--model" || flag === "-m") out.model = value();
+    else if (flag === "--use") {
+      const v = value();
+      if (!isModelUse(v)) throw new UsageError("--use must be coding, writing, reasoning, or general.");
+      out.use = v;
+    }
     else if (flag === "--scope") out.scope = value();
     else if (flag === "--circle") out.circle = value();
     else if (flag === "--verify") out.verify = value();
@@ -224,10 +231,10 @@ export function parseArgs(argv: string[]): CliArgs {
       if (positional.length > 2 || !["install", "uninstall", "start", "stop", "restart", "status"].includes(out.action)) throw new UsageError("Use potluck service install|uninstall|start|stop|restart|status.");
     } else if (out.command === "models") {
       out.action = positional[1] || "list";
-      if (!["list", "available", "install", "load", "unload", "progress", "cancel", "autoload", "pin", "lock", "sync", "unpin", "test"].includes(out.action)) throw new UsageError("Unknown model action. Run potluck models --help.");
+      if (!["list", "available", "recommend", "install", "load", "unload", "progress", "cancel", "autoload", "pin", "lock", "sync", "unpin", "test"].includes(out.action)) throw new UsageError("Unknown model action. Run potluck models --help.");
       out.target = positional[2];
-      if (positional.length > 3 || (["list", "available", "lock", "sync", "unpin"].includes(out.action) && out.target)
-          || (!["list", "available", "autoload", "lock", "sync", "unpin", "test"].includes(out.action) && !out.target && !out.help)) throw new UsageError("Use potluck models <action> <model-id>.");
+      if (positional.length > 3 || (["list", "available", "recommend", "lock", "sync", "unpin"].includes(out.action) && out.target)
+          || (!["list", "available", "recommend", "autoload", "lock", "sync", "unpin", "test"].includes(out.action) && !out.target && !out.help)) throw new UsageError("Use potluck models <action> <model-id>.");
       if (out.action === "autoload" && out.target && !["on", "off"].includes(out.target)) throw new UsageError("Use potluck models autoload [on|off].");
       if (out.target && (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(out.target) || out.target.length > 200)) throw new UsageError("Use a model ID from potluck models list.");
     } else if (out.command === "gateway") {
@@ -247,6 +254,8 @@ export function parseArgs(argv: string[]): CliArgs {
     } else if (positional.length !== 1) throw new UsageError("Unexpected argument. Run potluck --help.");
   }
   if (out.command && (out.saveSession || out.resume)) throw new UsageError("--save-session and --resume apply to the coding agent, not management commands.");
+  if (out.use && !(out.command === "setup" && !out.preferences || out.command === "models" && out.action === "recommend")) throw new UsageError("--use requires setup or models recommend.");
+  if (out.use && out.command === "setup" && (out.noInput || out.json) && !out.withModel && !out.model) throw new UsageError("Add --with-model or --model when using setup --use without prompts.");
   if (out.saveSession && out.resume) throw new UsageError("--resume already saves the continued session.");
   if ((out.watch || out.interval !== undefined) && out.command !== "status" && out.command !== "usage" && !(out.command === "batch" && out.action === "status")) throw new UsageError("--watch and --interval require status, batch status, or usage.");
   if (out.interval !== undefined && !out.watch && out.command !== "usage") throw new UsageError("--interval requires --watch.");

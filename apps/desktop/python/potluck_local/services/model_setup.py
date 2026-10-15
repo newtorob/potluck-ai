@@ -13,12 +13,18 @@ that starts after the reading; `contextTokens` says what the figure was taken at
 `recommended` is at most three models, best first, one per model: the ones that
 passed the answer check here and ran at MIN_TOKENS_PER_SECOND or more (largest
 first), then the ones that passed but are slower or have no speed, then unproven
-models that fit by the estimate (the one running, then featured, then already
-installed, then smaller first: with no speed on record the likeliest to be usable
-leads). A model whose check failed here, or that does not fit, is never in it.
+models that fit by the estimate. Those favor the largest catalog tier within the
+GPU memory budget, or small models on CPU, then featured and installed models.
+This is a capacity heuristic, not a measured speed or quality claim. A model whose
+check failed here, or that does not fit, is never in it.
+
+Optional intended-use guidance ranks catalog matches within each proof class,
+and within the hardware tier for untested models. General use keeps the original
+ordering. The tags are editorial guidance, never task-quality benchmark scores.
 """
 import math
 import shutil
+from typing import Literal
 
 from potluck_local.services import memory_probe, model_evidence, model_registry
 from potluck_local.services.hardware_detect import detect_hardware
@@ -31,6 +37,7 @@ MIN_TOKENS_PER_SECOND = 15.0
 MARGIN_FLOOR_GIB = 0.5
 MARGIN_FRACTION = 0.10
 MAX_RECOMMENDED = 3
+ModelUse = Literal['general', 'coding', 'writing', 'reasoning']
 
 
 def _up(gib: float) -> float:
@@ -60,10 +67,42 @@ def _measured(evidence: "model_evidence.Evidence | None") -> dict | None:
 
 def _speed(evidence: "model_evidence.Evidence | None") -> float | None:
     speed = ((evidence.benchmark or {}).get('tokens_per_sec')) if evidence else None
-    return float(speed) if isinstance(speed, (int, float)) and not isinstance(speed, bool) and speed > 0 else None
+    return float(speed) if _positive(speed) else None
 
 
-def setup_options() -> dict:
+def _positive(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value > 0
+
+
+def _estimate_preference(entry: dict, hardware: dict) -> tuple[int, str | None]:
+    """Rank catalog tiers by usable capacity. Unknown imports keep a neutral rank.
+
+    Unified RAM is one pool, never RAM plus VRAM. Reserve a quarter of total
+    unified memory, or 1 GiB of dedicated VRAM, for runtime/context/other use.
+    Live available RAM is checked separately. These budgets do not measure free
+    VRAM or prove that acceleration will work; local answer checks still lead.
+    """
+    tier = {'small': 1, 'medium': 2, 'large': 3}.get(entry.get('tier'))
+    if tier is None:
+        return 0, None
+    unified = hardware.get('os') == 'Darwin' and hardware.get('arch') == 'arm64'
+    capacity = hardware.get('ram_total_gb') if unified else hardware.get('gpu_vram_gb')
+    if hardware.get('inference_gpu_available') is False:
+        capacity = None
+    elif hardware.get('os') == 'Linux':
+        capacity = hardware.get('inference_gpu_vram_gb') if hardware.get('inference_gpu_available') is True else None
+    budget = max(0, capacity * 0.75 if unified else capacity - 1) if _positive(capacity) else 0
+    need = entry.get('min_vram_gb')
+    if _positive(need) and need <= budget:
+        return -tier, f'Within the estimated GPU memory budget ({budget:g} GiB). Speed is untested.'
+    if tier == 1:
+        return 0, 'Smaller model for CPU execution; speed is untested.'
+    return tier, 'May need CPU execution or partial GPU offload; speed is untested.'
+
+
+def setup_options(use_case: ModelUse = 'general') -> dict:
+    if use_case not in ('general', 'coding', 'writing', 'reasoning'):
+        raise ValueError('Unknown model use case')
     hardware = detect_hardware()
     base = models_dir()
     base.mkdir(parents=True, exist_ok=True)
@@ -95,9 +134,10 @@ def setup_options() -> dict:
             freed = size / GIB * 1.2 if isinstance(size, (int, float)) and size > 0 else 0.0
     candidates = []
     speeds = {}
+    preferences = {}
     for entry in entries:
         size = entry.get('size_on_disk') if entry.get('installed') else entry.get('size_bytes')
-        if not isinstance(size, (int, float)) or size <= 0:
+        if not _positive(size):
             continue
         # Reserve working memory for context/runtime. This is an estimate, not a
         # promise that a model or GPU driver will work. The smoke request proves that.
@@ -107,8 +147,14 @@ def setup_options() -> dict:
         seen = evidence.get(entry['slug'])
         measured = _measured(seen)
         speeds[entry['slug']] = _speed(seen)
+        preference, recommendation_reason = _estimate_preference(entry, hardware)
+        preferences[entry['slug']] = preference
+        tags = entry.get('use_cases')
+        # Ordered editorial guidance, strongest fit first, not evaluation scores.
+        use_cases = list(dict.fromkeys(u for u in tags if isinstance(u, str) and u in ('coding', 'writing', 'reasoning'))) if isinstance(tags, list) else []
         reasons = []
-        if not loaded and (not isinstance(available, (int, float)) or not isinstance(total, (int, float))):
+        if not loaded and (not _positive(total) or not isinstance(available, (int, float))
+                           or isinstance(available, bool) or not math.isfinite(available) or available < 0):
             reasons.append('Available memory could not be measured.')
         elif not loaded:
             free_after = available + freed
@@ -135,17 +181,24 @@ def setup_options() -> dict:
                            'loaded': loaded, 'fits': not reasons, 'reasons': reasons,
                            'estimatedWorkingGiB': working, 'featured': bool(entry.get('is_featured')),
                            'fitBasis': 'measured' if measured is not None else 'estimate',
-                           'measured': measured, 'checked': seen.checked if seen else None})
+                           'measured': measured, 'checked': seen.checked if seen else None,
+                           'recommendationReason': recommendation_reason, 'useCases': use_cases})
     usable = [c for c in candidates if c['fits'] and c['checked'] != 'failed']
     suitable = sorted(usable, key=lambda c: (not c['loaded'], not c['installed'], not c['featured'], c['sizeBytes'], c['id']))
-    return {'schemaVersion': 1, 'hardware': {k: hardware.get(k) for k in (
-        'os', 'arch', 'cpu_name', 'cpu_cores_physical', 'ram_total_gb', 'ram_available_gb', 'gpu_name')},
+    public_hardware = {k: hardware.get(k) for k in (
+        'os', 'arch', 'cpu_name', 'cpu_cores_physical', 'ram_total_gb', 'ram_available_gb', 'gpu_name',
+        'gpu_vram_gb', 'inference_gpu_available', 'inference_gpu_vram_gb')}
+    for key in ('ram_total_gb', 'ram_available_gb', 'gpu_vram_gb', 'inference_gpu_vram_gb'):
+        value = public_hardware[key]
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+            public_hardware[key] = None
+    return {'schemaVersion': 1, 'hardware': public_hardware, 'useCase': use_case,
         'diskFreeBytes': disk, 'currentModel': current,
         'recommendedModel': suitable[0]['id'] if suitable else None,
-        'recommended': _recommended(usable, speeds), 'models': candidates}
+        'recommended': _recommended(usable, speeds, preferences, use_case), 'models': candidates}
 
 
-def _recommended(usable: list[dict], speeds: dict) -> list[dict]:
+def _recommended(usable: list[dict], speeds: dict, preferences: dict | None = None, use_case: ModelUse = 'general') -> list[dict]:
     """Up to three models, one each, strongest proof first (see the module notes)."""
     def tier(c: dict) -> int:
         speed = speeds.get(c['id'])
@@ -155,13 +208,16 @@ def _recommended(usable: list[dict], speeds: dict) -> list[dict]:
 
     def order(c: dict) -> tuple:
         speed, t = speeds.get(c['id']), tier(c)
+        # Catalog guidance breaks ties within evidence/resource classes. It is
+        # not a task benchmark and cannot promote a failed or nonfitting model.
+        uses = c.get('useCases', [])
+        task_rank = 0 if use_case == 'general' else uses.index(use_case) if use_case in uses else 3
         if t == 0:  # a bigger model that still runs well here is the better pick
-            return (0, -c['sizeBytes'], -speed, c['id'])
+            return (0, task_rank, -c['sizeBytes'], -speed, c['id'])
         if t == 1:  # passed but slow: the fastest of them; speed unknown after, smaller first
-            return (1, speed is None, -(speed or 0.0), c['sizeBytes'], c['id'])
-        # Unproven: nothing says how fast it is, so the likeliest to be usable comes first
-        # (running, then featured, then already here), and smaller before larger.
-        return (2, not c['loaded'], not c['featured'], not c['installed'], c['sizeBytes'], c['id'])
+            return (1, task_rank, speed is None, -(speed or 0.0), c['sizeBytes'], c['id'])
+        return (2, (preferences or {}).get(c['id'], 0), task_rank, not c['loaded'], not c['featured'],
+                not c['installed'], c['sizeBytes'], c['id'])
 
     basis = {0: 'proven_fast', 1: 'proven_slow', 2: 'estimate'}
     picks = []

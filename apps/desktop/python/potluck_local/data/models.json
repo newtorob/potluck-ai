@@ -22,7 +22,8 @@
       "supersedes": [
         "qwen-2.5-0.5b-instruct-q4",
         "qwen-2.5-1.5b-instruct-q4"
-      ]
+      ],
+      "use_cases": []
     },
     {
       "slug": "qwen3-4b-instruct-2507-q4",
@@ -43,6 +44,9 @@
       "released": "2025-08-20",
       "supersedes": [
         "qwen-2.5-3b-instruct-q4"
+      ],
+      "use_cases": [
+        "writing"
       ]
     },
     {
@@ -62,7 +66,10 @@
       "recommended_tier": "small",
       "family": "llama",
       "released": "2024-10-08",
-      "supersedes": []
+      "supersedes": [],
+      "use_cases": [
+        "writing"
+      ]
     },
     {
       "slug": "gemma-3-4b-it-q4",
@@ -83,6 +90,9 @@
       "released": "2025-03-22",
       "supersedes": [
         "gemma-2-2b-it-q4"
+      ],
+      "use_cases": [
+        "writing"
       ]
     },
     {
@@ -104,6 +114,9 @@
       "released": "2025-02-28",
       "supersedes": [
         "phi-3.5-mini-instruct-q4"
+      ],
+      "use_cases": [
+        "reasoning"
       ]
     },
     {
@@ -125,6 +138,11 @@
       "released": "2025-05-21",
       "supersedes": [
         "qwen-2.5-7b-instruct-q4"
+      ],
+      "use_cases": [
+        "coding",
+        "reasoning",
+        "writing"
       ]
     },
     {
@@ -144,7 +162,12 @@
       "recommended_tier": "medium",
       "family": "llama",
       "released": "2024-12-01",
-      "supersedes": []
+      "supersedes": [],
+      "use_cases": [
+        "coding",
+        "writing",
+        "reasoning"
+      ]
     },
     {
       "slug": "deepseek-r1-distill-llama-8b-q4",
@@ -163,7 +186,10 @@
       "recommended_tier": "medium",
       "family": "deepseek",
       "released": "2025-01-22",
-      "supersedes": []
+      "supersedes": [],
+      "use_cases": [
+        "reasoning"
+      ]
     },
     {
       "slug": "gemma-3-12b-it-q4",
@@ -182,7 +208,11 @@
       "recommended_tier": "medium",
       "family": "gemma",
       "released": "2025-03-22",
-      "supersedes": []
+      "supersedes": [],
+      "use_cases": [
+        "writing",
+        "reasoning"
+      ]
     },
     {
       "slug": "phi-4-q4",
@@ -201,7 +231,10 @@
       "recommended_tier": "medium",
       "family": "phi",
       "released": "2025-01-13",
-      "supersedes": []
+      "supersedes": [],
+      "use_cases": [
+        "reasoning"
+      ]
     },
     {
       "slug": "ministral-8b-instruct-2410-q4",
@@ -220,7 +253,10 @@
       "recommended_tier": "medium",
       "family": "mistral",
       "released": "2024-10-21",
-      "supersedes": []
+      "supersedes": [],
+      "use_cases": [
+        "writing"
+      ]
     },
     {
       "slug": "qwen3-32b-q4",
@@ -241,6 +277,11 @@
       "released": "2025-05-09",
       "supersedes": [
         "qwen-2.5-32b-instruct-q4"
+      ],
+      "use_cases": [
+        "reasoning",
+        "coding",
+        "writing"
       ]
     },
     {
@@ -260,7 +301,11 @@
       "recommended_tier": "large",
       "family": "deepseek",
       "released": "2025-01-22",
-      "supersedes": []
+      "supersedes": [],
+      "use_cases": [
+        "reasoning",
+        "coding"
+      ]
     },
     {
       "slug": "gemma-3-27b-it-q4",
@@ -279,7 +324,11 @@
       "recommended_tier": "large",
       "family": "gemma",
       "released": "2025-03-22",
-      "supersedes": []
+      "supersedes": [],
+      "use_cases": [
+        "writing",
+        "reasoning"
+      ]
     }
   ]
 }
