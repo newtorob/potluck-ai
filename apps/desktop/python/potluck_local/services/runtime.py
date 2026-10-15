@@ -1632,6 +1632,13 @@ class LLMRuntime:
         if not worker.cancelled():
             worker.exception()
 
+    async def _cancel_split_request(self, model, cancel_event):
+        # Keep model access until cancellation finishes, even if the caller is
+        # cancelled again while the native engine is acknowledging the stop.
+        cancel_event.set()
+        worker = asyncio.create_task(asyncio.to_thread(model.cancel, cancel_event))
+        await self._drain_worker(worker)
+
     @asynccontextmanager
     async def _stream_session(self):
         """First batched stream acquires exclusive access; the last releases it."""
@@ -1720,6 +1727,8 @@ class LLMRuntime:
         """
         async with self._stream_session() as batched:
             self.assert_model_identity(expected_model, expected_sha256)
+            cancel_event = threading.Event()
+            cancel_model = None
             sampling = dict(max_new=max_tokens, temperature=temperature,
                             top_k=top_k, top_p=top_p, seed=seed)
             if self._batcher is not None:
@@ -1730,14 +1739,23 @@ class LLMRuntime:
                 label = f"pipeline_stream model_id={self._model_id}"
             elif self._model is not None:
                 model = self._model
+                if getattr(model, "managed_split", False):
+                    cancel_model = model
                 label = f"stream model_id={self._model_id}"
 
                 def produce():
-                    for chunk in model.create_chat_completion(
+                    chunks = model.create_chat_completion(
                         messages=messages, temperature=temperature, max_tokens=max_tokens,
                         stop=stop or [], stream=True, **tool_calls.completion_kwargs(tools, tool_choice),
-                    ):
-                        yield chunk["choices"][0].get("delta", {}).get("content")
+                        **({"cancel_event": cancel_event} if cancel_model is not None else {}),
+                    )
+                    try:
+                        for chunk in chunks:
+                            yield chunk["choices"][0].get("delta", {}).get("content")
+                    finally:
+                        close = getattr(chunks, "close", None)
+                        if close is not None:
+                            close()
             else:
                 yield 'data: {"error":"No model loaded"}\n\n'
                 yield "data: [DONE]\n\n"
@@ -1747,11 +1765,14 @@ class LLMRuntime:
             # on disconnect. An async-for alone leaves cleanup to finalization.
             async with aclosing(self._stream_sse_from_blocking(
                 produce, label=label, drain_on_cancel=batched,
+                cancel_event=cancel_event, cancel_model=cancel_model,
             )) as stream:
                 async for chunk in stream:
                     yield chunk
 
-    async def _stream_sse_from_blocking(self, produce, *, label, drain_on_cancel=False):
+    async def _stream_sse_from_blocking(
+        self, produce, *, label, drain_on_cancel=False, cancel_event=None, cancel_model=None,
+    ):
         """Pump a blocking iterator into SSE; caller must hold _stream_session.
 
         Batchers own their decode loop and currently have no per-row cancel API.
@@ -1760,11 +1781,14 @@ class LLMRuntime:
         """
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue = asyncio.Queue()
-        cancel_event = threading.Event()
+        if cancel_event is None:
+            cancel_event = threading.Event()
 
         def _generate() -> None:
+            chunks = None
             try:
-                for piece in produce():
+                chunks = produce()
+                for piece in chunks:
                     if cancel_event.is_set():
                         if drain_on_cancel:
                             continue
@@ -1774,9 +1798,14 @@ class LLMRuntime:
                 loop.call_soon_threadsafe(queue.put_nowait, None)
             except Exception as exc:
                 failure = inference_errors.describe_failure(exc, gpu_offload=self._gpu_offload_active())
-                logger.error("%s error=%s category=%s", label, type(exc).__name__, failure.category)
+                if not cancel_event.is_set():
+                    logger.error("%s error=%s category=%s", label, type(exc).__name__, failure.category)
                 loop.call_soon_threadsafe(queue.put_nowait, failure)
                 loop.call_soon_threadsafe(queue.put_nowait, None)
+            finally:
+                close = getattr(chunks, "close", None)
+                if close is not None:
+                    close()
 
         fut = loop.run_in_executor(None, _generate)
         token_count = 0
@@ -1801,8 +1830,8 @@ class LLMRuntime:
             logger.info("%s cancelled tokens_so_far=%d", label, token_count)
         finally:
             cancel_event.set()
-            if getattr(self._model, "managed_split", False) and not completed:
-                await asyncio.to_thread(self._model.cancel)
+            if cancel_model is not None and not completed:
+                await self._cancel_split_request(cancel_model, cancel_event)
             await self._drain_worker(fut)
             logger.info("%s complete tokens=%d duration=%.3fs",
                         label, token_count, round(time.monotonic() - start, 3))
@@ -1834,6 +1863,8 @@ class LLMRuntime:
             model = self._model
             model_id = self._model_id
             start = time.monotonic()
+            managed_split = getattr(model, "managed_split", False)
+            cancel_event = threading.Event()
 
             fut = loop.run_in_executor(
                 None,
@@ -1844,13 +1875,14 @@ class LLMRuntime:
                     stream=False,
                     **({"stop": stop} if stop else {}),
                     **tool_calls.completion_kwargs(tools, tool_choice),
+                    **({"cancel_event": cancel_event} if managed_split else {}),
                 ),
             )
             try:
-                result = await (asyncio.shield(fut) if getattr(model, "managed_split", False) else fut)
+                result = await asyncio.shield(fut)
             except asyncio.CancelledError:
-                if getattr(model, "managed_split", False):
-                    await asyncio.to_thread(model.cancel)
+                if managed_split:
+                    await self._cancel_split_request(model, cancel_event)
                 raise
             except Exception as exc:
                 failure = inference_errors.describe_failure(exc, gpu_offload=self._gpu_offload_active())
@@ -1863,13 +1895,9 @@ class LLMRuntime:
             finally:
                 # A cancelled request must not free the inference lock while the
                 # worker thread is still inside create_chat_completion (the model
-                # is not thread-safe). Wait for the thread to finish first. This
-                # is a blocking call with no early-stop hook, so we drain fully.
-                if not fut.done():
-                    try:
-                        await asyncio.shield(fut)
-                    except Exception:
-                        pass
+                # is not thread-safe). Ordinary local models have no early-stop
+                # hook and drain fully.
+                await self._drain_worker(fut)
 
             elapsed = round(time.monotonic() - start, 3)
             usage = result.get("usage", {})
@@ -1920,25 +1948,29 @@ class LLMRuntime:
             cancel_event = threading.Event()
 
             def _generate() -> None:
+                chunks = None
                 try:
-                    for chunk in model.create_chat_completion(
+                    chunks = model.create_chat_completion(
                         messages=messages,
                         temperature=temperature,
                         max_tokens=max_tokens,
                         stop=stop or [],
                         stream=True,
                         **tool_calls.completion_kwargs(tools, tool_choice),
-                    ):
+                        **({"cancel_event": cancel_event} if getattr(model, "managed_split", False) else {}),
+                    )
+                    for chunk in chunks:
                         if cancel_event.is_set():
                             break
                         loop.call_soon_threadsafe(queue.put_nowait, chunk)
                     loop.call_soon_threadsafe(queue.put_nowait, None)
                 except Exception as exc:
                     failure = inference_errors.describe_failure(exc, gpu_offload=self._gpu_offload_active())
-                    logger.error(
-                        "gateway_stream_error model_id=%s error=%s category=%s",
-                        model_id, type(exc).__name__, failure.category,
-                    )
+                    if not cancel_event.is_set():
+                        logger.error(
+                            "gateway_stream_error model_id=%s error=%s category=%s",
+                            model_id, type(exc).__name__, failure.category,
+                        )
                     # "__error__" is the text for this machine's own user. A route
                     # that serves another machine must use "__category__" instead.
                     loop.call_soon_threadsafe(
@@ -1946,6 +1978,10 @@ class LLMRuntime:
                         {"__error__": failure.message, "__category__": failure.category},
                     )
                     loop.call_soon_threadsafe(queue.put_nowait, None)
+                finally:
+                    close = getattr(chunks, "close", None)
+                    if close is not None:
+                        close()
 
             fut = loop.run_in_executor(None, _generate)
 
@@ -1968,11 +2004,8 @@ class LLMRuntime:
                 # non-thread-safe model while the next request acquires the lock.
                 cancel_event.set()
                 if getattr(model, "managed_split", False) and not completed:
-                    await asyncio.to_thread(model.cancel)
-                try:
-                    await asyncio.shield(fut)
-                except Exception:
-                    pass
+                    await self._cancel_split_request(model, cancel_event)
+                await self._drain_worker(fut)
                 logger.info(
                     "gateway_stream_complete model_id=%s chunks=%d duration=%.3fs",
                     model_id, chunk_count, round(time.monotonic() - start, 3),

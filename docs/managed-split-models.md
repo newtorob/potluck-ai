@@ -103,11 +103,17 @@ repository-edit evaluation suite uses `--context 8192`.
 potluck split stop
 ```
 
+Cancelling a request interrupts that request and discards its remaining output.
+The split stays loaded for the next request when the engine confirms it is idle;
+the selected model and workers remain unchanged. Cancellation waits up to three
+seconds for that confirmation before forcing the engine to stop. A very early
+cancellation may also stop the split if the engine has not yet confirmed that it
+accepted the request. In either case, explicitly start the split again. Partial
+output is never resumed or replayed.
+
 `stop` releases all workers. It leaves their saved opt-in unchanged. Restarting
-the runtime does not automatically recreate a split. Cancelling an active
-request stops this version's split engine; start it again before another
-request. Worker loss fails the current request and ends the split. Restore the
-worker and explicitly start again; partial output is not resumed or replayed.
+the runtime does not automatically recreate a split. Worker loss fails the
+current request and ends the split. Restore the worker and explicitly start again.
 
 ## Build and validate
 

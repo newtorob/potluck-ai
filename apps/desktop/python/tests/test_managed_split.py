@@ -167,9 +167,9 @@ def test_native_stream_requires_finish_and_done(monkeypatch, finish, done, valid
         assert model.failure and model.closed
 
 
-def test_explicit_cancel_is_not_relabelled_as_engine_failure():
+def test_explicit_close_is_not_relabelled_as_engine_failure():
     model = sn.SplitModel(Process(), 12345, "secret", lambda: None)
-    model.cancel()
+    model.close()
     model.failed("Socket closed after cancellation")
     assert model.closed and model.failure is None
 
@@ -269,7 +269,7 @@ def test_expired_lease_retry_gets_fresh_process_and_token(isolated):
     asyncio.run(run())
 
 
-def test_completed_split_stays_loaded_but_cancel_stops_native_worker():
+def test_completed_and_cancelled_requests_keep_split_loaded():
     class Model:
         managed_split = True
         closed = False
@@ -280,11 +280,12 @@ def test_completed_split_stays_loaded_but_cancel_stops_native_worker():
             if self.block:
                 self.released.wait(3)
             yield {"choices": [{"delta": {}, "finish_reason": "stop"}]}
-        def cancel(self):
-            self.closed = True
+        def cancel(self, cancel_event):
+            assert cancel_event.is_set()
             self.released.set()
         def close(self):
-            self.cancel()
+            self.closed = True
+            self.released.set()
     async def run():
         runtime = LLMRuntime()
         model = Model()
@@ -298,8 +299,10 @@ def test_completed_split_stays_loaded_but_cancel_stops_native_worker():
         stream = runtime.stream_chat_raw([{"role": "user", "content": "x"}])
         assert (await anext(stream))["choices"][0]["delta"]["content"] == "hello"
         await asyncio.wait_for(stream.aclose(), 2)
-        assert model.closed and not runtime.is_loaded()
+        assert not model.closed and runtime.is_loaded()
         assert not runtime._inference_lock.locked()
+        chunks = [c async for c in runtime.stream_chat_raw([{"role": "user", "content": "next"}])]
+        assert chunks[-1]["choices"][0]["finish_reason"] == "stop"
     asyncio.run(run())
 
 
