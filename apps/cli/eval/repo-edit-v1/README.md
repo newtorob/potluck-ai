@@ -1,17 +1,18 @@
 # Repository edit evaluation v1
 
-Three small, synthetic, two-file Python repairs exercise the **real CLI agent
-core**, filesystem tools, pinned gateway requests, and automatic verify loop:
+Three frozen, synthetic, two-file Python repairs exercise the **real CLI agent
+core**, filesystem tools, pinned gateway requests, and automatic verification:
 
 - Booking: half-open interval semantics and a caller accepting iterators.
 - Retry: exhaustion, backoff, Retry-After, and HTTP status eligibility.
 - Contacts: quoted CSV and normalized deduplication with stable ordering.
 
-The runner imports the built `runTask`; it does not exercise the terminal UI,
-argument parser, or interactive approval prompts. It grants edits only to the
-two designated source files. Shell tools are denied. The model sees the task,
-repository map, original sources, visible tests, and actual verification results.
-Reference implementations and additional oracle tests stay outside its workspace.
+The runner imports built `runTask`; it does not exercise terminal UI, argument
+parsing, interactive approvals, or automatic `AGENTS.md` loading. These fixtures
+have no project instruction files. Edits are allowed only to the two designated
+source files; shell tools are denied. Reference implementations and independent
+tests stay outside the agent workspace. Independent results are never sent to
+the model or used to choose a retry or candidate.
 
 ## Run
 
@@ -22,45 +23,114 @@ npm run build
 node scripts/eval-repo-edits.mjs --self-test --out /tmp/potluck-eval-checks
 node scripts/eval-repo-edits.mjs \
   --lock /path/to/pinned-project/potluck.lock \
-  --out /path/to/private-results
+  --environment /path/to/environment.json \
+  --trials 3 --out /path/to/private-results
 ```
 
 Use `POTLUCK_DATA_DIR` and `POTLUCK_GATEWAY_URL` for a separate test runtime.
-The gateway must be on loopback and enabled. The supplied project lock must
-match its loaded model. Configure the runtime with **8,192 context tokens**;
-for a managed split, pass `--context 8192` to `split start`. Runtime provisioning,
-context verification, and cleanup are the operator's responsibility; the runner
-does not change services or download models. Record runtime versions, placement,
-network transport, load time, and hardware alongside its report.
+The gateway must be enabled and on loopback. The supplied lock must match its
+loaded model. Configure **8,192 loaded context tokens**; for a managed split,
+pass `--context 8192` to `split start`. Before each trial, the runner asks the
+local gateway to check the exact artifact pin and report its loaded context.
+Unknown or mismatched context stops the run. This is a snapshot, not a runtime
+reservation; later reloads can still make a request fail. Inference itself
+continues to enforce the exact model pin and local scope.
 
-`--case booking|retry|contacts` selects one fixture for diagnosis. Compare both
-models with identical fixtures and limits, and disclose any excluded attempts.
+Runtime provisioning and cleanup remain the operator's responsibility. The
+runner does not change services, download models or broaden routing. A transport
+or execution error stops further inference in case a managed split was affected.
+Remaining planned trials are retained as `not_run` with the reason.
+
+`--case booking|retry|contacts` selects one fixture. `--trials` accepts 1–20;
+the default is three repetitions per case, interleaved by case, with a fresh
+workspace and conversation each time. Self-test defaults to one repetition and
+uses reference repairs without inference. There is no selection of the best
+repetition: all planned attempts remain in the denominator.
+
+## Reproducible conditions
+
+Supply an environment JSON with the actual conditions, for example:
+
+```json
+{
+  "schemaVersion": 1,
+  "runtimeVersion": "exact Potluck runtime version or revision",
+  "backend": { "name": "llama.cpp", "version": "exact wrapper and native build revisions" },
+  "hardware": ["CPU model and RAM; GPU model and VRAM for each participating machine"],
+  "placement": "single machine, or exact layer placement for a split",
+  "transport": "none, or link type and conditions for a split"
+}
+```
+
+These backend/version/hardware/placement fields are **operator-reported**, not
+independently verified by the evaluator. The report labels their provenance.
+Host OS, CPU model, RAM and Node version are collected locally; they describe
+the runner's host, which may differ from other machines in a managed split.
+Python, bubblewrap and prlimit versions are also recorded from the checker host.
+Loaded context and model-pin admission are gateway evidence at trial start.
+The report includes the complete model lock, fixture hashes, runner hashes,
+compiled CLI JavaScript hashes, Git revision and whether relevant source/script
+files were dirty. Compiled hashes identify the code actually imported even in a
+dirty checkout. No credentials are included in environment fields.
+
+Task, project, reference, oracle and manifest bytes contribute to the fixture
+fingerprint; README prose does not. Compare runs only with identical frozen
+fixture bytes, harness version, model artifact, and disclosed conditions.
+Harness/report version **2** changes grading and context handling; do not pool
+its scores with older runner results without rerunning both candidates.
 
 ## Bounds and grading
 
-Each trial gets a fresh repository, at most 16 agent turns, a 15-minute wall
-deadline, a 16,000-character history budget, temperature 0.2, and a 4,096-token
-output cap per turn. Character budgeting is approximate; context errors are
-failures rather than a reason to silently change model, context, or scope.
+Each trial allows at most 16 agent turns, four consecutive failed automatic
+checks, a 15-minute agent wall deadline and a 16,000-character upper bound.
+The agent additionally budgets against the confirmed loaded window, reserving
+output and template space with a conservative UTF-8 estimate. At 8,192 context
+tokens the effective output allowance is **2,048**, recorded in policy; it is
+not the old runner's hardcoded 4,096. Temperature is 0.2.
 
-Verification uses Python's standard library in a fresh bubblewrap namespace:
-no network, no home directory or credentials, read-only fixture and interpreter
-mounts, 10 seconds CPU, 15 seconds wall, 768 MiB address space, and bounded output.
-There is **no unsandboxed fallback**. The fixed visible test command runs after
-successful edits; independent oracle checks run only after the agent finishes.
+Checks use Python's standard library in a fresh bubblewrap namespace: no
+network, home or credentials; read-only fixture and interpreter mounts;
+10 seconds CPU, 15 seconds wall, 768 MiB address space and bounded output.
+There is **no unsandboxed runner fallback**. The visible checks run after edits.
+Independent checks run only after the agent ends, including after a caught
+agent error. A successful process exit alone does not pass: a completion record
+must confirm tests executed with no failures, errors or skipped tests. This
+rejects accidental early `sys.exit(0)` or `os._exit(0)` during imports.
 
-A pass requires changed source files, unchanged visible tests, a successful
-automatic verify, passing visible and oracle checks, and no stream error,
-deadline, or loop-limit notice. Final prose never counts as success. Self-test
-proves that the original code fails assertions and reference repairs pass both
-sets of checks. These reference repairs are never supplied to the model.
+A pass requires the agent's explicit `finished` outcome, successful automatic
+verification, passing final visible and independent checks, both required source
+files changed and nonempty, and no changes to protected files or added files.
+Informational notices such as context compaction do not make a correct result
+fail. Incomplete outcomes, transport errors, deadlines and destructive changes
+remain failures; final prose never establishes correctness.
 
-Reports contain fixture hashes, exact model identity, policy, timing, tool and
-verify events, conversation history, and final check output. They contain
-synthetic code but may include local paths; keep raw reports private by default.
+Each report records verification attempts/retries, failed checks, tool failures,
+denied actions, first token, and first visible verification success. The
+**time to verified result** begins at agent start and includes final visible and
+independent grading. Failures and unrun trials have `null`, not a fabricated time.
+Self-tests also have `null` model timings. Full trial duration separately includes
+workspace preparation and baseline checks. Results retain edited workspaces,
+history and check output; `events.jsonl` is appended during execution so an
+interrupted process leaves its tool/verification evidence. A running record in
+an interrupted report is incomplete, never a pass.
 
-This is a small acceptance suite, not evidence of a general coding-quality
-advantage. One trial per case does not measure variance. Different model sizes,
-quantizations, backends, and placement confound model-size-only comparisons.
-Freeze fixtures before comparing models; revise the version when changing the
-tasks or grading policy after observing model behavior.
+## Fixture and harness validation
+
+`pnpm exec vitest run test/eval-harness.test.ts` runs offline grading/metadata
+regressions and checks all five frozen baseline/reference pairs with `python3`.
+It executes only repository-owned fixture/reference code, never model-generated
+repairs. This development check can run on macOS and is **not** the Linux
+bubblewrap self-test or evidence that Linux sandbox execution works there.
+
+Both validation paths require original code to fail assertions, and references
+to pass visible and independent checks. The oracles are isolated from agent
+tools and feedback, but are not a secure grading system against deliberately
+hostile Python that tampers with unittest internals.
+
+These small synthetic cases do not establish a general coding-quality advantage.
+Repetitions expose some variance; they do not make the tasks representative.
+The fixtures are public and may be familiar to a model. Changing model sizes,
+quantization, backend or placement introduces confounds. Freeze tasks and grading
+before comparing candidates; version changes after seeing results. Keep raw
+reports private by default: synthetic traces may include local paths. A published
+benchmark claim still needs its raw run in `bench/results/` and full conditions.
