@@ -50,6 +50,10 @@ it("the installed agent selects the project pin ahead of global and shared model
   await writeFile(join(dir, "config.json"), JSON.stringify({ runtime: { active_model_id: "shared-model" }, gateway: { enabled: true } }));
   const calls: Record<string, unknown>[] = [];
   const server = createServer(async (req, res) => {
+    if (req.url?.startsWith("/v1/potluck/context?")) {
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ model: "pinned-model", scope: "local", context_window: 8192 })); return;
+    }
     if (req.url?.endsWith("/potluck/capabilities")) {
       res.setHeader("Content-Type", "application/json"); res.end(JSON.stringify({ model_lock_version: 1 })); return;
     }
@@ -79,6 +83,10 @@ it.each(["repeated failure", "repeated read", "step limit", "failed verify", "re
     await writeFile(join(dir, "f.txt"), "original");
     let requests = 0;
     const server = createServer(async (req, res) => {
+      if (req.url?.startsWith("/v1/potluck/context?")) {
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ model: "test-model", scope: "local", context_window: 8192 })); return;
+      }
       for await (const _ of req) { /* consume */ }
       requests++;
       const action = (tool: string, args: Record<string, unknown>) =>

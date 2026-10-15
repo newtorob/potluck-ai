@@ -42,7 +42,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -455,6 +455,34 @@ async def plan_chat(job: ChatJob, x_potluck_scope: str | None, x_potluck_circle:
         coordinator_scope=coordinator_scope, circle_id=circle_id, served_model=served_model,
         served_by=served_by, options=options, max_tokens=job.max_tokens or DEFAULT_MAX_TOKENS,
     )
+
+
+@router.get("/potluck/context")
+async def model_context(
+    model: str = Query(min_length=1, max_length=200),
+    scope: Literal["local", "mine"] = "local",
+    potluck_model_sha256: str | None = Query(default=None, pattern=r"^[a-f0-9]{64}$"),
+) -> dict:
+    """Report the loaded window on the same owned-machine route a chat would use.
+
+    This sends no prompt and does not run inference. The window is a snapshot:
+    a reload or household failover can change it before a subsequent request.
+    """
+    prepared = gateway_request.prepare([], None, None)
+    plan = await plan_chat(ChatJob(prepared, model, DEFAULT_TEMPERATURE, 1, False,
+                                   digest=potluck_model_sha256), scope, None)
+    if plan.peer is not None:
+        detail = (plan.peer.get("_capabilities") or {}).get("loaded_model_detail") or {}
+        window = detail.get("context_size") if isinstance(detail, dict) else None
+    else:
+        loaded_window = getattr(plan.runtime, "loaded_n_ctx", None)
+        window = loaded_window() if callable(loaded_window) else None
+    # Older engines may not advertise a loaded window. Do not replace unknown
+    # evidence with a catalog maximum or expose a household machine's identity.
+    if type(window) is not int or window <= 0:
+        window = None
+    return {"model": plan.served_model, "scope": scope, "context_window": window,
+            "source": plan.served_by}
 
 
 def shaped_chunks(plan: ChatPlan):

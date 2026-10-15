@@ -48,6 +48,10 @@ it("rejects unsafe files and keeps the previous save if a transcript exceeds its
 it("the installed coding agent saves and resumes history without replaying old actions", async () => {
   const requests: any[] = [];
   const server = createServer(async (req, res) => {
+    if (req.url?.startsWith("/v1/potluck/context?")) {
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ model: lock.model.id, scope: "local", context_window: 8192 })); return;
+    }
     if (req.url?.endsWith("capabilities")) { res.end('{"model_lock_version":1}'); return; }
     let text = ""; for await (const chunk of req) text += chunk;
     requests.push(JSON.parse(text));

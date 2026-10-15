@@ -2,15 +2,17 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   formatVerifyResult,
   parseAction,
   runTask,
   shouldVerify,
+  systemPrompt,
   trimHistory,
 } from "../src/agent.js";
+import { ContextBudgetError, estimateContextTokens } from "../src/context.js";
 import type { GatewayConfig } from "../src/config.js";
 import type { ChatMessage } from "../src/gateway.js";
 
@@ -40,6 +42,12 @@ function action(tool: string, args: Record<string, unknown>): string {
 const CFG: GatewayConfig = { baseURL: "x", apiKey: "k", enabled: true };
 
 describe("parseAction", () => {
+  it("accepts positive line ranges and rejects invalid read_file offsets/limits", () => {
+    expect(parseAction(action("read_file", { path: "a.ts", offset: 201, limit: 50 })).kind).toBe("action");
+    for (const args of [{ offset: 0 }, { offset: -1 }, { limit: 1.5 }, { limit: "50" }]) {
+      expect(parseAction(action("read_file", { path: "a.ts", ...args })).kind).toBe("error");
+    }
+  });
   it("extracts the first action block and parses its JSON", () => {
     const text = [
       "Let me read that file first.",
@@ -221,20 +229,19 @@ describe("trimHistory", () => {
       { role: "assistant", content: big },
       { role: "user", content: "recent" },
     ];
-    const trimmed = trimHistory(h, 60); // system + recent fit; the two big turns drop
+    const trimmed = trimHistory(h, 180); // system + marker + recent answer/task fit
     expect(trimmed[0].content).toBe("SYS");
     expect(trimmed[1].content).toMatch(/trimmed to fit/);
     expect(trimmed[trimmed.length - 1].content).toBe("recent");
-    expect(trimmed.length).toBeLessThan(h.length);
+    expect(trimmed).not.toContain(h[1]);
   });
 
-  it("always keeps at least the most recent message", () => {
+  it("refuses a task that cannot fit instead of silently exceeding the budget", () => {
     const h: ChatMessage[] = [
       { role: "system", content: "S" },
       { role: "user", content: "y".repeat(500) },
     ];
-    const trimmed = trimHistory(h, 10);
-    expect(trimmed[trimmed.length - 1].content).toBe("y".repeat(500));
+    expect(() => trimHistory(h, 10)).toThrow(ContextBudgetError);
   });
 
   it("pins the task so the goal survives even when it is the oldest user turn", () => {
@@ -246,9 +253,10 @@ describe("trimHistory", () => {
       { role: "assistant", content: "c".repeat(200) },
       { role: "user", content: "TOOL_RESULT: latest" },
     ];
-    const trimmed = trimHistory(h, 80);
+    const trimmed = trimHistory(h, 300);
     expect(trimmed.some((m) => m.content.includes("THE TASK"))).toBe(true);
     expect(trimmed[trimmed.length - 1].content).toContain("latest");
+    expect(trimmed).toContain(h[4]);
     expect(trimmed.some((m) => /trimmed to fit/.test(m.content))).toBe(true);
   });
 });
@@ -577,5 +585,118 @@ describe("runTask repeat-detection", () => {
     expect(results.length).toBe(3);
     expect(notice).toMatch(/failed identically/i);
     expect(results.every((r) => r.startsWith("error:"))).toBe(true);
+  });
+});
+
+describe("runTask context safety", () => {
+  const dirs: string[] = [];
+  const callbacks = {
+    onToken: () => {}, onTurnEnd: () => {}, onAction: () => {}, onToolResult: () => {},
+  };
+  beforeEach(() => streamChatMock.mockReset());
+  afterEach(async () => {
+    streamChatMock.mockReset();
+    await Promise.all(dirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })));
+  });
+  async function tmp(): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), "potluck-cli-context-"));
+    dirs.push(dir);
+    return dir;
+  }
+
+  it("refuses oversized pinned instructions before streaming or running a tool", async () => {
+    const notice = vi.fn();
+    scriptTurns([action("write_file", { path: "new.ts", content: "unexpected" })]);
+    const result = await runTask([{ role: "system", content: "x".repeat(8192) }], "fix this", {
+      cfg: CFG, model: "m", cwd: await tmp(), confirm: async () => true,
+      contextWindowTokens: 8192, callbacks: { ...callbacks, onNotice: notice },
+    });
+    expect(result).toEqual({ status: "incomplete", reason: "context_limit" });
+    expect(streamChatMock).not.toHaveBeenCalled();
+    expect(notice).toHaveBeenCalledWith(expect.stringContaining("larger context window"));
+  });
+
+  it("keeps the exact current task when its text starts with the tool-feedback prefix", async () => {
+    const task = "TOOL_RESULT: This is quoted output. Explain what it means.";
+    const history: ChatMessage[] = [
+      { role: "system", content: "system" },
+      { role: "user", content: "old task".repeat(2000) },
+      { role: "assistant", content: "old answer" },
+    ];
+    streamChatMock.mockImplementation((_cfg, messages: ChatMessage[]) => {
+      expect(messages.at(-1)).toEqual({ role: "user", content: task });
+      expect(messages).not.toContain(history[1]);
+      return (async function* () { yield "Explanation."; })();
+    });
+    expect(await runTask(history, task, {
+      cfg: CFG, model: "m", cwd: await tmp(), confirm: async () => true,
+      contextWindowTokens: 4096, callbacks,
+    })).toEqual({ status: "finished" });
+    expect(streamChatMock).toHaveBeenCalledOnce();
+  });
+
+  it("does not let a context-truncated full read authorize whole-file replacement", async () => {
+    const dir = await tmp();
+    const original = "export const original = 1;\n".repeat(80);
+    await writeFile(join(dir, "large.ts"), original);
+    scriptTurns([
+      action("read_file", { path: "large.ts" }),
+      action("write_file", { path: "large.ts", content: "unrelated functions lost\n" }),
+      "I cannot replace a partial view.",
+    ]);
+    const confirm = vi.fn(async () => true);
+    const results: string[] = [];
+    const history: ChatMessage[] = [{ role: "system", content: "s" }];
+    await runTask(history, "fix this", {
+      cfg: CFG, model: "m", cwd: dir, confirm, charBudget: 700,
+      contextWindowTokens: 8192,
+      callbacks: { ...callbacks, onToolResult: result => results.push(result) },
+    });
+    expect(streamChatMock.mock.calls[1][1].at(-1).content).toContain("Tool output truncated");
+    expect(results[1]).toContain("without reading it first");
+    expect(confirm).not.toHaveBeenCalled();
+    expect(await readFile(join(dir, "large.ts"), "utf8")).toBe(original);
+    expect(history[3].content).toContain(original);
+  });
+
+  it("allows a fresh small full read after earlier context has been compacted", async () => {
+    const dir = await tmp();
+    await writeFile(join(dir, "large.ts"), "export const original = 1;\n".repeat(80));
+    await writeFile(join(dir, "small.ts"), "const a = 1;\n");
+    scriptTurns([
+      action("read_file", { path: "large.ts" }),
+      action("read_file", { path: "small.ts" }),
+      action("write_file", { path: "small.ts", content: "const a = 2;\n" }),
+      "done",
+    ]);
+    const confirm = vi.fn(async () => true);
+    await runTask([{ role: "system", content: "s" }], "fix this", {
+      cfg: CFG, model: "m", cwd: dir, confirm, charBudget: 700,
+      contextWindowTokens: 8192, callbacks,
+    });
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(await readFile(join(dir, "small.ts"), "utf8")).toBe("const a = 2;\n");
+  });
+
+  it("retains failed-verification enforcement after large Unicode feedback is excerpted", async () => {
+    const dir = await tmp();
+    const requests: { messages: ChatMessage[]; options: { maxTokens: number; requireDone: boolean } }[] = [];
+    streamChatMock.mockImplementation((_cfg, messages, options) => {
+      requests.push({ messages: structuredClone(messages), options });
+      const response = requests.length === 1
+        ? action("write_file", { path: "new.ts", content: "incorrect\n" }) : "Everything passed.";
+      return (async function* () { yield response; })();
+    });
+    const result = await runTask([{ role: "system", content: systemPrompt(dir, "npm test") }], "Fix the bug", {
+      cfg: CFG, model: "m", cwd: dir, confirm: async () => true,
+      contextWindowTokens: 8192, verifyCommand: "npm test",
+      runVerify: async () => ({ code: 1, output: "错误🧑🏽‍💻".repeat(4000) }), callbacks,
+    });
+    expect(result).toEqual({ status: "incomplete", reason: "verification_failed" });
+    expect(streamChatMock.mock.calls.length).toBeGreaterThan(1);
+    for (const { messages, options } of requests) {
+      expect(estimateContextTokens(messages) + options.maxTokens).toBeLessThanOrEqual(8192);
+      expect(options).toMatchObject({ maxTokens: 2048, requireDone: true });
+    }
   });
 });

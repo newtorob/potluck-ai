@@ -103,9 +103,9 @@ That is it. You now have private, local AI running on your machine.
 
 ## 3. Use it
 
-Open a new chat and type. The response is generated on your own machine by the model you installed. Nothing leaves your device.
+Open a new chat and type. With **Local only** selected, Chat uses the model loaded in this machine's runtime without routing requests to a circle or the contributor network. A model configured for Big Model Mode can still use its configured remote compute. Other app activities, such as signing in, checking for updates and downloading models, may also use the internet.
 
-At the top of the chat there is a **routing selector** that decides where a request runs. It starts on **Local**, which means "this machine only." The other options come into play once you connect machines, and they are covered next. The rule never changes: **you pick the scope per request, and Potluck respects it.**
+At the top of the chat there is a **routing selector** that decides where a request runs. A new installation defaults to **Local**, which uses this machine's loaded model. The app remembers your choice, so check the scope before sending each message. The other options come into play once you connect machines, and they are covered next.
 
 ![The chat routing selector, open, showing Local only, My machines, Trusted circle, and Cooperative network](images/getting-started/06-chat-scopes.png)
 
@@ -145,20 +145,22 @@ A **trusted circle** is a named group of people you have explicitly allowed, lik
 3. In a chat, set the routing scope to **Trusted circle** and pick the circle. Requests now go only to online members of that circle. The chat header lists the models the circle can run at that moment.
 4. For a member's machine to answer, that member turns on **Share spare compute** under Network and chooses **My trusted circles too**. A machine shared this way is never offered open pool work.
 
-Privacy note: with **Trusted circle** routing, the member whose machine serves your request can see the conversation you send, including earlier messages, at the moment it runs (that is how inference works). The Potluck coordinator passes the request along over encrypted connections and offers it only to machines in the circle you chose. The request does not carry your account name, but in a small circle the person whose machine answers can guess who asked. Only use this with people you would trust with what you are asking.
+Privacy note: with **Trusted circle** routing, the member operating the answering machine can read the conversation you send, including earlier messages. Requests use a direct encrypted connection when available; when the Potluck coordinator relays the request, it also processes that content. Coordinator-dispatched jobs omit your account identity, but the conversation itself may identify you. Only use this with people you would trust with what you are asking.
 
 ### Cooperative network (the open pool)
 
 The **Cooperative** scope routes to the wider network of members' machines. Same blinded routing as a circle, but any contributor can serve the request. This is the tier for work that is not sensitive and where you just want capacity. Planned: the open pool is not available yet. Local, My machines, and Trusted circle are the tiers to use today.
 
+In the current desktop implementation, the open pool receives only the latest prompt, while trusted-circle requests include earlier messages. Both the coordinator and the serving contributor can read the prompt sent to the pool. The contributor job omits your account identity, but the prompt may identify you. This is not a guarantee of anonymity or end-to-end encrypted inference. Retention rules cannot prove that a modified contributor does not record requests.
+
 ### The four scopes at a glance
 
 | Scope | Runs on | Who can see your prompt |
 | --- | --- | --- |
-| **Local** | This machine only | No one. Nothing leaves the device. |
-| **My machines** | Machines you own, over your encrypted mesh | No one but you. Never touches the coordinator's inference path. |
-| **Trusted circle** | Online machines of people in a circle you chose | The member whose machine serves it, at inference time. |
-| **Cooperative** | Any online contributor (planned) | The contributor who serves it, at inference time. |
+| **Local** | This machine's loaded runtime, including configured Big Model Mode compute | No circle or contributor-network dispatch; a configured model split still uses its remote compute. |
+| **My machines** | Machines you own, over your encrypted mesh | The paired machine processing it. The coordinator does not carry inference content on this route. |
+| **Trusted circle** | Online machines of people in a circle you chose | The operator of the answering machine, and the coordinator when it relays the request. |
+| **Cooperative** | Any online contributor (planned) | The serving contributor and the coordinator. |
 
 ---
 
@@ -177,6 +179,8 @@ Potluck is a potluck: you can bring compute, not just use it. In setup (and late
 **A machine will not pair.** Both machines must be signed in to the same account. On the same network, pairing is automatic plus the code. Across networks it goes through the coordinator, so check that both machines show **connected** in the My machines view.
 
 **A circle member shows offline.** Circle routing only uses members who are online right now. If no member is online for the model you asked for, the request is refused rather than silently sent elsewhere. Ask a member to bring a machine online, or use a different scope.
+
+**Network unavailable in Chat.** Check your internet connection. Potluck checks again automatically while the app is visible. If you changed the coordinator address, check it in **Settings → Advanced → Network connection**. You can choose **Local only** and use a loaded model while the network is unavailable. If the cooperative connection drops, Chat returns to Local; reconnecting does not switch it back without your choice.
 
 **Windows SmartScreen keeps warning.** Windows builds are not code-signed. Match the published SHA-256 if you want to verify integrity, then **More info → Run anyway**.
 

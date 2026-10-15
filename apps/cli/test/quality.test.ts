@@ -170,7 +170,9 @@ describe("current-code repair feedback", () => {
     await runTool("read_file", { path: "large.py" }, deps);
     const large = "# preserved code\n".repeat(5000);
     await writeFile(path, large);
-    expect(await runTool("read_file", { path: "large.py" }, deps)).toContain("truncated");
+    const partial = await runTool("read_file", { path: "large.py" }, deps);
+    expect(partial).toContain("Partial read");
+    expect(partial).toContain("offset=201");
     const out = await runTool("write_file", { path: "large.py", content: "replacement\n" }, deps);
     expect(out).toMatch(/^error: refusing to overwrite/);
     expect(confirm).not.toHaveBeenCalled();
@@ -189,21 +191,27 @@ describe("current-code repair feedback", () => {
     expect(await readFile(path, "utf8")).toBe("preserve this");
   });
 
-  it("retains file identity with a read after its action is trimmed from context", async () => {
+  it("retains file identity and the producing action when older history is trimmed", async () => {
     await writeFile(join(cwd, "left.py"), "same-looking code");
     let turn = 0;
     stream.mockImplementation((_cfg, history: ChatMessage[]) => (async function* () {
       if (turn++ === 0) yield '```action\n{"tool":"read_file","args":{"path":"left.py"}}\n```';
       else {
-        expect(history.some(m => m.role === "assistant")).toBe(false);
+        expect(history.at(-2)?.content).toContain('"path":"left.py"');
+        expect(history.at(-2)?.role).toBe("assistant");
         expect(history.at(-1)?.content).toContain('FILE "left.py":\nsame-looking code');
+        expect(history.reduce((sum, message) => sum + message.content.length, 0)).toBeLessThanOrEqual(500);
         yield "Inspected.";
       }
     })());
-    const history: ChatMessage[] = [{ role: "system", content: "system" }];
+    const history: ChatMessage[] = [
+      { role: "system", content: "system" },
+      { role: "user", content: "old question".repeat(100) },
+      { role: "assistant", content: "old answer" },
+    ];
     expect(await runTask(history, "inspect", {
       cfg: { baseURL: "unused", apiKey: "test", enabled: true }, model: "pinned", cwd, confirm,
-      charBudget: 30, callbacks: { onToken() {}, onTurnEnd() {}, onAction() {}, onToolResult() {} },
+      charBudget: 500, callbacks: { onToken() {}, onTurnEnd() {}, onAction() {}, onToolResult() {} },
     })).toEqual({ status: "finished" });
   });
 

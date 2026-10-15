@@ -10,6 +10,7 @@
  */
 
 import { spawn } from "node:child_process";
+import { createReadStream } from "node:fs";
 import {
   lstat,
   mkdir,
@@ -64,7 +65,9 @@ export const TOOL_NAMES = [
 /** A recoverable tool failure - surfaced back to the model as TOOL_RESULT. */
 class ToolError extends Error {}
 
-const MAX_FILE_BYTES = 64_000;
+const MAX_READ_CHARS = 16_000;
+const DEFAULT_READ_LINES = 200;
+const MAX_READ_LINES = 2_000;
 const MAX_CMD_OUTPUT = 16_000;
 const MAX_SEARCH_HITS = 100;
 const MAX_GLOB_MATCHES = 200;
@@ -193,14 +196,113 @@ async function readFileTool(
   deps: ToolDeps,
 ): Promise<string> {
   const path = requireString(args, "path");
+  const offset = readPositiveInteger(args, "offset", 1);
+  const limit = readPositiveInteger(args, "limit", DEFAULT_READ_LINES, MAX_READ_LINES);
   const abs = await resolveInCwd(deps.cwd, path);
-  const content = await readFile(abs, "utf8");
-  if (content.length > MAX_FILE_BYTES) {
-    deps.readPaths?.delete(abs);
-    return `${content.slice(0, MAX_FILE_BYTES)}\n…[truncated at ${MAX_FILE_BYTES} chars]`;
+  // A partial inspection cannot establish that a previous full read is current.
+  deps.readPaths?.delete(abs);
+  const range = await readLineRange(abs, offset, limit);
+  if (offset === 1 && range.eof && !range.truncatedLine) {
+    deps.readPaths?.add(abs);
+    return range.content;
   }
-  deps.readPaths?.add(abs);
-  return content;
+  const next = range.lastLine + 1;
+  const guidance = range.truncatedLine
+    ? `Line ${range.lastLine} is truncated at the ${MAX_READ_CHARS}-character output limit. ` +
+      `Use an approved run_command to inspect a bounded character range within that line. ` +
+      `To inspect any later lines, use read_file with offset=${next} and limit=${limit}.`
+    : range.eof
+      ? "End of file."
+      : `Continue with read_file offset=${next} and limit=${limit}.`;
+  return `[Partial read: lines ${offset}-${range.lastLine}. ${guidance} ` +
+    `Use edit_file for targeted changes; this does not permit a whole-file overwrite.]\n` +
+    range.content;
+}
+
+function readPositiveInteger(
+  args: Record<string, unknown>,
+  key: string,
+  fallback: number,
+  max = Number.MAX_SAFE_INTEGER,
+): number {
+  const value = args[key];
+  if (value === undefined) return fallback;
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1 || value > max) {
+    throw new ToolError(`argument "${key}" must be an integer from 1 to ${max}`);
+  }
+  return value;
+}
+
+/** Keep UTF-16 surrogate pairs and CRLF line endings intact at the output cap. */
+function readPrefix(text: string, max: number): string {
+  let end = Math.min(text.length, max);
+  const last = text.charCodeAt(end - 1);
+  const next = text.charCodeAt(end);
+  if ((last >= 0xd800 && last <= 0xdbff && next >= 0xdc00 && next <= 0xdfff) ||
+      (text[end - 1] === "\r" && text[end] === "\n")) {
+    end--;
+  }
+  return text.slice(0, end);
+}
+
+interface ReadRange {
+  content: string;
+  lastLine: number;
+  eof: boolean;
+  truncatedLine: boolean;
+}
+
+/** Stream past unrequested lines without retaining a large file or oversized line. */
+async function readLineRange(abs: string, offset: number, limit: number): Promise<ReadRange> {
+  let content = "";
+  let pending = "";
+  let line = 1;
+  let lastLine = 0;
+  let hasUnterminatedLine = false;
+  for await (const chunk of createReadStream(abs, { encoding: "utf8" })) {
+    let pos = 0;
+    while (pos < chunk.length) {
+      if (lastLine >= offset && lastLine - offset + 1 >= limit) {
+        return { content, lastLine, eof: false, truncatedLine: false };
+      }
+      const newline = chunk.indexOf("\n", pos);
+      const end = newline === -1 ? chunk.length : newline + 1;
+      hasUnterminatedLine = newline === -1;
+      if (line >= offset) {
+        const remaining = MAX_READ_CHARS - content.length;
+        if (pending.length + end - pos > remaining) {
+          // Prefer complete lines. Only truncate when one line alone exceeds the cap.
+          if (content.length > 0) {
+            return { content, lastLine, eof: false, truncatedLine: false };
+          }
+          pending += chunk.slice(pos, pos + remaining - pending.length + 1);
+          return {
+            content: readPrefix(pending, remaining),
+            lastLine: line,
+            eof: false,
+            truncatedLine: true,
+          };
+        }
+        pending += chunk.slice(pos, end);
+        if (newline !== -1) {
+          content += pending;
+          pending = "";
+          lastLine = line;
+        }
+      }
+      if (newline !== -1) line++;
+      pos = end;
+    }
+  }
+  if (pending.length > 0) {
+    content += pending;
+    lastLine = line;
+  }
+  const totalLines = hasUnterminatedLine ? line : line - 1;
+  if (offset > Math.max(1, totalLines)) {
+    throw new ToolError(`offset ${offset} is past end of file (${totalLines} lines)`);
+  }
+  return { content, lastLine, eof: true, truncatedLine: false };
 }
 
 async function listDirTool(

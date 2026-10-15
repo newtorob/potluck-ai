@@ -65,10 +65,8 @@ export function CooperativeConnectionPanel() {
       </div>
 
       <p className="mb-3 text-xs text-muted-foreground">
-        The coordinator URL points to the Phase G control plane. When no override is
-        set, the app follows whichever coordinator the mesh sidecar is actually
-        connected to. Set an override to point at a coordinator on another machine
-        in your fleet (LAN IP, Tailscale IP, or the network's hosted endpoint).
+        The network coordinator helps your machines connect. Potluck chooses its
+        address automatically. Change it only to use a coordinator you operate.
       </p>
 
       <div className="flex flex-col gap-2">
@@ -81,12 +79,12 @@ export function CooperativeConnectionPanel() {
           </label>
           {!hasExplicitOverride && sidecarReportedUrl !== null && (
             <span className="text-[10px] text-muted-foreground/60">
-              Following sidecar
+              Automatic address
             </span>
           )}
           {hasExplicitOverride && (
             <span className="text-[10px] text-muted-foreground/60">
-              User override active
+              Custom address
             </span>
           )}
         </div>
@@ -124,7 +122,7 @@ export function CooperativeConnectionPanel() {
                 'text-muted-foreground hover:text-foreground hover:border-border',
                 'focus:outline-none focus:ring-2 focus:ring-ring',
               )}
-              title="Clear override and follow the sidecar's coordinator"
+              title="Use Potluck’s automatic coordinator address"
             >
               Reset
             </button>
@@ -136,31 +134,31 @@ export function CooperativeConnectionPanel() {
           <div className="flex items-start gap-1.5 rounded-md bg-amber-500/10 px-2 py-1.5 text-xs text-amber-600 dark:text-amber-400">
             <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
             <span>
-              Your override differs from the sidecar's active coordinator (
+              Your custom address differs from the automatic address (
               <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">
                 {sidecarReportedUrl}
               </code>
-              ). The app is using your override. Reset to follow the sidecar.
+              ). Potluck is using your custom address. Reset to use the automatic address.
             </span>
           </div>
         )}
 
         {/* Reachability indicator - hidden until the first probe settles */}
-        <div className="flex items-center gap-1.5 text-xs">
+        <div className="flex items-center gap-1.5 text-xs" role="status">
           {lastCheckedAt === null ? (
-            <span className="text-muted-foreground/50">Checking...</span>
+            <span className="text-muted-foreground/50">Checking connection…</span>
           ) : reachable ? (
             <>
               <CheckCircle2 className="h-3 w-3 text-sage" aria-hidden="true" />
-              <span className="text-muted-foreground">Reachable</span>
+              <span className="text-muted-foreground">Coordinator available</span>
             </>
           ) : (
             <>
               <AlertCircle className="h-3 w-3 text-amber-500" aria-hidden="true" />
               <span className="text-muted-foreground">
-                Unreachable. Verify the coordinator is running there (
-                <code className="rounded bg-muted px-1 py-0.5 font-mono text-[10px]">make up</code>
-                ).
+                Cannot connect to the network. Check your internet connection and the
+                coordinator address above. Potluck retries automatically. You can keep
+                chatting with a loaded model by choosing Local only in Chat.
               </span>
             </>
           )}

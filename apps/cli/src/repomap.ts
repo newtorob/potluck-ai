@@ -49,7 +49,7 @@ async function declarations(cwd: string, path: string): Promise<string> {
 }
 
 /** Build the repo-map text (empty string if the directory has no files). */
-export async function buildRepoMap(cwd: string, limit = MAX_MAP_FILES): Promise<string> {
+export async function buildRepoMap(cwd: string, limit = MAX_MAP_FILES, maxBytes?: number): Promise<string> {
   const rules = await loadIgnore(cwd);
   const files: string[] = [];
   let truncated = false;
@@ -64,8 +64,7 @@ export async function buildRepoMap(cwd: string, limit = MAX_MAP_FILES): Promise<
   files.sort((a, b) => a.localeCompare(b));
 
   const lines = [
-    "Repository files (relative to the working directory). Use these EXACT paths;",
-    "do not invent files or directories that are not listed here:",
+    "Repository files (relative paths; partial list). Use exact paths and search for others.",
     "Declaration hints are a bounded heuristic from the initial files; read_file to confirm.",
   ];
   let symbolFiles = 0;
@@ -82,5 +81,14 @@ export async function buildRepoMap(cwd: string, limit = MAX_MAP_FILES): Promise<
     }
   }
   if (truncated) lines.push(`(+ more files; showing the first ${limit})`);
-  return lines.join("\n");
+  const text = lines.join("\n");
+  if (maxBytes === undefined || Buffer.byteLength(text) <= maxBytes) return text;
+  const marker = "\n(+ more files; use glob or search_files)";
+  if (maxBytes < Buffer.byteLength(marker)) return "";
+  const bounded: string[] = [];
+  for (const line of lines) {
+    if (Buffer.byteLength([...bounded, line].join("\n") + marker) > maxBytes) break;
+    bounded.push(line);
+  }
+  return bounded.join("\n") + marker;
 }

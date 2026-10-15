@@ -164,10 +164,29 @@ Existing files must have been read completely before a whole-file overwrite;
 truncated reads and unreadable files do not satisfy that guard. Approval and
 workspace containment apply to both formats.
 
+`read_file` accepts a one-based `offset` and a line `limit` (default 200,
+maximum 2,000). Output is capped at 16,000 characters. Partial reads show where
+to continue and permit targeted edits, but never grant permission to replace
+the entire file. A single oversized line is marked as truncated and needs a
+bounded character read through an approved shell command.
+
+Before each task, the CLI checks the loaded context window for the selected
+model and `local` or `mine` route. It reserves output space and uses a conservative
+UTF-8 byte estimate plus template overhead for history. This is not an exact
+tokenizer count. Older engines without window metadata use a clearly announced
+4,096-token fallback. A model reload or household failover can change capacity
+after the check; the gateway still rejects a request that exceeds the new window.
+Instructions and the current task are kept intact; older exchanges and oversized
+tool feedback may be shortened with explicit notices. If the required content
+cannot fit, the task stops incomplete and asks for a larger loaded context or a
+smaller task. Compacted file contents must be read again before a whole-file rewrite.
+
 The initial repository map includes bounded Python and JavaScript/TypeScript
-declaration hints (names and line numbers). These are a heuristic to locate the
+declaration hints (names and line numbers), within a 512-byte initial map. These are a heuristic to locate the
 owning file; the agent still needs to read it before editing. Ignored files,
-symlinked entries and binary contents are skipped.
+symlinked entries and binary contents are skipped. The map is omitted when the
+loaded window is unknown or at most 4,096 tokens, leaving room for actual tool
+feedback; file search remains available.
 
 Repeated unchanged reads, failed edits, and same-content writes receive recovery
 feedback, then stop after three identical action/result pairs without a successful

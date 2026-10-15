@@ -33,7 +33,7 @@ import {
   type Scope,
   type VerifyResolution,
 } from "./config.js";
-import { listModels, type ChatMessage } from "./gateway.js";
+import { listModels, modelContextWindow, type ChatMessage } from "./gateway.js";
 import { readProjectModelLock, pinnedModel, ModelLockError } from "./model-lock.js";
 import { runTask, systemPrompt } from "./agent.js";
 import {
@@ -167,6 +167,22 @@ interface BriefState {
   brief: string | null;
 }
 
+/** The generated file map is optional navigation data, not project instructions. */
+async function prepareAgentContext(
+  history: ChatMessage[], repoMap: string, cfg: GatewayConfig, model: string, scope: Scope,
+  signal?: AbortSignal,
+): Promise<number | undefined> {
+  const window = await modelContextWindow(cfg, model, scope, signal);
+  const existing = history.findIndex(m => m.role === "system" && m.content === repoMap);
+  if (existing !== -1) history.splice(existing, 1);
+  // Small windows need room for the task and actual tool feedback. The agent
+  // can discover files with glob/search instead of spending that room up front.
+  if (repoMap && window !== undefined && window > 4096) {
+    history.splice(1, 0, { role: "system", content: repoMap });
+  }
+  return window;
+}
+
 /**
  * Load the handoff brief for this project (written by /snapshot here, or by
  * Claude Code / Codex through the same store) and announce it when present.
@@ -198,9 +214,9 @@ async function runOneShot(
   const conversation: ChatMessage[] = [
     { role: "system", content: systemPrompt(opts.cwd, opts.verifyCommand, brief) },
   ];
-  const repoMap = await buildRepoMap(opts.cwd);
-  if (repoMap) conversation.push({ role: "system", content: repoMap });
+  const repoMap = await buildRepoMap(opts.cwd, 200, 512);
   if (opts.session) conversation.push(...opts.session.history);
+  const contextWindowTokens = await prepareAgentContext(conversation, repoMap, opts.cfg, opts.model, opts.scope);
   if (!opts.verifyCommand) {
     stderr.write(
       c.dim(
@@ -214,6 +230,7 @@ async function runOneShot(
     cwd: opts.cwd,
     confirm,
     scope: opts.scope,
+    contextWindowTokens,
     verifyCommand: opts.verifyCommand,
     callbacks: {
       onToken: (t) => stdout.write(t),
@@ -468,8 +485,7 @@ async function main(): Promise<void> {
   const conversation: ChatMessage[] = [
     { role: "system", content: systemPrompt(cwd, verify.command, briefState.brief) },
   ];
-  const repoMap = await buildRepoMap(cwd);
-  if (repoMap) conversation.push({ role: "system", content: repoMap });
+  const repoMap = await buildRepoMap(cwd, 200, 512);
   if (session) {
     conversation.push(...session.history);
     stdout.write(`Session ${session.id}${previousSession ? ` (continued from ${previousSession.id})` : ""}. Completed turns will be saved privately.\n`);
@@ -549,12 +565,14 @@ async function main(): Promise<void> {
       active = new AbortController();
       stdout.write(`\n${c.dim("potluck ▸ ")}`);
       try {
+        const contextWindowTokens = await prepareAgentContext(draft, repoMap, cfg, model, scope, active.signal);
         await runTask(draft, snapshotRequest(), {
           cfg,
           model,
           cwd,
           confirm,
           scope,
+          contextWindowTokens,
           signal: active.signal,
           verifyCommand: null,
           maxSteps: 4,
@@ -607,7 +625,6 @@ async function main(): Promise<void> {
         role: "system",
         content: systemPrompt(cwd, verify.command, briefState.brief),
       });
-      if (repoMap) conversation.push({ role: "system", content: repoMap });
       stdout.write(
         `${c.dim("context cleared")}${briefState.brief ? c.dim(" · briefed from the snapshot above") : ""}\n`,
       );
@@ -637,17 +654,20 @@ async function main(): Promise<void> {
       continue;
     }
 
-    const snapshot = conversation.length;
+    let snapshot = conversation.length;
     active = new AbortController();
     stdout.write(`\n${c.dim("potluck ▸ ")}`);
 
     try {
+      const contextWindowTokens = await prepareAgentContext(conversation, repoMap, cfg, model, scope, active.signal);
+      snapshot = conversation.length;
       await runTask(conversation, line, {
         cfg,
         model,
         cwd,
         confirm,
         scope,
+        contextWindowTokens,
         signal: active.signal,
         verifyCommand: verify.command,
         callbacks: {

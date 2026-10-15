@@ -234,15 +234,18 @@ describe("progress and verification recovery", () => {
     ]);
     const runVerify = vi.fn(async () => ({ code: (await readFile(join(cwd, "b"), "utf8")) === "fixed" ? 0 : 1, output: "b remains broken" }));
     const history: ChatMessage[] = [{ role: "system", content: "system" }];
-    const opts = options({ charBudget: 100, verifyCommand: "fixed-check", runVerify });
+    const opts = options({ charBudget: 600, contextWindowTokens: 8192, verifyCommand: "fixed-check", runVerify });
     expect(await runTask(history, "repair both files", opts)).toEqual({ status: "finished" });
     expect(runVerify).toHaveBeenCalledTimes(2);
     for (const index of [2, 3]) {
       const sent = stream.mock.calls[index][1] as ChatMessage[];
       expect(sent.at(-1)?.content).toContain("b remains broken");
       expect(sent.some(m => m.content === "repair both files")).toBe(true);
+      expect(sent.reduce((sum, message) => sum + message.content.length, 0)).toBeLessThanOrEqual(600);
     }
-    expect(opts.callbacks.onNotice).not.toHaveBeenCalled();
+    expect(stream.mock.calls.some(([, sent]) => (sent as ChatMessage[])
+      .some(message => message.content.includes("trimmed to fit")))).toBe(true);
+    expect(opts.callbacks.onNotice).toHaveBeenCalledWith(expect.stringContaining("Earlier context or long tool output was trimmed"));
   });
 
   it("enforces the original four-failure verify bound and executes no fifth edit", async () => {

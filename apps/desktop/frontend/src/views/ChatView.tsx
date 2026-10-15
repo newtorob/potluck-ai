@@ -27,6 +27,7 @@ import { useMeshStore } from '@/stores/meshStore';
 import { localApi } from '@/lib/localApi';
 import type { Circle, CircleModel } from '@/lib/localApi';
 import { circleModelLabel, pickCircleModel } from '@/lib/circleModels';
+import { ROUTING_PRIVACY_COPY } from '@/lib/routingPrivacyCopy';
 import { PotluckLogo } from '@/components/brand/PotluckLogo';
 
 // ---------------------------------------------------------------------------
@@ -145,6 +146,7 @@ export function ChatView() {
       {/* ------------------------------------------------------------------ */}
       <ViewHeader
         title="Chat"
+        className="relative"
         tools={
           <>
             <ModelSelector disabled={isStreaming || networkMode || householdMode || circleMode} />
@@ -333,14 +335,14 @@ function ScopeSelector({
       label: 'Local only',
       shortLabel: 'Local',
       icon: Cpu,
-      hint: 'Runs on this machine. Nothing leaves your device.',
+      hint: ROUTING_PRIVACY_COPY.local,
     },
     {
       scope: 'household',
       label: 'My machines',
       shortLabel: 'My machines',
       icon: Home,
-      hint: 'Runs on one of your own machines over your private mesh, encrypted between your devices. Stays within your machines.',
+      hint: ROUTING_PRIVACY_COPY.household,
       ...(!householdAvailable && {
         unavailableReason: 'No paired machines reachable. Pair a machine in Household first.',
       }),
@@ -352,7 +354,7 @@ function ScopeSelector({
       icon: Users,
       hint:
         circles.length > 0
-          ? 'Runs on a machine in a circle you trust. The machine that answers sees this conversation.'
+          ? ROUTING_PRIVACY_COPY.circle
           : 'Runs on a machine in a circle you trust. Set up a circle in Circles first.',
       ...(circles.length === 0 && {
         unavailableReason: 'No circles yet. Go to Circles to create one.',
@@ -363,9 +365,9 @@ function ScopeSelector({
       label: 'Cooperative network',
       shortLabel: 'Network',
       icon: Globe,
-      hint: `Runs on any verified member's machine. The machine that answers sees your prompt to generate the reply, but the request carries no identity, so they do not know it came from you.${networkModelSlug ? ` Model: ${networkModelSlug}.` : ''}`,
+      hint: `${ROUTING_PRIVACY_COPY.cooperative}${networkModelSlug ? ` Model: ${networkModelSlug}.` : ''}`,
       ...(!cooperativeAvailable && {
-        unavailableReason: 'Coordinator unreachable. Start it with `make up`.',
+        unavailableReason: 'Network unavailable. Check your connection; Potluck retries automatically. Choose Local only to chat with a loaded model.',
       }),
     },
   ];
@@ -412,7 +414,7 @@ function ScopeSelector({
 
   return (
     <div className="flex items-center gap-1.5">
-    <div className="relative">
+    <div className="sm:relative">
       <button
         ref={triggerRef}
         type="button"
@@ -447,8 +449,8 @@ function ScopeSelector({
           aria-label="Routing scope"
           onKeyDown={handleMenuKeyDown}
           className={cn(
-            'absolute right-0 top-full z-50 mt-1.5',
-            'w-80 rounded-xl border border-border bg-popover shadow-hearth',
+            'absolute inset-x-4 top-full z-50 mt-1.5 sm:inset-x-auto sm:right-0',
+            'sm:w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-10rem)] sm:max-h-[calc(100dvh-8rem)] overflow-y-auto rounded-xl border border-border bg-popover shadow-hearth',
             'py-1.5',
           )}
         >

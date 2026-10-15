@@ -1,10 +1,9 @@
 /**
  * Thin OpenAI-compatible client for the Potluck gateway (127.0.0.1).
  *
- * Uses native fetch + manual SSE parsing — no SDK, no tools/function-calling.
- * The gateway request schema is deliberately small: messages / model /
- * temperature / max_tokens / stream / stop. Everything the agent does is
- * prompt-based on top of plain chat completions.
+ * Uses native fetch + manual SSE parsing. The built-in coding agent uses
+ * text actions on top of chat completions; the gateway also supports native
+ * tools for other clients.
  *
  * File contents only ever travel to this base URL (the local gateway).
  */
@@ -88,6 +87,37 @@ export async function listModels(cfg: GatewayConfig, signal?: AbortSignal): Prom
   return body.data ?? [];
 }
 
+/** Loaded context on the selected route; undefined on an older gateway.
+ * No project content is sent, and errors never broaden the requested scope. */
+export async function modelContextWindow(
+  cfg: GatewayConfig,
+  model: string,
+  scope: string,
+  signal?: AbortSignal,
+): Promise<number | undefined> {
+  if (scope !== "local" && scope !== "mine") throw new Error("Coding context checks require local or mine scope.");
+  pinnedModel(cfg.modelLock, model);
+  const query = new URLSearchParams({ model, scope });
+  if (cfg.modelLock) query.set("potluck_model_sha256", cfg.modelLock.model.sha256);
+  const res = await fetch(`${cfg.baseURL}/potluck/context?${query}`, {
+    headers: authHeaders(cfg), redirect: "error",
+    signal: AbortSignal.any([AbortSignal.timeout(12_000), ...(signal ? [signal] : [])]),
+  });
+  if (res.status === 404) {
+    const body = await bodyText(res);
+    let detail = body;
+    try { detail = (JSON.parse(body) as { detail?: string }).detail ?? body; } catch { /* plain legacy response */ }
+    if (typeof detail === "string" && /^not found\.?$/i.test(detail.trim())) return undefined;
+    throw new Error(`Could not check the model's context: 404 ${body}`);
+  }
+  if (res.status === 405) return undefined;
+  if (!res.ok) throw new Error(`Could not check the model's context: ${res.status} ${await bodyText(res)}`);
+  const body = await res.json() as { model?: unknown; scope?: unknown; context_window?: unknown };
+  if (body.model !== model || body.scope !== scope) throw new Error("Gateway returned context information for a different model or scope.");
+  const window = body.context_window;
+  return typeof window === "number" && Number.isSafeInteger(window) && window > 0 ? window : undefined;
+}
+
 /**
  * POST /v1/chat/completions (stream=true). Yields content deltas as they arrive.
  * Aborts cleanly when `signal` fires (Ctrl-C cancels the current turn).
@@ -110,8 +140,7 @@ export async function* streamChat(
       throw new Error("Gateway does not support project model locks. Upgrade the Potluck runtime before using this project.");
     }
   }
-  // A parallel gateway change adds local|mine routing; sending the header is
-  // harmless (ignored) on a gateway that doesn't yet understand it.
+  // Keep the caller's explicit routing choice on every request.
   if (opts.scope) headers["x-potluck-scope"] = opts.scope;
   if (opts.scope === "circle" && opts.circle) headers["x-potluck-circle"] = opts.circle;
 

@@ -23,7 +23,7 @@ describe("buildRepoMap", () => {
     expect(map).toContain("math.py");
     expect(map).toContain("lib/util.py");
     expect(map).not.toContain("src/"); // the exact hallucination the map prevents
-    expect(map).toMatch(/EXACT paths/);
+    expect(map).toMatch(/exact paths/);
   });
 
   it("respects .gitignore", async () => {
@@ -48,6 +48,15 @@ describe("buildRepoMap", () => {
 
   it("returns empty string for an empty directory", async () => {
     expect(await buildRepoMap(cwd)).toBe("");
+  });
+
+  it("bounds the initial map by bytes without splitting Unicode paths", async () => {
+    for (let i = 0; i < 30; i++) await writeFile(join(cwd, `日本語-${i}.ts`), "export function example() {}\n");
+    const map = await buildRepoMap(cwd, 200, 512);
+    expect(Buffer.byteLength(map)).toBeLessThanOrEqual(512);
+    expect(map).toContain("use glob or search_files");
+    expect(map).not.toContain("\ufffd");
+    for (const line of map.split("\n").filter(l => l.startsWith("日本語"))) expect(line).toMatch(/^日本語-\d+\.ts$/);
   });
 
   it("maps definitions to their owning file without including bodies or values", async () => {

@@ -12,3 +12,13 @@ python -m potluck_local.app --port 8321
 ```
 
 Set `POTLUCK_DEV=1` to enable Swagger UI at `http://127.0.0.1:8321/docs` and verbose logging.
+
+### Coding-agent context discovery
+
+`GET /v1/potluck/context?model=<id>&scope=local|mine` reports the loaded
+`context_window` for the same owned-machine route a chat request would use.
+It uses gateway authentication, accepts `potluck_model_sha256` to honor an exact
+project pin, sends no prompt and runs no inference. The response includes only
+model, scope, context window and the route category (`local` or `household`).
+Older serving engines may return a null window. This is a capacity snapshot,
+not a reservation: reloading the model or failing over can change it.

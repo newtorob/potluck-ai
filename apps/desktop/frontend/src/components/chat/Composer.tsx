@@ -23,6 +23,7 @@ import {
 import { Send, Square } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import type { RoutingScope } from '@/stores/chatStore';
+import { ROUTING_PRIVACY_COPY } from '@/lib/routingPrivacyCopy';
 
 interface ComposerProps {
   onSend: (content: string) => void;
@@ -219,30 +220,8 @@ function ComposerHint({ isStreaming, modelLoaded, routingScope }: ComposerHintPr
         Press <Kbd>Esc</Kbd> to stop generating.
       </>
     );
-  } else if (routingScope === 'household') {
-    body = (
-      <>
-        Runs on one of your own machines over your private mesh, encrypted between your devices. Stays within your machines.
-      </>
-    );
-  } else if (routingScope === 'circle') {
-    body = (
-      <>
-        Runs on a machine in a circle you chose. That machine sees this conversation, including earlier messages, so it can answer.
-      </>
-    );
-  } else if (routingScope === 'cooperative') {
-    body = (
-      <>
-        Runs on any verified member's machine. The machine that answers sees your prompt to generate the reply, but the request carries no identity, so they do not know it came from you.
-      </>
-    );
   } else {
-    body = (
-      <>
-        This chat runs on this machine. Your messages stay here.
-      </>
-    );
+    body = ROUTING_PRIVACY_COPY[routingScope];
   }
 
   return (
