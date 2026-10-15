@@ -434,10 +434,19 @@ class TestPromptTooLong:
         assert inference_errors.prompt_overflow("Requested tokens (5000) exceed context window of 4096") == (5000, 4096)
 
     def test_a_model_on_another_machine_reports_only_that_inference_failed(self, client, monkeypatch):
-        # The household route sends fixed text, so the reason does not arrive.
+        # A machine on an older release sends fixed text without the reason.
         use_peer(monkeypatch, error=RemoteStreamError("Inference failed", "inference_error"))
         assert_error(post(client, body(model="remote-model")), 502, "api_error", "Inference failed")
         assert_error(post(client, body(model="remote-model", stream=True)), 502, "api_error", "Inference failed")
+
+    def test_a_prompt_too_long_for_a_model_on_another_machine_is_a_400_without_numbers(self, client, monkeypatch):
+        message = "The prompt is longer than the context window of the model on the machine that serves it."
+        use_peer(monkeypatch, error=RemoteStreamError("The prompt is longer than the serving machine's context window.",
+                                                      "context_length_exceeded"))
+        for fields in ({}, {"stream": True}):
+            resp = post(client, body(model="remote-model", **fields))
+            assert_error(resp, 400, "invalid_request_error", message)
+            assert resp.headers["x-potluck-error"] == "context_length_exceeded"
 
 
 # ---------------------------------------------------------------------------
@@ -519,6 +528,14 @@ class TestRouting:
         assert resp.headers["x-potluck-served-by"] == "household" and blocks(events)[0]["text"] == "hello from the peer"
         assert events[0][1]["message"]["model"] == "remote-model"
         assert events[-2][1]["usage"] == {"output_tokens": 5}
+
+    @pytest.mark.parametrize("stream", [False, True])
+    def test_stop_sequences_go_to_a_household_peer(self, client, monkeypatch, stream):
+        serve(monkeypatch, FakeRuntime())
+        seen = use_peer(monkeypatch)
+        post(client, body(model="remote-model", stream=stream, stop_sequences=["END"]))
+        post(client, body(model="remote-model", stream=stream))
+        assert seen[0]["stop"] == ["END"] and "stop" not in seen[1]
 
     def test_tools_go_to_a_peer_that_says_it_supports_them_and_not_to_one_that_does_not(self, client, monkeypatch):
         serve(monkeypatch, FakeRuntime())

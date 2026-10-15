@@ -34,6 +34,7 @@ from contextlib import aclosing
 
 import httpx
 
+from .inference_errors import CONTEXT_LENGTH_EXCEEDED
 from .remote_stream import RemoteStreamError, collect_completion, openai_chunks
 from .peer_liveness import watch_peer_stream
 
@@ -265,7 +266,8 @@ async def _peer_chunks(peer: dict, body: dict, model: str, sha256: str | None):
 async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
                              temperature: float, max_tokens: int, *, sha256: str | None = None,
                              retry: bool = True, batch: bool = False,
-                             tools: list[dict] | None = None, tool_choice: str | dict | None = None):
+                             tools: list[dict] | None = None, tool_choice: str | dict | None = None,
+                             stop: list[str] | None = None):
     """Retry another household machine only while no output has been yielded.
 
     One absolute budget spans headers, prefill, every attempt and decoding.
@@ -279,11 +281,18 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
     if tools:
         body["tools"] = tools
         body["tool_choice"] = tool_choice
+    if stop:
+        body["stop"] = stop
     loop = asyncio.get_running_loop()
     deadline = loop.time() + REQUEST_TIMEOUT_S
     excluded: set[str] = set()
     committed = False
     last_error: Exception = RemoteStreamError("No compatible household machine is available")
+    # A machine that said the prompt does not fit. Another machine may have a larger
+    # window, so the next one is still tried. If none can serve it, this is the error
+    # to raise: a machine on an older release says "inference_error" for the same
+    # thing, and the last attempt would hide what the first one found out.
+    too_long: RemoteStreamError | None = None
     for attempt in range(MAX_DISPATCH_ATTEMPTS if retry else 1):
         try:
             if attempt:
@@ -326,17 +335,21 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
             if isinstance(exc, PeerDispatchError) and exc.status_code not in (408, 409, 429, 500, 502, 503, 504):
                 raise exc
             last_error = exc
+            if isinstance(exc, RemoteStreamError) and exc.category == CONTEXT_LENGTH_EXCEEDED:
+                too_long = exc
             if loop.time() >= deadline:
                 break
-    raise last_error
+    raise last_error if too_long is None else too_long
 
 
 async def complete_peer_openai(peer: dict, messages: list[dict], model: str,
                                temperature: float, max_tokens: int, *, sha256: str | None = None,
-                               tools: list[dict] | None = None, tool_choice: str | dict | None = None) -> dict:
+                               tools: list[dict] | None = None, tool_choice: str | dict | None = None,
+                               stop: list[str] | None = None) -> dict:
     """Dispatch to a peer (streamed under the hood) and return one OpenAI
     chat.completion envelope."""
     return await collect_completion(
         stream_peer_openai(peer, messages, model, temperature, max_tokens, **({"sha256": sha256} if sha256 else {}),
-                           **({"tools": tools, "tool_choice": tool_choice} if tools else {}))
+                           **({"tools": tools, "tool_choice": tool_choice} if tools else {}),
+                           **({"stop": stop} if stop else {}))
     )

@@ -26,9 +26,11 @@ detail carries a code it is returned in X-Potluck-Error.
 A prompt longer than the model's context is a 400 "prompt is too long: N tokens >
 M maximum", the words Claude Code looks for. The engine finds that out when it
 starts; this machine's model answers within a moment, so the 400 is a real HTTP
-error. A model served by another machine reports only "Inference failed" (the
-household route sends fixed text), so a prompt that is too long there is a plain
-inference failure, not this 400.
+error. Another of the user's machines reports it by category only (the household
+route sends fixed text, with no token counts), so a prompt that is too long there is
+a 400 with the code context_length_exceeded and a message without numbers, not
+Claude Code's words. A machine on an older release still reports it as a plain
+inference failure.
 """
 
 from __future__ import annotations

@@ -23,9 +23,11 @@ assistant tool_calls and role "tool" messages. See services/gateway_reply.py,
 services/tool_calls.py and services/reasoning_split.py for the rules.
 
 A reply names the model id it was served under, never the model file's path. A prompt
-that does not fit this machine's model is a 400 with the code context_length_exceeded.
-A whole reply from another machine carries estimated token counts when that machine
-gave none, and X-Potluck-Usage: estimated says so.
+that does not fit this machine's model is a 400 with the code context_length_exceeded,
+and so is one that does not fit the model on another of the user's machines (without
+the token counts, which that machine does not send). A whole reply from another
+machine carries estimated token counts when that machine gave none, and
+X-Potluck-Usage: estimated says so.
 
 Auth: the app-level middleware gates /v1 with POTLUCK_GATEWAY_API_KEY (a separate
 opt-in key for external tools), NOT the internal sidecar token. See app.py.
@@ -239,12 +241,27 @@ def _context_length(found: tuple[int, int]) -> dict:
             "message": f"This model's maximum context length is {window} tokens. The prompt is {tokens} tokens."}
 
 
+def _remote_context_length() -> dict:
+    """The 400 detail for a prompt that does not fit the model on another machine. That
+    machine sends a category and no numbers (see inference_errors), so there are none here."""
+    return {"code": inference_errors.CONTEXT_LENGTH_EXCEEDED,
+            "message": "The prompt is longer than the context window of the model on the machine that serves it."}
+
+
+def _remote_too_long(failure: object) -> bool:
+    """True when ``failure`` is another machine reporting that the prompt does not fit its model."""
+    return isinstance(failure, RemoteStreamError) and failure.category == inference_errors.CONTEXT_LENGTH_EXCEEDED
+
+
 def _stream_error(failure: object) -> dict:
     """The error object of a stream that failed after it began (the route sends it in a
     ``data:`` line, then ``[DONE]``). ``failure`` is the exception or the ``__error__`` chunk."""
     found = context_overflow(failure)
     if found is not None:
         detail = _context_length(found)
+        return {"message": detail["message"], "type": "invalid_request_error", "code": detail["code"]}
+    if _remote_too_long(failure):
+        detail = _remote_context_length()
         return {"message": detail["message"], "type": "invalid_request_error", "code": detail["code"]}
     if isinstance(failure, dict):
         return {"message": failure["__error__"], "type": "inference_error",
@@ -340,6 +357,10 @@ class ChatPlan:
     @property
     def peer_identity(self) -> dict:
         return {"sha256": self.job.digest} if self.job.digest else {}
+
+    @property
+    def stop_kwargs(self) -> dict:
+        return {"stop": self.stop} if self.stop else {}
 
     @property
     def tool_kwargs(self) -> dict:
@@ -456,12 +477,20 @@ def shaped_chunks(plan: ChatPlan):
     if plan.peer:
         return gateway_reply.shape_stream(gateway_routing.stream_peer_openai(
             plan.peer, plan.messages, plan.served_model, job.temperature, plan.max_tokens,
-            **plan.peer_identity, **plan.tool_kwargs
+            **plan.peer_identity, **plan.tool_kwargs, **plan.stop_kwargs
         ), plan.options)
     return gateway_reply.shape_stream(plan.runtime.stream_chat_raw(
         plan.messages, temperature=job.temperature, max_tokens=plan.max_tokens, stop=plan.stop,
         **plan.identity, **plan.tool_kwargs
     ), plan.options)
+
+
+def _remote_failure(exc: RemoteStreamError) -> HTTPException:
+    """The HTTP error for a reply another machine could not finish: a 502, except that
+    a prompt which does not fit its model is the caller's to fix, so it is a 400."""
+    if _remote_too_long(exc):
+        return HTTPException(status_code=400, detail=_remote_context_length())
+    return HTTPException(status_code=502, detail={"code": exc.category, "message": str(exc)})
 
 
 def http_failure(exc: BaseException, plan: ChatPlan) -> HTTPException:
@@ -472,7 +501,7 @@ def http_failure(exc: BaseException, plan: ChatPlan) -> HTTPException:
         # This machine's own GPU: the caller is this machine's user or agent.
         return HTTPException(status_code=503, detail={"code": exc.category, "message": exc.message})
     if isinstance(exc, RemoteStreamError):
-        return HTTPException(status_code=502, detail={"code": exc.category, "message": str(exc)})
+        return _remote_failure(exc)
     if isinstance(exc, pool_routing.PoolDispatchError):
         # Surface the coordinator's real status when it's meaningful (e.g. 503
         # "no peer serves this model", the same condition as a local 404); any other
@@ -503,13 +532,12 @@ async def infer_chat(plan: ChatPlan) -> dict:
         elif plan.peer:
             result = await gateway_routing.complete_peer_openai(
                 plan.peer, plan.messages, plan.served_model, job.temperature, plan.max_tokens,
-                **plan.peer_identity, **plan.tool_kwargs
+                **plan.peer_identity, **plan.tool_kwargs, **plan.stop_kwargs
             )
         else:
-            stop = {"stop": plan.stop} if plan.stop else {}
             result = await plan.runtime.chat(plan.messages, temperature=job.temperature,
                                              max_tokens=plan.max_tokens, **plan.identity,
-                                             **plan.tool_kwargs, **stop)
+                                             **plan.tool_kwargs, **plan.stop_kwargs)
     except Exception as exc:  # noqa: BLE001
         raise http_failure(exc, plan) from exc
     return gateway_reply.shape_completion(result, plan.options)
@@ -697,6 +725,7 @@ async def text_completions(
     messages = [{"role": "user", "content": prompt_text}]
     max_tokens = req.max_tokens or DEFAULT_MAX_TOKENS
     stop = _normalise_stop(req.stop)
+    stop_kwargs = {"stop": stop} if stop else {}
     served_model = req.model if (peer or use_pool) else local
     if use_pool:
         served_by = coordinator_scope
@@ -725,7 +754,7 @@ async def text_completions(
                     )
                 elif peer:
                     source = gateway_routing.stream_peer_openai(
-                        peer, messages, served_model, req.temperature, max_tokens, **peer_identity
+                        peer, messages, served_model, req.temperature, max_tokens, **peer_identity, **stop_kwargs
                     )
                 else:
                     source = runtime.stream_chat_raw(
@@ -795,7 +824,7 @@ async def text_completions(
             )
         elif peer:
             result = await gateway_routing.complete_peer_openai(
-                peer, messages, served_model, req.temperature, max_tokens, **peer_identity
+                peer, messages, served_model, req.temperature, max_tokens, **peer_identity, **stop_kwargs
             )
         else:
             result = await runtime.chat(messages, temperature=req.temperature, max_tokens=max_tokens, **identity)
@@ -807,7 +836,7 @@ async def text_completions(
         # This machine's own GPU: the caller is this machine's user or agent.
         raise HTTPException(status_code=503, detail={"code": exc.category, "message": exc.message}) from exc
     except RemoteStreamError as exc:
-        raise HTTPException(status_code=502, detail={"code": exc.category, "message": str(exc)}) from exc
+        raise _remote_failure(exc) from exc
     except pool_routing.PoolDispatchError as exc:
         status = exc.status_code if exc.status_code in (401, 404, 503) else 502
         raise HTTPException(status_code=status, detail=pool_routing.refusal_message(exc, coordinator_scope, served_model))

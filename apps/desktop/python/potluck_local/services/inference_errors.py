@@ -28,6 +28,14 @@ The other signals are phrases the GPU runtimes themselves emit (Vulkan's
 ``ErrorOutOfDeviceMemory``, CUDA's ``out of memory``, PyTorch's
 ``OutOfMemoryError``). They are matched as whole phrases, never on the bare
 word "memory".
+
+A prompt that does not fit the model's context window
+-----------------------------------------------------
+llama-cpp raises it as a ValueError, "Requested tokens (N) exceed context window
+of M" (see ``prompt_overflow``). It has its own category so the machine that asked
+can answer with a request error that tells its user to shorten the prompt, in place
+of an inference failure. The machine's own user still gets the engine's message,
+numbers included. Another machine gets fixed text with no numbers.
 """
 
 from __future__ import annotations
@@ -38,6 +46,7 @@ from dataclasses import dataclass
 GPU_OUT_OF_MEMORY = "gpu_out_of_memory"
 INFERENCE_ERROR = "inference_error"
 MODEL_NOT_VERIFIED = "model_not_verified"
+CONTEXT_LENGTH_EXCEEDED = "context_length_exceeded"
 
 # Microsoft C++ exception code, as ctypes reports it for an uncaught C++ throw.
 MSVC_CPP_EXCEPTION = 0xE06D7363
@@ -60,6 +69,7 @@ _OTHER_MACHINE_TEXT: dict[str, str] = {
     GPU_OUT_OF_MEMORY: "The serving machine's GPU most likely ran out of memory.",
     "model_mismatch": "Model identity changed",
     MODEL_NOT_VERIFIED: MODEL_NOT_VERIFIED_TEXT,
+    CONTEXT_LENGTH_EXCEEDED: "The prompt is longer than the serving machine's context window.",
 }
 
 _GPU_OOM_PHRASES = (
@@ -102,6 +112,8 @@ def classify_inference_error(exc: BaseException, *, gpu_offload: bool) -> str:
     """The stable category for *exc*. ``gpu_offload`` is whether the loaded model runs on a GPU."""
     if isinstance(exc, InferenceFailure):
         return exc.category
+    if prompt_overflow(exc) is not None:
+        return CONTEXT_LENGTH_EXCEEDED
     if isinstance(exc, MemoryError):
         return INFERENCE_ERROR  # host RAM, not the GPU
     if is_native_cpp_exception(exc):
@@ -120,7 +132,7 @@ def describe_failure(exc: BaseException, *, gpu_offload: bool) -> FailureDescrip
     """Category plus the text for the machine's own user.
 
     Only the GPU out-of-memory failure gets a fixed sentence; every other
-    failure keeps the engine's own message.
+    failure, a prompt that does not fit included, keeps the engine's own message.
     """
     category = classify_inference_error(exc, gpu_offload=gpu_offload)
     if category == GPU_OUT_OF_MEMORY:

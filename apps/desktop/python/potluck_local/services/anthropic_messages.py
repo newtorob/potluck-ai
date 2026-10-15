@@ -32,7 +32,8 @@ Accepted and ignored: ``metadata``, ``context_management``, ``safeguards``,
 (structured output) are refused, because ignoring them would hand the client a
 reply in the wrong shape. ``top_p`` and ``top_k`` are accepted and not applied:
 the engine's chat path takes temperature only. ``stop_sequences`` reach this
-machine's own model; a reply from another machine is not cut at them.
+machine's own model and another of the user's machines; a reply from a circle or
+the pool is not cut at them.
 
 ``thinking`` of type "enabled" or "adaptive" (unless its ``display`` is "omitted")
 returns the model's reasoning as a ``thinking`` block. Otherwise the reasoning

@@ -6,7 +6,8 @@ it, ctypes turned the structured exception into
 OSError(winerror=-529697949), and the user and a peer both received the
 exception text "[WinError -529697949] Windows Error 0xe06d7363". The user gets a
 sentence they can act on now. Another machine gets only fixed text chosen by
-category, never an exception string.
+category, never an exception string. The last section before the circle tests holds
+a prompt that does not fit the context window, which has a category of its own.
 """
 
 from __future__ import annotations
@@ -15,11 +16,13 @@ import asyncio
 import json
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from potluck_local.routers import gateway, models, peer
+from potluck_local.services import gateway_routing
 from potluck_local.services import inference_errors as ie
 from potluck_local.services.acceptance import MODEL_FAILED_TEXT
 from potluck_local.services.runtime import LLMRuntime
@@ -27,6 +30,8 @@ from potluck_local.services.runtime import LLMRuntime
 OWN_TEXT = "The GPU stopped this reply, most likely because it ran out of memory. Close other programs that use the GPU, or load a smaller model."
 RAW = "[WinError -529697949] Windows Error 0xe06d7363"
 LEAKS = ("WinError", "0xe06d7363", "-529697949", "secret-path", "OSError")
+OVERFLOW = "Requested tokens (5000) exceed context window of 4096"
+OTHER_MACHINE_OVERFLOW = "The prompt is longer than the serving machine's context window."
 
 
 class CppException(OSError):
@@ -299,6 +304,128 @@ def test_a_token_that_says_error_is_not_mistaken_for_an_error_event():
     chunk = 'data: {"choices": [{"delta": {"content": "an \\"error\\" in the text"}}]}\n\n'
     assert peer._fixed_error_event(chunk) == chunk
     assert peer._fixed_error_event("data: [DONE]\n\n") == "data: [DONE]\n\n"
+
+
+# ---------------------------------------------------------------------------
+# A prompt that does not fit the context window
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("gpu", [True, False])
+def test_a_prompt_that_does_not_fit_has_its_own_category_and_keeps_the_engines_message(gpu):
+    exc = ValueError(OVERFLOW)
+    assert ie.classify_inference_error(exc, gpu_offload=gpu) == ie.CONTEXT_LENGTH_EXCEEDED == "context_length_exceeded"
+    own = ie.describe_failure(exc, gpu_offload=gpu)
+    assert (own.category, own.message) == ("context_length_exceeded", OVERFLOW)
+
+
+@pytest.mark.parametrize("text", [
+    "Requested tokens are many", "exceed context window of 4096", "llama_decode returned -3", "",
+])
+def test_other_errors_are_not_taken_for_it(text):
+    assert ie.classify_inference_error(ValueError(text), gpu_offload=True) == ie.INFERENCE_ERROR
+
+
+def test_another_machine_gets_fixed_text_with_no_numbers_for_it():
+    sent = ie.other_machine_error("context_length_exceeded")
+    assert sent == {"category": "context_length_exceeded", "message": OTHER_MACHINE_OVERFLOW}
+    assert not any(ch.isdigit() for ch in sent["message"])
+    assert ie.fixed_category("context_length_exceeded") == "context_length_exceeded"
+
+
+def test_the_streamed_error_for_the_own_user_keeps_the_numbers_beside_the_category():
+    events = collect(make_runtime(ValueError(OVERFLOW)))
+    assert events[0] == f'data: {json.dumps({"error": OVERFLOW, "category": "context_length_exceeded"})}\n\n'
+    assert events[-1] == "data: [DONE]\n\n"
+
+
+def test_the_raw_stream_carries_the_category_beside_the_engines_message():
+    rt = make_runtime(ValueError(OVERFLOW))
+
+    async def go():
+        return [c async for c in rt.stream_chat_raw([{"role": "user", "content": "hi"}])]
+
+    assert asyncio.run(go()) == [{"__error__": OVERFLOW, "__category__": "context_length_exceeded"}]
+
+
+def test_a_non_streaming_call_still_raises_the_engines_own_error():
+    rt = make_runtime(ValueError(OVERFLOW))
+
+    async def go():
+        return await rt.chat([{"role": "user", "content": "hi"}])
+
+    with pytest.raises(ValueError, match="Requested tokens") as raised:
+        asyncio.run(go())
+    assert not isinstance(raised.value, ie.InferenceFailure)
+    assert gateway.context_overflow(raised.value) == (5000, 4096)
+
+
+@pytest.mark.parametrize("mode", ["stream", "whole", "batch"])
+def test_a_peer_gets_the_category_and_fixed_text_and_no_numbers_for_it(served, mode):
+    served.runtime = make_runtime(ValueError(OVERFLOW))
+    body = dict(BODY)
+    if mode == "stream":
+        body["stream"] = True
+    elif mode == "whole":
+        body["stream"] = False
+    else:
+        body.update(stream=True, potluck_batch=True, potluck_model_sha256="a" * 64)
+        served.runtime.assert_model_identity = lambda *a, **k: None
+    resp = served.client.post("/peer/chat/completions", json=body)
+    assert resp.status_code == 200
+    assert not any(leak in resp.text for leak in ("5000", "4096", "Requested tokens", "context window of")), resp.text
+    assert OTHER_MACHINE_OVERFLOW in resp.text and "context_length_exceeded" in resp.text
+    assert "inference_error" not in resp.text
+
+
+def test_the_local_gateway_still_answers_with_the_numbers(served):
+    served.runtime = make_runtime(ValueError(OVERFLOW))
+    local = {"X-Potluck-Scope": "local"}
+    resp = served.client.post("/v1/chat/completions", json={**BODY, "stream": False}, headers=local)
+    message = "This model's maximum context length is 4096 tokens. The prompt is 5000 tokens."
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == {"code": "context_length_exceeded", "message": message}
+    resp = served.client.post("/v1/chat/completions", json={**BODY, "stream": True}, headers=local)
+    assert sse_events(resp.text)[0]["error"] == {
+        "message": message, "type": "invalid_request_error", "code": "context_length_exceeded"}
+
+
+@pytest.fixture
+def household(served, monkeypatch):
+    """This machine's gateway with nothing loaded, and one household machine whose model
+    refuses the prompt. Requests to that machine are answered by the real peer route
+    in the same app, so the words cross the real wire format."""
+    served.runtime = make_runtime(ValueError(OVERFLOW))
+    served.runtime._model_id = "remote-model"
+    monkeypatch.setattr(gateway, "get_runtime", lambda: LLMRuntime())
+    other_machine = TestClient(served.client.app)
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        reply = other_machine.post(request.url.path, content=request.content,
+                                   headers={"content-type": "application/json"})
+        return httpx.Response(reply.status_code, content=reply.content,
+                              headers={"content-type": reply.headers["content-type"]})
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: real_client(transport=httpx.MockTransport(answer), **kw))
+
+    async def peer_for_model(model, sha256=None):
+        return {"node_name": "mac", "mesh_ip": "100.64.0.2", "_capabilities": {}}
+
+    monkeypatch.setattr(gateway_routing, "peer_for_model", peer_for_model)
+    return served
+
+
+def test_a_prompt_that_does_not_fit_crosses_from_one_machine_to_the_other_as_a_400(household):
+    message = "The prompt is longer than the context window of the model on the machine that serves it."
+    ask = {**BODY, "model": "remote-model"}
+    resp = household.client.post("/v1/chat/completions", json={**ask, "stream": False})
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == {"code": "context_length_exceeded", "message": message}
+    resp = household.client.post("/v1/chat/completions", json={**ask, "stream": True})
+    assert sse_events(resp.text)[0]["error"] == {
+        "message": message, "type": "invalid_request_error", "code": "context_length_exceeded"}
+    assert not any(number in resp.text for number in ("5000", "4096"))
 
 
 # ---------------------------------------------------------------------------

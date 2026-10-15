@@ -7,11 +7,13 @@ Contract:
     are, with no header; the usage row recorded uses the same numbers;
   * a prompt that does not fit this machine's model is a 400 with the code
     context_length_exceeded (a streamed reply keeps its shape: an error object in a
-    data: line, then [DONE]);
+    data: line, then [DONE]); a prompt that does not fit the model on another of the
+    user's machines is the same 400 without the numbers, and one that machine's older
+    release reports as an inference failure stays a 502;
   * `model` is the model id in whole replies and in every chunk, never the model
     file's path;
   * `stop` reaches this machine's model for a reply that is not streamed, as it does
-    for a streamed one.
+    for a streamed one, and reaches the household machine that serves the model.
 
 Same setup as test_gateway_reasoning_tools.py: TestClient with a loopback client
 address, gateway auth off, no real model.
@@ -38,6 +40,7 @@ WEATHER = {"type": "function", "function": {"name": "get_weather", "parameters":
 HERMES = '<tool_call>\n{"name": "get_weather", "arguments": {"city": "Paris"}}\n</tool_call>'
 OVERFLOW = "Requested tokens (5000) exceed context window of 4096"
 CONTEXT_MESSAGE = "This model's maximum context length is 4096 tokens. The prompt is 5000 tokens."
+REMOTE_CONTEXT_MESSAGE = "The prompt is longer than the context window of the model on the machine that serves it."
 
 
 def llama_chunks(pieces, finish="stop", usage=None, model=MODEL_PATH):
@@ -145,19 +148,37 @@ NO_COUNTS = {"prompt_tokens": None, "completion_tokens": None, "total_tokens": N
 
 
 def use_peer(monkeypatch, *, text="hello from peer", usage=NO_COUNTS, model=None):
+    """A household machine that has the model. Returns the keyword arguments of each call to it."""
     peer = {"node_name": "mac", "mesh_ip": "100.64.0.2", "_capabilities": {"supports_tools": True}}
+    seen: list[dict] = []
 
     async def peer_for_model(m, sha256=None):
         return peer
 
     async def complete_peer_openai(p, messages, m, temperature, max_tokens, **kw):
+        seen.append(kw)
         return remote_completion(model or m, text, dict(usage))
 
     async def stream_peer_openai(p, messages, m, temperature, max_tokens, **kw):
+        seen.append(kw)
         for chunk in llama_chunks([text], model=model or m, usage=dict(usage)):
             yield chunk
 
     monkeypatch.setattr("potluck_local.services.gateway_routing.peer_for_model", peer_for_model)
+    monkeypatch.setattr("potluck_local.services.gateway_routing.complete_peer_openai", complete_peer_openai)
+    monkeypatch.setattr("potluck_local.services.gateway_routing.stream_peer_openai", stream_peer_openai)
+    return seen
+
+
+def peer_fails(monkeypatch, error):
+    """The household machine that has the model fails with ``error`` before it says anything."""
+    async def complete_peer_openai(*a, **kw):
+        raise error
+
+    async def stream_peer_openai(*a, **kw):
+        raise error
+        yield  # makes this an async generator
+
     monkeypatch.setattr("potluck_local.services.gateway_routing.complete_peer_openai", complete_peer_openai)
     monkeypatch.setattr("potluck_local.services.gateway_routing.stream_peer_openai", stream_peer_openai)
 
@@ -309,6 +330,44 @@ class TestAPromptThatDoesNotFit:
         resp = post(client, model="remote-model")
         assert resp.status_code == 502 and resp.json()["detail"]["code"] == "inference_error"
 
+    def test_a_prompt_that_does_not_fit_another_machines_model_is_a_400_without_numbers(self, client, monkeypatch):
+        serve(monkeypatch, Engine())
+        use_peer(monkeypatch)
+        # What the machine writes is never used: the words are this machine's own.
+        peer_fails(monkeypatch, RemoteStreamError("9999 tokens at /secret/path", "context_length_exceeded"))
+        resp = post(client, model="remote-model")
+        assert resp.status_code == 400
+        assert resp.json() == {"detail": {"code": "context_length_exceeded", "message": REMOTE_CONTEXT_MESSAGE}}
+        resp = post(client, model="remote-model", stream=True)
+        error = {"message": REMOTE_CONTEXT_MESSAGE, "type": "invalid_request_error", "code": "context_length_exceeded"}
+        assert resp.status_code == 200
+        assert resp.text == f"data: {json.dumps({'error': error})}\n\ndata: [DONE]\n\n"
+        assert "9999" not in resp.text and "secret" not in resp.text
+
+    def test_the_legacy_completions_route_answers_the_same_for_another_machine(self, client, monkeypatch):
+        serve(monkeypatch, Engine())
+        use_peer(monkeypatch)
+        peer_fails(monkeypatch, RemoteStreamError("The prompt is longer than the serving machine's context window.",
+                                                  "context_length_exceeded"))
+        resp = client.post("/v1/completions", json={"model": "remote-model", "prompt": "hi"})
+        assert resp.status_code == 400
+        assert resp.json() == {"detail": {"code": "context_length_exceeded", "message": REMOTE_CONTEXT_MESSAGE}}
+        resp = client.post("/v1/completions", json={"model": "remote-model", "prompt": "hi", "stream": True})
+        error = {"message": REMOTE_CONTEXT_MESSAGE, "type": "invalid_request_error", "code": "context_length_exceeded"}
+        assert resp.status_code == 200 and events(resp)[0] == {"error": error} and events(resp)[-1] == "[DONE]"
+
+    def test_a_machine_on_an_older_release_still_reports_an_inference_failure(self, client, monkeypatch):
+        serve(monkeypatch, Engine())
+        use_peer(monkeypatch)
+        peer_fails(monkeypatch, RemoteStreamError("Inference failed", "inference_error"))
+        resp = post(client, model="remote-model")
+        assert resp.status_code == 502
+        assert resp.json() == {"detail": {"code": "inference_error", "message": "Inference failed"}}
+        assert events(post(client, model="remote-model", stream=True))[0] == {
+            "error": {"message": "Inference failed", "type": "inference_error", "code": "inference_error"}}
+        resp = client.post("/v1/completions", json={"model": "remote-model", "prompt": "hi"})
+        assert resp.status_code == 502 and resp.json()["detail"]["code"] == "inference_error"
+
     def test_the_messages_route_keeps_its_own_words(self, client, monkeypatch):
         serve(monkeypatch, Engine(chat_error=ValueError(OVERFLOW)))
         resp = client.post("/v1/messages", json={"model": "local-model", "max_tokens": 9, "messages": [USER]})
@@ -400,6 +459,30 @@ class TestStop:
         rt = serve(monkeypatch, Engine())
         post(client)
         assert "stop" not in rt.calls[0]
+
+    @pytest.mark.parametrize("stream", [False, True])
+    def test_stop_reaches_the_household_machine_that_serves_the_model(self, client, monkeypatch, stream):
+        serve(monkeypatch, Engine())
+        seen = use_peer(monkeypatch)
+        post(client, model="remote-model", stream=stream, stop=["END", "STOP"])
+        post(client, model="remote-model", stream=stream, stop="END")
+        assert [kw["stop"] for kw in seen] == [["END", "STOP"], ["END"]]
+
+    @pytest.mark.parametrize("stream", [False, True])
+    def test_without_stop_the_household_machine_is_not_sent_the_field(self, client, monkeypatch, stream):
+        serve(monkeypatch, Engine())
+        seen = use_peer(monkeypatch)
+        post(client, model="remote-model", stream=stream)
+        post(client, model="remote-model", stream=stream, stop=[])
+        assert len(seen) == 2 and all("stop" not in kw for kw in seen)
+
+    @pytest.mark.parametrize("stream", [False, True])
+    def test_the_legacy_completions_route_sends_stop_to_the_household_machine(self, client, monkeypatch, stream):
+        serve(monkeypatch, Engine())
+        seen = use_peer(monkeypatch)
+        client.post("/v1/completions", json={"model": "remote-model", "prompt": "hi", "stream": stream, "stop": "END"})
+        client.post("/v1/completions", json={"model": "remote-model", "prompt": "hi", "stream": stream})
+        assert seen[0]["stop"] == ["END"] and "stop" not in seen[1]
 
     def test_the_job_has_no_flag_for_the_old_behaviour(self):
         from potluck_local.routers import gateway
