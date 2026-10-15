@@ -66,7 +66,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 
   clearSession() {
-    set({ session: null, memberProfile: null });
+    set({ session: null, memberProfile: null, hasPersistedToken: false, authFailureKind: null });
   },
 
   setPendingSession(pendingSession) {
@@ -97,3 +97,8 @@ export const useAuthStore = create<AuthState>()((set) => ({
     );
   },
 }));
+
+/** A confirmed session or an existing desktop token while the API is unreachable. */
+export function hasAccountAccess(state: Pick<AuthState, 'session' | 'hasPersistedToken' | 'authFailureKind'>): boolean {
+  return state.session !== null || (state.hasPersistedToken === true && state.authFailureKind === 'network');
+}

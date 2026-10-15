@@ -35,6 +35,7 @@ import { setContributionReceiptsEnabled } from '@/lib/appPrefs';
  * the sidecar is not yet ready.
  */
 export async function hydrateDurablePrefs(): Promise<void> {
+  const localUseRevision = useUiPrefsStore.getState().localUseRevision;
   let settings;
   try {
     settings = await localApi.getSettings();
@@ -76,14 +77,21 @@ export async function hydrateDurablePrefs(): Promise<void> {
     setContributionReceiptsEnabled(receipts !== 'false');
   }
 
+  // A local choice made while this request was in flight wins over older saved routing.
+  const localChoiceChanged = useUiPrefsStore.getState().localUseRevision !== localUseRevision;
+  const localUse = ui[PREF.localUse];
+  if (!localChoiceChanged && (localUse === 'true' || localUse === 'false')) {
+    useUiPrefsStore.getState().setLocalUseEnabled(localUse === 'true');
+  }
+
   // routing_scope - Zustand chatStore handles live state + localStorage.
   const scope = ui[PREF.routingScope];
-  if (
+  if (!localChoiceChanged && !useUiPrefsStore.getState().localUseEnabled && (
     scope === 'local' ||
     scope === 'household' ||
     scope === 'circle' ||
     scope === 'cooperative'
-  ) {
+  )) {
     useChatStore.getState().setRoutingScope(scope);
   }
 
@@ -119,4 +127,5 @@ export const PREF = {
   routingMode: 'potluck.household_routing_mode',
   sidebarCollapsed: 'potluck.sidebar_collapsed',
   onboarding: 'potluck.onboarding_completed',
+  localUse: 'potluck.local_use_enabled',
 } as const;

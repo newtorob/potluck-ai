@@ -1,26 +1,19 @@
-/**
- * SignInWall - full-screen, blocking sign-in screen shown by AuthGate when
- * there is no signed-in session and no cached account to fall back to.
- *
- * Reuses MagicLinkForm/VerifyingLink, the same pair MembershipView uses for
- * its signed-out state, so the sign-in flow itself (and the potluck://
- * deep-link + SignInConfirmDialog handoff) is identical everywhere it
- * appears. This component owns only the framing and copy explaining why an
- * account is required here.
- */
 import { useState } from 'react';
 import { PotluckLogo } from '@/components/brand/PotluckLogo';
 import { MagicLinkForm } from '@/components/auth/MagicLinkForm';
 import { VerifyingLink } from '@/components/auth/VerifyingLink';
 import { useAuth } from '@/hooks/useAuth';
 
-export function SignInWall() {
+export function SignInWall({ onContinueLocal, checkingAccount = false }: {
+  onContinueLocal?: () => void;
+  checkingAccount?: boolean;
+}) {
   const { requestMagicLink } = useAuth();
   const [sentTo, setSentTo] = useState<string | null>(null);
 
   return (
-    <div className="flex h-full w-full items-center justify-center bg-background p-8 grain">
-      <div className="relative z-10 flex w-full max-w-md flex-col items-center gap-8 text-center animate-fade-in-up">
+    <div className="flex h-full w-full overflow-y-auto bg-background px-6 py-8 grain">
+      <div className="relative z-10 m-auto flex w-full max-w-md flex-col items-center gap-8 text-center animate-fade-in-up">
         <div className="relative h-16 w-16">
           <div
             className="absolute inset-0 rounded-2xl bg-primary/15 blur-xl"
@@ -33,18 +26,29 @@ export function SignInWall() {
 
         <div className="space-y-3">
           <h1 className="font-serif text-3xl leading-tight tracking-display text-foreground">
-            Sign in to use Potluck
+            Start with Potluck
           </h1>
           <p className="text-[15px] leading-relaxed text-muted-foreground">
-            Potluck runs on a network of member-owned machines, so every device needs an
-            account tied to a member. Sign in with your email to continue. Your chats and
-            models stay on this device either way.
+            Chat with a model on this machine and manage your models without an account.
+            Sign in to connect your machines or join a trusted circle.
           </p>
         </div>
 
-        <div className="w-full">
+        {onContinueLocal && (
+          <div className="w-full space-y-2">
+            <button type="button" autoFocus onClick={onContinueLocal}
+              className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              Use on this machine
+            </button>
+            <p className="text-xs leading-relaxed text-muted-foreground">You can sign in later. Your local chats and settings will still be here.</p>
+          </div>
+        )}
+
+        <div className="w-full space-y-4">
+          <p className="text-sm font-medium text-foreground">Or sign in to connect</p>
+          {checkingAccount && <p role="status" className="text-xs text-muted-foreground">Checking your account… You can continue locally now.</p>}
           {sentTo === null ? (
-            <MagicLinkForm onSent={setSentTo} />
+            <MagicLinkForm onSent={setSentTo} autoFocus={!onContinueLocal} />
           ) : (
             <VerifyingLink
               email={sentTo}

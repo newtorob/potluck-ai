@@ -2,7 +2,7 @@
  * PrivacyPanel - privacy and telemetry toggles.
  *
  * Each toggle has a label, description, and immediate save on change.
- * Re-asserts the core Potluck AI privacy guarantee.
+ * Explains the data boundary of each routing choice.
  */
 
 import { useState } from 'react';
@@ -101,17 +101,18 @@ export function PrivacyPanel({ settings, isSaving, saveError, onUpdate }: Privac
 
   return (
     <div className="space-y-6">
-      {/* Privacy guarantee banner */}
+      {/* Routing privacy explanation */}
       <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
         <Shield className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
         <div>
           <p className="text-sm font-medium text-foreground">Local by default. You choose when a prompt leaves this device.</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Local mode runs entirely on this device via llama.cpp. My Machines routes to your own
-            hardware over your private WireGuard mesh. Open-pool routing passes the prompt through
-            the coordinator (in memory, never stored, with your identity stripped) to a volunteer
-            peer who sees the prompt but not who you are. Potluck's servers never store your
-            conversation content.
+            Local uses this machine's loaded runtime, including any remote compute configured for
+            Big Model Mode. My machines uses your paired hardware over an encrypted mesh. A trusted
+            circle sends the conversation to a member's machine; the coordinator also processes it
+            when relaying the request. Open-pool routing is planned, not available yet. The serving
+            operator can read what you send, and the content may identify you even when account
+            details are omitted. Retention rules cannot guarantee what a modified contributor records.
           </p>
         </div>
       </div>

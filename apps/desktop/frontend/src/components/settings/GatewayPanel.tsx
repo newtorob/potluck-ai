@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import { hasAccountAccess, useAuthStore } from '@/stores/authStore';
 /**
  * GatewayPanel - Settings, Connect tools.
  *
@@ -56,6 +58,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
 }
 
 export function GatewayPanel({ settings, isSaving, saveError, onUpdate }: GatewayPanelProps) {
+  const accountAvailable = useAuthStore(hasAccountAccess);
   const gateway = settings.gateway;
   const hasKey = gateway.api_key.length > 0;
 
@@ -66,14 +69,17 @@ export function GatewayPanel({ settings, isSaving, saveError, onUpdate }: Gatewa
   const enabledAndReady = gateway.enabled && hasKey;
 
   const setEnabled = (enabled: boolean) => {
+    if (enabled && !hasAccountAccess(useAuthStore.getState())) return;
     void onUpdate({ gateway: { enabled } });
   };
 
   const setPoolRouting = (pool_routing: boolean) => {
+    if (pool_routing && !hasAccountAccess(useAuthStore.getState())) return;
     void onUpdate({ gateway: { pool_routing } });
   };
 
   const generateKey = async () => {
+    if (!hasAccountAccess(useAuthStore.getState())) return;
     setBusy(true);
     setError(null);
     try {
@@ -110,8 +116,8 @@ export function GatewayPanel({ settings, isSaving, saveError, onUpdate }: Gatewa
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Potluck speaks the OpenAI API. Point any compatible tool (Cursor, Continue, aider,
-            Open WebUI, the openai SDK) at the address below and it runs on this machine's loaded
-            model. The key opens only this gateway, never the rest of Potluck.
+            Open WebUI, the openai SDK) at the address below to use the loaded model or a model on
+            your connected machines. The key opens only this gateway, never the rest of Potluck.
           </p>
         </div>
       </div>
@@ -119,6 +125,13 @@ export function GatewayPanel({ settings, isSaving, saveError, onUpdate }: Gatewa
       {(saveError || error) && (
         <p className="text-sm text-destructive" role="alert">
           {saveError || error}
+        </p>
+      )}
+
+      {!accountAvailable && (
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          <Link to="/membership" className="text-primary underline underline-offset-2">Sign in</Link> to set up the inference gateway. It can route tool requests to your other machines.
+          {gateway.enabled && ' Your existing gateway is still running; choosing local chat does not stop it. You can turn it off below.'}
         </p>
       )}
 
@@ -139,7 +152,7 @@ export function GatewayPanel({ settings, isSaving, saveError, onUpdate }: Gatewa
           role="switch"
           aria-checked={gateway.enabled}
           aria-label="Enable the gateway"
-          disabled={isSaving || !hasKey}
+          disabled={isSaving || (!gateway.enabled && (!hasKey || !accountAvailable))}
           onClick={() => setEnabled(!gateway.enabled)}
           className={cn(
             'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200',
@@ -166,13 +179,14 @@ export function GatewayPanel({ settings, isSaving, saveError, onUpdate }: Gatewa
             that one prompt through the network to another member's machine. Your machines are
             always tried first. Off by default.
           </p>
+          {!accountAvailable && <p className="mt-1 text-xs text-muted-foreground"><Link to="/membership" className="text-primary underline underline-offset-2">Sign in</Link> to enable open-pool routing.</p>}
         </div>
         <button
           type="button"
           role="switch"
           aria-checked={gateway.pool_routing ?? false}
           aria-label="Allow open-pool routing"
-          disabled={isSaving || !enabledAndReady}
+          disabled={isSaving || (!gateway.pool_routing && (!enabledAndReady || !accountAvailable))}
           onClick={() => setPoolRouting(!(gateway.pool_routing ?? false))}
           className={cn(
             'relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200',
@@ -228,7 +242,7 @@ export function GatewayPanel({ settings, isSaving, saveError, onUpdate }: Gatewa
             <button
               type="button"
               onClick={() => void generateKey()}
-              disabled={busy}
+              disabled={busy || !accountAvailable}
               className="mt-1 inline-flex items-center gap-1.5 rounded text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <RefreshCw className={cn('h-3 w-3', busy && 'animate-spin')} aria-hidden />
@@ -242,7 +256,7 @@ export function GatewayPanel({ settings, isSaving, saveError, onUpdate }: Gatewa
           <button
             type="button"
             onClick={() => void generateKey()}
-            disabled={busy}
+            disabled={busy || !accountAvailable}
             className={cn(
               'inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground',
               'transition-colors hover:bg-primary/90 disabled:opacity-50 shadow-hearth-sm',
@@ -280,8 +294,8 @@ export function GatewayPanel({ settings, isSaving, saveError, onUpdate }: Gatewa
           The gateway is reachable only from this machine (loopback), and the key authorizes the
           gateway alone. Requests run on your loaded model by default. A request for a model you keep
           on another of your own machines runs there over your private mesh. Open-pool routing, only
-          when you enable it above, sends a single prompt to another member's machine with no account
-          or identity attached.
+          when you enable it above, sends a single prompt through the coordinator to another member's machine.
+          The job omits your account identity, but the prompt itself may identify you.
         </span>
       </div>
     </div>

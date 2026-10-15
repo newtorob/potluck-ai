@@ -5,7 +5,7 @@ Potluck is local-first AI. It runs open-source models on your own machine, and i
 This guide takes you from zero to running, then shows how to connect your own machines together and how to connect to other people.
 
 - [1. Install the app](#1-install-the-app)
-- [2. First run: pick a model and sign in](#2-first-run-pick-a-model-and-sign-in)
+- [2. First run: pick a model and choose local access](#2-first-run-pick-a-model-and-choose-local-access)
 - [3. Use it](#3-use-it)
 - [4. Add your own machines (your household)](#4-add-your-own-machines-your-household)
 - [5. Connect to other people (trusted circles + the open pool)](#5-connect-to-other-people)
@@ -73,7 +73,7 @@ See [Build from source](../README.md#build-from-source) in the repository README
 
 ---
 
-## 2. First run: pick a model and sign in
+## 2. First run: pick a model and choose local access
 
 The first time you open Potluck it walks you through a short setup. It takes a couple of minutes.
 
@@ -93,11 +93,15 @@ Click **Download and load** to begin. An already installed model needs an explic
 
 The model downloads with a visible progress bar and is checked against a known hash before it loads. This is the one part that can take a few minutes, depending on your connection and the model size.
 
-**Sign in.** Potluck runs on a network of member-owned machines, so each device is tied to an account. Enter your email and click **Send magic link**. Open the email, click the link, and you are in. No password. Your chats and models stay on your device either way.
+**Choose local access or sign in.** You can use chat, manage local models, and use local memory without an account. Choose **Use on this machine** to continue locally. This selects Local routing; requests to your other machines, trusted circles, and the cooperative network require sign-in.
 
-![The sign-in screen asking for an email to send a magic link](images/getting-started/04-sign-in.jpg)
+![Potluck entry screen with Use on this machine above the optional email sign-in form](images/getting-started/04-local-entry.jpg)
 
-That is it. You now have private, local AI running on your machine.
+To connect machines or use account features, enter your email and click **Send magic link**. Open the email and confirm the sign-in in Potluck. You can do this later from Settings → Account or when opening a feature that needs an account. Signing in keeps your local chats, models, and settings.
+
+The local choice controls desktop chat. Downloading models and checking for updates still use the internet, and existing gateway or compute-sharing services keep their configuration. Setting up the inference gateway in Settings → Connect tools requires sign-in because it can route requests to other machines; an already enabled gateway can still be turned off without signing in.
+
+If Big Model Mode is already using other machines, account-free chat asks you to open Models and load a model on this machine. Choosing local access does not stop or reconfigure that running model for you.
 
 ---
 

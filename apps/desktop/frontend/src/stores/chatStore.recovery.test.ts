@@ -1,13 +1,15 @@
+import { useUiPrefsStore } from '@/stores/uiPrefsStore';
+import { useAuthStore } from '@/stores/authStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HouseholdStreamOptions } from '@/lib/householdInference';
 
 const mocks = vi.hoisted(() => ({
-  household: vi.fn(), network: vi.fn(), local: vi.fn(),
+  household: vi.fn(), network: vi.fn(), local: vi.fn(), health: vi.fn(),
   history: { create: vi.fn(), appendMessage: vi.fn(), update: vi.fn() },
   usage: vi.fn(), settings: { privacy: { chat_history_enabled: false } },
 }));
 vi.mock('@/lib/localApi', () => ({ localApi: {
-  streamChat: mocks.local, streamNetworkJob: mocks.network,
+  streamChat: mocks.local, streamNetworkJob: mocks.network, health: mocks.health,
   history: mocks.history, usage: { record: mocks.usage },
 } }));
 vi.mock('@/lib/sidecarPersist', () => ({ persistUiPref: vi.fn() }));
@@ -36,8 +38,12 @@ async function interrupt() {
 }
 
 beforeEach(() => {
+  useUiPrefsStore.setState({ localUseEnabled: false });
+  useAuthStore.setState({ session: { memberId: 'member', token: '', expiresAt: '' }, hasPersistedToken: false, authFailureKind: null });
   useChatStore.getState().clearConversations();
   vi.clearAllMocks();
+  mocks.health.mockReset().mockResolvedValue({ model_loaded: true, loaded_rpc_servers: [], loaded_pipeline: null });
+  mocks.local.mockReset().mockImplementation(async () => new Response(completed));
   mocks.settings.privacy.chat_history_enabled = false;
   mocks.history.create.mockResolvedValue({});
   mocks.history.appendMessage.mockResolvedValue({});
@@ -108,4 +114,81 @@ describe('explicit household restart', () => {
     await useChatStore.getState().restartMessage('missing');
     expect(mocks.household).not.toHaveBeenCalled();
   });
+});
+
+
+describe('account-free dispatch protection', () => {
+  it('preserves the original local choice if preferences change while history is being saved', async () => {
+    useUiPrefsStore.setState({ localUseEnabled: true });
+    mocks.settings.privacy.chat_history_enabled = true;
+    let finishCreate!: (value: object) => void;
+    mocks.history.create.mockImplementationOnce(() => new Promise((resolve) => { finishCreate = resolve; }));
+    mocks.health.mockResolvedValue({ model_loaded: true, loaded_rpc_servers: ['192.0.2.2:50052'], loaded_pipeline: null });
+    const sending = useChatStore.getState().sendMessage('keep this request local');
+    await vi.waitFor(() => expect(finishCreate).toBeTypeOf('function'));
+    useUiPrefsStore.setState({ localUseEnabled: false });
+    finishCreate({});
+    await sending;
+    expect(mocks.health).toHaveBeenCalledOnce();
+    expect(mocks.local).not.toHaveBeenCalled();
+    expect(mocks.network).not.toHaveBeenCalled();
+    expect(mocks.household).not.toHaveBeenCalled();
+    expect(active().messages.at(-1)?.errorText).toContain('continue locally');
+  });
+
+  it('sends a restored remote scope only to a checked local runtime', async () => {
+    useAuthStore.getState().clearSession();
+    useChatStore.setState({ routingScope: 'cooperative' });
+    await useChatStore.getState().sendMessage('local request');
+    expect(mocks.health).toHaveBeenCalledOnce();
+    expect(mocks.local).toHaveBeenCalledOnce();
+    expect(mocks.network).not.toHaveBeenCalled();
+    expect(mocks.household).not.toHaveBeenCalled();
+    expect(active().messages.at(-1)?.status).toBe('complete');
+  });
+
+  it.each([
+    { loaded_rpc_servers: ['192.0.2.2:50052'], loaded_pipeline: null },
+    { loaded_rpc_servers: [], loaded_pipeline: { strategy: 'pipeline' } },
+  ])('blocks a previously configured split runtime without dispatching', async (runtime) => {
+    useAuthStore.getState().clearSession();
+    mocks.health.mockResolvedValue({ model_loaded: true, ...runtime });
+    await useChatStore.getState().sendMessage('keep local');
+    expect(mocks.local).not.toHaveBeenCalled();
+    expect(mocks.network).not.toHaveBeenCalled();
+    expect(mocks.household).not.toHaveBeenCalled();
+    expect(active().messages.at(-1)?.errorText).toContain('Open Models');
+  });
+
+  it('fails closed when the current runtime cannot be checked', async () => {
+    useAuthStore.getState().clearSession();
+    mocks.health.mockRejectedValue(new Error('offline'));
+    await useChatStore.getState().sendMessage('keep local');
+    expect(mocks.local).not.toHaveBeenCalled();
+    expect(active().messages.at(-1)?.errorText).toContain('Cannot check the loaded model');
+  });
+
+  it('does not restart a household request after signing out', async () => {
+    const interrupted = await interrupt();
+    useAuthStore.getState().clearSession();
+    useChatStore.getState().setRoutingScope('local');
+    await useChatStore.getState().restartMessage(interrupted.id);
+    expect(mocks.household).toHaveBeenCalledTimes(1);
+    expect(mocks.network).not.toHaveBeenCalled();
+    expect(mocks.local).not.toHaveBeenCalled();
+    expect(active().messages.at(-1)?.errorText).toContain('Sign in from Settings → Account');
+    expect(active().messages.at(-1)?.recovery?.modelSlug).toBe('original-model');
+  });
+});
+
+
+it('keeps an explicit local choice after a remembered account is restored', async () => {
+  useUiPrefsStore.getState().setLocalUseEnabled(true);
+  useChatStore.setState({ routingScope: 'cooperative' });
+  mocks.health.mockResolvedValue({ model_loaded: true, loaded_rpc_servers: ['192.0.2.2:50052'] });
+  await useChatStore.getState().sendMessage('local choice');
+  expect(mocks.health).toHaveBeenCalledOnce();
+  expect(mocks.local).not.toHaveBeenCalled();
+  expect(mocks.network).not.toHaveBeenCalled();
+  expect(active().messages.at(-1)?.errorText).toContain('continue locally');
 });

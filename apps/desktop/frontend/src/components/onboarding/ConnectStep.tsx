@@ -1,3 +1,4 @@
+import { hasAccountAccess, useAuthStore } from '@/stores/authStore';
 /**
  * ConnectStep - step 5 of the First Run wizard ("Your machines").
  *
@@ -28,6 +29,7 @@ import { registerContributorDeviceKey } from '@/lib/deviceKey';
 // ---------------------------------------------------------------------------
 
 export function ConnectStep() {
+  const accountAvailable = useAuthStore(hasAccountAccess);
   const status = useMeshStore((s) => s.status);
   const peers = useMeshStore((s) => s.peers);
   const bridge = useMeshStore((s) => s.bridge);
@@ -42,8 +44,8 @@ export function ConnectStep() {
   // Kick the mesh store if it hasn't been started yet (app-wide start in
   // App.tsx is idempotent, so this is a safe no-op in production).
   useEffect(() => {
-    start();
-  }, [start]);
+    if (accountAvailable) start();
+  }, [start, accountAvailable]);
 
   const isPaired = status !== null && status.node_id !== null && status.mesh_ip !== null;
   const meshUp = status?.mesh_status === 'running';
@@ -52,6 +54,7 @@ export function ConnectStep() {
   const contributorMode = settings?.network.contributor_mode ?? false;
 
   async function handleContributorToggle(next: boolean) {
+    if (next && !hasAccountAccess(useAuthStore.getState())) return;
     try {
       await updateSettings({ network: { contributor_mode: next } });
     } catch {
@@ -72,6 +75,14 @@ export function ConnectStep() {
       }
     }
   }
+
+  if (!accountAvailable) return (
+    <div className="space-y-3 animate-fade-in">
+      <h2 className="font-serif text-2xl tracking-display text-foreground">Start on this machine</h2>
+      <p className="text-sm leading-relaxed text-muted-foreground">No account is needed for local chat or model management. Continue on this machine now, and sign in later from Settings → Account to connect other machines or use the network.</p>
+      <p className="text-sm leading-relaxed text-muted-foreground">Signing in later keeps your local chats and settings.</p>
+    </div>
+  );
 
   return (
     <div className="space-y-5 animate-fade-in">

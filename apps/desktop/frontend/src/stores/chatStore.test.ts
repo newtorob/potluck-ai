@@ -1,3 +1,5 @@
+import { useUiPrefsStore } from '@/stores/uiPrefsStore';
+import { useAuthStore } from '@/stores/authStore';
 /**
  * Regression: createConversation must finish before appendMessage/update,
  * otherwise SQLite rejects the message with FOREIGN KEY constraint failed.
@@ -109,6 +111,8 @@ async function flush(): Promise<void> {
 
 describe('chatStore persistence and routing', () => {
   beforeEach(() => {
+  useUiPrefsStore.setState({ localUseEnabled: false });
+  useAuthStore.setState({ session: { memberId: 'member', token: '', expiresAt: '' }, hasPersistedToken: false, authFailureKind: null });
     history.create.mockReset().mockResolvedValue({});
     history.appendMessage.mockReset().mockResolvedValue({});
     history.update.mockReset().mockResolvedValue({});

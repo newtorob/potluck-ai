@@ -37,6 +37,9 @@ vi.mock('@/lib/localApi', () => ({
   },
 }));
 
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ isSignedIn: false, hasCachedAccount: false }) }));
+vi.mock('@/lib/sidecarPersist', () => ({ persistUiPref: vi.fn() }));
+
 vi.mock('@/hooks/useHardware', () => ({
   useHardware: () => ({
     hardware: {

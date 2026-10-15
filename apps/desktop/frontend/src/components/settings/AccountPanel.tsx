@@ -71,9 +71,9 @@ export function AccountPanel() {
         </div>
 
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Membership features (founding member status, governance voting, and the contributor
-          network) live on the Membership page. Sign-in is not required to use local chat. Your
-          models run entirely on this device.
+          Local chat and model management need no account. Sign in to connect your machines
+          or join trusted circles. Your local chats and settings
+          are kept when you sign in.
         </p>
 
         {isSignedIn ? (

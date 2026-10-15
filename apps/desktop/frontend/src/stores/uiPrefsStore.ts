@@ -96,6 +96,11 @@ interface UiPrefsState {
   /** Which sidebar nav groups are collapsed, keyed by group id. Absent/false = expanded. */
   navGroupsCollapsed: Record<string, boolean>;
   onboardingCompleted: boolean;
+  /** Explicit choice to enter the app without an account. */
+  localUseEnabled: boolean;
+  /** In-session revision prevents slow hydration from overwriting a new choice. */
+  localUseRevision: number;
+  setLocalUseEnabled: (enabled: boolean) => void;
 
   /** Switch theme, update DOM class, persist to localStorage + sidecar. */
   setTheme: (t: Theme) => void;
@@ -117,6 +122,14 @@ export const useUiPrefsStore = create<UiPrefsState>()((set) => ({
   sidebarCollapsed: readStoredSidebarCollapsed(),
   navGroupsCollapsed: readStoredNavGroupsCollapsed(),
   onboardingCompleted: readStoredOnboardingCompleted(),
+  localUseRevision: 0,
+  localUseEnabled: typeof window !== 'undefined' && window.localStorage.getItem('potluck.local_use_enabled') === 'true',
+
+  setLocalUseEnabled(enabled) {
+    if (typeof window !== 'undefined') window.localStorage.setItem('potluck.local_use_enabled', String(enabled));
+    set((state) => ({ localUseEnabled: enabled, localUseRevision: state.localUseRevision + 1 }));
+    persistUiPref('potluck.local_use_enabled', String(enabled));
+  },
 
   setTheme(t) {
     if (typeof window !== 'undefined') window.localStorage.setItem(THEME_KEY, t);

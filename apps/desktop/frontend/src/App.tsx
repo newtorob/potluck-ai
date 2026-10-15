@@ -8,6 +8,7 @@ import { SidecarReconnectingBanner } from '@/components/layout/SidecarReconnecti
 import { UpdateBanner } from '@/components/layout/UpdateBanner';
 import { AnswerCheckBanner } from '@/components/layout/AnswerCheckBanner';
 import { UpdateRequiredGate } from '@/components/layout/UpdateRequiredGate';
+import { AccountRequired } from '@/components/auth/AccountRequired';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { ChatView } from '@/views/ChatView';
 import { ModelLibrary } from '@/views/ModelLibrary';
@@ -41,7 +42,7 @@ import { WeeklyReceiptToast } from '@/components/household/WeeklyReceiptToast';
  * Root application shell.
  *
  * Layout: TitleBar (Mac drag region) + Sidebar (fixed left) + main content area.
- * AuthGate requires a signed-in account before Sidebar/routes render - see
+ * AuthGate offers local use or account sign-in before Sidebar/routes render - see
  * apps/desktop/frontend/src/components/auth/AuthGate.tsx for the loading /
  * sign-in-wall / offline-cached-account decision.
  *
@@ -266,13 +267,13 @@ export default function App() {
               <Route path="/tasks" element={<TaskStateView />} />
               <Route path="/agents" element={<AgentsView />} />
               <Route path="/usage" element={<UsageView />} />
-              <Route path="/household" element={<HouseholdView />} />
-              <Route path="/circles" element={<CirclesView />} />
+              <Route path="/household" element={<AccountRequired feature="connect your machines"><HouseholdView /></AccountRequired>} />
+              <Route path="/circles" element={<AccountRequired feature="use trusted circles"><CirclesView /></AccountRequired>} />
               <Route path="/readiness" element={<ReadinessView />} />
-              <Route path="/network" element={<NetworkView />} />
+              <Route path="/network" element={<AccountRequired feature="use the network"><NetworkView /></AccountRequired>} />
               <Route path="/settings" element={<SettingsView />} />
               <Route path="/membership" element={<MembershipView />} />
-              <Route path="/admin" element={<AdminView />} />
+              <Route path="/admin" element={<AccountRequired feature="open administration"><AdminView /></AccountRequired>} />
               {/* Catch-all: redirect unknown paths to chat */}
               <Route path="*" element={<Navigate to="/chat" replace />} />
             </Routes>

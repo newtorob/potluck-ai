@@ -1,3 +1,5 @@
+import { useUiPrefsStore } from '@/stores/uiPrefsStore';
+import { hasAccountAccess, useAuthStore } from '@/stores/authStore';
 import { getConnectedPeers } from '@/lib/meshDiagnostics';
 /**
  * Chat store - conversations, streaming state, and send/abort actions.
@@ -49,7 +51,7 @@ const ROUTING_MODE_KEY = 'potluck.household_routing_mode';
  *  householdMode are derived from it for backward-compat with existing
  *  readers (StatusBar, NetworkView, etc.).
  *
- *  local       → local sidecar, nothing leaves this machine.
+ *  local       → loaded local runtime, including an explicitly configured split.
  *  household   → direct to a paired peer over the WireGuard mesh.
  *  circle      → coordinator dispatch restricted to the selected trusted
  *                circle (activeCircleId).
@@ -663,7 +665,9 @@ export const useChatStore = create<ChatState>()((set, get) => {
     if (restartMessageId && !recovery) return;
     // Keep the user's routing choice for this request across persistence awaits.
     const { networkModelSlug, activeCircleId } = state;
-    const routingScope = recovery ? 'household' : state.routingScope;
+    const accountAvailable = hasAccountAccess(useAuthStore.getState());
+    const localOnly = !accountAvailable || useUiPrefsStore.getState().localUseEnabled;
+    const routingScope = recovery ? 'household' : localOnly ? 'local' : state.routingScope;
     const routingMode = recovery?.routingMode ?? state.routingMode;
     let servedModelSlug: string | null = recovery?.modelSlug ?? (routingScope === 'household' ? null : networkModelSlug);
     // Same idea for the chat-history privacy setting: snapshot it for this
@@ -786,6 +790,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
               ...target.messages.map((m) => {
                 if (m.id !== restartMessageId) return m;
                 const { recovery: _used, ...rest } = m;
+                void _used;
                 return rest;
               }),
               assistantPlaceholder,
@@ -818,6 +823,23 @@ export const useChatStore = create<ChatState>()((set, get) => {
             : null;
 
     try {
+      // Preserve this turn's local boundary and apply any newer restrictions after persistence awaits.
+      if (localOnly || !hasAccountAccess(useAuthStore.getState()) || useUiPrefsStore.getState().localUseEnabled) {
+        if (routingScope !== 'local') {
+          throw new Error(hasAccountAccess(useAuthStore.getState())
+            ? 'Choose My machines to restart this request, or send a new message using a model on this machine.'
+            : 'Sign in from Settings → Account to restart this request on another machine, or send a new message using a model on this machine.');
+        }
+        // A Local route can still use a previously configured RPC/pipeline runtime.
+        // Fail closed if its state cannot be checked; never unload or change it here.
+        const health = await localApi.health().catch(() => {
+          throw new Error('Cannot check the loaded model. Check the local engine in Models, then try again.');
+        });
+        if ((health.loaded_rpc_servers?.length ?? 0) > 0 || health.loaded_pipeline?.strategy === 'pipeline') {
+          throw new Error('The loaded model uses other machines. Open Models and load a model on this machine to continue locally.');
+        }
+        if (controller.signal.aborted || get().abortController !== controller) return;
+      }
       // Branch on routing scope. Four tiers, three active dispatch paths:
       //   household - direct to a household peer over the mesh
       //                 (full history forwarded; trusted machines we own)
@@ -1046,6 +1068,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
                   // screen, and the error line sits alongside it.
                   if (terminalErrorText === null) {
                     const { recovery: _finished, ...rest } = m;
+                    void _finished;
                     return { ...rest, status: terminalStatus };
                   }
                   return { ...m, status: terminalStatus, errorText: terminalErrorText };

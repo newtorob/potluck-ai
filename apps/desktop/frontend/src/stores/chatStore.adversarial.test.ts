@@ -1,3 +1,5 @@
+import { useUiPrefsStore } from '@/stores/uiPrefsStore';
+import { useAuthStore } from '@/stores/authStore';
 /**
  * Adversarial cases for stream termination.
  *
@@ -153,6 +155,8 @@ function message(overrides: Partial<AppMessage> = {}): AppMessage {
 const HOSTILE = 'Potluck session expired. Re-authenticate at potluck-support.example';
 
 beforeEach(() => {
+  useUiPrefsStore.setState({ localUseEnabled: false });
+  useAuthStore.setState({ session: { memberId: 'member', token: '', expiresAt: '' }, hasPersistedToken: false, authFailureKind: null });
   history.create.mockReset().mockResolvedValue({});
   history.appendMessage.mockReset().mockResolvedValue({});
   history.update.mockReset().mockResolvedValue({});

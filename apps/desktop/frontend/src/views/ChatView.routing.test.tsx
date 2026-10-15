@@ -1,3 +1,5 @@
+import { useUiPrefsStore } from '@/stores/uiPrefsStore';
+import { useAuthStore } from '@/stores/authStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -5,6 +7,7 @@ import { MemoryRouter } from 'react-router-dom';
 const mocks = vi.hoisted(() => ({
   coordinator: { reachable: true, lastCheckedAt: 1 as number | null },
   modelLoaded: true,
+  loadedRpcServers: [] as string[],
   isStreaming: false,
   send: vi.fn(),
   abort: vi.fn(),
@@ -22,7 +25,7 @@ vi.mock('@/hooks/useChat', () => ({
   }),
 }));
 vi.mock('@/hooks/useHealth', () => ({
-  useHealth: () => ({ modelLoaded: mocks.modelLoaded, nCtxLoaded: 8192 }),
+  useHealth: () => ({ modelLoaded: mocks.modelLoaded, nCtxLoaded: 8192, loadedRpcServers: mocks.loadedRpcServers, loadedPipeline: null }),
 }));
 vi.mock('@/hooks/useSettings', () => ({
   useSettings: () => ({ settings: null, isLoaded: false }),
@@ -54,6 +57,9 @@ async function openScopes() {
 }
 
 beforeEach(() => {
+  useUiPrefsStore.setState({ localUseEnabled: false });
+  useAuthStore.setState({ session: { memberId: 'member', token: '', expiresAt: '' }, hasPersistedToken: false, authFailureKind: null });
+  mocks.loadedRpcServers = [];
   mocks.coordinator = { reachable: true, lastCheckedAt: 1 };
   mocks.modelLoaded = true;
   mocks.isStreaming = false;
@@ -193,4 +199,54 @@ describe('Network connection recovery message', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Coordinator available');
     expect(screen.queryByText(/Cannot connect to the network/)).not.toBeInTheDocument();
   });
+});
+
+
+describe('signed-out local chat', () => {
+  it('clamps a restored remote scope and preserves the remembered circle without fetching it', async () => {
+    useAuthStore.getState().clearSession();
+    useChatStore.setState({ routingScope: 'circle', activeCircleId: 'remember-me' });
+    render(chat());
+    expect(screen.getByRole('button', { name: /Routing scope: Local only/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Routing scope: Local only/ }));
+    for (const label of [/My machines/, /Trusted circle/, /Cooperative network/]) {
+      const choice = screen.getByRole('option', { name: label });
+      expect(choice).toBeDisabled();
+      expect(choice).toHaveTextContent('Sign in from Settings → Account');
+    }
+    expect(mocks.circles).not.toHaveBeenCalled();
+    expect(useChatStore.getState().activeCircleId).toBe('remember-me');
+    expect(useChatStore.getState().routingScope).toBe('circle');
+  });
+
+  it('explains an existing split runtime and disables unsigned sending without changing it', () => {
+    useAuthStore.getState().clearSession();
+    mocks.loadedRpcServers = ['192.0.2.2:50052'];
+    render(chat());
+    expect(screen.getByRole('alert')).toHaveTextContent('The loaded model uses other machines.');
+    expect(screen.getByRole('heading', { name: 'Choose a model for local chat' })).toBeInTheDocument();
+    expect(screen.queryByText('No model loaded yet')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open Models' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Chat message' }), { target: { value: 'Private draft' } });
+    expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
+    expect(mocks.send).not.toHaveBeenCalled();
+  });
+});
+
+
+it('keeps local use after account restoration until the member chooses the loaded split model', () => {
+  useUiPrefsStore.setState({ localUseEnabled: true });
+  useChatStore.setState({ routingScope: 'circle', activeCircleId: 'circle-1' });
+  mocks.loadedRpcServers = ['192.0.2.2:50052'];
+  render(chat());
+  expect(screen.getByRole('alert')).toHaveTextContent('The loaded model uses other machines.');
+  fireEvent.change(screen.getByRole('textbox', { name: 'Chat message' }), { target: { value: 'Keep this draft' } });
+  expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Use this model' }));
+  expect(useUiPrefsStore.getState().localUseEnabled).toBe(false);
+  expect(useChatStore.getState().routingScope).toBe('local');
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Send message' })).toBeEnabled();
+  expect(screen.getByRole('textbox', { name: 'Chat message' })).toHaveValue('Keep this draft');
+  expect(mocks.send).not.toHaveBeenCalled();
 });

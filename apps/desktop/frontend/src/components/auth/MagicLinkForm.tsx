@@ -6,17 +6,19 @@
  * arrives later via a potluck:// deep link (see useDeepLinkAuth).
  */
 
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
 interface MagicLinkFormProps {
   onSent: (email: string) => void;
+  autoFocus?: boolean;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function MagicLinkForm({ onSent }: MagicLinkFormProps) {
+export function MagicLinkForm({ onSent, autoFocus = true }: MagicLinkFormProps) {
   const { requestMagicLink, authError } = useAuth();
+  const emailId = useId();
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const valid = EMAIL_RE.test(email.trim());
@@ -37,11 +39,13 @@ export function MagicLinkForm({ onSent }: MagicLinkFormProps) {
 
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="w-full space-y-3" noValidate>
+      <label htmlFor={emailId} className="block text-left text-sm font-medium text-foreground">Email address</label>
       <input
+        id={emailId}
         type="email"
         inputMode="email"
         autoComplete="email"
-        autoFocus
+        autoFocus={autoFocus}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder="you@example.com"

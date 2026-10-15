@@ -1,3 +1,5 @@
+import { hasAccountAccess, useAuthStore } from '@/stores/authStore';
+import { useUiPrefsStore } from '@/stores/uiPrefsStore';
 /**
  * ChatView - main chat interface route (/chat).
  *
@@ -57,10 +59,14 @@ export function ChatView() {
   } = useChat();
 
   const { settings, isLoaded: settingsLoaded } = useSettings();
-  const { modelLoaded, nCtxLoaded } = useHealth();
+  const { modelLoaded, nCtxLoaded, loadedRpcServers, loadedPipeline } = useHealth();
+  const accountAvailable = useAuthStore(hasAccountAccess);
+  const localUseEnabled = useUiPrefsStore((s) => s.localUseEnabled);
+  const remoteRuntime = (!accountAvailable || localUseEnabled) && ((loadedRpcServers?.length ?? 0) > 0 || loadedPipeline !== null && loadedPipeline !== undefined);
 
   // Primary routing scope - the four-tier trust gradient.
-  const routingScope = useChatStore((s) => s.routingScope);
+  const savedRoutingScope = useChatStore((s) => s.routingScope);
+  const routingScope = accountAvailable && !localUseEnabled ? savedRoutingScope : 'local';
   const setRoutingScope = useChatStore((s) => s.setRoutingScope);
   const networkModelSlug = useChatStore((s) => s.networkModelSlug);
   const activeCircleId = useChatStore((s) => s.activeCircleId);
@@ -70,6 +76,10 @@ export function ChatView() {
   // Best-effort: coordinator unreachable = empty list (tier stays disabled).
   const [circles, setCircles] = useState<Circle[]>([]);
   useEffect(() => {
+    if (!accountAvailable) {
+      setCircles([]);
+      return;
+    }
     let cancelled = false;
     localApi.circles
       .list()
@@ -88,7 +98,7 @@ export function ChatView() {
     return () => {
       cancelled = true;
     };
-  }, [setActiveCircleId]);
+  }, [setActiveCircleId, accountAvailable]);
 
   // Household-peer availability - mesh store polls the sidecar; we gate
   // the household tier on having at least one reachable peer.
@@ -127,7 +137,7 @@ export function ChatView() {
   const networkMode = routingScope === 'cooperative';
   const householdMode = routingScope === 'household';
   const circleMode = routingScope === 'circle' && activeCircleId !== null;
-  const sendReady = modelLoaded || networkMode || householdMode || circleMode;
+  const sendReady = !remoteRuntime && (modelLoaded || networkMode || householdMode || circleMode);
 
   const isEmpty = messages.length === 0;
 
@@ -154,7 +164,12 @@ export function ChatView() {
             {/* Four-tier scope selector. */}
             <ScopeSelector
               scope={routingScope}
-              onChange={setRoutingScope}
+              onChange={(scope) => {
+                if (scope !== 'local' && !hasAccountAccess(useAuthStore.getState())) return;
+                setRoutingScope(scope);
+                if (scope !== 'local') useUiPrefsStore.getState().setLocalUseEnabled(false);
+              }}
+              accountAvailable={accountAvailable}
               disabled={isStreaming}
               householdAvailable={householdPeersReachable}
               cooperativeAvailable={coordinatorReachable}
@@ -245,6 +260,7 @@ export function ChatView() {
       {isEmpty ? (
         <EmptyState
           modelLoaded={sendReady}
+          remoteRuntime={remoteRuntime}
           onSelectPrompt={(p) => void handleSend(p)}
           onGoToModels={() => navigate('/models')}
         />
@@ -255,6 +271,17 @@ export function ChatView() {
       {/* ------------------------------------------------------------------ */}
       {/* Composer                                                            */}
       {/* ------------------------------------------------------------------ */}
+      {remoteRuntime && (
+        <div role="alert" className="mx-4 mb-3 rounded-lg border border-border bg-card p-3 text-sm text-muted-foreground">
+          The loaded model uses other machines. Load a model on this machine to continue locally.{' '}
+          <button type="button" onClick={() => navigate('/models')} className="rounded-sm text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Open Models</button>
+          {accountAvailable && <button type="button" onClick={() => {
+            if (!hasAccountAccess(useAuthStore.getState())) return;
+            setRoutingScope('local');
+            useUiPrefsStore.getState().setLocalUseEnabled(false);
+          }} className="ml-3 rounded-sm text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Use this model</button>}
+        </div>
+      )}
       <Composer
         onSend={(content) => void handleSend(content)}
         onStop={abort}
@@ -281,6 +308,7 @@ interface ScopeTierConfig {
 }
 
 interface ScopeSelectorProps {
+  accountAvailable: boolean;
   scope: RoutingScope;
   onChange: (scope: RoutingScope) => void;
   disabled: boolean;
@@ -293,6 +321,7 @@ interface ScopeSelectorProps {
 }
 
 function ScopeSelector({
+  accountAvailable,
   scope,
   onChange,
   disabled,
@@ -371,6 +400,12 @@ function ScopeSelector({
       }),
     },
   ];
+
+  if (!accountAvailable) {
+    for (const tier of tiers) {
+      if (tier.scope !== 'local') tier.unavailableReason = 'Sign in from Settings → Account to use this scope.';
+    }
+  }
 
   const active = tiers.find((t) => t.scope === scope) ?? tiers[0]!;
   const ActiveIcon = active.icon;
@@ -750,11 +785,12 @@ function InfoChip({ icon, children, 'aria-label': ariaLabel, onClick }: InfoChip
 
 interface EmptyStateProps {
   modelLoaded: boolean;
+  remoteRuntime: boolean;
   onSelectPrompt: (prompt: string) => void;
   onGoToModels: () => void;
 }
 
-function EmptyState({ modelLoaded, onSelectPrompt, onGoToModels }: EmptyStateProps) {
+function EmptyState({ modelLoaded, remoteRuntime, onSelectPrompt, onGoToModels }: EmptyStateProps) {
   return (
     <div className="relative flex flex-1 flex-col items-center justify-center gap-8 px-4 grain">
       {/* Centered greeting. The serif heading sets the "warm + handcrafted"
@@ -772,11 +808,13 @@ function EmptyState({ modelLoaded, onSelectPrompt, onGoToModels }: EmptyStatePro
         </div>
         <div className="max-w-md">
           <h2 className="font-serif text-3xl leading-tight tracking-display text-foreground">
-            {modelLoaded ? 'What can I help you with?' : 'No model loaded yet'}
+            {remoteRuntime ? 'Choose a model for local chat' : modelLoaded ? 'What can I help you with?' : 'No model loaded yet'}
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground reading-measure mx-auto">
-            {modelLoaded
-              ? 'Ask anything. Runs on your machine by default; the network is opt-in per message.'
+            {remoteRuntime
+              ? 'Pick a model that fits on this machine to continue locally.'
+              : modelLoaded
+              ? 'Ask anything. Choose where your next message runs using the scope menu.'
               : 'Pick a model to load locally and we’ll be ready.'}
           </p>
         </div>

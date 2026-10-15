@@ -1,3 +1,4 @@
+import { AccountRequired } from '@/components/auth/AccountRequired';
 import { useState } from 'react';
 import { checkModelFit, suggestedDownload } from '@/lib/modelFit';
 /**
@@ -189,7 +190,7 @@ export function ModelLibrary() {
 
       {/* Grid */}
       <div className="flex-1 overflow-y-auto px-6 py-6">
-        {FEATURES.managedSplit && <MachineModels models={models} />}
+        {FEATURES.managedSplit && <AccountRequired feature="use models across your machines"><MachineModels models={models} /></AccountRequired>}
         {isFetching && models.length === 0 ? (
           <div
             className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"

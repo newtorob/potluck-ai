@@ -1,3 +1,4 @@
+import { useUiPrefsStore } from '@/stores/uiPrefsStore';
 /**
  * StatusBar - persistent bottom strip with "alive" indicators.
  *
@@ -51,7 +52,9 @@ export function StatusBar() {
 
   // Show the selected chat destination, including household and circle scope.
   // Receiving an answer and offering compute are independent controls.
-  const routingScope = useChatStore((s) => s.routingScope);
+  const savedRoutingScope = useChatStore((s) => s.routingScope);
+  const localUseEnabled = useUiPrefsStore((s) => s.localUseEnabled);
+  const routingScope = (isSignedIn || hasCachedAccount) && !localUseEnabled ? savedRoutingScope : 'local';
 
   return (
     <footer

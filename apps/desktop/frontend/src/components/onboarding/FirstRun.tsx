@@ -1,3 +1,5 @@
+import { useAuth } from '@/hooks/useAuth';
+import { continueLocally } from '@/lib/localUse';
 /**
  * FirstRun - 6-step onboarding wizard.
  *
@@ -89,6 +91,12 @@ interface FirstRunProps {
 // ---------------------------------------------------------------------------
 
 export function FirstRun({ models }: FirstRunProps) {
+  const { isSignedIn, hasCachedAccount } = useAuth();
+  const accountAvailable = isSignedIn || hasCachedAccount;
+  const finishConnection = () => {
+    if (!accountAvailable) continueLocally();
+    setStep('ready');
+  };
   const navigate = useNavigate();
   const { hardware, isLoading: hwLoading, error: hwError } = useHardware();
   const { sidecarUp, modelLoaded, activeModelId, nCtxLoaded } = useHealth();
@@ -374,14 +382,15 @@ export function FirstRun({ models }: FirstRunProps) {
           )}
           {step === 'loading' && <LoadingStep error={loadError} />}
           {step === 'connect' && <ConnectStep />}
-          {step === 'ready' && <ReadyStep report={readinessReport} onFinish={handleFinish} />}
+          {step === 'ready' && <ReadyStep report={readinessReport} onFinish={handleFinish} localOnly={!accountAvailable} />}
         </div>
 
         {/* Footer actions */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-6 py-4">
           <button
             type="button"
-            onClick={step === 'connect' ? () => setStep('ready') : handleSkip}
+            onClick={step === 'connect' ? finishConnection : handleSkip}
+            hidden={step === 'connect' && !accountAvailable}
             className={cn(
               'text-xs text-muted-foreground/80 hover:text-foreground',
               'transition-colors duration-fast rounded-sm',
@@ -428,8 +437,8 @@ export function FirstRun({ models }: FirstRunProps) {
           )}
 
           {step === 'connect' && (
-            <PrimaryButton onClick={() => setStep('ready')}>
-              Continue <ArrowRight className="h-4 w-4" />
+            <PrimaryButton onClick={finishConnection}>
+              {accountAvailable ? 'Continue' : 'Use on this machine'} <ArrowRight className="h-4 w-4" />
             </PrimaryButton>
           )}
 
@@ -570,14 +579,14 @@ const COMPACT_SEV = {
   },
 } as const;
 
-function ReadyStep({ report, onFinish }: { report: ReadinessReport; onFinish: () => void }) {
+function ReadyStep({ report, onFinish, localOnly }: { report: ReadinessReport; onFinish: () => void; localOnly: boolean }) {
   const navigate = useNavigate();
 
   const machineChecks = report.checks.filter((c) => c.group === 'machine');
-  const networkChecks = report.checks.filter((c) => c.group === 'network');
+  const networkChecks = localOnly ? [] : report.checks.filter((c) => c.group === 'network');
 
   // Gaps are any check that isn't 'ok' - shown with label + fix.
-  const hasGaps = report.checks.some((c) => c.severity === 'warn' || c.severity === 'error');
+  const hasGaps = [...machineChecks, ...networkChecks].some((c) => c.severity === 'warn' || c.severity === 'error');
 
   function handleViewReadiness() {
     onFinish(); // marks onboarding complete
@@ -608,7 +617,7 @@ function ReadyStep({ report, onFinish }: { report: ReadinessReport; onFinish: ()
           </h2>
           <p className="text-sm leading-relaxed text-muted-foreground reading-measure mx-auto">
             {report.machineReady && !hasGaps
-              ? 'Inference runs locally by default. Your conversations stay on this device unless you choose to use the network.'
+              ? 'Your model is ready for local chat. You can manage models and sign in later from Settings → Account.'
               : 'Inference runs locally by default. Any gaps below are non-blocking, and you can fix them after you start.'}
           </p>
         </div>
