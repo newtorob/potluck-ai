@@ -35,7 +35,7 @@ async function gateway(reply: (turn: number) => string = () => "Completed.", win
     requests.push({ body, headers: req.headers });
     res.writeHead(200, { "Content-Type": "text/event-stream", "X-Potluck-Model-Lock": "1",
       "X-Potluck-Model-SHA256": body.potluck_model_sha256 ?? "a".repeat(64) });
-    res.end(`data: ${JSON.stringify({ choices: [{ delta: { content: reply(requests.length) } }] })}\n\ndata: [DONE]\n\n`);
+    res.end(`data: ${JSON.stringify({ choices: [{ delta: { content: reply(requests.length) }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`);
   });
   await new Promise<void>((resolve, reject) => {
     server!.once("error", reject);

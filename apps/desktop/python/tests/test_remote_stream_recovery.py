@@ -72,11 +72,12 @@ def test_pool_preserves_finish_usage_and_aggregate_metadata(transport):
 
 
 @pytest.mark.parametrize('content', ['', TOKEN])
-def test_legacy_direct_done_is_explicit_success(content, transport):
+def test_legacy_direct_done_remains_chat_success_with_inferred_finish(content, transport):
     transport(content + DONE)
     result = asyncio.run(direct.complete_peer_openai({'mesh_ip': '100.64.0.2'}, [], 'test', 0.7, 20))
     assert result['choices'][0]['finish_reason'] == 'stop'
     assert result['choices'][0]['message']['content'] == ('partial' if content else '')
+    assert result['potluck'] == {'finish_reason_inferred': True}
 
 
 def test_direct_keeps_length_and_usage_and_parses_multiline_crlf(transport):
@@ -134,3 +135,65 @@ def test_public_gateway_terminal_contract(path, stream, success, transport, monk
     else:
         assert response.status_code == 502
         assert response.json()['detail']['code'] == 'stream_interrupted'
+
+
+def finish(reason, **extra):
+    return event({'choices': [{'index': 0, 'delta': {}, 'finish_reason': reason}], **extra})
+
+
+@pytest.mark.parametrize('route', ['direct', 'pool'])
+@pytest.mark.parametrize('terminal', [
+    finish('length') + finish('stop'),
+    finish('stop') + finish('stop'),
+    META + finish('stop'),
+    finish('stop') + META,
+    event({'meta': {'finish_reason': 'stop'},
+           'choices': [{'delta': {}, 'finish_reason': 'length'}]}),
+    event({'choices': [{'index': 0, 'delta': {}, 'finish_reason': 'stop'},
+                       {'index': 1, 'delta': {}, 'finish_reason': 'length'}]}),
+    finish('stop', potluck={'finish_reason': 'length'}),
+])
+def test_conflicting_or_duplicate_terminal_never_emits_success(route, terminal, transport):
+    transport(TOKEN + terminal + DONE)
+    async def run():
+        chunks = []
+        with pytest.raises(RemoteStreamError):
+            async for chunk in source(route):
+                chunks.append(chunk)
+        assert all(chunk['choices'][0]['finish_reason'] is None for chunk in chunks)
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('index', [1, -1, True, '0', None])
+def test_invalid_choice_index_cannot_be_rewritten_as_the_requested_choice(index, transport):
+    transport(TOKEN + event({'choices': [{'index': index, 'delta': {}, 'finish_reason': 'stop'}]}) + DONE)
+    async def run():
+        with pytest.raises(RemoteStreamError, match='choice index'):
+            await direct.complete_peer_openai({'mesh_ip': '100.64.0.2'}, [], 'test', 0.7, 20)
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('choice_index', [{}, {'index': 0}])
+def test_explicit_stop_with_final_content_and_usage_only_chunk_remains_native(choice_index, transport):
+    transport(event({'choices': [{**choice_index, 'delta': {'content': 'complete'}, 'finish_reason': 'stop'}]})
+              + event({'choices': [], 'usage': {'prompt_tokens': 2, 'completion_tokens': 3, 'total_tokens': 5}}) + DONE)
+    result = asyncio.run(direct.complete_peer_openai({'mesh_ip': '100.64.0.2'}, [], 'test', 0.7, 20))
+    assert result['choices'][0]['message']['content'] == 'complete'
+    assert result['choices'][0]['finish_reason'] == 'stop'
+    assert result['usage']['total_tokens'] == 5
+    assert 'potluck' not in result
+
+
+def test_relayed_inferred_finish_stays_marked_without_peer_identity(transport):
+    transport(TOKEN + finish('stop', potluck={'finish_reason_inferred': True, 'peer_id': 'private'}) + DONE)
+    result = asyncio.run(direct.complete_peer_openai({'mesh_ip': '100.64.0.2'}, [], 'test', 0.7, 20))
+    assert result['potluck'] == {'finish_reason_inferred': True}
+
+
+def test_batch_requires_native_finish_even_after_legacy_relay():
+    from potluck_local.services.remote_stream import openai_chunks
+    response = httpx.Response(200, text=TOKEN + finish('stop', potluck={'finish_reason_inferred': True}) + DONE)
+    async def run():
+        with pytest.raises(RemoteStreamError, match='without a finish reason'):
+            _ = [chunk async for chunk in openai_chunks(response, 'test', require_finish=True)]
+    asyncio.run(run())

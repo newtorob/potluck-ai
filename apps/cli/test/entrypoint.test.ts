@@ -61,7 +61,7 @@ it("the installed agent selects the project pin ahead of global and shared model
     calls.push(JSON.parse(body));
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("X-Potluck-Model-Lock", "1"); res.setHeader("X-Potluck-Model-SHA256", sha);
-    res.end('data: {"choices":[{"delta":{"content":"The pinned model answered."}}]}\n\ndata: [DONE]\n\n');
+    res.end('data: {"choices":[{"delta":{"content":"The pinned model answered."},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
   });
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   try {
@@ -103,7 +103,7 @@ it.each(["repeated failure", "repeated read", "step limit", "failed verify", "re
       else if (requests === 2 && scenario === "repaired verify") content = action("edit_file", { path: "f.txt", old_string: "broken", new_string: "fixed" });
       else content = "All fixed.";
       res.setHeader("Content-Type", "text/event-stream");
-      res.end(`data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\ndata: [DONE]\n\n`);
+      res.end(`data: ${JSON.stringify({ choices: [{ delta: { content }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`);
     });
     await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
     try {

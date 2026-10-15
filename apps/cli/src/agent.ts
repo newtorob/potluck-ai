@@ -508,11 +508,13 @@ export async function runTask(
       scope: opts.scope,
       signal: opts.signal,
       requireDone: true,
+      requireSuccessfulFinish: true,
       stop: ["\nTOOL_RESULT:"],
     })) {
       // Drain through [DONE] before acting. Closing the HTTP stream at the
       // action fence cancels inference and can stop a managed split runtime.
-      // A later transport error must prevent even a complete-looking edit.
+      // A later transport error or unsuccessful finish must prevent even a
+      // complete-looking edit.
       if (actionComplete) continue;
       const previousLength = assistant.length;
       assistant += token;

@@ -56,7 +56,7 @@ it("the installed coding agent saves and resumes history without replaying old a
     let text = ""; for await (const chunk of req) text += chunk;
     requests.push(JSON.parse(text));
     res.writeHead(200, { "Content-Type": "text/event-stream", "X-Potluck-Model-Lock": "1", "X-Potluck-Model-SHA256": lock.model.sha256 });
-    res.end('data: {"choices":[{"delta":{"content":"Session answer."}}]}\n\ndata: [DONE]\n\n');
+    res.end('data: {"choices":[{"delta":{"content":"Session answer."},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
   });
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   await writeFile(lock.path, JSON.stringify({ schemaVersion: 1, model: lock.model }));

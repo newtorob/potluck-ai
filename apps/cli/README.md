@@ -172,8 +172,17 @@ The agent validates tool names and argument types before execution. A completed
 fenced action missing only its final outer `}` can be recovered without changing
 its arguments. Complete action JSON may also omit the closing Markdown fence;
 these repairs are never combined. Unfinished strings and inner objects are
-rejected with specific feedback. Recovery still waits for the stream to finish and preserves
-the usual edit/command approval gate.
+rejected with specific feedback. Before executing an action or accepting a final
+answer, the coding agent requires an explicit successful finish and the stream's
+completion marker. A token-limit cutoff, filtered response, unsupported tool-call
+ending or missing completion cannot authorize an edit, even when the action JSON
+looks complete. Narrow the task or use a larger loaded context when output is cut
+off. Remote replies must report their actual finish status; if an older peer or
+an engine cannot provide it, the coding agent stops without executing that
+reply. Update Potluck on the serving machine or use a model loaded locally.
+Use an updated CLI and local runtime together; older runtimes may report a
+remote reply as complete without preserving the model's actual finish status.
+Recovery preserves the usual edit/command approval gate.
 
 Literal file writes use a strict JSON path header and an unescaped body:
 

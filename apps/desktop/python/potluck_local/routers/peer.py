@@ -494,24 +494,37 @@ async def peer_chat_completions(request: PeerChatRequest) -> object:
 
     served_model = runtime.current_model_id()
 
-    if request.potluck_batch:
-        async def batch_stream():
+    # Pipeline and continuous-batch engines expose only the text stream today.
+    # Keep that path usable for chat; the requester marks its inferred finish so
+    # coding clients cannot mistake it for an explicitly completed generation.
+    pipeline = getattr(runtime, "loaded_pipeline", lambda: None)()
+    batching = getattr(runtime, "continuous_batch_active", lambda: False)()
+    native_stream = request.potluck_batch or (request.stream and pipeline is None and not batching)
+    if native_stream:
+        async def completion_stream():
             try:
                 source = runtime.stream_chat_raw(messages_for_runtime, temperature=request.temperature,
-                                                 max_tokens=request.max_tokens, stop=request.stop, **identity)
+                                                 max_tokens=request.max_tokens, stop=request.stop, **identity, **tool_kwargs)
                 async with aclosing(source):
                     async for chunk in source:
                         if "__error__" in chunk:
                             event = {"error": inference_errors.other_machine_error(chunk.get("__category__"))}
                             yield f"data: {json.dumps(event)}\n\n"
                             return
-                        yield f"data: {json.dumps(chunk)}\n\n"
+                        # Native engines may put the private GGUF path in model.
+                        # Peers receive only the advertised model identifier.
+                        yield f"data: {json.dumps({**chunk, 'model': served_model})}\n\n"
                 yield "data: [DONE]\n\n"
             except ModelIdentityError:
                 yield 'data: {"error":{"message":"Model identity changed","category":"model_mismatch"}}\n\n'
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("peer_stream_failed error=%s", type(exc).__name__)
+                event = {"error": inference_errors.other_machine_error("inference_error")}
+                yield f"data: {json.dumps(event)}\n\n"
 
-        return StreamingResponse(_served_metering_stream(batch_stream(), served_model), media_type="text/event-stream",
-                                 headers={**lock_headers(digest), "X-Potluck-Batch-Protocol": "1",
+        return StreamingResponse(_served_metering_stream(completion_stream(), served_model), media_type="text/event-stream",
+                                 headers={**lock_headers(digest),
+                                          **({"X-Potluck-Batch-Protocol": "1"} if request.potluck_batch else {}),
                                           "Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     if request.stream:

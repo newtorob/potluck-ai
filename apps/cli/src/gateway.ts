@@ -33,6 +33,8 @@ export interface StreamOptions {
   circle?: string;
   /** Require the terminal SSE marker before accepting a response as complete. */
   requireDone?: boolean;
+  /** Require a successful text generation (finish_reason: stop) and the terminal SSE marker before accepting coding actions. */
+  requireSuccessfulFinish?: boolean;
   /** Sees the response headers once the gateway accepted the request. Throwing stops the stream before any text is read. */
   onHeaders?: (headers: Headers) => void;
 }
@@ -42,7 +44,12 @@ interface ModelsResponse {
 }
 
 interface ChatChunk {
-  choices?: Array<{ delta?: { content?: string } }>;
+  choices?: Array<{
+    index?: number;
+    delta?: { content?: string | null; reasoning_content?: string | null; role?: string; tool_calls?: unknown; function_call?: unknown };
+    finish_reason?: string | null;
+  }>;
+  potluck?: { finish_reason_inferred?: boolean };
   error?: { message?: string; code?: string; status?: number };
 }
 
@@ -179,6 +186,8 @@ export async function* streamChat(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let finishReason: string | undefined;
+  let finishError: string | undefined;
 
   try {
     while (true) {
@@ -198,15 +207,24 @@ export async function* streamChat(
           const line = rawLine.trimStart();
           if (!line.startsWith("data:")) continue;
           const data = line.slice(5).trim();
-          if (data === "[DONE]") return;
+          if (data === "[DONE]") {
+            if (opts.requireSuccessfulFinish) {
+              if (finishError) throw new Error(finishError);
+              if (finishReason !== "stop") throw new Error("Gateway did not confirm a successful generation (missing finish_reason: stop).");
+            }
+            return;
+          }
           if (!data) continue;
 
           let chunk: ChatChunk;
           try {
             chunk = JSON.parse(data) as ChatChunk;
           } catch {
-            if (opts.requireDone) throw new Error("Gateway returned an invalid stream frame.");
+            if (opts.requireDone || opts.requireSuccessfulFinish) throw new Error("Gateway returned an invalid stream frame.");
             continue; // skip a partial/garbled frame rather than crash
+          }
+          if (opts.requireSuccessfulFinish && (!chunk || typeof chunk !== "object" || Array.isArray(chunk))) {
+            throw new Error("Gateway returned an invalid stream frame.");
           }
           if (chunk.error) {
             // The gateway turned the request away before any answer started
@@ -217,12 +235,54 @@ export async function* streamChat(
             }
             throw new Error(chunk.error.message ?? "gateway inference error");
           }
+          if (opts.requireSuccessfulFinish) {
+            if (chunk.potluck?.finish_reason_inferred === true) {
+              finishError ??= "The remote machine did not report how the generation finished. Update Potluck on the serving machine and retry.";
+            }
+            if (!Array.isArray(chunk.choices)) throw new Error("Gateway returned an invalid completion chunk.");
+            // Usage-only chunks may follow the terminal choice. We request one
+            // completion, so another choice cannot establish its success.
+            if (chunk.choices.length === 0) continue;
+            const choice = chunk.choices[0];
+            if (chunk.choices.length !== 1 || !choice || typeof choice !== "object" || Array.isArray(choice)
+                || (choice.index !== undefined && choice.index !== 0)) {
+              throw new Error("Gateway returned an invalid completion choice.");
+            }
+            const delta = choice.delta;
+            if (delta != null && (typeof delta !== "object" || Array.isArray(delta))) {
+              throw new Error("Gateway returned an invalid completion delta.");
+            }
+            if ((delta?.content != null && typeof delta.content !== "string")
+                || (delta?.reasoning_content != null && typeof delta.reasoning_content !== "string")) {
+              throw new Error("Gateway returned an invalid completion content delta.");
+            }
+            const reason = choice.finish_reason;
+            if (reason != null && (typeof reason !== "string" || !reason)) {
+              throw new Error("Gateway returned an invalid finish_reason.");
+            }
+            const nativeTool = delta?.tool_calls != null || delta?.function_call != null;
+            if (finishReason !== undefined && (delta?.content || delta?.reasoning_content || delta?.role || nativeTool || reason != null)) {
+              finishError ??= "Gateway returned output after the generation had finished.";
+            }
+            if (nativeTool) finishError ??= "Gateway returned native tool calls instead of a completed text response.";
+            if (reason != null) {
+              finishReason ??= reason;
+              if (reason === "length") {
+                finishError ??= "The model hit its output limit, so this reply was not applied. Try a smaller change or a larger loaded context.";
+              } else if (reason !== "stop") {
+                finishError ??= `Gateway generation ended with finish_reason: ${reason}; the reply was not accepted as complete.`;
+              }
+            }
+            // Drain through [DONE] even after an unsuccessful finish so the
+            // runtime can clean up normally. Callers must consume the whole
+            // stream before treating any displayed text as an executable action.
+          }
           const delta = chunk.choices?.[0]?.delta?.content;
           if (delta) yield delta;
         }
       }
     }
-    if (opts.requireDone) throw new Error("Gateway stream ended before completion.");
+    if (opts.requireDone || opts.requireSuccessfulFinish) throw new Error("Gateway stream ended before completion.");
   } finally {
     // Best-effort: release the stream if the consumer stops early.
     void reader.cancel().catch(() => {});

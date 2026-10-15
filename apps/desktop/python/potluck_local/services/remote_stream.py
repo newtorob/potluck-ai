@@ -46,11 +46,14 @@ async def openai_chunks(
     their explicit success signal, unless an error preceded it. Coordinator
     streams additionally require a valid success meta envelope before DONE.
     EOF alone is never success. Hold finish/usage until the terminator arrives.
+    An inferred legacy finish is marked so clients that execute model actions
+    can refuse it without breaking ordinary chat compatibility.
     """
     cid = "chatcmpl-" + uuid.uuid4().hex[:24]
     created = int(time.time())
     finish: str | None = None
     meta: dict | None = None
+    finish_inferred = False
     usage = {"prompt_tokens": None, "completion_tokens": None, "total_tokens": None}
 
     def chunk(delta: dict, reason: str | None = None) -> dict:
@@ -59,17 +62,30 @@ async def openai_chunks(
             "choices": [{"index": 0, "delta": delta, "finish_reason": reason}],
         }
 
+    def set_finish(reason: object) -> None:
+        nonlocal finish
+        if not isinstance(reason, str) or not reason:
+            raise RemoteStreamError("Invalid remote finish reason", "stream_protocol_error")
+        if finish is not None:
+            raise RemoteStreamError("Multiple remote completion events", "stream_protocol_error")
+        if reason not in {"stop", "length", "tool_calls", "function_call", "content_filter"}:
+            raise RemoteStreamError("Remote inference did not complete", reason)
+        finish = reason
+
     async for data in _events(response):
         if data.strip() == "[DONE]":
-            if require_finish and finish is None:
+            if require_finish and (finish is None or finish_inferred):
                 raise RemoteStreamError("Batch result ended without a finish reason", "stream_protocol_error")
             if coordinator and (meta is None or finish is None):
                 raise RemoteStreamError("Remote job ended without a success summary")
             terminal = chunk({}, finish or "stop")
             terminal["usage"] = usage
-            if meta is not None:
-                # Whitelist only aggregate completion metadata, never identity.
-                terminal["potluck"] = meta
+            # Whitelist only aggregate completion metadata, never identity.
+            terminal_meta = dict(meta or {})
+            if finish is None or finish_inferred:
+                terminal_meta["finish_reason_inferred"] = True
+            if terminal_meta:
+                terminal["potluck"] = terminal_meta
             yield terminal
             return
         try:
@@ -90,7 +106,7 @@ async def openai_chunks(
             summary = obj["meta"]
             if not isinstance(summary, dict) or not isinstance(summary.get("finish_reason"), str):
                 raise RemoteStreamError("Invalid remote success summary", "stream_protocol_error")
-            finish = summary["finish_reason"]
+            set_finish(summary["finish_reason"])
             meta = {"finish_reason": finish}
             scope = summary.get("served_scope")
             if scope in ("mine", "circle", "pool"):
@@ -108,10 +124,14 @@ async def openai_chunks(
         choices = obj.get("choices", [])
         if not isinstance(choices, list):
             raise RemoteStreamError("Invalid remote choices", "stream_protocol_error")
+        if len(choices) > 1:
+            raise RemoteStreamError("Multiple remote choices", "stream_protocol_error")
         if choices:
             first = choices[0]
             if not isinstance(first, dict) or not isinstance(first.get("delta", {}), dict):
                 raise RemoteStreamError("Invalid remote delta", "stream_protocol_error")
+            if "index" in first and (type(first["index"]) is not int or first["index"] != 0):
+                raise RemoteStreamError("Invalid remote choice index", "stream_protocol_error")
             delta = first.get("delta", {})
             if delta:
                 if finish is not None:
@@ -119,11 +139,17 @@ async def openai_chunks(
                 yield chunk(delta)
             reason = first.get("finish_reason")
             if reason is not None:
-                if not isinstance(reason, str) or not reason:
-                    raise RemoteStreamError("Invalid remote finish reason", "stream_protocol_error")
-                finish = reason
-        if finish is not None and finish not in {"stop", "length", "tool_calls", "function_call", "content_filter"}:
-            raise RemoteStreamError("Remote inference did not complete", finish)
+                set_finish(reason)
+        aggregate = obj.get("potluck")
+        if aggregate is not None:
+            if not isinstance(aggregate, dict):
+                raise RemoteStreamError("Invalid remote completion metadata", "stream_protocol_error")
+            inferred = aggregate.get("finish_reason_inferred", False)
+            if not isinstance(inferred, bool):
+                raise RemoteStreamError("Invalid remote finish provenance", "stream_protocol_error")
+            finish_inferred = finish_inferred or inferred
+            if "finish_reason" in aggregate and aggregate["finish_reason"] != finish:
+                raise RemoteStreamError("Conflicting remote finish reason", "stream_protocol_error")
     raise RemoteStreamError("Remote connection ended before the reply finished")
 
 

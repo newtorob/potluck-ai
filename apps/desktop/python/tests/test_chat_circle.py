@@ -245,8 +245,7 @@ def test_the_app_route_never_carries_a_lenders_extra_keys_or_tool_calls(world):
 
     evil = sse({"id": "EVILID", "system_fingerprint": "EVILFP", "choices": [
         {"index": 0, "delta": {"role": "system", "content": "hi", "tool_calls": [{"id": "c"}], "reasoning": "EVILREASON"},
-         "finish_reason": None, "EVILCHOICEKEY": 1},
-        {"index": 1, "delta": {"content": "EVILSECOND"}}]})
+         "finish_reason": None, "EVILCHOICEKEY": 1}]})
     only_tools = sse({"choices": [{"index": 0, "delta": {"tool_calls": [{"id": "c"}]}}]})
     done = sse({"meta": {"output_tokens": 1, "duration_ms": 5, "finish_reason": "tool_calls"}})
     world.lender["100.64.1.2"] = lambda r, l: stream_response(only_tools, evil, done, DONE)
@@ -255,6 +254,24 @@ def test_the_app_route_never_carries_a_lenders_extra_keys_or_tool_calls(world):
     assert events[0] == {"choices": [{"delta": {"content": "hi"}}]}
     assert events[-2]["meta"]["finish_reason"] == "stop" and events[-1] == "[DONE]" and len(events) == 3
     for text in ("EVIL", "tool_calls", "reasoning", "fingerprint"):
+        assert text not in resp.text
+
+
+def test_multiple_lender_choices_fail_over_without_exposing_any_rejected_output(world):
+    evil = sse({"id": "EVILID", "system_fingerprint": "EVILFP", "hostname": "PRIVATE_LENDER", "choices": [
+        {"index": 0, "delta": {"content": "EVILFIRST", "tool_calls": [{"id": "c"}], "reasoning": "EVILREASON"}},
+        {"index": 1, "delta": {"content": "EVILSECOND"}, "finish_reason": "length"}]})
+    world.lender["100.64.1.2"] = lambda r, l: stream_response(evil, meta(), DONE)
+    resp = client().post("/chat/circle", json=APP_BODY)
+    events = frames(resp)
+    assert resp.status_code == 200
+    assert events[:2] == [{"choices": [{"delta": {"content": "Hello"}}]},
+                          {"choices": [{"delta": {"content": " world"}}]}]
+    assert events[-2]["meta"]["path"] == "direct"
+    assert events[-2]["meta"]["finish_reason"] == "stop" and events[-1] == "[DONE]" and len(events) == 4
+    assert len(world.lender_calls()) == 2, "the invalid lender is replaced before any output reaches the app"
+    assert world.count("POST", "/jobs/stream") == 0, "the healthy second lender answers directly"
+    for text in ("EVIL", "PRIVATE_LENDER", "hostname", "tool_calls", "reasoning", "fingerprint"):
         assert text not in resp.text
 
 

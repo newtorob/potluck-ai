@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { modelContextWindow, streamChat, type ChatMessage } from "../src/gateway.js";
+import { modelContextWindow, streamChat, type ChatMessage, type StreamOptions } from "../src/gateway.js";
 
 const cfg = { baseURL: "http://127.0.0.1:8321/v1", apiKey: "k", enabled: true };
 const messages: ChatMessage[] = [{ role: "user", content: "hi" }];
@@ -14,6 +14,16 @@ function sseResponse(frames: string[]): Response {
     },
   });
   return new Response(stream, { status: 200 });
+}
+
+function jsonFrame(chunk: unknown): string {
+  return `data: ${JSON.stringify(chunk)}\n\n`;
+}
+
+async function consumeStream(opts: Partial<StreamOptions> = {}): Promise<string> {
+  let output = "";
+  for await (const token of streamChat(cfg, messages, { model: "m", ...opts })) output += token;
+  return output;
 }
 
 afterEach(() => {
@@ -126,5 +136,117 @@ describe("streamChat", () => {
     }
 
     expect(seen[0]["x-potluck-scope"]).toBeUndefined();
+  });
+});
+
+describe("streamChat successful coding completion", () => {
+  const content = '```action\n{"tool":"write_file","args":{"path":"x","content":"y"}}';
+  const contentFrame = jsonFrame({ choices: [{ index: 0, delta: { content }, finish_reason: null }] });
+  const doneFrame = "data: [DONE]\n\n";
+  const terminal = (reason: unknown) => jsonFrame({ choices: [{ index: 0, delta: {}, finish_reason: reason }] });
+  const strict = { requireSuccessfulFinish: true };
+
+  it.each(["length", "content_filter", "tool_calls", "function_call", "error", "unknown"])(
+    "rejects %s even when the text is a recoverable action and DONE arrives", async reason => {
+      vi.stubGlobal("fetch", vi.fn(async () => sseResponse([contentFrame, terminal(reason), doneFrame])));
+      await expect(consumeStream(strict)).rejects.toThrow(reason === "length" ? "model hit its output limit" : `finish_reason: ${reason}`);
+    },
+  );
+
+  it.each([undefined, null])("requires an explicit stop, not only DONE (%s)", async reason => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([contentFrame, terminal(reason), doneFrame])));
+    await expect(consumeStream(strict)).rejects.toThrow("missing finish_reason: stop");
+  });
+
+  it("requires DONE even when stop arrives", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([contentFrame, terminal("stop")])));
+    await expect(consumeStream(strict)).rejects.toThrow("ended before completion");
+  });
+
+  it("accepts reasoning deltas, a final content delta with stop, and trailing usage", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([
+      jsonFrame({ choices: [{ index: 0, delta: { role: "assistant", content: null }, finish_reason: null }] }),
+      jsonFrame({ choices: [{ index: 0, delta: { reasoning_content: "thinking" }, finish_reason: null }] }),
+      contentFrame,
+      jsonFrame({ choices: [{ index: 0, delta: { content: "\n```" }, finish_reason: "stop" }], potluck: { scope: "local", finish_reason: "stop" } }),
+      jsonFrame({ choices: [], usage: { completion_tokens: 20 } }),
+      doneFrame,
+    ])));
+    await expect(consumeStream(strict)).resolves.toBe(content + "\n```");
+  });
+
+  it("accepts a single unindexed choice with an explicit successful finish", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([
+      jsonFrame({ choices: [{ delta: { content: "Complete." }, finish_reason: "stop" }] }), doneFrame,
+    ])));
+    await expect(consumeStream(strict)).resolves.toBe("Complete.");
+  });
+
+  it.each([true, false])("rejects an inferred stop with upgrade guidance, even on usage-only chunks (%s)", async usageOnly => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([
+      contentFrame,
+      ...(usageOnly ? [terminal("stop")] : []),
+      jsonFrame({ choices: usageOnly ? [] : [{ index: 0, delta: {}, finish_reason: "stop" }], potluck: { finish_reason_inferred: true } }),
+      doneFrame,
+    ])));
+    await expect(consumeStream(strict)).rejects.toThrow("Update Potluck on the serving machine and retry");
+  });
+
+  it.each(["stop", "length"])("drains past %s and honors a subsequent stream error", async reason => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([
+      contentFrame, terminal(reason), jsonFrame({ error: { message: "late inference failure" } }), doneFrame,
+    ])));
+    await expect(consumeStream(strict)).rejects.toThrow("late inference failure");
+  });
+
+  it("does not let a later stop erase an earlier unsuccessful finish", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([contentFrame, terminal("length"), terminal("stop"), doneFrame])));
+    await expect(consumeStream(strict)).rejects.toThrow("model hit its output limit");
+  });
+
+  it.each([
+    { choices: [{ index: 0, delta: { content: "extra" }, finish_reason: null }] },
+    { choices: [{ index: 0, delta: { reasoning_content: "extra" }, finish_reason: null }] },
+    { choices: [{ index: 0, delta: {}, finish_reason: "stop" }] },
+    { choices: [{ index: 0, delta: {}, finish_reason: "length" }] },
+  ])("rejects output or another terminal after stop: %j", async afterStop => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([contentFrame, terminal("stop"), jsonFrame(afterStop), doneFrame])));
+    await expect(consumeStream(strict)).rejects.toThrow("after the generation had finished");
+  });
+
+  it.each([
+    null,
+    [],
+    {},
+    { choices: {} },
+    { choices: [null] },
+    { choices: [{ index: 1, delta: {}, finish_reason: "stop" }] },
+    { choices: [{ index: "0", delta: {}, finish_reason: "stop" }] },
+    { choices: [{ index: 0, delta: {}, finish_reason: "stop" }, { index: 1, delta: {}, finish_reason: "stop" }] },
+    { choices: [{ index: 0, delta: "bad", finish_reason: "stop" }] },
+    { choices: [{ index: 0, delta: { content: {} }, finish_reason: "stop" }] },
+    { choices: [{ index: 0, delta: { reasoning_content: [] }, finish_reason: "stop" }] },
+    { choices: [{ index: 0, delta: {}, finish_reason: false }] },
+    { choices: [{ index: 0, delta: {}, finish_reason: "" }] },
+  ])("rejects malformed completion state: %j", async malformed => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([contentFrame, jsonFrame(malformed), doneFrame])));
+    await expect(consumeStream(strict)).rejects.toThrow(/invalid/);
+  });
+
+  it("rejects malformed JSON after an otherwise valid stop", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([contentFrame, terminal("stop"), "data: {\n\n", doneFrame])));
+    await expect(consumeStream(strict)).rejects.toThrow("invalid stream frame");
+  });
+
+  it.each(["tool_calls", "function_call"])("rejects native %s deltas even if stop follows", async key => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([
+      contentFrame, jsonFrame({ choices: [{ index: 0, delta: { [key]: {} }, finish_reason: null }] }), terminal("stop"), doneFrame,
+    ])));
+    await expect(consumeStream(strict)).rejects.toThrow("native tool calls");
+  });
+
+  it.each([undefined, "length", "tool_calls"])("preserves requireDone-only callers' finish handling (%s)", async reason => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([contentFrame, terminal(reason), doneFrame])));
+    await expect(consumeStream({ requireDone: true })).resolves.toBe(content);
   });
 });

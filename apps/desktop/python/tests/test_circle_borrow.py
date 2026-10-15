@@ -1425,15 +1425,16 @@ HOSTILE_DELTA = {
 }
 
 
-def hostile_chunk(delta=None, **top):
+def hostile_chunk(delta=None, *, extra_choice=False, **top):
     chunk = {
         "id": "EVILID", "object": "EVILOBJ", "created": 1, "model": "EVILMODEL", "system_fingerprint": "EVILFP",
         "choices": [
             {"index": 0, "delta": HOSTILE_DELTA if delta is None else delta, "finish_reason": None,
              "logprobs": {"content": []}, "EVILCHOICEKEY": 1},
-            {"index": 1, "delta": {"content": "EVILSECOND"}, "finish_reason": None},
         ],
     }
+    if extra_choice:
+        chunk["choices"].append({"index": 1, "delta": {"content": "EVILSECOND"}, "finish_reason": "length"})
     chunk.update(top)
     return sse(chunk)
 
@@ -1470,10 +1471,22 @@ def test_a_lenders_chunk_comes_out_with_only_role_and_content(world):
     chunks = assert_rebuilt(run(collect(circle_stream())))
     assert chunks[0]["choices"][0]["delta"] == {"content": "hi"}, "the system role went, the content stayed"
     assert chunks[0]["id"] != "EVILID" and chunks[0]["model"] == MODEL
-    assert text_of(chunks) == "hi", "the second choice was ignored"
+    assert text_of(chunks) == "hi", "valid content remains while extra keys and tool calls are stripped"
     last = chunks[-1]
     assert set(last) == TOP_KEYS | {"usage", "potluck"} and set(last["usage"]) == set(circle_link._USAGE_KEYS)
     assert last["choices"][0]["finish_reason"] == "stop" and last["potluck"]["path"] == "direct"
+
+
+def test_multiple_lender_choices_are_rejected_before_output_and_fail_over(world):
+    world.lender["100.64.1.2"] = lambda r, l: stream_response(
+        hostile_chunk(extra_choice=True, hostname="PRIVATE_LENDER"), meta(tokens=1), DONE)
+    chunks = assert_rebuilt(run(collect(circle_stream())))
+    assert text_of(chunks) == "Hello world", "none of the rejected lender's content reaches the caller"
+    assert receipt(chunks)["path"] == "direct" and receipt(chunks)["finish_reason"] == "stop"
+    assert len(world.lender_calls()) == 2 and world.count("POST", "/links") == 2
+    assert world.count("POST", "/jobs/stream") == 0, "the healthy second lender answers directly"
+    for text in ("EVIL", "PRIVATE_LENDER", "hostname", "tool_calls", "function_call", "reasoning", "fingerprint"):
+        assert text not in json.dumps(chunks)
 
 
 def test_the_role_assistant_is_kept_and_other_roles_are_not(world):
