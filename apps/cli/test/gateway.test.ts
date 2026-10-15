@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { modelContextWindow, streamChat, type ChatMessage, type StreamOptions } from "../src/gateway.js";
+import { GatewayContextError, modelContextWindow, streamChat, type ChatMessage, type StreamOptions } from "../src/gateway.js";
 
 const cfg = { baseURL: "http://127.0.0.1:8321/v1", apiKey: "k", enabled: true };
 const messages: ChatMessage[] = [{ role: "user", content: "hi" }];
@@ -55,6 +55,8 @@ describe("modelContextWindow", () => {
     await expect(modelContextWindow(cfg, "m", "local")).rejects.toThrow("different model or scope");
     vi.stubGlobal("fetch", vi.fn(async () => new Response("Unauthorized", { status: 401 })));
     await expect(modelContextWindow(cfg, "m", "local")).rejects.toThrow("401");
+    await expect(modelContextWindow(cfg, "m", "local")).rejects.toMatchObject({ status: 401 });
+    await expect(modelContextWindow(cfg, "m", "local")).rejects.toBeInstanceOf(GatewayContextError);
   });
 
   it("rejects non-owned scopes before contacting the gateway", async () => {
@@ -145,6 +147,25 @@ describe("streamChat successful coding completion", () => {
   const doneFrame = "data: [DONE]\n\n";
   const terminal = (reason: unknown) => jsonFrame({ choices: [{ index: 0, delta: {}, finish_reason: reason }] });
   const strict = { requireSuccessfulFinish: true };
+
+  it("permits a deliberate output limit only for an opted-in readiness probe", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse([contentFrame, terminal("length"), doneFrame])));
+    await expect(consumeStream({ ...strict, allowLengthFinish: true })).resolves.toBe(content);
+    await expect(consumeStream(strict)).rejects.toThrow("model hit its output limit");
+  });
+
+  it.each([
+    [contentFrame, terminal("length")],
+    [contentFrame, doneFrame],
+    [contentFrame, terminal("content_filter"), doneFrame],
+    [contentFrame, terminal("length"), terminal("stop"), doneFrame],
+    [contentFrame, jsonFrame({ choices: [{ delta: {}, finish_reason: "length" }], potluck: { finish_reason_inferred: true } }), doneFrame],
+    [contentFrame, terminal("length"), jsonFrame({ error: { message: "late failure" } }), doneFrame],
+    [contentFrame, jsonFrame({ choices: [{ delta: { tool_calls: [] } }] }), terminal("length"), doneFrame],
+  ])("keeps readiness probes strict about completion evidence: %j", async (...frames) => {
+    vi.stubGlobal("fetch", vi.fn(async () => sseResponse(frames)));
+    await expect(consumeStream({ ...strict, allowLengthFinish: true })).rejects.toThrow();
+  });
 
   it.each(["length", "content_filter", "tool_calls", "function_call", "error", "unknown"])(
     "rejects %s even when the text is a recoverable action and DONE arrives", async reason => {

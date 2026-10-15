@@ -35,6 +35,8 @@ export interface StreamOptions {
   requireDone?: boolean;
   /** Require a successful text generation (finish_reason: stop) and the terminal SSE marker before accepting coding actions. */
   requireSuccessfulFinish?: boolean;
+  /** Synthetic readiness probes may deliberately exhaust a tiny output budget. Never use for coding actions. */
+  allowLengthFinish?: boolean;
   /** Sees the response headers once the gateway accepted the request. Throwing stops the stream before any text is read. */
   onHeaders?: (headers: Headers) => void;
 }
@@ -69,6 +71,13 @@ export class GatewayRefusedError extends Error {
     let detail: unknown = null;
     try { detail = (JSON.parse(body) as { detail?: unknown }).detail; } catch { /* not JSON */ }
     this.detail = typeof detail === "string" && detail.length <= 400 ? detail : null;
+  }
+}
+
+/** A context lookup failed; callers can explain the status without exposing the response body. */
+export class GatewayContextError extends Error {
+  constructor(readonly status: number, body: string) {
+    super(`Could not check the model's context: ${status} ${body}`);
   }
 }
 
@@ -115,10 +124,10 @@ export async function modelContextWindow(
     let detail = body;
     try { detail = (JSON.parse(body) as { detail?: string }).detail ?? body; } catch { /* plain legacy response */ }
     if (typeof detail === "string" && /^not found\.?$/i.test(detail.trim())) return undefined;
-    throw new Error(`Could not check the model's context: 404 ${body}`);
+    throw new GatewayContextError(404, body);
   }
   if (res.status === 405) return undefined;
-  if (!res.ok) throw new Error(`Could not check the model's context: ${res.status} ${await bodyText(res)}`);
+  if (!res.ok) throw new GatewayContextError(res.status, await bodyText(res));
   const body = await res.json() as { model?: unknown; scope?: unknown; context_window?: unknown };
   if (body.model !== model || body.scope !== scope) throw new Error("Gateway returned context information for a different model or scope.");
   const window = body.context_window;
@@ -210,7 +219,9 @@ export async function* streamChat(
           if (data === "[DONE]") {
             if (opts.requireSuccessfulFinish) {
               if (finishError) throw new Error(finishError);
-              if (finishReason !== "stop") throw new Error("Gateway did not confirm a successful generation (missing finish_reason: stop).");
+              if (finishReason !== "stop" && !(opts.allowLengthFinish && finishReason === "length")) {
+                throw new Error("Gateway did not confirm a successful generation (missing finish_reason: stop).");
+              }
             }
             return;
           }
@@ -268,7 +279,7 @@ export async function* streamChat(
             if (reason != null) {
               finishReason ??= reason;
               if (reason === "length") {
-                finishError ??= "The model hit its output limit, so this reply was not applied. Try a smaller change or a larger loaded context.";
+                if (!opts.allowLengthFinish) finishError ??= "The model hit its output limit, so this reply was not applied. Try a smaller change or a larger loaded context.";
               } else if (reason !== "stop") {
                 finishError ??= `Gateway generation ended with finish_reason: ${reason}; the reply was not accepted as complete.`;
               }

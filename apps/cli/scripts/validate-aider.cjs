@@ -8,17 +8,22 @@ const path = require('node:path');
 const http = require('node:http');
 const { execFile } = require('node:child_process');
 const run = require('node:util').promisify(execFile);
-async function main() {
+async function check(contextWindow) {
   assert(process.env.POTLUCK_AIDER_BIN, 'Set POTLUCK_AIDER_BIN to an installed Aider executable.');
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'potluck-aider-check-'));
   const project = path.join(directory, 'project');
   const home = path.join(directory, 'profile');
   await fs.mkdir(project); await fs.mkdir(home);
   await run('git', ['init', '--quiet'], { cwd: project });
-  const hash = 'a'.repeat(64), calls = [];
+  const hash = 'a'.repeat(64), calls = [], contextCalls = [];
   const server = http.createServer(async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (req.url === '/v1/potluck/capabilities') return res.end(JSON.stringify({ model_lock_version: 1, scopes: ['local', 'mine'], artifact_format: 'gguf' }));
+    if (req.url.startsWith('/v1/potluck/context?')) {
+      const query = new URL(req.url, 'http://localhost').searchParams;
+      contextCalls.push({ query: Object.fromEntries(query), headers: req.headers });
+      return res.end(JSON.stringify({ model: 'fixture', scope: 'local', context_window: contextWindow }));
+    }
     if (req.url !== '/v1/chat/completions') { res.statusCode = 404; return res.end('{}'); }
     let raw = ''; for await (const chunk of req) raw += chunk;
     const body = JSON.parse(raw); calls.push({ body, headers: req.headers });
@@ -34,8 +39,12 @@ async function main() {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const existingEnv = 'OPENAI_API_BASE=http://127.0.0.1:1/v1\nOPENAI_API_KEY=wrong-existing-key\n';
   const existingConfig = 'model: openai/wrong\nweak-model: openai/wrong\nopenai-api-base: http://127.0.0.1:1/v1\n';
+  const existingSettings = JSON.stringify([{ name: 'aider/extra_params', extra_params: {
+    api_base: 'http://127.0.0.1:1/v1', api_key: 'wrong-existing-key', max_tokens: 99999,
+  } }]);
   await fs.writeFile(path.join(project, '.env'), existingEnv);
   await fs.writeFile(path.join(project, '.aider.conf.yml'), existingConfig);
+  await fs.writeFile(path.join(project, '.aider.model.settings.yml'), existingSettings);
   await fs.writeFile(path.join(project, 'potluck.lock'), JSON.stringify({ schemaVersion: 1, model: { id: 'fixture', format: 'gguf', sha256: hash, sizeBytes: 100 } }));
   const env = { ...process.env, HOME: home, POTLUCK_DATA_DIR: directory,
     POTLUCK_GATEWAY_KEY: 'real-gateway-secret', POTLUCK_GATEWAY_URL: `http://127.0.0.1:${server.address().port}/v1`,
@@ -45,17 +54,27 @@ async function main() {
     await fs.writeFile(path.join(directory, 'output.txt'), result.stdout + result.stderr, { mode: 0o600 });
     assert.match(result.stdout, /POTLUCK_AIDER_OK/);
     assert(calls.length >= 2, 'Expected readiness probe and an actual Aider request.');
+    assert(contextCalls.length >= 2, 'Expected launch and actual-request context checks.');
+    for (const { query, headers } of contextCalls) {
+      assert.deepEqual(query, { model: 'fixture', scope: 'local', potluck_model_sha256: hash });
+      assert.equal(headers.authorization, 'Bearer real-gateway-secret');
+    }
     for (const { body, headers } of calls) {
       assert.equal(body.model, 'fixture'); assert.equal(body.potluck_model_sha256, hash);
       assert.equal(headers['x-potluck-scope'], 'local'); assert.equal(headers.authorization, 'Bearer real-gateway-secret');
     }
+    assert.equal(calls[0].body.max_tokens, 16);
+    for (const { body } of calls.slice(1)) assert.equal(body.max_tokens, Math.min(4096, Math.floor(contextWindow / 4)));
     assert.equal(await fs.readFile(path.join(project, '.env'), 'utf8'), existingEnv);
     assert.equal(await fs.readFile(path.join(project, '.aider.conf.yml'), 'utf8'), existingConfig);
+    assert.equal(await fs.readFile(path.join(project, '.aider.model.settings.yml'), 'utf8'), existingSettings);
+    await assert.rejects(fs.stat(path.join(project, '.gitignore')), { code: 'ENOENT' });
     assert(!result.stdout.includes('real-gateway-secret') && !result.stderr.includes('real-gateway-secret'));
-    process.stdout.write(JSON.stringify({ passed: true, requests: calls.length, directory }) + '\n');
+    process.stdout.write(JSON.stringify({ passed: true, contextWindow, requests: calls.length, directory }) + '\n');
   } catch (error) {
     await fs.writeFile(path.join(directory, 'failure.txt'), String(error) + '\n' + (error.stdout || '') + (error.stderr || ''), { mode: 0o600 });
     throw new Error(`Aider validation failed; inspect ${directory}/failure.txt`);
   } finally { await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }); }
 }
+async function main() { for (const contextWindow of [8192, 32768]) await check(contextWindow); }
 main().catch(error => { process.stderr.write(error.message + '\n'); process.exitCode = 1; });

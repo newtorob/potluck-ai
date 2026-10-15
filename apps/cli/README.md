@@ -771,6 +771,28 @@ key. Aider's existing config files are preserved. Automatic commits, analytics,
 and update checks are disabled for the launch. Other Aider behavior, including
 file editing and history, remains under Aider's controls. Aider must already be
 installed; `POTLUCK_AIDER_BIN` can specify its absolute executable path.
+Noninteractive `--message` launches also disable Aider's `.gitignore` edit prompt.
+If the bridge rejects a one-shot request for its context or request format,
+Potluck exits with a failure status even if Aider exits successfully.
+
+Before starting Aider, Potluck requires a known **loaded** context of at least
+8,192 tokens on the selected route and a completed synthetic readiness probe.
+This minimum is Potluck's launcher policy, not an Aider requirement. If context
+is unknown, update the serving runtime and load the model with a known context;
+for a smaller context, reload it with at least 8,192 tokens and retry. A model's
+advertised maximum does not substitute for the context actually loaded.
+
+Potluck supplies Aider model metadata and history/repository-map budgets derived
+from that loaded context. It reserves one quarter for output, capped at 4,096
+tokens, plus 512 tokens of safety margin. Aider's metadata and history/map budgets
+are advisory. The bridge separately caps output and checks the entire plain-text
+request using a conservative UTF-8 byte estimate with message/template overhead,
+not the model's exact tokenizer. It rejects oversized requests without truncating
+files: clear old chat history, include fewer or smaller files, or load a larger
+context and restart the launcher. The runtime remains authoritative about what
+fits. The bridge rechecks the pinned model's context before each request; a
+smaller or unknown context requires restarting the launcher. Checks are snapshots,
+so a later reload or route change can still cause the runtime to refuse a request.
 
 Validated with Aider 0.86.2. The repeatable integration check is
 `POTLUCK_AIDER_BIN=/absolute/path/to/aider node scripts/validate-aider.cjs` from
