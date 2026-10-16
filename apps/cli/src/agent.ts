@@ -19,7 +19,7 @@ export { trimHistory } from "./context.js";
 import { runTool, runVerify, TOOL_NAMES, type Confirm, type VerifyOutcome } from "./tools.js";
 
 /** A function that runs the verify command (injectable for tests). */
-export type VerifyRunner = (command: string, cwd: string) => Promise<VerifyOutcome>;
+export type VerifyRunner = (command: string, cwd: string, signal?: AbortSignal) => Promise<VerifyOutcome>;
 
 export interface ParsedAction {
   tool: string;
@@ -451,7 +451,7 @@ export async function runTask(
     if (verifyCommand === null) return;
     callbacks.onVerifyStart?.(verifyCommand);
     opts.signal?.throwIfAborted();
-    const outcome = await verifyRunner(verifyCommand, cwd);
+    const outcome = await verifyRunner(verifyCommand, cwd, opts.signal);
     opts.signal?.throwIfAborted();
     const ok = outcome.code === 0;
     verificationFailed = !ok;
@@ -581,6 +581,7 @@ export async function runTask(
       cwd,
       confirm,
       readPaths,
+      signal: opts.signal,
       onCommandStarted: () => {
         if (verifyCommand === null) return;
         // Shell commands can change any file even when they exit nonzero. Keep

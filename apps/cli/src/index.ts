@@ -12,7 +12,8 @@
  * In-session commands: /exit, /model, /scope, /verify, /snapshot, /clear, /help.
  */
 
-import { createInterface, type Interface } from "node:readline";
+import { createInterface } from "node:readline";
+import { createAsk } from "./prompt.js";
 import { basename } from "node:path";
 import { readFileSync } from "node:fs";
 import { stdin, stdout, stderr } from "node:process";
@@ -212,83 +213,67 @@ async function runOneShot(
     session?: SavedSession;
   },
 ): Promise<void> {
-  const confirm = oneShotConfirm(opts.yes, (line) => stderr.write(`${line}\n`));
-  const { brief } = await loadBrief(opts.cwd, (line) => stderr.write(`${line}\n`));
-  const conversation: ChatMessage[] = [
-    { role: "system", content: systemPrompt(opts.cwd, opts.verifyCommand, brief) },
-  ];
-  const repoMap = await buildRepoMap(opts.cwd, 200, 512);
-  const instructions = new ProjectInstructions(opts.cwd);
-  if (opts.session) conversation.push(...opts.session.history);
-  const contextWindowTokens = await prepareAgentContext(conversation, repoMap, opts.cfg, opts.model, opts.scope,
-    instructions, line => stderr.write(`${line}\n`));
-  if (!opts.verifyCommand) {
-    stderr.write(
-      c.dim(
-        "no verify command: pass --verify '<test/build cmd>' so the agent checks its own edits.\n",
-      ),
-    );
-  }
-  const result = await runTask(conversation, task, {
-    cfg: opts.cfg,
-    model: opts.model,
-    cwd: opts.cwd,
-    confirm,
-    scope: opts.scope,
-    contextWindowTokens,
-    verifyCommand: opts.verifyCommand,
-    callbacks: {
-      onToken: (t) => stdout.write(t),
-      onTurnEnd: () => stdout.write("\n"),
-      onAction: (a) => stderr.write(`${renderAction(a.tool, a.args)}\n`),
-      onToolResult: (r) => stderr.write(`${renderResultPreview(r)}\n`),
-      onNotice: (m) => stderr.write(`${c.yellow(m)}\n`),
-      onVerifyStart: (cmd) => stderr.write(`${c.dim(`running verify: ${cmd}`)}\n`),
-      onVerify: (cmd, ok) =>
-        stderr.write(
-          ok
-            ? `${c.green("✓ verify passed")} ${c.dim(cmd)}\n`
-            : `${c.red("✗ verify failed")} ${c.dim(cmd)}\n`,
+  const cancellation = new AbortController();
+  let cancelledExit = 130;
+  const interrupt = (): void => { cancellation.abort(); };
+  const terminate = (): void => { cancelledExit = 143; cancellation.abort(); };
+  process.on("SIGINT", interrupt);
+  process.on("SIGTERM", terminate);
+  try {
+    const confirm = oneShotConfirm(opts.yes, (line) => stderr.write(`${line}\n`));
+    const { brief } = await loadBrief(opts.cwd, (line) => stderr.write(`${line}\n`));
+    const conversation: ChatMessage[] = [
+      { role: "system", content: systemPrompt(opts.cwd, opts.verifyCommand, brief) },
+    ];
+    const repoMap = await buildRepoMap(opts.cwd, 200, 512);
+    const instructions = new ProjectInstructions(opts.cwd);
+    if (opts.session) conversation.push(...opts.session.history);
+    const contextWindowTokens = await prepareAgentContext(conversation, repoMap, opts.cfg, opts.model, opts.scope,
+      instructions, line => stderr.write(`${line}\n`), cancellation.signal);
+    if (!opts.verifyCommand) {
+      stderr.write(
+        c.dim(
+          "no verify command: pass --verify '<test/build cmd>' so the agent checks its own edits.\n",
         ),
-    },
-  });
-  if (result.status === "incomplete") process.exitCode = 1;
-  if (opts.session) {
-    await saveSession(opts.session, conversation);
-    stderr.write(`Session saved: ${opts.session.id}\n`);
-  }
-}
-
-/**
- * A close-safe prompt bound to one readline. Resolves to null on EOF / readline
- * close (piped input ending, Ctrl-D) so callers stop instead of calling
- * question() on a closed readline (ERR_USE_AFTER_CLOSE).
- */
-function createAsk(rl: Interface): (q: string) => Promise<string | null> {
-  let closed = false;
-  rl.once("close", () => {
-    closed = true;
-  });
-  return (q: string): Promise<string | null> =>
-    new Promise((res) => {
-      if (closed) {
-        res(null);
-        return;
-      }
-      let done = false;
-      const onClose = (): void => {
-        if (!done) {
-          done = true;
-          res(null);
-        }
-      };
-      rl.once("close", onClose);
-      rl.question(q, (answer) => {
-        done = true;
-        rl.removeListener("close", onClose);
-        res(answer);
-      });
+      );
+    }
+    const result = await runTask(conversation, task, {
+      cfg: opts.cfg,
+      model: opts.model,
+      cwd: opts.cwd,
+      confirm,
+      scope: opts.scope,
+      contextWindowTokens,
+      signal: cancellation.signal,
+      verifyCommand: opts.verifyCommand,
+      callbacks: {
+        onToken: (t) => stdout.write(t),
+        onTurnEnd: () => stdout.write("\n"),
+        onAction: (a) => stderr.write(`${renderAction(a.tool, a.args)}\n`),
+        onToolResult: (r) => stderr.write(`${renderResultPreview(r)}\n`),
+        onNotice: (m) => stderr.write(`${c.yellow(m)}\n`),
+        onVerifyStart: (cmd) => stderr.write(`${c.dim(`running verify: ${cmd}`)}\n`),
+        onVerify: (cmd, ok) =>
+          stderr.write(
+            ok
+              ? `${c.green("✓ verify passed")} ${c.dim(cmd)}\n`
+              : `${c.red("✗ verify failed")} ${c.dim(cmd)}\n`,
+          ),
+      },
     });
+    if (result.status === "incomplete") process.exitCode = 1;
+    if (opts.session) {
+      await saveSession(opts.session, conversation);
+      stderr.write(`Session saved: ${opts.session.id}\n`);
+    }
+  } catch (error) {
+    if (!cancellation.signal.aborted) throw error;
+    stderr.write("Task cancelled. Changes already made are kept.\n");
+    process.exitCode = cancelledExit;
+  } finally {
+    process.off("SIGINT", interrupt);
+    process.off("SIGTERM", terminate);
+  }
 }
 
 function reportGatewayError(cfg: GatewayConfig, err: unknown, sink: NodeJS.WritableStream): void {
@@ -485,7 +470,8 @@ async function main(): Promise<void> {
   catch (error) { stderr.write(`${(error as Error).message}\n`); process.exitCode = 1; rl.close(); return; }
   if (initialScope.notice) stdout.write(`${c.yellow(initialScope.notice)}\n`);
 
-  const confirm = makeConfirm((q) => ask(q).then((a) => a ?? "n"));
+  let active: AbortController | null = null;
+  const confirm = makeConfirm((q) => ask(q, active?.signal).then((a) => a ?? "n"));
   const briefState = await loadBrief(cwd, (line) => stdout.write(`${line}\n`));
   const conversation: ChatMessage[] = [
     { role: "system", content: systemPrompt(cwd, verify.command, briefState.brief) },
@@ -498,7 +484,6 @@ async function main(): Promise<void> {
   }
 
   // Ctrl-C cancels the active turn; at an idle prompt it exits.
-  let active: AbortController | null = null;
   rl.on("SIGINT", () => {
     if (active) {
       active.abort();
@@ -645,12 +630,20 @@ async function main(): Promise<void> {
         );
       } else {
         stdout.write(`${c.dim("running verify:")} ${c.cyan(verify.command)}\n`);
-        const { code, output } = await runVerify(verify.command, cwd);
-        if (code === 0) {
-          stdout.write(`${c.green("✓ verify passed")}\n`);
-        } else {
-          stdout.write(`${c.red(`✗ verify failed (exit ${code})`)}\n`);
-          if (output.trim()) stdout.write(`${c.dim(output)}\n`);
+        active = new AbortController();
+        try {
+          const { code, output } = await runVerify(verify.command, cwd, active.signal);
+          if (code === 0) {
+            stdout.write(`${c.green("✓ verify passed")}\n`);
+          } else {
+            stdout.write(`${c.red(`✗ verify failed (exit ${code})`)}\n`);
+            if (output.trim()) stdout.write(`${c.dim(output)}\n`);
+          }
+        } catch (error) {
+          if (!active.signal.aborted) throw error;
+          stdout.write("Verification cancelled.\n");
+        } finally {
+          active = null;
         }
       }
       continue;

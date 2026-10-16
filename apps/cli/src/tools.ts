@@ -9,7 +9,7 @@
  * not the lexical one; see resolveInCwd.
  */
 
-import { spawn } from "node:child_process";
+import { commandProcess } from "./command-process.js";
 import { createReadStream } from "node:fs";
 import {
   lstat,
@@ -42,6 +42,7 @@ export interface ConfirmContext {
 export type Confirm = (ctx: ConfirmContext) => Promise<boolean>;
 
 export interface ToolDeps {
+  signal?: AbortSignal;
   cwd: string;
   confirm: Confirm;
   /** The approved shell actually started; it may mutate files even if it exits nonzero. */
@@ -740,38 +741,28 @@ async function editFileTool(
   return parts.join(" ") + editContext(path, result.updated, newString);
 }
 
-function execCommand(
+async function execCommand(
   command: string,
   cwd: string,
   onStarted?: () => void,
+  signal?: AbortSignal,
 ): Promise<{ code: number; output: string }> {
-  return new Promise((resolveExec) => {
-    const child = spawn(command, { cwd, shell: true });
-    child.once("spawn", () => onStarted?.());
-    let output = "";
-    let truncated = false;
-
-    const onData = (buf: Buffer): void => {
+  let output = "";
+  let truncated = false;
+  try {
+    const code = await commandProcess(command, cwd, { signal, onStarted, onData: buf => {
       if (truncated) return;
       output += buf.toString("utf8");
       if (output.length >= MAX_CMD_OUTPUT) {
         output = output.slice(0, MAX_CMD_OUTPUT);
         truncated = true;
       }
-    };
-
-    child.stdout.on("data", onData);
-    child.stderr.on("data", onData);
-    child.on("error", (err) => {
-      resolveExec({ code: -1, output: `failed to start: ${err.message}` });
-    });
-    child.on("close", (code) => {
-      resolveExec({
-        code: code ?? -1,
-        output: output + (truncated ? "\n…[output truncated]" : ""),
-      });
-    });
-  });
+    } });
+    return { code, output: output + (truncated ? "\n…[output truncated]" : "") };
+  } catch (error) {
+    signal?.throwIfAborted();
+    return { code: -1, output: `failed to start: ${(error as Error).message}` };
+  }
 }
 
 async function runCommandTool(
@@ -786,7 +777,7 @@ async function runCommandTool(
   });
   if (!approved) return "user declined";
 
-  const { code, output } = await execCommand(command, deps.cwd, deps.onCommandStarted);
+  const { code, output } = await execCommand(command, deps.cwd, deps.onCommandStarted, deps.signal);
   const body = output.trim().length > 0 ? output : "(no output)";
   return `exit ${code}\n${body}`;
 }
@@ -811,26 +802,18 @@ function tailCap(s: string): string {
  * spawn as run_command, but it is not gated (the user configured it) and the
  * captured output is tail-capped - build errors land at the end.
  */
-export function runVerify(command: string, cwd: string): Promise<VerifyOutcome> {
-  return new Promise((resolveExec) => {
-    const child = spawn(command, { cwd, shell: true });
-    let buf = "";
-
-    const onData = (b: Buffer): void => {
+export async function runVerify(command: string, cwd: string, signal?: AbortSignal): Promise<VerifyOutcome> {
+  let buf = "";
+  try {
+    const code = await commandProcess(command, cwd, { signal, onData: b => {
       buf += b.toString("utf8");
-      // Rolling tail buffer so a noisy build can't exhaust memory.
       if (buf.length > VERIFY_BUFFER_BYTES) buf = buf.slice(buf.length - VERIFY_BUFFER_BYTES);
-    };
-
-    child.stdout.on("data", onData);
-    child.stderr.on("data", onData);
-    child.on("error", (err) => {
-      resolveExec({ code: -1, output: `failed to start: ${err.message}` });
-    });
-    child.on("close", (code) => {
-      resolveExec({ code: code ?? -1, output: tailCap(buf) });
-    });
-  });
+    } });
+    return { code, output: tailCap(buf) };
+  } catch (error) {
+    signal?.throwIfAborted();
+    return { code: -1, output: `failed to start: ${(error as Error).message}` };
+  }
 }
 
 /**
@@ -844,6 +827,7 @@ export async function runTool(
   deps: ToolDeps,
 ): Promise<string> {
   try {
+    deps.signal?.throwIfAborted();
     switch (name) {
       case "read_file":
         return await readFileTool(args, deps);
@@ -863,6 +847,7 @@ export async function runTool(
         return `error: unknown tool "${name}"`;
     }
   } catch (err) {
+    deps.signal?.throwIfAborted();
     const message = err instanceof Error ? err.message : String(err);
     return `error: ${message}`;
   }

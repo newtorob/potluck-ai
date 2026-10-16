@@ -166,7 +166,13 @@ In-session commands:
 | `/help`       | Show help                               |
 | `/exit`       | Quit                                    |
 
-`Ctrl-C` cancels the current turn cleanly; pressing it at an idle prompt quits.
+`Ctrl-C` cancels the current turn, including an active shell command or fixed
+verification check; pressing it at an idle prompt quits. Cancelling `/verify`
+returns to the prompt. One-shot tasks stop on SIGINT/SIGTERM and exit 130/143.
+On macOS/Linux, cancellation stops the command's process group, escalating after
+a short grace period for children that ignore termination. Windows uses
+`taskkill /T /F`. Deliberately detached processes are outside that group.
+Changes already written to files are kept; cancellation does not undo edits.
 
 The agent validates tool names and argument types before execution. A completed
 fenced action missing only its final outer `}` can be recovered without changing
