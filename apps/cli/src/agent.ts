@@ -643,7 +643,11 @@ export async function runTask(
       mutationFailureFeedback = result.length > 1200 ? result.slice(0, 1200) + "\n[failed-change feedback trimmed]" : result;
     }
     const commandSucceeded = parsed.action.tool === "run_command" && result.startsWith("exit 0");
-    if (changed || commandSucceeded) observations.clear();
+    // A successful diagnostic command is not evidence that a failed edit was
+    // repaired. Keep prior observations; real command changes produce different
+    // file feedback. Successful commands themselves may mutate silently, so
+    // identical stdout alone does not classify them as stalled.
+    if (changed) observations.clear();
     const key = createHash("sha256").update(JSON.stringify([
       parsed.action.tool,
       JSON.stringify(parsed.action.args, Object.keys(parsed.action.args).sort()),

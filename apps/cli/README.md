@@ -233,8 +233,11 @@ feedback; file search remains available.
 
 Repeated unchanged reads, failed edits, and same-content writes receive recovery
 feedback, then stop after three identical action/result pairs without a successful
-change. Intervening reads do not reset a failed-edit loop. Actual edits reset the
-progress check. Read feedback includes the file path; successful edits and
+change. Intervening reads and successful shell commands do not reset a failed-edit
+loop. Actual file edits reset the progress check; changed tool feedback is a new
+observation. Successful shell commands are not themselves classified as stalled
+from identical output alone, since they can change files silently. Read feedback
+includes the file path; successful edits and
 failed matches/no-op edits include a bounded excerpt of the actual current file.
 This lets the agent inspect placement and repair stale or wrong-file edits without
 guessing another target. It does not automatically redirect or apply failed edits.
