@@ -45,6 +45,7 @@ export interface ToolDeps {
   signal?: AbortSignal;
   cwd: string;
   confirm: Confirm;
+  signal?: AbortSignal;
   /** The approved shell actually started; it may mutate files even if it exits nonzero. */
   onCommandStarted?: () => void;
   /**
@@ -192,6 +193,40 @@ async function resolveInCwd(cwd: string, p: string): Promise<string> {
     throw new ToolError(`path escapes the working directory: ${p}`);
   }
   return abs;
+}
+
+function staleApproval(path: string): ToolError {
+  return new ToolError(
+    `file ${path} changed while awaiting approval. Nothing was written. ` +
+    `Re-read the file and request a new change so its current diff can be approved.`,
+  );
+}
+
+/** The approved diff must still describe the same target and bytes. */
+async function checkApprovedFile(
+  deps: ToolDeps,
+  path: string,
+  abs: string,
+  expected: Buffer | null,
+): Promise<void> {
+  try {
+    if (await resolveInCwd(deps.cwd, path) !== abs) throw staleApproval(path);
+    let current: Buffer | null;
+    try {
+      current = await readFile(abs);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      current = null;
+    }
+    if (expected === null ? current !== null : current === null || !current.equals(expected)) {
+      throw staleApproval(path);
+    }
+  } catch {
+    deps.readPaths?.delete(abs);
+    throw staleApproval(path);
+  }
+  // This closes the approval wait window; it is not a filesystem transaction.
+  // Another process can still write between this check and the subsequent write.
 }
 
 async function readFileTool(
@@ -434,9 +469,11 @@ async function writeFileTool(
   const abs = await resolveInCwd(deps.cwd, path);
 
   let current = "";
+  let before: Buffer | null = null;
   let exists = false;
   try {
-    current = await readFile(abs, "utf8");
+    before = await readFile(abs);
+    current = before.toString("utf8");
     exists = true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
@@ -478,10 +515,18 @@ async function writeFileTool(
     summary,
     subject: path,
   });
+  deps.signal?.throwIfAborted();
   if (!approved) return "user declined";
 
+  await checkApprovedFile(deps, path, abs, before);
   await mkdir(dirname(abs), { recursive: true });
-  await writeFile(abs, content, "utf8");
+  try {
+    // Exclusive creation also protects a new file appearing after the recheck.
+    await writeFile(abs, content, { encoding: "utf8", flag: exists ? "w" : "wx" });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") throw staleApproval(path);
+    throw error;
+  }
   // After authoring the file, the agent knows its content - a later overwrite is
   // informed, not blind, so record it like a read.
   deps.readPaths?.add(abs);
@@ -709,8 +754,10 @@ async function editFileTool(
     throw new ToolError("old_string must not be empty (use write_file for new files)");
   }
   let current: string;
+  let before: Buffer;
   try {
-    current = await readFile(abs, "utf8");
+    before = await readFile(abs);
+    current = before.toString("utf8");
   } catch {
     throw new ToolError(
       `file does not exist: ${path} (use write_file to create new files)`,
@@ -732,8 +779,10 @@ async function editFileTool(
 
   const summary = unifiedDiff(path, current, result.updated);
   const approved = await deps.confirm({ tool: "edit_file", summary, subject: path });
+  deps.signal?.throwIfAborted();
   if (!approved) return "user declined";
 
+  await checkApprovedFile(deps, path, abs, before);
   await writeFile(abs, result.updated, "utf8");
   const parts = [`edited ${path}`];
   if (result.count > 1) parts.push(`(${result.count} occurrences)`);
