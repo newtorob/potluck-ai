@@ -178,6 +178,8 @@ Potluck is a potluck: you can bring compute, not just use it. In setup (and late
 
 **The app opened but nothing loads / "sidecar offline."** Give it 10 to 20 seconds on first launch while it unpacks. If it persists, quit and reopen.
 
+**Settings could not load.** Choose **Retry** in Settings to reconnect without leaving the tab. If settings were already loaded, they stay visible when a refresh fails. Wait a moment and retry; if the problem persists, quit and reopen Potluck.
+
 **Model download is slow or stalls.** It is a large file over your connection. It resumes; you can leave the Models page and come back. Every download is hash-verified before it loads, so a corrupt download is caught rather than used.
 
 **A machine will not pair.** Both machines must be signed in to the same account. On the same network, pairing is automatic plus the code. Across networks it goes through the coordinator, so check that both machines show **connected** in the My machines view.

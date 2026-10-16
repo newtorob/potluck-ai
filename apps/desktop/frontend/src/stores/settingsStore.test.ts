@@ -14,7 +14,29 @@ vi.mock('@/lib/localApi', () => ({
 }));
 
 import { useSettingsStore } from './settingsStore';
-import type { PotluckSettings } from '@/lib/localApi';
+import { localApi, type PotluckSettings } from '@/lib/localApi';
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
+}
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  useSettingsStore.setState({
+    settings: null,
+    isLoaded: false,
+    isLoading: false,
+    loadError: null,
+    isSaving: false,
+    saveError: null,
+  });
+});
 
 function makeSettings(chatHistoryEnabled: boolean): PotluckSettings {
   return {
@@ -29,7 +51,7 @@ function makeSettings(chatHistoryEnabled: boolean): PotluckSettings {
       contributor_mode: false,
       contributor_schedule: null,
       max_gpu_percent: 50,
-    max_concurrent_jobs: 1,
+      max_concurrent_jobs: 1,
       coordinator_url: '',
     },
     app: { theme: 'system', font_size: 14 },
@@ -54,15 +76,6 @@ function makeSettings(chatHistoryEnabled: boolean): PotluckSettings {
 }
 
 describe('settingsStore.hydrateFromSidecar', () => {
-  beforeEach(() => {
-    useSettingsStore.setState({
-      settings: null,
-      isLoaded: false,
-      isSaving: false,
-      saveError: null,
-    });
-  });
-
   it('seeds settings without a second round-trip', () => {
     const settings = makeSettings(true);
 
@@ -78,5 +91,111 @@ describe('settingsStore.hydrateFromSidecar', () => {
     useSettingsStore.getState().hydrateFromSidecar(makeSettings(false));
 
     expect(useSettingsStore.getState().settings?.privacy.chat_history_enabled).toBe(false);
+  });
+
+  it('does not overwrite a fetched value or a user update with a late startup response', async () => {
+    const fetched = makeSettings(false);
+    vi.mocked(localApi.getSettings).mockResolvedValue(fetched);
+    await useSettingsStore.getState().fetch();
+    useSettingsStore.getState().hydrateFromSidecar(makeSettings(true));
+    expect(useSettingsStore.getState().settings).toBe(fetched);
+
+    const save = deferred<PotluckSettings>();
+    vi.mocked(localApi.updateSettings).mockReturnValue(save.promise);
+    const update = useSettingsStore.getState().update({ app: { theme: 'dark' } });
+    const optimistic = useSettingsStore.getState().settings;
+    useSettingsStore.getState().hydrateFromSidecar(makeSettings(true));
+    expect(useSettingsStore.getState().settings).toBe(optimistic);
+    const saved = { ...fetched, app: { ...fetched.app, theme: 'dark' as const } };
+    save.resolve(saved);
+    await update;
+    useSettingsStore.getState().hydrateFromSidecar(makeSettings(true));
+    expect(useSettingsStore.getState().settings).toBe(saved);
+  });
+});
+
+describe('settingsStore.fetch', () => {
+  it('shares the active request and releases it when loading completes', async () => {
+    const response = deferred<PotluckSettings>();
+    vi.mocked(localApi.getSettings).mockReturnValue(response.promise);
+    const first = useSettingsStore.getState().fetch();
+    const second = useSettingsStore.getState().fetch();
+    expect(second).toBe(first);
+    expect(localApi.getSettings).toHaveBeenCalledOnce();
+    expect(useSettingsStore.getState().isLoading).toBe(true);
+    response.resolve(makeSettings(false));
+    await first;
+    expect(useSettingsStore.getState().isLoading).toBe(false);
+    expect(useSettingsStore.getState().isLoaded).toBe(true);
+  });
+
+  it('can retry a synchronous API failure without reflecting its private message', async () => {
+    vi.mocked(localApi.getSettings).mockImplementationOnce(() => {
+      throw new Error('private-api-key');
+    });
+    await useSettingsStore.getState().fetch();
+    expect(useSettingsStore.getState()).toMatchObject({
+      settings: null,
+      isLoading: false,
+      isLoaded: false,
+    });
+    expect(useSettingsStore.getState().loadError).toContain('Could not load settings');
+    expect(useSettingsStore.getState().loadError).not.toContain('private-api-key');
+
+    const response = deferred<PotluckSettings>();
+    vi.mocked(localApi.getSettings).mockReturnValue(response.promise);
+    const retry = useSettingsStore.getState().fetch();
+    expect(useSettingsStore.getState().isLoading).toBe(true);
+    expect(useSettingsStore.getState().loadError).toContain('Could not load settings');
+    response.resolve(makeSettings(false));
+    await retry;
+    expect(localApi.getSettings).toHaveBeenCalledTimes(2);
+    expect(useSettingsStore.getState()).toMatchObject({
+      isLoading: false,
+      isLoaded: true,
+      loadError: null,
+    });
+  });
+
+  it('preserves cached settings and save feedback when refreshing fails', async () => {
+    const cached = makeSettings(false);
+    useSettingsStore.getState().hydrateFromSidecar(cached);
+    useSettingsStore.setState({ saveError: 'A previous save failed' });
+    vi.mocked(localApi.getSettings).mockRejectedValue(new Error('offline'));
+    await useSettingsStore.getState().fetch();
+    expect(useSettingsStore.getState()).toMatchObject({
+      settings: cached,
+      isLoaded: true,
+      isLoading: false,
+      saveError: 'A previous save failed',
+    });
+    expect(useSettingsStore.getState().loadError).toContain('Could not load settings');
+  });
+
+  it('does not let an obsolete completion clear a newer request loading state', async () => {
+    const obsolete = deferred<PotluckSettings>();
+    const current = deferred<PotluckSettings>();
+    vi.mocked(localApi.getSettings)
+      .mockReturnValueOnce(obsolete.promise)
+      .mockReturnValueOnce(current.promise);
+    const first = useSettingsStore.getState().fetch();
+    const hydrated = makeSettings(false);
+    useSettingsStore.getState().hydrateFromSidecar(hydrated);
+    const second = useSettingsStore.getState().fetch();
+    obsolete.reject(new Error('old request failed'));
+    await first;
+    expect(useSettingsStore.getState()).toMatchObject({
+      settings: hydrated,
+      isLoading: true,
+      loadError: null,
+    });
+    const fresh = makeSettings(true);
+    current.resolve(fresh);
+    await second;
+    expect(useSettingsStore.getState()).toMatchObject({
+      settings: fresh,
+      isLoading: false,
+      loadError: null,
+    });
   });
 });

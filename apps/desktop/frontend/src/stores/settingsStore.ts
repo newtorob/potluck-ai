@@ -17,13 +17,13 @@ import type { PotluckSettings } from '@/lib/localApi';
 // Deep-partial helper for the patch type
 // ---------------------------------------------------------------------------
 
-type DeepPartial<T> = T extends object
-  ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : T;
+type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
 interface SettingsState {
   settings: PotluckSettings | null;
   isLoaded: boolean;
+  isLoading: boolean;
+  loadError: string | null;
   isSaving: boolean;
   saveError: string | null;
 
@@ -33,7 +33,8 @@ interface SettingsState {
   /** Seed the store from a GET /settings response someone else already made
    *  (durablePrefs at App mount). Lets gates that read settings - notably
    *  privacy.chat_history_enabled - have a real value before the first send,
-   *  with no extra round-trip. Mirrors connectionStore.hydrateFromSidecar. */
+   *  with no extra round-trip. Seed-only: a late startup response must not
+   *  replace settings already fetched or changed in this session. */
   hydrateFromSidecar: (settings: PotluckSettings) => void;
 }
 
@@ -41,48 +42,94 @@ interface SettingsState {
 // Store
 // ---------------------------------------------------------------------------
 
-export const useSettingsStore = create<SettingsState>()((set, get) => ({
-  settings: null,
-  isLoaded: false,
-  isSaving: false,
-  saveError: null,
+export const useSettingsStore = create<SettingsState>()((set, get) => {
+  let revision = 0;
+  let inFlight: Promise<void> | null = null;
+  let pendingUpdates = 0;
+  const invalidateRead = () => {
+    revision++;
+    inFlight = null;
+  };
 
-  async fetch() {
-    try {
-      const settings = await localApi.getSettings();
-      set({ settings, isLoaded: true });
-    } catch (err) {
-      // Sidecar may not be running during pure UI development - log and continue
-      console.warn('[settingsStore] Could not load settings:', err);
-    }
-  },
+  return {
+    settings: null,
+    isLoaded: false,
+    isLoading: false,
+    loadError: null,
+    isSaving: false,
+    saveError: null,
 
-  async update(patch) {
-    const previous = get().settings;
-    if (!previous) return;
+    fetch() {
+      if (inFlight) return inFlight;
+      const startedAt = ++revision;
+      set({ isLoading: true });
+      // Preserve an existing error while retrying so the retry control stays
+      // visible. A delayed read cannot undo hydration or an optimistic/save result.
+      let response: Promise<PotluckSettings>;
+      try {
+        response = Promise.resolve(localApi.getSettings());
+      } catch (error) {
+        response = Promise.reject(error);
+      }
+      inFlight = response
+        .then((settings) => {
+          if (revision === startedAt && pendingUpdates === 0) {
+            set({ settings, isLoaded: true, loadError: null });
+          }
+        })
+        .catch(() => {
+          if (revision === startedAt && pendingUpdates === 0) {
+            set({
+              loadError:
+                'Could not load settings. Try again, or close and reopen Potluck if the problem continues.',
+            });
+          }
+        })
+        .finally(() => {
+          if (revision === startedAt) {
+            inFlight = null;
+            set({ isLoading: false });
+          }
+        });
+      return inFlight;
+    },
 
-    // Optimistic update - deep-merge the patch
-    const optimistic = deepMerge(previous, patch);
-    set({ settings: optimistic, isSaving: true, saveError: null });
+    async update(patch) {
+      const previous = get().settings;
+      if (!previous) return;
 
-    try {
-      const updated = await localApi.updateSettings(patch as Partial<PotluckSettings>);
-      set({ settings: updated, isSaving: false });
-    } catch (err) {
-      // Rollback to previous on failure
-      set({
-        settings: previous,
-        isSaving: false,
-        saveError: err instanceof Error ? err.message : 'Failed to save settings',
-      });
-      throw err;
-    }
-  },
+      // Optimistic update - deep-merge the patch
+      const optimistic = deepMerge(previous, patch);
+      pendingUpdates++;
+      invalidateRead();
+      set({ settings: optimistic, isSaving: true, saveError: null, isLoading: false });
 
-  hydrateFromSidecar(settings) {
-    set({ settings, isLoaded: true });
-  },
-}));
+      try {
+        const updated = await localApi.updateSettings(patch as Partial<PotluckSettings>);
+        invalidateRead();
+        set({ settings: updated, isSaving: false, isLoading: false, loadError: null });
+      } catch (err) {
+        // Rollback to previous on failure
+        invalidateRead();
+        set({
+          settings: previous,
+          isSaving: false,
+          isLoading: false,
+          saveError: err instanceof Error ? err.message : 'Failed to save settings',
+        });
+        throw err;
+      } finally {
+        pendingUpdates--;
+      }
+    },
+
+    hydrateFromSidecar(settings) {
+      if (get().settings !== null) return;
+      invalidateRead();
+      set({ settings, isLoaded: true, isLoading: false, loadError: null });
+    },
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Deep merge utility (no external dep needed)

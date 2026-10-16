@@ -24,20 +24,26 @@ export function applyTheme(theme: 'system' | 'light' | 'dark') {
 export interface UseSettingsReturn {
   settings: PotluckSettings | null;
   isLoaded: boolean;
+  isLoading: boolean;
+  loadError: string | null;
   isSaving: boolean;
   saveError: string | null;
   update: (patch: PotluckSettingsPatch) => Promise<void>;
+  retry: () => Promise<void>;
 }
 
 export function useSettings(): UseSettingsReturn {
   const store = useSettingsStore();
 
+  const retry = async () => {
+    await store.fetch();
+    const settings = useSettingsStore.getState().settings;
+    if (settings) applyTheme(settings.app.theme);
+  };
+
   // Fetch on mount, apply theme when settings arrive
   useEffect(() => {
-    void store.fetch().then(() => {
-      const s = useSettingsStore.getState().settings;
-      if (s) applyTheme(s.app.theme);
-    });
+    void retry();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -51,8 +57,11 @@ export function useSettings(): UseSettingsReturn {
   return {
     settings: store.settings,
     isLoaded: store.isLoaded,
+    isLoading: store.isLoading,
+    loadError: store.loadError,
     isSaving: store.isSaving,
     saveError: store.saveError,
     update,
+    retry,
   };
 }

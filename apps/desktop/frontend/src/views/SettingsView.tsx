@@ -12,7 +12,7 @@
  */
 
 import { useSearchParams } from 'react-router-dom';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/components/ui/cn';
 import { HardwarePanel } from '@/components/settings/HardwarePanel';
 import { PrivacyPanel } from '@/components/settings/PrivacyPanel';
@@ -52,7 +52,7 @@ function tabFromParam(value: string | null): TabId {
 // ---------------------------------------------------------------------------
 
 export function SettingsView() {
-  const { settings, isLoaded, isSaving, saveError, update } = useSettings();
+  const { settings, isLoading, loadError, isSaving, saveError, update, retry } = useSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = tabFromParam(searchParams.get('tab'));
   const setActiveTab = (tab: TabId) => {
@@ -95,14 +95,14 @@ export function SettingsView() {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-w-0 flex-col">
       <ViewHeader title="Settings" />
 
       {/* Tab bar */}
       <div
         role="tablist"
         aria-label="Settings tabs"
-        className="flex gap-0 border-b border-border px-6"
+        className="flex shrink-0 gap-0 overflow-x-auto border-b border-border px-6"
       >
         {TABS.map(({ id, label }, idx) => (
           <button
@@ -116,7 +116,7 @@ export function SettingsView() {
             onClick={() => setActiveTab(id)}
             onKeyDown={(e) => handleTabKeyDown(e, idx)}
             className={cn(
-              'px-4 py-2.5 text-sm font-medium transition-colors duration-fast border-b-2 -mb-px',
+              'shrink-0 cursor-pointer whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors duration-fast border-b-2 -mb-px',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
               activeTab === id
                 ? 'border-primary text-foreground'
@@ -158,17 +158,20 @@ export function SettingsView() {
               aria-labelledby={`tab-${id}`}
               hidden={activeTab !== id}
             >
-              {!isLoaded ? (
-                <SettingsSkeleton />
-              ) : settings ? (
-                <Panel
-                  settings={settings}
-                  isSaving={isSaving}
-                  saveError={saveError}
-                  onUpdate={update}
-                />
+              {settings ? (
+                <>
+                  {loadError && <SettingsLoadError cached isLoading={isLoading} onRetry={retry} />}
+                  <Panel
+                    settings={settings}
+                    isSaving={isSaving}
+                    saveError={saveError}
+                    onUpdate={update}
+                  />
+                </>
+              ) : loadError ? (
+                <SettingsLoadError isLoading={isLoading} onRetry={retry} />
               ) : (
-                <SidecarError />
+                <SettingsSkeleton />
               )}
             </section>
           ))}
@@ -184,7 +187,12 @@ export function SettingsView() {
 
 function SettingsSkeleton() {
   return (
-    <div className="space-y-5 animate-fade-in" aria-label="Loading settings" aria-live="polite">
+    <div
+      className="space-y-5 animate-fade-in"
+      role="status"
+      aria-label="Loading settings"
+      aria-busy="true"
+    >
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="space-y-2" style={{ animationDelay: `${i * 60}ms` }}>
           <div className="h-3 w-1/4 animate-hearth-pulse rounded-full bg-muted" />
@@ -195,15 +203,64 @@ function SettingsSkeleton() {
   );
 }
 
-function SidecarError() {
+function SettingsLoadError({
+  cached = false,
+  isLoading,
+  onRetry,
+}: {
+  cached?: boolean;
+  isLoading: boolean;
+  onRetry: () => Promise<void>;
+}) {
+  const retryButton = (
+    <button
+      type="button"
+      onClick={() => {
+        void onRetry();
+      }}
+      disabled={isLoading}
+      aria-busy={isLoading}
+      className={cn(
+        'inline-flex h-10 w-36 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground',
+        'transition-colors hover:bg-primary/90 active:bg-primary/80',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        'disabled:cursor-not-allowed disabled:opacity-50',
+      )}
+    >
+      <RefreshCw
+        className={cn('h-4 w-4', isLoading && 'motion-safe:animate-spin')}
+        aria-hidden="true"
+      />
+      <span aria-live="polite">{isLoading ? 'Trying again…' : 'Retry'}</span>
+    </button>
+  );
+
+  if (cached) {
+    return (
+      <div className="mb-6 flex flex-wrap items-start gap-3 rounded-xl border border-border bg-card p-4">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <div className="min-w-0 flex-1" role="status">
+          <p className="text-sm font-medium text-foreground">Couldn’t refresh settings</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Showing your last loaded settings. Try again to check for changes.
+          </p>
+        </div>
+        {retryButton}
+      </div>
+    );
+  }
+
   return (
-    <EmptyState
-      icon={AlertCircle}
-      tone="warning"
-      title="Local sidecar unreachable"
-      description="The Python backend isn't responding on 127.0.0.1:8321. Settings will load once it's running."
-      align="top"
-      grain={false}
-    />
+    <div role="alert">
+      <EmptyState
+        icon={AlertCircle}
+        tone="warning"
+        title="Settings couldn’t load"
+        description="Potluck couldn’t read your settings. Try again. If it keeps happening, close and reopen Potluck."
+        primaryAction={retryButton}
+        align="top"
+        grain={false}
+      />
+    </div>
   );
 }
