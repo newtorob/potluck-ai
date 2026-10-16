@@ -473,6 +473,54 @@ describe("runTask verify loop", () => {
     expect(spy).toHaveBeenCalledOnce();
   });
 
+  it("defers one fresh check across diagnostic commands and keeps pending status through compaction", async () => {
+    const dir = await tmp();
+    const verify = vi.fn(async () => ({ code: 0, output: "passed" }));
+    scriptTurns([
+      action("write_file", { path: "value.txt", content: "ready" }),
+      action("run_command", { command: "echo diagnostic" }),
+      action("read_file", { path: "value.txt" }),
+      action("run_command", { command: "echo another-diagnostic" }),
+      "done",
+    ]);
+    const feedback: string[] = [];
+    const result = await runTask([{ role: "system", content: "s" }], "repair this", {
+      cfg: CFG, model: "m", cwd: dir, confirm: async () => true,
+      verifyCommand: "fixed-check", runVerify: verify, charBudget: 1000,
+      callbacks: {
+        onToken: () => {}, onTurnEnd: () => {}, onAction: () => {},
+        onToolResult: text => { feedback.push(text); expect(verify).toHaveBeenCalledOnce(); },
+      },
+    });
+    expect(result).toEqual({ status: "finished" });
+    expect(verify).toHaveBeenCalledTimes(2);
+    expect(feedback.slice(1)).toHaveLength(3);
+    for (const text of feedback.slice(1)) {
+      expect(text).toContain("VERIFY pending");
+      expect(text).not.toContain("passed.");
+    }
+    const finalRequest = streamChatMock.mock.calls.at(-1)![1] as ChatMessage[];
+    expect(finalRequest.some(message => /trimmed to fit/.test(message.content))).toBe(true);
+    expect(finalRequest.at(-1)?.content).toContain("FIXED CHECK PENDING");
+    expect(finalRequest.at(-1)?.content).not.toContain("STILL FAILS");
+  });
+
+  it("does not start the fixed check when its start callback cancels the task", async () => {
+    const dir = await tmp();
+    const controller = new AbortController();
+    const verify = vi.fn(async () => ({ code: 0, output: "passed" }));
+    scriptTurns(["done"]);
+    await expect(runTask([], "repair this", {
+      cfg: CFG, model: "m", cwd: dir, confirm: async () => true,
+      verifyCommand: "fixed-check", runVerify: verify, signal: controller.signal,
+      callbacks: {
+        onToken: () => {}, onTurnEnd: () => {}, onAction: () => {}, onToolResult: () => {},
+        onVerifyStart: () => controller.abort(new Error("cancelled before fixed check")),
+      },
+    })).rejects.toThrow("cancelled before fixed check");
+    expect(verify).not.toHaveBeenCalled();
+  });
+
   it("stops the task at the unchanged verify failure cap instead of editing blindly", async () => {
     const dir = await tmp();
     scriptTurns(Array.from({ length: 5 }, (_, i) => action("write_file", { path: "out.txt", content: `attempt ${i}` })));

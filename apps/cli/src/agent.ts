@@ -335,7 +335,7 @@ export function systemPrompt(
 
   if (verifyCommand) {
     lines.push(
-      `After edits the CLI runs the fixed check: ${verifyCommand}.`,
+      `Fixed check after edits and before completion after shell commands: ${verifyCommand}.`,
       "If VERIFY FAILED, fix errors before claiming completion. Four consecutive failures stop the task. Group corrections. Passing checks do not replace checking all original requirements.",
     );
   }
@@ -350,7 +350,8 @@ export function systemPrompt(
 /**
  * Whether a verify run should follow this tool result: only edit_file/write_file
  * that actually changed a file. An "error:" result or a declined edit changed
- * nothing, and read-only tools / run_command never trigger verify.
+ * nothing, and read-only tools / run_command never trigger an immediate check.
+ * Executed shell commands separately invalidate verification until the next check.
  */
 export function shouldVerify(tool: string, result: string): boolean {
   if (tool !== "edit_file" && tool !== "write_file") return false;
@@ -403,8 +404,9 @@ export interface AgentOptions {
   /** Requested output allowance, capped at a quarter of context (at most 4096). */
   maxOutputTokens?: number;
   /**
-   * The FIXED verify command run after a successful edit/write (the model can
-   * never choose it). null/undefined disables the verify loop.
+   * The FIXED verify command run after a successful edit/write and before
+   * completion after executed shell commands (the model can never choose it).
+   * null/undefined disables the verify loop.
    */
   verifyCommand?: string | null;
   /** Consecutive verify failures before the task stops incomplete (default 4). */
@@ -434,6 +436,7 @@ export async function runTask(
   const verifyRunner = opts.runVerify ?? runVerify;
   let consecutiveVerifyFailures = 0;
   let verificationFailed = false;
+  let verificationPending = verifyCommand !== null;
   let verificationFeedback = "";
   let protocolFailures = 0;
   // Count identical action + actual result pairs between mutations. Intervening
@@ -447,10 +450,12 @@ export async function runTask(
   async function verifyCurrent(): Promise<void> {
     if (verifyCommand === null) return;
     callbacks.onVerifyStart?.(verifyCommand);
+    opts.signal?.throwIfAborted();
     const outcome = await verifyRunner(verifyCommand, cwd);
     opts.signal?.throwIfAborted();
     const ok = outcome.code === 0;
     verificationFailed = !ok;
+    verificationPending = false;
     consecutiveVerifyFailures = ok ? 0 : consecutiveVerifyFailures + 1;
     callbacks.onVerify?.(verifyCommand, ok, outcome.output);
     verificationFeedback = formatVerifyResult(verifyCommand, {
@@ -472,10 +477,12 @@ export async function runTask(
     const reminder = requestPoints.length <= 1000 ? task : requestPoints.slice(0, 1000).join("") +
       "\n[Request excerpt; the complete original request is pinned above.]";
     // Keep the actual request near repair feedback, with a short authoritative
-    // failure status that survives excerpting a long error log.
-    const repairFeedback = verificationFailed && originalFeedback?.content.startsWith("TOOL_RESULT:")
+    // check status that survives excerpting a long error log or command output.
+    const checkStatus = verificationFailed ? "FIXED CHECK STILL FAILS."
+      : verificationPending && verificationFeedback ? "FIXED CHECK PENDING; earlier results no longer apply." : undefined;
+    const repairFeedback = checkStatus && originalFeedback?.content.startsWith("TOOL_RESULT:")
       ? { ...originalFeedback, content: originalFeedback.content.replace("TOOL_RESULT:",
-        "TOOL_RESULT: FIXED CHECK STILL FAILS.") + "\n\nORIGINAL REQUEST (still applies):\n" + reminder }
+        `TOOL_RESULT: ${checkStatus}`) + "\n\nORIGINAL REQUEST (still applies):\n" + reminder }
       : undefined;
     const pending = repairFeedback ? [...history.slice(0, -1), repairFeedback] : history;
     let context;
@@ -540,7 +547,7 @@ export async function runTask(
       // A model can describe a repair without ever editing. If the user has
       // configured a check, run it before accepting an otherwise unchecked
       // completion. The failed check consumes the same verification budget.
-      if (verifyCommand !== null && !verificationFeedback) await verifyCurrent();
+      if (verificationPending) await verifyCurrent();
       if (verificationFailed) {
         // One prose claim is not a reason to abandon a repair. Return the real
         // failing check, within the SAME turn budget, and let it correct course.
@@ -574,7 +581,17 @@ export async function runTask(
       cwd,
       confirm,
       readPaths,
+      onCommandStarted: () => {
+        if (verifyCommand === null) return;
+        // Shell commands can change any file even when they exit nonzero. Keep
+        // the actual-check failure count, but never carry stale pass/fail status
+        // into the next turn. Defer the check so diagnostic commands stay cheap.
+        verificationPending = true;
+        verificationFailed = false;
+        verificationFeedback = "\nVERIFY pending: a shell command ran. Earlier check results no longer apply; the fixed check will run before completion.";
+      },
     });
+    opts.signal?.throwIfAborted();
     let grantedPath: string | undefined;
     if (["read_file", "write_file"].includes(parsed.action.tool) &&
         !result.startsWith("error:") && result !== "user declined") {

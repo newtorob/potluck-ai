@@ -44,6 +44,8 @@ export type Confirm = (ctx: ConfirmContext) => Promise<boolean>;
 export interface ToolDeps {
   cwd: string;
   confirm: Confirm;
+  /** The approved shell actually started; it may mutate files even if it exits nonzero. */
+  onCommandStarted?: () => void;
   /**
    * Absolute paths the agent has fully read this task. read_file adds to it; write_file
    * refuses to blind-overwrite an existing file that isn't in it. Optional so
@@ -741,9 +743,11 @@ async function editFileTool(
 function execCommand(
   command: string,
   cwd: string,
+  onStarted?: () => void,
 ): Promise<{ code: number; output: string }> {
   return new Promise((resolveExec) => {
     const child = spawn(command, { cwd, shell: true });
+    child.once("spawn", () => onStarted?.());
     let output = "";
     let truncated = false;
 
@@ -782,7 +786,7 @@ async function runCommandTool(
   });
   if (!approved) return "user declined";
 
-  const { code, output } = await execCommand(command, deps.cwd);
+  const { code, output } = await execCommand(command, deps.cwd, deps.onCommandStarted);
   const body = output.trim().length > 0 ? output : "(no output)";
   return `exit ${code}\n${body}`;
 }

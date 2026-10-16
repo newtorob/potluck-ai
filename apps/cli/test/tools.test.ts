@@ -143,24 +143,57 @@ describe("write_file", () => {
 
 describe("run_command", () => {
   it("runs the command when confirmed and captures output + exit code", async () => {
+    const started = vi.fn();
     const out = await runTool(
       "run_command",
       { command: "echo potluck-ok" },
-      { cwd, confirm: allow },
+      { cwd, confirm: allow, onCommandStarted: started },
     );
     expect(out).toContain("exit 0");
     expect(out).toContain("potluck-ok");
+    expect(started).toHaveBeenCalledOnce();
+  });
+
+  it("reports execution even when the shell exits nonzero after changing a file", async () => {
+    const started = vi.fn();
+    await writeFile(join(cwd, "change-and-fail.cjs"),
+      'require("node:fs").writeFileSync("marker.txt", "changed"); process.exit(7);');
+    const out = await runTool("run_command", { command: "node change-and-fail.cjs" },
+      { cwd, confirm: allow, onCommandStarted: started });
+    expect(out).toMatch(/^exit 7/);
+    expect(await readFile(join(cwd, "marker.txt"), "utf8")).toContain("changed");
+    expect(started).toHaveBeenCalledOnce();
+  });
+
+  it("does not report execution when the shell fails to spawn", async () => {
+    const started = vi.fn();
+    const out = await runTool("run_command", { command: "echo unexpected" },
+      { cwd: join(cwd, "missing"), confirm: allow, onCommandStarted: started });
+    expect(out).toContain("failed to start:");
+    expect(started).not.toHaveBeenCalled();
+  });
+
+  it("does not report execution for invalid arguments", async () => {
+    const started = vi.fn();
+    const confirm = vi.fn(allow);
+    const out = await runTool("run_command", { command: 123 },
+      { cwd, confirm, onCommandStarted: started });
+    expect(out).toMatch(/^error:/);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(started).not.toHaveBeenCalled();
   });
 
   it("does not run when declined", async () => {
     const confirm = vi.fn<Confirm>(async () => false);
+    const started = vi.fn();
     const out = await runTool(
       "run_command",
       { command: "echo should-not-run > marker.txt" },
-      { cwd, confirm },
+      { cwd, confirm, onCommandStarted: started },
     );
     expect(out).toBe("user declined");
     expect(confirm).toHaveBeenCalledOnce();
+    expect(started).not.toHaveBeenCalled();
     await expect(readFile(join(cwd, "marker.txt"), "utf8")).rejects.toBeTruthy();
   });
 });

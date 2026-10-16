@@ -238,8 +238,10 @@ During repair, a bounded excerpt of the original request is also placed beside
 the latest feedback, consuming the existing context budget. Passing configured
 checks is necessary but does not establish complete task correctness.
 When verification is configured but no check has run, a final response triggers
-the fixed check even if the model made no edits. Explaining a repair does not
-bypass verification.
+the fixed check even if the model made no edits. An executed shell command makes
+any earlier check result out of date, including when the command exits with an
+error. The CLI runs the fixed check again before accepting a final response.
+Explaining a repair does not bypass verification.
 After four consecutive verification failures the task stops incomplete, before
 further unverified edits; the fixed verify command and existing limits still apply.
 
@@ -500,10 +502,16 @@ After a successful `edit_file`/`write_file`, the CLI runs a **fixed** verify
 command (a build or test) and folds the outcome into the `TOOL_RESULT` fed back
 to the model. On failure the model sees the (tail-capped) errors and fixes them;
 the task is not done until verify passes. The latest result stays in subsequent
-tool feedback. Read-only tools, no-op edits, and `run_command` do not trigger
-verification. If the model finishes without any check, the CLI runs the configured
-check once before accepting completion. A failure gives it a chance to repair
-within the remaining turn budget.
+tool feedback while it is current. An approved `run_command` that starts may
+change files, even if it exits with an error, so its feedback marks earlier
+verification as out of date. The fixed check runs again before accepting the
+next final response, or immediately after a later file edit. Diagnostic shell
+commands do not each trigger a full check.
+
+Read-only file tools, no-op edits, declined commands and commands that could not
+start leave the current check result unchanged. If the model finishes without
+any check, the CLI runs the configured check once before accepting completion.
+A failure gives it a chance to repair within the remaining turn budget.
 
 The command is the resolved one only: the model can't choose it, and it runs
 without the `[y/N]` confirm (you opted in by configuring it). After 4 consecutive
