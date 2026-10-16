@@ -2,7 +2,9 @@ import { createHash } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 
-export const HARNESS_VERSION = 2;
+export const HARNESS_VERSION = 3;
+// A broken fixture can emit many subtest failures before its completion record.
+export const CHECK_MAX_BUFFER = 2 * 1024 * 1024;
 
 export function trialCount(value, selfTest = false) {
   if (value === undefined) return selfTest ? 1 : 3;
@@ -153,6 +155,18 @@ export function checkResult(exitCode, output, token) {
     completion.errors === 0 && completion.skipped === 0;
   return { code: passed ? 0 : exitCode || 1, output: output.slice(-12000),
     harnessCompleted: Boolean(harnessCompleted), ...(harnessCompleted ? { completion } : {}) };
+}
+
+export function checkExecutionError(error, token) {
+  if (error.code === 'ENOENT') throw error;
+  const overflow = error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER';
+  const notice = overflow ? '\nCheck exceeded its output limit.'
+    : error.killed ? '\nCheck exceeded its execution limit.' : '';
+  return {
+    ...checkResult(typeof error.code === 'number' ? error.code : 124,
+      String(error.stdout ?? '') + String(error.stderr ?? '') + notice, token),
+    ...(overflow ? { failure: 'output_limit' } : {}),
+  };
 }
 
 /** No host shell, home, network or writable source mount; also used for final grading. */

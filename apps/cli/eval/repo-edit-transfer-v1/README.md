@@ -19,7 +19,7 @@ The default runner still selects the unchanged original suite. Both baseline
 and candidate must use the same runner and frozen fixture bytes. Never modify
 fixtures after looking at candidate results; add a new version instead.
 
-The shared runner uses harness/report version 2. It records all repetitions,
+The shared runner uses harness version 3 and report schema 2. It records all repetitions,
 including failures and unrun attempts; checks exact model admission and the
 loaded 8,192-token context; and separates operator-declared runtime conditions
 from observed metadata. Independent checks are never used for repair feedback

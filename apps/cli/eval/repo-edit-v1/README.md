@@ -76,8 +76,12 @@ dirty checkout. No credentials are included in environment fields.
 Task, project, reference, oracle and manifest bytes contribute to the fixture
 fingerprint; README prose does not. Compare runs only with identical frozen
 fixture bytes, harness version, model artifact, and disclosed conditions.
-Harness/report version **2** changes grading and context handling; do not pool
-its scores with older runner results without rerunning both candidates.
+Harness version **3** (report schema 2) captures up to 2 MiB per output stream
+from each checker so a broken fixture's assertion output does not discard its
+completion record. An output-limit exit remains a failed check, even if a
+completion record was already printed. Reports retain only the last 12,000
+characters. Run both candidates with the same harness; do not pool scores from
+different harness versions without rerunning them.
 
 ## Bounds and grading
 

@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
-  assertBrokenBaseline, checkArguments, checkerScript, checkResult, fingerprint, gradeTrial,
+  CHECK_MAX_BUFFER, assertBrokenBaseline, checkArguments, checkExecutionError, checkerScript, checkResult, fingerprint, gradeTrial,
   hashes, inspectWorkspace, markNotRun, planTrials, summarizeTrials, trialCount,
   trialMetrics, validateEnvironment,
 } from "../scripts/eval-repo-edits-lib.mjs";
@@ -164,6 +164,29 @@ describe("independent checker boundary", () => {
     expect(() => assertBrokenBaseline({ code: 1, output: "FAILED (errors=1)\nImportError", harnessCompleted: true }, "fixture")).toThrow();
     expect(() => assertBrokenBaseline({ code: 1, output: "FAIL: boundary\nAssertionError\nFAILED", harnessCompleted: true }, "fixture")).not.toThrow();
   });
+
+  it("retains a completion record after more than 128 KiB of failed assertions", async () => {
+    const cwd = await workspace();
+    await mkdir(join(cwd, "tests"));
+    await writeFile(join(cwd, "tests", "test_many.py"), "import unittest\nclass Many(unittest.TestCase):\n def test_many(self):\n  for i in range(600):\n   with self.subTest(i=i): self.assertTrue(False)\n");
+    const result = await trustedFixtureCheck(cwd, join(cwd, "tests"));
+    expect(result.code).toBe(1);
+    expect(result.harnessCompleted).toBe(true);
+    expect(result.completion.failures).toBe(600);
+    expect(result.output.length).toBeLessThanOrEqual(12000);
+    expect(() => assertBrokenBaseline(result, "large failing fixture")).not.toThrow();
+  });
+
+  it("never accepts an output-limit exit even if an earlier completion marker claims success", async () => {
+    const token = "bounded-output";
+    const marker = `POTLUCK_EVAL_CHECK:${token}:${JSON.stringify({ testsRun: 1, failures: 0, errors: 0, skipped: 0 })}\n`;
+    const error = await exec(process.execPath, ["-e", "process.stdout.write(process.argv[1]);process.stderr.write('x'.repeat(3*1024*1024))", marker],
+      { maxBuffer: CHECK_MAX_BUFFER, timeout: 5000 }).catch(error => error);
+    const result = checkExecutionError(error, token);
+    expect(result).toMatchObject({ code: 124, failure: "output_limit", harnessCompleted: true });
+    expect(result.output).toContain("Check exceeded its output limit.");
+    expect(result.output.length).toBeLessThanOrEqual(12000);
+  });
 });
 
 // This executes only repository-owned fixture/reference code, never generated repairs.
@@ -171,11 +194,10 @@ describe("independent checker boundary", () => {
 async function trustedFixtureCheck(cwd: string, tests: string) {
   const token = "trusted-fixture-validation";
   try {
-    const { stdout, stderr } = await exec("python3", ["-I", "-B", "-c", checkerScript(cwd, tests, token)], { timeout: 10000 });
+    const { stdout, stderr } = await exec("python3", ["-I", "-B", "-c", checkerScript(cwd, tests, token)], { timeout: 10000, maxBuffer: CHECK_MAX_BUFFER });
     return checkResult(0, stdout + stderr, token);
   } catch (error: any) {
-    if (error.code === "ENOENT") throw error;
-    return checkResult(typeof error.code === "number" ? error.code : 124, String(error.stdout ?? "") + String(error.stderr ?? ""), token);
+    return checkExecutionError(error, token);
   }
 }
 

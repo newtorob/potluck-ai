@@ -15,7 +15,7 @@ import { modelContextWindow } from '../dist/gateway.js';
 import { readProjectModelLock, validateLock } from '../dist/model-lock.js';
 import { buildRepoMap } from '../dist/repomap.js';
 import {
-  HARNESS_VERSION, assertBrokenBaseline, checkArguments, checkResult, fingerprint, gradeTrial,
+  HARNESS_VERSION, CHECK_MAX_BUFFER, assertBrokenBaseline, checkArguments, checkExecutionError, checkResult, fingerprint, gradeTrial,
   hashes, inspectWorkspace, markNotRun, planTrials, summarizeTrials, trialCount,
   trialMetrics, validateEnvironment,
 } from './eval-repo-edits-lib.mjs';
@@ -45,13 +45,11 @@ async function check(cwd, oracle) {
   const token = randomUUID();
   try {
     const { stdout, stderr } = await exec('prlimit', checkArguments(cwd, oracle, token), {
-      timeout: 15000, killSignal: 'SIGKILL', maxBuffer: 128 * 1024,
+      timeout: 15000, killSignal: 'SIGKILL', maxBuffer: CHECK_MAX_BUFFER,
     });
     return checkResult(0, stdout + stderr, token);
   } catch (error) {
-    if (error.code === 'ENOENT') throw error;
-    return checkResult(typeof error.code === 'number' ? error.code : 124,
-      String(error.stdout ?? '') + String(error.stderr ?? '') + (error.killed ? '\nCheck exceeded its execution limit.' : ''), token);
+    return checkExecutionError(error, token);
   }
 }
 
@@ -75,7 +73,8 @@ const report = {
   policy: { ...manifest, repetitions: count, temperature: 0.2, maxOutputTokens: outputTokens, maxVerifyFailures: 4, scope: 'local',
     contextSizing: 'conservative UTF-8 byte estimate with output and template room reserved',
     shellTools: 'denied', verify: verifyCommand, independentChecks: 'after agent finishes; never used for repair or candidate selection',
-    sandbox: 'bubblewrap, no network, read-only mounts, 10s CPU / 15s wall / 768MiB per check' },
+    sandbox: 'bubblewrap, no network, read-only mounts, 10s CPU / 15s wall / 768MiB per check',
+    checkOutputLimitBytes: CHECK_MAX_BUFFER },
   selfTest: Boolean(values['self-test']), trials: planTrials(selected, count),
 };
 const save = async () => {
