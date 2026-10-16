@@ -331,6 +331,7 @@ export function systemPrompt(
     "```",
     "Include the final newline; no placeholders. For embedded triple backticks use four on BOTH outer fences. STOP after this one action.",
     "Do not repeat unchanged reads/ineffective edits. Use feedback to correct course or report the blocker. Keep prose short.",
+    "A failed edit/write stays unresolved until an actual file change succeeds. Passing checks alone do not resolve it. A declined action stops this task.",
   ];
 
   if (verifyCommand) {
@@ -418,7 +419,7 @@ export interface AgentOptions {
 /** A final response is distinct from stopping with unfinished or unchecked work. */
 export type AgentResult =
   | { status: "finished" }
-  | { status: "incomplete"; reason: "verification_failed" | "repeated_tool_failure" | "stalled" | "invalid_action" | "step_limit" | "context_limit" };
+  | { status: "incomplete"; reason: "verification_failed" | "mutation_failed" | "action_declined" | "repeated_tool_failure" | "stalled" | "invalid_action" | "step_limit" | "context_limit" };
 
 /**
  * Run one task to completion. Mutates `history` in place (the caller owns it so
@@ -438,6 +439,7 @@ export async function runTask(
   let verificationFailed = false;
   let verificationPending = verifyCommand !== null;
   let verificationFeedback = "";
+  let mutationFailureFeedback = "";
   let protocolFailures = 0;
   // Count identical action + actual result pairs between mutations. Intervening
   // reads do not hide a failing-edit cycle; changed contents do not count as a
@@ -479,8 +481,11 @@ export async function runTask(
       "\n[Request excerpt; the complete original request is pinned above.]";
     // Keep the actual request near repair feedback, with a short authoritative
     // check status that survives excerpting a long error log or command output.
-    const checkStatus = verificationFailed ? "FIXED CHECK STILL FAILS."
-      : verificationPending && verificationFeedback ? "FIXED CHECK PENDING; earlier results no longer apply." : undefined;
+    const checkStatus = [
+      verificationFailed ? "FIXED CHECK STILL FAILS."
+        : verificationPending && verificationFeedback ? "FIXED CHECK PENDING; earlier results no longer apply." : "",
+      mutationFailureFeedback ? "FILE CHANGE STILL FAILED; a successful check alone does not resolve it." : "",
+    ].filter(Boolean).join(" ");
     const repairFeedback = checkStatus && originalFeedback?.content.startsWith("TOOL_RESULT:")
       ? { ...originalFeedback, content: originalFeedback.content.replace("TOOL_RESULT:",
         `TOOL_RESULT: ${checkStatus}`) + "\n\nORIGINAL REQUEST (still applies):\n" + reminder }
@@ -563,6 +568,20 @@ export async function runTask(
         }
         continue;
       }
+      if (mutationFailureFeedback) {
+        // A passing check may never exercise the failed change. Give the model
+        // a bounded chance to correct the attempt, including a wrong target,
+        // without interpreting prose as evidence that the file was changed.
+        const result = "error: task is not complete; a file change still failed. Correct the failed attempt with a targeted edit/write or report the blocker.\n" +
+          mutationFailureFeedback + verificationFeedback;
+        callbacks.onToolResult(result);
+        history.push({ role: "user", content: `TOOL_RESULT: ${result}` });
+        if (++protocolFailures >= 3) {
+          callbacks.onNotice?.("Task incomplete: a failed file change remains unresolved.");
+          return { status: "incomplete", reason: "mutation_failed" };
+        }
+        continue;
+      }
       return { status: "finished" };
     }
 
@@ -596,6 +615,14 @@ export async function runTask(
       },
     });
     opts.signal?.throwIfAborted();
+    if (result === "user declined") {
+      // A refusal is the user's decision. Stop before the model can repeatedly
+      // ask for approval or substitute a different tool for the denied action.
+      callbacks.onToolResult(result + verificationFeedback);
+      history.push({ role: "user", content: `TOOL_RESULT: ${result}${verificationFeedback}` });
+      callbacks.onNotice?.("Task incomplete: you declined an action. Give a follow-up instruction to continue.");
+      return { status: "incomplete", reason: "action_declined" };
+    }
     let grantedPath: string | undefined;
     if (["read_file", "write_file"].includes(parsed.action.tool) &&
         !result.startsWith("error:") && result !== "user declined") {
@@ -611,6 +638,10 @@ export async function runTask(
     }
 
     const changed = shouldVerify(parsed.action.tool, result);
+    if (changed) mutationFailureFeedback = "";
+    else if (["edit_file", "write_file"].includes(parsed.action.tool) && result.startsWith("error:")) {
+      mutationFailureFeedback = result.length > 1200 ? result.slice(0, 1200) + "\n[failed-change feedback trimmed]" : result;
+    }
     const commandSucceeded = parsed.action.tool === "run_command" && result.startsWith("exit 0");
     if (changed || commandSucceeded) observations.clear();
     const key = createHash("sha256").update(JSON.stringify([

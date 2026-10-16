@@ -110,12 +110,13 @@ describe("fixed verification after approved shell commands", () => {
     expect(h.verify).toHaveBeenCalledTimes(2);
   });
 
-  it("declining a command executes nothing and preserves the current check", async () => {
+  it("declining a command stops incomplete, executes nothing, and preserves the current check", async () => {
     const confirm = vi.fn(async (request: { tool: string }) => request.tool !== "run_command");
     const h = harness([edit("original", "good"), await command("broken"), "The task is complete."], { confirm });
-    expect(await h.run()).toEqual({ status: "finished" });
+    expect(await h.run()).toEqual({ status: "incomplete", reason: "action_declined" });
     expect(await readFile(join(cwd, "state.txt"), "utf8")).toBe("good");
     expect(h.verify).toHaveBeenCalledOnce();
+    expect(h.requests).toHaveLength(2);
     expect(h.results.some(result => result.startsWith("user declined"))).toBe(true);
   });
 

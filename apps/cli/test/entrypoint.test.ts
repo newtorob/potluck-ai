@@ -78,7 +78,7 @@ it("the installed agent selects the project pin ahead of global and shared model
   } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
 });
 
-it.each(["repeated failure", "repeated read", "step limit", "failed verify", "repaired verify", "malformed action", "literal write verify", "truncated literal"])(
+it.each(["repeated failure", "repeated read", "step limit", "failed verify", "repaired verify", "malformed action", "literal write verify", "truncated literal", "failed edit completion", "declined edit"])(
   "reports the actual outcome of a one-shot agent run: %s", async scenario => {
     await writeFile(join(dir, "f.txt"), "original");
     let requests = 0;
@@ -97,6 +97,8 @@ it.each(["repeated failure", "repeated read", "step limit", "failed verify", "re
       else if (scenario === "step limit") content = action("read_file", { path: `absent-${requests}.txt` });
       else if (scenario === "malformed action") content = '```action\n{"tool": "edit_file", "args": {\n```';
       else if (scenario === "truncated literal") content = '```write_file {"path":"f.txt"}\nwrong\n';
+      else if (scenario === "failed edit completion") content = requests === 1
+        ? action("edit_file", { path: "f.txt", old_string: "absent", new_string: "fixed" }) : "All fixed.";
       else if (scenario === "literal write verify") content = requests === 1 ? action("read_file", { path: "f.txt" }) :
         requests === 2 ? '```write_file {"path":"f.txt"}\nfixed\n```\n' : "All fixed.";
       else if (requests === 1) content = action("edit_file", { path: "f.txt", old_string: "original", new_string: "broken" });
@@ -111,7 +113,8 @@ it.each(["repeated failure", "repeated read", "step limit", "failed verify", "re
       const nodePath = "'" + process.execPath.replace(/'/g, "'\\''") + "'";
       const expected = scenario === "literal write verify" ? "'fixed' + String.fromCharCode(10)" : "'fixed'";
       const verify = `${nodePath} -e "process.exit(require('fs').readFileSync('f.txt','utf8') === (${expected}) ? 0 : 1)"`;
-      const result = await run(["-p", "Repair f.txt", "-m", "test-model", "--scope", "local", "--yes",
+      const result = await run(["-p", "Repair f.txt", "-m", "test-model", "--scope", "local",
+        ...(scenario === "declined edit" ? [] : ["--yes"]),
         ...(scenario.includes("verify") ? ["--verify", verify] : ["--no-verify"])], {
         POTLUCK_GATEWAY_KEY: "test", POTLUCK_GATEWAY_URL: `http://127.0.0.1:${port}/v1`,
       });
@@ -123,6 +126,15 @@ it.each(["repeated failure", "repeated read", "step limit", "failed verify", "re
       if (scenario === "repeated failure") expect(result.stderr).toContain("failed identically");
       if (scenario === "repeated read") expect(result.stderr).toContain("unchanged results");
       if (scenario === "malformed action") expect(result.stderr).toContain("invalid action responses");
+      if (scenario === "failed edit completion") {
+        expect(result.stderr).toContain("failed file change remains unresolved");
+        expect(await readFile(join(dir, "f.txt"), "utf8")).toBe("original");
+      }
+      if (scenario === "declined edit") {
+        expect(requests).toBe(1);
+        expect(result.stderr).toContain("you declined an action");
+        expect(await readFile(join(dir, "f.txt"), "utf8")).toBe("original");
+      }
     } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
   },
 );

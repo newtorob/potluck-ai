@@ -248,12 +248,21 @@ the fixed check even if the model made no edits. An executed shell command makes
 any earlier check result out of date, including when the command exits with an
 error. The CLI runs the fixed check again before accepting a final response.
 Explaining a repair does not bypass verification.
+An unsuccessful `edit_file` or `write_file` also prevents completion until a
+later file edit/write actually succeeds. Reads, successful shell commands and
+passing checks cannot clear that failure. The agent gets a bounded chance to
+correct its attempt, including choosing a different target file. This is a
+failed-change guard, not proof that every requested change was made. Failed
+exploratory reads and nonzero diagnostic commands do not by themselves block
+completion. Declining an edit, write or command stops the task incomplete;
+give a follow-up instruction to continue with a different approach.
 After four consecutive verification failures the task stops incomplete, before
 further unverified edits; the fixed verify command and existing limits still apply.
 
 One-shot agent runs (`-p`) exit with status 1 when they exhaust the step limit,
-stop after repeated tool failures, or finish with automatic verification still
-failing. A model saying “done” does not override a failed check. Saved sessions
+stop after repeated tool failures, have an unresolved failed file change or a
+declined action, or finish with automatic verification still failing. A model
+saying “done” does not override a failed check or file change. Saved sessions
 remain available for follow-up work. Status 0 means the loop reached a final
 response without these failures; it does not prove correctness beyond the
 checks you configured.
