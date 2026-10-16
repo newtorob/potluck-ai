@@ -540,9 +540,11 @@ async function writeFileTool(
   if (!approved) return "user declined";
 
   await checkApprovedFile(deps, path, abs, before);
+  deps.signal?.throwIfAborted();
   await mkdir(dirname(abs), { recursive: true });
   try {
     // Exclusive creation also protects a new file appearing after the recheck.
+    deps.signal?.throwIfAborted();
     await writeFile(abs, content, { encoding: "utf8", flag: exists ? "w" : "wx" });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "EEXIST") throw staleApproval(path);
@@ -805,6 +807,7 @@ async function editFileTool(
   if (!approved) return "user declined";
 
   await checkApprovedFile(deps, path, abs, before);
+  deps.signal?.throwIfAborted();
   await writeFile(abs, result.updated, "utf8");
   // A targeted edit's bounded result need not contain the complete new file.
   // Require a fresh full read before a subsequent whole-file replacement.

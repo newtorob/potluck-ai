@@ -174,18 +174,17 @@ describe("fixed verification after approved shell commands", () => {
     expect(feedback).not.toContain("FAILED");
   });
 
-  it("does not start a fresh check when cancellation arrives during an approved command", async () => {
+  it("does not start a command or fresh check when cancelled as approval resolves", async () => {
     const controller = new AbortController();
     const h = harness([edit("original", "good"), await command("broken"), "The task is complete."], {
       signal: controller.signal,
     });
-    h.opts.callbacks.onAction = action => {
-      if (action.tool === "run_command") {
-        setTimeout(() => controller.abort(new Error("cancelled during command")), 0);
-      }
-    };
+    h.opts.confirm = vi.fn(async action => {
+      if (action.tool === "run_command") controller.abort(new Error("cancelled during command"));
+      return true;
+    });
     await expect(h.run()).rejects.toThrow("cancelled during command");
-    expect(await readFile(join(cwd, "state.txt"), "utf8")).toBe("broken");
+    expect(await readFile(join(cwd, "state.txt"), "utf8")).toBe("good");
     expect(h.verify).toHaveBeenCalledOnce();
     expect(h.opts.confirm).toHaveBeenCalledTimes(2);
   });
