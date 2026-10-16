@@ -1,4 +1,4 @@
-# Potluck CLI 0.1.10
+# Potluck CLI 0.1.11-rc.3
 
 Set up your local AI runtime, manage models, inspect connections, and use a
 terminal coding agent powered by Potluck.
@@ -10,7 +10,8 @@ glibc 2.35 or newer (such as Ubuntu 22.04+). Node.js 20 or newer is required.
 The archive includes the Python runtime; no separate Python
 installation or desktop app is required. Models are downloaded separately.
 
-Homebrew installs the CLI and Node:
+Homebrew installs the stable CLI and Node. For this release candidate, use the
+standalone archive instructions below.
 
 ```sh
 brew install newtorob/potluck/potluck
