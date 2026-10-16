@@ -10,6 +10,7 @@
  */
 
 import { commandProcess } from "./command-process.js";
+import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import {
   lstat,
@@ -42,7 +43,6 @@ export interface ConfirmContext {
 export type Confirm = (ctx: ConfirmContext) => Promise<boolean>;
 
 export interface ToolDeps {
-  signal?: AbortSignal;
   cwd: string;
   confirm: Confirm;
   signal?: AbortSignal;
@@ -54,6 +54,8 @@ export interface ToolDeps {
    * direct tool tests can omit it (the guard is then inert).
    */
   readPaths?: Set<string>;
+  /** Content hashes paired with full-read permissions, scoped to one task. */
+  readVersions?: Map<string, string>;
 }
 
 export const TOOL_NAMES = [
@@ -68,6 +70,15 @@ export const TOOL_NAMES = [
 
 /** A recoverable tool failure - surfaced back to the model as TOOL_RESULT. */
 class ToolError extends Error {}
+
+function contentVersion(content: string | Buffer): string {
+  return createHash("sha256").update(content).digest("hex");
+}
+
+function forgetRead(deps: ToolDeps, abs: string): void {
+  deps.readPaths?.delete(abs);
+  deps.readVersions?.delete(abs);
+}
 
 const MAX_READ_CHARS = 16_000;
 const DEFAULT_READ_LINES = 200;
@@ -222,7 +233,7 @@ async function checkApprovedFile(
       throw staleApproval(path);
     }
   } catch {
-    deps.readPaths?.delete(abs);
+    forgetRead(deps, abs);
     throw staleApproval(path);
   }
   // This closes the approval wait window; it is not a filesystem transaction.
@@ -238,10 +249,11 @@ async function readFileTool(
   const limit = readPositiveInteger(args, "limit", DEFAULT_READ_LINES, MAX_READ_LINES);
   const abs = await resolveInCwd(deps.cwd, path);
   // A partial inspection cannot establish that a previous full read is current.
-  deps.readPaths?.delete(abs);
+  forgetRead(deps, abs);
   const range = await readLineRange(abs, offset, limit);
   if (offset === 1 && range.eof && !range.truncatedLine) {
     deps.readPaths?.add(abs);
+    deps.readVersions?.set(abs, contentVersion(range.content));
     return range.content;
   }
   const next = range.lastLine + 1;
@@ -509,6 +521,15 @@ async function writeFileTool(
     );
   }
 
+  if (deps.readPaths?.has(abs) && deps.readVersions &&
+      (before === null || deps.readVersions.get(abs) !== contentVersion(before))) {
+    forgetRead(deps, abs);
+    throw new ToolError(
+      `file ${path} changed since its full read. Refusing a whole-file overwrite from stale contents. ` +
+      `Read it again before write_file, or use edit_file for a targeted change against its current contents.`,
+    );
+  }
+
   const summary = unifiedDiff(path, current, content);
   const approved = await deps.confirm({
     tool: "write_file",
@@ -530,6 +551,7 @@ async function writeFileTool(
   // After authoring the file, the agent knows its content - a later overwrite is
   // informed, not blind, so record it like a read.
   deps.readPaths?.add(abs);
+  deps.readVersions?.set(abs, contentVersion(content));
   return `wrote ${content.length} bytes to ${path}`;
 }
 
@@ -784,6 +806,9 @@ async function editFileTool(
 
   await checkApprovedFile(deps, path, abs, before);
   await writeFile(abs, result.updated, "utf8");
+  // A targeted edit's bounded result need not contain the complete new file.
+  // Require a fresh full read before a subsequent whole-file replacement.
+  forgetRead(deps, abs);
   const parts = [`edited ${path}`];
   if (result.count > 1) parts.push(`(${result.count} occurrences)`);
   if (result.fuzzy) parts.push("(matched with whitespace flexibility)");

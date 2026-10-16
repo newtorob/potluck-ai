@@ -444,6 +444,7 @@ export async function runTask(
   // repeated read. Hashes keep large file contents out of this bounded map.
   const observations = new Map<string, number>();
   const readPaths = new Set<string>(); // files read this task (write_file guard)
+  const readVersions = new Map<string, string>();
   const readEvidence = new Map<string, ChatMessage[]>();
   let compactionNoticed = false;
 
@@ -502,6 +503,7 @@ export async function runTask(
         if (!evidence || evidence.some(message => !context.messages.includes(message) &&
             !(message === originalFeedback && repairFeedback && context.messages.includes(repairFeedback)))) {
           readPaths.delete(path);
+          readVersions.delete(path);
         }
       }
       if (!compactionNoticed) {
@@ -582,6 +584,7 @@ export async function runTask(
       confirm,
       readPaths,
       signal: opts.signal,
+      readVersions,
       onCommandStarted: () => {
         if (verifyCommand === null) return;
         // Shell commands can change any file even when they exit nonzero. Keep
@@ -603,6 +606,7 @@ export async function runTask(
         // If the file disappeared or its identity changed, no stale read may
         // authorize replacing it on the next turn.
         readPaths.clear();
+        readVersions.clear();
       }
     }
 
