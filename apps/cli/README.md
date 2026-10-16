@@ -207,6 +207,12 @@ Existing files must have been read completely before a whole-file overwrite;
 truncated reads and unreadable files do not satisfy that guard. Approval and
 workspace containment apply to both formats.
 
+Whole-file replacement also checks that the file still contains the version the
+agent read. If an editor, formatter or another process changes or deletes it,
+the CLI refuses the stale replacement before approval. Re-read the current file
+or use a targeted edit. A successful targeted edit requires a fresh full read
+before a later whole-file replacement.
+
 `read_file` accepts a one-based `offset` and a line `limit` (default 200,
 maximum 2,000). Output is capped at 16,000 characters. Partial reads show where
 to continue and permit targeted edits, but never grant permission to replace
@@ -620,8 +626,14 @@ Malformed JSON is fed back as an error so the model can retry.
   the string is missing or appears more than once. Use it for existing files;
   `write_file` is for creating new ones.
 - `edit_file` / `write_file` show a **unified diff** of the change before asking `[y/N]`.
+- File writes recheck the target path and exact contents after approval. If the
+  file changed, disappeared, appeared as a new file or a symlink was retargeted
+  while approval was pending, the change is refused and needs a fresh diff.
+  This protects the approval wait window; it is not a filesystem transaction
+  against arbitrary writes between the final check and the write.
 - `run_command` shows the exact command before asking `[y/N]`.
-- Declining feeds `TOOL_RESULT: user declined` back to the model.
+- Declining records `TOOL_RESULT: user declined` and stops the task incomplete;
+  give a follow-up instruction to continue.
 - All paths resolve **under the current working directory**; anything that
   escapes it is refused.
 - File contents only ever travel to the local gateway (`127.0.0.1`).
