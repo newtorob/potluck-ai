@@ -107,9 +107,10 @@ it("does not let repository instructions bypass the one-shot edit approval gate"
   const env = await gateway(turn => turn === 1 ? action("read_file", { path: "code.txt" })
     : turn === 2 ? action("write_file", { path: "code.txt", content: "changed" }) : "The change was declined.");
   const result = await run(["-m", "fixture", "--scope", "local", "-p", "Fix code.txt."], env);
-  expect(result.code).toBe(0);
+  expect(result.code).toBe(1);
   expect(await readFile(join(project, "code.txt"), "utf8")).toBe("original");
-  expect(requests[2].body.messages.at(-1)?.content).toContain("user declined");
+  expect(requests).toHaveLength(2);
+  expect(result.stderr).toContain("user declined");
 });
 
 it("refreshes each REPL task and /clear, and a refresh error cannot continue with stale guidance", async () => {

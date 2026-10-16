@@ -105,10 +105,11 @@ describe("tool protocol recovery", () => {
     stream.mockImplementation(() => (async function* () { yield "Done."; })());
     const confirm = vi.fn(async () => { expect(completed).toBe(true); return false; });
     const opts = options({ confirm });
-    await runTask([], "write", opts);
+    expect(await runTask([], "write", opts)).toEqual({ status: "incomplete", reason: "action_declined" });
     expect(confirm).toHaveBeenCalledOnce();
+    expect(stream).toHaveBeenCalledOnce();
     await expect(readFile(join(cwd, "new.txt"))).rejects.toMatchObject({ code: "ENOENT" });
-    expect(opts.callbacks.onToolResult).toHaveBeenCalledWith(expect.stringContaining("Recovered one missing outer"));
+    expect(opts.callbacks.onToolResult).toHaveBeenCalledWith("user declined");
   });
 
   it("never executes a repaired action if the transport fails after the fence", async () => {
