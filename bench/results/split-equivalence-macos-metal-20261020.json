@@ -1,0 +1,1480 @@
+{
+  "l2": {
+    "qwen-2.5-0.5b-instruct-q4": {
+      "created": "2026-10-20T14:27:24+00:00",
+      "engineCommit": "5a32f7b66ef6cfb3e60deea26e3454cc6ad3438c",
+      "machine": {
+        "os": "Darwin",
+        "release": "24.6.0",
+        "arch": "arm64",
+        "python": "3.11.15",
+        "cpu": "Apple M2 Pro",
+        "memBytes": 17179869184
+      },
+      "text": {
+        "path": "/private/tmp/potluck-equiv/work/text.txt",
+        "sha256": "a0d11af75d8790137861519ed1334921de82da70669c8a6ddeca90ae382488d0",
+        "bytes": 29921
+      },
+      "ctx": 512,
+      "chunks": 16,
+      "thresholds": {
+        "max_mean_kld": 0.0001,
+        "max_max_kld": 0.001,
+        "min_top1": 99.9,
+        "max_abs_dppl": 0.05
+      },
+      "reference": {
+        "name": "whole",
+        "model": "~/.potluck/models/qwen-2.5-0.5b-instruct-q4/model.gguf",
+        "args": [
+          "-ngl",
+          "99"
+        ],
+        "rpc_servers": 0,
+        "modelSha256": "6eb923e7d26e9cea28811e1a8e852009b21242fb157b26149d3b188f3a8c8653",
+        "ppl": 76.7247,
+        "returncode": 0,
+        "placement": {
+          "observed": {
+            "layers": 24,
+            "ranges": {
+              "MTL0": [
+                0,
+                23
+              ]
+            },
+            "outputDevice": "MTL0"
+          },
+          "problems": [],
+          "modelBufferMiB": {
+            "CPU": 0.0,
+            "MTL0": 0.0,
+            "CPU_Mapped": 137.94,
+            "MTL0_Mapped": 373.71
+          }
+        }
+      },
+      "candidates": [
+        {
+          "name": "whole-repeat-noise-floor",
+          "model": "~/.potluck/models/qwen-2.5-0.5b-instruct-q4/model.gguf",
+          "binDir": "/private/tmp/potluck-equiv/build/bin",
+          "args": [
+            "-ngl",
+            "99"
+          ],
+          "rpcServers": 0,
+          "log": "/private/tmp/potluck-equiv/work/compare-whole-repeat-noise-floor-qwen-2.5-0.5b-instruct-q4.log",
+          "seconds": 3.0,
+          "returncode": 0,
+          "placement": {
+            "observed": {
+              "layers": 24,
+              "ranges": {
+                "MTL0": [
+                  0,
+                  23
+                ]
+              },
+              "outputDevice": "MTL0"
+            },
+            "problems": [],
+            "modelBufferMiB": {
+              "CPU": 0.0,
+              "MTL0": 0.0,
+              "CPU_Mapped": 137.94,
+              "MTL0_Mapped": 373.71
+            }
+          },
+          "metrics": {
+            "meanKld": 0.0,
+            "maxKld": 5.3e-05,
+            "p999Kld": 4.7e-05,
+            "medianKld": 0.0,
+            "meanDeltaP": -0.0,
+            "maxDeltaPPct": 0.004,
+            "rmsDeltaPPct": 0.0,
+            "top1AgreementPct": 100.0,
+            "pplCandidate": 76.724679,
+            "pplReference": 76.721601,
+            "meanLnPplRatio": 4e-05,
+            "absDeltaPpl": 0.003078
+          },
+          "verdict": {
+            "pass": true,
+            "checks": {
+              "meanKld": true,
+              "maxKld": true,
+              "top1": true,
+              "absDeltaPpl": true
+            }
+          }
+        },
+        {
+          "name": "split-2way-even",
+          "model": "~/.potluck/models/qwen-2.5-0.5b-instruct-q4/model.gguf",
+          "binDir": "/private/tmp/potluck-equiv/build/bin",
+          "args": [
+            "--device",
+            "MTL0,RPC0",
+            "--fit",
+            "off",
+            "-ngl",
+            "99",
+            "-ts",
+            "1,1"
+          ],
+          "rpcServers": 1,
+          "log": "/private/tmp/potluck-equiv/work/compare-split-2way-even-qwen-2.5-0.5b-instruct-q4.log",
+          "seconds": 3.8,
+          "returncode": 0,
+          "placement": {
+            "observed": {
+              "layers": 24,
+              "ranges": {
+                "MTL0": [
+                  0,
+                  12
+                ],
+                "RPC0": [
+                  13,
+                  23
+                ]
+              },
+              "outputDevice": "RPC0"
+            },
+            "problems": [],
+            "modelBufferMiB": {
+              "CPU_Mapped": 137.94,
+              "MTL0_Mapped": 235.76,
+              "RPC0[127.0.0.1:18100]": 244.33
+            },
+            "predicted": {
+              "ranges": {
+                "MTL0": [
+                  0,
+                  12
+                ],
+                "RPC0": [
+                  13,
+                  23
+                ]
+              },
+              "outputDevice": "RPC0"
+            },
+            "matchesPrediction": true
+          },
+          "metrics": {
+            "meanKld": 0.0,
+            "maxKld": 5.3e-05,
+            "p999Kld": 4.7e-05,
+            "medianKld": 0.0,
+            "meanDeltaP": -0.0,
+            "maxDeltaPPct": 0.004,
+            "rmsDeltaPPct": 0.0,
+            "top1AgreementPct": 100.0,
+            "pplCandidate": 76.724679,
+            "pplReference": 76.721601,
+            "meanLnPplRatio": 4e-05,
+            "absDeltaPpl": 0.003078
+          },
+          "verdict": {
+            "pass": true,
+            "checks": {
+              "meanKld": true,
+              "maxKld": true,
+              "top1": true,
+              "absDeltaPpl": true
+            }
+          }
+        },
+        {
+          "name": "split-3way-even",
+          "model": "~/.potluck/models/qwen-2.5-0.5b-instruct-q4/model.gguf",
+          "binDir": "/private/tmp/potluck-equiv/build/bin",
+          "args": [
+            "--device",
+            "MTL0,RPC0,RPC1",
+            "--fit",
+            "off",
+            "-ngl",
+            "99",
+            "-ts",
+            "1,1,1"
+          ],
+          "rpcServers": 2,
+          "log": "/private/tmp/potluck-equiv/work/compare-split-3way-even-qwen-2.5-0.5b-instruct-q4.log",
+          "seconds": 4.5,
+          "returncode": 0,
+          "placement": {
+            "observed": {
+              "layers": 24,
+              "ranges": {
+                "MTL0": [
+                  0,
+                  8
+                ],
+                "RPC0": [
+                  9,
+                  16
+                ],
+                "RPC1": [
+                  17,
+                  23
+                ]
+              },
+              "outputDevice": "RPC1"
+            },
+            "problems": [],
+            "modelBufferMiB": {
+              "CPU_Mapped": 137.94,
+              "MTL0_Mapped": 225.38,
+              "RPC0[127.0.0.1:18100]": 78.59,
+              "RPC0[127.0.0.1:18101]": 205.04
+            },
+            "predicted": {
+              "ranges": {
+                "MTL0": [
+                  0,
+                  8
+                ],
+                "RPC0": [
+                  9,
+                  16
+                ],
+                "RPC1": [
+                  17,
+                  23
+                ]
+              },
+              "outputDevice": "RPC1"
+            },
+            "matchesPrediction": true
+          },
+          "metrics": {
+            "meanKld": 0.0,
+            "maxKld": 5.3e-05,
+            "p999Kld": 4.7e-05,
+            "medianKld": 0.0,
+            "meanDeltaP": -0.0,
+            "maxDeltaPPct": 0.004,
+            "rmsDeltaPPct": 0.0,
+            "top1AgreementPct": 100.0,
+            "pplCandidate": 76.724679,
+            "pplReference": 76.721601,
+            "meanLnPplRatio": 4e-05,
+            "absDeltaPpl": 0.003078
+          },
+          "verdict": {
+            "pass": true,
+            "checks": {
+              "meanKld": true,
+              "maxKld": true,
+              "top1": true,
+              "absDeltaPpl": true
+            }
+          }
+        },
+        {
+          "name": "split-2way-uneven-70-30",
+          "model": "~/.potluck/models/qwen-2.5-0.5b-instruct-q4/model.gguf",
+          "binDir": "/private/tmp/potluck-equiv/build/bin",
+          "args": [
+            "--device",
+            "MTL0,RPC0",
+            "--fit",
+            "off",
+            "-ngl",
+            "99",
+            "-ts",
+            "7,3"
+          ],
+          "rpcServers": 1,
+          "log": "/private/tmp/potluck-equiv/work/compare-split-2way-uneven-70-30-qwen-2.5-0.5b-instruct-q4.log",
+          "seconds": 5.5,
+          "returncode": 0,
+          "placement": {
+            "observed": {
+              "layers": 24,
+              "ranges": {
+                "MTL0": [
+                  0,
+                  17
+                ],
+                "RPC0": [
+                  18,
+                  23
+                ]
+              },
+              "outputDevice": "RPC0"
+            },
+            "problems": [],
+            "modelBufferMiB": {
+              "CPU_Mapped": 137.94,
+              "MTL0_Mapped": 235.76,
+              "RPC0[127.0.0.1:18100]": 195.77
+            },
+            "predicted": {
+              "ranges": {
+                "MTL0": [
+                  0,
+                  17
+                ],
+                "RPC0": [
+                  18,
+                  23
+                ]
+              },
+              "outputDevice": "RPC0"
+            },
+            "matchesPrediction": true
+          },
+          "metrics": {
+            "meanKld": 0.0,
+            "maxKld": 5.3e-05,
+            "p999Kld": 4.7e-05,
+            "medianKld": 0.0,
+            "meanDeltaP": -0.0,
+            "maxDeltaPPct": 0.004,
+            "rmsDeltaPPct": 0.0,
+            "top1AgreementPct": 100.0,
+            "pplCandidate": 76.724679,
+            "pplReference": 76.721601,
+            "meanLnPplRatio": 4e-05,
+            "absDeltaPpl": 0.003078
+          },
+          "verdict": {
+            "pass": true,
+            "checks": {
+              "meanKld": true,
+              "maxKld": true,
+              "top1": true,
+              "absDeltaPpl": true
+            }
+          }
+        },
+        {
+          "name": "split-remote-only",
+          "model": "~/.potluck/models/qwen-2.5-0.5b-instruct-q4/model.gguf",
+          "binDir": "/private/tmp/potluck-equiv/build/bin",
+          "args": [
+            "--device",
+            "RPC0",
+            "--fit",
+            "off",
+            "-ngl",
+            "99"
+          ],
+          "rpcServers": 1,
+          "log": "/private/tmp/potluck-equiv/work/compare-split-remote-only-qwen-2.5-0.5b-instruct-q4.log",
+          "seconds": 3.9,
+          "returncode": 0,
+          "placement": {
+            "observed": {
+              "layers": 24,
+              "ranges": {
+                "RPC0": [
+                  0,
+                  23
+                ]
+              },
+              "outputDevice": "RPC0"
+            },
+            "problems": [],
+            "modelBufferMiB": {
+              "CPU_Mapped": 137.94,
+              "RPC0[127.0.0.1:18100]": 373.71
+            }
+          },
+          "metrics": {
+            "meanKld": 0.0,
+            "maxKld": 5.3e-05,
+            "p999Kld": 4.7e-05,
+            "medianKld": 0.0,
+            "meanDeltaP": -0.0,
+            "maxDeltaPPct": 0.004,
+            "rmsDeltaPPct": 0.0,
+            "top1AgreementPct": 100.0,
+            "pplCandidate": 76.724679,
+            "pplReference": 76.721601,
+            "meanLnPplRatio": 4e-05,
+            "absDeltaPpl": 0.003078
+          },
+          "verdict": {
+            "pass": true,
+            "checks": {
+              "meanKld": true,
+              "maxKld": true,
+              "top1": true,
+              "absDeltaPpl": true
+            }
+          }
+        },
+        {
+          "name": "split-potluck-fit-args",
+          "model": "~/.potluck/models/qwen-2.5-0.5b-instruct-q4/model.gguf",
+          "binDir": "/private/tmp/potluck-equiv/build/bin",
+          "args": [
+            "@potluck-fit"
+          ],
+          "rpcServers": 1,
+          "log": "/private/tmp/potluck-equiv/work/compare-split-potluck-fit-args-qwen-2.5-0.5b-instruct-q4.log",
+          "resolvedArgs": [
+            "--device",
+            "MTL0,RPC0",
+            "--fit",
+            "on",
+            "--fit-target",
+            "7459,7459"
+          ],
+          "seconds": 3.6,
+          "returncode": 0,
+          "placement": {
+            "observed": {
+              "layers": 24,
+              "ranges": {
+                "MTL0": [
+                  0,
+                  12
+                ],
+                "RPC0": [
+                  13,
+                  23
+                ]
+              },
+              "outputDevice": "RPC0"
+            },
+            "problems": [],
+            "modelBufferMiB": {
+              "CPU": 0.0,
+              "MTL0": 0.0,
+              "RPC0[127.0.0.1:18100]": 244.33,
+              "CPU_Mapped": 137.94,
+              "MTL0_Mapped": 235.76
+            }
+          },
+          "metrics": {
+            "meanKld": 0.0,
+            "maxKld": 5.3e-05,
+            "p999Kld": 4.7e-05,
+            "medianKld": 0.0,
+            "meanDeltaP": -0.0,
+            "maxDeltaPPct": 0.004,
+            "rmsDeltaPPct": 0.0,
+            "top1AgreementPct": 100.0,
+            "pplCandidate": 76.724679,
+            "pplReference": 76.721601,
+            "meanLnPplRatio": 4e-05,
+            "absDeltaPpl": 0.003078
+          },
+          "verdict": {
+            "pass": true,
+            "checks": {
+              "meanKld": true,
+              "maxKld": true,
+              "top1": true,
+              "absDeltaPpl": true
+            }
+          }
+        }
+      ],
+      "noiseFloor": [
+        {
+          "meanKld": 0.0,
+          "maxKld": 5.3e-05,
+          "p999Kld": 4.7e-05,
+          "medianKld": 0.0,
+          "meanDeltaP": -0.0,
+          "maxDeltaPPct": 0.004,
+          "rmsDeltaPPct": 0.0,
+          "top1AgreementPct": 100.0,
+          "pplCandidate": 76.724679,
+          "pplReference": 76.721601,
+          "meanLnPplRatio": 4e-05,
+          "absDeltaPpl": 0.003078
+        }
+      ],
+      "children": [
+        {
+          "pid": 19935,
+          "role": "llama-perplexity:base:whole",
+          "stopped": true,
+          "exit": 0
+        },
+        {
+          "pid": 19941,
+          "role": "llama-perplexity:compare:whole-repeat-noise-floor",
+          "stopped": true,
+          "exit": 0
+        },
+        {
+          "pid": 19951,
+          "role": "rpc-server:18100",
+          "stopped": true,
+          "exit": -15
+        },
+        {
+          "pid": 19952,
+          "role": "llama-perplexity:compare:split-2way-even",
+          "stopped": true,
+          "exit": 0
+        },
+        {
+          "pid": 19970,
+          "role": "rpc-server:18100",
+          "stopped": true,
+          "exit": -15
+        },
+        {
+          "pid": 19971,
+          "role": "rpc-server:18101",
+          "stopped": true,
+          "exit": -15
+        },
+        {
+          "pid": 19979,
+          "role": "llama-perplexity:compare:split-3way-even",
+          "stopped": true,
+          "exit": 0
+        },
+        {
+          "pid": 20004,
+          "role": "rpc-server:18100",
+          "stopped": true,
+          "exit": -15
+        },
+        {
+          "pid": 20006,
+          "role": "llama-perplexity:compare:split-2way-uneven-70-30",
+          "stopped": true,
+          "exit": 0
+        },
+        {
+          "pid": 20096,
+          "role": "rpc-server:18100",
+          "stopped": true,
+          "exit": -15
+        },
+        {
+          "pid": 20097,
+          "role": "llama-perplexity:compare:split-remote-only",
+          "stopped": true,
+          "exit": 0
+        },
+        {
+          "pid": 20149,
+          "role": "rpc-server:18100",
+          "stopped": true,
+          "exit": -15
+        },
+        {
+          "pid": 20151,
+          "role": "llama-perplexity:compare:split-potluck-fit-args",
+          "stopped": true,
+          "exit": 0
+        }
+      ],
+      "allPassed": true
+    },
+    "qwen-2.5-1.5b-instruct-q4": {
+      "created": "2026-10-20T15:23:16+00:00",
+      "engineCommit": "5a32f7b66ef6cfb3e60deea26e3454cc6ad3438c",
+      "machine": {
+        "os": "Darwin",
+        "release": "24.6.0",
+        "arch": "arm64",
+        "python": "3.11.15",
+        "cpu": "Apple M2 Pro",
+        "memBytes": 17179869184
+      },
+      "text": {
+        "path": "/private/tmp/potluck-equiv/work/text.txt",
+        "sha256": "a0d11af75d8790137861519ed1334921de82da70669c8a6ddeca90ae382488d0",
+        "bytes": 29921
+      },
+      "ctx": 512,
+      "chunks": 16,
+      "thresholds": {
+        "max_mean_kld": 0.0001,
+        "max_max_kld": 0.001,
+        "min_top1": 99.9,
+        "max_abs_dppl": 0.05
+      },
+      "reference": {
+        "name": "whole",
+        "model": "~/.potluck/models/qwen-2.5-1.5b-instruct-q4/model.gguf",
+        "args": [
+          "-ngl",
+          "99"
+        ],
+        "rpc_servers": 0,
+        "modelSha256": "1adf0b11065d8ad2e8123ea110d1ec956dab4ab038eab665614adba04b6c3370",
+        "ppl": 56.9817,
+        "returncode": 0,
+        "placement": {
+          "observed": {
+            "layers": 28,
+            "ranges": {
+              "MTL0": [
+                0,
+                27
+              ]
+            },
+            "outputDevice": "MTL0"
+          },
+          "problems": [],
+          "modelBufferMiB": {
+            "CPU": 0.0,
+            "MTL0": 0.0,
+            "CPU_Mapped": 182.57,
+            "MTL0_Mapped": 934.69
+          }
+        }
+      },
+      "candidates": [
+        {
+          "name": "whole-repeat-noise-floor",
+          "model": "~/.potluck/models/qwen-2.5-1.5b-instruct-q4/model.gguf",
+          "binDir": "/private/tmp/potluck-equiv/build/bin",
+          "args": [
+            "-ngl",
+            "99"
+          ],
+          "rpcServers": 0,
+          "log": "/private/tmp/potluck-equiv/work/compare-whole-repeat-noise-floor-qwen-2.5-1.5b-instruct-q4.log",
+          "seconds": 5.3,
+          "returncode": 0,
+          "placement": {
+            "observed": {
+              "layers": 28,
+              "ranges": {
+                "MTL0": [
+                  0,
+                  27
+                ]
+              },
+              "outputDevice": "MTL0"
+            },
+            "problems": [],
+            "modelBufferMiB": {
+              "CPU": 0.0,
+              "MTL0": 0.0,
+              "CPU_Mapped": 182.57,
+              "MTL0_Mapped": 934.69
+            }
+          },
+          "metrics": {
+            "meanKld": -0.0,
+            "maxKld": 4.2e-05,
+            "p999Kld": 4e-05,
+            "medianKld": -0.0,
+            "meanDeltaP": 0.0,
+            "maxDeltaPPct": 0.005,
+            "rmsDeltaPPct": 0.0,
+            "top1AgreementPct": 99.964,
+            "pplCandidate": 56.981729,
+            "pplReference": 56.974991,
+            "meanLnPplRatio": 0.000118,
+            "absDeltaPpl": 0.006738
+          },
+          "verdict": {
+            "pass": true,
+            "checks": {
+              "meanKld": true,
+              "maxKld": true,
+              "top1": true,
+              "absDeltaPpl": true
+            }
+          }
+        },
+        {
+          "name": "split-2way-even",
+          "model": "~/.potluck/models/qwen-2.5-1.5b-instruct-q4/model.gguf",
+          "binDir": "/private/tmp/potluck-equiv/build/bin",
+          "args": [
+            "--device",
+            "MTL0,RPC0",
+            "--fit",
+            "off",
+            "-ngl",
+            "99",
+            "-ts",
+            "1,1"
+          ],
+          "rpcServers": 1,
+          "log": "/private/tmp/potluck-equiv/work/compare-split-2way-even-qwen-2.5-1.5b-instruct-q4.log",
+          "seconds": 6.2,
+          "returncode": 0,
+          "placement": {
+            "observed": {
+              "layers": 28,
+              "ranges": {
+                "MTL0": [
+                  0,
+                  14
+                ],
+                "RPC0": [
+                  15,
+                  27
+                ]
+              },
+              "outputDevice": "RPC0"
+            },
+            "problems": [],
+            "modelBufferMiB": {
+              "CPU_Mapped": 182.57,
+              "MTL0_Mapped": 752.12,
+              "RPC0[127.0.0.1:18100]": 526.55
+            },
+            "predicted": {
+              "ranges": {
+                "MTL0": [
+                  0,
+                  14
+                ],
+                "RPC0": [
+                  15,
+                  27
+                ]
+              },
+              "outputDevice": "RPC0"
+            },
+            "matchesPrediction": true
+          },
+          "metrics": {
+            "meanKld": -0.0,
+            "maxKld": 4.2e-05,
+            "p999Kld": 4e-05,
+            "medianKld": -0.0,
+            "meanDeltaP": 0.0,
+            "maxDeltaPPct": 0.005,
+            "rmsDeltaPPct": 0.0,
+            "top1AgreementPct": 99.964,
+            "pplCandidate": 56.981729,
+            "pplReference": 56.974991,
+            "meanLnPplRatio": 0.000118,
+            "absDeltaPpl": 0.006738
+          },
+          "verdict": {
+            "pass": true,
+            "checks": {
+              "meanKld": true,
+              "maxKld": true,
+              "top1": true,
+              "absDeltaPpl": true
+            }
+          }
+        },
+        {
+          "name": "split-3way-even",
+          "model": "~/.potluck/models/qwen-2.5-1.5b-instruct-q4/model.gguf",
+          "binDir": "/private/tmp/potluck-equiv/build/bin",
+          "args": [
+            "--device",
+            "MTL0,RPC0,RPC1",
+            "--fit",
+            "off",
+            "-ngl",
+            "99",
+            "-ts",
+            "1,1,1"
+          ],
+          "rpcServers": 2,
+          "log": "/private/tmp/potluck-equiv/work/compare-split-3way-even-qwen-2.5-1.5b-instruct-q4.log",
+          "seconds": 6.4,
+          "returncode": 0,
+          "placement": {
+            "observed": {
+              "layers": 28,
+              "ranges": {
+                "MTL0": [
+                  0,
+                  9
+                ],
+                "RPC0": [
+                  10,
+                  19
+                ],
+                "RPC1": [
+                  20,
+                  27
+                ]
+              },
+              "outputDevice": "RPC1"
+            },
+            "problems": [],
+            "modelBufferMiB": {
+              "CPU_Mapped": 182.57,
+              "MTL0_Mapped": 752.12,
+              "RPC0[127.0.0.1:18100]": 265.13,
+              "RPC0[127.0.0.1:18101]": 393.99
+            },
+            "predicted": {
+              "ranges": {
+                "MTL0": [
+                  0,
+                  9
+                ],
+                "RPC0": [
+                  10,
+                  19
+                ],
+                "RPC1": [
+                  20,
+                  27
+                ]
+              },
+              "outputDevice": "RPC1"
+            },
+            "matchesPrediction": true
+          },
+          "metrics": {
+            "meanKld": -0.0,
+            "maxKld": 4.2e-05,
+            "p999Kld": 4e-05,
+            "medianKld": -0.0,
+            "meanDeltaP": 0.0,
+            "maxDeltaPPct": 0.005,
+            "rmsDeltaPPct": 0.0,
+            "top1AgreementPct": 99.964,
+            "pplCandidate": 56.981729,
+            "pplReference": 56.974991,
+            "meanLnPplRatio": 0.000118,
+            "absDeltaPpl": 0.006738
+          },
+          "verdict": {
+            "pass": true,
+            "checks": {
+              "meanKld": true,
+              "maxKld": true,
+              "top1": true,
+              "absDeltaPpl": true
+            }
+          }
+        },
+        {
+          "name": "split-2way-uneven-70-30",
+          "model": "~/.potluck/models/qwen-2.5-1.5b-instruct-q4/model.gguf",
+          "binDir": "/private/tmp/potluck-equiv/build/bin",
+          "args": [
+            "--device",
+            "MTL0,RPC0",
+            "--fit",
+            "off",
+            "-ngl",
+            "99",
+            "-ts",
+            "7,3"
+          ],
+          "rpcServers": 1,
+          "log": "/private/tmp/potluck-equiv/work/compare-split-2way-uneven-70-30-qwen-2.5-1.5b-instruct-q4.log",
+          "seconds": 6.2,
+          "returncode": 0,
+          "placement": {
+            "observed": {
+              "layers": 28,
+              "ranges": {
+                "MTL0": [
+                  0,
+                  20
+                ],
+                "RPC0": [
+                  21,
+                  27
+                ]
+              },
+              "outputDevice": "RPC0"
+            },
+            "problems": [],
+            "modelBufferMiB": {
+              "CPU_Mapped": 182.57,
+              "MTL0_Mapped": 752.12,
+              "RPC0[127.0.0.1:18100]": 368.87
+            },
+            "predicted": {
+              "ranges": {
+                "MTL0": [
+                  0,
+                  20
+                ],
+                "RPC0": [
+                  21,
+                  27
+                ]
+              },
+              "outputDevice": "RPC0"
+            },
+            "matchesPrediction": true
+          },
+          "metrics": {
+            "meanKld": -0.0,
+            "maxKld": 4.2e-05,
+            "p999Kld": 4e-05,
+            "medianKld": -0.0,
+            "meanDeltaP": 0.0,
+            "maxDeltaPPct": 0.005,
+            "rmsDeltaPPct": 0.0,
+            "top1AgreementPct": 99.964,
+            "pplCandidate": 56.981729,
+            "pplReference": 56.974991,
+            "meanLnPplRatio": 0.000118,
+            "absDeltaPpl": 0.006738
+          },
+          "verdict": {
+            "pass": true,
+            "checks": {
+              "meanKld": true,
+              "maxKld": true,
+              "top1": true,
+              "absDeltaPpl": true
+            }
+          }
+        },
+        {
+          "name": "split-remote-only",
+          "model": "~/.potluck/models/qwen-2.5-1.5b-instruct-q4/model.gguf",
+          "binDir": "/private/tmp/potluck-equiv/build/bin",
+          "args": [
+            "--device",
+            "RPC0",
+            "--fit",
+            "off",
+            "-ngl",
+            "99"
+          ],
+          "rpcServers": 1,
+          "log": "/private/tmp/potluck-equiv/work/compare-split-remote-only-qwen-2.5-1.5b-instruct-q4.log",
+          "seconds": 6.6,
+          "returncode": 0,
+          "placement": {
+            "observed": {
+              "layers": 28,
+              "ranges": {
+                "RPC0": [
+                  0,
+                  27
+                ]
+              },
+              "outputDevice": "RPC0"
+            },
+            "problems": [],
+            "modelBufferMiB": {
+              "CPU_Mapped": 182.57,
+              "RPC0[127.0.0.1:18100]": 934.69
+            }
+          },
+          "metrics": {
+            "meanKld": -0.0,
+            "maxKld": 4.2e-05,
+            "p999Kld": 4e-05,
+            "medianKld": -0.0,
+            "meanDeltaP": 0.0,
+            "maxDeltaPPct": 0.005,
+            "rmsDeltaPPct": 0.0,
+            "top1AgreementPct": 99.964,
+            "pplCandidate": 56.981729,
+            "pplReference": 56.974991,
+            "meanLnPplRatio": 0.000118,
+            "absDeltaPpl": 0.006738
+          },
+          "verdict": {
+            "pass": true,
+            "checks": {
+              "meanKld": true,
+              "maxKld": true,
+              "top1": true,
+              "absDeltaPpl": true
+            }
+          }
+        },
+        {
+          "name": "split-potluck-fit-args",
+          "model": "~/.potluck/models/qwen-2.5-1.5b-instruct-q4/model.gguf",
+          "binDir": "/private/tmp/potluck-equiv/build/bin",
+          "args": [
+            "@potluck-fit"
+          ],
+          "rpcServers": 1,
+          "log": "/private/tmp/potluck-equiv/work/compare-split-potluck-fit-args-qwen-2.5-1.5b-instruct-q4.log",
+          "resolvedArgs": [
+            "--device",
+            "MTL0,RPC0",
+            "--fit",
+            "on",
+            "--fit-target",
+            "5122,5122"
+          ],
+          "seconds": 6.5,
+          "returncode": 0,
+          "placement": {
+            "observed": {
+              "layers": 28,
+              "ranges": {
+                "MTL0": [
+                  0,
+                  14
+                ],
+                "RPC0": [
+                  15,
+                  27
+                ]
+              },
+              "outputDevice": "RPC0"
+            },
+            "problems": [],
+            "modelBufferMiB": {
+              "CPU": 0.0,
+              "MTL0": 0.0,
+              "RPC0[127.0.0.1:18100]": 526.55,
+              "CPU_Mapped": 182.57,
+              "MTL0_Mapped": 752.12
+            }
+          },
+          "metrics": {
+            "meanKld": -0.0,
+            "maxKld": 4.2e-05,
+            "p999Kld": 4e-05,
+            "medianKld": -0.0,
+            "meanDeltaP": 0.0,
+            "maxDeltaPPct": 0.005,
+            "rmsDeltaPPct": 0.0,
+            "top1AgreementPct": 99.964,
+            "pplCandidate": 56.981729,
+            "pplReference": 56.974991,
+            "meanLnPplRatio": 0.000118,
+            "absDeltaPpl": 0.006738
+          },
+          "verdict": {
+            "pass": true,
+            "checks": {
+              "meanKld": true,
+              "maxKld": true,
+              "top1": true,
+              "absDeltaPpl": true
+            }
+          }
+        }
+      ],
+      "noiseFloor": [
+        {
+          "meanKld": -0.0,
+          "maxKld": 4.2e-05,
+          "p999Kld": 4e-05,
+          "medianKld": -0.0,
+          "meanDeltaP": 0.0,
+          "maxDeltaPPct": 0.005,
+          "rmsDeltaPPct": 0.0,
+          "top1AgreementPct": 99.964,
+          "pplCandidate": 56.981729,
+          "pplReference": 56.974991,
+          "meanLnPplRatio": 0.000118,
+          "absDeltaPpl": 0.006738
+        }
+      ],
+      "children": [
+        {
+          "pid": 30458,
+          "role": "llama-perplexity:base:whole",
+          "stopped": true,
+          "exit": 0
+        },
+        {
+          "pid": 30460,
+          "role": "llama-perplexity:compare:whole-repeat-noise-floor",
+          "stopped": true,
+          "exit": 0
+        },
+        {
+          "pid": 30462,
+          "role": "rpc-server:18100",
+          "stopped": true,
+          "exit": -15
+        },
+        {
+          "pid": 30463,
+          "role": "llama-perplexity:compare:split-2way-even",
+          "stopped": true,
+          "exit": 0
+        },
+        {
+          "pid": 30464,
+          "role": "rpc-server:18100",
+          "stopped": true,
+          "exit": -15
+        },
+        {
+          "pid": 30465,
+          "role": "rpc-server:18101",
+          "stopped": true,
+          "exit": -15
+        },
+        {
+          "pid": 30466,
+          "role": "llama-perplexity:compare:split-3way-even",
+          "stopped": true,
+          "exit": 0
+        },
+        {
+          "pid": 30478,
+          "role": "rpc-server:18100",
+          "stopped": true,
+          "exit": -15
+        },
+        {
+          "pid": 30479,
+          "role": "llama-perplexity:compare:split-2way-uneven-70-30",
+          "stopped": true,
+          "exit": 0
+        },
+        {
+          "pid": 30481,
+          "role": "rpc-server:18100",
+          "stopped": true,
+          "exit": -15
+        },
+        {
+          "pid": 30482,
+          "role": "llama-perplexity:compare:split-remote-only",
+          "stopped": true,
+          "exit": 0
+        },
+        {
+          "pid": 30483,
+          "role": "rpc-server:18100",
+          "stopped": true,
+          "exit": -15
+        },
+        {
+          "pid": 30485,
+          "role": "llama-perplexity:compare:split-potluck-fit-args",
+          "stopped": true,
+          "exit": 0
+        }
+      ],
+      "allPassed": true
+    },
+    "generic-config-negative-control-1.5b-vs-0.5b": {
+      "created": "2026-10-20T14:50:19+00:00",
+      "engineCommit": "5a32f7b66ef6cfb3e60deea26e3454cc6ad3438c",
+      "machine": {
+        "os": "Darwin",
+        "release": "24.6.0",
+        "arch": "arm64",
+        "python": "3.11.15",
+        "cpu": "Apple M2 Pro",
+        "memBytes": 17179869184
+      },
+      "text": {
+        "path": "/private/tmp/potluck-equiv/work/text.txt",
+        "sha256": "a0d11af75d8790137861519ed1334921de82da70669c8a6ddeca90ae382488d0",
+        "bytes": 29921
+      },
+      "ctx": 512,
+      "chunks": 16,
+      "thresholds": {
+        "max_mean_kld": 0.0001,
+        "max_max_kld": 0.001,
+        "min_top1": 99.9,
+        "max_abs_dppl": 0.05
+      },
+      "reference": {
+        "name": "1.5b-whole",
+        "model": "~/.potluck/models/qwen-2.5-1.5b-instruct-q4/model.gguf",
+        "args": [
+          "-ngl",
+          "99"
+        ],
+        "rpc_servers": 0,
+        "modelSha256": "1adf0b11065d8ad2e8123ea110d1ec956dab4ab038eab665614adba04b6c3370",
+        "ppl": 56.9817,
+        "returncode": 0,
+        "placement": {
+          "observed": {
+            "layers": 28,
+            "ranges": {
+              "MTL0": [
+                0,
+                27
+              ]
+            },
+            "outputDevice": "MTL0"
+          },
+          "problems": [],
+          "modelBufferMiB": {
+            "CPU": 0.0,
+            "MTL0": 0.0,
+            "CPU_Mapped": 182.57,
+            "MTL0_Mapped": 934.69
+          }
+        }
+      },
+      "candidates": [
+        {
+          "name": "0.5b-whole-negative-control",
+          "model": "~/.potluck/models/qwen-2.5-0.5b-instruct-q4/model.gguf",
+          "binDir": "/private/tmp/potluck-equiv/build/bin",
+          "args": [
+            "-ngl",
+            "99"
+          ],
+          "rpcServers": 0,
+          "log": "/private/tmp/potluck-equiv/work/compare-0.5b-whole-negative-control-qwen-2.5-0.5b-instruct-q4.log",
+          "seconds": 30.8,
+          "returncode": 0,
+          "placement": {
+            "observed": {
+              "layers": 24,
+              "ranges": {
+                "MTL0": [
+                  0,
+                  23
+                ]
+              },
+              "outputDevice": "MTL0"
+            },
+            "problems": [],
+            "modelBufferMiB": {
+              "CPU": 0.0,
+              "MTL0": 0.0,
+              "CPU_Mapped": 137.94,
+              "MTL0_Mapped": 373.71
+            }
+          },
+          "metrics": {
+            "meanKld": 0.49373,
+            "maxKld": 5.318046,
+            "p999Kld": 3.194702,
+            "medianKld": 0.424849,
+            "meanDeltaP": -2.007,
+            "maxDeltaPPct": 80.902,
+            "rmsDeltaPPct": 10.779,
+            "top1AgreementPct": 63.03,
+            "pplCandidate": 76.724679,
+            "pplReference": 56.974991,
+            "meanLnPplRatio": 0.297611,
+            "absDeltaPpl": 19.749688
+          },
+          "verdict": {
+            "pass": false,
+            "checks": {
+              "meanKld": false,
+              "maxKld": false,
+              "top1": false,
+              "absDeltaPpl": false
+            }
+          }
+        },
+        {
+          "name": "1.5b-split-2way-generic-config",
+          "model": "~/.potluck/models/qwen-2.5-1.5b-instruct-q4/model.gguf",
+          "binDir": "/private/tmp/potluck-equiv/build/bin",
+          "args": [
+            "--device",
+            "MTL0,RPC0",
+            "--fit",
+            "off",
+            "-ngl",
+            "99",
+            "-ts",
+            "1,1"
+          ],
+          "rpcServers": 1,
+          "log": "/private/tmp/potluck-equiv/work/compare-1.5b-split-2way-generic-config-qwen-2.5-1.5b-instruct-q4.log",
+          "seconds": 146.8,
+          "returncode": 0,
+          "placement": {
+            "observed": {
+              "layers": 28,
+              "ranges": {
+                "MTL0": [
+                  0,
+                  14
+                ],
+                "RPC0": [
+                  15,
+                  27
+                ]
+              },
+              "outputDevice": "RPC0"
+            },
+            "problems": [],
+            "modelBufferMiB": {
+              "CPU_Mapped": 182.57,
+              "MTL0_Mapped": 752.12,
+              "RPC0[127.0.0.1:18100]": 526.55
+            },
+            "predicted": {
+              "ranges": {
+                "MTL0": [
+                  0,
+                  14
+                ],
+                "RPC0": [
+                  15,
+                  27
+                ]
+              },
+              "outputDevice": "RPC0"
+            },
+            "matchesPrediction": true
+          },
+          "metrics": {
+            "meanKld": -0.0,
+            "maxKld": 4.2e-05,
+            "p999Kld": 4e-05,
+            "medianKld": -0.0,
+            "meanDeltaP": 0.0,
+            "maxDeltaPPct": 0.005,
+            "rmsDeltaPPct": 0.0,
+            "top1AgreementPct": 99.964,
+            "pplCandidate": 56.981729,
+            "pplReference": 56.974991,
+            "meanLnPplRatio": 0.000118,
+            "absDeltaPpl": 0.006738
+          },
+          "verdict": {
+            "pass": true,
+            "checks": {
+              "meanKld": true,
+              "maxKld": true,
+              "top1": true,
+              "absDeltaPpl": true
+            }
+          }
+        }
+      ],
+      "noiseFloor": [],
+      "children": [
+        {
+          "pid": 24862,
+          "role": "llama-perplexity:base:1.5b-whole",
+          "stopped": true,
+          "exit": 0
+        },
+        {
+          "pid": 24963,
+          "role": "llama-perplexity:compare:0.5b-whole-negative-control",
+          "stopped": true,
+          "exit": 0
+        },
+        {
+          "pid": 25100,
+          "role": "rpc-server:18100",
+          "stopped": true,
+          "exit": -15
+        },
+        {
+          "pid": 25153,
+          "role": "llama-perplexity:compare:1.5b-split-2way-generic-config",
+          "stopped": true,
+          "exit": 0
+        }
+      ],
+      "allPassed": false
+    }
+  },
+  "l1": {
+    "tests": [
+      "tests/test_split_layout.py",
+      "tests/test_split_memory.py",
+      "tests/test_managed_split.py"
+    ],
+    "passed": true,
+    "summary": "620 passed, 1 warning in 3.79s",
+    "seconds": 4.0,
+    "models": [
+      {
+        "model": "~/.potluck/models/qwen-2.5-0.5b-instruct-q4/model.gguf",
+        "sizeBytes": 397808192,
+        "header": {
+          "block_count": 24,
+          "embedding_length": 896,
+          "attention.head_count": 14,
+          "attention.head_count_kv": 2
+        },
+        "kvMiB": 48.0,
+        "ctx": 4096,
+        "plan": {
+          "budgetsMiB": [
+            6000,
+            4000
+          ],
+          "fits": true,
+          "summary": {
+            "layers": 24,
+            "ranges": {
+              "0": [
+                0,
+                14
+              ],
+              "1": [
+                15,
+                23
+              ]
+            },
+            "outputDevice": 1,
+            "counts": {
+              "0": 15,
+              "1": 9
+            }
+          },
+          "loadMiB": {
+            "0": 257.6,
+            "1": 169.8
+          }
+        }
+      },
+      {
+        "model": "~/.potluck/models/qwen-2.5-1.5b-instruct-q4/model.gguf",
+        "sizeBytes": 986048768,
+        "header": {
+          "block_count": 28,
+          "embedding_length": 1536,
+          "attention.head_count": 12,
+          "attention.head_count_kv": 2
+        },
+        "kvMiB": 112.0,
+        "ctx": 4096,
+        "plan": {
+          "budgetsMiB": [
+            6000,
+            4000
+          ],
+          "fits": true,
+          "summary": {
+            "layers": 28,
+            "ranges": {
+              "0": [
+                0,
+                17
+              ],
+              "1": [
+                18,
+                27
+              ]
+            },
+            "outputDevice": 1,
+            "counts": {
+              "0": 18,
+              "1": 10
+            }
+          },
+          "loadMiB": {
+            "0": 655.7,
+            "1": 396.7
+          }
+        }
+      }
+    ],
+    "machine": {
+      "os": "Darwin",
+      "release": "24.6.0",
+      "arch": "arm64",
+      "python": "3.11.15",
+      "cpu": "Apple M2 Pro",
+      "memBytes": 17179869184
+    },
+    "engineCommit": "5a32f7b66ef6cfb3e60deea26e3454cc6ad3438c"
+  }
+}

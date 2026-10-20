@@ -64,3 +64,76 @@ def test_cancelling_memory_probe_terminates_native_process(tmp_path):
 def test_shared_memory_estimate_never_invents_capacity(available, expected):
     from potluck_local.services.split_memory import shared_memory_budget
     assert shared_memory_budget(available) == expected
+
+
+# ---- L1 plan metadata checks (bench/scripts/split_equivalence.py l1) ----------
+# No weights, binaries or GPUs. They run the planner's own functions over a
+# matrix of synthetic device inventories and budgets and assert invariants.
+
+import itertools
+from pathlib import Path
+
+from potluck_local.services.split_manager import head_arguments
+
+BACKENDS = ("metal", "cpu", "cuda")
+
+
+def _inventory(local: str, workers: list[tuple[int, int]]) -> str:
+    """Synthetic --list-devices output: one local device then RPC workers."""
+    lines = ["Available devices:", f"  {local}0: Local ({20000} MiB, {20000} MiB free)"]
+    for i, (_, free) in enumerate(workers):
+        lines.append(f"  RPC{i}: 127.0.0.1:{2000 + i} ({free + 500} MiB, {free} MiB free)")
+    return "\n".join(lines) + "\n"
+
+
+def _plan(local: str, backends: list[str], free: list[int], avail: list[int], local_avail=64000):
+    workers = {str(2000 + i): {"backend": b, "freeMemoryBytes": a * MIB}
+               for i, (b, a) in enumerate(zip(backends, avail))}
+    return fit_arguments(_inventory(local, [(0, f) for f in free]), workers, local_avail * MIB)
+
+
+MATRIX = [(local, backends, free, avail)
+          for local in ("CUDA", "MTL")
+          for n in (1, 2, 3)
+          for backends in itertools.product(BACKENDS, repeat=n)
+          for free in ([8000] * n, [4000, 16000, 24000][:n])
+          for avail in ([6000] * n, [12000, 4096, 40000][:n])]
+
+
+@pytest.mark.parametrize("local,backends,free,avail", MATRIX)
+def test_fit_plan_invariants_over_device_matrix(local, backends, free, avail):
+    args = _plan(local, backends, free, avail)
+    assert args == _plan(local, backends, free, avail)  # deterministic
+    assert args[0] == "--device" and args[2:4] == ["--fit", "on"] and args[4] == "--fit-target"
+    devices, margins = args[1].split(","), [int(m) for m in args[5].split(",")]
+    # One margin per device, local first, then workers in the order selected.
+    assert devices == [f"{local}0"] + [f"RPC{i}" for i in range(len(free))]
+    assert len(margins) == len(devices) and all(m >= 1024 for m in margins)
+    assert not set(args) & {"--n-gpu-layers", "-ngl", "--tensor-split", "-ts"}  # the engine decides
+    usable = [20000 - margins[0]] + [f - m for f, m in zip(free, margins[1:])]
+    for i, backend in enumerate(backends, start=1):
+        if backend == "cuda":
+            assert usable[i] == free[i - 1] - 1024  # VRAM: native free minus 1 GiB
+        else:  # shared RAM: a device never plans past the machine's lease budget
+            assert usable[i] <= max(0, avail[i - 1] - 2048)
+
+
+def test_fit_plan_refuses_when_no_worker_has_budget():
+    for backend in ("metal", "cpu"):
+        with pytest.raises(SplitError, match="too little available memory"):
+            _plan("CUDA", [backend], [8000], [2048 + 255])
+    assert _plan("CUDA", ["metal"], [8000], [2048 + 256])  # exactly the minimum budget still plans
+
+
+def test_head_command_line_is_loopback_layer_split_with_matching_endpoints(tmp_path):
+    endpoints = ["127.0.0.1:41000", "127.0.0.1:41001"]
+    memory = _plan("CUDA", ["cuda", "cuda"], [8000, 8000], [0, 0])
+    argv = head_arguments(tmp_path, Path("m.gguf"), 41100, 8192, 4, endpoints, memory)
+    assert argv == head_arguments(tmp_path, Path("m.gguf"), 41100, 8192, 4, endpoints, memory)
+    assert argv[argv.index("--split-mode") + 1] == "layer" and argv[argv.index("--parallel") + 1] == "1"
+    assert argv[argv.index("--host") + 1] == "127.0.0.1"
+    assert argv[argv.index("--ctx-size") + 1] == "8192"
+    assert argv[argv.index("--rpc") + 1].split(",") == endpoints
+    assert len(argv[argv.index("--device") + 1].split(",")) == len(endpoints) + 1  # local + each worker
+    assert all(a.startswith("127.0.0.1:") for a in argv[argv.index("--rpc") + 1].split(","))
+    assert "0.0.0.0" not in argv and "--n-gpu-layers" not in argv

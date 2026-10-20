@@ -52,6 +52,8 @@ def isolated(monkeypatch, tmp_path):
     monkeypatch.setattr(sm, "household_peers", roster)
     monkeypatch.setattr(sm, "engine_bundle", lambda: (tmp_path, {**sn.PIN, "backend": "cpu"}))
     monkeypatch.setattr(sm, "NativeProcess", Process)
+    # Worker acquisition checks real free RAM; keep the suite independent of the host.
+    monkeypatch.setattr(sm.psutil, "virtual_memory", lambda: SimpleNamespace(available=16 * 1024 ** 3))
     return manager, runtime, settings
 
 

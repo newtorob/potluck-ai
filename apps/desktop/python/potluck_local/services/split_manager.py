@@ -34,6 +34,19 @@ LOAD_SECONDS = 1200
 SPLIT_PEER_PORT = int(os.environ.get("POTLUCK_SPLIT_PEER_PORT", str(PEER_SIDECAR_PORT)))
 
 
+def head_arguments(root, path, port: int, context: int, threads: int, endpoints: list[str],
+                   memory_args: list[str]) -> list[str]:
+    """The head's native command line. Kept pure so tests can read the plan."""
+    return [str(root / "llama-server"), "--model", str(path),
+            "--host", "127.0.0.1", "--port", str(port), "--ctx-size", str(context),
+            "--threads", str(threads),
+            "--rpc", ",".join(endpoints), *memory_args, "--split-mode", "layer",
+            "--parallel", "1", "--no-warmup", "--no-webui",
+            # The pinned engine emits allocation records at level
+            # four. The supervisor forwards only numeric counters.
+            "--log-verbosity", "4"]
+
+
 async def paired_host(host: str) -> bool:
     try:
         address = ipaddress.ip_address(host)
@@ -345,14 +358,8 @@ class SplitManager:
                         raise SplitError("Unload the head's current model before starting a split.")
                     # Keep other model commands out until the new process has
                     # loaded and its original pinned file has been rechecked.
-                    process = NativeProcess([str(root / "llama-server"), "--model", str(path),
-                        "--host", "127.0.0.1", "--port", str(port), "--ctx-size", str(head["context"]),
-                        "--threads", str(get_settings().runtime.threads or 4),
-                        "--rpc", ",".join(endpoints), *memory_args, "--split-mode", "layer",
-                        "--parallel", "1", "--no-warmup", "--no-webui",
-                        # The pinned engine emits allocation records at level
-                        # four. The supervisor forwards only numeric counters.
-                        "--log-verbosity", "4"], env={"LLAMA_API_KEY": key})
+                    process = NativeProcess(head_arguments(root, path, port, head["context"],
+                        get_settings().runtime.threads or 4, endpoints, memory_args), env={"LLAMA_API_KEY": key})
                     head["process"] = process
                     head["phase"] = "loading"
                     loop = asyncio.get_running_loop()
