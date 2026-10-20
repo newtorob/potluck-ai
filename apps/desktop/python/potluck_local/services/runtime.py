@@ -23,7 +23,7 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
-from contextlib import aclosing, asynccontextmanager
+from contextlib import aclosing, asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
@@ -627,6 +627,7 @@ class LLMRuntime:
             self._load_memory = {**window, "window": "load"} if window else None
             self._gpu_meter = meter if window else None
             self._persisted_benchmarks = None
+            self._attach_prompt_cache(model, identity, rpc_servers)
             backend_selection = selection.as_dict()
             if not backend_selection["devices"]:
                 # Metal, or a wheel with one backend set: nothing was probed, so
@@ -854,6 +855,48 @@ class LLMRuntime:
                 "continuous_batch": continuous_batch,
                 **engine.describe(),
             }
+
+    def _attach_prompt_cache(self, model, identity, rpc_servers) -> None:
+        """Give an eligible in-process model a disk prompt cache (services/prompt_cache.py)."""
+        self._prompt_cache = None
+        try:
+            from potluck_local.config import get_local_settings
+            from potluck_local.services import prompt_cache
+            from potluck_local.services.settings_manager import get_settings
+
+            settings = get_settings()
+            runtime_settings = settings.runtime
+            # Saved prompts are chat content: they follow the chat history setting,
+            # and the cache's own switch can still turn them off.
+            if not (settings.privacy.chat_history_enabled and runtime_settings.prompt_cache) \
+                    or rpc_servers or not identity:
+                return
+            reason = prompt_cache.eligibility(getattr(model, "metadata", None))
+            if reason:
+                logger.info("prompt_cache_off model_id=%s reason=%s", self._model_id, reason)
+                return
+            store = prompt_cache.PromptCacheStore(
+                prompt_cache.cache_root(get_local_settings().data_dir),
+                max_bytes=int(runtime_settings.prompt_cache_max_gib * 1024 ** 3),
+                ttl_seconds=runtime_settings.prompt_cache_ttl_hours * 3600)
+            store.sweep()
+            cache = prompt_cache.PromptDiskCache(store, model, identity[0])
+            model.set_cache(cache)
+            self._prompt_cache = cache
+        except Exception:  # noqa: BLE001 - the cache is an optimisation, never a load failure
+            logger.warning("prompt_cache_attach_failed", exc_info=True)
+            self._prompt_cache = None
+
+    def _detach_prompt_cache(self, model) -> None:
+        """Write the pending and live prompt state before the model is freed."""
+        cache, self._prompt_cache = getattr(self, "_prompt_cache", None), None
+        if cache is not None:
+            try:
+                cache.close()
+            except Exception:  # noqa: BLE001
+                logger.warning("prompt_cache_detach_failed", exc_info=True)
+            with suppress(Exception):
+                model.set_cache(None)
 
     def unload_model(self) -> None:
         """Release the current model and free memory."""
@@ -1687,6 +1730,7 @@ class LLMRuntime:
             self._loaded_n_ctx = None
             self._loaded_rpc_servers = None
             self._load_report = None
+            self._detach_prompt_cache(model)
             close = getattr(model, "close", None)
             if callable(close):
                 try:

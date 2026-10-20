@@ -30,6 +30,13 @@ class RuntimeSettings(BaseModel):
     # before trusting it, and move it to the CPU if only the GPU does not. Off
     # means no checks and no move, and the model is not offered to other people.
     verify_answers: bool = True
+    # Keep the processed prompt of a long conversation on disk so it resumes
+    # after a restart or a model swap without being read again (services/
+    # prompt_cache.py). Entries stay on this machine under the data directory.
+    # Only active while privacy.chat_history_enabled is true; this switch turns it off.
+    prompt_cache: bool = True
+    prompt_cache_max_gib: float = Field(default=8, ge=0.5, le=1024)
+    prompt_cache_ttl_hours: float = Field(default=72, ge=1, le=24 * 365)
 
 
 class PrivacySettings(BaseModel):
