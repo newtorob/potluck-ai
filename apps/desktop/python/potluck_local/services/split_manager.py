@@ -268,6 +268,8 @@ class SplitManager:
                 try:
                     response = await client.get(self._url(peer, "/status"))
                     cap = response.json()
+                    if response.status_code == 200 and cap.get("engine", {}).get("commit") not in (None, PIN["commit"]):
+                        raise SplitError("That worker runs a different split engine build. Update Potluck on the older of the two computers so both match.", code="split_engine_mismatch")
                     if response.status_code != 200 or not cap.get("available") \
                             or cap.get("engine", {}).get("commit") != PIN["commit"]:
                         raise ValueError()

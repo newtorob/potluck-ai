@@ -13,7 +13,7 @@ gateway requests use the loaded split model through the normal runtime slot.
 The runtime never downloads, swaps the pin or broadens the routing scope.
 
 The native engine is llama.cpp commit
-`5a32f7b66ef6cfb3e60deea26e3454cc6ad3438c`, built with RPC and Metal/CUDA/CPU.
+`d80619397c2ba5cf1366c29f7d43699ca3a159b9` (release b11756, ggml RPC protocol 8.0.0), built with RPC and Metal/CUDA/CPU. The CUDA build on a machine with nvcc 11.5 needs `--cuda-host-compiler /usr/bin/g++-10`: the default g++ 11 fails inside libstdc++ `std::function`.
 The build script archives this exact commit without changing a developer's
 checkout. Bundles carry the same engine protocol and commit; mixed builds fail
 closed. No patched Python binding is needed. CLI/runtime packaging includes

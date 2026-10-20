@@ -8,6 +8,7 @@ The source checkout is read through git archive and never modified.
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -43,6 +44,10 @@ def main():
         source.mkdir()
         with tarfile.open(archive) as tar:
             tar.extractall(source, filter="data")
+        header = (source / "ggml/include/ggml-rpc.h").read_text()
+        found = ".".join(re.search(rf"RPC_PROTO_{k}_VERSION\s+(\d+)", header)[1] for k in ("MAJOR", "MINOR", "PATCH"))
+        if found != PIN["rpcProtocol"]:
+            parser.error(f"source speaks ggml RPC {found}, pin says {PIN['rpcProtocol']}; update split-engine.json")
         build = root / "build"
         extra = []
         if args.backend == "cuda":
@@ -55,7 +60,10 @@ def main():
             "-DGGML_METAL=" + ("ON" if args.backend == "metal" else "OFF"),
             "-DGGML_CUDA=" + ("ON" if args.backend == "cuda" else "OFF"),
             "-DGGML_METAL_EMBED_LIBRARY=ON", "-DGGML_BLAS=OFF",
-            "-DLLAMA_CURL=OFF", "-DLLAMA_OPENSSL=OFF", "-DLLAMA_BUILD_TESTS=OFF",
+            "-DLLAMA_OPENSSL=OFF", "-DLLAMA_BUILD_TESTS=OFF",
+            # Upstream fetches prebuilt web UI assets from Hugging Face at build time
+            # unless these are off. The managed engine always runs with --no-webui.
+            "-DLLAMA_BUILD_UI=OFF", "-DLLAMA_USE_PREBUILT_UI=OFF",
             "-DLLAMA_BUILD_SERVER=ON", "-DLLAMA_BUILD_EXAMPLES=ON"] + extra, check=True)
         subprocess.run(["cmake", "--build", str(build), "--config", "Release", "--target",
                         "llama-server", "ggml-rpc-server", "-j", str(args.jobs)], check=True)
