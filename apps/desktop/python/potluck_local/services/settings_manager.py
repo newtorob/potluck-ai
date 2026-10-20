@@ -7,6 +7,7 @@ Small, self-contained, no heavy deps.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 from pathlib import Path
@@ -250,6 +251,11 @@ def save_settings(
     """
     if config_path is None:
         config_path = _default_config_path()
+    try:
+        # From the file, not the cache: callers may have changed the cached object in place.
+        previous = PotluckSettings.model_validate_json(config_path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 - no readable previous file means nothing to compare
+        previous = None
     config_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         os.chmod(config_path.parent, 0o700)
@@ -266,6 +272,14 @@ def save_settings(
         os.replace(temporary, config_path)
     finally:
         Path(temporary).unlink(missing_ok=True)
+    if previous is not None:
+        # Saved prompts are chat content: turning chat history or the cache off removes them.
+        try:
+            from potluck_local.services import prompt_cache
+
+            prompt_cache.purge_for_settings_change(config_path.parent, previous, settings)
+        except Exception:  # noqa: BLE001 - a purge problem must not block saving settings
+            logging.getLogger(__name__).warning("prompt_cache_purge_failed", exc_info=True)
     # Keep the mtime cache coherent so the next get_settings reflects this write.
     try:
         _settings_cache[str(config_path)] = (config_path.stat().st_mtime, settings)

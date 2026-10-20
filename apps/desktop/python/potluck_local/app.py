@@ -356,6 +356,10 @@ def create_app() -> FastAPI:
         # full local surface - so that must not happen without revisiting this gate.
         client_host = request.client.host if request.client else ""
         is_loopback = client_host in ("127.0.0.1", "::1", "localhost")
+        # Only requests that began on this machine may touch the disk prompt cache.
+        from potluck_local.services import prompt_cache
+
+        prompt_cache.mark_request(is_loopback, normalised)
 
         # Non-loopback callers (household peers over the mesh) are restricted to
         # the explicit peer-facing surface (/peer/* + /health). The local user's

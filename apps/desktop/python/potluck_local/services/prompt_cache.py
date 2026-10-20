@@ -30,6 +30,7 @@ The in-process adapter is PromptDiskCache, a llama-cpp-python cache object
 from __future__ import annotations
 
 import array
+import contextvars
 import hashlib
 import json
 import logging
@@ -40,6 +41,7 @@ import sqlite3
 import struct
 import threading
 import time
+import weakref
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -87,6 +89,63 @@ def eligibility(metadata: dict | None) -> str | None:
             except (TypeError, ValueError):
                 return "model uses sliding window attention"
     return None
+
+
+# Who asked. Only a request that began on this machine (the app and local clients on
+# 127.0.0.1) may read or write the cache. A request served for another machine, a
+# household peer or a circle member, neither saves its prompt here nor learns from a
+# fast first token that this user sent the same prefix. The default is "not local", so
+# every path that does not say otherwise (peer routes, the circle listener, contributor
+# jobs, batch jobs, benchmarks, answer checks) is kept out.
+request_is_local: contextvars.ContextVar[bool] = contextvars.ContextVar("potluck_request_is_local", default=False)
+
+
+def mark_request(is_loopback: bool, path: str) -> None:
+    """Called once where a request enters the sidecar (the HTTP middleware)."""
+    request_is_local.set(bool(is_loopback) and not (path == "/peer" or path.startswith("/peer/")))
+
+
+def in_request_context(fn):
+    """fn bound to the caller's request context, for a worker thread (executors do not copy it)."""
+    ctx = contextvars.copy_context()
+    return lambda: ctx.run(fn)
+
+
+_LIVE: "weakref.WeakSet[PromptDiskCache]" = weakref.WeakSet()
+
+
+def purge_all(root: Path, reason: str = "") -> int:
+    """Remove every saved prompt, for every model, loaded or not. Returns entries removed.
+
+    Stops attached caches from saving first, so nothing is written back afterwards.
+    """
+    root = Path(root)
+    for cache in list(_LIVE):
+        if cache.store.root == root:
+            cache.disable()
+    removed = 0
+    if root.exists():
+        store = PromptCacheStore(root)
+        try:
+            removed = store.stats()["entries"]
+            store.clear()
+        except sqlite3.Error:
+            logger.warning("prompt_cache_purge_index_failed", exc_info=True)
+        finally:
+            store.close()
+        for directory in root.iterdir():
+            if directory.is_dir():
+                shutil.rmtree(directory, ignore_errors=True)
+    logger.info("prompt_cache_purged entries=%d reason=%s", removed, reason)
+    return removed
+
+
+def purge_for_settings_change(config_dir: Path, before, after) -> None:
+    """Called by save_settings: chat history turned off, or the cache itself turned off."""
+    history_off = bool(before.privacy.chat_history_enabled) and not after.privacy.chat_history_enabled
+    cache_off = bool(before.runtime.prompt_cache) and not after.runtime.prompt_cache
+    if history_off or cache_off:
+        purge_all(cache_root(config_dir), "chat_history_off" if history_off else "prompt_cache_off")
 
 
 def cache_root(data_dir: Path) -> Path:
@@ -446,6 +505,24 @@ class PromptDiskCache:
         self._writer.start()
         self.last_restore: dict | None = None
         self.last_save: dict | None = None
+        self.disabled = False
+        # Whether the KV state in the model came only from requests that began here.
+        self._live_is_local = True
+        _LIVE.add(self)
+
+    def _allowed(self) -> bool:
+        return not self.disabled and request_is_local.get()
+
+    def disable(self) -> None:
+        """Stop reading and writing; drop queued writes and wait for one in progress."""
+        self.disabled = True
+        while True:
+            try:
+                self._queue.get_nowait()
+                self._queue.task_done()
+            except queue.Empty:
+                break
+        self.flush()
 
     @property
     def cache_size(self) -> int:
@@ -454,9 +531,15 @@ class PromptDiskCache:
     # -- restore -------------------------------------------------------
 
     def __contains__(self, key) -> bool:
+        if not self._allowed():
+            return False
         return self.store.lookup(self.sha, self.signature, list(key)) is not None
 
     def __getitem__(self, key):
+        # Every request passes through here first, so note whose tokens the model now holds.
+        self._live_is_local = self._allowed()
+        if not self._live_is_local:
+            raise KeyError("prompt cache is for local requests only")
         tokens = list(key)
         model = self.model
         live = _common_prefix(model.input_ids[: model.n_tokens], tokens)
@@ -484,6 +567,8 @@ class PromptDiskCache:
 
     def __setitem__(self, key, state) -> None:
         # The state's own tokens say what its KV holds; the key can be one longer.
+        if not self._allowed():
+            return
         n = int(state.n_tokens)
         if n < self.store.min_tokens:
             return
@@ -492,6 +577,8 @@ class PromptDiskCache:
     def save_live(self) -> None:
         """Queue the model's current state, for a turn that did not finish normally."""
         model = self.model
+        if self.disabled or not self._live_is_local:
+            return
         n = int(model.n_tokens)
         if n < self.store.min_tokens:
             return

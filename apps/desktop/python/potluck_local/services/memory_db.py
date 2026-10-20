@@ -1294,6 +1294,22 @@ async def update_conversation(
     return found
 
 
+def _purge_prompt_cache(db_path: Path | None) -> None:
+    """Deleting or clearing chat history also removes the saved prompts (services/prompt_cache.py).
+
+    Entries cannot be tied to one conversation, so all of them go, for every model.
+    The data directory is the one above the database's own (<data>/data/memory.db).
+    """
+    try:
+        from potluck_local.config import get_local_settings
+        from potluck_local.services import prompt_cache
+
+        data_dir = db_path.parent.parent if db_path else get_local_settings().data_dir
+        prompt_cache.purge_all(prompt_cache.cache_root(data_dir), "chat_history_cleared")
+    except Exception:  # noqa: BLE001 - never fail a delete over the cache
+        logger.warning("prompt_cache_purge_failed", exc_info=True)
+
+
 async def delete_conversation(
     conversation_id: str,
     db_path: Path | None = None,
@@ -1312,6 +1328,8 @@ async def delete_conversation(
         )
         deleted = cursor.rowcount > 0
         await db.commit()
+    if deleted:
+        _purge_prompt_cache(db_path)
     return deleted
 
 
@@ -1441,4 +1459,6 @@ async def clear_conversation_messages(
         )
         removed = cursor.rowcount
         await db.commit()
+    if removed:
+        _purge_prompt_cache(db_path)
     return removed

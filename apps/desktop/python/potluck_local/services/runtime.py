@@ -34,6 +34,7 @@ from potluck_local.services import (
     memory_probe,
     model_evidence,
     model_traits,
+    prompt_cache,
     prompt_guard,
     tool_calls,
 )
@@ -1857,7 +1858,7 @@ class LLMRuntime:
                 if close is not None:
                     close()
 
-        fut = loop.run_in_executor(None, _generate)
+        fut = loop.run_in_executor(None, prompt_cache.in_request_context(_generate))
         token_count = 0
         completed = False
         start = time.monotonic()
@@ -1933,7 +1934,7 @@ class LLMRuntime:
                 finally:
                     ticket.close()
 
-            fut = loop.run_in_executor(None, _complete)
+            fut = loop.run_in_executor(None, prompt_cache.in_request_context(_complete))
             try:
                 result = await asyncio.shield(fut)
             except asyncio.CancelledError:
@@ -2044,7 +2045,7 @@ class LLMRuntime:
                         close()
                     ticket.close()
 
-            fut = loop.run_in_executor(None, _generate)
+            fut = loop.run_in_executor(None, prompt_cache.in_request_context(_generate))
 
             chunk_count = 0
             completed = False

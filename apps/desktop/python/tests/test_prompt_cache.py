@@ -253,7 +253,9 @@ def adapter(tmp_path, monkeypatch):
     monkeypatch.setattr(pc, "_load_into", fake_load)
     model = FakeModel()
     cache = pc.PromptDiskCache(store(tmp_path), model, SHA_A)
+    token = pc.request_is_local.set(True)  # a request that began on this machine
     yield cache, model
+    pc.request_is_local.reset(token)
     cache.close()
 
 
@@ -366,3 +368,76 @@ def test_native_slot_for_another_model_is_a_miss(tmp_path):
     other = FakeServer(slot_dir, turn)
     assert pc.NativeSlotCache(s, slot_dir, SHA_B, SIG, other).restore(turn) is None
     assert other.calls == []
+
+
+# ---- origin: only requests that began on this machine ---------------------------------
+
+def test_mark_request_trusts_loopback_but_never_the_peer_surface():
+    for host, path, expected in [("127.0.0.1", "/chat/stream", True), ("::1", "/v1/chat/completions", True),
+                                 ("127.0.0.1", "/peer/chat/completions", False), ("127.0.0.1", "/peer", False),
+                                 ("100.64.0.9", "/peer/chat/completions", False), ("192.168.1.5", "/v1/x", False)]:
+        pc.mark_request(host in ("127.0.0.1", "::1"), path)
+        assert pc.request_is_local.get() is expected, (host, path)
+    pc.request_is_local.set(False)
+
+
+def test_the_default_is_not_local():
+    import contextvars
+
+    assert contextvars.Context().run(pc.request_is_local.get) is False
+
+
+def test_worker_threads_get_the_requests_origin_only_through_in_request_context():
+    import concurrent.futures
+
+    seen = []
+    pc.request_is_local.set(True)
+    try:
+        with concurrent.futures.ThreadPoolExecutor(1) as pool:
+            pool.submit(lambda: seen.append(pc.request_is_local.get())).result()  # a bare executor drops it
+            pool.submit(pc.in_request_context(lambda: seen.append(pc.request_is_local.get()))).result()
+    finally:
+        pc.request_is_local.set(False)
+    assert seen == [False, True]
+
+
+def test_a_peer_request_neither_restores_nor_saves(adapter):
+    cache, model = adapter
+    turn = toks(64)
+    cache[turn] = saved_state(turn)  # a local turn is saved
+    cache.flush()
+    assert cache.store.stats()["entries"] == 1
+    pc.request_is_local.set(False)  # now a request served for another machine
+    with pytest.raises(KeyError):
+        cache[turn + [1]]  # no restore, so no timing signal about the local user's prompt
+    assert turn not in cache and model.loaded == []
+    other = toks(64, 500)
+    cache[other] = saved_state(other)
+    cache.flush()
+    assert cache.store.stats()["entries"] == 1
+    assert cache.store.lookup(SHA_A, SIG, other) is None
+
+
+def test_the_live_state_of_a_peer_request_is_not_saved_on_close(adapter, monkeypatch):
+    cache, model = adapter
+    monkeypatch.setattr(pc, "_state_bytes", lambda m: b"live")
+    pc.request_is_local.set(False)
+    with pytest.raises(KeyError):
+        cache[toks(80)]
+    model.input_ids[:80] = toks(80)  # the peer's prompt is what the model now holds
+    model.n_tokens = 80
+    cache.close()
+    assert cache.store.stats()["entries"] == 0
+
+
+def test_a_disabled_cache_does_nothing(adapter):
+    cache, model = adapter
+    turn = toks(64)
+    cache[turn] = saved_state(turn)
+    cache.flush()
+    cache.disable()
+    with pytest.raises(KeyError):
+        cache[turn]
+    cache[toks(64, 9)] = saved_state(toks(64, 9))
+    cache.flush()
+    assert cache.store.stats()["entries"] == 1
