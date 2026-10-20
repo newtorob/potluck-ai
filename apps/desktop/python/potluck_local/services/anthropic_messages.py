@@ -235,6 +235,9 @@ def _join_neighbours(messages: list[dict]) -> list[dict]:
     return out
 
 
+join_neighbours = _join_neighbours  # shared with services/responses_api.py
+
+
 def _messages(raw: Any) -> tuple[list[dict], list[str]]:
     """``(messages, texts of the role "system" entries)``."""
     if not isinstance(raw, list) or not raw:

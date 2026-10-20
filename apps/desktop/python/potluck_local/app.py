@@ -22,10 +22,10 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from potluck_local import __version__
-from potluck_local.routers import account, agents, anthropic, batches, chat, chat_circle, circles, contributor, gateway, hardware, health, memory, models, ollama, peer, readiness, settings, tasks, usage, vault, verify
+from potluck_local.routers import account, agents, anthropic, batches, chat, chat_circle, circles, contributor, gateway, hardware, health, memory, models, ollama, peer, readiness, responses, settings, tasks, usage, vault, verify
 from potluck_local.utils.logging import setup_logging
 from potluck_local.routers import split
-from potluck_local.services import anthropic_messages, peer_trust
+from potluck_local.services import anthropic_messages, peer_trust, responses_api
 from potluck_local.services.split_native import SplitError
 
 logger = logging.getLogger(__name__)
@@ -72,8 +72,8 @@ def _resolve_mesh_network() -> ipaddress.IPv4Network | ipaddress.IPv6Network:
         return ipaddress.ip_network(_DEFAULT_MESH_CIDR)
 
 
-# The Anthropic Messages routes answer in Anthropic's error shape, including the
-# refusals made here before a request reaches them.
+# The Anthropic Messages routes answer in Anthropic's error shape, and /v1/responses
+# in OpenAI's, including the refusals made here before a request reaches them.
 _MESSAGES_PATHS = ("/v1/messages", "/v1/messages/count_tokens")
 
 
@@ -82,6 +82,8 @@ def _refusal(path: str, status: int, detail: str) -> JSONResponse:
     every other path keeps {"detail": ...}."""
     if path in _MESSAGES_PATHS:
         return JSONResponse(status_code=status, content=anthropic_messages.error_body(status, detail))
+    if path == "/v1/responses":
+        return JSONResponse(status_code=status, content=responses_api.error_body(status, detail))
     return JSONResponse(status_code=status, content={"detail": detail})
 
 
@@ -510,6 +512,7 @@ def create_app() -> FastAPI:
     app.include_router(verify.router, prefix="/verify", tags=["verify"])
     app.include_router(gateway.router, prefix="/v1", tags=["gateway"])
     app.include_router(anthropic.router, prefix="/v1", tags=["gateway"])
+    app.include_router(responses.router, prefix="/v1", tags=["gateway"])
     app.include_router(ollama.router, prefix="/api", tags=["ollama"])
 
     return app
