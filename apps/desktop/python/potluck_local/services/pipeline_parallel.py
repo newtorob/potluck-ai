@@ -50,10 +50,12 @@ try:
     from . import pipeline_wire as wire
     from .pipeline_wire import send_msg, recv_msg
     from .sampling import sample_token, sample_from_topk
+    from .prompt_guard import hf_chat_inputs
 except ImportError:  # running this file directly rather than as a package module
     import pipeline_wire as wire
     from pipeline_wire import send_msg, recv_msg
     from sampling import sample_token, sample_from_topk
+    from prompt_guard import hf_chat_inputs
 
 logger = logging.getLogger(__name__)
 
@@ -589,8 +591,8 @@ class PipelineParallelEngine:
             gen = torch.Generator(device="cpu")  # logits arrive on CPU from tail
             gen.manual_seed(seed)
 
-        enc = self.tokenizer.apply_chat_template(
-            messages, add_generation_prompt=True, return_tensors="pt", return_dict=True)
+        # Special-token text in the messages stays text (prompt_guard).
+        enc = hf_chat_inputs(self.tokenizer, messages)
         ids = enc["input_ids"].to(self.device)
         cache = DynamicCache()
         sock = _connect_with_retry(self.peer, self.port, self.timeout)
@@ -661,8 +663,8 @@ class PipelineParallelEngine:
         and each node (mid, tail) truncates before running, so a round still costs exactly
         one round-trip (no extra rollback trip). _stats: optional dict the caller passes to
         collect round-trip + acceptance counters (used by tests; never affects output)."""
-        enc = self.tokenizer.apply_chat_template(
-            messages, add_generation_prompt=True, return_tensors="pt", return_dict=True)
+        # Special-token text in the messages stays text (prompt_guard).
+        enc = hf_chat_inputs(self.tokenizer, messages)
         ids = enc["input_ids"].to(self.device)
         eos = self.tokenizer.eos_token_id
         head_cache, draft_cache = DynamicCache(), DynamicCache()
@@ -828,8 +830,8 @@ class WholeModelEngine:
         greedy -- sampling applies only to this local whole-model path where logits are
         fully available on this node.
         """
-        enc = self.tokenizer.apply_chat_template(
-            messages, add_generation_prompt=True, return_tensors="pt", return_dict=True)
+        # Special-token text in the messages stays text (prompt_guard).
+        enc = hf_chat_inputs(self.tokenizer, messages)
         ids = enc["input_ids"].to(self.device)
         attn = enc.get("attention_mask")
         attn = attn.to(self.device) if attn is not None else None

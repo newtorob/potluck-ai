@@ -294,6 +294,12 @@ class SplitModel:
         if self.closed or self.process.process.poll() is not None:
             request.finished.set()
             raise self.failed("Split model is stopped. Start it again before inference.")
+        # Not covered by prompt_guard. llama-server renders the template itself and
+        # tokenizes the result with parse_special=true (server-context.cpp at the
+        # pinned commit), so control-token text in these messages still becomes
+        # control tokens. Closing it needs /apply-template, /tokenize and a
+        # /completion call with a token array, plus the chat endpoint's reply
+        # shaping and tool-call parsing rebuilt here.
         body = {**kwargs, "cache_prompt": True}
         if kwargs.get("stream"):
             return self._stream(body, request)

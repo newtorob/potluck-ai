@@ -114,6 +114,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Iterator
 
+from potluck_local.services import prompt_guard
+
 logger = logging.getLogger(__name__)
 
 # Sentinel values pushed into a sequence's output queue.
@@ -239,10 +241,8 @@ class ContinuousBatcher:
         from .sampling import sample_token
         from transformers import DynamicCache
 
-        enc = self._tok.apply_chat_template(
-            messages, add_generation_prompt=True,
-            return_tensors="pt", return_dict=True,
-        )
+        # Special-token text in the messages stays text (prompt_guard).
+        enc = prompt_guard.hf_chat_inputs(self._tok, messages)
         input_ids = enc["input_ids"].to(self._device)
         attn_mask = enc.get("attention_mask")
         if attn_mask is not None:
@@ -711,10 +711,8 @@ class DistributedContinuousBatcher:
         # K for top-K return: same sizing rule as PipelineParallelEngine.stream_tokens.
         sample_k = max(top_k if (top_k and top_k > 0) else 0, 64) if sampling else 0
 
-        enc = self._tok.apply_chat_template(
-            messages, add_generation_prompt=True,
-            return_tensors="pt", return_dict=True,
-        )
+        # Special-token text in the messages stays text (prompt_guard).
+        enc = prompt_guard.hf_chat_inputs(self._tok, messages)
         input_ids = enc["input_ids"].to(self._device)
         prompt_tokens = input_ids[0].tolist()
 

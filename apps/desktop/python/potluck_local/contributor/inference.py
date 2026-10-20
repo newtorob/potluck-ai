@@ -37,6 +37,8 @@ from pathlib import Path
 from typing import Protocol
 from urllib.parse import urlparse
 
+from potluck_local.services import prompt_guard
+
 logger = logging.getLogger("potluck.contributor.inference")
 
 # A sentinel pushed onto the queue to signal "generator exhausted."
@@ -153,10 +155,13 @@ class LlamaCppInferenceEngine:
             stop_event = threading.Event()
 
             def _produce() -> None:
+                ticket = prompt_guard.NO_TICKET
                 try:
                     assert self._llama is not None
+                    # Control-token text in the prompt stays text (prompt_guard).
+                    safe_prompt, ticket = prompt_guard.protect_prompt(self._llama, prompt)
                     completion_kwargs: dict = {
-                        "prompt": prompt,
+                        "prompt": safe_prompt,
                         "max_tokens": max_tokens,
                         "temperature": temperature,
                         "stream": True,
@@ -188,6 +193,7 @@ class LlamaCppInferenceEngine:
                 except BaseException as exc:  # noqa: BLE001
                     error_box.append(exc)
                 finally:
+                    ticket.close()
                     try:
                         asyncio.run_coroutine_threadsafe(queue.put(_DONE), loop).result()
                     except RuntimeError:
@@ -266,10 +272,13 @@ class LlamaCppInferenceEngine:
             stop_event = threading.Event()
 
             def _produce() -> None:
+                ticket = prompt_guard.NO_TICKET
                 try:
                     assert self._llama is not None
+                    # Control-token text in the messages stays text (prompt_guard).
+                    safe_messages, _, ticket = prompt_guard.protect_chat(self._llama, messages)
                     chat_kwargs: dict = {
-                        "messages": messages,
+                        "messages": safe_messages,
                         "max_tokens": max_tokens,
                         "temperature": temperature,
                         "stream": True,
@@ -300,6 +309,7 @@ class LlamaCppInferenceEngine:
                 except BaseException as exc:  # noqa: BLE001
                     error_box.append(exc)
                 finally:
+                    ticket.close()
                     try:
                         asyncio.run_coroutine_threadsafe(queue.put(_DONE), loop).result()
                     except RuntimeError:

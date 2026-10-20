@@ -34,6 +34,7 @@ from potluck_local.services import (
     memory_probe,
     model_evidence,
     model_traits,
+    prompt_guard,
     tool_calls,
 )
 from potluck_local.services.model_identity import ModelIdentityError, artifact_identity, file_stamp
@@ -1744,18 +1745,23 @@ class LLMRuntime:
                 label = f"stream model_id={self._model_id}"
 
                 def produce():
-                    chunks = model.create_chat_completion(
-                        messages=messages, temperature=temperature, max_tokens=max_tokens,
-                        stop=stop or [], stream=True, **tool_calls.completion_kwargs(tools, tool_choice),
-                        **({"cancel_event": cancel_event} if cancel_model is not None else {}),
-                    )
+                    # Control-token text in the request stays text (prompt_guard).
+                    safe_messages, extra, ticket = prompt_guard.protect_chat(
+                        model, messages, tool_calls.completion_kwargs(tools, tool_choice))
+                    chunks = None
                     try:
+                        chunks = model.create_chat_completion(
+                            messages=safe_messages, temperature=temperature, max_tokens=max_tokens,
+                            stop=stop or [], stream=True, **extra,
+                            **({"cancel_event": cancel_event} if cancel_model is not None else {}),
+                        )
                         for chunk in chunks:
                             yield chunk["choices"][0].get("delta", {}).get("content")
                     finally:
                         close = getattr(chunks, "close", None)
                         if close is not None:
                             close()
+                        ticket.close()
             else:
                 yield 'data: {"error":"No model loaded"}\n\n'
                 yield "data: [DONE]\n\n"
@@ -1866,18 +1872,24 @@ class LLMRuntime:
             managed_split = getattr(model, "managed_split", False)
             cancel_event = threading.Event()
 
-            fut = loop.run_in_executor(
-                None,
-                lambda: model.create_chat_completion(
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    stream=False,
-                    **({"stop": stop} if stop else {}),
-                    **tool_calls.completion_kwargs(tools, tool_choice),
-                    **({"cancel_event": cancel_event} if managed_split else {}),
-                ),
-            )
+            def _complete():
+                # Control-token text in the request stays text (prompt_guard).
+                safe_messages, extra, ticket = prompt_guard.protect_chat(
+                    model, messages, tool_calls.completion_kwargs(tools, tool_choice))
+                try:
+                    return model.create_chat_completion(
+                        messages=safe_messages,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        stream=False,
+                        **({"stop": stop} if stop else {}),
+                        **extra,
+                        **({"cancel_event": cancel_event} if managed_split else {}),
+                    )
+                finally:
+                    ticket.close()
+
+            fut = loop.run_in_executor(None, _complete)
             try:
                 result = await asyncio.shield(fut)
             except asyncio.CancelledError:
@@ -1949,14 +1961,18 @@ class LLMRuntime:
 
             def _generate() -> None:
                 chunks = None
+                ticket = prompt_guard.NO_TICKET
                 try:
+                    # Control-token text in the request stays text (prompt_guard).
+                    safe_messages, extra, ticket = prompt_guard.protect_chat(
+                        model, messages, tool_calls.completion_kwargs(tools, tool_choice))
                     chunks = model.create_chat_completion(
-                        messages=messages,
+                        messages=safe_messages,
                         temperature=temperature,
                         max_tokens=max_tokens,
                         stop=stop or [],
                         stream=True,
-                        **tool_calls.completion_kwargs(tools, tool_choice),
+                        **extra,
                         **({"cancel_event": cancel_event} if getattr(model, "managed_split", False) else {}),
                     )
                     for chunk in chunks:
@@ -1982,6 +1998,7 @@ class LLMRuntime:
                     close = getattr(chunks, "close", None)
                     if close is not None:
                         close()
+                    ticket.close()
 
             fut = loop.run_in_executor(None, _generate)
 
