@@ -54,14 +54,15 @@ def test_known_layout_matches_the_real_engine_log():
 
 @pytest.mark.parametrize("n", LAYERS)
 def test_output_head_lands_on_the_last_device_in_device_order(n):
-    # Potluck orders devices local first, then workers. The head is layer index n,
-    # the last slot, so any worker holding at least one slot's worth of the
-    # split receives it. This is the policy that puts the output projection on
-    # the remote machine; it is a visible, checkable consequence of the order.
-    for local, worker in ((10.8, 8.0), (1, 1), (24, 8), (1, 5)):
-        a = predict_layer_assignment(n, [local, worker])
+    # The head is layer index n, the last slot, so the last device in the order
+    # receives it when it holds at least one slot's worth of the split. Potluck
+    # lists workers first and its own devices last (split_memory.fit_arguments),
+    # which keeps the output projection and the logits on the head machine.
+    for worker, local in ((8.0, 10.8), (1, 1), (8, 24), (5, 1)):
+        a = predict_layer_assignment(n, [worker, local])
         assert a[n] == 1
-    assert predict_layer_assignment(n, [100, 0.5])[n] == 0  # a sliver of a worker does not get it
+    assert predict_layer_assignment(n, [0.5, 100])[n] == 1
+    assert predict_layer_assignment(n, [100, 0.5])[n] == 0  # a sliver of the last device does not get it
     assert predict_layer_assignment(n, [1, 1, 1])[n] == 2
 
 

@@ -57,15 +57,23 @@ process on pipe EOF.
 `bench/scripts/split_equivalence.py` has two levels, after DeepInfer's
 `yoco_equiv.py`.
 
-Potluck does not compute layer ranges. It fixes the device order (head first,
-then workers in the order selected) and a memory margin per device
+Potluck does not compute layer ranges. It fixes the device order (workers in the
+order selected, then the head's own devices last) and a memory margin per device
 (`split_memory.fit_arguments`), and the pinned engine's `--fit` picks the tensor
 split. The engine then applies a fixed rule: layer `il` goes to the first device
 whose cumulative split fraction exceeds `il / (n_layer + 1)`, the output head is
 slot `n_layer`, and the token embedding stays on the CPU. Consequence: the output
 head lands on the last device in the order whenever that device holds at least one
-slot's worth of the split, which for a head plus workers means a worker. A split
-that runs slowly should be checked for this first.
+slot's worth of the split. Potluck puts the head machine last on purpose, so the
+output layer and the full logits vector (vocabulary size times 4 bytes per token,
+about 0.95 MiB for a 248K vocabulary) stay local instead of crossing the network
+every token. Measured on 2026-10-20 with Bonsai 2 27B split 50/50 between an RTX
+2080 Ti head and an RX 6600 XT RPC worker, same transport and the same 4 graph
+splits: device order CUDA0,RPC0 decoded at 4.67 tok/s and RPC0,CUDA0 at 11.62
+tok/s, with byte-identical greedy output on the short prompt. Pinning only
+`output.weight` with `-ot` raised graph splits from 4 to 21 and halved speed, so
+the order is the lever, not tensor overrides. A split with no local device is
+unchanged. The managed path's own gain has not been measured yet.
 `services/split_layout.py` restates the rule so a plan can be read.
 
 **L1, plan metadata (seconds, no weights, binaries or GPUs).** Runs in the normal
@@ -109,7 +117,8 @@ A second whole-model run (the noise floor) gives the same figures: they come fro
 the reference file storing log-probabilities as 16-bit values, not from the
 split. The observed layer ranges matched the L1 rule in every case with a fixed
 tensor split; the output head sat on the last device each time (for example
-layers 0-12 on MTL0, 13-23 and the head on RPC0). As a negative control, 1.5b as
+layers 0-12 on MTL0, 13-23 and the head on RPC0 for the hand-written MTL0,RPC0 cases;
+Potluck's planner now lists RPC0,MTL0, which puts the head on MTL0). As a negative control, 1.5b as
 reference against 0.5b as candidate gave mean KLD 0.494, max 5.318, top-1 63.03%,
 and fails every threshold.
 

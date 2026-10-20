@@ -33,6 +33,11 @@ def fit_arguments(output: str, workers: dict[str, dict], local_available: int) -
     system RAM too. Bound each machine's aggregate allocation using the fresh
     lease snapshot, with 2 GiB reserved. CUDA uses native free VRAM with 1 GiB
     headroom. An unavailable budget fails closed before loading model weights.
+
+    Workers come first and the head's own devices last. llama.cpp puts the
+    output layer, and so the full logits vector every token, on the last device,
+    and that should be the head rather than a worker across the network
+    (measured 2026-10-20: 4.67 tok/s with the head first, 11.62 tok/s last).
     """
     devices = []
     for line in output.splitlines():
@@ -50,6 +55,7 @@ def fit_arguments(output: str, workers: dict[str, dict], local_available: int) -
         raise SplitError("Could not discover every selected split device. Check worker engine compatibility.")
     if len(devices) > 16 or len({name for name, _, _ in devices}) != len(devices):
         raise SplitError("Split engine reported an unsupported device layout.")
+    devices.sort(key=lambda d: d[1] == "local")  # stable: workers keep their order
     margins = []
     for name, key, free in devices:
         worker = workers.get(key)

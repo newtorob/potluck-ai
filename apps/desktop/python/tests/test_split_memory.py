@@ -11,14 +11,14 @@ from potluck_local.services.split_native import SplitError
 def test_mac_budget_uses_available_ram_instead_of_metal_capacity():
     output = "Available devices:\n  CUDA0: NVIDIA (10811 MiB, 10500 MiB free)\n  RPC0: 127.0.0.1:1234 (10922 MiB, 10922 MiB free)\n"
     args = fit_arguments(output, {"1234": {"backend": "metal", "freeMemoryBytes": 4096 * MIB}}, 60000 * MIB)
-    assert args == ["--device", "CUDA0,RPC0", "--fit", "on", "--fit-target", "1024,8874"]
+    assert args == ["--device", "RPC0,CUDA0", "--fit", "on", "--fit-target", "8874,1024"]
     assert "--n-gpu-layers" not in args  # permit CPU overflow while preserving context
 
 
 def test_shared_budget_is_divided_across_devices_on_same_machine():
     output = "MTL0: Apple (10000 MiB, 10000 MiB free)\nRPC0: 127.0.0.1:1234 (8000 MiB, 8000 MiB free)\nRPC1: 127.0.0.1:1234 (8000 MiB, 8000 MiB free)"
     args = fit_arguments(output, {"1234": {"backend": "cpu", "freeMemoryBytes": 8192 * MIB}}, 4096 * MIB)
-    assert args[-1] == "7952,4928,4928"
+    assert args[1] == "RPC0,RPC1,MTL0" and args[-1] == "4928,4928,7952"
 
 
 @pytest.mark.parametrize("memory", [None, True, "4096", -1, 2200 * MIB])
@@ -106,16 +106,33 @@ def test_fit_plan_invariants_over_device_matrix(local, backends, free, avail):
     assert args == _plan(local, backends, free, avail)  # deterministic
     assert args[0] == "--device" and args[2:4] == ["--fit", "on"] and args[4] == "--fit-target"
     devices, margins = args[1].split(","), [int(m) for m in args[5].split(",")]
-    # One margin per device, local first, then workers in the order selected.
-    assert devices == [f"{local}0"] + [f"RPC{i}" for i in range(len(free))]
+    # One margin per device: workers in the order selected, then the head's device last.
+    assert devices == [f"RPC{i}" for i in range(len(free))] + [f"{local}0"]
     assert len(margins) == len(devices) and all(m >= 1024 for m in margins)
     assert not set(args) & {"--n-gpu-layers", "-ngl", "--tensor-split", "-ts"}  # the engine decides
-    usable = [20000 - margins[0]] + [f - m for f, m in zip(free, margins[1:])]
-    for i, backend in enumerate(backends, start=1):
+    usable = [f - m for f, m in zip(free, margins)] + [20000 - margins[-1]]
+    for i, backend in enumerate(backends):
         if backend == "cuda":
-            assert usable[i] == free[i - 1] - 1024  # VRAM: native free minus 1 GiB
+            assert usable[i] == free[i] - 1024  # VRAM: native free minus 1 GiB
         else:  # shared RAM: a device never plans past the machine's lease budget
-            assert usable[i] <= max(0, avail[i - 1] - 2048)
+            assert usable[i] <= max(0, avail[i] - 2048)
+
+
+@pytest.mark.parametrize("local,backends,free,avail", MATRIX)
+def test_output_layer_lands_on_the_local_device(local, backends, free, avail):
+    from potluck_local.services.split_layout import predict_layer_assignment
+    devices = _plan(local, backends, free, avail)[1].split(",")
+    assert devices[-1] == f"{local}0"
+    for n in (24, 28, 36, 64, 80):
+        for split in ([1] * len(devices), [free_ + 1 for free_ in free] + [20000], [1] * (len(devices) - 1) + [3]):
+            assigned = predict_layer_assignment(n, [float(x) for x in split])
+            assert devices[assigned[n]] == f"{local}0"
+
+
+def test_no_local_device_keeps_worker_order():
+    output = "RPC0: 127.0.0.1:1 (8000 MiB, 8000 MiB free)\nRPC1: 127.0.0.1:2 (8000 MiB, 8000 MiB free)"
+    args = fit_arguments(output, {"1": {"backend": "cuda"}, "2": {"backend": "cuda"}}, 0)
+    assert args[1] == "RPC0,RPC1"
 
 
 def test_fit_plan_refuses_when_no_worker_has_budget():
@@ -135,5 +152,6 @@ def test_head_command_line_is_loopback_layer_split_with_matching_endpoints(tmp_p
     assert argv[argv.index("--ctx-size") + 1] == "8192"
     assert argv[argv.index("--rpc") + 1].split(",") == endpoints
     assert len(argv[argv.index("--device") + 1].split(",")) == len(endpoints) + 1  # local + each worker
+    assert argv[argv.index("--device") + 1].split(",")[-1] == "CUDA0"  # the head's device is last
     assert all(a.startswith("127.0.0.1:") for a in argv[argv.index("--rpc") + 1].split(","))
     assert "0.0.0.0" not in argv and "--n-gpu-layers" not in argv

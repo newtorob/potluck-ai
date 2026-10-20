@@ -255,6 +255,7 @@ def suite(name: str, defaults: dict) -> tuple[dict, list[dict]]:
         {**base, "name": "split-2way-even", "rpc_servers": 1, "args": ["--device", "MTL0,RPC0", "--fit", "off", "-ngl", "99", "-ts", "1,1"]},
         {**base, "name": "split-3way-even", "rpc_servers": 2, "args": ["--device", "MTL0,RPC0,RPC1", "--fit", "off", "-ngl", "99", "-ts", "1,1,1"]},
         {**base, "name": "split-2way-uneven-70-30", "rpc_servers": 1, "args": ["--device", "MTL0,RPC0", "--fit", "off", "-ngl", "99", "-ts", "7,3"]},
+        {**base, "name": "split-2way-head-last", "rpc_servers": 1, "args": ["--device", "RPC0,MTL0", "--fit", "off", "-ngl", "99", "-ts", "1,1"]},
         {**base, "name": "split-remote-only", "rpc_servers": 1, "args": ["--device", "RPC0", "--fit", "off", "-ngl", "99"]},
         {**base, "name": "split-potluck-fit-args", "rpc_servers": 1, "args": ["@potluck-fit"]},
     ]
