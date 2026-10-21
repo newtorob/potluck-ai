@@ -64,3 +64,31 @@ required; an arbitrary external server is not accepted. Missing bundles fail
 explicitly. To revert, set `runtime.backend` to `llama-cpp-python` and reload.
 Windows native-local support is not enabled because the supervisor uses POSIX
 process groups; Windows keeps the default backend.
+
+### Pinned model recipes (experimental)
+
+`GET /models/recipes` lists bundled setups with an immutable Hugging Face revision,
+exact GGUF filename, size and SHA-256, native engine commit, context window and
+resource settings. These recipes are independent of the refreshable model catalog.
+They are candidate setups, not a claim of model quality or hardware qualification.
+
+`GET /models/recipes/{recipe_id}/preflight` inspects the engine, platform, live
+available memory, disk space and installed artifact. It does not download, load or
+change preferences. RAM estimates include weights, context-dependent KV cache,
+prompt cache and working overhead; they are not measured peak usage. Unified RAM
+is counted once. Unknown free dedicated GPU memory blocks an accelerated load.
+The memory held by an existing loaded model is not guessed back into the budget.
+
+`POST /models/recipes/{recipe_id}/install` starts an explicitly requested download
+from the pinned revision and verifies its size and hash. Use the returned `slug`
+with the usual download-progress route. An existing different file is never
+overwritten. `POST /models/recipes/{recipe_id}/load` repeats preflight and loads
+exact recipe settings, with no smaller-context or backend fallback. File identity
+is checked again before replacing the current model and after native loading.
+Resource availability is a snapshot, not a reservation or a guarantee against OOM.
+
+A successful recipe load is session-only: it clears the previous startup model
+choice, so restarting cannot silently restore that model with different settings.
+Other runtime preferences stay unchanged. A failed preflight preserves the
+current model and startup choice. Ordinary model loads still use the existing
+restart behavior. See [recipe provenance and commands](../../../docs/model-recipes.md).

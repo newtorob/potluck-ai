@@ -25,6 +25,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from potluck_local.services import model_registry
+from potluck_local.services import model_recipes
 from potluck_local.services.context_tuning import resolve_context_size
 from potluck_local.services.inference_errors import InferenceFailure
 from potluck_local.services.model_downloader import get_downloader
@@ -102,6 +103,82 @@ async def get_setup_options(use_case: Literal['general', 'coding', 'writing', 'r
 async def available_models() -> dict:
     from potluck_local.services.model_availability import model_availability
     return await model_availability()
+
+
+def _recipe(recipe_id: str) -> dict:
+    recipe = model_recipes.get_recipe(recipe_id)
+    if recipe is None:
+        raise HTTPException(404, f"Unknown model recipe '{recipe_id}'.")
+    return recipe
+
+
+@router.get("/recipes")
+async def list_recipes() -> dict:
+    return {"schema_version": 1, "recipes": model_recipes.load_recipes()}
+
+
+@router.get("/recipes/{recipe_id}/preflight")
+async def recipe_preflight(recipe_id: str) -> dict:
+    return await asyncio.to_thread(
+        model_recipes.preflight_recipe, _recipe(recipe_id), verify_artifact=True,
+    )
+
+
+def _require_recipe_ready(report: dict, action: str) -> None:
+    if not report[f"can_{action}"]:
+        messages = [issue["message"] for issue in report["issues"] if action in issue["blocks"]]
+        raise HTTPException(409, " ".join(messages) or f"Recipe is not ready to {action}.")
+
+
+@router.post("/recipes/{recipe_id}/install", status_code=202)
+async def install_recipe(recipe_id: str, background_tasks: BackgroundTasks) -> dict:
+    recipe = _recipe(recipe_id)
+    async with get_model_lifecycle().command():
+        report = await asyncio.to_thread(model_recipes.preflight_recipe, recipe, verify_artifact=True)
+        model = recipe["model"]
+        if report["installed"]:
+            if not report["artifact_verified"]:
+                raise HTTPException(409, "The installed file does not match this recipe. It was not overwritten.")
+            return {"status": "already_installed", "slug": model["id"], "recipe_id": recipe_id}
+        _require_recipe_ready(report, "install")
+        downloader = get_downloader()
+        progress = downloader.get_progress(model["id"])
+        if progress and progress.status in ("downloading", "verifying"):
+            raise HTTPException(409, "A download is already running for this model. Wait for it and run preflight again.")
+        background_tasks.add_task(
+            downloader.download_model, model_id=model["id"], url=model_recipes.recipe_url(recipe),
+            expected_sha256=model["sha256"], expected_size=model["size_bytes"],
+            overwrite_existing=False,
+        )
+        return {"status": "downloading", "slug": model["id"], "recipe_id": recipe_id}
+
+
+@router.post("/recipes/{recipe_id}/load")
+async def load_recipe(recipe_id: str) -> dict:
+    recipe = _recipe(recipe_id)
+    lifecycle = get_model_lifecycle()
+    async with lifecycle.command():
+        # A bare model slug would restore with global settings and lose the pin.
+        # Clear the previous startup choice only after the recipe succeeds.
+        return await lifecycle.load_and_remember(_load_recipe(recipe), None)
+
+
+async def _load_recipe(recipe: dict) -> dict:
+    report = await asyncio.to_thread(model_recipes.preflight_recipe, recipe, verify_artifact=True)
+    _require_recipe_ready(report, "load")
+    config, model = recipe["runtime"], recipe["model"]
+    from potluck_local.services.model_identity import ModelIdentityError
+    try:
+        result = await get_runtime().load_model_async(
+            str(model_recipes.recipe_path(recipe)),
+            n_ctx=config["context_size"], n_gpu_layers=config["gpu_layers"],
+            backend=recipe["engine"]["backend"], native_cache_mib=config["native_cache_mib"],
+            expected_model_sha256=model["sha256"],
+            expected_engine_acceleration=recipe["engine"]["acceleration"],
+        )
+    except (ModelIdentityError, ValueError) as exc:
+        raise HTTPException(409, str(exc)) from None
+    return {**result, "status": "loaded", "recipe_id": recipe["id"], "autoload": False}
 
 
 class ModelTestRequest(BaseModel):

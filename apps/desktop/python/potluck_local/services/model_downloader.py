@@ -10,6 +10,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 import re
 import time
 from dataclasses import dataclass
@@ -64,6 +65,8 @@ class ModelDownloader:
         url: str,
         expected_sha256: str,
         expected_size: int | None = None,
+        *,
+        overwrite_existing: bool = True,
     ) -> Path:
         """Download a model with resume support. Returns path to the .gguf file."""
         async with self._flight_lock:
@@ -72,7 +75,10 @@ class ModelDownloader:
             self._in_flight.add(model_id)
 
         try:
-            return await self._do_download(model_id, url, expected_sha256, expected_size)
+            return await self._do_download(
+                model_id, url, expected_sha256, expected_size,
+                **({"overwrite_existing": False} if not overwrite_existing else {}),
+            )
         finally:
             async with self._flight_lock:
                 self._in_flight.discard(model_id)
@@ -83,6 +89,8 @@ class ModelDownloader:
         url: str,
         expected_sha256: str,
         expected_size: int | None,
+        *,
+        overwrite_existing: bool = True,
     ) -> Path:
         model_dir = self.models_dir / model_id
         model_dir.mkdir(parents=True, exist_ok=True)
@@ -90,6 +98,29 @@ class ModelDownloader:
         partial_path = model_dir / "model.gguf.partial"
         meta_path = model_dir / "model.gguf.partial.meta"
         hash_sidecar = model_dir / "model.gguf.sha256"
+
+        def publish() -> None:
+            try:
+                if overwrite_existing:
+                    partial_path.rename(file_path)
+                else:
+                    # Link within this filesystem refuses an existing destination
+                    # atomically, even if it appeared after recipe preflight.
+                    os.link(partial_path, file_path)
+                    partial_path.unlink()
+            except FileExistsError:
+                self._set_error(model_id, downloaded, downloaded,
+                                "A model file already exists. It was not overwritten; run recipe preflight again.")
+                raise ValueError("Existing model file was not overwritten") from None
+            except OSError:
+                self._set_error(model_id, downloaded, downloaded,
+                                "Could not publish the verified model file. Check storage permissions and retry.")
+                raise
+
+        if not overwrite_existing and (file_path.exists() or file_path.is_symlink()):
+            self._set_error(model_id, 0, expected_size or 0,
+                            "A model file already exists. It was not overwritten; run recipe preflight again.")
+            raise ValueError("Existing model file was not overwritten")
 
         self._cancel_flags[model_id] = False
 
@@ -250,7 +281,7 @@ class ModelDownloader:
         # Verify or skip
         if not expected_sha256:
             logger.warning("sha256_skip model_id=%s reason=empty_hash", model_id)
-            partial_path.rename(file_path)
+            publish()
             meta_path.unlink(missing_ok=True)  # partial done; no hash to record
             self._progress[model_id] = DownloadProgress(
                 model_id=model_id,
@@ -284,7 +315,7 @@ class ModelDownloader:
             self._set_error(model_id, downloaded, downloaded, err)
             raise ValueError(f"SHA256 mismatch for {model_id}")
 
-        partial_path.rename(file_path)
+        publish()
         # Record the verified hash next to the model so it can be re-checked at
         # load time (opt-in), and drop the now-stale partial meta.
         try:
@@ -361,7 +392,7 @@ def _partial_meta_matches(meta_path: Path, url: str, expected_sha256: str) -> bo
         meta = json.loads(meta_path.read_text())
     except (OSError, ValueError):
         return False
-    return meta.get("url") == url and meta.get("sha256") == expected_sha256
+    return isinstance(meta, dict) and meta.get("url") == url and meta.get("sha256") == expected_sha256
 
 
 def _write_partial_meta(meta_path: Path, url: str, expected_sha256: str) -> None:

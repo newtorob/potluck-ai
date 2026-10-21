@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "recipes": [
+    {
+      "id": "qwen2.5-0.5b-instruct-q4-k-m-cpu-4k",
+      "name": "Qwen2.5 0.5B Instruct Q4_K_M · CPU · 4K",
+      "model": {
+        "id": "qwen-2.5-0.5b-instruct-q4",
+        "repository": "Qwen/Qwen2.5-0.5B-Instruct-GGUF",
+        "revision": "9217f5db79a29953eb74d5343926648285ec7e67",
+        "filename": "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+        "sha256": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+        "size_bytes": 491400032
+      },
+      "engine": {
+        "backend": "llama-server",
+        "commit": "d80619397c2ba5cf1366c29f7d43699ca3a159b9",
+        "acceleration": "cpu",
+        "platforms": [
+          { "os": "Darwin", "arch": "arm64" },
+          { "os": "Linux", "arch": "x86_64" }
+        ]
+      },
+      "runtime": {
+        "context_size": 4096,
+        "gpu_layers": 0,
+        "native_cache_mib": 128
+      },
+      "resources": {
+        "kv_bytes_per_token": 12288,
+        "overhead_bytes": 1073741824
+      },
+      "qualification": "experimental",
+      "notes": "Small CPU candidate for local protocol checks. The exact artifact passed a macOS CPU tool-call and cancellation smoke check; this is not coding-quality, speed or Linux qualification. Resource requirements are estimates at this context size. No GPU use or network lending."
+    },
+    {
+      "id": "qwen3-8b-q4-k-m-metal-8k",
+      "name": "Qwen3 8B Q4_K_M · Apple Metal · 8K",
+      "model": {
+        "id": "qwen3-8b-q4",
+        "repository": "Qwen/Qwen3-8B-GGUF",
+        "revision": "7c41481f57cb95916b40956ab2f0b139b296d974",
+        "filename": "Qwen3-8B-Q4_K_M.gguf",
+        "sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "size_bytes": 5027783488
+      },
+      "engine": {
+        "backend": "llama-server",
+        "commit": "d80619397c2ba5cf1366c29f7d43699ca3a159b9",
+        "acceleration": "metal",
+        "platforms": [
+          { "os": "Darwin", "arch": "arm64" }
+        ]
+      },
+      "runtime": {
+        "context_size": 8192,
+        "gpu_layers": -1,
+        "native_cache_mib": 256
+      },
+      "resources": {
+        "kv_bytes_per_token": 147456,
+        "overhead_bytes": 2147483648
+      },
+      "qualification": "experimental",
+      "notes": "Apple Silicon candidate with a pinned official GGUF and an 8192-token context. This native-engine recipe has not been qualified for loading, tool use, coding quality or speed. Unified-memory estimates count weights once; preflight checks currently available RAM. No network lending."
+    },
+    {
+      "id": "muse-glimmer-30b-17gb-metal-4k",
+      "name": "Muse Glimmer 30B KQuant 17GB · Apple Metal · 4K",
+      "model": {
+        "id": "muse-glimmer-30b-17gb-q4-k-m",
+        "repository": "meta-models/Muse-Glimmer-30B-GGUF",
+        "revision": "70bf1b61ac09f91b24d39038091b41c582bc5d7a",
+        "filename": "Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf",
+        "sha256": "4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e",
+        "size_bytes": 16756683904
+      },
+      "engine": {
+        "backend": "llama-server",
+        "commit": "d80619397c2ba5cf1366c29f7d43699ca3a159b9",
+        "acceleration": "metal",
+        "platforms": [
+          { "os": "Darwin", "arch": "arm64" }
+        ]
+      },
+      "runtime": {
+        "context_size": 4096,
+        "gpu_layers": -1,
+        "native_cache_mib": 256
+      },
+      "resources": {
+        "kv_bytes_per_token": 53248,
+        "overhead_bytes": 2147483648
+      },
+      "qualification": "experimental",
+      "notes": "Text-only Apple Silicon candidate. The pinned engine source registers the Muse architecture, but this artifact has not been loaded or qualified in Potluck. The 17GB label names the upstream quantization, not total required memory. No image projector, speculative drafter, coding-quality or speed claim. Full-context KV and a 2 GiB overhead allowance are unmeasured estimates. No network lending."
+    }
+  ]
+}

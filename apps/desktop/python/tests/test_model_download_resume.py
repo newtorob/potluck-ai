@@ -297,3 +297,65 @@ def test_stale_partial_is_not_appended_after_url_changes(setup):
 
     transport(respond)
     assert run(downloader).read_bytes() == DATA
+
+
+def test_recipe_download_never_replaces_existing_file(setup):
+    downloader, partial, transport = setup
+    final = partial.with_name('model.gguf')
+    final.write_bytes(b'existing user model')
+    transport(lambda _: pytest.fail('Must not download over an existing artifact'))
+    with pytest.raises(ValueError, match='not overwritten'):
+        asyncio.run(downloader.download_model('test-model', URL, SHA, len(DATA), overwrite_existing=False))
+    assert final.read_bytes() == b'existing user model'
+    assert downloader.get_progress('test-model').status == 'error'
+
+
+def test_recipe_download_handles_destination_appearing_during_download(setup):
+    downloader, partial, transport = setup
+    final = partial.with_name('model.gguf')
+    transport(lambda _: httpx.Response(200, stream=Stream(
+        DATA[:3], lambda: final.write_bytes(b'another completed install'), DATA[3:],
+    ), headers={'Content-Length': str(len(DATA))}))
+    with pytest.raises(ValueError, match='not overwritten'):
+        asyncio.run(downloader.download_model('test-model', URL, SHA, len(DATA), overwrite_existing=False))
+    assert final.read_bytes() == b'another completed install'
+    assert partial.read_bytes() == DATA
+    assert downloader.get_progress('test-model').status == 'error'
+
+
+def test_recipe_download_publishes_verified_bytes_without_overwrite(setup):
+    downloader, partial, transport = setup
+    transport(lambda _: httpx.Response(200, content=DATA))
+    result = asyncio.run(downloader.download_model('test-model', URL, SHA, len(DATA), overwrite_existing=False))
+    assert result.read_bytes() == DATA and not partial.exists()
+    assert downloader.get_progress('test-model').status == 'complete'
+
+
+def test_recipe_publish_failure_can_retry_verified_partial(setup, monkeypatch):
+    downloader, partial, transport = setup
+    real_link = downloads.os.link
+    def fail_link(*args):
+        raise OSError('filesystem does not allow this operation')
+    monkeypatch.setattr(downloads.os, 'link', fail_link)
+    transport(lambda _: httpx.Response(200, content=DATA))
+    with pytest.raises(OSError):
+        asyncio.run(downloader.download_model('test-model', URL, SHA, len(DATA), overwrite_existing=False))
+    assert downloader.get_progress('test-model').status == 'error'
+    assert partial.read_bytes() == DATA
+    monkeypatch.setattr(downloads.os, 'link', real_link)
+    transport(lambda _: httpx.Response(416, headers={'Content-Range': 'bytes */6'}))
+    result = asyncio.run(downloader.download_model('test-model', URL, SHA, len(DATA), overwrite_existing=False))
+    assert result.read_bytes() == DATA and downloader.get_progress('test-model').status == 'complete'
+
+
+@pytest.mark.parametrize('metadata', [[], None, 'bad', 3])
+def test_nonobject_partial_metadata_restarts_cleanly(setup, metadata):
+    downloader, partial, transport = setup
+    partial.write_bytes(b'old')
+    partial.with_name('model.gguf.partial.meta').write_text(json.dumps(metadata))
+    def respond(request):
+        assert 'range' not in request.headers
+        return httpx.Response(200, content=DATA)
+    transport(respond)
+    result = asyncio.run(downloader.download_model('test-model', URL, SHA, len(DATA), overwrite_existing=False))
+    assert result.read_bytes() == DATA

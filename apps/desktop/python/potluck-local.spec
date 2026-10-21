@@ -7,6 +7,7 @@ from pathlib import Path
 
 datas = [('potluck_local/data/models.json', 'potluck_local/data')]
 datas += [('potluck_local/data/split-engine.json', 'potluck_local/data')]
+datas += [('potluck_local/data/model-recipes.json', 'potluck_local/data')]
 binaries = []
 split_bundle = Path(SPECPATH) / 'native' / 'split'
 if split_bundle.is_dir():
