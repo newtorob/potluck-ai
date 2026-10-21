@@ -29,7 +29,7 @@ from dataclasses import dataclass
 
 from potluck_local.services.reasoning_split import CONTENT, REASONING, ReasoningSplitter, split_reasoning
 from potluck_local.services.token_estimate import engine_count, estimate_tokens, tokens_for_chars
-from potluck_local.services.tool_calls import CallDetector, ToolCall, ToolCallScanner, extract_tool_calls
+from potluck_local.services.tool_calls import AUTH, CallDetector, ToolCall, ToolCallScanner, extract_tool_calls
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,9 @@ class ShapeOptions:
     starts_in_reasoning: bool | None = False
     offered: frozenset[str] | None = None  # tool names; None when no tools were offered
     model: str | None = None  # the id a reply names as its model; None leaves the engine's own
+    # Marker texts the engine proves by token (tool_markers.py): a call marker counts only
+    # when the text carries tool_calls.AUTH before it. Empty reads markers from text alone.
+    proven: frozenset[str] = frozenset()
 
     @property
     def active(self) -> bool:
@@ -69,11 +72,13 @@ def shape_completion(result: dict, options: ShapeOptions) -> dict:
         if options.split_reasoning:
             reasoning, text = split_reasoning(
                 text, starts_in_reasoning=options.starts_in_reasoning,
-                calls=CallDetector(options.offered) if options.offered else None,
+                calls=CallDetector(options.offered, options.proven) if options.offered else None,
             )
         calls: list[ToolCall] = []
         if options.offered:
-            text, calls = extract_tool_calls(text, options.offered, trim=options.split_reasoning)
+            text, calls = extract_tool_calls(text, options.offered, trim=options.split_reasoning,
+                                             proven=options.proven)
+        reasoning = reasoning.replace(AUTH, "")
         message["content"] = text if (text or not calls) else None
         if reasoning:
             message["reasoning_content"] = reasoning
@@ -138,20 +143,22 @@ class _Pipeline:
         self.splitter = (
             ReasoningSplitter(
                 starts_in_reasoning=options.starts_in_reasoning,
-                calls=CallDetector(options.offered) if options.offered else None,
+                calls=CallDetector(options.offered, options.proven) if options.offered else None,
             )
             if options.split_reasoning else None
         )
         # A raw reply (no reasoning split) also keeps the text before a call untouched.
-        self.scanner = ToolCallScanner(options.offered, trim=options.split_reasoning) if options.offered else None
+        self.scanner = (
+            ToolCallScanner(options.offered, trim=options.split_reasoning, proven=options.proven)
+            if options.offered else None
+        )
 
     def _through_tools(self, pieces: list[tuple[str, str]]) -> list[tuple[str, str]]:
         if self.scanner is None:
             return pieces
         out = []
         for kind, text in pieces:
-            if kind == CONTENT:
-                text = self.scanner.feed(text)
+            text = self.scanner.feed(text) if kind == CONTENT else text.replace(AUTH, "")
             if text:
                 out.append((kind, text))
         return out

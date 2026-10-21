@@ -413,7 +413,8 @@ class SplitManager:
                     def closed():
                         with suppress(RuntimeError):
                             loop.call_soon_threadsafe(lambda: asyncio.create_task(self._adapter_closed(head)))
-                    adapter = SplitModel(process, port, key, closed, lambda: prompt_guard.gguf_protected_tokens(path), slot_cache)
+                    adapter = SplitModel(process, port, key, closed, lambda: prompt_guard.gguf_protected_tokens(path), slot_cache,
+                                         lambda: prompt_guard.gguf_marker_tokens(path))
                     head["adapter"] = adapter
                     async with httpx.AsyncClient(timeout=2, trust_env=False) as client:
                         while True:

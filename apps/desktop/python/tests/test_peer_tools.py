@@ -217,3 +217,85 @@ def test_a_retry_only_considers_machines_that_advertise_tools(monkeypatch):
     assert asyncio.run(direct._replacement_peer("m", set()))["mesh_ip"] == "100.64.0.2"
     assert asyncio.run(direct._replacement_peer("m", set(), tools=True))["mesh_ip"] == "100.64.0.4"
     assert asyncio.run(direct._replacement_peer("m", {"100.64.0.4"}, tools=True)) is None
+
+
+# ---- proof that a call marker was sampled as the marker token ------------------------------------
+
+
+class MarkerModel(Model):
+    """A model whose vocab has Qwen's <tool_call> as one token (see services/tool_markers.py)."""
+
+    def __init__(self, template):
+        super().__init__(template)
+        self._potluck_tool_markers = {7: "<tool_call>"}
+
+    def generate(self, tokens, **kw):
+        yield from ()
+
+
+def test_capabilities_list_the_markers_the_model_can_prove(monkeypatch):
+    body = peer_client(runtime_with(MarkerModel(QWEN_TOOLS)), monkeypatch).get("/peer/capabilities").json()
+    assert body["tool_markers"] == ["<tool_call>"]
+    body = peer_client(runtime_with(Model(QWEN_TOOLS)), monkeypatch).get("/peer/capabilities").json()
+    assert body["tool_markers"] == []
+    body = peer_client(LLMRuntime(), monkeypatch).get("/peer/capabilities").json()
+    assert body["tool_markers"] == []
+    assert peer.PeerCapabilities.model_fields["tool_markers"].default == []
+
+
+def test_a_proof_request_reaches_the_runtime_only_when_the_requester_asked(monkeypatch):
+    rt = runtime_with(MarkerModel(QWEN_TOOLS))
+    seen = []
+    real = rt.stream_chat_raw
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs.get("tool_proof"))
+        return real(*args, **kwargs)
+
+    rt.stream_chat_raw = spy
+    client = peer_client(rt, monkeypatch)
+    for proof in (False, True):
+        resp = client.post("/peer/chat/completions", json={
+            "messages": [USER], "model": "test", "stream": True, "tools": [WEATHER], "potluck_tool_proof": proof})
+        assert resp.status_code == 200
+    assert seen == [None, True]
+
+
+def test_the_peer_request_asks_for_proof_only_with_tools(capture):
+    peer_info = {"mesh_ip": "100.64.0.2"}
+    asyncio.run(direct.complete_peer_openai(peer_info, [USER], "test", 0.7, 20, tools=[WEATHER], tool_choice="auto",
+                                            tool_proof=True))
+    asyncio.run(direct.complete_peer_openai(peer_info, [USER], "test", 0.7, 20, tools=[WEATHER], tool_choice="auto"))
+    asyncio.run(direct.complete_peer_openai(peer_info, [USER], "test", 0.7, 20, tool_proof=True))
+    assert capture[0]["potluck_tool_proof"] is True
+    assert "potluck_tool_proof" not in capture[1] and "potluck_tool_proof" not in capture[2]
+
+
+def test_the_gateway_reads_proven_markers_from_the_engine_or_the_peer_capabilities():
+    from potluck_local.routers import gateway
+
+    local = SimpleNamespace(proves_tool_markers=lambda: frozenset({"<tool_call>"}))
+    assert gateway._proven_markers(local, None) == {"<tool_call>"}
+    assert gateway._proven_markers(SimpleNamespace(), None) == frozenset()
+    assert gateway._proven_markers(local, {"_capabilities": {"tool_markers": ["[TOOL_CALLS]"]}}) == {"[TOOL_CALLS]"}
+    assert gateway._proven_markers(local, {"_capabilities": {}}) == frozenset()  # an older machine proves nothing
+    assert gateway._proven_markers(local, {"_capabilities": {"tool_markers": "<tool_call>"}}) == frozenset()
+    broken = SimpleNamespace(proves_tool_markers=lambda: 1 / 0)
+    assert gateway._proven_markers(broken, None) == frozenset()
+
+
+def test_the_plan_asks_the_engine_for_proof_only_when_markers_are_proven():
+    from potluck_local.routers import gateway
+    from potluck_local.services import gateway_reply, gateway_request
+
+    prepared = gateway_request.prepare([USER], [WEATHER], None)
+
+    def plan(proven):
+        options = gateway_reply.ShapeOptions(offered=prepared.offered_names, proven=frozenset(proven))
+        return SimpleNamespace(job=SimpleNamespace(prepared=prepared), options=options)
+
+    assert "tool_proof" not in gateway.ChatPlan.tool_kwargs.fget(plan(set()))
+    assert gateway.ChatPlan.tool_kwargs.fget(plan({"<tool_call>"}))["tool_proof"] is True
+    bare = gateway_request.prepare([USER], None, None)
+    plain = SimpleNamespace(job=SimpleNamespace(prepared=bare), options=gateway_reply.ShapeOptions(proven=frozenset({"x"})))
+    assert gateway.ChatPlan.tool_kwargs.fget(plain) == {}

@@ -37,6 +37,7 @@ from potluck_local.services import (
     prompt_cache,
     prompt_guard,
     tool_calls,
+    tool_markers,
 )
 from potluck_local.services.model_identity import ModelIdentityError, artifact_identity, file_stamp
 
@@ -141,6 +142,16 @@ def _parse_load_log(lines: list[str]) -> dict:
 
 # A recorded check that a request cut short is asked again once, after the request has gone.
 RECORDED_TRIES = 2
+
+
+def _mark_reply(reader, result: object) -> None:
+    """Tag the marker tokens in a whole reply's text (tool_markers). Never raises."""
+    try:
+        message = result["choices"][0]["message"]  # type: ignore[index]
+        if isinstance(message.get("content"), str):
+            message["content"] = reader.whole(message["content"])
+    except Exception:  # noqa: BLE001 - never turn a reply into an error
+        pass
 
 
 class _Gate(asyncio.Lock):
@@ -276,6 +287,17 @@ class LLMRuntime:
         if _native_model(self._model) and self._model.closed:
             return False
         return self._model is not None or self._pipeline is not None
+
+    def proves_tool_markers(self) -> frozenset[str]:
+        """The tool-call markers whose token this machine's model can prove were sampled
+        (see tool_markers.py). Empty for a pipeline, a split model or an unloaded engine."""
+        model = self._model
+        if self._pipeline is not None or self._batcher is not None or model is None:
+            return frozenset()
+        try:
+            return tool_markers.proven(model)
+        except Exception:  # noqa: BLE001
+            return frozenset()
 
     def current_model_id(self) -> str | None:
         return self._model_id
@@ -1872,6 +1894,7 @@ class LLMRuntime:
         seed: int | None = None,
         tools: list[dict] | None = None,
         tool_choice: str | dict | None = None,
+        tool_proof: bool = False,
     ):
         """Yield OpenAI SSE with shared admission only for continuous batchers.
 
@@ -1903,13 +1926,19 @@ class LLMRuntime:
                         model, messages, tool_calls.completion_kwargs(tools, tool_choice))
                     chunks = None
                     try:
-                        chunks = model.create_chat_completion(
-                            messages=safe_messages, temperature=temperature, max_tokens=max_tokens,
-                            stop=stop or [], stream=True, **extra,
-                            **({"cancel_event": cancel_event} if cancel_model is not None else {}),
-                        )
-                        for chunk in chunks:
-                            yield chunk["choices"][0].get("delta", {}).get("content")
+                        # tool_proof: mark the tool-call markers the model sampled as
+                        # the marker token (tool_markers).
+                        with tool_markers.watch(model, tool_proof and bool(extra.get("tools"))) as reader:
+                            chunks = model.create_chat_completion(
+                                messages=safe_messages, temperature=temperature, max_tokens=max_tokens,
+                                stop=stop or [], stream=True, **extra,
+                                **({"cancel_event": cancel_event} if cancel_model is not None else {}),
+                            )
+                            for chunk in chunks:
+                                piece = chunk["choices"][0].get("delta", {}).get("content")
+                                yield reader.text(piece) if reader is not None and piece else piece
+                            if reader is not None:
+                                yield reader.flush()
                     finally:
                         close = getattr(chunks, "close", None)
                         if close is not None:
@@ -2006,6 +2035,7 @@ class LLMRuntime:
         tools: list[dict] | None = None,
         tool_choice: str | dict | None = None,
         stop: list[str] | None = None,
+        tool_proof: bool = False,
     ) -> dict:
         """Non-streaming completion. Returns raw llama result dict."""
         if self._pipeline is not None:
@@ -2030,15 +2060,19 @@ class LLMRuntime:
                 safe_messages, extra, ticket = prompt_guard.protect_chat(
                     model, messages, tool_calls.completion_kwargs(tools, tool_choice))
                 try:
-                    return model.create_chat_completion(
-                        messages=safe_messages,
-                        temperature=temperature,
-                        max_tokens=max_tokens,
-                        stream=False,
-                        **({"stop": stop} if stop else {}),
-                        **extra,
-                        **({"cancel_event": cancel_event} if managed_split else {}),
-                    )
+                    with tool_markers.watch(model, tool_proof and bool(extra.get("tools"))) as reader:
+                        result = model.create_chat_completion(
+                            messages=safe_messages,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                            stream=False,
+                            **({"stop": stop} if stop else {}),
+                            **extra,
+                            **({"cancel_event": cancel_event} if managed_split else {}),
+                        )
+                        if reader is not None:
+                            _mark_reply(reader, result)
+                        return result
                 finally:
                     ticket.close()
 
@@ -2086,6 +2120,7 @@ class LLMRuntime:
         stop: list[str] | None = None,
         tools: list[dict] | None = None,
         tool_choice: str | dict | None = None,
+        tool_proof: bool = False,
     ):
         """Yield llama-cpp's native OpenAI-shaped streaming chunk dicts.
 
@@ -2119,19 +2154,20 @@ class LLMRuntime:
                     # Control-token text in the request stays text (prompt_guard).
                     safe_messages, extra, ticket = prompt_guard.protect_chat(
                         model, messages, tool_calls.completion_kwargs(tools, tool_choice))
-                    chunks = model.create_chat_completion(
-                        messages=safe_messages,
-                        temperature=temperature,
-                        max_tokens=max_tokens,
-                        stop=stop or [],
-                        stream=True,
-                        **extra,
-                        **({"cancel_event": cancel_event} if _native_model(model) else {}),
-                    )
-                    for chunk in chunks:
-                        if cancel_event.is_set():
-                            break
-                        loop.call_soon_threadsafe(queue.put_nowait, chunk)
+                    with tool_markers.watch(model, tool_proof and bool(extra.get("tools"))) as reader:
+                        chunks = model.create_chat_completion(
+                            messages=safe_messages,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                            stop=stop or [],
+                            stream=True,
+                            **extra,
+                            **({"cancel_event": cancel_event} if _native_model(model) else {}),
+                        )
+                        for chunk in chunks:
+                            if cancel_event.is_set():
+                                break
+                            loop.call_soon_threadsafe(queue.put_nowait, chunk if reader is None else reader.chunk(chunk))
                     loop.call_soon_threadsafe(queue.put_nowait, None)
                 except Exception as exc:
                     failure = inference_errors.describe_failure(exc, gpu_offload=self._gpu_offload_active())

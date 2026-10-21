@@ -267,7 +267,7 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
                              temperature: float, max_tokens: int, *, sha256: str | None = None,
                              retry: bool = True, batch: bool = False,
                              tools: list[dict] | None = None, tool_choice: str | dict | None = None,
-                             stop: list[str] | None = None):
+                             stop: list[str] | None = None, tool_proof: bool = False):
     """Retry another household machine only while no output has been yielded.
 
     One absolute budget spans headers, prefill, every attempt and decoding.
@@ -281,6 +281,8 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
     if tools:
         body["tools"] = tools
         body["tool_choice"] = tool_choice
+        if tool_proof:
+            body["potluck_tool_proof"] = True
     if stop:
         body["stop"] = stop
     loop = asyncio.get_running_loop()
@@ -345,11 +347,12 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
 async def complete_peer_openai(peer: dict, messages: list[dict], model: str,
                                temperature: float, max_tokens: int, *, sha256: str | None = None,
                                tools: list[dict] | None = None, tool_choice: str | dict | None = None,
-                               stop: list[str] | None = None) -> dict:
+                               stop: list[str] | None = None, tool_proof: bool = False) -> dict:
     """Dispatch to a peer (streamed under the hood) and return one OpenAI
     chat.completion envelope."""
     return await collect_completion(
         stream_peer_openai(peer, messages, model, temperature, max_tokens, **({"sha256": sha256} if sha256 else {}),
                            **({"tools": tools, "tool_choice": tool_choice} if tools else {}),
+                           **({"tool_proof": True} if tool_proof else {}),
                            **({"stop": stop} if stop else {}))
     )

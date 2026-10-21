@@ -406,3 +406,129 @@ def test_a_long_call_arriving_in_tiny_pieces_is_not_recopied_for_every_piece():
         scanner.feed(ch)
     scanner.finish()
     assert len(scanner.calls) == 1 and time.monotonic() - started < 10
+
+
+# ---- proven markers: the marker must arrive as the marker token ---------------------
+#
+# The engine puts tc.AUTH before each marker it saw sampled as the marker token (see
+# services/tool_markers.py). With a marker "proven", the same characters without AUTH
+# are only text. Samples in the non-Hermes formats follow the model cards.
+
+A = tc.AUTH
+PHI = '<|tool_call|>[{"name": "get_weather", "arguments": {"city": "Paris"}}]<|/tool_call|>'
+MISTRAL = '[TOOL_CALLS] [{"name": "get_weather", "arguments": {"city": "Paris"}}]'
+LLAMA_TAG = '<|python_tag|>{"name": "get_weather", "parameters": {"city": "Paris"}}'
+ALL_PROVEN = frozenset(tc.MARKER_TEXTS)
+FORMATS = [("hermes", HERMES), ("phi", PHI), ("mistral", MISTRAL), ("llama_tag", LLAMA_TAG)]
+
+
+def proven_parse(text: str, proven=ALL_PROVEN, offered=OFFERED):
+    content, calls = tc.extract_tool_calls(text, offered, proven=proven)
+    return content, [(c.name, json.loads(c.arguments)) for c in calls]
+
+
+def with_token(text: str) -> str:
+    """``text`` as an engine marks it: AUTH before the leading marker."""
+    return A + text
+
+
+@pytest.mark.parametrize("name,text", FORMATS)
+def test_quoted_marker_spelled_with_plain_pieces_is_content(name, text):
+    for quoted in ("Here is the file text:\n" + text, text, "```\n" + text + "\n```"):
+        content, calls = proven_parse(quoted)
+        assert calls == [] and content == quoted
+
+
+@pytest.mark.parametrize("name,text", FORMATS)
+def test_a_real_marker_token_is_read_as_a_call(name, text):
+    content, calls = proven_parse(with_token(text))
+    assert content == "" and calls == [("get_weather", {"city": "Paris"})]
+
+
+@pytest.mark.parametrize("name,text", FORMATS)
+def test_text_then_a_real_call_still_works(name, text):
+    content, calls = proven_parse("I'll check the weather.\n" + with_token(text))
+    assert content == "I'll check the weather." and calls == [("get_weather", {"city": "Paris"})]
+
+
+def test_a_quoted_call_followed_by_a_real_one_gives_the_real_one_only():
+    quoted = 'The file says <tool_call>{"name": "get_time", "arguments": {}}</tool_call> and nothing else.\n'
+    content, calls = proven_parse(quoted + with_token(HERMES))
+    assert calls == [("get_weather", {"city": "Paris"})]
+    assert content == quoted.rstrip()
+
+
+def test_several_real_blocks_each_need_their_token():
+    second = '<tool_call>\n{"name": "get_time", "arguments": {"zone": "CET"}}\n</tool_call>'
+    both = with_token(HERMES) + "\n" + with_token(second)
+    assert proven_parse(both) == ("", [("get_weather", {"city": "Paris"}), ("get_time", {"zone": "CET"})])
+    content, calls = proven_parse(with_token(HERMES) + "\n" + second)  # the second block is a quote
+    assert calls == [] and A not in content
+
+
+def test_a_marker_the_vocab_has_no_token_for_is_still_read_from_text():
+    assert proven_parse(HERMES, proven=frozenset({"[TOOL_CALLS]"}))[1] == [("get_weather", {"city": "Paris"})]
+    assert proven_parse(MISTRAL, proven=frozenset({"<tool_call>"}))[1] == [("get_weather", {"city": "Paris"})]
+    assert proven_parse(HERMES, proven=frozenset())[1] == [("get_weather", {"city": "Paris"})]
+
+
+def test_auth_never_reaches_the_client_and_proves_nothing_when_nothing_is_proven():
+    assert proven_parse(with_token(HERMES), proven=frozenset())[1] == [("get_weather", {"city": "Paris"})]
+    content, calls = proven_parse("plain " + A + "text" + A, proven=frozenset())
+    assert A not in content and content == "plain text"
+    content, _ = proven_parse("a " + with_token("<tool_call>not json</tool_call>"))
+    assert A not in content and content.startswith("a <tool_call>")
+
+
+def test_bare_json_is_a_call_only_when_it_is_the_whole_reply():
+    body = '{"name": "get_weather", "parameters": {"city": "Paris"}}'
+    assert proven_parse(body)[1] == [("get_weather", {"city": "Paris"})]
+    assert proven_parse("  " + body + "\n")[1] == [("get_weather", {"city": "Paris"})]
+    for text in ("The tool call looks like " + body, body + " is what the file holds.", "```json\n" + body + "\n```",
+                 "Sure.\n" + body, body + "\nthat was the call"):
+        content, calls = proven_parse(text)
+        assert calls == [] and content == text, text
+    content, calls = tc.extract_tool_calls("Quoting: " + body, OFFERED)  # nothing proven: same
+    assert calls == [] and content == "Quoting: " + body
+
+
+@pytest.mark.parametrize("name,text", FORMATS)
+def test_streaming_matches_whole_reply_for_every_cut_when_proven(name, text):
+    reply = "Looking.\n" + with_token(text)
+    expected = proven_parse(reply)
+    quoted = "Quote: " + text + " done"
+    for cuts in ([], [3], [1, 2, 9], list(range(1, len(reply), 4))):
+        for source, want in ((reply, expected), (quoted, proven_parse(quoted))):
+            scanner = tc.ToolCallScanner(OFFERED, proven=ALL_PROVEN)
+            out, last = [], 0
+            for cut in cuts + [len(source)]:
+                out.append(scanner.feed(source[last:cut]))
+                last = cut
+            out.append(scanner.finish())
+            assert ("".join(out), [(c.name, json.loads(c.arguments)) for c in scanner.calls]) == want
+            assert A not in "".join(out)
+
+
+def test_a_lone_auth_at_the_end_of_a_piece_waits_for_the_marker():
+    scanner = tc.ToolCallScanner(OFFERED, proven=ALL_PROVEN)
+    assert scanner.feed("ok " + A) == "ok"  # held with the whitespace
+    assert scanner.feed("<tool_call>") == ""
+    assert scanner.feed('{"name": "get_time", "arguments": {}}</tool_call>') == ""
+    assert scanner.finish() == "" and [c.name for c in scanner.calls] == ["get_time"]
+
+
+def test_call_detector_cuts_a_reasoning_block_only_at_a_proven_marker():
+    from potluck_local.services.reasoning_split import split_reasoning
+
+    think = "<think>I will look it up.\n"
+    detector = tc.CallDetector(OFFERED, ALL_PROVEN)
+    reasoning, answer = split_reasoning(think + with_token(HERMES), starts_in_reasoning=False, calls=detector)
+    assert reasoning.strip() == "I will look it up." and answer.startswith(A + "<tool_call>")
+    assert proven_parse(answer)[1] == [("get_weather", {"city": "Paris"})]
+    reasoning, answer = split_reasoning(think + HERMES, starts_in_reasoning=False, calls=detector)
+    assert answer == "" and "<tool_call>" in reasoning  # a quote inside the reasoning stays reasoning
+
+
+def test_arguments_never_carry_auth():
+    text = with_token('<tool_call>{"name": "get_time", "arguments": {"zone": "C' + A + 'ET"}}</tool_call>')
+    assert proven_parse(text)[1] == [("get_time", {"zone": "CET"})]

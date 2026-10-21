@@ -28,6 +28,19 @@ The text comes from a model, possibly on another machine, so it is bounded:
 MAX_TOOL_CALLS calls, MAX_ARGUMENT_BYTES per call, MAX_TOOL_TEXT held back per
 reply. Arguments are never logged here.
 
+Which marker text counts
+------------------------
+Text that spells a marker is not the marker. A file, web page or tool result the
+model quotes can contain ``<tool_call>{...}</tool_call>``, and the decoded text of
+that quote is the same characters as a real call. Where the loaded vocab has the
+marker as a single token, the engine that decoded the reply says which markers
+were sampled as that token: it puts ``AUTH`` (a private-use character) in front of
+each one (see tool_markers.py). Those markers are "proven": a reply is read as a
+call only when its marker arrives with ``AUTH``, and the same text without it is
+content. A marker the vocab has no token for keeps being read from text. ``AUTH``
+never reaches a client: the scanner removes it from everything it returns, and the
+engine escapes any ``AUTH`` the model itself wrote.
+
 Streaming
 ---------
 ``ToolCallScanner`` passes ordinary text through as it arrives. From the first
@@ -54,10 +67,17 @@ HERMES_OPEN = "<tool_call>"
 HERMES_CLOSE = "</tool_call>"
 _LEADS = ("<|python_tag|>", "[TOOL_CALLS]", "<|tool_call|>")
 _MARKERS = (HERMES_OPEN,) + _LEADS
+MARKER_TEXTS = _MARKERS
+AUTH = "\ue000"
 _TRAILERS = ("<|/tool_call|>", "<|eom_id|>", "<|eot_id|>", "<|im_end|>", "</s>")
 # What may begin the JSON of a call. A reply that starts with "{" and then shows
 # any other key is an ordinary JSON answer and is released at once.
 _CALL_KEYS = ("name", "type", "function", "id", "arguments", "parameters")
+
+
+def _spelled(proven: frozenset[str]) -> tuple[str, ...]:
+    """The markers as they must appear in text: a proven one behind ``AUTH``."""
+    return tuple(AUTH + m if m in proven else m for m in _MARKERS)
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +137,7 @@ def _call_from_object(obj: object, offered: frozenset[str], taken: list[str]) ->
         text = json.dumps(args, ensure_ascii=False, separators=(",", ":"))
     except (TypeError, ValueError, RecursionError):
         return None
+    text = text.replace(AUTH, "")
     if len(text.encode("utf-8", "replace")) > MAX_ARGUMENT_BYTES:
         return None
     call = ToolCall(new_call_id(taken), name, text)
@@ -148,14 +169,15 @@ def _parse_json_values(text: str, offered: frozenset[str]) -> list[ToolCall] | N
     return calls or None
 
 
-def _parse_hermes(text: str, offered: frozenset[str]) -> list[ToolCall] | None:
+def _parse_hermes(text: str, offered: frozenset[str], proven: frozenset[str] = frozenset()) -> list[ToolCall] | None:
     calls: list[ToolCall] = []
     taken: list[str] = []
+    opener = AUTH + HERMES_OPEN if HERMES_OPEN in proven else HERMES_OPEN
     pos = 0
     while pos < len(text):
-        if not text.startswith(HERMES_OPEN, pos):
+        if not text.startswith(opener, pos):
             return None
-        start = pos + len(HERMES_OPEN)
+        start = pos + len(opener)
         end = text.find(HERMES_CLOSE, start)
         body = text[start:] if end < 0 else text[start:end]  # a missing closing tag at the very end is allowed
         pos = len(text) if end < 0 else end + len(HERMES_CLOSE)
@@ -170,11 +192,16 @@ def _parse_hermes(text: str, offered: frozenset[str]) -> list[ToolCall] | None:
     return calls or None
 
 
-def parse_calls(text: str, offered: Iterable[str]) -> list[ToolCall] | None:
-    """The calls in ``text``, which must hold only calls, or None."""
+def parse_calls(text: str, offered: Iterable[str], proven: frozenset[str] = frozenset()) -> list[ToolCall] | None:
+    """The calls in ``text``, which must hold only calls, or None.
+
+    ``proven`` is the set of markers that count only behind ``AUTH`` (see the module
+    docstring). With none proven, ``AUTH`` is dropped and text alone decides."""
     if not isinstance(text, str):
         return None
     names = frozenset(offered)
+    if not proven:
+        text = text.replace(AUTH, "")
     body = text.strip()
     stripped = True
     while stripped:
@@ -183,11 +210,12 @@ def parse_calls(text: str, offered: Iterable[str]) -> list[ToolCall] | None:
             if body.endswith(trailer):
                 body = body[: -len(trailer)].rstrip()
                 stripped = True
-    if body.startswith(HERMES_OPEN):
-        return _parse_hermes(body, names)
+    spelled = dict(zip(_MARKERS, _spelled(proven)))
+    if body.startswith(spelled[HERMES_OPEN]):
+        return _parse_hermes(body, names, proven)
     for lead in _LEADS:
-        if body.startswith(lead):
-            return _parse_json_values(body[len(lead):], names)
+        if body.startswith(spelled[lead]):
+            return _parse_json_values(body[len(spelled[lead]):], names)
     if body[:1] in ("{", "["):
         return _parse_json_values(body, names)
     return None
@@ -241,9 +269,9 @@ def _viable_call_prefix(text: str, offered: frozenset[str]) -> bool:
     return rest[1:close] in offered
 
 
-def _viable_marker_body(held: str, offered: frozenset[str]) -> bool:
+def _viable_marker_body(held: str, offered: frozenset[str], markers: tuple[str, ...] = _MARKERS) -> bool:
     """After a marker, a call's JSON must follow (a Hermes tag may be in prose)."""
-    for marker in _MARKERS:
+    for marker in markers:
         if held.startswith(marker):
             rest = held[len(marker):].lstrip()
             return not rest or (rest[0] in "{[" and _viable_call_prefix(rest[:200], offered))
@@ -299,16 +327,16 @@ class CallDetector:
     It uses the same tests as the scanner below, so a call it finds is one the scanner accepts.
     """
 
-    markers = _MARKERS
-
-    def __init__(self, offered: Iterable[str]) -> None:
+    def __init__(self, offered: Iterable[str], proven: Iterable[str] = ()) -> None:
         self._offered = frozenset(offered)
+        self._proven = frozenset(proven)
+        self.markers = _spelled(self._proven)
 
     def viable(self, rest: str) -> bool:
-        return _viable_marker_body(rest, self._offered)
+        return _viable_marker_body(rest, self._offered, self.markers)
 
     def parses(self, rest: str) -> bool:
-        return parse_calls(rest, self._offered) is not None
+        return parse_calls(rest, self._offered, self._proven) is not None
 
 
 _PLAIN, _JSON, _TOOL, _OFF = "plain", "json", "tool", "off"
@@ -329,9 +357,11 @@ class ToolCallScanner:
     before the call gives no content.
     """
 
-    def __init__(self, offered: Iterable[str], *, trim: bool = True) -> None:
+    def __init__(self, offered: Iterable[str], *, trim: bool = True, proven: Iterable[str] = ()) -> None:
         self._offered = frozenset(offered)
         self._trim = trim
+        self._proven = frozenset(proven)
+        self._markers = _spelled(self._proven)
         self._mode = _PLAIN
         self._pending = ""  # plain: whitespace or the start of a marker, not yet released
         self._at_start = True  # only whitespace seen so far
@@ -348,11 +378,16 @@ class ToolCallScanner:
     # -- feeding ----------------------------------------------------------
 
     def feed(self, text: str) -> str:
-        if not isinstance(text, str) or not text:
+        if not isinstance(text, str):
+            return ""
+        if not self._proven:
+            text = text.replace(AUTH, "")
+        if not text:
             return ""
         if self._mode == _OFF:
-            return text
+            return text.replace(AUTH, "")
         out = self._hold(text) if self._mode in (_JSON, _TOOL) else self._plain(self._pending + text)
+        out = out.replace(AUTH, "")
         if out:
             self._emitted = True
         return out
@@ -372,7 +407,7 @@ class ToolCallScanner:
                 self._mode = _JSON
                 return self._hold(stripped)
             self._at_start = False
-        first = min((i for i in (buf.find(m) for m in _MARKERS) if i >= 0), default=-1)
+        first = min((i for i in (buf.find(m) for m in self._markers) if i >= 0), default=-1)
         if first >= 0:
             before = buf[:first]
             if self._trim or (not self._emitted and not before.strip()):
@@ -380,7 +415,7 @@ class ToolCallScanner:
             self._lead = buf[len(before):first]  # given back if this turns out to be prose
             self._mode = _TOOL
             return before + self._hold(buf[first:])
-        keep = _overlap_any(buf, _MARKERS)
+        keep = _overlap_any(buf, self._markers)
         body = buf[: len(buf) - keep]
         if self._trim or (not self._emitted and not body.strip()):
             # Whitespace may be dropped if a call follows, so it waits. (A raw reply
@@ -402,7 +437,7 @@ class ToolCallScanner:
             viable = (
                 _viable_call_prefix(self._head, self._offered)
                 if self._mode == _JSON
-                else _viable_marker_body(self._head, self._offered)
+                else _viable_marker_body(self._head, self._offered, self._markers)
             )
             if not viable:
                 return self._release()
@@ -423,7 +458,7 @@ class ToolCallScanner:
             _, end = _DECODER.raw_decode(text)
         except (ValueError, RecursionError):
             return False
-        return parse_calls(text[:end], self._offered) is not None
+        return parse_calls(text[:end], self._offered, self._proven) is not None
 
     def _drop_held(self) -> str:
         held = "".join(self._parts)
@@ -445,20 +480,21 @@ class ToolCallScanner:
             return ""
         if self._mode == _PLAIN:
             tail, self._pending = self._pending, ""
-            return tail
-        calls = parse_calls("".join(self._parts), self._offered)
+            return tail.replace(AUTH, "")
+        calls = parse_calls("".join(self._parts), self._offered, self._proven)
         if calls:
             self.calls = calls
             self._drop_held()
             self._lead = ""
             self._mode = _OFF
             return ""
-        return self._release()
+        return self._release().replace(AUTH, "")
 
 
-def extract_tool_calls(text: str, offered: Iterable[str], *, trim: bool = True) -> tuple[str, list[ToolCall]]:
+def extract_tool_calls(text: str, offered: Iterable[str], *, trim: bool = True,
+                       proven: Iterable[str] = ()) -> tuple[str, list[ToolCall]]:
     """``(content, calls)`` for a whole reply. Content is "" when the reply was only calls."""
-    scanner = ToolCallScanner(offered, trim=trim)
+    scanner = ToolCallScanner(offered, trim=trim, proven=proven)
     content = scanner.feed(text) + scanner.finish()
     return content, scanner.calls
 

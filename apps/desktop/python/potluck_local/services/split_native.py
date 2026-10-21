@@ -16,7 +16,7 @@ import time
 
 import httpx
 
-from . import prompt_cache, prompt_guard
+from . import prompt_cache, prompt_guard, tool_markers
 
 logger = logging.getLogger(__name__)
 PIN = json.loads(importlib.resources.files("potluck_local.data").joinpath("split-engine.json").read_text())
@@ -143,12 +143,17 @@ class SplitModel:
     """
     managed_split = True
 
-    def __init__(self, process: NativeProcess, port: int, key: str, on_close, protected_tokens=None, slot_cache=None):
+    def __init__(self, process: NativeProcess, port: int, key: str, on_close, protected_tokens=None, slot_cache=None,
+                 marker_tokens=None):
         # protected_tokens() lists the control-token texts of the loaded vocab, for
         # prompt_guard. None leaves every request on the server's own chat endpoint.
         # slot_cache is a prompt_cache.SplitSlotCache for a server started with
         # --slot-save-path, or None for no disk prompt cache.
+        # marker_tokens() is {token id: text} of the tool-call markers the vocab holds as
+        # a token (tool_markers.py), or None when the engine cannot say.
         self.process, self.on_close = process, on_close
+        self._marker_tokens = marker_tokens
+        self._markers_cache: dict[int, str] | None = None
         self._slot_cache = slot_cache
         self._protected_tokens = protected_tokens
         self._guard_cache: prompt_guard.PromptGuard | None | bool = False
@@ -319,6 +324,14 @@ class SplitModel:
                         request.admitted = True
         return trace
 
+    def tool_markers(self) -> dict[int, str]:
+        if self._markers_cache is None:
+            try:
+                self._markers_cache = dict(self._marker_tokens()) if self._marker_tokens is not None else {}
+            except Exception:  # noqa: BLE001 - a vocab that cannot be read proves nothing
+                self._markers_cache = {}
+        return self._markers_cache
+
     def _guard(self):
         if self._guard_cache is False:
             texts = self._protected_tokens() if self._protected_tokens is not None else []
@@ -373,13 +386,21 @@ class SplitModel:
                     if protected and tokens and piece in plain:
                         tokens += plain[piece]
                         continue
-                    ids = self._post(client, request, "/tokenize", {
-                        "content": piece, "add_special": not tokens, "parse_special": not protected})["tokens"]
+                    # A tool-call marker is cut in two so the vocab cannot match it whole.
+                    halves = [piece[:len(piece) // 2], piece[len(piece) // 2:]] if protected and piece in guard.split else [piece]
+                    ids = []
+                    for half in halves:
+                        ids += self._post(client, request, "/tokenize", {
+                            "content": half, "add_special": not tokens and not ids,
+                            "parse_special": not protected})["tokens"]
                     if protected and tokens:
                         plain[piece] = ids
                     tokens += ids
             completion = {k: v for k, v in body.items() if k not in _CHAT_ONLY}
             completion["prompt"] = tokens
+            if body.get("tools") and self.tool_markers():
+                # The server names each sampled token's id in logprobs; tool_markers reads it.
+                completion["logprobs"] = 1
             schema = body.get("response_format")
             if isinstance(schema, dict) and schema.get("type") in ("json_object", "json_schema"):
                 found = schema.get("schema") if schema["type"] == "json_object" else (schema.get("json_schema") or {}).get("schema")
@@ -484,7 +505,17 @@ class SplitModel:
                         or not result.get("choices") or not all(isinstance(c, dict) and c.get("finish_reason") for c in result["choices"]):
                     raise SplitError("The split engine could not complete this request.", 502)
                 done = True
-                return self._chat_reply(result) if path == COMPLETION_PATH else result
+                if path == COMPLETION_PATH:
+                    markers = self.tool_markers() if "logprobs" in body else {}
+                    for choice in result["choices"]:
+                        if markers:
+                            choice["text"] = tool_markers.tag_whole(markers, choice)
+                    return self._chat_reply(result)
+                for choice in result["choices"]:
+                    message = choice.get("message")
+                    if isinstance(message, dict) and isinstance(message.get("content"), str):
+                        message["content"] = tool_markers.escape(message["content"])
+                return result
         except Exception:
             if request.cancelled.is_set():
                 raise self._cancelled() from None
@@ -526,10 +557,17 @@ class SplitModel:
                             if choice.get("finish_reason") is not None:
                                 terminal = True
                         if path == COMPLETION_PATH:
+                            if "logprobs" in body and self.tool_markers():
+                                for choice in chunk.get("choices", []):
+                                    choice["text"] = tool_markers.tag_chunk(self.tool_markers(), choice)
                             for shaped in self._chat_chunks(chunk, first):
                                 yield shaped
                             first = False
                         else:
+                            for choice in chunk.get("choices", []):
+                                delta = choice.get("delta") if isinstance(choice, dict) else None
+                                if isinstance(delta, dict) and isinstance(delta.get("content"), str):
+                                    delta["content"] = tool_markers.escape(delta["content"])
                             yield chunk
             raise SplitError("Split inference was interrupted before completion.", 502)
         except Exception:

@@ -291,8 +291,23 @@ def _tool_route_error(prepared: gateway_request.Prepared, runtime, peer: dict | 
     return HTTPException(status_code=400, detail={"code": "tools_not_supported", "message": message})
 
 
+def _proven_markers(runtime, peer: dict | None) -> frozenset[str]:
+    """The tool-call markers whose token the engine serving this reply can prove (see
+    services/tool_markers.py). A household machine says so in its capabilities; a
+    reply from the pool, or from an engine that does not say, proves nothing."""
+    try:
+        if peer is not None:
+            listed = (peer.get("_capabilities") or {}).get("tool_markers")
+            return frozenset(m for m in listed if isinstance(m, str)) if isinstance(listed, list) else frozenset()
+        prove = getattr(runtime, "proves_tool_markers", None)
+        found = prove() if callable(prove) else frozenset()
+        return frozenset(found) if isinstance(found, (set, frozenset)) else frozenset()
+    except Exception:  # noqa: BLE001
+        return frozenset()
+
+
 def _shape_options(split_reasoning: bool, prepared: gateway_request.Prepared, runtime,
-                   remote: bool, model: str | None) -> gateway_reply.ShapeOptions:
+                   remote: bool, model: str | None, peer: dict | None = None) -> gateway_reply.ShapeOptions:
     """How to shape this reply. Reply text from another machine does not say whether
     its template opened the reasoning block; this machine's own template does. The
     reply names ``model`` as its model, never the model file's path."""
@@ -300,11 +315,13 @@ def _shape_options(split_reasoning: bool, prepared: gateway_request.Prepared, ru
     if not remote:
         traits = traits_of_runtime(runtime)
         starts = None if traits is None else traits.opens_reasoning
+    offered = prepared.offered_names or None
     return gateway_reply.ShapeOptions(
         split_reasoning=split_reasoning,
         starts_in_reasoning=starts,
-        offered=prepared.offered_names or None,
+        offered=offered,
         model=model,
+        proven=_proven_markers(runtime, peer) if offered and (peer is not None or not remote) else frozenset(),
     )
 
 
@@ -364,7 +381,10 @@ class ChatPlan:
 
     @property
     def tool_kwargs(self) -> dict:
-        return self.job.prepared.runtime_kwargs()  # empty unless the request offered tools
+        kwargs = self.job.prepared.runtime_kwargs()  # empty unless the request offered tools
+        if kwargs and self.options.proven:
+            kwargs["tool_proof"] = True  # the engine marks the markers it saw sampled as the token
+        return kwargs
 
 
 async def plan_chat(job: ChatJob, x_potluck_scope: str | None, x_potluck_circle: str | None) -> ChatPlan:
@@ -438,7 +458,8 @@ async def plan_chat(job: ChatJob, x_potluck_scope: str | None, x_potluck_circle:
         raise refusal
 
     served_model = job.model if (peer or use_pool) else local
-    options = _shape_options(job.split_reasoning, prepared, runtime, remote=bool(peer or use_pool), model=served_model)
+    options = _shape_options(job.split_reasoning, prepared, runtime, remote=bool(peer or use_pool), model=served_model,
+                             peer=peer)
     if use_pool:
         served_by = coordinator_scope  # "pool" or "circle"
     elif peer:

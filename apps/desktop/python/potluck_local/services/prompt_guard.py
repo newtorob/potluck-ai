@@ -24,10 +24,16 @@ angle-bracket marker. The 128-bit nonce is unknown to whoever wrote the content,
 so request text cannot forge a placeholder, and a placeholder with an unknown
 nonce is left as the plain text it is.
 
-Only CONTROL tokens (and end-of-generation tokens) are protected. ``</think>``
-and ``<tool_call>`` are user-defined tokens in the Qwen vocabularies, not control
-tokens, and templates (Qwen3 splits assistant content on ``</think>``) and Potluck's
-own tool-call parsing rely on them, so they are left alone.
+CONTROL tokens (and end-of-generation tokens) are protected, and so are the
+tool-call markers (tool_calls.MARKER_TEXTS) wherever the vocab has them as a token.
+``</think>`` is a user-defined token in the Qwen vocabularies, not a control token,
+and templates (Qwen3 splits assistant content on ``</think>``) rely on it, so it is
+left alone. ``<tool_call>`` is user-defined too, and no flag stops a tokenizer
+from matching it, so a marker is protected by cutting its text in two and
+tokenizing the halves apart. Without that, a file the model is asked to repeat
+would put the real marker token in the prompt, and the model would sample the real
+token back: the engine's check that a call marker was sampled as the marker token
+(tool_markers.py) would then pass for text the user never meant as a call.
 
 Importable without torch or llama_cpp; both are only touched through the
 objects passed in.
@@ -41,6 +47,8 @@ import struct
 import threading
 from collections import OrderedDict
 from typing import Any, Iterable
+
+from potluck_local.services.tool_calls import MARKER_TEXTS
 
 MARK = "PLKGRD"
 _PLACEHOLDER = re.compile(MARK + r"([0-9a-f]{32})T([0-9]+)E")
@@ -86,6 +94,8 @@ class PromptGuard:
         # Longest first so a token that contains another is matched whole.
         texts = sorted({t for t in protected if t}, key=len, reverse=True)
         self.protected = tuple(texts)
+        # Tokenized in two halves, never as one piece (a marker that is a user-defined token).
+        self.split = frozenset(t for t in texts if t in MARKER_TEXTS)
         self._pattern = re.compile("|".join(re.escape(t) for t in texts)) if texts else None
         self._open: "OrderedDict[str, Ticket]" = OrderedDict()
         self._lock = threading.Lock()
@@ -174,6 +184,8 @@ def llama_protected_tokens(model: Any) -> list[str]:
     """
     import llama_cpp
 
+    from potluck_local.services import tool_markers
+
     inner = model._model
     control = llama_cpp.LLAMA_TOKEN_ATTR_CONTROL
     vocab = inner.vocab
@@ -187,7 +199,8 @@ def llama_protected_tokens(model: Any) -> list[str]:
             continue
         if model.tokenize(text.encode("utf-8"), add_bos=False, special=True) == [token]:
             found.append(text)
-    return found
+    # A marker the tokenizer matches in any text (a user-defined token) still has to stay text.
+    return found + [text for text in tool_markers.marker_tokens(model).values() if text not in found]
 
 
 def llama_guard(model: Any) -> PromptGuard | None:
@@ -223,7 +236,12 @@ def install_tokenize_guard(model: Any, guard: PromptGuard) -> PromptGuard:
         for piece, protected in pieces:
             if not piece:
                 continue
-            ids += plain(piece.encode("utf-8"), add_bos=add_bos and first, special=not protected)
+            if protected and piece in guard.split:
+                cut = len(piece) // 2
+                ids += plain(piece[:cut].encode("utf-8"), add_bos=add_bos and first, special=False)
+                ids += plain(piece[cut:].encode("utf-8"), add_bos=False, special=False)
+            else:
+                ids += plain(piece.encode("utf-8"), add_bos=add_bos and first, special=not protected)
             first = False
         return ids
 
@@ -266,28 +284,24 @@ def protect_prompt(model: Any, prompt: str) -> tuple[str, Ticket]:
 
 _GGUF_FIXED = {0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8}
 _GGUF_CONTROL = 3  # tokenizer.ggml.token_type value for a control token
+_GGUF_USER_DEFINED = 4
 _GGUF_END_KEYS = frozenset(f"tokenizer.ggml.{n}_token_id" for n in ("eos", "eot", "eom"))
 
 
-def gguf_protected_tokens(path: Any) -> list[str]:
-    """The same texts ``llama_protected_tokens`` finds, read from the GGUF header.
-
-    The native split engine (split_native.py) keeps its vocab in a llama-server
-    child, so the control tokens (token type 3) and the end-of-generation ids the
-    header names (eos, eot, eom) are read from the file instead. Returns [] when
-    the file cannot be read as GGUF; never raises.
-    """
+def _gguf_vocab(path: Any) -> tuple[list[str], list[int], set[int]]:
+    """``(token texts, token types, end-of-generation ids)`` from a GGUF header, or empty
+    values when the file cannot be read as GGUF. Never raises."""
     texts: list[str] = []
     types: list[int] = []
     ends: set[int] = set()
     try:
         with open(path, "rb") as fh:
             if fh.read(4) != b"GGUF" or struct.unpack("<I", fh.read(4))[0] not in (2, 3):
-                return []
+                return [], [], set()
             fh.read(8)  # tensor_count
             (kv_count,) = struct.unpack("<Q", fh.read(8))
             if kv_count > 100_000:
-                return []
+                return [], [], set()
 
             def read_str() -> bytes:
                 (n,) = struct.unpack("<Q", fh.read(8))
@@ -321,9 +335,32 @@ def gguf_protected_tokens(path: Any) -> list[str]:
                 else:
                     raise ValueError("unknown GGUF array element type")
     except (OSError, struct.error, ValueError):
-        return []
+        return [], [], set()
+    return texts, types, ends
+
+
+def gguf_protected_tokens(path: Any) -> list[str]:
+    """The same texts ``llama_protected_tokens`` finds, read from the GGUF header.
+
+    The native split engine (split_native.py) keeps its vocab in a llama-server
+    child, so the control tokens (token type 3), the end-of-generation ids the
+    header names (eos, eot, eom) and the tool-call markers that are user-defined
+    tokens (type 4) are read from the file instead. Returns [] when the file
+    cannot be read as GGUF; never raises.
+    """
+    texts, types, ends = _gguf_vocab(path)
     found = {i for i, t in enumerate(types[:len(texts)]) if t == _GGUF_CONTROL} | {i for i in ends if 0 <= i < len(texts)}
+    # Tool-call markers the vocab holds as user-defined tokens (Qwen's <tool_call>).
+    found |= {i for i, t in enumerate(types[:len(texts)]) if t == _GGUF_USER_DEFINED and texts[i] in MARKER_TEXTS}
     return sorted({texts[i] for i in found if texts[i].strip()})
+
+
+def gguf_marker_tokens(path: Any) -> dict[int, str]:
+    """``{token id: marker text}`` for the tool-call markers the GGUF vocab holds as one
+    control or user-defined token (what ``tool_markers.marker_tokens`` finds in process)."""
+    texts, types, _ = _gguf_vocab(path)
+    return {i: texts[i] for i, t in enumerate(types[:len(texts)])
+            if t in (_GGUF_CONTROL, _GGUF_USER_DEFINED) and texts[i] in MARKER_TEXTS}
 
 
 # ---- Hugging Face tokenizers ------------------------------------------------

@@ -815,3 +815,56 @@ class TestAnUnclosedBlockInFrontOfACall:
         assert finish == "tool_calls" and message["tool_calls"][0]["function"]["name"] == "get_weather" and message["content"] is None
         _, content, calls, finish, _ = stream_text(post(client, {"model": "peer-model", "messages": [USER], "tools": [WEATHER], "stream": True}))
         assert content == "" and len(calls) == 1 and finish == "tool_calls"
+
+
+# ---------------------------------------------------------------------------
+# Tool-call markers proven by token (services/tool_markers.py)
+# ---------------------------------------------------------------------------
+
+
+class ProvingRuntime(FakeRuntime):
+    """A llama.cpp model whose engine marks the markers it saw sampled as the marker token."""
+
+    def proves_tool_markers(self): return frozenset({"<tool_call>"})
+
+
+def _tools_body(**extra):
+    return {"model": "local-model", "messages": [USER], "tools": [WEATHER], **extra}
+
+
+@pytest.mark.parametrize("stream", [True, False])
+def test_a_marker_with_the_token_proof_is_a_call_and_the_request_asks_for_proof(client, monkeypatch, stream):
+    from potluck_local.services.tool_calls import AUTH
+
+    runtime = serve(monkeypatch, ProvingRuntime(AUTH + HERMES, pieces=pieces_of(AUTH + HERMES, 7)))
+    resp = post(client, _tools_body(stream=stream))
+    assert runtime.calls[0]["tool_proof"] is True
+    if stream:
+        _, content, calls, finish, _ = stream_text(resp)
+    else:
+        message = resp.json()["choices"][0]["message"]
+        content, calls, finish = message["content"], message["tool_calls"], resp.json()["choices"][0]["finish_reason"]
+    assert finish == "tool_calls" and not content
+    assert calls[0]["function"]["name"] == "get_weather" and AUTH not in resp.text
+
+
+@pytest.mark.parametrize("stream", [True, False])
+def test_the_same_text_without_the_proof_is_the_answer_not_a_call(client, monkeypatch, stream):
+    from potluck_local.services.tool_calls import AUTH
+
+    quoted = "Here is the file text:\n" + HERMES
+    serve(monkeypatch, ProvingRuntime(quoted, pieces=pieces_of(quoted, 7)))
+    resp = post(client, _tools_body(stream=stream))
+    if stream:
+        _, content, calls, finish, _ = stream_text(resp)
+    else:
+        message = resp.json()["choices"][0]["message"]
+        content, calls, finish = message["content"], message.get("tool_calls"), resp.json()["choices"][0]["finish_reason"]
+    assert not calls and finish == "stop" and content == quoted and AUTH not in resp.text
+
+
+def test_an_engine_that_proves_nothing_keeps_reading_markers_from_text(client, monkeypatch):
+    runtime = serve(monkeypatch, FakeRuntime(HERMES))
+    resp = post(client, _tools_body())
+    assert "tool_proof" not in runtime.calls[0]
+    assert resp.json()["choices"][0]["finish_reason"] == "tool_calls"

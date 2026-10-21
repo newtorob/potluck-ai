@@ -198,6 +198,12 @@ class PeerCapabilities(BaseModel):
     # that does not say true.
     supports_tools: bool = False
 
+    # Tool-call markers this node's model can prove were sampled as the marker token
+    # (additive; older nodes omit it, which a requester reads as none). A requester that
+    # sees a marker here sends `potluck_tool_proof` and reads that marker only behind
+    # the proof character in the reply text. See services/tool_markers.py.
+    tool_markers: list[str] = []
+
 
 # Cache the hardware detect — it shells out to system tools (lspci, system_profiler,
 # GPUtil) on first call. Hardware doesn't change at runtime, so we re-detect once
@@ -305,7 +311,16 @@ async def peer_capabilities() -> PeerCapabilities:
         link_type=link_type,
         answers_verified=runtime.answers_verified() if loaded else None,
         supports_tools=bool(loaded and getattr(traits_of_runtime(runtime), "supports_tools", False)),
+        tool_markers=_tool_markers(runtime) if loaded else [],
     )
+
+
+def _tool_markers(runtime) -> list[str]:
+    prove = getattr(runtime, "proves_tool_markers", None)
+    try:
+        return sorted(prove()) if callable(prove) else []
+    except Exception:  # noqa: BLE001
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -434,6 +449,9 @@ class PeerChatRequest(BaseModel):
     # supports_tools; anything else is refused here too.
     tools: list[dict] | None = None
     tool_choice: str | dict | None = None
+    # Mark, in the reply text, the tool-call markers the model sampled as the marker
+    # token (see PeerCapabilities.tool_markers). Only meaningful with `tools`.
+    potluck_tool_proof: bool = Field(default=False, strict=True)
 
 
 @router.post("/chat/completions")
@@ -603,7 +621,10 @@ def _peer_tool_kwargs(request: PeerChatRequest, runtime, messages: list[dict]) -
         prepared = gateway_request.prepare(messages, request.tools, request.tool_choice)
     except gateway_request.RequestError:
         raise HTTPException(status_code=400, detail=_TOOLS_BAD) from None
-    return prepared.runtime_kwargs()
+    kwargs = prepared.runtime_kwargs()
+    if kwargs and request.potluck_tool_proof:
+        kwargs["tool_proof"] = True
+    return kwargs
 
 
 def _fixed_error_event(chunk: str) -> str:
