@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -287,8 +288,8 @@ def test_tag_whole_places_each_marker_by_its_bytes_and_refuses_a_mismatch():
 
 # ---- real vocab ----------------------------------------------------------------------------
 
-QWEN = Path("/Users/rob/.potluck/models/qwen-2.5-0.5b-instruct-q4/model.gguf")
-real = pytest.mark.skipif(not QWEN.exists(), reason="needs qwen-2.5-0.5b-instruct-q4 under ~/.potluck/models")
+QWEN = Path(os.environ.get("POTLUCK_TEST_QWEN_GGUF", "/nonexistent"))
+real = pytest.mark.skipif(not QWEN.is_file(), reason="set POTLUCK_TEST_QWEN_GGUF to a Qwen2.5 GGUF")
 
 
 @pytest.fixture(scope="module")
