@@ -523,6 +523,8 @@ async def _load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
     runtime = get_runtime()
 
     rpc_servers = body.rpc_servers if body and body.rpc_servers else None
+    if settings.runtime.backend == "llama-server" and rpc_servers:
+        raise HTTPException(422, "The native local backend cannot use rpc_servers; use managed split mode.")
 
     # Resolve n_ctx: auto-tune from the model + RAM when context_size is 0,
     # otherwise honor the user's pin (capped at the model's max). For a
@@ -556,6 +558,8 @@ async def _load_model(slug: str, body: LoadModelRequest | None = None) -> dict:
             n_threads=settings.runtime.threads or None,
             rpc_servers=rpc_servers,
             verify_answers=settings.runtime.verify_answers,
+            **({"backend": "llama-server", "native_cache_mib": settings.runtime.native_cache_mib}
+               if settings.runtime.backend == "llama-server" else {}),
         )
     except TypeError as exc:
         # Stock (non-Potluck-patched) llama-cpp-python doesn't accept the

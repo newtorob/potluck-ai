@@ -158,8 +158,8 @@ class NativeFixture:
         self.thread.join(timeout=2)
 
 
-@pytest.fixture
-def native(monkeypatch, tmp_path):
+@pytest.fixture(params=["split", "local"])
+def native(monkeypatch, tmp_path, request):
     monkeypatch.setenv("POTLUCK_DATA_DIR", str(tmp_path))
     fixtures: list[NativeFixture] = []
 
@@ -169,6 +169,9 @@ def native(monkeypatch, tmp_path):
         runtime = LLMRuntime()
         closed: list[bool] = []
         model = SplitModel(fixture, fixture.server.server_port, "fixture-key", lambda: closed.append(True))
+        if request.param == "local":
+            model.managed_split = False
+            model.managed_native = True
         runtime._model = model
         runtime._model_id = "fixture-split"
         return fixture, runtime, model, closed

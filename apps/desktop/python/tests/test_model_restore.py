@@ -68,6 +68,23 @@ def test_success_restores_with_current_resources_and_preserves_other_settings(ri
     asyncio.run(scenario())
 
 
+def test_selected_native_backend_and_cache_survive_restore(rig, monkeypatch):
+    lifecycle, rt, calls = rig
+    settings = get_settings().model_copy(deep=True)
+    settings.runtime.backend = "llama-server"
+    settings.runtime.native_cache_mib = 128
+    settings.runtime.startup_model_id = "first"
+    save_settings(settings)
+
+    def native_load(path, **kwargs):
+        calls.append((Path(path).parent.name, kwargs))
+        return {"model_id": "first", "backend": "llama-server"}
+    monkeypatch.setattr(rt, "_load_local_server", native_load)
+    asyncio.run(lifecycle.restore(models._load_model))
+    assert lifecycle.status() == {"status": "restored", "model_id": "first"}
+    assert calls == [("first", {"n_ctx": 4096, "n_gpu_layers": -1, "n_threads": None, "cache_mib": 128})]
+
+
 @pytest.mark.parametrize("action", ["unload", "delete"])
 def test_explicit_removal_stays_unloaded_after_restart(rig, action):
     lifecycle, rt, calls = rig

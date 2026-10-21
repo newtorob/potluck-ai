@@ -1,4 +1,4 @@
-"""LLM inference runtime — wraps llama-cpp-python.
+"""LLM inference runtime: llama-cpp-python and the opt-in supervised native server.
 
 One process, one loaded model. Batched streams share model access; other
 inference and model lifecycle operations retain exclusive access.
@@ -43,6 +43,11 @@ from potluck_local.services.model_identity import ModelIdentityError, artifact_i
 logger = logging.getLogger(__name__)
 
 PERSISTED_BENCHMARKS_TTL = 30.0
+
+
+def _native_model(model) -> bool:
+    return bool(getattr(model, "managed_native", False) or getattr(model, "managed_split", False))
+
 
 # llama.cpp reports what it actually did while loading a model. These are the
 # lines that carry it. Parsing the engine's own output is the only way to say
@@ -268,7 +273,7 @@ class LLMRuntime:
         self._atexit_registered = False
 
     def is_loaded(self) -> bool:
-        if getattr(self._model, "managed_split", False) and self._model.closed:
+        if _native_model(self._model) and self._model.closed:
             return False
         return self._model is not None or self._pipeline is not None
 
@@ -286,7 +291,7 @@ class LLMRuntime:
         return bool(report.get("used_n_gpu_layers"))
 
     def current_model_sha256(self) -> str | None:
-        if getattr(self._model, "managed_split", False) and self._model.closed:
+        if _native_model(self._model) and self._model.closed:
             return None
         if not self._artifact or not self._model_path or self._pipeline is not None or self._loaded_rpc_servers:
             return None
@@ -323,7 +328,12 @@ class LLMRuntime:
     def template_traits(self) -> "model_traits.TemplateTraits | None":
         """What the loaded llama.cpp model's chat template can do (tools, an opened
         reasoning block). None when nothing is loaded or the backend cannot say."""
-        return model_traits.traits_of_model(self._model) if self._pipeline is None else None
+        if self._pipeline is not None:
+            return None
+        native_traits = getattr(self._model, "template_traits", None)
+        if isinstance(native_traits, model_traits.TemplateTraits):
+            return native_traits if self.is_loaded() else None
+        return model_traits.traits_of_model(self._model)
 
     async def count_tokens(self, text: str) -> int | None:
         """Tokens in ``text`` by the loaded llama.cpp model's own tokenizer, or None
@@ -335,6 +345,16 @@ class LLMRuntime:
             if not callable(tokenize):
                 return None
             try:
+                if _native_model(self._model):
+                    # Native tokenization is loopback HTTP, not a cheap in-process call.
+                    # Drain it before a lifecycle operation can free the child.
+                    worker = asyncio.get_running_loop().run_in_executor(
+                        None, partial(tokenize, text.encode("utf-8", "replace"), add_bos=False),
+                    )
+                    try:
+                        return len(await asyncio.shield(worker))
+                    finally:
+                        await self._drain_worker(worker)
                 return len(tokenize(text.encode("utf-8", "replace"), add_bos=False))
             except Exception as exc:  # noqa: BLE001 - a count is a convenience, never a failure
                 logger.debug("count_tokens_failed error=%s", type(exc).__name__)
@@ -437,6 +457,8 @@ class LLMRuntime:
         else:
             cpu_dev = devices.get("CPU") or {}
             device_name = cpu_dev.get("description") or "CPU"
+        if not verified and report.get("engine") == "llama-server":
+            backend = device_name = "unknown"
 
         return {
             "schema_version": 1,
@@ -937,12 +959,31 @@ class LLMRuntime:
         n_threads: int | None = None,
         rpc_servers: list[str] | None = None,
         verify_answers: bool | None = None,
+        backend: str = "llama-cpp-python",
+        native_cache_mib: int = 256,
+        expected_model_sha256: str | None = None,
+        expected_engine_acceleration: str | None = None,
     ) -> dict:
         """verify_answers: True checks the model's answers as part of the load
         (and may move it to the CPU), False records that the owner turned the
         check off, None leaves the check alone."""
         if self._split_worker_reserved:
             raise RuntimeError("This machine is reserved as a split worker. Run potluck split worker off first.")
+        if backend == "llama-server":
+            if rpc_servers:
+                raise ValueError("The native local backend cannot use rpc_servers; use managed split mode.")
+            return await self._run_lifecycle(partial(
+                self._load_local_server, model_path, n_ctx=n_ctx, n_gpu_layers=n_gpu_layers,
+                n_threads=n_threads, cache_mib=native_cache_mib,
+                **({"expected_model_sha256": expected_model_sha256,
+                    "expected_engine_acceleration": expected_engine_acceleration}
+                   if expected_model_sha256 is not None or expected_engine_acceleration is not None
+                   else {}),
+            ))
+        if expected_model_sha256 is not None or expected_engine_acceleration is not None:
+            raise ValueError("Pinned engine recipes require the native local backend")
+        if backend != "llama-cpp-python":
+            raise ValueError("Unknown inference backend")
         load = partial(self.load_model, model_path, n_ctx=n_ctx,
                        n_gpu_layers=n_gpu_layers, n_threads=n_threads,
                        rpc_servers=rpc_servers)
@@ -955,6 +996,64 @@ class LLMRuntime:
             # The load has returned and both gates are free: a request that was waiting for them has
             # the model first. The recorded checks start after that, if the load left any to run.
             self._launch_recorded()
+
+    def _load_local_server(self, model_path, *, n_ctx, n_gpu_layers, n_threads, cache_mib,
+                           expected_model_sha256=None, expected_engine_acceleration=None):
+        from potluck_local.services import local_server
+
+        if n_ctx < 512 or n_gpu_layers < -1 or (n_threads is not None and n_threads < 0):
+            raise ValueError("Invalid native engine resource settings")
+        if not 0 <= cache_mib <= 4096:
+            raise ValueError("Native prompt cache must be between 0 and 4096 MiB")
+        # Validate availability and the exact file before freeing a working model.
+        root, manifest = local_server.bundle()
+        if expected_engine_acceleration is not None:
+            if expected_engine_acceleration not in ("cpu", "metal", "cuda"):
+                raise ValueError("Invalid recipe engine acceleration")
+            if ((expected_engine_acceleration == "cpu" and n_gpu_layers != 0)
+                    or (expected_engine_acceleration != "cpu"
+                        and (manifest.get("backend") != expected_engine_acceleration
+                             or n_gpu_layers != -1))):
+                raise ValueError("The native engine no longer matches this recipe. Run preflight again.")
+        identity = artifact_identity(Path(model_path))
+        if expected_model_sha256 is not None and identity[0] != expected_model_sha256:
+            raise ModelIdentityError("The installed model does not match this recipe's SHA-256.")
+        with self._load_lock:
+            self._release_model()
+            start = time.monotonic()
+            model = local_server.start(model_path, root=root, n_ctx=n_ctx,
+                                       n_gpu_layers=n_gpu_layers, n_threads=n_threads,
+                                       cache_mib=cache_mib)
+            try:
+                if artifact_identity(Path(model_path)) != identity:
+                    raise ModelIdentityError("The model file changed during loading. Reload the unchanged file.")
+            except BaseException:
+                model.close()
+                raise
+            self._model = model
+            self._model_path = model_path
+            self._model_id = Path(model_path).parent.name
+            self._artifact = identity
+            # Preserve the first-use recheck for a file just written in this timestamp tick.
+            self._verified_artifact = None
+            self._loaded_n_ctx = n_ctx
+            self._loaded_rpc_servers = None
+            self._persisted_benchmarks = None
+            self._load_report = {
+                "engine": "llama-server", "engine_commit": manifest["commit"],
+                "requested_n_ctx": n_ctx, "used_n_ctx": n_ctx,
+                "requested_n_gpu_layers": n_gpu_layers,
+                "native_cache_mib": cache_mib, "flash_attention": "auto",
+                "cpu_only": n_gpu_layers == 0,
+            }
+            if not self._atexit_registered:
+                atexit.register(self.unload_model)
+                self._atexit_registered = True
+            return {"model_id": self._model_id, "model_path": model_path,
+                    "load_time_seconds": round(time.monotonic() - start, 2),
+                    "n_ctx": n_ctx, "n_threads": n_threads, "backend": "llama-server",
+                    "engine_commit": manifest["commit"], "native_cache_mib": cache_mib,
+                    "inference": self.inference_summary(), "answers_verified": False}
 
     async def load_pipeline_async(self, model_id: str, **kwargs) -> dict:
         if self._split_worker_reserved:
@@ -1012,12 +1111,15 @@ class LLMRuntime:
         on this machine. A managed split, a pipeline or whole-model load and a load
         with rpc_servers are not checked (see services/acceptance.py)."""
         return (self._pipeline is None and not self._loaded_rpc_servers
-                and not getattr(self._model, "managed_split", False))
+                and not _native_model(self._model))
 
     def acceptance_summary(self) -> dict:
         """The answer-check result for what is loaded, as /health/inference reports it."""
         if not self.is_loaded():
             return acceptance.summary()
+        if getattr(self._model, "managed_native", False):
+            return acceptance.summary(model_id=self._model_id,
+                                      message="Native local engine qualification is pending. Use it on your own machines; lending is paused.")
         if not self._check_covers_load():
             return acceptance.summary(model_id=self._model_id)
         if not self._checking_answers():
@@ -1028,7 +1130,11 @@ class LLMRuntime:
         """True when the loaded model passed its answer check, False when it did
         not, was not checked, or the owner turned the check off. None when nothing
         is loaded, and when the check does not cover this kind of load."""
-        if not self.is_loaded() or not self._check_covers_load():
+        if not self.is_loaded():
+            return None
+        if getattr(self._model, "managed_native", False):
+            return False
+        if not self._check_covers_load():
             return None
         return bool(self._acceptance and self._acceptance["status"] == acceptance.PASSED and self._checking_answers())
 
@@ -1046,7 +1152,9 @@ class LLMRuntime:
 
     def _accept_loaded(self, expected_model, expected_sha256, level, force) -> tuple[dict, int | None]:
         self.assert_model_identity(expected_model, expected_sha256)
-        if self._model is None or getattr(self._model, "managed_split", False):
+        if getattr(self._model, "managed_native", False):
+            raise RuntimeError("Answer checks are not available for the native local backend yet. Use llama-cpp-python to run this check.")
+        if self._model is None or _native_model(self._model):
             raise RuntimeError("No model loaded")
         self._check_loaded(level, force=force)
         return self.acceptance_summary(), self._acceptance_tokens
@@ -1401,7 +1509,7 @@ class LLMRuntime:
         self._publish(level, key, proof=proof, plan=plan, **publish)
 
     def _missing_plan(self, level: str, proof: dict) -> acceptance.RecordedPlan | None:
-        if self._model is None or getattr(self._model, "managed_split", False):
+        if self._model is None or _native_model(self._model):
             return None
         return acceptance.resume_plan(
             self._model, level, n_ctx=self._loaded_n_ctx, on_cpu=not self._gpu_offload_active(),
@@ -1785,7 +1893,7 @@ class LLMRuntime:
                 label = f"pipeline_stream model_id={self._model_id}"
             elif self._model is not None:
                 model = self._model
-                if getattr(model, "managed_split", False):
+                if _native_model(model):
                     cancel_model = model
                 label = f"stream model_id={self._model_id}"
 
@@ -1914,7 +2022,7 @@ class LLMRuntime:
             model = self._model
             model_id = self._model_id
             start = time.monotonic()
-            managed_split = getattr(model, "managed_split", False)
+            managed_split = _native_model(model)
             cancel_event = threading.Event()
 
             def _complete():
@@ -2018,7 +2126,7 @@ class LLMRuntime:
                         stop=stop or [],
                         stream=True,
                         **extra,
-                        **({"cancel_event": cancel_event} if getattr(model, "managed_split", False) else {}),
+                        **({"cancel_event": cancel_event} if _native_model(model) else {}),
                     )
                     for chunk in chunks:
                         if cancel_event.is_set():
@@ -2065,7 +2173,7 @@ class LLMRuntime:
                 # stream_chat) so a disconnect can't leave inference running on the
                 # non-thread-safe model while the next request acquires the lock.
                 cancel_event.set()
-                if getattr(model, "managed_split", False) and not completed:
+                if _native_model(model) and not completed:
                     await self._cancel_split_request(model, cancel_event)
                 await self._drain_worker(fut)
                 logger.info(
@@ -2110,8 +2218,8 @@ class LLMRuntime:
             loop = asyncio.get_running_loop()
             model = self._model
             model_id = self._model_id
-            if getattr(model, "managed_split", False):
-                raise RuntimeError("Scoring verification is not supported for owned-machine split sessions.")
+            if _native_model(model):
+                raise RuntimeError("Scoring verification is not supported for native engine sessions.")
 
             def _score() -> dict:
                 import math
@@ -2200,6 +2308,8 @@ class LLMRuntime:
             queue: asyncio.Queue = asyncio.Queue()
             model = self._model
             model_id = self._model_id
+            if getattr(model, "managed_native", False):
+                raise RuntimeError("The native local backend does not support this benchmark yet.")
             cancel_event = threading.Event()
 
             def _generate() -> None:

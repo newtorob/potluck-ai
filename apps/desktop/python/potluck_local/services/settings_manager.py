@@ -17,6 +17,9 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class RuntimeSettings(BaseModel):
+    # Native inference is opt-in until model/hardware recipes pass qualification.
+    backend: Literal["llama-cpp-python", "llama-server"] = "llama-cpp-python"
+    native_cache_mib: int = Field(default=256, ge=0, le=4096)
     # Only a successfully loaded local GGUF is eligible for startup restore.
     # Separate from active_model_id (the coding agent's model preference).
     startup_model_id: str | None = None
