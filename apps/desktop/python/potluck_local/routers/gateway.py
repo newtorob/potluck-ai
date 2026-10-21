@@ -297,8 +297,7 @@ def _proven_markers(runtime, peer: dict | None) -> frozenset[str]:
     reply from the pool, or from an engine that does not say, proves nothing."""
     try:
         if peer is not None:
-            listed = (peer.get("_capabilities") or {}).get("tool_markers")
-            return frozenset(m for m in listed if isinstance(m, str)) if isinstance(listed, list) else frozenset()
+            return gateway_routing.listed_markers(peer.get("_capabilities") or {})
         prove = getattr(runtime, "proves_tool_markers", None)
         found = prove() if callable(prove) else frozenset()
         return frozenset(found) if isinstance(found, (set, frozenset)) else frozenset()

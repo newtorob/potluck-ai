@@ -219,6 +219,47 @@ def test_a_retry_only_considers_machines_that_advertise_tools(monkeypatch):
     assert asyncio.run(direct._replacement_peer("m", {"100.64.0.4"}, tools=True)) is None
 
 
+def test_a_proof_retry_only_considers_machines_that_prove_the_same_markers(monkeypatch):
+    async def peers():
+        return [{"node_name": n, "mesh_ip": ip} for n, ip in (("a", "100.64.0.2"), ("b", "100.64.0.3"), ("c", "100.64.0.4"))]
+
+    tools = {"available_for_inference": True, "loaded_model": "m", "supports_tools": True}
+    caps = {
+        "100.64.0.2": tools,  # an older release lists no markers
+        "100.64.0.3": {**tools, "tool_markers": ["<tool_call>", "[TOOL_CALLS]"]},
+        "100.64.0.4": {**tools, "tool_markers": ["<tool_call>"]},
+    }
+
+    async def peer_caps(client, p):
+        return caps[p["mesh_ip"]]
+
+    monkeypatch.setattr(direct, "household_peers", peers)
+    monkeypatch.setattr(direct, "_peer_caps", peer_caps)
+    proven = frozenset({"<tool_call>"})
+    assert asyncio.run(direct._replacement_peer("m", set(), tools=True))["mesh_ip"] == "100.64.0.2"
+    assert asyncio.run(direct._replacement_peer("m", set(), tools=True, markers=proven))["mesh_ip"] == "100.64.0.4"
+    assert asyncio.run(direct._replacement_peer("m", {"100.64.0.4"}, tools=True, markers=proven)) is None
+
+
+def test_a_proof_stream_retries_with_the_first_machines_markers(monkeypatch):
+    real = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient",
+                        lambda **kw: real(transport=httpx.MockTransport(lambda r: httpx.Response(503)), **kw))
+    asked: list[dict] = []
+
+    async def replacement(model, excluded, **kwargs):
+        asked.append(kwargs)
+        return None
+
+    monkeypatch.setattr(direct, "_replacement_peer", replacement)
+    first = {"mesh_ip": "100.64.0.2", "_capabilities": {"supports_tools": True, "tool_markers": ["<tool_call>"]}}
+    for proof in (True, False):
+        with pytest.raises(direct.RemoteStreamError):
+            asyncio.run(direct.complete_peer_openai(first, [USER], "test", 0.7, 20, tools=[WEATHER], tool_choice="auto",
+                                                    **({"tool_proof": True} if proof else {})))
+    assert asked == [{"tools": True, "markers": frozenset({"<tool_call>"})}, {"tools": True}]
+
+
 # ---- proof that a call marker was sampled as the marker token ------------------------------------
 
 

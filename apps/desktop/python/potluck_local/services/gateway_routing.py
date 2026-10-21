@@ -112,11 +112,21 @@ async def _search(peers: list[dict], wanted: Callable[[dict], bool], model: str,
     return found
 
 
+def listed_markers(cap: dict) -> frozenset[str]:
+    """The tool-call markers a machine's capabilities say its engine proves (see
+    services/tool_markers.py). Empty for an older machine or a malformed list."""
+    listed = cap.get("tool_markers")
+    return frozenset(m for m in listed if isinstance(m, str)) if isinstance(listed, list) else frozenset()
+
+
 async def _replacement_peer(model: str, excluded: set[str], sha256: str | None = None, *,
-                            tools: bool = False, ask_again: bool = False) -> dict | None:
+                            tools: bool = False, markers: frozenset[str] | None = None,
+                            ask_again: bool = False) -> dict | None:
     # Read current membership on every retry. Never route through the pool or
     # relax the requested model because an earlier household machine failed.
     # A request with tools only goes to a machine that says it supports them.
+    # With markers, only to a machine that proves exactly those: the reply is
+    # read with the first machine's markers (routers/gateway.py).
     # ask_again is for the first lookup of a request, which can refuse (see _search);
     # a retry in the middle of a stream does not wait for a silent machine.
     peers = [p for p in await household_peers() if p["mesh_ip"] not in excluded]
@@ -124,6 +134,8 @@ async def _replacement_peer(model: str, excluded: set[str], sha256: str | None =
     def wanted(cap: dict) -> bool:
         return bool(cap.get("available_for_inference") and cap.get("loaded_model") == model and (
             not tools or cap.get("supports_tools") is True
+        ) and (
+            markers is None or listed_markers(cap) == markers
         ) and (
             sha256 is None or (cap.get("model_lock_version") == 1
                                and (cap.get("loaded_model_detail") or {}).get("sha256") == sha256)
@@ -285,6 +297,8 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
             body["potluck_tool_proof"] = True
     if stop:
         body["stop"] = stop
+    # A proof request's reply is read with this machine's markers, so a retry needs the same ones.
+    markers = listed_markers(peer.get("_capabilities") or {}) if tools and tool_proof else None
     loop = asyncio.get_running_loop()
     deadline = loop.time() + REQUEST_TIMEOUT_S
     excluded: set[str] = set()
@@ -300,7 +314,8 @@ async def stream_peer_openai(peer: dict, messages: list[dict], model: str,
             if attempt:
                 async with asyncio.timeout_at(deadline):
                     peer = await _replacement_peer(model, excluded, **({"sha256": sha256} if sha256 else {}),
-                                                   **({"tools": True} if tools else {}))
+                                                   **({"tools": True} if tools else {}),
+                                                   **({"markers": markers} if markers is not None else {}))
                 if peer is None:
                     break
             excluded.add(peer["mesh_ip"])
