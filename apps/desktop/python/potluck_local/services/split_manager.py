@@ -20,6 +20,7 @@ import websockets
 
 from .gateway_routing import household_peers, PEER_SIDECAR_PORT
 from .model_identity import artifact_identity
+from . import prompt_guard
 from .model_lifecycle import get_model_lifecycle
 from .runtime import get_runtime
 from .settings_manager import get_settings, save_settings
@@ -368,7 +369,7 @@ class SplitManager:
                     def closed():
                         with suppress(RuntimeError):
                             loop.call_soon_threadsafe(lambda: asyncio.create_task(self._adapter_closed(head)))
-                    adapter = SplitModel(process, port, key, closed)
+                    adapter = SplitModel(process, port, key, closed, lambda: prompt_guard.gguf_protected_tokens(path))
                     head["adapter"] = adapter
                     async with httpx.AsyncClient(timeout=2, trust_env=False) as client:
                         while True:

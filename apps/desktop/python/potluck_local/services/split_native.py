@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.resources
 from dataclasses import dataclass, field
 import json
+import logging
 import os
 from pathlib import Path
 import secrets
@@ -15,10 +16,22 @@ import time
 
 import httpx
 
+from . import prompt_guard
+
+logger = logging.getLogger(__name__)
 PIN = json.loads(importlib.resources.files("potluck_local.data").joinpath("split-engine.json").read_text())
 CANCEL_GRACE_SECONDS = 3.0
 CANCEL_POLL_SECONDS = 0.05
 CANCEL_PROBE_TIMEOUT = 0.25
+CHAT_PATH = "/v1/chat/completions"
+COMPLETION_PATH = "/v1/completions"
+# Request keys that only the chat endpoint reads: they shape the template or the
+# reply, and /v1/completions has no use for them. Every other key goes through.
+_CHAT_ONLY = frozenset({"messages", "tools", "tool_choice", "parallel_tool_calls", "response_format",
+                        "add_generation_prompt", "continue_final_message", "chat_template_kwargs",
+                        "reasoning_format", "reasoning_effort", "echo", "logprobs", "top_logprobs"})
+_TEMPLATE_KEYS = ("messages", "tools", "tool_choice", "parallel_tool_calls", "add_generation_prompt",
+                  "continue_final_message", "chat_template_kwargs", "reasoning_format", "reasoning_effort")
 
 
 class SplitError(RuntimeError):
@@ -128,8 +141,12 @@ class SplitModel:
     """
     managed_split = True
 
-    def __init__(self, process: NativeProcess, port: int, key: str, on_close):
+    def __init__(self, process: NativeProcess, port: int, key: str, on_close, protected_tokens=None):
+        # protected_tokens() lists the control-token texts of the loaded vocab, for
+        # prompt_guard. None leaves every request on the server's own chat endpoint.
         self.process, self.on_close = process, on_close
+        self._protected_tokens = protected_tokens
+        self._guard_cache: prompt_guard.PromptGuard | None | bool = False
         self.base = f"http://127.0.0.1:{port}"
         self.headers = {"Authorization": f"Bearer {key}"}
         self.closed = False
@@ -288,25 +305,99 @@ class SplitModel:
                         request.admitted = True
         return trace
 
+    def _guard(self):
+        if self._guard_cache is False:
+            texts = self._protected_tokens() if self._protected_tokens is not None else []
+            if self._protected_tokens is not None and not texts:
+                logger.warning("split_prompt_guard_unavailable reason=no_control_tokens_read")
+            self._guard_cache = prompt_guard.PromptGuard(texts) if texts else None
+        return self._guard_cache
+
+    def _post(self, client, request: _SplitRequest, path: str, body: dict):
+        if request.cancelled.is_set():
+            request.prevented_send = True
+            raise self._cancelled()
+        response = client.post(self.base + path, headers=self.headers, json=body)
+        if response.status_code != 200:
+            raise SplitError("The split engine could not read this request.", 502)
+        return response.json()
+
+    def _prepare(self, request: _SplitRequest, body: dict):
+        """``(path, body, ticket)`` for the request.
+
+        llama-server renders the chat template itself and tokenizes the whole
+        prompt with parse_special=true (server-context.cpp and server-common.cpp at
+        the pinned commit), and no request field or flag turns that off. So when
+        prompt_guard finds control-token text in the request, the prompt is built
+        here from the same server's own template and tokenizer: /apply-template
+        renders the sanitized messages, /tokenize turns the template text into
+        tokens with special parsing on and each protected piece into plain text
+        tokens, and /v1/completions gets the token ids. A request with no such
+        text is returned untouched for /v1/chat/completions.
+        """
+        guard = self._guard()
+        if guard is None:
+            return CHAT_PATH, body, prompt_guard.NO_TICKET
+        clean, ticket = guard.sanitize({"messages": body.get("messages"), "tools": body.get("tools")})
+        if not ticket.active:
+            return CHAT_PATH, body, prompt_guard.NO_TICKET
+        try:
+            template = {k: body[k] for k in _TEMPLATE_KEYS if k in body}
+            template["messages"] = clean["messages"]
+            if "tools" in template:
+                template["tools"] = clean["tools"]
+            # A separate client: the request's own connection is made later, under
+            # its trace, so cancellation can reach it.
+            with httpx.Client(timeout=httpx.Timeout(30, connect=3), trust_env=False) as client:
+                text = self._post(client, request, "/apply-template", template)["prompt"]
+                tokens: list[int] = []
+                plain: dict[str, list[int]] = {}  # a protected text repeats; tokenize it once
+                # The template text has no BOS; the server adds it on the first piece.
+                for piece, protected in guard.segments(text) or [(text, False)]:
+                    if not piece:
+                        continue
+                    if protected and tokens and piece in plain:
+                        tokens += plain[piece]
+                        continue
+                    ids = self._post(client, request, "/tokenize", {
+                        "content": piece, "add_special": not tokens, "parse_special": not protected})["tokens"]
+                    if protected and tokens:
+                        plain[piece] = ids
+                    tokens += ids
+            completion = {k: v for k, v in body.items() if k not in _CHAT_ONLY}
+            completion["prompt"] = tokens
+            schema = body.get("response_format")
+            if isinstance(schema, dict) and schema.get("type") in ("json_object", "json_schema"):
+                found = schema.get("schema") if schema["type"] == "json_object" else (schema.get("json_schema") or {}).get("schema")
+                completion["json_schema"] = found if isinstance(found, dict) else {}
+            return COMPLETION_PATH, completion, ticket
+        except BaseException:
+            ticket.close()
+            raise
+
+    @staticmethod
+    def _chat_reply(result: dict) -> dict:
+        """A /v1/completions reply as the chat.completion the chat endpoint returns."""
+        choices = [{"index": c.get("index", 0), "finish_reason": c.get("finish_reason"),
+                    "message": {"role": "assistant", "content": c.get("text", "")}}
+                   for c in result.get("choices", []) if isinstance(c, dict)]
+        return {**{k: v for k, v in result.items() if k != "choices"}, "object": "chat.completion", "choices": choices}
+
     def create_chat_completion(self, **kwargs):
         cancel_event = kwargs.pop("cancel_event", None)
         request = self._begin(cancel_event)
         if self.closed or self.process.process.poll() is not None:
             request.finished.set()
             raise self.failed("Split model is stopped. Start it again before inference.")
-        # Not covered by prompt_guard. llama-server renders the template itself and
-        # tokenizes the result with parse_special=true (server-context.cpp at the
-        # pinned commit), so control-token text in these messages still becomes
-        # control tokens. Closing it needs /apply-template, /tokenize and a
-        # /completion call with a token array, plus the chat endpoint's reply
-        # shaping and tool-call parsing rebuilt here.
         body = {**kwargs, "cache_prompt": True}
         if kwargs.get("stream"):
             return self._stream(body, request)
+        ticket = prompt_guard.NO_TICKET
         try:
             self._start(request)
+            path, body, ticket = self._prepare(request, body)
             with httpx.Client(timeout=httpx.Timeout(180, connect=3), trust_env=False) as client:
-                response = client.post(self.base + "/v1/chat/completions", headers=self.headers, json=body,
+                response = client.post(self.base + path, headers=self.headers, json=body,
                                        extensions={"trace": self._trace(request)})
                 if request.cancelled.is_set():
                     raise self._cancelled()
@@ -314,23 +405,27 @@ class SplitModel:
                 if response.status_code != 200 or not isinstance(result, dict) or result.get("error") \
                         or not result.get("choices") or not all(isinstance(c, dict) and c.get("finish_reason") for c in result["choices"]):
                     raise SplitError("The split engine could not complete this request.", 502)
-                return result
+                return self._chat_reply(result) if path == COMPLETION_PATH else result
         except Exception:
             if request.cancelled.is_set():
                 raise self._cancelled() from None
             raise self.failed("Split inference failed. Check worker status and start again.") from None
         finally:
+            ticket.close()
             request.finished.set()
 
     def _stream(self, body, request):
         terminal = False
+        ticket = prompt_guard.NO_TICKET
         try:
             self._start(request)
+            path, body, ticket = self._prepare(request, body)
             with httpx.Client(timeout=httpx.Timeout(90, connect=3), trust_env=False) as client:
-                with client.stream("POST", self.base + "/v1/chat/completions", headers=self.headers, json=body,
+                with client.stream("POST", self.base + path, headers=self.headers, json=body,
                                    extensions={"trace": self._trace(request)}) as response:
                     if response.status_code != 200:
                         raise SplitError("The split engine rejected the request.", 502)
+                    first = path == COMPLETION_PATH
                     for line in response.iter_lines():
                         if request.cancelled.is_set():
                             raise self._cancelled()
@@ -347,14 +442,37 @@ class SplitModel:
                         for choice in chunk.get("choices", []):
                             if choice.get("finish_reason") is not None:
                                 terminal = True
-                        yield chunk
+                        if path == COMPLETION_PATH:
+                            for shaped in self._chat_chunks(chunk, first):
+                                yield shaped
+                            first = False
+                        else:
+                            yield chunk
             raise SplitError("Split inference was interrupted before completion.", 502)
         except Exception:
             if request.cancelled.is_set():
                 raise self._cancelled() from None
             raise self.failed("Split inference was interrupted. Check worker status and start again.") from None
         finally:
+            ticket.close()
             request.finished.set()
+
+    @staticmethod
+    def _chat_chunks(chunk: dict, first: bool):
+        """A /v1/completions stream chunk as chat.completion.chunk objects, the way the chat endpoint streams."""
+        choice = (chunk.get("choices") or [{}])[0]
+        base = {k: v for k, v in chunk.items() if k not in ("choices", "usage")}
+        base["object"] = "chat.completion.chunk"
+
+        def make(delta, finish, extra=None):
+            return {"choices": [{"finish_reason": finish, "index": choice.get("index", 0), "delta": delta}],
+                    **base, **(extra or {})}
+        if first:
+            yield make({"role": "assistant", "content": None}, None)
+        if choice.get("text"):
+            yield make({"content": choice["text"]}, None)
+        if choice.get("finish_reason") is not None:
+            yield make({}, choice["finish_reason"], {"usage": chunk["usage"]} if "usage" in chunk else None)
 
     def tokenize(self, text: bytes, add_bos=True, special=False):
         with httpx.Client(timeout=10, trust_env=False) as client:

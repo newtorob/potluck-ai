@@ -34,8 +34,10 @@ objects passed in.
 """
 from __future__ import annotations
 
+import os
 import re
 import secrets
+import struct
 import threading
 from collections import OrderedDict
 from typing import Any, Iterable
@@ -195,7 +197,8 @@ def llama_guard(model: Any) -> PromptGuard | None:
     ``create_completion`` both reach the tokenizer through that instance
     attribute, so one wrapper covers chat, tools and raw completions. Returns
     None for objects with no in-process vocab: the native split adapter (a
-    llama-server child, see split_native.py) and test fakes.
+    llama-server child; split_native.py reads the header with
+    ``gguf_protected_tokens`` instead) and test fakes.
     """
     existing = getattr(model, "_potluck_prompt_guard", None)
     if isinstance(existing, PromptGuard):
@@ -257,6 +260,70 @@ def protect_prompt(model: Any, prompt: str) -> tuple[str, Ticket]:
         return prompt, NO_TICKET
     clean, ticket = guard.sanitize(prompt)
     return (clean, ticket) if ticket.active else (prompt, NO_TICKET)
+
+
+# ---- Native llama-server ------------------------------------------------------
+
+_GGUF_FIXED = {0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8}
+_GGUF_CONTROL = 3  # tokenizer.ggml.token_type value for a control token
+_GGUF_END_KEYS = frozenset(f"tokenizer.ggml.{n}_token_id" for n in ("eos", "eot", "eom"))
+
+
+def gguf_protected_tokens(path: Any) -> list[str]:
+    """The same texts ``llama_protected_tokens`` finds, read from the GGUF header.
+
+    The native split engine (split_native.py) keeps its vocab in a llama-server
+    child, so the control tokens (token type 3) and the end-of-generation ids the
+    header names (eos, eot, eom) are read from the file instead. Returns [] when
+    the file cannot be read as GGUF; never raises.
+    """
+    texts: list[str] = []
+    types: list[int] = []
+    ends: set[int] = set()
+    try:
+        with open(path, "rb") as fh:
+            if fh.read(4) != b"GGUF" or struct.unpack("<I", fh.read(4))[0] not in (2, 3):
+                return []
+            fh.read(8)  # tensor_count
+            (kv_count,) = struct.unpack("<Q", fh.read(8))
+            if kv_count > 100_000:
+                return []
+
+            def read_str() -> bytes:
+                (n,) = struct.unpack("<Q", fh.read(8))
+                if n > 1 << 20:
+                    raise ValueError("implausible GGUF string length")
+                return fh.read(n)
+
+            for _ in range(kv_count):
+                key = read_str().decode("utf-8", "replace")
+                (vtype,) = struct.unpack("<I", fh.read(4))
+                if vtype != 9:
+                    if vtype == 8:
+                        read_str()
+                    elif vtype in _GGUF_FIXED:
+                        raw = fh.read(_GGUF_FIXED[vtype])
+                        if key in _GGUF_END_KEYS and vtype in (4, 5):
+                            ends.add(struct.unpack("<I" if vtype == 4 else "<i", raw)[0])
+                    else:
+                        raise ValueError("unknown GGUF value type")
+                    continue
+                elem, count = struct.unpack("<IQ", fh.read(12))
+                if key == "tokenizer.ggml.tokens" and elem == 8:
+                    texts = [read_str().decode("utf-8", "ignore") for _ in range(count)]
+                elif key == "tokenizer.ggml.token_type" and elem in (4, 5):
+                    types = list(struct.unpack(f"<{count}{'I' if elem == 4 else 'i'}", fh.read(4 * count)))
+                elif elem in _GGUF_FIXED:
+                    fh.seek(_GGUF_FIXED[elem] * count, os.SEEK_CUR)
+                elif elem == 8:
+                    for _ in range(count):
+                        read_str()
+                else:
+                    raise ValueError("unknown GGUF array element type")
+    except (OSError, struct.error, ValueError):
+        return []
+    found = {i for i, t in enumerate(types[:len(texts)]) if t == _GGUF_CONTROL} | {i for i in ends if 0 <= i < len(texts)}
+    return sorted({texts[i] for i in found if texts[i].strip()})
 
 
 # ---- Hugging Face tokenizers ------------------------------------------------
