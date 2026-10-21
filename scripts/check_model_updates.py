@@ -21,6 +21,11 @@ Modes:
                refreshed catalog to models.json.proposed (schema_version 2).
                Never touches the shipped models.json.
 
+Pinning: every emitted download_url is https://huggingface.co/<repo>/resolve/
+<40-hex commit>/<file>, where the commit is the repo's main head at resolve
+time (the same commit the sha256 and size were read from). Never use
+`resolve/main`; tests/test_catalog_pinned.py fails the build if one appears.
+
 Network: pure public HF Hub API (HfApi + the unauthenticated
 `/api/models/{repo}?expand[]=gguf` endpoint for GGUF header metadata,
 i.e. context length, without pulling the multi-GB file). No tokens.
@@ -33,6 +38,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -426,6 +432,7 @@ class ResolvedModel:
     entry: LineupEntry
     size_bytes: int | None = None
     sha256: str | None = None
+    revision: str | None = None  # 40-hex commit of the repo's main branch the metadata came from
     released: str | None = None  # ISO date
     context_window: int | None = None
     num_layers: int | None = None
@@ -443,6 +450,9 @@ def _resolve_file_metadata(api: HfApi, entry: LineupEntry, resolved: ResolvedMod
         resolved.errors.append(f"model_info({entry.repo}) failed: {type(exc).__name__}: {exc}")
         return
 
+    # The sha256/size below describe the files at this exact commit, so the
+    # emitted download_url pins to it instead of the movable `main` ref.
+    resolved.revision = info.sha
     resolved.released = info.lastModified.date().isoformat() if info.lastModified else None
 
     match = next((s for s in info.siblings if s.rfilename == entry.filename), None)
@@ -665,7 +675,7 @@ def build_proposed_catalog(resolved_lineup: list[ResolvedModel]) -> dict:
     models = []
     for r in resolved_lineup:
         e = r.entry
-        if r.size_bytes is None or r.sha256 is None:
+        if r.size_bytes is None or r.sha256 is None or not re.fullmatch(r"[0-9a-f]{40}", r.revision or ""):
             # Refuse to emit an entry we can't verify; the report already
             # surfaces the error, and an unverified sha256 would defeat the
             # downloader's integrity gate.
@@ -677,7 +687,7 @@ def build_proposed_catalog(resolved_lineup: list[ResolvedModel]) -> dict:
                 "version": "1.0.0",
                 "description": e.description,
                 "tier": e.tier,
-                "download_url": f"https://huggingface.co/{e.repo}/resolve/main/{e.filename}",
+                "download_url": f"https://huggingface.co/{e.repo}/resolve/{r.revision}/{e.filename}",
                 "size_bytes": r.size_bytes,
                 "sha256": r.sha256,
                 "min_ram_gb": e.min_ram_gb,

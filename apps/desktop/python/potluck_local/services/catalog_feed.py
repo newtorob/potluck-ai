@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from typing import Any
 
 import httpx
@@ -34,10 +35,23 @@ REFRESH_INTERVAL_SECONDS = 6 * 60 * 60  # 6h
 _REQUEST_TIMEOUT_SECONDS = 10.0
 
 
+_HF_RESOLVE_REVISION = re.compile(r"^https://huggingface\.co/[^/]+/[^/]+/resolve/([^/]+)/")
+_COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
+
+
+def is_pinned_download_url(url: str) -> bool:
+    """False for a Hugging Face `resolve/<ref>/` URL whose ref is not a full
+    40-hex commit (`main`, a branch, a tag): those refs move, so the bytes
+    behind the URL can change after review. Non-HF URLs are not judged here."""
+    match = _HF_RESOLVE_REVISION.match(url)
+    return match is None or _COMMIT_SHA.match(match.group(1)) is not None
+
+
 def _validate(data: Any) -> bool:
     """True when `data` is a structurally valid catalog feed payload:
     a dict carrying schema_version and a non-empty models list, every entry
-    of which has at minimum slug + download_url + sha256."""
+    of which has at minimum slug + download_url + sha256, and whose
+    Hugging Face download_url is pinned to a commit (never `resolve/main`)."""
     if not isinstance(data, dict):
         return False
     if "schema_version" not in data:
@@ -49,6 +63,8 @@ def _validate(data: Any) -> bool:
         if not isinstance(entry, dict):
             return False
         if not (entry.get("slug") and entry.get("download_url") and entry.get("sha256")):
+            return False
+        if not is_pinned_download_url(str(entry["download_url"])):
             return False
     return True
 

@@ -70,7 +70,7 @@ def test_cached_remote_wins_when_fresher(
                     {
                         "slug": "future-model-9b",
                         "name": "Future Model 9B",
-                        "download_url": "https://huggingface.co/x/y/resolve/main/z.gguf",
+                        "download_url": "https://huggingface.co/x/y/resolve/0123456789abcdef0123456789abcdef01234567/z.gguf",
                         "sha256": "0" * 64,
                     }
                 ],
@@ -133,3 +133,13 @@ def test_no_upgrade_from_when_nothing_installed(monkeypatch: pytest.MonkeyPatch)
         "potluck_local.services.model_downloader.get_downloader", lambda: _NoProgress()
     )
     assert all("upgrade_from" not in m for m in model_registry.list_models())
+
+
+def test_feed_with_unpinned_download_url_is_rejected() -> None:
+    def feed(url: str) -> dict:
+        return {"schema_version": 2, "models": [{"slug": "m", "download_url": url, "sha256": "0" * 64}]}
+
+    pinned = "https://huggingface.co/x/y/resolve/" + "a" * 40 + "/z.gguf"
+    assert catalog_feed._validate(feed(pinned))
+    for bad in ("main", "v1.0", "a" * 39, "A" * 40):
+        assert not catalog_feed._validate(feed(f"https://huggingface.co/x/y/resolve/{bad}/z.gguf"))
