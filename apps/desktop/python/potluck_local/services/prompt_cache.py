@@ -25,7 +25,10 @@ Rules this module enforces on its own:
     llama-cpp-python 0.3.x, so a restored entry would be useless or wrong.
 
 The in-process adapter is PromptDiskCache, a llama-cpp-python cache object
-(Llama.set_cache). Nothing here imports llama_cpp or torch at module import.
+(Llama.set_cache). The managed split engine (services/split_native.py) has
+SplitSlotCache, which drives llama-server's slot save and restore with the same
+store and the same privacy rules. Nothing here imports llama_cpp or torch at
+module import.
 """
 from __future__ import annotations
 
@@ -91,6 +94,61 @@ def eligibility(metadata: dict | None) -> str | None:
     return None
 
 
+_GGUF_SCALARS = {0: "<B", 1: "<b", 2: "<H", 3: "<h", 4: "<I", 5: "<i", 6: "<f", 7: "<?", 10: "<Q", 11: "<q", 12: "<d"}
+
+
+def read_gguf_metadata(path) -> dict | None:
+    """Scalar and string keys of a GGUF header, for eligibility(). Arrays are skipped.
+
+    The split engine keeps the model in a llama-server child, so there is no loaded
+    model to ask. None when the file is not readable GGUF; never raises.
+    """
+    out: dict = {}
+    try:
+        with open(path, "rb") as fh:
+            if fh.read(4) != b"GGUF" or struct.unpack("<I", fh.read(4))[0] not in (2, 3):
+                return None
+            fh.read(8)  # tensor_count
+            (kv_count,) = struct.unpack("<Q", fh.read(8))
+            if kv_count > 100_000:
+                return None
+
+            def read_str() -> str:
+                (n,) = struct.unpack("<Q", fh.read(8))
+                if n > 1 << 24:
+                    raise ValueError("implausible GGUF string length")
+                return fh.read(n).decode("utf-8", "replace")
+
+            def skip(vtype: int) -> None:
+                if vtype in _GGUF_SCALARS:
+                    fh.seek(struct.calcsize(_GGUF_SCALARS[vtype]), os.SEEK_CUR)
+                elif vtype == 8:
+                    read_str()
+                else:
+                    raise ValueError("unknown GGUF value type")
+
+            for _ in range(kv_count):
+                key = read_str()
+                (vtype,) = struct.unpack("<I", fh.read(4))
+                if vtype == 9:
+                    elem, count = struct.unpack("<IQ", fh.read(12))
+                    if elem in _GGUF_SCALARS:
+                        fh.seek(struct.calcsize(_GGUF_SCALARS[elem]) * count, os.SEEK_CUR)
+                    else:
+                        for _ in range(count):
+                            skip(elem)
+                elif vtype == 8:
+                    out[key] = read_str()
+                elif vtype in _GGUF_SCALARS:
+                    fmt = _GGUF_SCALARS[vtype]
+                    (out[key],) = struct.unpack(fmt, fh.read(struct.calcsize(fmt)))
+                else:
+                    return None
+    except (OSError, struct.error, ValueError):
+        return None
+    return out or None
+
+
 # Who asked. Only a request that began on this machine (the app and local clients on
 # 127.0.0.1) may read or write the cache. A request served for another machine, a
 # household peer or a circle member, neither saves its prompt here nor learns from a
@@ -111,7 +169,8 @@ def in_request_context(fn):
     return lambda: ctx.run(fn)
 
 
-_LIVE: "weakref.WeakSet[PromptDiskCache]" = weakref.WeakSet()
+# Anything with .store, .disable() and a flush: PromptDiskCache and SplitSlotCache.
+_LIVE: "weakref.WeakSet[PromptDiskCache | SplitSlotCache]" = weakref.WeakSet()
 
 
 def purge_all(root: Path, reason: str = "") -> int:
@@ -136,8 +195,19 @@ def purge_all(root: Path, reason: str = "") -> int:
         for directory in root.iterdir():
             if directory.is_dir():
                 shutil.rmtree(directory, ignore_errors=True)
+    clear_slot_files(slot_root(root.parent))
     logger.info("prompt_cache_purged entries=%d reason=%s", removed, reason)
     return removed
+
+
+def clear_slot_files(directory: Path) -> None:
+    """Remove slot files a crash or a purge left behind. The directory stays."""
+    try:
+        for f in Path(directory).glob("*.slot"):
+            with _suppress():
+                f.unlink()
+    except OSError:
+        pass
 
 
 def purge_for_settings_change(config_dir: Path, before, after) -> None:
@@ -150,6 +220,15 @@ def purge_for_settings_change(config_dir: Path, before, after) -> None:
 
 def cache_root(data_dir: Path) -> Path:
     return Path(data_dir) / "prompt-cache"
+
+
+def slot_root(data_dir: Path) -> Path:
+    """Where a llama-server writes slot files on their way into the store.
+
+    A sibling of cache_root, not inside it: purge_all removes every directory under
+    the root, and a running server must keep a directory to save into.
+    """
+    return Path(data_dir) / "prompt-cache-slots"
 
 
 def chain_hashes(model_sha256: str, signature: str, tokens, block: int = BLOCK_TOKENS) -> list[bytes]:
@@ -690,14 +769,19 @@ class NativeSlotCache:
         self.slot_dir.mkdir(parents=True, exist_ok=True)
         os.chmod(self.slot_dir, 0o700)
 
-    def restore(self, prompt_tokens, *, slot: int = 0) -> dict | None:
-        hit = self.store.lookup(self.sha, self.signature, prompt_tokens)
-        if hit is None:
+    def restore(self, prompt_tokens, *, slot: int = 0, min_matched: int = 0, max_tokens: int | None = None) -> dict | None:
+        """Load the longest saved prefix into the slot. None on a miss or a failed restore.
+
+        min_matched: only an entry that shares more tokens than this is worth loading
+        (what the server's live slot already holds). max_tokens: the slot's context.
+        """
+        hit = self.store.lookup(self.sha, self.signature, prompt_tokens, min_matched=min_matched)
+        if hit is None or (max_tokens is not None and hit.n_tokens > max_tokens):
             return None
         name = f"restore-{hit.entry_id}.slot"
         path = self.slot_dir / name
         try:
-            self.store.export_state(hit, path)
+            tokens = self.store.export_state(hit, path)
             reply = self._post(f"/slots/{slot}?action=restore", {"filename": name})
         except Exception:  # noqa: BLE001
             logger.warning("prompt_cache_slot_restore_failed entry=%s", hit.entry_id, exc_info=True)
@@ -707,7 +791,7 @@ class NativeSlotCache:
             with _suppress():
                 path.unlink()
         return {"entry": hit.entry_id, "saved_tokens": hit.n_tokens, "matched_tokens": hit.matched_tokens,
-                "n_restored": reply.get("n_restored")}
+                "n_restored": reply.get("n_restored"), "tokens": tokens}
 
     def save(self, tokens, *, slot: int = 0) -> str | None:
         if len(tokens) < self.store.min_tokens:
@@ -722,3 +806,226 @@ class NativeSlotCache:
         finally:
             with _suppress():
                 path.unlink()
+
+
+# llama-server's slot file: u32 magic 'ggsq', u32 version, u32 n_words, n_words x i32, then the KV
+# state (llama-context.cpp state_seq_save_file at the pinned commit). The words are the slot's
+# server_tokens packed by server_tokens::serialize (server-common.cpp): marker -1, u32 state
+# version, u32 n, n token ids, u32 media count (0 for text), zero padded to a word. An older
+# server wrote the plain token ids.
+_SLOT_MAGIC = 0x67677371
+_TOKENS_STATE_VERSION = 1
+
+
+def read_slot_tokens(path: Path) -> list[int]:
+    """The prompt tokens a slot file holds, which are exactly what the server had evaluated."""
+    with open(path, "rb") as f:
+        magic, _version, n_words = struct.unpack("<III", f.read(12))
+        if magic != _SLOT_MAGIC or n_words > 1 << 24:
+            raise ValueError("not a slot file")
+        raw = f.read(n_words * 4)
+    if len(raw) != n_words * 4:
+        raise ValueError("truncated slot file")
+    words = array.array("i")
+    words.frombytes(raw)
+    words = words.tolist()
+    if not words or words[0] != -1:
+        return words
+    if len(words) < 4 or words[1] != _TOKENS_STATE_VERSION or words[2] < 0 or 3 + words[2] >= len(words) \
+            or words[3 + words[2]] != 0:
+        raise ValueError("slot file holds media or an unknown token state")
+    return words[3:3 + words[2]]
+
+
+def split_signature(engine_commit: str, head_backend: str, worker_backends) -> str:
+    """What must match for a slot saved by one split head to load into another.
+
+    A slot file is per-layer KV bytes, so the device a layer sits on does not change
+    them (checked on this Mac: a state saved with half the layers on an RPC worker
+    loads into an all-local head and the next-token logprobs match a fresh prefill
+    exactly). What can change them is the engine build and the backends: flash
+    attention is chosen per backend set ("auto") and the V cache is laid out
+    differently without it. So the key is the engine commit, the head's backend and
+    the sorted backends of the workers, and a different set of machines misses.
+    """
+    parts = {"kind": "split-slot", "commit": engine_commit, "head": head_backend,
+             "workers": sorted(str(b or "?") for b in worker_backends)}
+    return hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()[:16]
+
+
+class SplitSlotCache:
+    """Disk prompt cache for one managed llama-server (the split head), slot 0.
+
+    Same rules as PromptDiskCache. Only a request that began on this machine reads
+    or writes. Another machine's request waits for any save in flight, forgets what
+    the slot holds and touches nothing else. purge_all disables this the same way.
+
+    The server keeps one live slot (--parallel 1). A save is queued after a
+    completed local request and runs in the background; the next request of any
+    origin waits at barrier() for the server-side write (not for the copy into the
+    store), so the slot cannot change under a save. The tokens of an entry come from
+    the slot file's own header, so they are exactly what the server evaluated.
+    """
+
+    def __init__(self, store: PromptCacheStore, slot_dir: Path, model_sha256: str, signature: str, context: int):
+        self.store, self.slot_dir, self.sha, self.signature, self.context = store, Path(slot_dir), model_sha256, signature, int(context)
+        self.native: NativeSlotCache | None = None
+        self.disabled = False
+        # What the live slot holds, as far as this side knows: a prefix of its tokens,
+        # whether only local requests produced it, and whether the store lacks it.
+        self.live_tokens: list[int] = []
+        self.live_local = False
+        self.dirty = False
+        self._epoch = 0  # counts requests, so a save knows whether the slot moved on
+        self.last_restore: dict | None = None
+        self.last_save: dict | None = None
+        self._cv = threading.Condition()
+        self._saving = False
+        self._queue: queue.Queue = queue.Queue(maxsize=2)
+        self._writer = threading.Thread(target=self._run, name="prompt-cache-slot-writer", daemon=True)
+        self._writer.start()
+        _LIVE.add(self)
+
+    def bind(self, post) -> None:
+        """post(path, json) -> dict talks to the server; raises on a non-200 reply."""
+        self.native = NativeSlotCache(self.store, self.slot_dir, self.sha, self.signature, post)
+        clear_slot_files(self.slot_dir)  # leftovers of a crashed run
+
+    def disable(self) -> None:
+        self.disabled = True
+        while True:
+            try:
+                self._queue.get_nowait()
+                self._queue.task_done()
+            except queue.Empty:
+                break
+        with self._cv:
+            self._saving = False
+            self._cv.notify_all()
+        self.flush()
+        self._forget()
+        clear_slot_files(self.slot_dir)
+
+    def _forget(self) -> None:
+        with self._cv:
+            self.live_tokens, self.live_local, self.dirty = [], False, False
+            self._epoch += 1
+
+    def barrier(self, timeout: float = 60.0) -> None:
+        """Wait until no save is reading the slot."""
+        with self._cv:
+            self._cv.wait_for(lambda: not self._saving, timeout)
+
+    # -- per request ----------------------------------------------------
+
+    def begin(self, local: bool, prompt_ids) -> list[int] | None:
+        """Before a request. Restores a saved prefix when it beats the live slot.
+
+        prompt_ids() returns the prompt's token ids; it is not called for a request
+        that may not use the cache. Returns the ids to hand to finish(), or None.
+        """
+        self.barrier()
+        if self.disabled or not local or self.native is None:
+            self._forget()
+            return None
+        try:
+            ids = list(prompt_ids())
+            live = _common_prefix(self.live_tokens, ids) if self.live_local else 0
+            if len(ids) >= self.store.min_tokens:
+                started = time.monotonic()
+                got = self.native.restore(ids, min_matched=live, max_tokens=self.context)
+                if got is not None:
+                    self.last_restore = {**{k: v for k, v in got.items() if k != "tokens"},
+                                         "seconds": round(time.monotonic() - started, 3)}
+                    logger.info("split_prompt_cache_restore entry=%s tokens=%d matched=%d seconds=%.3f", got["entry"],
+                                got["saved_tokens"], got["matched_tokens"], self.last_restore["seconds"])
+            with self._cv:
+                self.live_tokens, self.live_local, self.dirty = ids, True, True
+                self._epoch += 1
+            return ids
+        except Exception:  # noqa: BLE001 - an optimisation, never a request failure
+            logger.warning("split_prompt_cache_begin_failed", exc_info=True)
+            self._forget()
+            return None
+
+    def finish(self, ids: list[int] | None, completed: bool) -> None:
+        """After a request. A completed local request queues a save of the slot."""
+        if ids is None or self.disabled or not completed or len(ids) < self.store.min_tokens or self.native is None:
+            return
+        with self._cv:
+            self._saving = True
+        try:
+            self._queue.put_nowait("save")
+        except queue.Full:
+            with self._cv:
+                self._saving = False
+                self._cv.notify_all()
+
+    # -- saving ---------------------------------------------------------
+
+    def _save_slot(self) -> None:
+        """Save slot 0 into the store. The caller holds the barrier or is closing."""
+        native = self.native
+        name = f"save-{os.getpid()}-{threading.get_ident()}-{time.monotonic_ns()}.slot"
+        path = self.slot_dir / name
+        started = time.monotonic()
+        try:
+            native._post("/slots/0?action=save", {"filename": name})
+            tokens = read_slot_tokens(path)
+            with self._cv:
+                epoch = self._epoch
+                # Whose state the file holds is settled here, before the barrier opens:
+                # a request of another machine may start the moment it does.
+                local = self.live_local and not self.disabled
+                if local:
+                    self.live_tokens = tokens
+                self._saving = False
+                self._cv.notify_all()
+            if not local or self.disabled:
+                return
+            eid = self.store.save(self.sha, self.signature, tokens, path)
+            with self._cv:
+                if self._epoch == epoch:
+                    self.dirty = False
+            if eid:
+                self.last_save = {"entry": eid, "tokens": len(tokens), "seconds": round(time.monotonic() - started, 3)}
+                logger.info("split_prompt_cache_save entry=%s tokens=%d seconds=%.3f", eid, len(tokens),
+                            self.last_save["seconds"])
+        finally:
+            with self._cv:
+                self._saving = False
+                self._cv.notify_all()
+            with _suppress():
+                path.unlink()
+
+    def _run(self) -> None:
+        while True:
+            item = self._queue.get()
+            try:
+                if item is None:
+                    return
+                if not self.disabled:
+                    self._save_slot()
+            except Exception:  # noqa: BLE001
+                logger.warning("split_prompt_cache_save_failed", exc_info=True)
+            finally:
+                self._queue.task_done()
+
+    def flush(self, timeout: float = 60.0) -> None:
+        deadline = time.monotonic() + timeout
+        while self._queue.unfinished_tasks and time.monotonic() < deadline:
+            time.sleep(0.01)
+
+    def final_save(self) -> None:
+        """Before the server stops: save the live slot if local requests made it and the store lacks it."""
+        self.flush()
+        if self.disabled or self.native is None or not (self.live_local and self.dirty) \
+                or len(self.live_tokens) < self.store.min_tokens:
+            return
+        self._save_slot()
+
+    def close(self) -> None:
+        """Stop the writer. The server must already be saved (final_save) or gone."""
+        self.flush()
+        with _suppress():
+            self._queue.put_nowait(None)

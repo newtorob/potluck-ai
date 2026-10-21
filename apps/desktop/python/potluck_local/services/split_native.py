@@ -16,7 +16,7 @@ import time
 
 import httpx
 
-from . import prompt_guard
+from . import prompt_cache, prompt_guard
 
 logger = logging.getLogger(__name__)
 PIN = json.loads(importlib.resources.files("potluck_local.data").joinpath("split-engine.json").read_text())
@@ -131,6 +131,8 @@ class _SplitRequest:
     sent: bool = False
     prevented_send: bool = False
     admitted: bool = False
+    # Waiting on or running a slot restore: a bounded native call cancel() must not mistake for a hang.
+    restoring: bool = False
 
 
 class SplitModel:
@@ -141,10 +143,13 @@ class SplitModel:
     """
     managed_split = True
 
-    def __init__(self, process: NativeProcess, port: int, key: str, on_close, protected_tokens=None):
+    def __init__(self, process: NativeProcess, port: int, key: str, on_close, protected_tokens=None, slot_cache=None):
         # protected_tokens() lists the control-token texts of the loaded vocab, for
         # prompt_guard. None leaves every request on the server's own chat endpoint.
+        # slot_cache is a prompt_cache.SplitSlotCache for a server started with
+        # --slot-save-path, or None for no disk prompt cache.
         self.process, self.on_close = process, on_close
+        self._slot_cache = slot_cache
         self._protected_tokens = protected_tokens
         self._guard_cache: prompt_guard.PromptGuard | None | bool = False
         self.base = f"http://127.0.0.1:{port}"
@@ -153,6 +158,8 @@ class SplitModel:
         self.failure = None
         self._state_lock = threading.Lock()
         self._request: _SplitRequest | None = None
+        if slot_cache is not None:
+            slot_cache.bind(self._slot_post)
 
     @staticmethod
     def _interrupt(request: _SplitRequest | None):
@@ -176,9 +183,12 @@ class SplitModel:
         try:
             self.process.close()
         finally:
+            if self._slot_cache is not None:
+                self._slot_cache.close()
             self.on_close()
 
     def close(self):
+        self._save_live_slot()
         self._close()
 
     def _slot_busy(self, timeout: float) -> bool | None:
@@ -224,6 +234,10 @@ class SplitModel:
                 request.admitted = True
         self._interrupt(request)
         while time.monotonic() < deadline:
+            if request.restoring:
+                # A slot restore ends by itself (its own HTTP timeout); stopping the
+                # engine over it would throw away the state being restored.
+                deadline = max(deadline, time.monotonic() + CANCEL_GRACE_SECONDS)
             with self._state_lock:
                 if self.closed or self._request is not request:
                     return
@@ -383,6 +397,68 @@ class SplitModel:
                    for c in result.get("choices", []) if isinstance(c, dict)]
         return {**{k: v for k, v in result.items() if k != "choices"}, "object": "chat.completion", "choices": choices}
 
+    # -- disk prompt cache (prompt_cache.SplitSlotCache) ------------------------------
+
+    def _slot_post(self, path: str, body: dict) -> dict:
+        with httpx.Client(timeout=httpx.Timeout(60, connect=3), trust_env=False) as client:
+            response = client.post(self.base + path, headers=self.headers, json=body)
+        if response.status_code != 200:
+            raise SplitError("The split engine could not move a prompt state.", 502)
+        return response.json()
+
+    def _prompt_ids(self, request: _SplitRequest, path: str, body: dict) -> list[int]:
+        """The token ids the server evaluates for this request.
+
+        A request prepared by _prepare already carries them. A clean one is rendered
+        and tokenized the way the server's chat endpoint does it, by the same server:
+        /apply-template, then /tokenize with add_special and parse_special on (the
+        pinned server-context tokenizes a rendered chat prompt with both on). The ids
+        only choose which saved prefix to load, and the server matches the prompt
+        itself, so a difference could cost a miss and never a wrong answer.
+        """
+        if path == COMPLETION_PATH:
+            return list(body["prompt"])
+        template = {k: body[k] for k in _TEMPLATE_KEYS if k in body}
+        with httpx.Client(timeout=httpx.Timeout(30, connect=3), trust_env=False) as client:
+            text = self._post(client, request, "/apply-template", template)["prompt"]
+            return self._post(client, request, "/tokenize", {"content": text, "add_special": True, "parse_special": True})["tokens"]
+
+    def _cache_begin(self, request: _SplitRequest, path: str, body: dict):
+        cache = self._slot_cache
+        if cache is None:
+            return None
+        request.restoring = True
+        try:
+            return cache.begin(prompt_cache.request_is_local.get(), lambda: self._prompt_ids(request, path, body))
+        except Exception:  # noqa: BLE001 - never fail a request over the cache
+            logger.warning("split_prompt_cache_begin_failed", exc_info=True)
+            return None
+        finally:
+            request.restoring = False
+
+    def _cache_finish(self, ids, completed: bool):
+        if self._slot_cache is not None and not self.closed:
+            try:
+                self._slot_cache.finish(ids, completed)
+            except Exception:  # noqa: BLE001
+                logger.warning("split_prompt_cache_finish_failed", exc_info=True)
+
+    def _save_live_slot(self):
+        """On unload, model swap and shutdown: keep the live slot if local requests made it."""
+        cache = self._slot_cache
+        if cache is None or self.closed:
+            return
+        with self._state_lock:
+            request = self._request
+            if request is not None and not request.finished.is_set():
+                return  # a request is running: the slot is mid-decode
+        if self.process.process.poll() is not None:
+            return
+        try:
+            cache.final_save()
+        except Exception:  # noqa: BLE001
+            logger.warning("split_prompt_cache_final_save_failed", exc_info=True)
+
     def create_chat_completion(self, **kwargs):
         cancel_event = kwargs.pop("cancel_event", None)
         request = self._begin(cancel_event)
@@ -393,9 +469,11 @@ class SplitModel:
         if kwargs.get("stream"):
             return self._stream(body, request)
         ticket = prompt_guard.NO_TICKET
+        ids, done = None, False
         try:
             self._start(request)
             path, body, ticket = self._prepare(request, body)
+            ids = self._cache_begin(request, path, body)
             with httpx.Client(timeout=httpx.Timeout(180, connect=3), trust_env=False) as client:
                 response = client.post(self.base + path, headers=self.headers, json=body,
                                        extensions={"trace": self._trace(request)})
@@ -405,6 +483,7 @@ class SplitModel:
                 if response.status_code != 200 or not isinstance(result, dict) or result.get("error") \
                         or not result.get("choices") or not all(isinstance(c, dict) and c.get("finish_reason") for c in result["choices"]):
                     raise SplitError("The split engine could not complete this request.", 502)
+                done = True
                 return self._chat_reply(result) if path == COMPLETION_PATH else result
         except Exception:
             if request.cancelled.is_set():
@@ -412,14 +491,17 @@ class SplitModel:
             raise self.failed("Split inference failed. Check worker status and start again.") from None
         finally:
             ticket.close()
+            self._cache_finish(ids, done)
             request.finished.set()
 
     def _stream(self, body, request):
         terminal = False
         ticket = prompt_guard.NO_TICKET
+        ids, done = None, False
         try:
             self._start(request)
             path, body, ticket = self._prepare(request, body)
+            ids = self._cache_begin(request, path, body)
             with httpx.Client(timeout=httpx.Timeout(90, connect=3), trust_env=False) as client:
                 with client.stream("POST", self.base + path, headers=self.headers, json=body,
                                    extensions={"trace": self._trace(request)}) as response:
@@ -435,6 +517,7 @@ class SplitModel:
                         if data == "[DONE]":
                             if not terminal:
                                 raise SplitError("Split inference ended without a completion event.", 502)
+                            done = True
                             return
                         chunk = json.loads(data)
                         if "error" in chunk:
@@ -455,6 +538,7 @@ class SplitModel:
             raise self.failed("Split inference was interrupted. Check worker status and start again.") from None
         finally:
             ticket.close()
+            self._cache_finish(ids, done)
             request.finished.set()
 
     @staticmethod

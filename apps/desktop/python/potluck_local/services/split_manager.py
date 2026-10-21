@@ -9,6 +9,7 @@ import asyncio
 from contextlib import suppress
 import hmac
 import ipaddress
+import logging
 import os
 import secrets
 import time
@@ -20,13 +21,14 @@ import websockets
 
 from .gateway_routing import household_peers, PEER_SIDECAR_PORT
 from .model_identity import artifact_identity
-from . import prompt_guard
+from . import prompt_cache, prompt_guard
 from .model_lifecycle import get_model_lifecycle
 from .runtime import get_runtime
 from .settings_manager import get_settings, save_settings
 from .split_native import PIN, NativeProcess, SplitError, SplitModel, engine_bundle, free_port
 from .split_memory import probe_fit_arguments, shared_memory_budget
 
+logger = logging.getLogger(__name__)
 WORKER_KEY = "potluck.split_worker_enabled"
 LEASE_SECONDS = 30
 LOAD_SECONDS = 1200
@@ -36,13 +38,16 @@ SPLIT_PEER_PORT = int(os.environ.get("POTLUCK_SPLIT_PEER_PORT", str(PEER_SIDECAR
 
 
 def head_arguments(root, path, port: int, context: int, threads: int, endpoints: list[str],
-                   memory_args: list[str]) -> list[str]:
+                   memory_args: list[str], slot_dir=None) -> list[str]:
     """The head's native command line. Kept pure so tests can read the plan."""
     return [str(root / "llama-server"), "--model", str(path),
             "--host", "127.0.0.1", "--port", str(port), "--ctx-size", str(context),
             "--threads", str(threads),
             "--rpc", ",".join(endpoints), *memory_args, "--split-mode", "layer",
             "--parallel", "1", "--no-warmup", "--no-webui",
+            # Slot files for the disk prompt cache (prompt_cache.SplitSlotCache); the
+            # directory is private to this user and only a local request writes there.
+            *(["--slot-save-path", str(slot_dir)] if slot_dir else []),
             # The pinned engine emits allocation records at level
             # four. The supervisor forwards only numeric counters.
             "--log-verbosity", "4"]
@@ -68,6 +73,42 @@ async def pipe_pair(first, second):
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
+
+
+def slot_cache_for(head: dict, manifest: dict, path) -> "prompt_cache.SplitSlotCache | None":
+    """The disk prompt cache for this split, or None when it must stay off.
+
+    Same gates as the in-process cache (Runtime._attach_prompt_cache): chat history
+    and the cache switch both on, and a model whose state can be trimmed to a
+    shorter prefix. Splits with RPC workers are covered: slot save and restore
+    moves the KV cache of layers that sit on a worker too (checked against a
+    localhost rpc-server, bit-identical to a fresh decode of the last token).
+    """
+    try:
+        from potluck_local.config import get_local_settings
+
+        settings = get_settings()
+        if not (settings.privacy.chat_history_enabled and settings.runtime.prompt_cache):
+            return None
+        reason = prompt_cache.eligibility(prompt_cache.read_gguf_metadata(path))
+        if reason:
+            logger.info("split_prompt_cache_off model_id=%s reason=%s", head["model"]["id"], reason)
+            return None
+        data_dir = get_local_settings().data_dir
+        slot_dir = prompt_cache.slot_root(data_dir)
+        slot_dir.mkdir(parents=True, exist_ok=True)
+        os.chmod(slot_dir, 0o700)
+        store = prompt_cache.PromptCacheStore(
+            prompt_cache.cache_root(data_dir),
+            max_bytes=int(settings.runtime.prompt_cache_max_gib * 1024 ** 3),
+            ttl_seconds=settings.runtime.prompt_cache_ttl_hours * 3600)
+        store.sweep()
+        signature = prompt_cache.split_signature(manifest["commit"], manifest["backend"],
+                                                 [w.get("backend") for w in head["workers"]])
+        return prompt_cache.SplitSlotCache(store, slot_dir, head["model"]["sha256"], signature, head["context"])
+    except Exception:  # noqa: BLE001 - an optimisation, never a load failure
+        logger.warning("split_prompt_cache_attach_failed", exc_info=True)
+        return None
 
 
 class SplitManager:
@@ -349,7 +390,7 @@ class SplitManager:
                         worker["server"] = await asyncio.start_server(
                             lambda r, w, peer=worker: self._head_tunnel(peer, r, w), "127.0.0.1", 0)
                 endpoints = [f"127.0.0.1:{w['server'].sockets[0].getsockname()[1]}" for w in head["workers"]]
-                root, _ = engine_bundle()
+                root, manifest = engine_bundle()
                 memory_args = await probe_fit_arguments(root, endpoints,
                     {str(w["server"].sockets[0].getsockname()[1]): w for w in head["workers"]})
                 from potluck_local.routers.models import _safe_model_dir
@@ -361,15 +402,18 @@ class SplitManager:
                         raise SplitError("Unload the head's current model before starting a split.")
                     # Keep other model commands out until the new process has
                     # loaded and its original pinned file has been rechecked.
+                    slot_cache = await asyncio.to_thread(slot_cache_for, head, manifest, path)
+                    head["slotCache"] = slot_cache
                     process = NativeProcess(head_arguments(root, path, port, head["context"],
-                        get_settings().runtime.threads or 4, endpoints, memory_args), env={"LLAMA_API_KEY": key})
+                        get_settings().runtime.threads or 4, endpoints, memory_args,
+                        slot_cache.slot_dir if slot_cache else None), env={"LLAMA_API_KEY": key})
                     head["process"] = process
                     head["phase"] = "loading"
                     loop = asyncio.get_running_loop()
                     def closed():
                         with suppress(RuntimeError):
                             loop.call_soon_threadsafe(lambda: asyncio.create_task(self._adapter_closed(head)))
-                    adapter = SplitModel(process, port, key, closed, lambda: prompt_guard.gguf_protected_tokens(path))
+                    adapter = SplitModel(process, port, key, closed, lambda: prompt_guard.gguf_protected_tokens(path), slot_cache)
                     head["adapter"] = adapter
                     async with httpx.AsyncClient(timeout=2, trust_env=False) as client:
                         while True:
@@ -435,6 +479,8 @@ class SplitManager:
             await get_runtime().release_split_async(adapter)
         elif head.get("process"):
             await asyncio.to_thread(head["process"].close)
+        if head.get("slotCache") and not adapter:
+            head["slotCache"].close()  # the adapter closes its own
         async with httpx.AsyncClient(timeout=3, trust_env=False) as client:
             for worker in head["workers"]:
                 if worker.get("server"):
