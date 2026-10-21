@@ -97,6 +97,56 @@ Older runtimes and mismatched model files fail clearly instead of substituting.
 See [project model locking](../../docs/project-model-locking.md) for commands,
 download behavior, and supported backends.
 
+## Experimental model recipes
+
+Recipes pair immutable GGUF bytes with a specific native `llama-server` commit,
+acceleration mode and context/cache settings. A recipe is a configuration to
+evaluate; it is not a model quality, speed or hardware qualification.
+
+```sh
+potluck models recipes --json
+potluck models preflight <recipe-id>
+potluck models install-recipe <recipe-id>
+potluck models progress <model-id>
+potluck models load-recipe <recipe-id>
+```
+
+`recipes` lists the runtime's catalog without probing hardware. `preflight` checks
+the declared platform and engine, live available memory and disk, and the exact
+installed file's size and SHA-256. It explains install and load blockers
+separately; unknown capacity remains unknown. RAM/VRAM requirements are estimates
+for that recipe's context and cache, not measured performance. These two commands
+do not download, load, change preferences or enable sharing. A passing preflight
+is only a snapshot; the runtime checks again before an install or load.
+
+`install-recipe` explicitly starts the pinned download in the background and
+prints the model ID for `models progress`. It does not load the model. Existing
+files that conflict with the pin are refused without overwriting them.
+`load-recipe` explicitly replaces the current local model using the recipe's
+engine and settings, with no fallback or implicit download. The load is **session
+only**: it clears the saved startup model so a restart cannot silently restore
+different settings. Runtime preferences remain unchanged. Unload with the usual
+`potluck models unload <model-id>`. Recipes do not create or change a project's
+`potluck.lock`; its exact model pin still applies to coding sessions.
+
+All four commands support `--json`. The CLI emits an allowlisted object with
+`schemaVersion: 1` and `action`; recipe and preflight fields retain the runtime's
+snake_case names. `preflight` exits 0 only when `can_load` is true, or 1 when
+blocked (including missing weights even if installation is possible). Other
+commands exit 0 on success, 1 on failure; invalid arguments exit 2. Recipe
+preflight/install/load use a 120-second timeout, configurable with `--timeout`
+up to 300000 ms. Hashing large files can take time. A timed-out load may still
+finish; check `potluck status` before retrying.
+
+The local runtime API is `GET /models/recipes`,
+`GET /models/recipes/{recipe_id}/preflight`,
+`POST /models/recipes/{recipe_id}/install`, and
+`POST /models/recipes/{recipe_id}/load`. Inspection returns `schema_version: 1`;
+preflight includes `recipe`, `installed`, `artifact_verified`, `can_install`,
+`can_load`, `issues`, `warnings` and `resources`. Each issue names which action it
+blocks. Install returns `status`, `slug` and `recipe_id`; load returns
+`status: "loaded"`, `model_id`, `recipe_id` and `autoload: false`.
+
 ## Usage
 
 Managed split models run one pinned GGUF across explicitly selected owned machines
@@ -791,6 +841,60 @@ codes: 0 measured, 1 not measured (or the previous model could not be restored),
 (set when only the other machines were measured) and, with `--scope mine`, `mine`. Engine error text, addresses and keys are never printed.
 It needs a running engine and a runtime that has the model setup and benchmark
 routes (`potluck up`).
+
+### Launch OpenCode (experimental)
+
+Install OpenCode **1.19.3** separately, then use it with an already loaded,
+tool-capable model:
+
+```sh
+potluck launch opencode --scope local
+potluck launch opencode --scope mine
+potluck launch opencode --message "Read README.md and explain this project"
+```
+
+`POTLUCK_OPENCODE_BIN` can name an absolute executable path. The launcher checks
+this exact OpenCode version because its isolated-profile behavior is version
+specific. It does not install OpenCode, download a model or change your loaded
+model. Update/install the tested client yourself; unsupported versions stop with
+guidance.
+
+The selected model must pass a synthetic function-call and tool-result round
+trip before OpenCode receives your project request. The probe executes no tool
+and sends no project content. It confirms basic protocol readiness, not coding
+quality. The bridge fixes every inference request to the selected model,
+`local`/`mine` scope and project model lock, including OpenCode's small model.
+Only a temporary bridge credential reaches OpenCode; the gateway key stays in
+Potluck.
+
+OpenCode uses a temporary profile and skips existing global/project provider,
+plugin and MCP configuration. Existing files remain unchanged. The launcher
+verifies the effective configuration and refuses conflicting managed overrides.
+External plugins, sharing, automatic updates and remote model-catalog fetching
+are disabled. Read/glob/grep/list tools are allowed; other tools, including file
+edits and shell commands, require OpenCode approval. Web fetch/search are denied
+for this launch. `--message` is a noninteractive request: it cannot approve edits
+or commands. Use the interactive launcher to work on code. Temporary session
+history and profile data are removed when the launcher exits normally; this
+launch does not resume an existing OpenCode session. This is configuration
+isolation, not an OS sandbox for OpenCode or approved shell commands.
+
+Potluck requires at least **16,384 loaded context tokens**, reserves 512 tokens
+for the template, and caps output at 4,096 tokens. Every request is checked with
+a conservative UTF-8 byte estimate covering messages, tool results, call
+arguments and tool schemas. Tool-heavy prompts can require much more than the
+launch minimum; the real-client smoke uses a **65,536-token fixture**. If a
+request is too large, no content is truncated or forwarded. The loaded context
+is rechecked on each request; the runtime remains authoritative about actual
+tokens. A bridge rejection makes a one-shot launch exit nonzero even if the
+client itself exits zero.
+
+Validation: `POTLUCK_OPENCODE_BIN=/absolute/path/to/opencode node
+scripts/validate-opencode.cjs` from `apps/cli` runs the real 1.19.3 client against
+synthetic inference in a disposable project. It checks a real file-read tool
+round trip, routing/pin enforcement and preservation of a conflicting project
+config. It does not run a model or measure model quality. Tested on macOS Apple
+Silicon; Linux and Windows execution are not yet validated.
 
 ### Launch Aider
 

@@ -6,7 +6,7 @@ const hash = "a".repeat(64);
 const cleanup: Array<() => Promise<void>> = [];
 const budget = { contextWindowTokens: 8192, maxInputTokens: 5632, maxOutputTokens: 2048 };
 afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
-async function fixture(acknowledge = true, limits?: typeof budget) {
+async function fixture(acknowledge = true, limits?: typeof budget, nativeTools = false) {
   const calls: Array<{ headers: import("node:http").IncomingHttpHeaders; body: any }> = [];
   const contextCalls: Array<{ url: URL; headers: import("node:http").IncomingHttpHeaders }> = [];
   const context = { window: 8192 as number | null, status: 200, model: "test", scope: "local" };
@@ -29,7 +29,7 @@ async function fixture(acknowledge = true, limits?: typeof budget) {
   cleanup.push(() => new Promise<void>(resolve => { server.close(() => resolve()); server.closeAllConnections(); }));
   const port = (server.address() as import("node:net").AddressInfo).port;
   const proxy = await startIntegrationProxy({ baseURL: `http://127.0.0.1:${port}/v1`, apiKey: "actual-gateway-secret", enabled: true,
-    modelLock: { path: "/project/potluck.lock", schemaVersion: 1, model: { id: "test", format: "gguf", sizeBytes: 10, sha256: hash } } }, "test", "local", limits);
+    modelLock: { path: "/project/potluck.lock", schemaVersion: 1, model: { id: "test", format: "gguf", sizeBytes: 10, sha256: hash } } }, "test", "local", limits, nativeTools);
   cleanup.push(proxy.close);
   const post = (body: unknown, key = proxy.key) => fetch(proxy.baseURL + "/chat/completions", {
     method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "X-Potluck-Scope": "pool" }, body: JSON.stringify(body),
@@ -174,4 +174,26 @@ it("validates launcher arguments without consuming coding-agent options", () => 
   for (const args of [["launch", "unknown"], ["launch", "aider", "--json"], ["launch", "aider", "--scope", "pool"], ["--message", "hi"]]) {
     expect(() => parseArgs(args)).toThrow();
   }
+});
+
+
+it("forwards native function history and schemas intact only on the opted-in bridge", async () => {
+  const { post, calls } = await fixture(true, budget, true);
+  const messages = [{ role: "user", content: "read the file" },
+    { role: "assistant", content: null, tool_calls: [{ id: "read-1", type: "function", function: { name: "read", arguments: '{"path":"README.md"}' } }] },
+    { role: "tool", tool_call_id: "read-1", content: [{ type: "text", text: "file content" }] }];
+  const tools = [{ type: "function", function: { name: "read", parameters: { type: "object" } } }];
+  const response = await post({ model: "test", messages, tools, tool_choice: "auto", stream: true });
+  expect(response.status).toBe(200); expect(await response.text()).toContain("[DONE]");
+  expect(calls[0].body).toMatchObject({ messages, tools, tool_choice: "auto", potluck_model_sha256: hash, max_tokens: 2048 });
+  expect(calls[0].headers["x-potluck-scope"]).toBe("local");
+});
+
+it("counts oversized schemas and tool results before contacting upstream on the native bridge", async () => {
+  const { post, calls } = await fixture(true, budget, true);
+  for (const extra of [
+    { tools: [{ type: "function", function: { name: "read", description: "x".repeat(6000) } }], messages: [] },
+    { messages: [{ role: "tool", tool_call_id: "read-1", content: "x".repeat(6000) }] },
+  ]) expect((await post({ model: "test", ...extra })).status).toBe(400);
+  expect(calls).toHaveLength(0);
 });

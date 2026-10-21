@@ -13,7 +13,7 @@ import { startIntegrationProxy } from "./integration-proxy.js";
 import { AiderContextError, planAiderContext, type AiderContextBudget } from "./aider-context.js";
 
 /** Keep useful setup guidance without reflecting untrusted gateway bodies. */
-function preflightError(error: unknown, stage: "setup" | "context" | "probe"): Error {
+export function preflightError(error: unknown, stage: "setup" | "context" | "probe", agent = "Aider"): Error {
   if (error instanceof ModelLockError || error instanceof UsageError || error instanceof RuntimeError) return error;
   if (error instanceof GatewayDisabledError || error instanceof AiderContextError) return new RuntimeError(error.message);
   const message = error instanceof Error ? error.message : "";
@@ -45,7 +45,7 @@ function preflightError(error: unknown, stage: "setup" | "context" | "probe"): E
   if (stage === "probe") {
     return new RuntimeError("The selected model did not complete a usable readiness reply. Check potluck doctor and update Potluck on the local and serving machines, then retry.");
   }
-  return new RuntimeError("Could not prepare Aider's Potluck connection. Check gateway settings, load a model, and run potluck doctor before retrying.");
+  return new RuntimeError(`Could not prepare ${agent}'s Potluck connection. Check gateway settings, load a model, and run potluck doctor before retrying.`);
 }
 
 async function prepareAider(args: CliArgs): Promise<{ cfg: GatewayConfig; model: string; scope: Scope; budget: AiderContextBudget }> {

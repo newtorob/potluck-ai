@@ -225,16 +225,16 @@ export function parseArgs(argv: string[]): CliArgs {
       if ((out.jobs !== undefined || out.maxTokens !== undefined || out.minFreeMemory !== undefined) && out.action !== "limits") throw new UsageError("Limit options require contribute limits.");
     } else if (out.command === "launch") {
       out.action = positional[1];
-      if ((!out.help && out.action !== "aider") || positional.length > 2) throw new UsageError("Use potluck launch aider [--model <id>] [--scope local|mine] [--message <prompt>].");
+      if ((!out.help && !["aider", "opencode"].includes(out.action || "")) || positional.length > 2) throw new UsageError("Use potluck launch aider|opencode [--model <id>] [--scope local|mine] [--message <prompt>].");
     } else if (out.command === "service") {
       out.action = positional[1] || "status";
       if (positional.length > 2 || !["install", "uninstall", "start", "stop", "restart", "status"].includes(out.action)) throw new UsageError("Use potluck service install|uninstall|start|stop|restart|status.");
     } else if (out.command === "models") {
       out.action = positional[1] || "list";
-      if (!["list", "available", "recommend", "install", "load", "unload", "progress", "cancel", "autoload", "pin", "lock", "sync", "unpin", "test"].includes(out.action)) throw new UsageError("Unknown model action. Run potluck models --help.");
+      if (!["list", "available", "recommend", "recipes", "preflight", "install-recipe", "load-recipe", "install", "load", "unload", "progress", "cancel", "autoload", "pin", "lock", "sync", "unpin", "test"].includes(out.action)) throw new UsageError("Unknown model action. Run potluck models --help.");
       out.target = positional[2];
-      if (positional.length > 3 || (["list", "available", "recommend", "lock", "sync", "unpin"].includes(out.action) && out.target)
-          || (!["list", "available", "recommend", "autoload", "lock", "sync", "unpin", "test"].includes(out.action) && !out.target && !out.help)) throw new UsageError("Use potluck models <action> <model-id>.");
+      if (positional.length > 3 || (["list", "available", "recommend", "recipes", "lock", "sync", "unpin"].includes(out.action) && out.target)
+          || (!["list", "available", "recommend", "recipes", "autoload", "lock", "sync", "unpin", "test"].includes(out.action) && !out.target && !out.help)) throw new UsageError("Use potluck models <action> <model-or-recipe-id>.");
       if (out.action === "autoload" && out.target && !["on", "off"].includes(out.target)) throw new UsageError("Use potluck models autoload [on|off].");
       if (out.target && (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(out.target) || out.target.length > 200)) throw new UsageError("Use a model ID from potluck models list.");
     } else if (out.command === "gateway") {
@@ -286,11 +286,13 @@ export function parseArgs(argv: string[]): CliArgs {
   if (out.command === "benchmark" && !seen.has("--timeout")) out.timeout = 120000;
   // The answer check generates text, which a slow CPU can stretch past 30 s.
   const modelTest = out.command === "models" && out.action === "test";
-  if (modelTest && !seen.has("--timeout")) out.timeout = 120000;
-  if (out.command !== "run" && out.command !== "benchmark" && !modelTest && out.timeout > 30000) throw new UsageError("--timeout must be an integer from 1 to 30000 for this command.");
+  // Recipe operations verify exact model bytes, which can take time even without a load.
+  const modelRecipe = out.command === "models" && ["preflight", "install-recipe", "load-recipe"].includes(out.action || "");
+  if ((modelTest || modelRecipe) && !seen.has("--timeout")) out.timeout = 120000;
+  if (out.command !== "run" && out.command !== "benchmark" && !modelTest && !modelRecipe && out.timeout > 30000) throw new UsageError("--timeout must be an integer from 1 to 30000 for this command.");
   if (out.command === "launch" && out.json) throw new UsageError("launch runs an external tool; JSON output is not supported.");
   if (out.command === "serve" && (out.json || seen.has("--timeout"))) throw new UsageError("serve runs in the foreground; use service status --json for reports.");
-  if (out.command === "models" && !modelTest && !seen.has("--timeout")) out.timeout = 30000;
+  if (out.command === "models" && !modelTest && !modelRecipe && !seen.has("--timeout")) out.timeout = 30000;
   if ((out.full || out.force) && !modelTest) throw new UsageError("--full and --force require models test.");
   if (["setup", "login", "logout", "household", "connect", "disconnect", "circle"].includes(out.command || "") && !seen.has("--timeout")) out.timeout = 30000;
   if (out.command && out.version) throw new UsageError("--version must be used without a command.");

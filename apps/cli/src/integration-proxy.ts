@@ -6,6 +6,7 @@ import { pipeline } from "node:stream/promises";
 import type { GatewayConfig, Scope } from "./config.js";
 import { modelContextWindow, type ChatMessage } from "./gateway.js";
 import { estimateContextTokens } from "./context.js";
+import { toolRequestTokens } from "./integration-tools.js";
 
 interface IntegrationBudget {
   contextWindowTokens: number;
@@ -13,13 +14,14 @@ interface IntegrationBudget {
   maxOutputTokens: number;
 }
 
-export async function startIntegrationProxy(cfg: GatewayConfig, model: string, scope: Scope, budget?: IntegrationBudget) {
+export async function startIntegrationProxy(cfg: GatewayConfig, model: string, scope: Scope, budget?: IntegrationBudget, nativeTools = false) {
+  if (nativeTools && !budget) throw new Error("Native-tool integrations require a context budget.");
   const key = randomBytes(32).toString("hex");
   let requestRejected = false;
   const active = new Set<AbortController>();
   const server = createServer(async (req, res) => {
     const reply = (status: number, message: string) => {
-      if (budget && status === 400) requestRejected = true;
+      if (budget && status >= 400) requestRejected = true;
       if (res.headersSent) { res.destroy(); return; }
       res.writeHead(status, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: { message, type: status === 400 ? "invalid_request_error" : "potluck_integration_error" } }));
@@ -47,7 +49,7 @@ export async function startIntegrationProxy(cfg: GatewayConfig, model: string, s
       catch { reply(400, "Invalid JSON request."); return; }
       if (!body || Array.isArray(body) || typeof body !== "object") { reply(400, "Invalid request."); return; }
       if (body.model !== model) { reply(409, "This launch is fixed to its selected model. Restart potluck launch to change models."); return; }
-      if (body.tools || body.functions || !Array.isArray(body.messages)) { reply(400, "This integration uses plain chat messages; native tool calls are not supported."); return; }
+      if ((!nativeTools && body.tools) || body.functions || !Array.isArray(body.messages)) { reply(400, "This integration does not support this message or tool format."); return; }
       const digest = cfg.modelLock?.model.sha256;
       if (body.potluck_model_sha256 && body.potluck_model_sha256 !== digest) { reply(409, "Request conflicts with the project model lock."); return; }
       if (digest) body.potluck_model_sha256 = digest;
@@ -57,10 +59,12 @@ export async function startIntegrationProxy(cfg: GatewayConfig, model: string, s
         const plainMessages = body.messages.every(message => message && typeof message === "object" && !Array.isArray(message)
           && ["system", "user", "assistant"].includes(message.role) && typeof message.content === "string"
           && Object.keys(message).every(key => key === "role" || key === "content"));
-        if (!plainMessages || body.response_format != null || body.tool_choice != null || body.function_call != null) {
+        if ((!nativeTools && (!plainMessages || body.tool_choice != null)) || body.response_format != null || body.function_call != null) {
           reply(400, "This launch supports plain text messages only. Remove structured output, images and native tools."); return;
         }
-        const estimate = estimateContextTokens(body.messages as ChatMessage[]);
+        let estimate: number;
+        try { estimate = nativeTools ? toolRequestTokens(body) : estimateContextTokens(body.messages as ChatMessage[]); }
+        catch { reply(400, "This launch supports text and native function tools only. Remove images, audio and unsupported message fields."); return; }
         if (estimate > budget.maxInputTokens) {
           // Aider retries 413/409/503 responses. These require user action, so
           // return a nonretryable OpenAI-style invalid-request error instead.
@@ -92,6 +96,7 @@ export async function startIntegrationProxy(cfg: GatewayConfig, model: string, s
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.apiKey}`, "X-Potluck-Scope": scope },
         body: JSON.stringify(body),
       });
+      if (!upstream.ok) requestRejected = true;
       if (upstream.ok && digest && (upstream.headers.get("x-potluck-model-lock") !== "1"
           || upstream.headers.get("x-potluck-model-sha256") !== digest)) {
         await upstream.body?.cancel(); reply(502, "Runtime did not acknowledge the project lock. Upgrade the runtime."); return;
