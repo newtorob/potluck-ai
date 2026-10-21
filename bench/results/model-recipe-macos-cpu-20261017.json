@@ -1,0 +1,120 @@
+{
+  "kind": "recipe_protocol_smoke_not_quality_benchmark",
+  "utc": "2026-10-17T01:16:10.059071+00:00",
+  "platform": "Darwin",
+  "arch": "arm64",
+  "recipe": {
+    "id": "qwen2.5-0.5b-instruct-q4-k-m-cpu-4k",
+    "name": "Qwen2.5 0.5B Instruct Q4_K_M \u00b7 CPU \u00b7 4K",
+    "model": {
+      "id": "qwen-2.5-0.5b-instruct-q4",
+      "repository": "Qwen/Qwen2.5-0.5B-Instruct-GGUF",
+      "revision": "9217f5db79a29953eb74d5343926648285ec7e67",
+      "filename": "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+      "sha256": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+      "size_bytes": 491400032
+    },
+    "engine": {
+      "backend": "llama-server",
+      "commit": "5a32f7b66ef6cfb3e60deea26e3454cc6ad3438c",
+      "acceleration": "cpu",
+      "platforms": [
+        {
+          "os": "Darwin",
+          "arch": "arm64"
+        },
+        {
+          "os": "Linux",
+          "arch": "x86_64"
+        }
+      ]
+    },
+    "runtime": {
+      "context_size": 4096,
+      "gpu_layers": 0,
+      "native_cache_mib": 128
+    },
+    "resources": {
+      "kv_bytes_per_token": 12288,
+      "overhead_bytes": 1073741824
+    },
+    "qualification": "experimental",
+    "notes": "Small CPU candidate for local protocol checks. The exact artifact passed a macOS CPU tool-call and cancellation smoke check; this is not coding-quality, speed or Linux qualification. Resource requirements are estimates at this context size. No GPU use or network lending."
+  },
+  "checks": {
+    "bundled_recipe_listed": true,
+    "preflight_can_load": true,
+    "preflight_did_not_load_or_change_settings": true,
+    "recipe_loaded": true,
+    "exact_artifact": true,
+    "exact_context_and_engine": true,
+    "session_only": true,
+    "preferences_preserved": true,
+    "unqualified_not_lent": true,
+    "gateway_exact_model_response": true,
+    "unload_stops_child": true
+  },
+  "source_files_sha256": {
+    "services/runtime.py": "5a0d013509aa7834e8802560683b6f7f07058950c39f869e47fde43a086a8e15",
+    "services/local_server.py": "5b1b991ff8a08b82b6379c68e6364eada1f3e3f7dab16462167ba6f495a724da",
+    "services/model_recipes.py": "fc8b46825bfed4ac14135fbfd184be74538ea6e2fb69e59897e67233ff03ee5a",
+    "routers/models.py": "2b5c96ab4f85ca71d2ce8878d319628579cf95653bae4823f962cbde508fffa4",
+    "data/model-recipes.json": "f5912037b9fa2bdae9e03c7f4fbd08bfee5860eee042b314c6c771ca5d4c76c3"
+  },
+  "preflight": {
+    "schema_version": 1,
+    "recipe": {
+      "id": "qwen2.5-0.5b-instruct-q4-k-m-cpu-4k",
+      "name": "Qwen2.5 0.5B Instruct Q4_K_M \u00b7 CPU \u00b7 4K",
+      "model": {
+        "id": "qwen-2.5-0.5b-instruct-q4",
+        "repository": "Qwen/Qwen2.5-0.5B-Instruct-GGUF",
+        "revision": "9217f5db79a29953eb74d5343926648285ec7e67",
+        "filename": "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+        "sha256": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+        "size_bytes": 491400032
+      },
+      "engine": {
+        "backend": "llama-server",
+        "commit": "5a32f7b66ef6cfb3e60deea26e3454cc6ad3438c",
+        "acceleration": "cpu",
+        "platforms": [
+          {
+            "os": "Darwin",
+            "arch": "arm64"
+          },
+          {
+            "os": "Linux",
+            "arch": "x86_64"
+          }
+        ]
+      },
+      "runtime": {
+        "context_size": 4096,
+        "gpu_layers": 0,
+        "native_cache_mib": 128
+      },
+      "resources": {
+        "kv_bytes_per_token": 12288,
+        "overhead_bytes": 1073741824
+      },
+      "qualification": "experimental",
+      "notes": "Small CPU candidate for local protocol checks. The exact artifact passed a macOS CPU tool-call and cancellation smoke check; this is not coding-quality, speed or Linux qualification. Resource requirements are estimates at this context size. No GPU use or network lending."
+    },
+    "can_install": true,
+    "can_load": true,
+    "installed": true,
+    "artifact_verified": true,
+    "issues": [],
+    "warnings": [
+      "Resource estimates are not model or hardware qualification, and do not establish answer quality, tool reliability or speed. Available resources can change before loading."
+    ],
+    "resources": {
+      "estimated_ram_bytes": 1749691232,
+      "available_ram_bytes": 4089462784,
+      "disk_free_bytes": 7049760768,
+      "required_disk_bytes": 0
+    }
+  },
+  "passed": true
+}

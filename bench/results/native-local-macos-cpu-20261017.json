@@ -1,0 +1,111 @@
+{
+  "kind": "protocol_smoke_not_quality_benchmark",
+  "utc": "2026-10-17T00:05:53.234634+00:00",
+  "platform": "Darwin",
+  "machine": "arm64",
+  "device": "cpu",
+  "threads": 2,
+  "context": 4096,
+  "cache_mib": 128,
+  "engine_commit": "5a32f7b66ef6cfb3e60deea26e3454cc6ad3438c",
+  "model_filename": "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+  "model_sha256": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
+  "checks": {
+    "identity": true,
+    "unqualified_not_lent": true,
+    "gateway_tools_advertised": true,
+    "tool_call": true,
+    "public_model_id": true,
+    "tool_result_turn": true,
+    "cancel_preserves_model": true,
+    "request_after_cancel": true,
+    "unload_stops_process": true
+  },
+  "source_files_sha256": {
+    "runtime.py": "9e80be4e0598e85e1c258ddca5884736ff6526b740a47122c2a1c5499da27179",
+    "local_server.py": "5b1b991ff8a08b82b6379c68e6364eada1f3e3f7dab16462167ba6f495a724da"
+  },
+  "tool_response": {
+    "choices": [
+      {
+        "finish_reason": "tool_calls",
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "callaf453",
+              "type": "function",
+              "function": {
+                "name": "get_weather",
+                "arguments": "{\"city\":\"Paris\"}"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "created": 1792195556,
+    "model": "test-model",
+    "system_fingerprint": "b0-unknown",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 25,
+      "prompt_tokens": 173,
+      "total_tokens": 198,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "id": "chatcmpl-ov3gBZjRmjAKuPMysloQr99qQEiu4zUm",
+    "timings": {
+      "cache_n": 0,
+      "prompt_n": 173,
+      "prompt_ms": 1162.544,
+      "prompt_per_token_ms": 6.719907514450868,
+      "prompt_per_second": 148.81157186308644,
+      "predicted_n": 25,
+      "predicted_ms": 281.472,
+      "predicted_per_token_ms": 11.728,
+      "predicted_per_second": 85.26603001364256
+    }
+  },
+  "tool_result_response": {
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "The current temperature in Paris is 17 degrees Celsius."
+        }
+      }
+    ],
+    "created": 1792195557,
+    "model": "test-model",
+    "system_fingerprint": "b0-unknown",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 13,
+      "prompt_tokens": 88,
+      "total_tokens": 101,
+      "prompt_tokens_details": {
+        "cached_tokens": 18
+      }
+    },
+    "id": "chatcmpl-uutbXwXRYZzEdRm8iBWgbWtwHIIZHCr8",
+    "timings": {
+      "cache_n": 18,
+      "prompt_n": 70,
+      "prompt_ms": 466.057,
+      "prompt_per_token_ms": 6.657957142857143,
+      "prompt_per_second": 150.19622063395678,
+      "predicted_n": 13,
+      "predicted_ms": 140.102,
+      "predicted_per_token_ms": 11.675166666666668,
+      "predicted_per_second": 85.65188220011134
+    }
+  },
+  "passed": true
+}

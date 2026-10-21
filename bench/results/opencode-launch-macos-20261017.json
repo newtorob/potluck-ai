@@ -1,0 +1,70 @@
+{
+  "date": "2026-10-17",
+  "status": "protocol_verified_with_synthetic_inference",
+  "platform": "macOS arm64",
+  "client": {
+    "name": "OpenCode",
+    "version": "1.19.3",
+    "source": "https://github.com/anomalyco/opencode/tree/v1.19.3",
+    "binary_sha256": "6d3e6458fce4b649edf974c19959d5dbfe1e7f255a503dcfc01215b24ad3ea5b"
+  },
+  "cases": [
+    {
+      "passed": true,
+      "scenario": "read",
+      "client": "OpenCode 1.19.3",
+      "platform": "darwin",
+      "architecture": "arm64",
+      "inference": "synthetic gateway; no model/GPU/quality claim",
+      "loadedContextFixture": 65536,
+      "calls": 5,
+      "readToolExecuted": true,
+      "toolResultReturned": true,
+      "writeToolOfferedButDenied": false,
+      "projectConfigurationPreserved": true,
+      "maxRequestBytes": 30253
+    },
+    {
+      "passed": true,
+      "scenario": "denied-write",
+      "client": "OpenCode 1.19.3",
+      "platform": "darwin",
+      "architecture": "arm64",
+      "inference": "synthetic gateway; no model/GPU/quality claim",
+      "loadedContextFixture": 65536,
+      "calls": 4,
+      "readToolExecuted": false,
+      "toolResultReturned": false,
+      "writeToolOfferedButDenied": true,
+      "projectConfigurationPreserved": true,
+      "maxRequestBytes": 29656
+    }
+  ],
+  "checks": {
+    "cli_tests_passed": 1151,
+    "frontend_tests_passed": 512,
+    "landing_tests_passed": 44,
+    "typechecks": "passed",
+    "privacy_lint": "passed"
+  },
+  "limitations": [
+    "No real-model coding quality, speed or GPU result",
+    "Linux and Windows not execution-tested",
+    "Interactive approval and cancellation not exercised with actual OpenCode TUI",
+    "Fixture context 65536 tokens; tool-heavy requests may need more than the 16384 launch minimum",
+    "Source is uncommitted and unreleased"
+  ],
+  "source_sha256": {
+    "apps/cli/README.md": "b3fe64b940ba03b08c3aa2c20cf3a2f635229510aee679d9f979706e14755e58",
+    "apps/cli/src/args.ts": "cc08bc81b1a12edefe51000c97e181f4f6791a6f6b874c53edc3405e266128b9",
+    "apps/cli/src/index.ts": "0457024e0fcedbb22e3e0d226e46b0f4078d69a180c0bfe40821915cb6ebee64",
+    "apps/cli/src/operations.ts": "2708e4c895a85008c8b532274a6b1870bc8ff32850d8aee4fd170d4345b2e5a3",
+    "apps/cli/src/launch.ts": "29b4f8930e66fb30dc8d10d9150df955619c3400deda526d4a29fcc431953105",
+    "apps/cli/src/integration-proxy.ts": "6db530cb207e3bc791be48fe8ed0ba11c55e3e510cd724648ed0ab90edac4298",
+    "apps/cli/src/integration-tools.ts": "a05db19de38d76179e2153ba473c52f02af7c4460fc488c0f3a50774bf62483e",
+    "apps/cli/src/launch-opencode.ts": "46d08218c2e97abb24276cc8fd16cdf9a2f63a9c24accc30e478e095a04b1831",
+    "apps/cli/test/integration-proxy.test.ts": "f09518aabf947b5dbbb96301b6dd05e4f1ac3b5033c6af5271e8d9ceff79581e",
+    "apps/cli/test/launch-opencode.test.ts": "73bdef5079f092a8b8c91d30bf97f87bd5e6c3bbc2eb5255dabb892123d8de71",
+    "apps/cli/scripts/validate-opencode.cjs": "5bc61b170f6c929d76e48676973505b9c6774cd148096df91e472eafbb36f33d"
+  }
+}
