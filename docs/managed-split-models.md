@@ -74,10 +74,15 @@ A larger memory budget may move more layers to GPUs, but the amount depends on
 layer sizes and runtime buffers; measure response speed separately.
 
 Loading budgets Metal and CPU workers against available system RAM reported
-when their lease is acquired, targeting 2 GiB of headroom. CUDA devices target
-at least 1 GiB of free VRAM. The native engine can keep overflow layers on the
-head's CPU; the selected context and exact model bytes stay unchanged. These
-are startup estimates, not a reservation against memory used by other apps.
+when their lease is acquired, targeting 2 GiB of headroom. Dedicated GPUs (CUDA,
+and Vulkan cards with their own memory) target at least 768 MiB of free VRAM.
+The native engine can keep overflow layers on the head's CPU; the selected
+context and exact model bytes stay unchanged. A layer on the CPU also turns off
+the engine's pipeline parallelism, which lets the split's GPUs work on
+consecutive prompt batches at the same time. With Qwen3.8-27B on a 2080 Ti head
+and a 6600 XT worker, a 1 GiB target left one layer on the CPU and eight agent
+turns took 67.8 s; at 768 MiB every layer stayed on the GPUs and they took 50.9 s.
+These are startup estimates, not a reservation against memory used by other apps.
 Check the reported placement before drawing conclusions about GPU fit or speed.
 
 Once ready, use the gateway, coding agent, or plain inference from the head:
@@ -150,7 +155,9 @@ crosses the network every turn. The head passes the flag only when its manifest
 lists the feature, because a release engine without the patch would refuse the
 flag and fail to start. Workers need no patch. In one measured session (Qwen3.5-4B,
 Mac head, Windows worker, both on Wi-Fi), eight agent turns took 78.4 s with host
-checkpoints and 32.5 s with device checkpoints.
+checkpoints and 32.5 s with device checkpoints. With Qwen3.8-27B IQ4_XS (Linux
+2080 Ti head, Windows 6600 XT worker over Wi-Fi) they took 108.2 and 111.8 s with
+host checkpoints and 42.2 and 42.5 s with device checkpoints, in two runs each.
 
 A Vulkan engine budgets each GPU by its memory type. A dedicated card is
 budgeted like CUDA, from its free VRAM. An integrated GPU (Intel Arc or Iris,

@@ -4,15 +4,23 @@ import sys
 
 import pytest
 
-from potluck_local.services.split_memory import fit_arguments, probe_fit_arguments, MIB
+from potluck_local.services.split_memory import fit_arguments, probe_fit_arguments, MIB, VRAM_HEADROOM_MIB
 from potluck_local.services.split_native import SplitError
 
 
 def test_mac_budget_uses_available_ram_instead_of_metal_capacity():
     output = "Available devices:\n  CUDA0: NVIDIA (10811 MiB, 10500 MiB free)\n  RPC0: 127.0.0.1:1234 (10922 MiB, 10922 MiB free)\n"
     args = fit_arguments(output, {"1234": {"backend": "metal", "freeMemoryBytes": 4096 * MIB}}, 60000 * MIB)
-    assert args == ["--device", "RPC0,CUDA0", "--fit", "on", "--fit-target", "8874,1024"]
+    assert args == ["--device", "RPC0,CUDA0", "--fit", "on", "--fit-target", "8874,768"]
     assert "--n-gpu-layers" not in args  # permit CPU overflow while preserving context
+
+
+def test_dedicated_vram_headroom_is_smaller_than_the_shared_memory_floor():
+    # A layer pushed to the CPU turns off pipeline parallelism, so dedicated VRAM keeps
+    # 768 MiB; shared memory still keeps at least 1 GiB on top of the 2 GiB reserve.
+    output = "RPC0: 127.0.0.1:1234 (8000 MiB, 8000 MiB free)\nCUDA0: GPU (10811 MiB, 9629 MiB free)"
+    shared = fit_arguments(output, {"1234": {"backend": "metal", "freeMemoryBytes": 60000 * MIB}}, 0)
+    assert shared[-1] == "1024,768"
 
 
 def test_shared_budget_is_divided_across_devices_on_same_machine():
@@ -108,12 +116,12 @@ def test_fit_plan_invariants_over_device_matrix(local, backends, free, avail):
     devices, margins = args[1].split(","), [int(m) for m in args[5].split(",")]
     # One margin per device: workers in the order selected, then the head's device last.
     assert devices == [f"RPC{i}" for i in range(len(free))] + [f"{local}0"]
-    assert len(margins) == len(devices) and all(m >= 1024 for m in margins)
+    assert len(margins) == len(devices) and all(m >= VRAM_HEADROOM_MIB for m in margins)
     assert not set(args) & {"--n-gpu-layers", "-ngl", "--tensor-split", "-ts"}  # the engine decides
     usable = [f - m for f, m in zip(free, margins)] + [20000 - margins[-1]]
     for i, backend in enumerate(backends):
         if backend == "cuda":
-            assert usable[i] == free[i] - 1024  # VRAM: native free minus 1 GiB
+            assert usable[i] == free[i] - VRAM_HEADROOM_MIB  # VRAM: native free minus the headroom
         else:  # shared RAM: a device never plans past the machine's lease budget
             assert usable[i] <= max(0, avail[i] - 2048)
 
@@ -172,13 +180,13 @@ def test_vulkan_device_lines_parse_as_real_llama_server_prints_them():
 def test_dedicated_vulkan_worker_is_budgeted_like_cuda():
     output = "RPC0: 127.0.0.1:1234 (8176 MiB, 7900 MiB free)\nCUDA0: GPU (10811 MiB, 9629 MiB free)"
     args = fit_arguments(output, {"1234": {"backend": "vulkan", "unifiedMemory": False, "freeMemoryBytes": 2200 * MIB}}, 0)
-    assert args == ["--device", "RPC0,CUDA0", "--fit", "on", "--fit-target", "1024,1024"]
+    assert args == ["--device", "RPC0,CUDA0", "--fit", "on", "--fit-target", "768,768"]
 
 
 def test_integrated_vulkan_worker_is_budgeted_from_system_memory():
     output = "RPC0: 127.0.0.1:1234 (30000 MiB, 30000 MiB free)\nCUDA0: GPU (10811 MiB, 9629 MiB free)"
     args = fit_arguments(output, {"1234": {"backend": "vulkan", "unifiedMemory": True, "freeMemoryBytes": 8192 * MIB}}, 0)
-    assert args[-1] == "23856,1024"  # 30000 free - (8192 - 2048) budget
+    assert args[-1] == "23856,768"  # 30000 free - (8192 - 2048) budget
     with pytest.raises(SplitError, match="too little available memory"):
         fit_arguments(output, {"1234": {"backend": "vulkan", "unifiedMemory": True, "freeMemoryBytes": 2200 * MIB}}, 0)
 
@@ -187,9 +195,9 @@ def test_vulkan_head_is_last_and_follows_the_same_rules():
     output = "Vulkan0: AMD (8176 MiB, 7900 MiB free)\nRPC0: 127.0.0.1:1234 (8000 MiB, 8000 MiB free)"
     workers = {"1234": {"backend": "cuda"}}
     args = fit_arguments(output, workers, 0, False)
-    assert args[1] == "RPC0,Vulkan0" and args[-1] == "1024,1024"
+    assert args[1] == "RPC0,Vulkan0" and args[-1] == "768,768"
     args = fit_arguments(output, workers, 6000 * MIB, True)
-    assert args[1] == "RPC0,Vulkan0" and args[-1] == "1024,%d" % (7900 - (6000 - 2048))
+    assert args[1] == "RPC0,Vulkan0" and args[-1] == "768,%d" % (7900 - (6000 - 2048))
 
 
 @pytest.mark.parametrize("flag", [None, 1, "false"])

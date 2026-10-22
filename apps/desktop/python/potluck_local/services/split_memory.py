@@ -13,6 +13,13 @@ from .split_native import SplitError, binary
 
 MIB = 1024 ** 2
 RESERVE_MIB = 2048
+# Free VRAM kept on a dedicated GPU (CUDA, or Vulkan with its own memory). A model that
+# misses the target by a little gets a whole layer moved to the CPU, and one layer on
+# the CPU turns off llama.cpp's pipeline parallelism across the split's devices
+# (Qwen3.8-27B IQ4_XS, 2080 Ti head and 6600 XT worker, 2026-10-22: 1024 left a layer
+# on the CPU and 8 agent turns took 67.8 s; 768 kept every layer on the GPUs, 50.9 s,
+# and both cards still had at least 880 MiB free after the session).
+VRAM_HEADROOM_MIB = 768
 DEVICE = re.compile(r"^\s*(CUDA\d+|MTL\d+|Vulkan\d+|RPC\d+): (.+) "
                     r"\((\d+) MiB, (\d+) MiB free\)\s*$")
 # ggml-vulkan prints this per device at debug level; uma is 1 for an integrated GPU.
@@ -35,10 +42,10 @@ def fit_arguments(output: str, workers: dict[str, dict], local_available: int,
 
     Metal's native free count excludes other apps' RAM. CPU RPC workers share
     system RAM too. Bound each machine's aggregate allocation using the fresh
-    lease snapshot, with 2 GiB reserved. CUDA uses native free VRAM with 1 GiB
-    headroom. Vulkan is CUDA on a dedicated GPU and metal on one that shares
-    system memory (unifiedMemory on a worker, local_unified on the head). An
-    unavailable budget fails closed before loading model weights.
+    lease snapshot, with 2 GiB reserved. CUDA uses native free VRAM with
+    VRAM_HEADROOM_MIB of headroom. Vulkan is CUDA on a dedicated GPU and metal
+    on one that shares system memory (unifiedMemory on a worker, local_unified
+    on the head). An unavailable budget fails closed before loading model weights.
 
     Workers come first and the head's own devices last. llama.cpp puts the
     output layer, and so the full logits vector every token, on the last device,
@@ -72,7 +79,7 @@ def fit_arguments(output: str, workers: dict[str, dict], local_available: int,
         unified = worker.get("unifiedMemory") if worker else local_unified
         if backend == "vulkan" and type(unified) is not bool:
             raise SplitError("Worker did not report a supported memory budget. Update its Potluck runtime.")
-        margin = 1024
+        margin = VRAM_HEADROOM_MIB
         if backend in ("metal", "cpu") or backend == "vulkan" and unified:
             available = worker.get("freeMemoryBytes") if worker else local_available
             memory = shared_memory_budget(available)
@@ -82,7 +89,7 @@ def fit_arguments(output: str, workers: dict[str, dict], local_available: int,
             budget = memory["budgetMiB"] // count
             if budget < 256:
                 raise SplitError("A split computer has too little available memory. Close other models or apps and try again.")
-            margin = max(margin, free - budget)
+            margin = max(1024, free - budget)
         margins.append(str(margin))
     return ["--device", ",".join(d[0] for d in devices), "--fit", "on",
             "--fit-target", ",".join(margins)]
