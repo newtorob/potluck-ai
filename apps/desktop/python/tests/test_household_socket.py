@@ -68,3 +68,22 @@ def test_user_socket_remains_fallback_and_windows_stays_unsupported(monkeypatch)
     monkeypatch.setattr(routing.sys, "platform", "win32")
     monkeypatch.setenv("POTLUCK_LOCAL_API_SOCKET", "a-named-pipe")
     assert routing.mesh_socket_path() is None
+
+
+def test_windows_reads_the_roster_over_the_named_pipe(monkeypatch):
+    from potluck_local.services import mesh_ipc
+    monkeypatch.setattr(routing.sys, "platform", "win32")
+    asked = []
+
+    async def mesh_get(path, *, timeout):
+        asked.append(path)
+        return {"peers": [{"node_name": "linux", "mesh_ip": "100.64.0.1", "reachable": True},
+                          {"node_name": "offline", "mesh_ip": "100.64.0.9", "reachable": False}]}
+    monkeypatch.setattr(mesh_ipc, "mesh_get", mesh_get)
+    assert asyncio.run(routing.household_peers()) == [{"node_name": "linux", "mesh_ip": "100.64.0.1"}]
+    assert asked == ["/peers"]
+
+    async def unavailable(path, *, timeout):
+        raise mesh_ipc.MeshUnavailable("no pipe")
+    monkeypatch.setattr(mesh_ipc, "mesh_get", unavailable)
+    assert asyncio.run(routing.household_peers()) == []

@@ -146,9 +146,10 @@ async def _replacement_peer(model: str, excluded: set[str], sha256: str | None =
 
 def mesh_socket_path() -> str | None:
     """Resolve the Go mesh sidecar's local-API socket. Mirrors electron/main.js
-    meshSocketPath(). Returns None on Windows (named pipe, not yet supported here)."""
+    meshSocketPath(). Returns None on Windows, where the sidecar serves a named pipe
+    that mesh_ipc reads."""
     if sys.platform == "win32" or platform.system() == "Windows":
-        return None  # named pipe; household routing degrades to local-only for now
+        return None
     configured = os.environ.get("POTLUCK_LOCAL_API_SOCKET")
     if configured:
         return configured
@@ -168,14 +169,20 @@ def mesh_socket_path() -> str | None:
 
 async def household_peers() -> list[dict]:
     """Reachable peers from the mesh sidecar roster. [] on any failure (degrade)."""
-    sock = mesh_socket_path()
-    if not sock or not os.path.exists(sock):
+    windows = sys.platform == "win32" or platform.system() == "Windows"
+    sock = None if windows else mesh_socket_path()
+    if not windows and (not sock or not os.path.exists(sock)):
         return []
     try:
-        transport = httpx.AsyncHTTPTransport(uds=sock)
-        async with httpx.AsyncClient(transport=transport, timeout=_ROSTER_TIMEOUT_S) as c:
-            r = await c.get("http://localhost/peers")
-            data = r.json()
+        if windows:
+            # The sidecar's named pipe, read the way peer trust reads it.
+            from .mesh_ipc import mesh_get
+            data = await mesh_get("/peers", timeout=_ROSTER_TIMEOUT_S)
+        else:
+            transport = httpx.AsyncHTTPTransport(uds=sock)
+            async with httpx.AsyncClient(transport=transport, timeout=_ROSTER_TIMEOUT_S) as c:
+                r = await c.get("http://localhost/peers")
+                data = r.json()
         peers = data.get("peers", []) if isinstance(data, dict) else (data or [])
         return [
             {"node_name": p.get("node_name"), "mesh_ip": p.get("mesh_ip")}
