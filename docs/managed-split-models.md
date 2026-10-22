@@ -129,6 +129,7 @@ Git checkout containing that commit, build on the target machine:
 ```sh
 python3 scripts/build-split-engine.py --source /path/to/llama.cpp --backend metal
 # Linux: use --backend cpu, or --backend cuda with the installed CUDA toolchain.
+# Windows or Linux with an AMD or Intel GPU: --backend vulkan with the Vulkan SDK.
 cd apps/desktop/python
 .venv/bin/python build.py
 ```
@@ -139,6 +140,12 @@ manifest under `native/split`. Use `--output` for a separate build directory;
 the builder refuses to overwrite an existing bundle. For CUDA, select the
 target architectures with `--cuda-architectures` and a compatible host compiler
 with `--cuda-host-compiler` when required by that toolkit.
+
+A Vulkan engine budgets each GPU by its memory type. A dedicated card is
+budgeted like CUDA, from its free VRAM. An integrated GPU (Intel Arc or Iris,
+AMD APU) shares system memory and is budgeted like Metal. The engine reads
+which kind it has from ggml-vulkan's device line (`uma: 1` for an integrated
+GPU) and refuses to plan a split if it cannot tell.
 
 The CLI release packager requires that engine inside the frozen runtime and
 records its identity. macOS release signing must cover both nested executables;

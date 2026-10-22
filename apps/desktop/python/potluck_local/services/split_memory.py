@@ -9,12 +9,15 @@ import subprocess
 
 import psutil
 
-from .split_native import SplitError
+from .split_native import SplitError, binary
 
 MIB = 1024 ** 2
 RESERVE_MIB = 2048
-DEVICE = re.compile(r"^\s*(CUDA\d+|MTL\d+|RPC\d+): (.+) "
+DEVICE = re.compile(r"^\s*(CUDA\d+|MTL\d+|Vulkan\d+|RPC\d+): (.+) "
                     r"\((\d+) MiB, (\d+) MiB free\)\s*$")
+# ggml-vulkan prints this per device at debug level; uma is 1 for an integrated GPU.
+VULKAN_INFO = re.compile(r"ggml_vulkan: (\d+) = .* \| uma: ([01]) \|")
+_unified_memory: dict[str, bool] = {}
 
 
 def shared_memory_budget(available: object) -> dict | None:
@@ -26,13 +29,16 @@ def shared_memory_budget(available: object) -> dict | None:
             "budgetMiB": max(0, available_mib - RESERVE_MIB)}
 
 
-def fit_arguments(output: str, workers: dict[str, dict], local_available: int) -> list[str]:
+def fit_arguments(output: str, workers: dict[str, dict], local_available: int,
+                  local_unified: bool | None = None) -> list[str]:
     """Explicit device ordering keeps fit margins attached to the right worker.
 
     Metal's native free count excludes other apps' RAM. CPU RPC workers share
     system RAM too. Bound each machine's aggregate allocation using the fresh
     lease snapshot, with 2 GiB reserved. CUDA uses native free VRAM with 1 GiB
-    headroom. An unavailable budget fails closed before loading model weights.
+    headroom. Vulkan is CUDA on a dedicated GPU and metal on one that shares
+    system memory (unifiedMemory on a worker, local_unified on the head). An
+    unavailable budget fails closed before loading model weights.
 
     Workers come first and the head's own devices last. llama.cpp puts the
     output layer, and so the full logits vector every token, on the last device,
@@ -59,11 +65,15 @@ def fit_arguments(output: str, workers: dict[str, dict], local_available: int) -
     margins = []
     for name, key, free in devices:
         worker = workers.get(key)
-        backend = worker.get("backend") if worker else ("metal" if name.startswith("MTL") else "cuda")
-        if backend not in ("metal", "cpu", "cuda"):
+        backend = worker.get("backend") if worker else (
+            "metal" if name.startswith("MTL") else "vulkan" if name.startswith("Vulkan") else "cuda")
+        if backend not in ("metal", "cpu", "cuda", "vulkan"):
+            raise SplitError("Worker did not report a supported memory budget. Update its Potluck runtime.")
+        unified = worker.get("unifiedMemory") if worker else local_unified
+        if backend == "vulkan" and type(unified) is not bool:
             raise SplitError("Worker did not report a supported memory budget. Update its Potluck runtime.")
         margin = 1024
-        if backend in ("metal", "cpu"):
+        if backend in ("metal", "cpu") or backend == "vulkan" and unified:
             available = worker.get("freeMemoryBytes") if worker else local_available
             memory = shared_memory_budget(available)
             if memory is None:
@@ -78,15 +88,15 @@ def fit_arguments(output: str, workers: dict[str, dict], local_available: int) -
             "--fit-target", ",".join(margins)]
 
 
-async def probe_fit_arguments(root, endpoints: list[str], workers: dict[str, dict]) -> list[str]:
+async def _list_devices(root, *args: str, merge_stderr=False) -> bytes:
     # List-devices makes no model allocations and does not receive any prompts.
     # It connects only to our leased loopback tunnels; never arbitrary URLs.
     env = {k: v for k, v in os.environ.items() if not k.startswith(("LLAMA_", "GGML_RPC_"))}
     process = None
     try:
-        process = await asyncio.create_subprocess_exec(str(root / "llama-server"), "--rpc", ",".join(endpoints),
+        process = await asyncio.create_subprocess_exec(str(binary(root, "llama-server")), *args,
             "--list-devices", stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL, env=env)
+            stderr=subprocess.STDOUT if merge_stderr else subprocess.DEVNULL, env=env)
         async with asyncio.timeout(20):
             output, _ = await process.communicate()
         if process.returncode:
@@ -105,6 +115,34 @@ async def probe_fit_arguments(root, endpoints: list[str], workers: dict[str, dic
                 with suppress(ProcessLookupError):
                     process.kill()
                 await process.wait()
+    return output
+
+
+def known_unified_memory(root) -> bool | None:
+    return _unified_memory.get(str(root))
+
+
+async def probe_unified_memory(root) -> bool:
+    """Whether this machine's Vulkan devices share system memory, read once per engine.
+
+    The pinned ggml-vulkan logs `uma` per device only at debug level, so the
+    probe asks for it and reads both streams. Any device that shares counts, and
+    a probe that finds no device line fails closed.
+    """
+    key = str(root)
+    if key not in _unified_memory:
+        output = await _list_devices(root, "--log-verbosity", "5", merge_stderr=True)
+        found = VULKAN_INFO.findall(output[:1048576].decode("utf-8", errors="replace"))
+        if len(output) > 1048576 or not found:
+            raise SplitError("Could not tell whether this computer's GPU shares system memory.", 503)
+        _unified_memory[key] = any(uma == "1" for _, uma in found)
+    return _unified_memory[key]
+
+
+async def probe_fit_arguments(root, endpoints: list[str], workers: dict[str, dict]) -> list[str]:
+    output = await _list_devices(root, "--rpc", ",".join(endpoints))
     if len(output) > 16384:
         raise SplitError("Split engine returned an invalid device inventory.")
-    return fit_arguments(output.decode("utf-8", errors="replace"), workers, psutil.virtual_memory().available)
+    text = output.decode("utf-8", errors="replace")
+    local_unified = await probe_unified_memory(root) if re.search(r"^\s*Vulkan\d+:", text, re.MULTILINE) else None
+    return fit_arguments(text, workers, psutil.virtual_memory().available, local_unified)

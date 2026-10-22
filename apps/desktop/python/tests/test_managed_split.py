@@ -226,6 +226,27 @@ def test_supervisor_eof_terminates_native_child(tmp_path):
             supervisor.wait(timeout=6)
 
 
+def test_supervisor_on_windows_ends_the_child_at_stdin_eof(monkeypatch):
+    from potluck_local.services import native_supervisor
+
+    class Stdin:
+        buffer = io.BytesIO(b".\n.\n")
+    monkeypatch.setattr(native_supervisor.sys, "platform", "win32")
+    monkeypatch.setattr(native_supervisor.sys, "stdin", Stdin)
+    monkeypatch.setattr(native_supervisor.signal, "signal", lambda *_: None)
+    started = []
+    real_popen = subprocess.Popen
+
+    def popen(*args, **kwargs):
+        started.append(real_popen(*args, **kwargs))
+        return started[-1]
+    monkeypatch.setattr(native_supervisor.subprocess, "Popen", popen)
+    began = time.monotonic()
+    native_supervisor.run([sys.executable, "-c", "import time; time.sleep(120)"])
+    assert time.monotonic() - began < 6
+    assert started[0].poll() is not None
+
+
 def test_native_allocation_counters_keep_only_device_numbers():
     assert allocation_counter("load_tensors: RPC0[127.0.0.1:54321] model buffer size = 217.23 MiB") == {
         "device": "RPC", "modelMiB": 217.23, "rpcPort": 54321}
@@ -362,3 +383,60 @@ def test_plan_reports_shared_budget_without_treating_cuda_ram_as_vram(isolated, 
     else:
         assert worker["sharedMemory"] == expected
     assert plan["context"] == 8192 and manager.head is None and manager.worker is None
+
+
+@pytest.mark.parametrize("backend", ["metal", "cuda", "vulkan", "cpu"])
+def test_engine_bundle_accepts_each_supported_backend(monkeypatch, tmp_path, backend):
+    monkeypatch.setenv("POTLUCK_SPLIT_ENGINE_DIR", str(tmp_path))
+    (tmp_path / "manifest.json").write_text(json.dumps({**sn.PIN, "backend": backend}))
+    for name in ("llama-server", "rpc-server"):
+        (tmp_path / name).write_text("")
+        (tmp_path / name).chmod(0o700)
+    assert sn.engine_bundle()[1]["backend"] == backend
+    (tmp_path / "manifest.json").write_text(json.dumps({**sn.PIN, "backend": "rocm"}))
+    with pytest.raises(sn.SplitError):
+        sn.engine_bundle()
+
+
+def test_windows_engine_bundle_uses_exe_names_and_needs_no_exec_bit(monkeypatch, tmp_path):
+    monkeypatch.setenv("POTLUCK_SPLIT_ENGINE_DIR", str(tmp_path))
+    monkeypatch.setattr(sys, "platform", "win32")
+    (tmp_path / "manifest.json").write_text(json.dumps({**sn.PIN, "backend": "vulkan"}))
+    for name in ("llama-server", "rpc-server"):
+        (tmp_path / name).write_text("")
+        (tmp_path / name).chmod(0o700)
+    with pytest.raises(sn.SplitError):  # extensionless names are not Windows binaries
+        sn.engine_bundle()
+    for name in ("llama-server.exe", "rpc-server.exe"):
+        (tmp_path / name).write_text("")
+        (tmp_path / name).chmod(0o600)
+    root, manifest = sn.engine_bundle()
+    assert manifest["backend"] == "vulkan"
+    assert sn.binary(root, "rpc-server") == tmp_path / "rpc-server.exe"
+    monkeypatch.setattr(sys, "platform", "linux")
+    assert sn.binary(root, "llama-server") == tmp_path / "llama-server"
+
+
+def test_vulkan_worker_reports_and_head_carries_unified_memory(isolated, monkeypatch, tmp_path):
+    from potluck_local.services import split_memory
+    manager, _, _ = isolated
+    monkeypatch.setattr(sm, "engine_bundle", lambda: (tmp_path, {**sn.PIN, "backend": "vulkan"}))
+    calls = []
+    async def probe(root):
+        calls.append(root)
+        split_memory._unified_memory[str(root)] = True
+        return True
+    monkeypatch.setattr(sm, "probe_unified_memory", probe)
+    monkeypatch.setattr(split_memory, "_unified_memory", {})
+    async def run():
+        assert manager.status()["unifiedMemory"] is None  # not probed yet
+        lease = await manager.acquire("100.64.1.2", {"commit": sn.PIN["commit"], "request_id": str(uuid4())})
+        assert lease["unifiedMemory"] is True and calls == [tmp_path]
+        assert manager.status()["engine"]["backend"] == "vulkan" and manager.status()["unifiedMemory"] is True
+        await manager.close()
+    asyncio.run(run())
+
+
+def test_non_vulkan_worker_reports_no_unified_memory(isolated):
+    manager, _, _ = isolated
+    assert "unifiedMemory" not in manager.status()

@@ -25,8 +25,8 @@ from . import prompt_cache, prompt_guard
 from .model_lifecycle import get_model_lifecycle
 from .runtime import get_runtime
 from .settings_manager import get_settings, save_settings
-from .split_native import PIN, NativeProcess, SplitError, SplitModel, engine_bundle, free_port
-from .split_memory import probe_fit_arguments, shared_memory_budget
+from .split_native import PIN, NativeProcess, SplitError, SplitModel, binary, engine_bundle, free_port
+from .split_memory import known_unified_memory, probe_fit_arguments, probe_unified_memory, shared_memory_budget
 
 logger = logging.getLogger(__name__)
 WORKER_KEY = "potluck.split_worker_enabled"
@@ -40,7 +40,7 @@ SPLIT_PEER_PORT = int(os.environ.get("POTLUCK_SPLIT_PEER_PORT", str(PEER_SIDECAR
 def head_arguments(root, path, port: int, context: int, threads: int, endpoints: list[str],
                    memory_args: list[str], slot_dir=None) -> list[str]:
     """The head's native command line. Kept pure so tests can read the plan."""
-    return [str(root / "llama-server"), "--model", str(path),
+    return [str(binary(root, "llama-server")), "--model", str(path),
             "--host", "127.0.0.1", "--port", str(port), "--ctx-size", str(context),
             "--threads", str(threads),
             "--rpc", ",".join(endpoints), *memory_args, "--split-mode", "layer",
@@ -131,7 +131,7 @@ class SplitManager:
 
     def status(self):
         try:
-            _, manifest = engine_bundle()
+            root, manifest = engine_bundle()
             engine = {"available": True, "commit": manifest["commit"], "backend": manifest["backend"]}
         except SplitError:
             engine = {"available": False, "commit": PIN["commit"]}
@@ -141,6 +141,7 @@ class SplitManager:
                 "available": self.enabled() and engine["available"] and self.worker is None
                     and self.head is None and not runtime.is_loaded() and not self.stopping,
                 "freeMemoryBytes": psutil.virtual_memory().available,
+                **({"unifiedMemory": known_unified_memory(root)} if engine.get("backend") == "vulkan" else {}),
                 "state": self.state, "error": self.error,
                 "session": None if not self.head else {
                     "id": self.head["id"], "model": self.head["model"],
@@ -158,7 +159,9 @@ class SplitManager:
     async def enable_worker(self, enabled: bool):
         async with self.lock:
             if enabled:
-                engine_bundle()
+                root, manifest = engine_bundle()
+                if manifest["backend"] == "vulkan":
+                    await probe_unified_memory(root)
                 if get_runtime().is_loaded() or self.head:
                     raise SplitError("Unload the local model before enabling this computer as a split worker.", code="split_model_loaded")
             else:
@@ -185,14 +188,16 @@ class SplitManager:
                 raise SplitError("Worker is disabled, busy or has no compatible engine.")
             if psutil.virtual_memory().available < 1024 ** 3:
                 raise SplitError("Worker needs at least 1 GiB of available system memory.")
-            root, _ = engine_bundle()
+            root, manifest = engine_bundle()
+            if manifest["backend"] == "vulkan":
+                await probe_unified_memory(root)
             async with get_model_lifecycle().command():
                 if get_runtime().is_loaded():
                     raise SplitError("Unload this computer's local model before sharing split compute.")
                 get_runtime()._split_worker_reserved = True
                 port = free_port()
                 try:
-                    process = NativeProcess([str(root / "rpc-server"), "--host", "127.0.0.1", "--port", str(port)])
+                    process = NativeProcess([str(binary(root, "rpc-server")), "--host", "127.0.0.1", "--port", str(port)])
                 except Exception:
                     get_runtime()._split_worker_reserved = False
                     raise SplitError("Could not start the packaged split worker.", 503) from None
@@ -203,8 +208,10 @@ class SplitManager:
             return self._lease_response()
 
     def _lease_response(self):
+        status = self.status()
         return {"lease": self.worker["token"], "ttl": LEASE_SECONDS,
-                "freeMemoryBytes": psutil.virtual_memory().available}
+                "freeMemoryBytes": psutil.virtual_memory().available,
+                **({"unifiedMemory": status["unifiedMemory"]} if "unifiedMemory" in status else {})}
 
     def authenticate_lease(self, host: str, token: str):
         worker = self.worker
@@ -318,6 +325,8 @@ class SplitManager:
                     peer["backend"] = cap["engine"].get("backend")
                     if peer["backend"] in ("metal", "cpu"):
                         peer["sharedMemory"] = shared_memory_budget(cap.get("freeMemoryBytes"))
+                    elif peer["backend"] == "vulkan":
+                        peer["unifiedMemory"] = cap.get("unifiedMemory")
                 except (httpx.HTTPError, ValueError, KeyError):
                     raise SplitError("A selected worker is unavailable. On it, unload any model and run potluck split worker on.", code="split_peer_unavailable") from None
         return {"model": model, "context": context, "workers": selected,
@@ -387,6 +396,8 @@ class SplitManager:
                         lease = response.json()
                         worker["lease"] = lease["lease"]
                         worker["freeMemoryBytes"] = lease.get("freeMemoryBytes")
+                        if "unifiedMemory" in lease:
+                            worker["unifiedMemory"] = lease["unifiedMemory"]
                         worker["server"] = await asyncio.start_server(
                             lambda r, w, peer=worker: self._head_tunnel(peer, r, w), "127.0.0.1", 0)
                 endpoints = [f"127.0.0.1:{w['server'].sockets[0].getsockname()[1]}" for w in head["workers"]]

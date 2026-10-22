@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from potluck_local.services.model_downloader import _partial_meta_matches
 from potluck_local.services.model_identity import artifact_identity
-from potluck_local.services.split_native import PIN, SplitError, engine_bundle
+from potluck_local.services.split_native import PIN, SplitError, binary, engine_bundle
 from potluck_local.utils.paths import models_dir
 
 MIB = 1024 ** 2
@@ -229,7 +229,7 @@ def _cuda_free(root: Path) -> int | None:
     env = {k: v for k, v in os.environ.items() if not k.startswith(("LLAMA_", "GGML_RPC_"))}
     try:
         result = subprocess.run(
-            [str(root / "llama-server"), "--list-devices"],
+            [str(binary(root, "llama-server")), "--list-devices"],
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             timeout=10, env=env, check=False,
         )

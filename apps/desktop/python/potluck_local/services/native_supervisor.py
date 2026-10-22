@@ -67,25 +67,47 @@ def run(argv: list[str]) -> int:
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     try:
-        deadline = time.monotonic() + 45
-        while child.poll() is None:
-            ready, _, _ = select.select([sys.stdin.buffer], [], [], 1)
-            if time.monotonic() >= deadline:
-                break
-            if ready:
-                if not os.read(sys.stdin.fileno(), 1024):
-                    break
-                deadline = time.monotonic() + 45
+        (watch_threaded if sys.platform == "win32" else watch)(child)
     finally:
         if child.poll() is None:
-            os.killpg(child.pid, signal.SIGTERM)
-            try:
+            if sys.platform == "win32":
+                # TerminateProcess; the pinned llama-server and rpc-server start no processes of their own.
+                child.kill()
                 child.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                os.killpg(child.pid, signal.SIGKILL)
-                child.wait(timeout=3)
+            else:
+                os.killpg(child.pid, signal.SIGTERM)
+                try:
+                    child.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    os.killpg(child.pid, signal.SIGKILL)
+                    child.wait(timeout=3)
         reader.join(timeout=1)
     return child.returncode or 0
+
+
+def watch(child):
+    deadline = time.monotonic() + 45
+    while child.poll() is None:
+        ready, _, _ = select.select([sys.stdin.buffer], [], [], 1)
+        if time.monotonic() >= deadline:
+            break
+        if ready:
+            if not os.read(sys.stdin.fileno(), 1024):
+                break
+            deadline = time.monotonic() + 45
+
+
+def watch_threaded(child):
+    # Windows cannot select() on a pipe, so a thread reads the heartbeat lines.
+    last, eof = [time.monotonic()], threading.Event()
+
+    def read():
+        for _ in iter(sys.stdin.buffer.readline, b""):
+            last[0] = time.monotonic()
+        eof.set()
+    threading.Thread(target=read, daemon=True).start()
+    while child.poll() is None and not eof.wait(1) and time.monotonic() < last[0] + 45:
+        pass
 
 
 if __name__ == "__main__":

@@ -15,7 +15,7 @@ import httpx
 
 from potluck_local.services import prompt_guard
 from potluck_local.services.model_traits import TemplateTraits
-from potluck_local.services.split_native import NativeProcess, SplitError, SplitModel, engine_bundle, free_port
+from potluck_local.services.split_native import NativeProcess, SplitError, SplitModel, binary, engine_bundle, free_port
 
 LOAD_TIMEOUT = 180.0
 HEARTBEAT_INTERVAL = 5.0
@@ -112,7 +112,7 @@ class LocalServerModel(SplitModel):
 def start(model_path: str, *, root: Path, n_ctx: int, n_gpu_layers: int,
           n_threads: int | None, cache_mib: int) -> LocalServerModel:
     port, key = free_port(), secrets.token_hex(32)
-    args = [str(root / "llama-server"), "--model", model_path,
+    args = [str(binary(root, "llama-server")), "--model", model_path,
             "--host", "127.0.0.1", "--port", str(port), "--ctx-size", str(n_ctx),
             "--parallel", "1", "--slots", "--no-context-shift", "--no-webui",
             "--jinja", "--reasoning-format", "none", "--flash-attn", "auto",

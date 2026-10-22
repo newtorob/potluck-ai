@@ -12,6 +12,7 @@ import re
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 
@@ -22,7 +23,7 @@ PIN = json.loads((ROOT / "apps/desktop/python/potluck_local/data/split-engine.js
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
-    parser.add_argument("--backend", choices=["metal", "cuda", "cpu"], required=True)
+    parser.add_argument("--backend", choices=["metal", "cuda", "vulkan", "cpu"], required=True)
     parser.add_argument("--output", type=Path, default=ROOT / "apps/desktop/python/native/split")
     parser.add_argument("--jobs", type=int, default=4)
     parser.add_argument("--cuda-host-compiler", type=Path)
@@ -59,6 +60,7 @@ def main():
             "-DGGML_RPC=ON", "-DGGML_RPC_RDMA=OFF", "-DGGML_NATIVE=OFF",
             "-DGGML_METAL=" + ("ON" if args.backend == "metal" else "OFF"),
             "-DGGML_CUDA=" + ("ON" if args.backend == "cuda" else "OFF"),
+            "-DGGML_VULKAN=" + ("ON" if args.backend == "vulkan" else "OFF"),
             "-DGGML_METAL_EMBED_LIBRARY=ON", "-DGGML_BLAS=OFF",
             "-DLLAMA_OPENSSL=OFF", "-DLLAMA_BUILD_TESTS=OFF",
             # Upstream fetches prebuilt web UI assets from Hugging Face at build time
@@ -69,8 +71,11 @@ def main():
                         "llama-server", "ggml-rpc-server", "-j", str(args.jobs)], check=True)
         staged = root / "bundle"
         staged.mkdir()
+        # MSVC is multi-config: binaries land in bin/Release and carry .exe.
+        built = build / "bin" / "Release" if sys.platform == "win32" else build / "bin"
+        suffix = ".exe" if sys.platform == "win32" else ""
         for name in ("llama-server", "rpc-server"):
-            shutil.copy2(build / "bin" / ("ggml-rpc-server" if name == "rpc-server" else name), staged / name)
+            shutil.copy2(built / (("ggml-rpc-server" if name == "rpc-server" else name) + suffix), staged / (name + suffix))
         shutil.copy2(source / "LICENSE", staged / "LICENSE")
         (staged / "manifest.json").write_text(json.dumps({**PIN, "backend": args.backend}, indent=2) + "\n")
         shutil.copytree(staged, args.output)

@@ -155,3 +155,79 @@ def test_head_command_line_is_loopback_layer_split_with_matching_endpoints(tmp_p
     assert argv[argv.index("--device") + 1].split(",")[-1] == "CUDA0"  # the head's device is last
     assert all(a.startswith("127.0.0.1:") for a in argv[argv.index("--rpc") + 1].split(","))
     assert "0.0.0.0" not in argv and "--n-gpu-layers" not in argv
+
+
+VULKAN_OUTPUT = ("Available devices:\n  RPC0: 127.0.0.1:1234 (8176 MiB, 7900 MiB free)\n"
+                 "  Vulkan0: AMD Radeon RX 6600 XT (8176 MiB, 7900 MiB free)\n")
+
+
+def test_vulkan_device_lines_parse_as_real_llama_server_prints_them():
+    output = ("Available devices:\n  CUDA0: NVIDIA GeForce RTX 2080 Ti (10811 MiB, 9629 MiB free)\n"
+              "  RPC0: 127.0.0.1:50052 (23688 MiB, 21319 MiB free)\n"
+              "  Vulkan0: AMD Radeon RX 6600 XT (8176 MiB, 7900 MiB free)\n")
+    args = fit_arguments(output, {"50052": {"backend": "cuda"}}, 0, False)
+    assert args[1] == "RPC0,CUDA0,Vulkan0"
+
+
+def test_dedicated_vulkan_worker_is_budgeted_like_cuda():
+    output = "RPC0: 127.0.0.1:1234 (8176 MiB, 7900 MiB free)\nCUDA0: GPU (10811 MiB, 9629 MiB free)"
+    args = fit_arguments(output, {"1234": {"backend": "vulkan", "unifiedMemory": False, "freeMemoryBytes": 2200 * MIB}}, 0)
+    assert args == ["--device", "RPC0,CUDA0", "--fit", "on", "--fit-target", "1024,1024"]
+
+
+def test_integrated_vulkan_worker_is_budgeted_from_system_memory():
+    output = "RPC0: 127.0.0.1:1234 (30000 MiB, 30000 MiB free)\nCUDA0: GPU (10811 MiB, 9629 MiB free)"
+    args = fit_arguments(output, {"1234": {"backend": "vulkan", "unifiedMemory": True, "freeMemoryBytes": 8192 * MIB}}, 0)
+    assert args[-1] == "23856,1024"  # 30000 free - (8192 - 2048) budget
+    with pytest.raises(SplitError, match="too little available memory"):
+        fit_arguments(output, {"1234": {"backend": "vulkan", "unifiedMemory": True, "freeMemoryBytes": 2200 * MIB}}, 0)
+
+
+def test_vulkan_head_is_last_and_follows_the_same_rules():
+    output = "Vulkan0: AMD (8176 MiB, 7900 MiB free)\nRPC0: 127.0.0.1:1234 (8000 MiB, 8000 MiB free)"
+    workers = {"1234": {"backend": "cuda"}}
+    args = fit_arguments(output, workers, 0, False)
+    assert args[1] == "RPC0,Vulkan0" and args[-1] == "1024,1024"
+    args = fit_arguments(output, workers, 6000 * MIB, True)
+    assert args[1] == "RPC0,Vulkan0" and args[-1] == "1024,%d" % (7900 - (6000 - 2048))
+
+
+@pytest.mark.parametrize("flag", [None, 1, "false"])
+def test_vulkan_without_a_shared_memory_flag_fails_closed(flag):
+    worker = {"backend": "vulkan", "freeMemoryBytes": 8192 * MIB, **({} if flag is None else {"unifiedMemory": flag})}
+    with pytest.raises(SplitError, match="supported memory budget"):
+        fit_arguments(VULKAN_OUTPUT.split("\n  Vulkan0")[0], {"1234": worker}, 0)
+    with pytest.raises(SplitError, match="supported memory budget"):
+        fit_arguments(VULKAN_OUTPUT, {"1234": {"backend": "cuda"}}, 0, flag)
+
+
+def _fake_engine(tmp_path, uma_lines: str):
+    executable = tmp_path / "llama-server"
+    executable.write_text(f"#!{sys.executable}\nimport sys\nprint({VULKAN_OUTPUT!r})\nprint({uma_lines!r}, file=sys.stderr)\n")
+    executable.chmod(0o700)
+
+
+def test_probe_reads_unified_memory_from_the_vulkan_init_line(tmp_path):
+    from potluck_local.services import split_memory as sm
+    # Captured 2026-10-21 from the pinned engine at --log-verbosity 5 on an Intel Meteor Lake laptop.
+    line = ("0.00.007.687 D ggml_vulkan: 0 = Intel(R) Graphics (MTL) (Intel open-source Mesa driver) | uma: 1 | fp16: 1 | "
+            "bf16: 0 | fp4: 0 | warp size: 32 | shared memory: 49152 | int dot: 1 | matrix cores: none")
+    _fake_engine(tmp_path, line)
+    assert asyncio.run(sm.probe_unified_memory(tmp_path)) is True
+    assert sm.known_unified_memory(tmp_path) is True
+    args = asyncio.run(sm.probe_fit_arguments(tmp_path, ["127.0.0.1:1234"], {"1234": {"backend": "cuda"}}))
+    assert args[1] == "RPC0,Vulkan0"
+
+
+def test_probe_reports_a_dedicated_gpu_and_fails_closed_without_the_line(tmp_path):
+    from potluck_local.services import split_memory as sm
+    # Captured 2026-10-21 the same way on an RX 6600 XT under Windows.
+    _fake_engine(tmp_path, "0.00.072.859 D ggml_vulkan: 0 = AMD Radeon RX 6600 XT (AMD proprietary driver) | uma: 0 | fp16: 1 | "
+                           "bf16: 0 | fp4: 0 | warp size: 32 | shared memory: 32768")
+    assert asyncio.run(sm.probe_unified_memory(tmp_path)) is False
+    missing = tmp_path / "other"
+    missing.mkdir()
+    _fake_engine(missing, "nothing useful")
+    with pytest.raises(SplitError, match="shares system memory"):
+        asyncio.run(sm.probe_unified_memory(missing))
+    assert sm.known_unified_memory(missing) is None

@@ -40,6 +40,11 @@ class SplitError(RuntimeError):
         super().__init__(detail)
 
 
+def binary(root: Path, name: str) -> Path:
+    """The packaged ``llama-server`` or ``rpc-server`` under root, with .exe on Windows."""
+    return root / (name + ".exe" if sys.platform == "win32" else name)
+
+
 def engine_bundle() -> tuple[Path, dict]:
     # Override is for source validation/builds. Shipped users need no environment
     # variables, toolchain or external llama installation.
@@ -51,11 +56,12 @@ def engine_bundle() -> tuple[Path, dict]:
         manifest = json.loads((root / "manifest.json").read_text())
         if any(manifest.get(k) != PIN[k] for k in ("schemaVersion", "protocol", "commit")):
             raise ValueError()
-        if manifest.get("backend") not in ("metal", "cuda", "cpu"):
+        if manifest.get("backend") not in ("metal", "cuda", "vulkan", "cpu"):
             raise ValueError()
         for name in ("llama-server", "rpc-server"):
-            path = root / name
-            if not path.is_file() or not os.access(path, os.X_OK):
+            path = binary(root, name)
+            # os.access(X_OK) only reports existence on Windows.
+            if not path.is_file() or not (sys.platform == "win32" or os.access(path, os.X_OK)):
                 raise ValueError()
         return root, manifest
     except (OSError, ValueError, KeyError):

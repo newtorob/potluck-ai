@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 import importlib.util
+import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all
@@ -13,7 +14,8 @@ split_bundle = Path(SPECPATH) / 'native' / 'split'
 if split_bundle.is_dir():
     datas += [(str(split_bundle / 'manifest.json'), 'split-engine'),
               (str(split_bundle / 'LICENSE'), 'split-engine')]
-    binaries += [(str(split_bundle / name), 'split-engine') for name in ('llama-server', 'rpc-server')]
+    suffix = '.exe' if sys.platform == 'win32' else ''
+    binaries += [(str(split_bundle / (name + suffix)), 'split-engine') for name in ('llama-server', 'rpc-server')]
 hiddenimports = [
     'aiosqlite',
     'aiosqlite.core',
