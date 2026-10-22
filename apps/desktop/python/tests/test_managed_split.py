@@ -363,6 +363,21 @@ def test_local_control_token_and_nonmember_rejection(isolated, monkeypatch):
     asyncio.run(run())
 
 
+def test_peer_status_tells_members_whether_a_vulkan_gpu_shares_memory(isolated, monkeypatch):
+    from potluck_local.routers import split as split_router
+    async def member(host):
+        return True
+    status = {"protocol": 1, "engine": {"available": True, "backend": "vulkan"}, "available": True,
+              "freeMemoryBytes": 1, "unifiedMemory": False, "session": {"model": "private"}}
+    monkeypatch.setattr(split_router, "paired_host", member)
+    monkeypatch.setattr(split_router, "get_split_manager", lambda: SimpleNamespace(status=lambda: status))
+    request = SimpleNamespace(client=SimpleNamespace(host="100.64.0.2"))
+    assert asyncio.run(split_router.peer_status(request)) == {
+        key: status[key] for key in ("protocol", "engine", "available", "freeMemoryBytes", "unifiedMemory")}
+    del status["unifiedMemory"]
+    assert "unifiedMemory" not in asyncio.run(split_router.peer_status(request))
+
+
 @pytest.mark.parametrize("backend,available,expected", [
     ("metal", 4096 * 1024**2, {"availableMiB": 4096, "reserveMiB": 2048, "budgetMiB": 2048}),
     ("cpu", 1024 * 1024**2, {"availableMiB": 1024, "reserveMiB": 2048, "budgetMiB": 0}),

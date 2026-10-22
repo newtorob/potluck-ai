@@ -67,7 +67,8 @@ async def peer_status(request: Request):
         raise HTTPException(403, "Only current owned mesh members can discover split workers.")
     value = get_split_manager().status()
     # Household peers discover capacity, never local model paths/session state.
-    return {key: value[key] for key in ("protocol", "engine", "available", "freeMemoryBytes")}
+    return {key: value[key] for key in ("protocol", "engine", "available", "freeMemoryBytes", "unifiedMemory")
+            if key in value}
 
 
 @peer_router.post("/lease")
