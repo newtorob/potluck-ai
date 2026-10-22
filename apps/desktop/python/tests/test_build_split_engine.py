@@ -1,5 +1,6 @@
 import importlib.util
 import io
+import json
 from pathlib import Path
 import sys
 import tarfile
@@ -17,9 +18,12 @@ def build(monkeypatch, tmp_path):
     header = "".join(f"#define RPC_PROTO_{k}_VERSION {v}\n" for k, v in zip(("MAJOR", "MINOR", "PATCH"), module.PIN["rpcProtocol"].split(".")))
     calls = []
 
-    def run(command, stdout=None, check=False):
+    def run(command, stdout=None, check=False, cwd=None, env=None):
         calls.append(command)
-        if command[0] == "git":
+        if command[:2] == ["git", "apply"]:
+            assert (Path(cwd) / "ggml/include/ggml-rpc.h").is_file()  # the extracted copy, never --source
+            assert env["GIT_CEILING_DIRECTORIES"] == str(Path(cwd).parent)
+        elif command[0] == "git":
             with tarfile.open(fileobj=stdout, mode="w") as tar:
                 for name, text in (("ggml/include/ggml-rpc.h", header), ("LICENSE", "license")):
                     info = tarfile.TarInfo(name)
@@ -39,6 +43,7 @@ def build(monkeypatch, tmp_path):
         monkeypatch.setattr(sys, "argv", ["build", "--source", str(tmp_path), "--backend", backend, "--output", str(tmp_path / name)])
         module.main()
         return tmp_path / name
+    go.module = module
     return go, calls
 
 
@@ -70,3 +75,27 @@ def test_existing_output_is_still_refused(build, tmp_path):
     (tmp_path / "taken").mkdir()
     with pytest.raises(SystemExit):
         go("vulkan", "linux", "taken")
+
+
+def test_listed_patches_are_applied_and_named_in_the_manifest(build, tmp_path):
+    go, calls = build
+    output = go("cuda", "linux")
+    listed = json.loads((SCRIPT.parent / "split-engine-patches/patches.json").read_text())
+    applied = [c[-1] for c in calls if c[:2] == ["git", "apply"]]
+    assert applied == [str(SCRIPT.parent / "split-engine-patches" / p["file"]) for p in listed]
+    manifest = json.loads((output / "manifest.json").read_text())
+    assert manifest["features"] == [p["feature"] for p in listed] and "ctx-checkpoints-device" in manifest["features"]
+    assert manifest["patches"] == [{"file": p["file"], "sha256": p["sha256"]} for p in listed]
+    assert manifest["commit"] == json.loads((SCRIPT.parents[1] / "apps/desktop/python/potluck_local/data/split-engine.json").read_text())["commit"]
+
+
+def test_a_patch_that_no_longer_matches_its_hash_stops_the_build(build, tmp_path, monkeypatch):
+    go, calls = build
+    patches = tmp_path / "patches"
+    patches.mkdir()
+    (patches / "0001.patch").write_text("changed")
+    (patches / "patches.json").write_text(json.dumps([{"file": "0001.patch", "sha256": "0" * 64, "feature": "x"}]))
+    monkeypatch.setattr(go.module, "PATCHES", patches)
+    with pytest.raises(SystemExit, match="SHA-256"):
+        go("cuda", "linux")
+    assert not any(c[:2] == ["git", "apply"] for c in calls) and not any("--build" in c for c in calls)

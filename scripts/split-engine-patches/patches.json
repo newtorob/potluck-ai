@@ -1,0 +1,3 @@
+[
+  {"file": "0001-server-device-context-checkpoints.patch", "sha256": "96c029b280bb85cd4d5a567e7a273aa28bb3a79265632469cd22d783dd2f56e7", "feature": "ctx-checkpoints-device"}
+]

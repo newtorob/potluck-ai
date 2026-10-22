@@ -46,7 +46,7 @@ Contributors rarely need them.
 | Script | What it does |
 |---|---|
 | `build-windows-installer.ps1` | Builds the Windows installer from a clean checkout. Runs the bundle steps explicitly (the Makefile chain assumes a POSIX shell) and fails if the GPU backend set is missing from the bundle. Flags: `-SkipDeps`, `-AllowDirty`. |
-| `build-split-engine.py` | Builds the pinned household inference engine from a llama.cpp source checkout (`--source`, `--backend metal\|cuda\|vulkan\|cpu`). Output defaults to `apps/desktop/python/native/split`. |
+| `build-split-engine.py` | Builds the pinned household inference engine from a llama.cpp source checkout (`--source`, `--backend metal\|cuda\|vulkan\|cpu`), applying the hash-checked patches in `split-engine-patches/`. Output defaults to `apps/desktop/python/native/split`. |
 | `release_upload.sh` | Uploads a finished desktop build from `apps/desktop/electron/out/` to the release bucket with `rclone`: installers first, update feed second. Supports `--dry-run`. |
 | `check_model_updates.py` | Compares the shipped model catalog (`apps/desktop/python/potluck_local/data/models.json`) with a curated lineup using public Hugging Face metadata. `--json` for machine output, `--write` to emit a proposed catalog. Run it with `make check-models`. Emitted `download_url`s are pinned to the repo's current commit (`resolve/<40-hex>/<file>`), never `resolve/main`; promote the proposed file into both the sidecar and `services/api` copies. |
 | `smoke_prod.sh` | Read-only smoke test of a deployed API and coordinator. Run it with `make smoke-prod`; `API_URL` and `COORDINATOR_URL` override the targets. |

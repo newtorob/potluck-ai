@@ -38,7 +38,7 @@ SPLIT_PEER_PORT = int(os.environ.get("POTLUCK_SPLIT_PEER_PORT", str(PEER_SIDECAR
 
 
 def head_arguments(root, path, port: int, context: int, threads: int, endpoints: list[str],
-                   memory_args: list[str], slot_dir=None) -> list[str]:
+                   memory_args: list[str], slot_dir=None, features=()) -> list[str]:
     """The head's native command line. Kept pure so tests can read the plan."""
     return [str(binary(root, "llama-server")), "--model", str(path),
             "--host", "127.0.0.1", "--port", str(port), "--ctx-size", str(context),
@@ -48,6 +48,12 @@ def head_arguments(root, path, port: int, context: int, threads: int, endpoints:
             # Slot files for the disk prompt cache (prompt_cache.SplitSlotCache); the
             # directory is private to this user and only a local request writes there.
             *(["--slot-save-path", str(slot_dir)] if slot_dir else []),
+            # Hybrid models (Qwen3.5, Qwen3.8) checkpoint their recurrent state every prompt.
+            # Kept on the device, a worker's share no longer crosses the network each turn
+            # (Qwen3.5-4B, Mac head and Windows worker over Wi-Fi, 2026-10-22: 8 agent turns
+            # took 78.4 s with host checkpoints, 32.5 s with device ones). Only engines built
+            # with scripts/split-engine-patches know the flag.
+            *(["--ctx-checkpoints-device"] if "ctx-checkpoints-device" in features else []),
             # The pinned engine emits allocation records at level
             # four. The supervisor forwards only numeric counters.
             "--log-verbosity", "4"]
@@ -417,7 +423,8 @@ class SplitManager:
                     head["slotCache"] = slot_cache
                     process = NativeProcess(head_arguments(root, path, port, head["context"],
                         get_settings().runtime.threads or 4, endpoints, memory_args,
-                        slot_cache.slot_dir if slot_cache else None), env={"LLAMA_API_KEY": key})
+                        slot_cache.slot_dir if slot_cache else None, manifest.get("features", ())),
+                        env={"LLAMA_API_KEY": key})
                     head["process"] = process
                     head["phase"] = "loading"
                     loop = asyncio.get_running_loop()

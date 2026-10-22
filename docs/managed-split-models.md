@@ -141,6 +141,17 @@ the builder refuses to overwrite an existing bundle. For CUDA, select the
 target architectures with `--cuda-architectures` and a compatible host compiler
 with `--cuda-host-compiler` when required by that toolkit.
 
+The builder applies the patches listed in `scripts/split-engine-patches/patches.json`
+to its extracted copy, after checking each file's SHA-256, and names their
+features in the manifest. The one patch so far adds `--ctx-checkpoints-device` to
+llama-server. Hybrid models such as Qwen3.5 and Qwen3.8 save their recurrent
+state while reading every prompt, and without it the share held by each worker
+crosses the network every turn. The head passes the flag only when its manifest
+lists the feature, because a release engine without the patch would refuse the
+flag and fail to start. Workers need no patch. In one measured session (Qwen3.5-4B,
+Mac head, Windows worker, both on Wi-Fi), eight agent turns took 78.4 s with host
+checkpoints and 32.5 s with device checkpoints.
+
 A Vulkan engine budgets each GPU by its memory type. A dedicated card is
 budgeted like CUDA, from its free VRAM. An integrated GPU (Intel Arc or Iris,
 AMD APU) shares system memory and is budgeted like Metal. The engine reads

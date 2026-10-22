@@ -1,0 +1,234 @@
+Keep the newest context checkpoint in device memory (llama-server --ctx-checkpoints-device).
+
+For recurrent and hybrid models (Qwen3.5 and Qwen3.8 among them) llama-server copies the
+recurrent state to host memory up to three times per prompt and restores one copy at the
+next turn. When layers sit on an RPC worker, each copy crosses the network. This option
+uses the library's LLAMA_STATE_SEQ_FLAGS_ON_DEVICE instead: one copy per sequence, kept
+on the device that holds each layer, copied on the worker for RPC layers. The server
+then takes one checkpoint per prompt, before its last 4 tokens, and keeps device
+checkpoints out of slot files and the RAM prompt cache. Other models fall back to host
+checkpoints. Applies to llama.cpp d80619397c2ba5cf1366c29f7d43699ca3a159b9; not upstream.
+
+diff --git a/common/arg.cpp b/common/arg.cpp
+index 267b84874..57fcc8172 100644
+--- a/common/arg.cpp
++++ b/common/arg.cpp
+@@ -1705,6 +1705,15 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
+             params.n_ctx_checkpoints = value;
+         }
+     ).set_env("LLAMA_ARG_CTX_CHECKPOINTS").set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
++    add_opt(common_arg(
++        {"--ctx-checkpoints-device"},
++        "keep the newest context checkpoint in device memory instead of host memory; older checkpoints are dropped "
++        "and device checkpoints are not written to slot files or the prompt cache. Saves copying recurrent state "
++        "off the device, which matters most when layers sit on RPC servers (default: disabled)",
++        [](common_params & params) {
++            params.ctx_checkpoints_device = true;
++        }
++    ).set_env("LLAMA_ARG_CTX_CHECKPOINTS_DEVICE").set_examples({LLAMA_EXAMPLE_SERVER}));
+     add_opt(common_arg(
+         {"-cms", "--checkpoint-min-step"}, "N",
+         string_format("minimum spacing between context checkpoints in tokens (default: %d, 0 = no minimum)", params.checkpoint_min_step),
+diff --git a/common/common.cpp b/common/common.cpp
+index b59e66e3b..a5309d90c 100644
+--- a/common/common.cpp
++++ b/common/common.cpp
+@@ -2371,6 +2371,8 @@ void common_prompt_checkpoint::clear() {
+     data_tgt.clear();
+     data_dft.clear();
+     data_spec.clear();
++
++    on_device = false;
+ }
+ 
+ void common_prompt_checkpoint::update_pos(
+@@ -2398,6 +2400,8 @@ void common_prompt_checkpoint::update_tgt(
+     if (n != ckpt_size) {
+         GGML_ABORT("checkpoint size mismatch: expected %zu, got %zu\n", ckpt_size, n);
+     }
++
++    on_device = (flags & LLAMA_STATE_SEQ_FLAGS_ON_DEVICE) != 0;
+ }
+ 
+ void common_prompt_checkpoint::update_dft(
+@@ -2430,6 +2434,10 @@ bool common_prompt_checkpoint::load_tgt(
+         return true;
+     }
+ 
++    if (on_device) {
++        flags |= LLAMA_STATE_SEQ_FLAGS_ON_DEVICE;
++    }
++
+     const size_t n = llama_state_seq_set_data_ext(ctx, data_tgt.data(), data_tgt.size(), seq_id, flags);
+     return n == data_tgt.size();
+ }
+diff --git a/common/common.h b/common/common.h
+index b172b4efe..e60a1217a 100644
+--- a/common/common.h
++++ b/common/common.h
+@@ -637,6 +637,7 @@ struct common_params {
+     bool    cache_prompt        = true;  // whether to enable prompt caching
+     bool    cache_idle_slots    = true;  // save and clear idle slots upon starting a new task
+     int32_t n_ctx_checkpoints   = 32;    // max number of context checkpoints per slot
++    bool    ctx_checkpoints_device = false; // keep the newest context checkpoint in device memory
+     int32_t kv_unified_per_slot = 0;     // max context per parallel slot; 0 = unset
+     int32_t checkpoint_min_step = 8192;  // minimum spacing between context checkpoints
+     int32_t cache_ram_mib       = 8192;  // -1 = no limit, 0 - disable, 1 = 1 MiB, etc.
+@@ -1290,6 +1291,10 @@ struct common_prompt_checkpoint {
+     std::vector<uint8_t> data_tgt;
+     std::vector<uint8_t> data_dft;
+ 
++    // data_tgt holds only metadata; the target tensors stay in the context's device copy for this
++    // sequence (LLAMA_STATE_SEQ_FLAGS_ON_DEVICE), which the next device checkpoint replaces
++    bool on_device = false;
++
+     // (optional) speculative-decoding implementation state stashed with the checkpoint
+     // (e.g. eagle3's deferred-boundary g_embd row)
+     std::vector<uint8_t> data_spec;
+diff --git a/tools/server/server-context.cpp b/tools/server/server-context.cpp
+index b2116b174..ddbcc5ea6 100644
+--- a/tools/server/server-context.cpp
++++ b/tools/server/server-context.cpp
+@@ -1388,6 +1388,18 @@ private:
+             SRV_TRC("%s", "speculative decoding will use checkpoints\n");
+         }
+ 
++        if (params_base.ctx_checkpoints_device) {
++            // the device path is checked for recurrent state; SWA caches write many small ranges
++            const bool recurrent = ctx_tgt_seq_rm_type == COMMON_CONTEXT_SEQ_RM_TYPE_FULL ||
++                                   ctx_tgt_seq_rm_type == COMMON_CONTEXT_SEQ_RM_TYPE_RS;
++            if (!recurrent || n_swa > 0) {
++                SRV_WRN("%s", "device context checkpoints need a recurrent or hybrid model without sliding-window attention, using host checkpoints\n");
++                params_base.ctx_checkpoints_device = false;
++            } else {
++                SRV_INF("%s", "context checkpoints are kept in device memory, newest only\n");
++            }
++        }
++
+         // setup slots
+         SRV_INF("initializing, n_slots = %d, n_ctx_slot = %d, kv_unified = '%s'\n",
+                 params_base.n_parallel, n_ctx_slot(), params_base.kv_unified ? "true" : "false");
+@@ -2544,6 +2556,20 @@ private:
+     void create_checkpoint(server_slot & slot, const int64_t n_tokens_cur, llama_pos pos_min, llama_pos pos_max) {
+         const int id_task = slot.task->id;
+ 
++        const bool on_device = params_base.ctx_checkpoints_device;
++        if (on_device) {
++            // the context holds one device copy per sequence: a new device checkpoint replaces the old one
++            for (auto it = slot.prompt.checkpoints.begin(); it != slot.prompt.checkpoints.end(); ) {
++                if (it->on_device) {
++                    SLT_TRC(slot, "dropping device context checkpoint (pos_min = %d, pos_max = %d, n_tokens = %" PRId64 ")\n",
++                            it->pos_min, it->pos_max, it->n_tokens);
++                    it = slot.prompt.checkpoints.erase(it);
++                } else {
++                    ++it;
++                }
++            }
++        }
++
+         // evict checkpoints within min-step of a previous checkpoint, unless they were
+         // created by the current task
+         // only when the list is full, otherwise short prompts keep just the oldest checkpoint
+@@ -2595,7 +2621,7 @@ private:
+         //       this is not true for SWA models: https://github.com/ggml-org/llama.cpp/pull/24411#issuecomment-4677983225
+         cur.update_pos(slot.prompt.n_tokens() - n_tokens_cur, pos_min, pos_max);
+ 
+-        cur.update_tgt(ctx_tgt, slot.id, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
++        cur.update_tgt(ctx_tgt, slot.id, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY | (on_device ? LLAMA_STATE_SEQ_FLAGS_ON_DEVICE : 0));
+         cur.update_dft(ctx_dft, slot.id, LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY);
+         // stash the draft's speculative state with the checkpoint
+         common_speculative_get_state(spec.get(), slot.id, cur.data_spec);
+@@ -2645,7 +2671,10 @@ private:
+     // returns false if the appendix could not be written completely
+     bool save_slot_checkpoints(const std::string & filepath, const server_slot & slot, size_t & n_written) const {
+         n_written = 0;
+-        if (slot.prompt.checkpoints.empty()) {
++        // device checkpoints keep their tensors in device memory, so they cannot go into a file
++        const uint32_t count = (uint32_t) std::count_if(slot.prompt.checkpoints.begin(), slot.prompt.checkpoints.end(),
++                [](const common_prompt_checkpoint & cur) { return !cur.on_device; });
++        if (count == 0) {
+             return true;
+         }
+         std::ofstream ofs(std::filesystem::u8path(filepath), std::ios::binary | std::ios::app);
+@@ -2655,11 +2684,13 @@ private:
+         }
+         const uint32_t magic   = SLOT_CKPT_MAGIC;
+         const uint32_t version = SLOT_CKPT_VERSION;
+-        const uint32_t count   = (uint32_t) slot.prompt.checkpoints.size();
+         ckpt_write(ofs, &magic,   sizeof(magic),   n_written);
+         ckpt_write(ofs, &version, sizeof(version), n_written);
+         ckpt_write(ofs, &count,   sizeof(count),   n_written);
+         for (const auto & cur : slot.prompt.checkpoints) {
++            if (cur.on_device) {
++                continue;
++            }
+             ckpt_write(ofs, &cur.n_tokens, sizeof(cur.n_tokens), n_written);
+             ckpt_write(ofs, &cur.pos_min,  sizeof(cur.pos_min),  n_written);
+             ckpt_write(ofs, &cur.pos_max,  sizeof(cur.pos_max),  n_written);
+@@ -4095,7 +4126,8 @@ private:
+                         slot.prompt.tokens.push_back(cur_tok);
+ 
+                         // break at the last user message, or at user messages at least min step past the last checkpoint
+-                        if (do_checkpoint && spans.is_user_start(slot.prompt.n_tokens())) {
++                        // (not with device checkpoints: only the newest is kept, and that is the one near the prompt end)
++                        if (do_checkpoint && !params_base.ctx_checkpoints_device && spans.is_user_start(slot.prompt.n_tokens())) {
+                             const auto pos = slot.prompt.n_tokens();
+                             const auto & checkpoints = slot.prompt.checkpoints;
+ 
+@@ -4112,8 +4144,11 @@ private:
+                         if (do_checkpoint) {
+                             static const int checkpoint_offsets[] = {4 + n_ubatch, 4};
+ 
++                            // device checkpoints: the earlier offset would be replaced before the prompt ends
++                            const int n_offsets = params_base.ctx_checkpoints_device ? 1 : 2;
++
+                             bool should_break = false;
+-                            for (int offset : checkpoint_offsets) {
++                            for (int offset : std::vector<int>(std::end(checkpoint_offsets) - n_offsets, std::end(checkpoint_offsets))) {
+                                 const int n_last = std::min(n_batch, offset);
+                                 if (slot.task->n_tokens() == slot.prompt.n_tokens() + n_last) {
+                                     should_break = true;
+@@ -4155,6 +4190,11 @@ private:
+                         if (!is_user_start && !near_prompt_end) {
+                             do_checkpoint = false;
+                         }
++
++                        // a device checkpoint is taken only before the batch that ends the prompt
++                        if (params_base.ctx_checkpoints_device) {
++                            do_checkpoint = false;
++                        }
+                     }
+ 
+                     const auto pos_min = llama_memory_seq_pos_min(llama_get_memory(ctx_tgt), slot.id);
+diff --git a/tools/server/server-task.cpp b/tools/server/server-task.cpp
+index 3f30da2cd..7ad0b2665 100644
+--- a/tools/server/server-task.cpp
++++ b/tools/server/server-task.cpp
+@@ -1722,9 +1722,17 @@ server_prompt_cache_state * server_prompt_cache::alloc(const server_prompt & pro
+         }
+     }
+ 
++    // device checkpoints stay with the slot: the next device checkpoint overwrites their data
++    std::list<common_prompt_checkpoint> checkpoints_host;
++    for (const auto & ckpt : prompt.checkpoints) {
++        if (!ckpt.on_device) {
++            checkpoints_host.push_back(ckpt);
++        }
++    }
++
+     // calculate checkpoints size to see if it will fit with the prompt
+     size_t checkpoints_size = 0;
+-    for (const auto & ckpt : prompt.checkpoints) {
++    for (const auto & ckpt : checkpoints_host) {
+         checkpoints_size += ckpt.size();
+     }
+ 
+@@ -1782,7 +1790,7 @@ server_prompt_cache_state * server_prompt_cache::alloc(const server_prompt & pro
+     states.push_back({
+         /*.prompt =*/ {
+             /*.tokens      =*/ prompt.tokens.clone(),
+-            /*.checkpoints =*/ prompt.checkpoints,
++            /*.checkpoints =*/ std::move(checkpoints_host),
+         },
+         /*.data   =*/ {
+             /*.main =*/ std::move(state_data_tgt),

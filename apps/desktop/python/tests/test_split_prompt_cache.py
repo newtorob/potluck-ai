@@ -433,6 +433,15 @@ def test_head_arguments_pass_the_slot_directory_only_when_given(tmp_path):
     assert with_slots[with_slots.index("--parallel") + 1] == "1"
 
 
+def test_head_arguments_keep_checkpoints_on_device_only_when_the_engine_was_patched(tmp_path):
+    # Release engines (the Windows Vulkan bundle) reject the flag and llama-server would not start.
+    stock = mgr.head_arguments(tmp_path, tmp_path / "m.gguf", 18400, 4096, 4, ["127.0.0.1:1"], [])
+    assert "--ctx-checkpoints-device" not in stock
+    patched = mgr.head_arguments(tmp_path, tmp_path / "m.gguf", 18400, 4096, 4, ["127.0.0.1:1"], [],
+                                 None, ["ctx-checkpoints-device"])
+    assert patched == stock[:-2] + ["--ctx-checkpoints-device"] + stock[-2:]
+
+
 def test_slot_file_reader_decodes_the_packed_state_and_the_plain_list(tmp_path):
     packed = tmp_path / "p.slot"
     words = [-1, 1, 3, 11, 12, 13, 0]

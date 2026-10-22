@@ -3,9 +3,12 @@
 
 python scripts/build-split-engine.py --source /path/to/llama.cpp --backend metal
 Output defaults to apps/desktop/python/native/split, consumed by build.py.
-The source checkout is read through git archive and never modified.
+The source checkout is read through git archive and never modified. The patches
+listed in scripts/split-engine-patches/patches.json are checked against their
+SHA-256 and applied to the extracted copy; their features go into the manifest.
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -18,6 +21,21 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PIN = json.loads((ROOT / "apps/desktop/python/potluck_local/data/split-engine.json").read_text())
+PATCHES = ROOT / "scripts/split-engine-patches"
+
+
+def apply_patches(source: Path) -> list[dict]:
+    """Apply the listed patches in order; refuse any whose bytes changed."""
+    applied = []
+    for entry in json.loads((PATCHES / "patches.json").read_text()):
+        patch = PATCHES / entry["file"]
+        if hashlib.sha256(patch.read_bytes()).hexdigest() != entry["sha256"]:
+            raise SystemExit(f"{entry['file']} does not match its SHA-256 in patches.json")
+        # The ceiling keeps git from treating an enclosing repository as the target.
+        subprocess.run(["git", "apply", "--whitespace=nowarn", str(patch)], cwd=source, check=True,
+                       env={**os.environ, "GIT_CEILING_DIRECTORIES": str(source.parent)})
+        applied.append(entry)
+    return applied
 
 
 def main():
@@ -45,6 +63,7 @@ def main():
         source.mkdir()
         with tarfile.open(archive) as tar:
             tar.extractall(source, filter="data")
+        patches = apply_patches(source)
         header = (source / "ggml/include/ggml-rpc.h").read_text()
         found = ".".join(re.search(rf"RPC_PROTO_{k}_VERSION\s+(\d+)", header)[1] for k in ("MAJOR", "MINOR", "PATCH"))
         if found != PIN["rpcProtocol"]:
@@ -77,7 +96,9 @@ def main():
         for name in ("llama-server", "rpc-server"):
             shutil.copy2(built / (("ggml-rpc-server" if name == "rpc-server" else name) + suffix), staged / (name + suffix))
         shutil.copy2(source / "LICENSE", staged / "LICENSE")
-        (staged / "manifest.json").write_text(json.dumps({**PIN, "backend": args.backend}, indent=2) + "\n")
+        (staged / "manifest.json").write_text(json.dumps({**PIN, "backend": args.backend,
+            "features": [p["feature"] for p in patches],
+            "patches": [{"file": p["file"], "sha256": p["sha256"]} for p in patches]}, indent=2) + "\n")
         shutil.copytree(staged, args.output)
         print(f"Built pinned {args.backend} split engine: {args.output}")
 
