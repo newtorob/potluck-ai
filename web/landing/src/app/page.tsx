@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Arrow } from '@/components/Arrow';
 import { BlogArtwork } from '@/components/BlogArtwork';
 import { SOURCE_URL, LICENSE_URL, OPEN_SOURCE_ARTICLE } from '@/lib/openSource';
@@ -35,21 +34,21 @@ function RouteMark() {
 export default function HomePage() {
   const latest = getAllPosts()[0];
   return <div className="vivid-home">
-    <aside className="home-source-announcement" aria-label="Open-source announcement"><div className="home-wrap"><p><strong>Potluck is now open source.</strong> MIT licensed.</p><Link href={OPEN_SOURCE_ARTICLE}>Why we opened the code <Arrow /></Link></div></aside>
-    <section className="vivid-hero" aria-labelledby="home-title">
-      <div className="vivid-hero-copy home-wrap">
+    <section className="gather-hero" aria-labelledby="home-title">
+      <div className="home-wrap gather-opening">
+        <Link href={OPEN_SOURCE_ARTICLE} className="gather-source"><span>Open source. MIT licensed.</span><Arrow /></Link>
         <h1 id="home-title">Bigger models.<br /><span>Same computers.</span></h1>
-        <div className="vivid-hero-intro"><p>Your laptop. Your gaming PC. That spare desktop. Potluck splits one AI model across your machines, making room for something bigger.</p>
-          <div className="room-hero-actions"><a href="#sharing" className="btn-primary">See how it works <Arrow /></a><a href="#the-film" className="room-watch-link"><svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><path d="M1 1v12l10-6z" /></svg>Watch the film</a></div>
+        <div className="gather-intro">
+          <div className="gather-description"><p>Your laptop. Your gaming PC. That spare desktop.<br className="gather-desktop-break" /> Bring them together. Make more room for AI.</p><p className="gather-launch-note">Local AI available now. Model splitting is experimental.</p></div>
+          <div className="gather-actions"><Link href="/install" className="btn-primary">Get Potluck <Arrow /></Link><a href="#the-film" className="gather-film"><svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor" aria-hidden="true"><path d="M1 1v12l10-6z" /></svg>Watch the idea</a></div>
         </div>
       </div>
-      <div className="vivid-hardware home-wrap"><Image src="/images/potluck-computers-vivid.webp" width={2057} height={765} alt="An illustrated group of everyday computers: two laptops, a gaming PC, and a desktop." sizes="(max-width: 700px) 100vw, 1320px" priority /><div className="vivid-hardware-caption"><span>Individually, your computers.<br /><strong>Together, more room for AI.</strong></span><a href="#sharing" aria-label="Explore how the model is shared"><Arrow /></a></div></div>
-      <p className="vivid-availability home-wrap">Model splitting is experimental. The tested Mac + Linux GPU setup uses development builds.</p>
+      <ModelSplit />
+      <div className="gather-footnote home-wrap"><p>Model splitting is experimental. The tested Mac + Linux GPU setup uses development builds.</p><a href="#sharing">A little more about how <Arrow /></a></div>
     </section>
 
     <section id="sharing" className="vivid-sharing room-section" aria-labelledby="sharing-heading">
-      <div className="home-wrap vivid-sharing-heading"><h2 id="sharing-heading">Too big for one?<br /><span>Bring another.</span></h2><p>A model doesn’t have to live on a single computer. Give each machine a part, and let them work on the same answer.</p></div>
-      <ModelSplit />
+      <div className="home-wrap vivid-sharing-heading"><h2 id="sharing-heading">A bigger model.<br /><span>A group effort.</span></h2><p>Potluck splits one AI model across your computers. Each holds a part. They work together on the same answer.</p></div>
     </section>
 
     <section className="room-get-started home-wrap room-section" aria-labelledby="start-heading">

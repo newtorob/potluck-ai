@@ -22,18 +22,19 @@ function ComputerSymbol({ kind }: { kind: string }) {
 
 /** A conceptual model partition, not live discovery or a memory calculator. */
 export function ModelSplit() {
-  const [count, setCount] = useState(4);
+  const [count, setCount] = useState(3);
   const portions = PORTIONS[count]!;
 
   return <div className="split-illustration home-wrap" id="split-example">
+    <div className="split-stage">
     <div className="split-diagram-heading">
-      <p>One model. <strong>{count} machines.</strong></p>
+      <p>One model. <strong>Shared.</strong></p>
       <div className="split-machine-count" role="group" aria-label="Number of machines in the illustration">
-        {[2, 3, 4].map((value) => <button type="button" key={value} aria-pressed={count === value} aria-controls="split-explanation" onClick={() => setCount(value)}>{value} machines</button>)}
+        {[2, 3, 4].map((value) => <button type="button" key={value} aria-pressed={count === value} aria-controls="split-explanation" onClick={() => setCount(value)} aria-label={`${value} machines`}>{value}<span> machines</span></button>)}
       </div>
     </div>
     <div className="split-model-band" aria-label={`One model divided into ${count} portions`}>
-      {portions.map((size, i) => <div key={i} className={`split-model-portion split-${MACHINES[i]!.color}`} style={{ flex: size }}><span>Part {i + 1}</span><div className="split-weight-blocks" aria-hidden="true">{Array.from({ length: size }, (_, j) => <i key={j} />)}</div></div>)}
+      {portions.map((size, i) => <div key={i} className={`split-model-portion split-${MACHINES[i]!.color}`} style={{ flex: size }}><span>Part {i + 1}<span className="split-portion-detail"> / {count}</span></span><div className="split-weight-blocks" aria-hidden="true">{Array.from({ length: size }, (_, j) => <i key={j} />)}</div></div>)}
     </div>
     <svg className="split-connectors" viewBox="0 0 1000 34" preserveAspectRatio="none" fill="none" aria-hidden="true">
       {portions.map((size, i) => {
@@ -44,12 +45,14 @@ export function ModelSplit() {
     </svg>
     <ol className="split-computers" aria-label="Machines sharing this model">
       {MACHINES.map((machine, i) => <li key={machine.name} className={`split-computer split-${machine.color}`} data-participating={i < count}>
-        <span className="split-part-label">{i < count ? `Part ${i + 1} runs here` : 'Not in this setup'}</span>
-        <ComputerSymbol kind={machine.kind} />
+        <div className="split-device-face"><ComputerSymbol kind={machine.kind} /><span className="split-part-label">{i < count ? `Part ${i + 1}` : 'Not in this setup'}</span></div>
         <span className="split-computer-name">{machine.name}</span>
       </li>)}
     </ol>
-    <p className="split-explanation" id="split-explanation" aria-live="polite">{count} computers hold different parts of the same model and work together on one answer.</p>
-    <p className="split-example-note">Concept illustration, not a hardware estimate. Actual placement depends on the model, compatible hardware, and available memory.</p>
+    <div className="split-stage-footer"><span className="split-preview-label">Concept preview</span>
+    <p className="split-explanation" id="split-explanation" aria-live="polite">{count} computers. One model. One answer.</p>
+    </div>
+    </div>
+    <p className="split-example-note">Try a different number of machines. This illustrates sharing, not model fit or live activity.</p>
   </div>;
 }

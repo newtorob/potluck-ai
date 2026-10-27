@@ -80,10 +80,12 @@ input, textarea { caret-color: hsl(var(--primary)); }
 
 .btn-primary:active { background: hsl(var(--foreground)); }
 
-/* The homepage opens as one uninterrupted warm-white field. */
-.site-header-home { background: hsl(var(--background)); border-bottom-color: transparent; }
+/* The homepage header joins its orange opening; editorial routes stay light. */
+.site-header-home { background: hsl(var(--brand-orange)); border-bottom-color: hsl(var(--foreground) / .18); }
 .site-header-home .site-wordmark span, .site-header-home .site-desktop-nav a { color: hsl(var(--foreground)); }
 .site-header-home .site-desktop-nav a:hover { text-decoration: underline; text-underline-offset: 5px; }
 .site-header-home .btn-primary { background: hsl(var(--foreground)); }
-.site-header-home .btn-primary:hover { background: hsl(var(--primary)); }
+.site-header-home .btn-primary:hover { background: hsl(var(--background)); color: hsl(var(--foreground)); }
+.site-header-home :focus-visible { outline-color: hsl(var(--foreground)); }
+.site-header-home .site-menu-toggle:hover { background: hsl(var(--foreground) / .08); }
 .site-header-home .site-mobile-nav a { border-color: hsl(var(--foreground) / .2); }

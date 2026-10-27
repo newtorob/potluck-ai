@@ -11,6 +11,13 @@ The website for [trypotluck.ai](https://trypotluck.ai). Next.js 15 (App Router) 
 - **Tests:** vitest
 - **Hosting:** Vercel (`vercel.json` sets the framework, build commands and security headers)
 
+## Design
+
+[DESIGN.md](DESIGN.md) documents the public-site palette and typography. The
+homepage uses an orange opening and an interactive model-sharing illustration.
+The illustration is a concept preview; local AI availability and experimental
+model splitting are labeled separately beside the first install action.
+
 ## Run locally
 
 ```bash
