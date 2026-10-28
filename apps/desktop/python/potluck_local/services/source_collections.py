@@ -1,8 +1,8 @@
 """Local-owner source registration and atomic Markdown ingestion.
 
-Evidence stays outside personal memory, MCP search and peer routes until an
-authorized retrieval path exists. Workspace identifiers organize evidence;
-they are not credentials. This module exposes no network endpoint.
+Evidence stays outside personal memory search and peer routes. The separate
+evidence service provides explicitly scoped retrieval. Workspace identifiers
+organize evidence; they are not credentials. This module exposes no network endpoint.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ import aiosqlite
 
 from potluck_local.services.memory_db import get_memory_db_path, init_memory_db
 from potluck_local.services.memory_safety import redact_credentials
+from potluck_local.services.source_schema import TOMBSTONE_SQL
 from potluck_local.services.vault_ingestion import chunk_markdown
 
 PARSER_VERSION = 'markdown-evidence-v1'
@@ -73,6 +74,11 @@ async def register_collection(
             if row[1] != str(root):
                 raise ValueError('Collection root cannot change; register a new collection')
             if (row[2], row[3]) != (include_json, exclude_json):
+                # Revoke all payloads derived from this collection, including history.
+                await db.execute(TOMBSTONE_SQL +
+                                 'id IN (SELECT claim_id FROM reviewed_claim_sources '
+                                 'WHERE collection_id=?)',
+                                 (_now(), 'collection_reconfigured', row[0]))
                 # Changed rules immediately revoke derived content; the next scan rebuilds it.
                 await db.execute(
                     'DELETE FROM source_chunks WHERE document_id IN '
@@ -178,6 +184,10 @@ async def scan_collection(workspace: str, collection_id: str) -> CollectionScan:
                     uuid.UUID(document_id), PARSER_VERSION + ':'
                     + hashlib.sha256(safe_text.encode()).hexdigest(),
                 ))
+                await db.execute(TOMBSTONE_SQL +
+                                 'id IN (SELECT claim_id FROM reviewed_claim_sources '
+                                 'WHERE document_id=?)',
+                                 (_now(), 'source_changed', document_id))
                 await db.execute('DELETE FROM source_chunks WHERE document_id=?', (document_id,))
                 await db.execute(
                     'INSERT INTO source_documents '
@@ -202,6 +212,11 @@ async def scan_collection(workspace: str, collection_id: str) -> CollectionScan:
                 else:
                     result.files_added += 1
             for relative in known.keys() - seen:
+                await db.execute(TOMBSTONE_SQL +
+                                 'id IN (SELECT r.claim_id FROM reviewed_claim_sources r '
+                                 'JOIN source_documents d ON d.id=r.document_id '
+                                 'WHERE d.collection_id=? AND d.relative_path=?)',
+                                 (_now(), 'source_removed', collection_id, relative))
                 await db.execute(
                     'DELETE FROM source_documents WHERE collection_id=? AND relative_path=?',
                     (collection_id, relative),
@@ -242,6 +257,12 @@ async def remove_collection(workspace: str, collection_id: str) -> None:
     """Remove registered evidence only; never delete source files."""
     async with aiosqlite.connect(get_memory_db_path()) as db:
         await db.execute('PRAGMA foreign_keys=ON')
+        await db.execute('BEGIN IMMEDIATE')
+        await db.execute(TOMBSTONE_SQL +
+                         'workspace=? AND id IN '
+                         '(SELECT claim_id FROM reviewed_claim_sources '
+                         'WHERE collection_id=?)',
+                         (_now(), 'collection_removed', workspace, collection_id))
         cursor = await db.execute('DELETE FROM source_collections WHERE id=? AND workspace=?',
                                   (collection_id, workspace))
         if cursor.rowcount != 1:
