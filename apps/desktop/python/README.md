@@ -92,3 +92,49 @@ choice, so restarting cannot silently restore that model with different settings
 Other runtime preferences stay unchanged. A failed preflight preserves the
 current model and startup choice. Ordinary model loads still use the existing
 restart behavior. See [recipe provenance and commands](../../../docs/model-recipes.md).
+
+### Source collections (local development foundation)
+
+Source collections register explicitly selected Markdown folders in a workspace.
+This developer command is the first Company Brain milestone, not the complete
+investigation workflow or an enterprise release. It exposes no HTTP/MCP route.
+
+```sh
+# Use a disposable database while evaluating the feature.
+export POTLUCK_MEMORY_DB_PATH=/absolute/path/to/experiment/memory.db
+python -m potluck_local.services.source_collections --workspace example register runbooks /absolute/path/to/runbooks --exclude 'drafts/**'
+# Use the collection_id printed by registration.
+python -m potluck_local.services.source_collections --workspace example scan COLLECTION_ID
+python -m potluck_local.services.source_collections --workspace example status
+python -m potluck_local.services.source_collections --workspace example remove COLLECTION_ID
+```
+
+Registration binds a name and real directory to a workspace. Repeat registration
+with the same name/root is idempotent. Changed include/exclude rules immediately
+clear that collection's derived content and require a new scan. A root change
+requires a new collection. The command adds `--exclude` patterns to defaults
+excluding `.git`, `.obsidian`, and lowercase `archive` directories. Use explicit
+patterns for other historical folders/files, including exported memory archives.
+Patterns use case-sensitive POSIX paths and shell-style wildcards; `**/` also
+matches at the root. The default include is `**/*.md`.
+
+Scans reuse Markdown chunking and credential redaction, track stable document and
+revision identifiers, and atomically replace only that collection's evidence.
+Unchanged files retain their IDs. Removed or excluded files lose derived content;
+empty files replace old chunks. The 2 MiB per-file limit, invalid UTF-8 or a failed
+read aborts the scan and records failed status while preserving the last complete
+snapshot. Check status/freshness before using evidence. Symlink files/directories
+are excluded; registration requires a real path. This local-owner facility is
+not an OS sandbox against a hostile process mutating parent directories.
+
+Evidence is stored in `source_collections`, `source_documents`, and `source_chunks`
+in the existing local database. These are raw-source records, separate from
+approved knowledge and personal memory. No embedding or inference runs, and no
+source is sent to another machine. Existing personal/global memory, legacy vault
+imports and agent search are unchanged. `remove` cascades through the selected
+collection's derived records without touching the original files. A personal
+memory wipe does not remove source collections; remove them explicitly.
+
+Workspace labels organize this local store, not authentication. Permission-aware
+retrieval, review/supersession, investigation briefs, evaluations, and shared-user
+authorization remain subsequent milestones.

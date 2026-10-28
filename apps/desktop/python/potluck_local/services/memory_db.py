@@ -278,6 +278,9 @@ async def init_memory_db(db_path: Path | None = None) -> None:
         await db.execute(_CREATE_AGENT_EVENTS)
         await db.execute(_CREATE_AGENT_RESOURCES)
         await db.execute(_CREATE_VAULT_FILES)
+        from potluck_local.services.source_schema import SOURCE_SCHEMA
+        for statement in SOURCE_SCHEMA:
+            await db.execute(statement)
         await db.execute(_CREATE_CONVERSATIONS)
         await db.execute(_CREATE_MESSAGES)
         await db.execute(_CREATE_USAGE_EVENTS)
