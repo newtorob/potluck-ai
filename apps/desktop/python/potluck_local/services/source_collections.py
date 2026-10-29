@@ -26,6 +26,7 @@ import aiosqlite
 from potluck_local.services.memory_db import get_memory_db_path, init_memory_db
 from potluck_local.services.memory_safety import redact_credentials
 from potluck_local.services.source_schema import TOMBSTONE_SQL
+from potluck_local.services.investigations import invalidate
 from potluck_local.services.vault_ingestion import chunk_markdown
 
 PARSER_VERSION = 'markdown-evidence-v1'
@@ -74,6 +75,7 @@ async def register_collection(
             if row[1] != str(root):
                 raise ValueError('Collection root cannot change; register a new collection')
             if (row[2], row[3]) != (include_json, exclude_json):
+                await invalidate(db, 'collection_id=?', (row[0],))
                 # Revoke all payloads derived from this collection, including history.
                 await db.execute(TOMBSTONE_SQL +
                                  'id IN (SELECT claim_id FROM reviewed_claim_sources '
@@ -184,6 +186,7 @@ async def scan_collection(workspace: str, collection_id: str) -> CollectionScan:
                     uuid.UUID(document_id), PARSER_VERSION + ':'
                     + hashlib.sha256(safe_text.encode()).hexdigest(),
                 ))
+                await invalidate(db, 'collection_id=?', (collection_id,))
                 await db.execute(TOMBSTONE_SQL +
                                  'id IN (SELECT claim_id FROM reviewed_claim_sources '
                                  'WHERE document_id=?)',
@@ -212,6 +215,10 @@ async def scan_collection(workspace: str, collection_id: str) -> CollectionScan:
                 else:
                     result.files_added += 1
             for relative in known.keys() - seen:
+                cur = await db.execute('SELECT id FROM source_documents WHERE collection_id=? AND relative_path=?', (collection_id, relative))
+                removed = await cur.fetchone()
+                if removed:
+                    await invalidate(db, 'collection_id=?', (collection_id,))
                 await db.execute(TOMBSTONE_SQL +
                                  'id IN (SELECT r.claim_id FROM reviewed_claim_sources r '
                                  'JOIN source_documents d ON d.id=r.document_id '
@@ -258,6 +265,11 @@ async def remove_collection(workspace: str, collection_id: str) -> None:
     async with aiosqlite.connect(get_memory_db_path()) as db:
         await db.execute('PRAGMA foreign_keys=ON')
         await db.execute('BEGIN IMMEDIATE')
+        exists = await db.execute('SELECT 1 FROM source_collections WHERE id=? AND workspace=?',
+                                  (collection_id, workspace))
+        if not await exists.fetchone():
+            raise LookupError('Collection not found in this workspace')
+        await invalidate(db, 'collection_id=?', (collection_id,))
         await db.execute(TOMBSTONE_SQL +
                          'workspace=? AND id IN '
                          '(SELECT claim_id FROM reviewed_claim_sources '

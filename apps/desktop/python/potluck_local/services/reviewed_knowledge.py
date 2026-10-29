@@ -17,6 +17,7 @@ from potluck_local.services.memory_db import get_memory_db_path, init_memory_db
 from potluck_local.services.memory_safety import redact_credentials
 from potluck_local.services.source_collections import _now
 from potluck_local.services.source_schema import TOMBSTONE_SQL
+from potluck_local.services.investigations import invalidate
 
 
 def _scope(workspace: str, allowed: list[str] | tuple[str, ...]) -> set[str]:
@@ -83,7 +84,9 @@ async def _authorized(db: aiosqlite.Connection, workspace: str, allowed: set[str
 
 
 async def propose_claim(workspace: str, allowed_collection_ids: list[str] | tuple[str, ...],
-                        claim_key: str, content: str, citations: list[dict[str, str]]) -> str:
+                        claim_key: str, content: str, citations: list[dict[str, str]], *,
+                        origin_investigation_id: str | None = None,
+                        origin_citation_ids: list[str] | None = None) -> str:
     allowed = _scope(workspace, allowed_collection_ids)
     if (not isinstance(claim_key, str) or not claim_key.strip()
             or len(claim_key) > 256 or not isinstance(content, str)
@@ -96,6 +99,43 @@ async def propose_claim(workspace: str, allowed_collection_ids: list[str] | tupl
         await db.execute('BEGIN IMMEDIATE')
         if not await _valid(db, workspace, allowed, citations):
             raise ValueError('Citations are unavailable or outside scope')
+        if origin_investigation_id is not None:
+            from potluck_local.services.evidence_lookup import EvidenceScope
+            from potluck_local.services.investigations import _bindings_valid, _refs, ensure_schema
+            import json
+
+            scope = EvidenceScope(workspace, tuple(sorted(allowed)))
+            await ensure_schema(db)
+            cursor = await db.execute(
+                'SELECT status, review, outcome, brief, evidence FROM investigations '
+                'WHERE id=? AND workspace=? AND scope=?',
+                (origin_investigation_id, workspace, json.dumps(sorted(allowed))))
+            row = await cursor.fetchone()
+            if not row or row[0] != 'reviewed' or not row[1] or not row[2]:
+                raise ValueError('Investigation unavailable')
+            review, brief, evidence = json.loads(row[1]), json.loads(row[3]), json.loads(row[4])
+            if review['decision'] not in ('accept', 'correct'):
+                raise ValueError('Investigation unavailable')
+            if review['decision'] == 'correct':
+                brief = review['corrected_brief']
+            cited = {cid for section in ('facts', 'prior_fixes', 'hypotheses', 'recommended_checks')
+                     for item in brief[section] for cid in item['citation_ids']}
+            chosen = set(origin_citation_ids or [])
+            selected = [item for item in evidence if item['citation_id'] in chosen]
+            if not chosen or not chosen <= cited or len(selected) != len(chosen):
+                raise ValueError('Investigation citations unavailable')
+            cursor = await db.execute(
+                'SELECT collection_id,document_id,revision_id,chunk_id,claim_id '
+                'FROM investigation_bindings WHERE investigation_id=?', (origin_investigation_id,))
+            if not await _bindings_valid(db, await cursor.fetchall(), scope):
+                raise ValueError('Investigation unavailable')
+            expected = {tuple(ref[:4]) for ref in _refs(selected)}
+            actual = {tuple(ref[key] for key in ('collection_id', 'document_id', 'revision_id', 'chunk_id'))
+                      for ref in citations}
+            if expected != actual:
+                raise ValueError('Investigation citations unavailable')
+        elif origin_citation_ids is not None:
+            raise ValueError('Investigation unavailable')
         claim_id = str(uuid.uuid4())
         await db.execute('INSERT INTO reviewed_claims '
                          '(id, workspace, claim_key, content, status, created_at) '
@@ -105,6 +145,9 @@ async def propose_claim(workspace: str, allowed_collection_ids: list[str] | tupl
             await db.execute('INSERT INTO reviewed_claim_sources VALUES (?,?,?,?,?)',
                              (claim_id, ref['collection_id'], ref['document_id'],
                               ref['revision_id'], ref['chunk_id']))
+        if origin_investigation_id is not None:
+            await db.execute('INSERT INTO investigation_claim_origins VALUES (?,?)',
+                             (claim_id, origin_investigation_id))
         await db.commit()
         return claim_id
 
@@ -158,6 +201,12 @@ async def supersede_claim(workspace: str, allowed_collection_ids: list[str] | tu
         new = await _claim(db, workspace, allowed, replacement_id)
         if old[2] != 'approved' or new[2] != 'proposed' or old[1] != new[1]:
             raise ValueError('Supersession requires an approved claim and matching proposal')
+        await invalidate(db, 'claim_id=?', (current_id,))
+        # Invalidation may reach either claim through an investigation dependency.
+        old_after = await _claim(db, workspace, allowed, current_id)
+        new_after = await _claim(db, workspace, allowed, replacement_id)
+        if old_after[2] != 'approved' or new_after[2] != 'proposed':
+            raise ValueError('Replacement depends on invalidated knowledge')
         await db.execute(
             "UPDATE reviewed_claims SET status='superseded', superseded_by=?, "
             'superseded_at=?, superseded_reviewer=?, superseded_reason=? WHERE id=?',
@@ -201,6 +250,7 @@ async def delete_claim(workspace: str, allowed_collection_ids: list[str] | tuple
         if not await cursor.fetchone() or not await _authorized(
                 db, workspace, allowed, await _refs(db, claim_id)):
             raise LookupError('Claim unavailable in this scope')
+        await invalidate(db, 'claim_id=?', (claim_id,))
         await db.execute(TOMBSTONE_SQL + 'id=? AND workspace=?',
                          (_now(), 'manual', claim_id, workspace))
         await db.commit()

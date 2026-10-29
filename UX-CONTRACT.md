@@ -52,3 +52,32 @@ The existing universal minimum-version gate and server authorization policies re
 - Concurrent loads share one request; older responses cannot replace newer saved or hydrated settings. GET recovery does not change the existing save/rollback or authorization contract.
 - Tabs retain their URL selection and arrow-key behavior. The tab strip scrolls at narrow widths; controls and error guidance remain reachable in light and dark themes.
 - Browser evidence uses real components with simulated API responses and synthetic settings. It does not certify live inference, a native installer or a real service outage.
+
+
+## Local investigations
+
+`views/InvestigationsView.tsx` uses the shared `ViewHeader` and Hearth tokens.
+The workflow is single-owner and local; workspace strings and typed reviewer
+names are not company authentication. Its lifecycle is defined in the Python
+`COMPANY_BRAIN.md` guide and enforced by the sidecar, including current evidence
+validation on every read and write.
+
+- Choose the workspace, exact source collection set and already loaded model
+  explicitly. Changing the source scope clears the previous list and selection.
+- Disable scope/model/record switching while an operation is pending. Errors use
+  an alert and clear the displayed artifact rather than leaving revoked evidence
+  visible. No operation silently retries or routes to another model.
+- Review and outcome are separate one-shot actions. Corrections retain the original
+  draft; outcomes have no preselected result. Reviewed does not mean resolved.
+- Numbered citation links open the matching source disclosure; full IDs, source
+  revision and model identity remain inspectable. Knowledge proposals are available
+  only after accepted/corrected review and an outcome, and remain unapproved.
+- Textareas use fixed adequate rows and internal scrolling. Preserve entered text
+  during pending work; all controls have visible labels and normal keyboard access.
+
+The Investigations view uses native select controls for the loaded local model,
+review decision, and outcome. The existing desktop Memory view uses the same
+platform-owned select pattern. Native popup geometry and keyboard behavior are
+accepted for this workflow; this decision does not establish a global select
+owner for other views. Verify keyboard operation and the popup in the desktop
+browser review.

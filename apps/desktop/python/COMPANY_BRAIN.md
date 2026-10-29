@@ -1,10 +1,11 @@
 # Local Company Brain evidence and review
 
-This developer feature connects scoped Markdown source collections to explicit
-human-reviewed knowledge and read-only MCP evidence lookup. It is a local-owner
-foundation, not the completed investigation interface or a multi-user service.
-No inference, embeddings, training, production actions, or external transfers are
-performed by these services.
+This local-owner developer feature connects scoped Markdown source collections,
+reviewed knowledge and cited lookup to a saved investigation in the desktop app.
+The investigation explicitly uses an already loaded local model. Source/review
+commands do not invoke a model. No tool execution, training, remote inference or
+automatic knowledge approval is part of this workflow. Shared company deployment
+still requires authenticated server-side authorization and operational work.
 
 ## Sources and authority
 
@@ -156,7 +157,75 @@ databases and synthetic documents. They exercise scope isolation, atomic
 supersession, scan rollback, deletion, freshness, citation invalidation, privacy,
 and concurrent approvals. No real vault is implicitly ingested by these tests.
 
-Next: review an actual source manifest, freeze an independent evaluation holdout,
-then build the cited engineering investigation brief and saved handoff on an
-explicitly selected owned model. Add actual-outcome review and evaluation gates
-before claiming that retrieval improves model quality or training any model.
+Model usefulness is a separate gate from these software tests. Frozen synthetic
+cases and the comparison contract are in [evals/company_brain](evals/company_brain/README.md).
+The comparison consumes explicit independent labels; it does not run a model or
+infer semantic support from valid citation IDs. No quality improvement is claimed.
+
+## Saved investigations in the desktop app
+
+Open **Workspace → Investigations**. Enter the workspace used to register the
+selected sources, load collections, and choose the exact collection scope. Source
+registration/scanning remains a local CLI operation. Load a model in **Models**,
+reload collections to refresh model status, and explicitly select the loaded
+model. Enter an issue and a short evidence query, then create an investigation.
+
+The brief separates facts, prior fixes, hypotheses, recommended checks and missing
+evidence. Numbered citations open source text and revision metadata. Generated
+facts and prior fixes must cite retrieved records; valid citations do not establish
+that the text supports the model's assertion. The owner must inspect that support.
+Recommendations are text only; no commands, tools or fixes are executed.
+
+Saved drafts retain the original answer, selected source scope, all retrieved
+evidence bindings, model slug and SHA-256, prompt/retrieval versions, generation
+settings and elapsed time. **Load saved** uses the original exact collection set.
+Current limits are 100 saved records per scope and 10 lookup results total,
+with at most 6,000 characters per evidence record and 24,000 characters total
+model context. Truncation is disclosed. These character bounds are not a tokenizer
+budget; a model can reject context it cannot fit.
+
+Generation uses the selected local runtime directly, temperature 0 and at most
+1,600 output tokens. Request-local citation aliases reduce output overhead and
+are checked and mapped to full source IDs before persistence. Only a valid JSON
+brief (optionally in one enclosing JSON fence) is accepted. Missing-evidence
+entries may be strings or strictly validated text/citation objects; the latter
+normalize to text with their verified source IDs retained. Generation has a
+240-second soft timeout: the existing runtime drains a non-cancellable worker
+before returning. Invalid output or timeout saves no partial investigation and
+does not trigger an automatic retry, model download or broader routing.
+
+## Review, outcomes and reuse
+
+1. Explicitly accept, correct or reject a draft, with a reviewer and reason.
+   A correction preserves the original draft and can change text and citations.
+   The currently supported review is one-shot; it is not a collaborative editor.
+2. Record the actual outcome separately as resolved, unresolved or inconclusive,
+   with notes. Accepting a brief does not resolve the underlying issue. An outcome
+   is also one-shot; create a new investigation for a later observation.
+3. Export a Markdown handoff, or after review and outcome explicitly download an
+   evaluation-case proposal. The proposal contains references and review/outcome
+   categories rather than source text or an automatically accepted test answer.
+4. An accepted/corrected investigation with an outcome can propose knowledge using
+   citations from the reviewed brief. The claim remains **proposed**; approval
+   still uses the separate owner review CLI. This does not train a model.
+
+The HTTP endpoints are under `/company-brain` and use the sidecar's existing
+loopback/token middleware. They are unavailable through peer/remote routes.
+Workspace strings and reviewer names are organizational labels, not authenticated
+company identities. Both memory privacy switches are required. Exports already
+downloaded cannot be revoked or scrubbed by later source changes.
+
+New, changed or removed source material in any selected collection invalidates
+the investigation, including earlier empty-result claims. Unchanged rescans keep
+it available. Invalidated payloads are scrubbed, and knowledge derived from those
+investigations is scrubbed recursively through dependent investigations. Review,
+outcome and knowledge writes revalidate the evidence inside their transaction.
+Old versions never reactivate automatically. A failed or stale scan hides an
+artifact until evidence is current again; a content-invalidated artifact does not
+revive after rescan. The logical-erasure limits above also apply here.
+
+Before a pilot, run the frozen cases on pinned baseline/candidate configurations,
+independently label citation support and unsupported answers, and measure review
+effort/time to accepted output. Source lifecycle UI, authenticated organizational
+access, larger-corpus performance and repeatable backup/recovery remain additional
+work. This implementation belongs to the free/open core.
