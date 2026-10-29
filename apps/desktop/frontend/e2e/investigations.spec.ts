@@ -20,6 +20,11 @@ const draft = { id: 'new', workspace: 'workspace', collection_ids: ['docs'], iss
 const legacy = { ...draft, id: 'old', issue: 'Historical incident', evidence: [source], retrieval_notices: [],
   provenance: {}, brief: { facts: [], prior_fixes: [], hypotheses: [], recommended_checks: [],
     missing_evidence: ['Old combined notice'] } };
+const snippet = { snippet_id: 'S1', citation_id: sourceId, quote: 'The worker was restarted.' };
+const answerDraft = { ...draft, brief: { questions: [{ id: 'Q1', text: 'What happened?' }],
+  answers: [{ question_id: 'Q1', status: 'supported', text: 'The worker restarted.', snippet_ids: ['S1'], source_excerpts: [snippet] }],
+  facts: [], prior_fixes: [], hypotheses: [], recommended_checks: [], model_uncertainties: [] },
+  provenance: { ...draft.provenance, template_version: 'investigation-v6', question_origin: 'explicit', snippet_catalog: [snippet] } };
 
 type Controls = { unavailable: boolean; empty: boolean; failCreate: boolean; createGate?: Promise<void> };
 async function setup(page: Page, controls: Controls) {
@@ -44,6 +49,7 @@ async function setup(page: Page, controls: Controls) {
     if (path === '/company-brain/investigations' && request.method() === 'POST') {
       if (controls.createGate) await controls.createGate;
       if (controls.failCreate) return fulfill({ detail: 'generation_failed: unavailable' }, 400);
+      if (request.postDataJSON().answer_each_question) current = structuredClone(answerDraft);
       return fulfill(current);
     }
     if (path === '/company-brain/investigations') return fulfill({ investigations: [current, legacy] });
@@ -52,6 +58,12 @@ async function setup(page: Page, controls: Controls) {
     if (path === '/company-brain/investigations/new/review') {
       if (controls.unavailable) return fulfill({ detail: 'investigation_unavailable: source changed' }, 404);
       const input = request.postDataJSON();
+      if (input.corrected_brief.questions) {
+        if (input.corrected_brief.answers[0].text === 'Invalid') return fulfill({ detail: 'invalid_review_brief: Invalid corrected brief' }, 400);
+        current = { ...current, status: 'reviewed', review: { decision: 'correct', reviewer: input.reviewer,
+          reason: input.reason, corrected_brief: { ...input.corrected_brief, answers: input.corrected_brief.answers.map((a: Record<string, unknown>) => ({ ...a, source_excerpts: (a.snippet_ids as string[]).map(() => snippet) })) } } };
+        return fulfill(current);
+      }
       if (input.corrected_brief.facts[0].source_excerpts[0].quote === 'Forged excerpt')
         return fulfill({ detail: 'invalid_review_brief: Invalid corrected brief' }, 400);
       current = { ...draft, status: 'reviewed', review: { decision: 'correct', reviewer: input.reviewer,
@@ -64,6 +76,41 @@ async function setup(page: Page, controls: Controls) {
   await mkdir(output, { recursive: true });
   await page.goto('/#/investigations');
 }
+
+test('question preview renders sources and recovers a correction', async ({ page }) => {
+  await setup(page, { unavailable: false, empty: false, failCreate: false });
+  await page.setViewportSize({ width: 480, height: 740 });
+  await scope(page);
+  await page.getByLabel('Answer each question (preview)').check();
+  await page.getByLabel('Questions, one per line (optional)').fill('What happened?');
+  await page.getByLabel('Answer profile').selectOption('qwen3-non-thinking');
+  await page.setViewportSize({ width: 1152, height: 768 });
+  await page.getByLabel('Answer profile').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${output}/question-profile-desktop.png`, animations: 'disabled' });
+  await page.setViewportSize({ width: 480, height: 740 });
+  const request = page.waitForRequest((r) => r.url().endsWith('/company-brain/investigations') && r.method() === 'POST');
+  await create(page);
+  expect((await request).postDataJSON()).toMatchObject({ answer_each_question: true, questions: ['What happened?'], generation_profile: 'qwen3-non-thinking' });
+  await expect(page.getByText('Supported (model claim)', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Draft answers need review/)).toBeVisible();
+  await page.setViewportSize({ width: 1152, height: 768 });
+  await page.getByRole('heading', { name: 'Questions and answers' }).evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await page.screenshot({ path: `${output}/question-answer-desktop.png`, animations: 'disabled' });
+  await page.setViewportSize({ width: 480, height: 740 });
+  await page.getByRole('link', { name: 'Source 1.1' }).click();
+  await expect(page.locator('#investigation-source-1-1')).toBeInViewport();
+  await page.getByLabel('Decision').selectOption('correct');
+  await page.getByLabel('Answer text').fill('Invalid');
+  await page.getByLabel('Reviewer', { exact: true }).fill('Owner');
+  await page.getByLabel('Reason', { exact: true }).fill('Checked source');
+  await page.getByRole('button', { name: 'Save review' }).click();
+  await expect(page.getByRole('alert')).toContainText('Check the correction');
+  await expect(page.getByLabel('Answer text')).toHaveValue('Invalid');
+  await page.getByLabel('Answer text').fill('Corrected answer');
+  await page.getByRole('button', { name: 'Save review' }).click();
+  await expect(page.getByText('Corrected answer')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
 async function scope(page: Page) {
   await page.getByLabel('Workspace', { exact: true }).fill('workspace');
   await page.getByRole('button', { name: 'Load collections' }).click();

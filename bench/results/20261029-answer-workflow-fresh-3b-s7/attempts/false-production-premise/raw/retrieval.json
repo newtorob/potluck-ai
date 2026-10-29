@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "31191d74-6677-457e-a839-c985b582743b"
+  ],
+  "query": "When was release R8 deployed to production, and who approved that deployment?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "31191d74-6677-457e-a839-c985b582743b"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "31191d74-6677-457e-a839-c985b582743b",
+        "document_id": "cbe0f72b-83c0-593c-8b05-901ac053253d",
+        "revision_id": "916b1400-d16b-5cba-abf4-3ce5ec7b9141",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:55:20.964318+00:00",
+        "chunk_id": "a22b1495-1e3e-5546-b1e9-cad1ed4f9274",
+        "anchor": "r8-release-status",
+        "heading": "R8 release status",
+        "content": "R8 was deployed to staging on Tuesday by Sol. Production deployment remains pending; no production deployment approval is recorded.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:55:20.964684+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:a22b1495-1e3e-5546-b1e9-cad1ed4f9274:916b1400-d16b-5cba-abf4-3ce5ec7b9141"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

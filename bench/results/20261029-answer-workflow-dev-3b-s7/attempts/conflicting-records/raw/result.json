@@ -1,0 +1,165 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "9bb49529-34e4-409f-a927-4b2a250aa523",
+    "workspace": "synthetic-eval",
+    "issue": "What is the current retry interval, and can these records establish which value is current?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What is the current retry interval?"
+        },
+        {
+          "id": "Q2",
+          "text": "Can these records determine the current retry interval?"
+        },
+        {
+          "id": "Q3",
+          "text": "What records should be checked to find the current retry interval?"
+        },
+        {
+          "id": "Q4",
+          "text": "How are the retry interval values established?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "conflicting",
+          "text": "The retry interval is stated as 30 seconds in S1 and 75 seconds in S2, hence conflicting information.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:1e1f6516-d345-50b5-97e8-f28cd1ec1a56:17852771-5932-554d-8758-618d50b77bdb",
+              "quote": "The deployment checklist says the retry interval is 30 seconds. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:1e1f6516-d345-50b5-97e8-f28cd1ec1a56:17852771-5932-554d-8758-618d50b77bdb",
+              "quote": "The operations runbook says the retry interval is 75 seconds. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "unknown",
+          "text": "The records do not establish which value is current, S3 indicates no timestamps or approval status to determine the current value.",
+          "snippet_ids": [
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:1e1f6516-d345-50b5-97e8-f28cd1ec1a56:17852771-5932-554d-8758-618d50b77bdb",
+              "quote": "These records have no timestamps or approval status establishing which is current."
+            }
+          ]
+        },
+        {
+          "question_id": "Q3",
+          "status": "unknown",
+          "text": "No specific records are mentioned to check for the current retry interval, only the conflicting values are provided.",
+          "snippet_ids": [],
+          "source_excerpts": []
+        },
+        {
+          "question_id": "Q4",
+          "status": "unknown",
+          "text": "No information is provided on how the retry interval values are established, only the conflicting values are mentioned.",
+          "snippet_ids": [],
+          "source_excerpts": []
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "6c2163a0-d150-4f1a-bb2d-793b4dc3a5ba",
+        "document_id": "ce36bec8-0df3-5689-b3fc-d6e3a768027e",
+        "revision_id": "17852771-5932-554d-8758-618d50b77bdb",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:41:53.070649+00:00",
+        "chunk_id": "1e1f6516-d345-50b5-97e8-f28cd1ec1a56",
+        "anchor": "retry-interval-records",
+        "heading": "Retry interval records",
+        "content": "The deployment checklist says the retry interval is 30 seconds. The operations runbook says the retry interval is 75 seconds. These records have no timestamps or approval status establishing which is current.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:41:53.070863+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:1e1f6516-d345-50b5-97e8-f28cd1ec1a56:17852771-5932-554d-8758-618d50b77bdb",
+        "presented_content": "The deployment checklist says the retry interval is 30 seconds. The operations runbook says the retry interval is 75 seconds. These records have no timestamps or approval status establishing which is current."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T17:42:09.093110+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What is the current retry interval, and can these records establish which value is current?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 16017,
+      "created_at": "2026-10-29T17:42:09.093110+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:1e1f6516-d345-50b5-97e8-f28cd1ec1a56:17852771-5932-554d-8758-618d50b77bdb",
+          "quote": "The deployment checklist says the retry interval is 30 seconds. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:1e1f6516-d345-50b5-97e8-f28cd1ec1a56:17852771-5932-554d-8758-618d50b77bdb",
+          "quote": "The operations runbook says the retry interval is 75 seconds. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:1e1f6516-d345-50b5-97e8-f28cd1ec1a56:17852771-5932-554d-8758-618d50b77bdb",
+          "quote": "These records have no timestamps or approval status establishing which is current."
+        }
+      ],
+      "planner_version": "issue-only-v1",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": null
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "6c2163a0-d150-4f1a-bb2d-793b4dc3a5ba"
+    ]
+  },
+  "latency_seconds": 16.027035834267735,
+  "setup_seconds": 0.01627962477505207,
+  "attempt_total_seconds": 16.043315459042788
+}

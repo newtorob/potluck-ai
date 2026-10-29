@@ -1,0 +1,2 @@
+# Latency observation
+The operator cleared the cache. Median latency was 180 ms before the maintenance window and 120 ms afterward. Queue concurrency was also changed during the same window. This observation does not establish which intervention caused the change.

@@ -1,0 +1,153 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "102f1120-5596-4413-88cb-1affe4667a08",
+    "workspace": "synthetic-eval",
+    "issue": "Which steps should follow signing-key rotation, and which of those steps does this document show were actually completed?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What steps should follow signing-key rotation?"
+        },
+        {
+          "id": "Q2",
+          "text": "Which of the steps following signing-key rotation does this document show were actually completed?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "supported",
+          "text": "The steps that should follow signing-key rotation are: update the verifier key set, reload the verifier, and check a signed test request.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:f3679d4d-9ce8-5c24-9e6e-647201f77092:b6f04926-e24a-577c-a1d0-62e6cfdb42e6",
+              "quote": "Procedure: after rotating the signing key, update the verifier key set, reload the verifier, and check a signed test request.\n"
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "supported",
+          "text": "The document shows that updating the verifier key set was completed, but there is no evidence of reloading the verifier or checking a signed test request.",
+          "snippet_ids": [
+            "S2",
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:f3679d4d-9ce8-5c24-9e6e-647201f77092:b6f04926-e24a-577c-a1d0-62e6cfdb42e6",
+              "quote": "Execution log: the verifier key set was updated on Monday. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:f3679d4d-9ce8-5c24-9e6e-647201f77092:b6f04926-e24a-577c-a1d0-62e6cfdb42e6",
+              "quote": "The log records no reload or test-request check."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "28131f3d-44f7-4d61-b1e1-013f9556e1a4",
+        "document_id": "e3b8a816-9b22-5e9e-80a1-6c991f5a6f48",
+        "revision_id": "b6f04926-e24a-577c-a1d0-62e6cfdb42e6",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:57:05.867414+00:00",
+        "chunk_id": "f3679d4d-9ce8-5c24-9e6e-647201f77092",
+        "anchor": "signing-key-rotation",
+        "heading": "Signing-key rotation",
+        "content": "Procedure: after rotating the signing key, update the verifier key set, reload the verifier, and check a signed test request.\nExecution log: the verifier key set was updated on Monday. The log records no reload or test-request check.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:57:05.867645+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:f3679d4d-9ce8-5c24-9e6e-647201f77092:b6f04926-e24a-577c-a1d0-62e6cfdb42e6",
+        "presented_content": "Procedure: after rotating the signing key, update the verifier key set, reload the verifier, and check a signed test request.\nExecution log: the verifier key set was updated on Monday. The log records no reload or test-request check."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T17:57:54.932957+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "Which steps should follow signing-key rotation, and which of those steps does this document show were actually completed?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 49060,
+      "created_at": "2026-10-29T17:57:54.932957+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:f3679d4d-9ce8-5c24-9e6e-647201f77092:b6f04926-e24a-577c-a1d0-62e6cfdb42e6",
+          "quote": "Procedure: after rotating the signing key, update the verifier key set, reload the verifier, and check a signed test request.\n"
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:f3679d4d-9ce8-5c24-9e6e-647201f77092:b6f04926-e24a-577c-a1d0-62e6cfdb42e6",
+          "quote": "Execution log: the verifier key set was updated on Monday. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:f3679d4d-9ce8-5c24-9e6e-647201f77092:b6f04926-e24a-577c-a1d0-62e6cfdb42e6",
+          "quote": "The log records no reload or test-request check."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "28131f3d-44f7-4d61-b1e1-013f9556e1a4"
+    ]
+  },
+  "latency_seconds": 49.070663374848664,
+  "setup_seconds": 0.015933833085000515,
+  "attempt_total_seconds": 49.086597207933664
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-94de8d16-74d9-4b90-a329-497d6a0374d2",
+  "object": "chat.completion",
+  "created": 1793296461,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"] , \"text\": \"update the verifier key set, reload the verifier, and check a signed test request.\" , \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S2\", \"S3\"] , \"text\": \"the verifier key set was updated on Monday.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 450,
+    "completion_tokens": 79,
+    "total_tokens": 529
+  }
+}

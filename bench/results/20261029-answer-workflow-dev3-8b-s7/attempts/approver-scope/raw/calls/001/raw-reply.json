@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-18504a60-59c7-412a-9332-d5ebde2cb13d",
+  "object": "chat.completion",
+  "created": 1793296363,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"Who approved the schema migration?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 95,
+    "completion_tokens": 11,
+    "total_tokens": 106
+  }
+}

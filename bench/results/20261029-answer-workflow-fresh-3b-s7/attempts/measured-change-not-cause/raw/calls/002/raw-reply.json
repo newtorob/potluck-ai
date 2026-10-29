@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-dd5e1e27-a77c-495e-b553-529baf57ceaf",
+  "object": "chat.completion",
+  "created": 1793296498,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S2\"], \"text\": \"Median latency was 180 ms before the maintenance window and 120 ms afterward.\" , \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S1\", \"S4\"], \"text\": \"The operator cleared the cache. This observation does not establish which intervention caused the change.\", \"status\": \"supported\"}, \"Q3\": {\"snippet_ids\": [\"S2\"], \"text\": \"Median latency was 180 ms before the maintenance window and 120 ms afterward.\", \"status\": \"supported\"}, \"Q4\": {\"snippet_ids\": [\"S3\"], \"text\": \"Queue concurrency was also changed during the same window.\", \"status\": \"supported\"}, \"Q5\": {\"snippet_ids\": [\"S2\"], \"text\": \"Median latency was 180 ms before the maintenance window and 120 ms afterward.\", \"status\": \"supported\"}, \"Q6\": {\"snippet_ids\": [\"S2\"], \"text\": \"Median latency was 180 ms before the maintenance window and 120 ms afterward.\", \"status\": \"supported\"}, \"Q7\": {\"snippet_ids\": [\"S2\"], \"text\": \"Median latency was 180 ms before the maintenance window and 120 ms afterward.\", \"status\": \"supported\"}, \"Q8\": {\"snippet_ids\": [\"S4\"], \"text\": \"This observation does not establish which intervention caused the change.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 606,
+    "completion_tokens": 328,
+    "total_tokens": 934
+  }
+}

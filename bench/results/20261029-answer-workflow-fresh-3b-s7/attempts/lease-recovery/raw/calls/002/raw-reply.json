@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-71ab51bd-3959-4650-abd9-67b07733fe33",
+  "object": "chat.completion",
+  "created": 1793296448,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S2\"], \"text\": \"The lease processing was restored.\" , \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S3\"], \"text\": \"The message TTL was not changed.\", \"status\": \"supported\"}, \"Q3\": {\"snippet_ids\": [\"S4\"], \"text\": \"The recovery note does not identify the operator.\", \"status\": \"supported\"}, \"Q4\": {\"snippet_ids\": [\"S5\"], \"text\": \"The cause of the issue has not been established.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 517,
+    "completion_tokens": 125,
+    "total_tokens": 642
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-5c9388a4-8660-4ca5-a59f-639012e33bf6",
+  "object": "chat.completion",
+  "created": 1793296235,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"30 seconds.\" , \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S3\"], \"text\": \"These records have no timestamps or approval status establishing which is current.\", \"status\": \"supported\"}, \"Q3\": {\"snippet_ids\": [\"S1\", \"S2\"], \"text\": \"S1 and S2\", \"status\": \"supported\"}, \"Q4\": {\"snippet_ids\": [\"S1\", \"S2\"], \"text\": \"S1 and S2\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 480,
+    "completion_tokens": 131,
+    "total_tokens": 611
+  }
+}

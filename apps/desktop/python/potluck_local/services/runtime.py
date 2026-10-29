@@ -31,6 +31,7 @@ from pathlib import Path
 from potluck_local.services import (
     acceptance,
     inference_errors,
+    investigation_profiles,
     memory_probe,
     model_evidence,
     model_traits,
@@ -86,6 +87,15 @@ def _structured_response_format(model, response_format: dict) -> dict:
                 raise ValueError("Invalid structured response array bounds")
         elif kind in ("string", "integer", "number", "boolean", "null"):
             allowed.add("enum")
+            if kind == "string":
+                allowed |= {"minLength", "maxLength"}
+                for key in ("minLength", "maxLength"):
+                    if key in schema and (type(schema[key]) is not int or schema[key] < 0):
+                        raise ValueError("Invalid structured response string bounds")
+                if schema.get("maxLength", float("inf")) < schema.get("minLength", 0):
+                    raise ValueError("Invalid structured response string bounds")
+                if "enum" in schema and ("minLength" in schema or "maxLength" in schema):
+                    raise ValueError("String enum and length bounds cannot be combined")
             if "enum" in schema:
                 types = {"string": str, "integer": int, "number": (int, float),
                          "boolean": bool, "null": type(None)}
@@ -2100,6 +2110,19 @@ class LLMRuntime:
             logger.info("%s complete tokens=%d duration=%.3fs",
                         label, token_count, round(time.monotonic() - start, 3))
 
+    async def validate_investigation_profile(
+        self, name: str, *, expected_model: str | None = None, expected_sha256: str | None = None,
+    ) -> dict:
+        """Validate a profile against the loaded model without running inference."""
+        profile = investigation_profiles.resolve_profile(name)
+        async with self._inference_lock:
+            self.assert_model_identity(expected_model, expected_sha256)
+            try:
+                investigation_profiles.stock_handler(self._model, profile, threading.Event())
+            except (RuntimeError, ImportError, AttributeError) as exc:
+                raise ValueError(f"Investigation profile is incompatible: {exc}") from exc
+        return profile.metadata()
+
     async def chat(
         self,
         messages: list[dict],
@@ -2113,6 +2136,9 @@ class LLMRuntime:
         stop: list[str] | None = None,
         tool_proof: bool = False,
         response_format: dict | None = None,
+        generation_profile: str | None = None,
+        seed: int | None = None,
+        bounded_generation: bool = False,
     ) -> dict:
         """Non-streaming completion. Returns raw llama result dict."""
         if self._pipeline is not None:
@@ -2135,6 +2161,14 @@ class LLMRuntime:
             start = time.monotonic()
             managed_split = _native_model(model)
             cancel_event = threading.Event()
+            profile = (investigation_profiles.resolve_profile(generation_profile)
+                       if generation_profile is not None else None)
+            profile_handler = None
+            if profile is not None or bounded_generation:
+                if response_format is None or tools or tool_choice is not None:
+                    raise ValueError("Bounded investigation generation requires structured output without tools or reasoning controls")
+                if profile is not None or not managed_split:
+                    profile_handler = investigation_profiles.stock_handler(model, profile, cancel_event)
 
             def _complete():
                 # Control-token text in the request stays text (prompt_guard).
@@ -2155,15 +2189,23 @@ class LLMRuntime:
                     model, messages, {**tool_calls.completion_kwargs(tools, tool_choice), **structured})
                 try:
                     with tool_markers.watch(model, tool_proof and bool(extra.get("tools"))) as reader:
-                        result = model.create_chat_completion(
+                        kwargs = dict(
                             messages=safe_messages,
-                            temperature=temperature,
+                            temperature=profile.temperature if profile else temperature,
                             max_tokens=max_tokens,
                             stream=False,
                             **({"stop": stop} if stop else {}),
                             **extra,
                             **({"cancel_event": cancel_event} if managed_split else {}),
+                            **({"seed": seed} if seed is not None else {}),
                         )
+                        if profile_handler is not None:
+                            kwargs["repeat_penalty"] = profile.repeat_penalty if profile else 1.0
+                            if profile is not None:
+                                kwargs.update(top_p=profile.top_p, top_k=profile.top_k, min_p=profile.min_p)
+                            result = profile_handler(llama=model, **kwargs)
+                        else:
+                            result = model.create_chat_completion(**kwargs)
                         if reader is not None:
                             _mark_reply(reader, result)
                         return result
@@ -2174,6 +2216,8 @@ class LLMRuntime:
             try:
                 result = await asyncio.shield(fut)
             except asyncio.CancelledError:
+                if profile_handler is not None:
+                    cancel_event.set()
                 if managed_split:
                     await self._cancel_split_request(model, cancel_event)
                 raise
@@ -2188,8 +2232,8 @@ class LLMRuntime:
             finally:
                 # A cancelled request must not free the inference lock while the
                 # worker thread is still inside create_chat_completion (the model
-                # is not thread-safe). Ordinary local models have no early-stop
-                # hook and drain fully.
+                # is not thread-safe). Opt-in investigation handlers stop between
+                # tokens; prefill and other stock requests may still drain fully.
                 await self._drain_worker(fut)
 
             elapsed = round(time.monotonic() - start, 3)

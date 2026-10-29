@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "eea56bac-84a2-4d95-a12d-6ede57db0665",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-answer-workflow-fresh-3b-s7/attempts/rotation-evidence/raw/allowed",
+  "source_sha256": "bac748ac131e4b25a9becb34813c8b4804669aab6149116b177412cc010ca685",
+  "scan": {
+    "collection_id": "eea56bac-84a2-4d95-a12d-6ede57db0665",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

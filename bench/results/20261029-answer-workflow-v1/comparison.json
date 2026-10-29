@@ -1,0 +1,66 @@
+{
+  "corpus": "answer-workflow-v1-fresh",
+  "arms": [
+    {
+      "model": "3b",
+      "seed": 7,
+      "attempts": 8,
+      "saved": 8,
+      "primary_successful": 5,
+      "independent_successful": 4
+    },
+    {
+      "model": "3b",
+      "seed": 29,
+      "attempts": 8,
+      "saved": 8,
+      "primary_successful": 5,
+      "independent_successful": 4
+    },
+    {
+      "model": "8b",
+      "seed": 7,
+      "attempts": 8,
+      "saved": 8,
+      "primary_successful": 7,
+      "independent_successful": 7
+    },
+    {
+      "model": "8b",
+      "seed": 29,
+      "attempts": 8,
+      "saved": 8,
+      "primary_successful": 7,
+      "independent_successful": 7
+    }
+  ],
+  "disagreements": [
+    {
+      "arm": "3b-s7",
+      "case_id": "lease-recovery",
+      "primary": true,
+      "independent": false,
+      "primary_reason": "All four original points are answered in text or selected exact excerpts. Planner changes the wording of the recovery question; the visible dispatcher-restart quote nevertheless answers the original mechanism request. Recorded as a planning-quality warning, not a delivered-coverage failure.",
+      "independent_reason": "All four requested facts are visible: Q1\u2019s S2 explicitly says restarting the dispatcher restored processing; Q2\u2013Q4 state unchanged TTL, operator unrecorded, and cause unestablished. However, Q1 asks what was restored rather than what restored processing, which is a different unrequested question and omits the requested recovery action from planning. The selected excerpt nevertheless supplies the requested fact."
+    },
+    {
+      "arm": "3b-s29",
+      "case_id": "lease-recovery",
+      "primary": true,
+      "independent": false,
+      "primary_reason": "All four original points are answered in text or selected exact excerpts. Planner changes the wording of the recovery question; the visible dispatcher-restart quote nevertheless answers the original mechanism request. Recorded as a planning-quality warning, not a delivered-coverage failure.",
+      "independent_reason": "All four requested facts are visible: Q1\u2019s S2 explicitly says restarting the dispatcher restored processing; Q2\u2013Q4 state unchanged TTL, operator unrecorded, and cause unestablished. However, Q1 asks what was restored rather than what restored processing, which is a different unrequested question and omits the requested recovery action from planning. The selected excerpt nevertheless supplies the requested fact."
+    }
+  ],
+  "human_acceptance": false,
+  "human_review_time": null,
+  "decision": "Keep production v4 and existing model selection; v6 remains explicit preview. Use verified Qwen3 non-thinking as candidate for supervised internal dogfood. 3B is not recommended for this investigation workflow. No production promotion from these synthetic results.",
+  "limitations": [
+    "Only eight synthetic cases, repeated at two seeds; repeated greedy outputs are not independent cases.",
+    "Model, template, sampling and workflow differ; no isolated attribution or paired improvement over historical v4/v5 cases.",
+    "Both Qwen3 runs omit the requested explicit numerical difference; 3B retains injection, authority and planner failures.",
+    "One Qwen3 answer quotes irrelevant malicious source text without adopting it.",
+    "Cancellation stops between generated tokens; prefill may still drain beyond the soft timeout.",
+    "Human review effort and real company acceptance are unmeasured."
+  ]
+}

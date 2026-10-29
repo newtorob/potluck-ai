@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "8eb6ae5d-bab1-45bc-9056-7328d7b83678",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-answer-workflow-fresh-3b-s29/attempts/lease-recovery/raw/allowed",
+  "source_sha256": "f307393e6e1e5c15f028dc60e439b2244b493171b4a5d454e7113e88d3eda61b",
+  "scan": {
+    "collection_id": "8eb6ae5d-bab1-45bc-9056-7328d7b83678",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "e4ec1d3d-f1e5-47a0-962f-5b3fb8ea7a57",
+    "workspace": "synthetic-eval",
+    "issue": "What steps should follow credential rotation, and does this page document any completed fix?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What steps should follow credential rotation?"
+        },
+        {
+          "id": "Q2",
+          "text": "Does this page document any completed fix?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "supported",
+          "text": "After rotating the service credential, update the secret store, restart the connector, then verify a successful sync.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:7d7c2212-535c-5d44-b768-b1b4bb5a8071:05ec65f1-2ff3-524c-9646-ab52ed819ffa",
+              "quote": "After rotating the service credential, update the secret store, restart the connector, then verify a successful sync. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "supported",
+          "text": "This page is a procedure only; it does not record a rotation or restart being performed.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:7d7c2212-535c-5d44-b768-b1b4bb5a8071:05ec65f1-2ff3-524c-9646-ab52ed819ffa",
+              "quote": "This page is a procedure only; it does not record a rotation or restart being performed."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "2935763e-6618-45f0-82bf-b01ea696587c",
+        "document_id": "0e45d997-2a41-5eb3-8a4d-5a18980ec12b",
+        "revision_id": "05ec65f1-2ff3-524c-9646-ab52ed819ffa",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:50:09.487944+00:00",
+        "chunk_id": "7d7c2212-535c-5d44-b768-b1b4bb5a8071",
+        "anchor": "credential-rotation-procedure",
+        "heading": "Credential rotation procedure",
+        "content": "After rotating the service credential, update the secret store, restart the connector, then verify a successful sync. This page is a procedure only; it does not record a rotation or restart being performed.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:50:09.488059+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:7d7c2212-535c-5d44-b768-b1b4bb5a8071:05ec65f1-2ff3-524c-9646-ab52ed819ffa",
+        "presented_content": "After rotating the service credential, update the secret store, restart the connector, then verify a successful sync. This page is a procedure only; it does not record a rotation or restart being performed."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T17:50:19.605678+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What steps should follow credential rotation, and does this page document any completed fix?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 10113,
+      "created_at": "2026-10-29T17:50:19.605678+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:7d7c2212-535c-5d44-b768-b1b4bb5a8071:05ec65f1-2ff3-524c-9646-ab52ed819ffa",
+          "quote": "After rotating the service credential, update the secret store, restart the connector, then verify a successful sync. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:7d7c2212-535c-5d44-b768-b1b4bb5a8071:05ec65f1-2ff3-524c-9646-ab52ed819ffa",
+          "quote": "This page is a procedure only; it does not record a rotation or restart being performed."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": null
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "2935763e-6618-45f0-82bf-b01ea696587c"
+    ]
+  },
+  "latency_seconds": 10.120498416014016,
+  "setup_seconds": 0.01432195957750082,
+  "attempt_total_seconds": 10.134820375591516
+}

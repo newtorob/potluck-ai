@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-19c2d8b0-a77f-4a06-8d38-2f54156524fd",
+  "object": "chat.completion",
+  "created": 1793296918,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"How much did median latency change?\", \"Does clearing the cache cause the change in median latency?\", \"What is the record median latency before and after clearing the cache?\", \"How was the median latency measured before and after clearing the cache?\", \"What was the median latency before clearing the cache?\", \"What was the median latency after clearing the cache?\", \"How significant was the change in median latency?\", \"What evidence supports the claim that clearing the cache caused the change in median latency?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 105,
+    "completion_tokens": 101,
+    "total_tokens": 206
+  }
+}

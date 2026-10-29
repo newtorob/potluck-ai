@@ -785,7 +785,7 @@ export const localApi = {
     return timedFetch(`${LOCAL_BASE}/company-brain/investigations/${encodeURIComponent(id)}?${investigationQuery(scope)}`)
       .then(handleResponse<Investigation>);
   },
-  createInvestigation(input: InvestigationScope & { issue: string; query: string; model_slug: string }): Promise<Investigation> {
+  createInvestigation(input: InvestigationScope & { issue: string; query: string; model_slug: string; answer_each_question?: boolean; questions?: string[]; generation_profile?: string }): Promise<Investigation> {
     return timedFetch(`${LOCAL_BASE}/company-brain/investigations`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
     }, 360_000).then(handleResponse<Investigation>);

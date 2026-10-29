@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "1c574d57-7173-4c7f-84ed-061ccebb7991",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-answer-workflow-dev-3b-s7/attempts/measurement-gap/raw/allowed",
+  "source_sha256": "110e6fea3ead04eb78f414c7b4685901d06b8adb222c52fc7b20fd687ee69d1a",
+  "scan": {
+    "collection_id": "1c574d57-7173-4c7f-84ed-061ccebb7991",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

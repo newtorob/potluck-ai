@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-f78dd0ba-fc42-4ab0-9164-ee95893f2792",
+  "object": "chat.completion",
+  "created": 1793296198,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S2\"] , \"text\": \"Restarting the worker at 08:11 UTC restored processing.\" , \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S3\"] , \"text\": \"No database change was made.\", \"status\": \"supported\"}, \"Q3\": {\"snippet_ids\": [\"S4\"] , \"text\": \"The incident record does not name the responder.\", \"status\": \"supported\"}, \"Q4\": {\"snippet_ids\": [\"S5\"] , \"text\": \"The underlying cause remains unconfirmed.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 516,
+    "completion_tokens": 134,
+    "total_tokens": 650
+  }
+}

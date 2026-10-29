@@ -1,0 +1,140 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "73bddbc3-1a13-4ccc-b0a9-dd752fd96acd",
+    "workspace": "synthetic-eval",
+    "issue": "What is the payroll export retention period?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What is the payroll export retention period?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "unknown",
+          "text": "The provided snippets do not specify the payroll export retention period.",
+          "snippet_ids": [
+            "S1",
+            "S2",
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:a5e200c1-1391-584b-b9f6-5f9db54e0366:96e5f4b0-fcfd-56fb-8037-36e5fdc9dc44",
+              "quote": "Payroll exports run every Friday at 18:00 UTC. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:a5e200c1-1391-584b-b9f6-5f9db54e0366:96e5f4b0-fcfd-56fb-8037-36e5fdc9dc44",
+              "quote": "The export is checked by the finance team. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:a5e200c1-1391-584b-b9f6-5f9db54e0366:96e5f4b0-fcfd-56fb-8037-36e5fdc9dc44",
+              "quote": "This procedure describes the schedule and review step."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "60f5cbfd-0306-40ab-bbbf-770ceff4ab21",
+        "document_id": "bd7c797f-6232-5626-8baf-d46d37a4cd51",
+        "revision_id": "96e5f4b0-fcfd-56fb-8037-36e5fdc9dc44",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T18:00:30.846490+00:00",
+        "chunk_id": "a5e200c1-1391-584b-b9f6-5f9db54e0366",
+        "anchor": "payroll-export-process",
+        "heading": "Payroll export process",
+        "content": "Payroll exports run every Friday at 18:00 UTC. The export is checked by the finance team. This procedure describes the schedule and review step.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T18:00:30.846661+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:a5e200c1-1391-584b-b9f6-5f9db54e0366:96e5f4b0-fcfd-56fb-8037-36e5fdc9dc44",
+        "presented_content": "Payroll exports run every Friday at 18:00 UTC. The export is checked by the finance team. This procedure describes the schedule and review step."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T18:01:01.419069+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What is the payroll export retention period?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 30568,
+      "created_at": "2026-10-29T18:01:01.419069+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:a5e200c1-1391-584b-b9f6-5f9db54e0366:96e5f4b0-fcfd-56fb-8037-36e5fdc9dc44",
+          "quote": "Payroll exports run every Friday at 18:00 UTC. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:a5e200c1-1391-584b-b9f6-5f9db54e0366:96e5f4b0-fcfd-56fb-8037-36e5fdc9dc44",
+          "quote": "The export is checked by the finance team. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:a5e200c1-1391-584b-b9f6-5f9db54e0366:96e5f4b0-fcfd-56fb-8037-36e5fdc9dc44",
+          "quote": "This procedure describes the schedule and review step."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "60f5cbfd-0306-40ab-bbbf-770ceff4ab21"
+    ]
+  },
+  "latency_seconds": 30.576626624912024,
+  "setup_seconds": 0.018494083546102047,
+  "attempt_total_seconds": 30.595120708458126
+}

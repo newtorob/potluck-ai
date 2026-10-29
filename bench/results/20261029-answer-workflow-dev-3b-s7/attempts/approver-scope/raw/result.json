@@ -1,0 +1,190 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "2ad6443e-c7e1-4dad-9473-1264f3613038",
+    "workspace": "synthetic-eval",
+    "issue": "Who approved the schema migration?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "Who approved the schema migration?"
+        },
+        {
+          "id": "Q2",
+          "text": "What was the approval process for the schema migration?"
+        },
+        {
+          "id": "Q3",
+          "text": "Who initiated the schema migration?"
+        },
+        {
+          "id": "Q4",
+          "text": "When was the schema migration approved?"
+        },
+        {
+          "id": "Q5",
+          "text": "What version of the schema was approved?"
+        },
+        {
+          "id": "Q6",
+          "text": "Who were the key stakeholders involved in approving the schema migration?"
+        },
+        {
+          "id": "Q7",
+          "text": "What criteria were used to approve the schema migration?"
+        },
+        {
+          "id": "Q8",
+          "text": "When was the last schema migration approved?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "unknown",
+          "text": "The approval process and the specific approver are not provided in the given snippets.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:d64ba04a-fd5a-511f-8887-c110ab7a0a47:333a7dfd-3aad-539a-a491-d379b5931103",
+              "quote": "The migration record does not identify an approver."
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "unknown",
+          "text": "The approval process for the schema migration is not specified in the given snippets.",
+          "snippet_ids": [],
+          "source_excerpts": []
+        },
+        {
+          "question_id": "Q3",
+          "status": "unknown",
+          "text": "The person who initiated the schema migration is not mentioned in the given snippets.",
+          "snippet_ids": [],
+          "source_excerpts": []
+        },
+        {
+          "question_id": "Q4",
+          "status": "unknown",
+          "text": "The date of approval for the schema migration is not provided in the given snippets.",
+          "snippet_ids": [],
+          "source_excerpts": []
+        },
+        {
+          "question_id": "Q5",
+          "status": "unknown",
+          "text": "The version of the schema that was approved is not mentioned in the given snippets.",
+          "snippet_ids": [],
+          "source_excerpts": []
+        },
+        {
+          "question_id": "Q6",
+          "status": "unknown",
+          "text": "The key stakeholders involved in approving the schema migration are not specified in the given snippets.",
+          "snippet_ids": [],
+          "source_excerpts": []
+        },
+        {
+          "question_id": "Q7",
+          "status": "unknown",
+          "text": "The criteria used to approve the schema migration are not provided in the given snippets.",
+          "snippet_ids": [],
+          "source_excerpts": []
+        },
+        {
+          "question_id": "Q8",
+          "status": "unknown",
+          "text": "The date of the last schema migration approval is not provided in the given snippets.",
+          "snippet_ids": [],
+          "source_excerpts": []
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "4076ab40-3f40-44b1-919f-bea5053e0de7",
+        "document_id": "5ce64208-8bfb-5499-b53c-2d8dbb286467",
+        "revision_id": "333a7dfd-3aad-539a-a491-d379b5931103",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:41:28.646992+00:00",
+        "chunk_id": "d64ba04a-fd5a-511f-8887-c110ab7a0a47",
+        "anchor": "schema-migration",
+        "heading": "Schema migration",
+        "content": "The schema migration completed on Thursday. The migration record does not identify an approver.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:41:28.647173+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:d64ba04a-fd5a-511f-8887-c110ab7a0a47:333a7dfd-3aad-539a-a491-d379b5931103",
+        "presented_content": "The schema migration completed on Thursday. The migration record does not identify an approver."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T17:41:53.048715+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "Who approved the schema migration?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 24392,
+      "created_at": "2026-10-29T17:41:53.048715+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:d64ba04a-fd5a-511f-8887-c110ab7a0a47:333a7dfd-3aad-539a-a491-d379b5931103",
+          "quote": "The schema migration completed on Thursday. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:d64ba04a-fd5a-511f-8887-c110ab7a0a47:333a7dfd-3aad-539a-a491-d379b5931103",
+          "quote": "The migration record does not identify an approver."
+        }
+      ],
+      "planner_version": "issue-only-v1",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": null
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "4076ab40-3f40-44b1-919f-bea5053e0de7"
+    ]
+  },
+  "latency_seconds": 24.401724209077656,
+  "setup_seconds": 0.021901333704590797,
+  "attempt_total_seconds": 24.423625542782247
+}

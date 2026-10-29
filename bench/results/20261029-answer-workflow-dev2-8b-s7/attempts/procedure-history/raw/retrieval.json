@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "f1917cae-f894-457b-aca2-78424826d4f9"
+  ],
+  "query": "What steps should follow credential rotation, and does this page document any completed fix?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "f1917cae-f894-457b-aca2-78424826d4f9"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "f1917cae-f894-457b-aca2-78424826d4f9",
+        "document_id": "8db6612a-1c13-5aa9-b393-ae2d8b849aba",
+        "revision_id": "c7af47f0-194a-525e-aafc-dfbe2b8bec5f",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:46:52.607919+00:00",
+        "chunk_id": "748e214d-3d2b-5339-90ce-07a2db016486",
+        "anchor": "credential-rotation-procedure",
+        "heading": "Credential rotation procedure",
+        "content": "After rotating the service credential, update the secret store, restart the connector, then verify a successful sync. This page is a procedure only; it does not record a rotation or restart being performed.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:46:52.608095+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:748e214d-3d2b-5339-90ce-07a2db016486:c7af47f0-194a-525e-aafc-dfbe2b8bec5f"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

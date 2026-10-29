@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-571a112c-405b-4b97-a053-4b99c0f73323",
+  "object": "chat.completion",
+  "created": 1793296635,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"The steps that should follow signing-key rotation are: update the verifier key set, reload the verifier, and check a signed test request.\", \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S2\", \"S3\"], \"text\": \"The document shows that updating the verifier key set was completed, but there is no evidence of reloading the verifier or checking a signed test request.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 460,
+    "completion_tokens": 103,
+    "total_tokens": 563
+  }
+}

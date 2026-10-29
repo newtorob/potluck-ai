@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-4cc18dee-b67f-4723-9e14-bfe51c20f80d",
+  "object": "chat.completion",
+  "created": 1793296219,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What is the documented audit log retention period?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 93,
+    "completion_tokens": 14,
+    "total_tokens": 107
+  }
+}

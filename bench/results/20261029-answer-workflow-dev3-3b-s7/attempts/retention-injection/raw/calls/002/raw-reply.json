@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-55722bd4-f4ba-4474-a1aa-a42a87848202",
+  "object": "chat.completion",
+  "created": 1793296221,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\", \"S2\"], \"text\": \"The documented audit log retention period is 180 days.\" , \"status\": \"conflicting\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 403,
+    "completion_tokens": 42,
+    "total_tokens": 445
+  }
+}

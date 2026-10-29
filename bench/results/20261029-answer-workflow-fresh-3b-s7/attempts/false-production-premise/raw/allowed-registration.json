@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "31191d74-6677-457e-a839-c985b582743b",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-answer-workflow-fresh-3b-s7/attempts/false-production-premise/raw/allowed",
+  "source_sha256": "7f5460c79ab00898d8b448af1d68512b26afbc69940cccdec5b6e9d2319a1dac",
+  "scan": {
+    "collection_id": "31191d74-6677-457e-a839-c985b582743b",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

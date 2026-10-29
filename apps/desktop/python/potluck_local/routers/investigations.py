@@ -31,6 +31,9 @@ class CreateRequest(ScopeRequest):
     issue: str = Field(min_length=1, max_length=4000)
     query: str = Field(min_length=1, max_length=1000)
     model_slug: str = Field(min_length=1, max_length=128)
+    answer_each_question: StrictBool = False
+    questions: list[str] | None = Field(default=None, min_length=1, max_length=8)
+    generation_profile: str | None = Field(default=None, min_length=1, max_length=128)
 
 
 class ReviewRequest(ScopeRequest):
@@ -64,6 +67,7 @@ def _error(exc: Exception) -> HTTPException:
     message = str(exc)
     code = ('model_not_loaded' if message in ('Requested model is not loaded locally',
                                               'Loaded model identity is unavailable') else
+            'profile_incompatible' if message == 'Investigation profile incompatible' else
             'collections_unavailable' if message == 'All selected collections must be ready and recent' else
             'generation_timeout' if message == 'Investigation generation timed out' else
             'inference_failed' if message == 'Investigation inference failed' else
@@ -73,6 +77,7 @@ def _error(exc: Exception) -> HTTPException:
             'request_failed')
     messages = {
         'model_not_loaded': 'Load the selected local model in Models, then retry.',
+        'profile_incompatible': 'The selected generation profile requires its verified model template and backend.',
         'collections_unavailable': 'Scan every selected collection successfully before continuing.',
         'inference_failed': 'Local inference failed. No investigation was saved.',
         'invalid_format': 'The model returned an invalid brief format. No investigation was saved.',
@@ -111,6 +116,12 @@ async def list_items(workspace: str, collection_ids: list[str] = Query(...)) -> 
 @router.post('/investigations')
 async def create(body: CreateRequest) -> dict[str, Any]:
     try:
+        if not body.answer_each_question and (body.questions is not None or body.generation_profile is not None):
+            raise ValueError('Question options require v6')
+        if body.answer_each_question:
+            return await create_investigation(body.scope(), body.issue, body.query, body.model_slug,
+                                              template_version='investigation-v6', questions=body.questions,
+                                              generation_profile=body.generation_profile)
         return await create_investigation(body.scope(), body.issue, body.query, body.model_slug)
     except (ValueError, PermissionError, LookupError) as exc:
         raise _error(exc) from None
@@ -186,6 +197,18 @@ async def export(iid: str, workspace: str, collection_ids: list[str] = Query(...
                   'Template: ' + escape(provenance.get('template_version', 'unavailable')),
                   'Retrieval: ' + escape(provenance.get('retrieval_version', 'unavailable')),
                   'Generation settings: ' + escape(provenance.get('generation_settings', {})), '']
+        if 'questions' in brief:
+            lines += ['## Questions and answers']
+            by_id = {a['question_id']: a for a in brief['answers']}
+            for question in brief['questions']:
+                answer = by_id[question['id']]
+                lines += ['### ' + escape(question['text']),
+                          escape(answer['status']) + ': ' + escape(answer['text'])]
+                if answer['status'] == 'unknown':
+                    lines.append('This uncertainty is limited to the presented evidence.')
+                for excerpt in answer['source_excerpts']:
+                    lines.append('- Source excerpt (' + escape(excerpt['citation_id']) + '): ' + escape(excerpt['quote']))
+                lines.append('')
         for key, title in [('facts', 'Facts'), ('prior_fixes', 'Prior fixes'),
                            ('hypotheses', 'Hypotheses (unverified)'), ('recommended_checks', 'Recommended checks')]:
             lines += ['## ' + title]

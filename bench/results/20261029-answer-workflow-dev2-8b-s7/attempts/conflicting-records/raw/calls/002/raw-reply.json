@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-e6b6cbdb-1cc7-4933-bf3d-1784602fc096",
+  "object": "chat.completion",
+  "created": 1793296083,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"status\": \"unknown\", \"text\": \"The current retry interval is unknown because the records do not have timestamps or approval status to determine which value is current.\", \"snippet_ids\": [\"S3\"]}, \"Q2\": {\"status\": \"unknown\", \"text\": \"These records cannot establish which value is current because they lack timestamps or approval status.\", \"snippet_ids\": [\"S3\"]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 375,
+    "completion_tokens": 91,
+    "total_tokens": 466
+  }
+}

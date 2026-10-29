@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-5f97a314-0c8b-4b79-9e58-7b10193159e9",
+  "object": "chat.completion",
+  "created": 1793295877,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"status\": \"unknown\", \"text\": \"The schema migration completed on Thursday. The migration record does not identify an approver.\" , \"snippet_ids\": [\"S1\", \"S2\"]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 301,
+    "completion_tokens": 45,
+    "total_tokens": 346
+  }
+}

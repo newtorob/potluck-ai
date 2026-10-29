@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-798cd2ee-ace2-4f3f-88de-4f0ea8870ff0",
+  "object": "chat.completion",
+  "created": 1793296750,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"How much did the median latency change?\", \"Does this record establish that clearing the cache caused that change?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 109,
+    "completion_tokens": 26,
+    "total_tokens": 135
+  }
+}

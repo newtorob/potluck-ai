@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-0d4ffa2f-cb81-46ee-b397-bde089fd765c",
+  "object": "chat.completion",
+  "created": 1793297134,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\", \"S2\"], \"text\": \"The current retry delay is not established by the presented evidence.\", \"status\": \"unknown\"}, \"Q2\": {\"snippet_ids\": [\"S1\", \"S2\", \"S3\"], \"text\": \"The deployment checklist says the retry delay is 12 seconds. The operations handbook says the retry delay is 45 seconds. Neither record establishes precedence, approval, or a superseding decision.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 435,
+    "completion_tokens": 107,
+    "total_tokens": 542
+  }
+}

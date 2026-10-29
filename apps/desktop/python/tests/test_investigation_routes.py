@@ -126,3 +126,49 @@ def test_export_separates_legacy_and_escapes_untrusted_content(monkeypatch):
     assert r'\*quoted\*' in result
     assert 'Historical combined missing evidence (provenance unknown)' in result
     assert '## Model questions' not in result
+
+
+def test_v6_explicit_questions_export_and_source_revocation(tmp_path, monkeypatch):
+    monkeypatch.setenv('POTLUCK_DATA_DIR', str(tmp_path))
+    monkeypatch.setenv('POTLUCK_MEMORY_DB_PATH', str(tmp_path / 'memory.db'))
+    monkeypatch.delenv('POTLUCK_SIDECAR_TOKEN', raising=False)
+    monkeypatch.setattr(investigations, 'get_settings', lambda: SimpleNamespace(
+        privacy=SimpleNamespace(memory_enabled=True), memory=SimpleNamespace(enabled=True)))
+    calls = []
+
+    class Runtime:
+        def current_model_id(self): return 'test-model'
+        def current_model_sha256(self): return 'a' * 64
+        async def chat(self, messages, **kwargs):
+            payload = json.loads(messages[1]['content'])
+            calls.append(payload)
+            snippet = payload['snippets'][0]['snippet_id']
+            result = {'Q1': {'status': 'supported', 'text': 'Friday.', 'snippet_ids': [snippet]}}
+            return {'choices': [{'message': {'content': json.dumps(result)}}]}
+
+    monkeypatch.setattr(investigations, 'get_runtime', Runtime)
+    client = TestClient(create_app(), client=('127.0.0.1', 44444))
+    source = tmp_path / 'sources'
+    source.mkdir()
+    doc = source / 'release.md'
+    doc.write_text('# Release\nDeadline Friday.')
+    from potluck_local.services.memory_db import init_memory_db
+    asyncio.run(init_memory_db())
+    cid = asyncio.run(register_collection('demo', 'docs', source))
+    asyncio.run(scan_collection('demo', cid))
+    scope = {'workspace': 'demo', 'collection_ids': [cid]}
+    data = {**scope, 'issue': 'When is release?', 'query': 'release', 'model_slug': 'test-model',
+            'answer_each_question': True, 'questions': ['When is release?']}
+    response = client.post('/company-brain/investigations', json=data)
+    assert response.status_code == 200, response.text
+    item = response.json()
+    assert len(calls) == 1 and item['provenance']['question_origin'] == 'explicit'
+    base = '/company-brain/investigations/' + item['id']
+    exported = client.get(base + '/export', params=scope)
+    assert exported.status_code == 200 and 'Friday' in exported.json()['markdown']
+    assert 'Source excerpt' in exported.json()['markdown']
+    doc.unlink()
+    asyncio.run(scan_collection('demo', cid))
+    assert client.post(base + '/review', json={**scope, 'decision': 'correct',
+        'reviewer': 'owner', 'reason': 'Checked', 'corrected_brief': item['brief']}).status_code == 404
+    assert client.post('/company-brain/investigations', json={**data, 'answer_each_question': False}).status_code == 400

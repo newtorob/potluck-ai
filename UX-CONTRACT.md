@@ -65,9 +65,10 @@ validation on every read and write.
 - Choose the workspace, exact source collection set and already loaded model
   explicitly. Changing the source scope clears the previous list and selection.
 - Disable scope/model/record switching while an operation is pending. Errors use
-  an alert. Only the specific invalid-corrected-brief response preserves the
-  entered correction; unavailable sources and other failures clear the displayed
-  artifact and correction. No operation silently retries or routes to another model.
+  an alert. Recoverable review failures preserve the entered correction;
+  unavailable sources clear the displayed artifact and correction. Other operation
+  failures clear the displayed artifact. No operation silently retries or routes
+  to another model.
 - Review and outcome are separate one-shot actions. Corrections retain the original
   draft; outcomes have no preselected result. Reviewed does not mean resolved.
 - Numbered citation links open the matching source disclosure; full IDs, source
@@ -77,7 +78,7 @@ validation on every read and write.
   during pending work; all controls have visible labels and normal keyboard access.
 
 The Investigations view uses native select controls for the loaded local model,
-review decision, and outcome. The existing desktop Memory view uses the same
+answer profile, review decision, and outcome. The existing desktop Memory view uses the same
 platform-owned select pattern. Native popup geometry and keyboard behavior are
 accepted for this workflow; this decision does not establish a global select
 owner for other views. Verify keyboard operation and the popup in the desktop
@@ -90,3 +91,13 @@ are separate and cannot be edited. Historical combined missing-evidence lists ke
 their unknown provenance label. Corrections preserve the original draft and must
 include valid excerpts for facts and prior fixes. The investigation content panel
 owns scrolling; citation navigation must not scroll the outer desktop shell.
+
+The opt-in question-answer preview accepts up to eight optional questions; when
+left blank, questions are planned from the issue. Answers and exact excerpts are
+drafts for review: a supported status is a model claim, not proof of correctness.
+Corrections keep the original questions and choose source snippets from the saved
+catalog; the sidecar derives excerpts from those selections. Recoverable review
+errors preserve edits, while an unavailable source clears the displayed artifact.
+The preview defaults to the standard answer profile. Qwen3 non-thinking is an
+explicit selection requiring a compatible loaded Qwen3 model; incompatibility
+fails the request without falling back to another profile.

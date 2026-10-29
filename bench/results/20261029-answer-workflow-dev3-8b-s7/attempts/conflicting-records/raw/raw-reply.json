@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-940aa2d2-480f-479f-a32d-3bc23ed97d2e",
+  "object": "chat.completion",
+  "created": 1793296375,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What is the current retry interval?\", \"Can these records establish which value is current?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 106,
+    "completion_tokens": 22,
+    "total_tokens": 128
+  }
+}

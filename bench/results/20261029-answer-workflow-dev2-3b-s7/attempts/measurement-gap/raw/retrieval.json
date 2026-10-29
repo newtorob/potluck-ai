@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "a4badc1c-01ef-4f7e-abd5-25123c72c47d"
+  ],
+  "query": "What action was taken, and by how much did it improve request latency?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "a4badc1c-01ef-4f7e-abd5-25123c72c47d"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "a4badc1c-01ef-4f7e-abd5-25123c72c47d",
+        "document_id": "c28afd1d-6f4e-5ffb-a7ea-747f43476d7b",
+        "revision_id": "45d1ba2b-ea12-5a6b-b747-a4936b10c3da",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:44:59.794948+00:00",
+        "chunk_id": "7bccaca2-9933-5649-b8c7-a2f97f081df5",
+        "anchor": "cache-cleanup",
+        "heading": "Cache cleanup",
+        "content": "On Friday the operator deleted expired cache entries. This note contains no before-and-after latency measurements and no statement that request latency improved.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:44:59.795117+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:7bccaca2-9933-5649-b8c7-a2f97f081df5:45d1ba2b-ea12-5a6b-b747-a4936b10c3da"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

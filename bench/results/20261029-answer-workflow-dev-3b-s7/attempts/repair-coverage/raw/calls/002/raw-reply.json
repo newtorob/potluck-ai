@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-bc6bf68e-10db-4f8d-a0b2-8ef7a4025591",
+  "object": "chat.completion",
+  "created": 1793295642,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"status\": \"supported\", \"text\": \"The parcel worker stopped processing at 08:04 UTC. Restored processing was achieved by restarting the worker at 08:11 UTC.\" , \"snippet_ids\": [\"S1\", \"S2\"]}, \"Q2\": {\"status\": \"unknown\", \"text\": \"Was the database changed?\", \"snippet_ids\": [\"S3\"]}, \"Q3\": {\"status\": \"unknown\", \"text\": \"Who responded to the issue?\", \"snippet_ids\": [\"S4\"]}, \"Q4\": {\"status\": \"conflicting\", \"text\": \"Is the underlying cause known?\", \"snippet_ids\": [\"S5\"]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 326,
+    "completion_tokens": 159,
+    "total_tokens": 485
+  }
+}

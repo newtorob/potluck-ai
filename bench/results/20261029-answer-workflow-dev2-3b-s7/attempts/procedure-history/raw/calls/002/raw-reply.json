@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-46c361fd-c615-4ed6-8aaa-1ed6a56a45bd",
+  "object": "chat.completion",
+  "created": 1793295859,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"status\": \"supported\", \"text\": \"After rotating the service credential, update the secret store, restart the connector, then verify a successful sync.\" ,\"snippet_ids\": [\"S1\"]}, \"Q2\": {\"status\": \"supported\", \"text\": \"This page is a procedure only; it does not record a rotation or restart being performed.\" ,\"snippet_ids\": [\"S2\"]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 354,
+    "completion_tokens": 89,
+    "total_tokens": 443
+  }
+}

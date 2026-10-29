@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-4cd7dafa-95c4-489a-98e0-e3111632cfb2",
+  "object": "chat.completion",
+  "created": 1793296468,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"How long are support logs retained by default?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 92,
+    "completion_tokens": 14,
+    "total_tokens": 106
+  }
+}

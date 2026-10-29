@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-6fa47d1f-2b45-487b-8c80-c8b0bddbe7fd",
+  "object": "chat.completion",
+  "created": 1793296963,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\", \"S2\", \"S3\"], \"text\": \"The retention period for payroll export data is not explicitly stated in the provided snippets, but it is run every Friday at 18:00 UTC and is checked by the finance team.\" , \"status\": \"unknown\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 403,
+    "completion_tokens": 70,
+    "total_tokens": 473
+  }
+}

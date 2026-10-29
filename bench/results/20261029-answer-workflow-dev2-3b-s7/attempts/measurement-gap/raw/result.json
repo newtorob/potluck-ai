@@ -1,0 +1,132 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "ce64c927-8e1c-44c5-91a3-1004d3103423",
+    "workspace": "synthetic-eval",
+    "issue": "What action was taken, and by how much did it improve request latency?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What actions were taken to improve request latency?"
+        },
+        {
+          "id": "Q2",
+          "text": "By how much did the improvement in request latency occur?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "unknown",
+          "text": "The action taken was to delete expired cache entries. The improvement in request latency is unknown.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:7bccaca2-9933-5649-b8c7-a2f97f081df5:45d1ba2b-ea12-5a6b-b747-a4936b10c3da",
+              "quote": "On Friday the operator deleted expired cache entries. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "unknown",
+          "text": "The improvement in request latency is unknown.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:7bccaca2-9933-5649-b8c7-a2f97f081df5:45d1ba2b-ea12-5a6b-b747-a4936b10c3da",
+              "quote": "This note contains no before-and-after latency measurements and no statement that request latency improved."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "a4badc1c-01ef-4f7e-abd5-25123c72c47d",
+        "document_id": "c28afd1d-6f4e-5ffb-a7ea-747f43476d7b",
+        "revision_id": "45d1ba2b-ea12-5a6b-b747-a4936b10c3da",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:44:59.794948+00:00",
+        "chunk_id": "7bccaca2-9933-5649-b8c7-a2f97f081df5",
+        "anchor": "cache-cleanup",
+        "heading": "Cache cleanup",
+        "content": "On Friday the operator deleted expired cache entries. This note contains no before-and-after latency measurements and no statement that request latency improved.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:44:59.795117+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:7bccaca2-9933-5649-b8c7-a2f97f081df5:45d1ba2b-ea12-5a6b-b747-a4936b10c3da",
+        "presented_content": "On Friday the operator deleted expired cache entries. This note contains no before-and-after latency measurements and no statement that request latency improved."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T17:45:09.406938+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What action was taken, and by how much did it improve request latency?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 9608,
+      "created_at": "2026-10-29T17:45:09.406938+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:7bccaca2-9933-5649-b8c7-a2f97f081df5:45d1ba2b-ea12-5a6b-b747-a4936b10c3da",
+          "quote": "On Friday the operator deleted expired cache entries. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:7bccaca2-9933-5649-b8c7-a2f97f081df5:45d1ba2b-ea12-5a6b-b747-a4936b10c3da",
+          "quote": "This note contains no before-and-after latency measurements and no statement that request latency improved."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": null
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "a4badc1c-01ef-4f7e-abd5-25123c72c47d"
+    ]
+  },
+  "latency_seconds": 9.618230042047799,
+  "setup_seconds": 0.015938792377710342,
+  "attempt_total_seconds": 9.634168834425509
+}

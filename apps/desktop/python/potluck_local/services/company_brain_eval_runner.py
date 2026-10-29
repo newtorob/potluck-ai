@@ -74,19 +74,31 @@ def identity() -> dict[str, Any]:
 class CaptureRuntime:
     def __init__(self, runtime: Any, attempt_dir: Path):
         self.runtime, self.attempt_dir = runtime, attempt_dir
+        self.call_count = 0
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.runtime, name)
 
     async def chat(self, messages: Any, **kwargs: Any) -> Any:
-        write_new(self.attempt_dir / 'request.json', {'messages': messages, 'settings': kwargs})
+        self.call_count += 1
+        call_number = self.call_count
+        call_dir = self.attempt_dir / 'calls' / f'{call_number:03d}'
+        call_dir.mkdir(parents=True)
+        request = {'messages': messages, 'settings': kwargs}
+        write_new(call_dir / 'request.json', request)
+        if call_number == 1:
+            write_new(self.attempt_dir / 'request.json', request)
         try:
             reply = await self.runtime.chat(messages, **kwargs)
         except BaseException as exc:
-            write_new(self.attempt_dir / 'runtime-error.json',
-                      {'type': type(exc).__name__, 'message': str(exc)})
+            error = {'type': type(exc).__name__, 'message': str(exc)}
+            write_new(call_dir / 'runtime-error.json', error)
+            if call_number == 1:
+                write_new(self.attempt_dir / 'runtime-error.json', error)
             raise
-        write_new(self.attempt_dir / 'raw-reply.json', reply)
+        write_new(call_dir / 'raw-reply.json', reply)
+        if call_number == 1:
+            write_new(self.attempt_dir / 'raw-reply.json', reply)
         return reply
 
 
@@ -154,7 +166,9 @@ async def setup_case(root: Path, case: dict[str, Any], arm: str) -> EvidenceScop
 
 
 async def attempt(out: Path, case: dict[str, Any], arm: str, runtime: Any, model: str,
-                  *, template_version: str | None = None) -> dict[str, Any]:
+                  *, template_version: str | None = None,
+                  generation_profile: str | None = None, seed: int | None = None,
+                  questions: list[str] | None = None) -> dict[str, Any]:
     folder = out / 'attempts' / case['id'] / arm
     folder.mkdir(parents=True)
     write_new(folder / 'started.json', {'case_id': case['id'], 'arm': arm,
@@ -187,6 +201,12 @@ async def attempt(out: Path, case: dict[str, Any], arm: str, runtime: Any, model
             try:
                 investigation_started = time.monotonic()
                 kwargs = {} if template_version is None else {'template_version': template_version}
+                if generation_profile is not None:
+                    kwargs['generation_profile'] = generation_profile
+                if seed is not None:
+                    kwargs['seed'] = seed
+                if questions is not None:
+                    kwargs['questions'] = questions
                 item = await investigations.create_investigation(
                     scope, case['question'], case['question'], model, **kwargs)
             finally:

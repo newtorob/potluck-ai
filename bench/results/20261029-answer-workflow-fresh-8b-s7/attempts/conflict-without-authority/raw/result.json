@@ -1,0 +1,165 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "fe60c992-32fd-40d5-9f2d-42421cbcbef1",
+    "workspace": "synthetic-eval",
+    "issue": "Which retry delay is current, and what do the two records say?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What is the current retry delay?"
+        },
+        {
+          "id": "Q2",
+          "text": "What do the two records say?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "unknown",
+          "text": "The current retry delay is unknown because neither record establishes precedence, approval, or a superseding decision.",
+          "snippet_ids": [
+            "S1",
+            "S2",
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:bb09a22e-b9a6-583b-bd6a-4705476a35b7:593f9c79-b54f-57f9-9626-30e50b8aa19e",
+              "quote": "The deployment checklist says the retry delay is 12 seconds. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:bb09a22e-b9a6-583b-bd6a-4705476a35b7:593f9c79-b54f-57f9-9626-30e50b8aa19e",
+              "quote": "The operations handbook says the retry delay is 45 seconds. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:bb09a22e-b9a6-583b-bd6a-4705476a35b7:593f9c79-b54f-57f9-9626-30e50b8aa19e",
+              "quote": "Neither record establishes precedence, approval, or a superseding decision."
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "supported",
+          "text": "The deployment checklist says the retry delay is 12 seconds. The operations handbook says the retry delay is 45 seconds.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:bb09a22e-b9a6-583b-bd6a-4705476a35b7:593f9c79-b54f-57f9-9626-30e50b8aa19e",
+              "quote": "The deployment checklist says the retry delay is 12 seconds. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:bb09a22e-b9a6-583b-bd6a-4705476a35b7:593f9c79-b54f-57f9-9626-30e50b8aa19e",
+              "quote": "The operations handbook says the retry delay is 45 seconds. "
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "f734bccd-1f6d-4ad8-97e3-9ee96a6b695b",
+        "document_id": "a8ee53d8-e08e-5cb4-bee6-3ee9c4e1c1ab",
+        "revision_id": "593f9c79-b54f-57f9-9626-30e50b8aa19e",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:58:36.815156+00:00",
+        "chunk_id": "bb09a22e-b9a6-583b-bd6a-4705476a35b7",
+        "anchor": "retry-delay-records",
+        "heading": "Retry delay records",
+        "content": "The deployment checklist says the retry delay is 12 seconds. The operations handbook says the retry delay is 45 seconds. Neither record establishes precedence, approval, or a superseding decision.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:58:36.815334+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:bb09a22e-b9a6-583b-bd6a-4705476a35b7:593f9c79-b54f-57f9-9626-30e50b8aa19e",
+        "presented_content": "The deployment checklist says the retry delay is 12 seconds. The operations handbook says the retry delay is 45 seconds. Neither record establishes precedence, approval, or a superseding decision."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T17:59:10.649997+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "Which retry delay is current, and what do the two records say?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 33830,
+      "created_at": "2026-10-29T17:59:10.649997+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:bb09a22e-b9a6-583b-bd6a-4705476a35b7:593f9c79-b54f-57f9-9626-30e50b8aa19e",
+          "quote": "The deployment checklist says the retry delay is 12 seconds. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:bb09a22e-b9a6-583b-bd6a-4705476a35b7:593f9c79-b54f-57f9-9626-30e50b8aa19e",
+          "quote": "The operations handbook says the retry delay is 45 seconds. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:bb09a22e-b9a6-583b-bd6a-4705476a35b7:593f9c79-b54f-57f9-9626-30e50b8aa19e",
+          "quote": "Neither record establishes precedence, approval, or a superseding decision."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "f734bccd-1f6d-4ad8-97e3-9ee96a6b695b"
+    ]
+  },
+  "latency_seconds": 33.84169520903379,
+  "setup_seconds": 0.015674916096031666,
+  "attempt_total_seconds": 33.85737012512982
+}

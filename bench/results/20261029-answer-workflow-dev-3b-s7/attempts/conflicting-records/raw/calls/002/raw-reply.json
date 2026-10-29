@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-54ba03af-eab4-47e3-a65b-48ce88a2c642",
+  "object": "chat.completion",
+  "created": 1793295716,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"status\": \"conflicting\", \"text\": \"The retry interval is stated as 30 seconds in S1 and 75 seconds in S2, hence conflicting information.\",\"snippet_ids\": [\"S1\", \"S2\"]}, \"Q2\": {\"status\": \"unknown\", \"text\": \"The records do not establish which value is current, S3 indicates no timestamps or approval status to determine the current value.\" ,\"snippet_ids\": [\"S3\"]}, \"Q3\": {\"status\": \"unknown\", \"text\": \"No specific records are mentioned to check for the current retry interval, only the conflicting values are provided.\" ,\"snippet_ids\": []}, \"Q4\": {\"status\": \"unknown\", \"text\": \"No information is provided on how the retry interval values are established, only the conflicting values are mentioned.\" ,\"snippet_ids\": []}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 300,
+    "completion_tokens": 181,
+    "total_tokens": 481
+  }
+}

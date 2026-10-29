@@ -1,0 +1,262 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "fcabdc5c-e5cc-4e3c-b398-a3658e535aa2",
+    "workspace": "synthetic-eval",
+    "issue": "How much did median latency change, and does this record establish that clearing the cache caused that change?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "How much did median latency change?"
+        },
+        {
+          "id": "Q2",
+          "text": "Does clearing the cache cause the change in median latency?"
+        },
+        {
+          "id": "Q3",
+          "text": "What is the record median latency before and after clearing the cache?"
+        },
+        {
+          "id": "Q4",
+          "text": "How was the median latency measured before and after clearing the cache?"
+        },
+        {
+          "id": "Q5",
+          "text": "What was the median latency before clearing the cache?"
+        },
+        {
+          "id": "Q6",
+          "text": "What was the median latency after clearing the cache?"
+        },
+        {
+          "id": "Q7",
+          "text": "How significant was the change in median latency?"
+        },
+        {
+          "id": "Q8",
+          "text": "What evidence supports the claim that clearing the cache caused the change in median latency?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "supported",
+          "text": "Median latency was 180 ms before the maintenance window and 120 ms afterward.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:9908a74c-5b36-5657-8211-69cdb28f8c43:86ae3dbe-3248-5e9a-9be8-2cac02473981",
+              "quote": "Median latency was 180 ms before the maintenance window and 120 ms afterward. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "supported",
+          "text": "The operator cleared the cache. This observation does not establish which intervention caused the change.",
+          "snippet_ids": [
+            "S1",
+            "S4"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:9908a74c-5b36-5657-8211-69cdb28f8c43:86ae3dbe-3248-5e9a-9be8-2cac02473981",
+              "quote": "The operator cleared the cache. "
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:9908a74c-5b36-5657-8211-69cdb28f8c43:86ae3dbe-3248-5e9a-9be8-2cac02473981",
+              "quote": "This observation does not establish which intervention caused the change."
+            }
+          ]
+        },
+        {
+          "question_id": "Q3",
+          "status": "supported",
+          "text": "Median latency was 180 ms before the maintenance window and 120 ms afterward.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:9908a74c-5b36-5657-8211-69cdb28f8c43:86ae3dbe-3248-5e9a-9be8-2cac02473981",
+              "quote": "Median latency was 180 ms before the maintenance window and 120 ms afterward. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q4",
+          "status": "supported",
+          "text": "Queue concurrency was also changed during the same window.",
+          "snippet_ids": [
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:9908a74c-5b36-5657-8211-69cdb28f8c43:86ae3dbe-3248-5e9a-9be8-2cac02473981",
+              "quote": "Queue concurrency was also changed during the same window. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q5",
+          "status": "supported",
+          "text": "Median latency was 180 ms before the maintenance window and 120 ms afterward.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:9908a74c-5b36-5657-8211-69cdb28f8c43:86ae3dbe-3248-5e9a-9be8-2cac02473981",
+              "quote": "Median latency was 180 ms before the maintenance window and 120 ms afterward. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q6",
+          "status": "supported",
+          "text": "Median latency was 180 ms before the maintenance window and 120 ms afterward.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:9908a74c-5b36-5657-8211-69cdb28f8c43:86ae3dbe-3248-5e9a-9be8-2cac02473981",
+              "quote": "Median latency was 180 ms before the maintenance window and 120 ms afterward. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q7",
+          "status": "supported",
+          "text": "Median latency was 180 ms before the maintenance window and 120 ms afterward.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:9908a74c-5b36-5657-8211-69cdb28f8c43:86ae3dbe-3248-5e9a-9be8-2cac02473981",
+              "quote": "Median latency was 180 ms before the maintenance window and 120 ms afterward. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q8",
+          "status": "supported",
+          "text": "This observation does not establish which intervention caused the change.",
+          "snippet_ids": [
+            "S4"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:9908a74c-5b36-5657-8211-69cdb28f8c43:86ae3dbe-3248-5e9a-9be8-2cac02473981",
+              "quote": "This observation does not establish which intervention caused the change."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "d02b3aa9-0c35-4cd2-9537-c5cbe92dabb5",
+        "document_id": "9f48474c-2323-5819-9828-0a04772f871f",
+        "revision_id": "86ae3dbe-3248-5e9a-9be8-2cac02473981",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T18:01:58.094845+00:00",
+        "chunk_id": "9908a74c-5b36-5657-8211-69cdb28f8c43",
+        "anchor": "latency-observation",
+        "heading": "Latency observation",
+        "content": "The operator cleared the cache. Median latency was 180 ms before the maintenance window and 120 ms afterward. Queue concurrency was also changed during the same window. This observation does not establish which intervention caused the change.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T18:01:58.094990+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:9908a74c-5b36-5657-8211-69cdb28f8c43:86ae3dbe-3248-5e9a-9be8-2cac02473981",
+        "presented_content": "The operator cleared the cache. Median latency was 180 ms before the maintenance window and 120 ms afterward. Queue concurrency was also changed during the same window. This observation does not establish which intervention caused the change."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T18:02:30.844003+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "How much did median latency change, and does this record establish that clearing the cache caused that change?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 29,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 32744,
+      "created_at": "2026-10-29T18:02:30.844003+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:9908a74c-5b36-5657-8211-69cdb28f8c43:86ae3dbe-3248-5e9a-9be8-2cac02473981",
+          "quote": "The operator cleared the cache. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:9908a74c-5b36-5657-8211-69cdb28f8c43:86ae3dbe-3248-5e9a-9be8-2cac02473981",
+          "quote": "Median latency was 180 ms before the maintenance window and 120 ms afterward. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:9908a74c-5b36-5657-8211-69cdb28f8c43:86ae3dbe-3248-5e9a-9be8-2cac02473981",
+          "quote": "Queue concurrency was also changed during the same window. "
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:9908a74c-5b36-5657-8211-69cdb28f8c43:86ae3dbe-3248-5e9a-9be8-2cac02473981",
+          "quote": "This observation does not establish which intervention caused the change."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 29
+      },
+      "generation_profile": null
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "d02b3aa9-0c35-4cd2-9537-c5cbe92dabb5"
+    ]
+  },
+  "latency_seconds": 32.75366562511772,
+  "setup_seconds": 0.016292084008455276,
+  "attempt_total_seconds": 32.769957709126174
+}

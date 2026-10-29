@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-fd12ea18-a80f-4ce1-96cd-7f6f4bdae9ad",
+  "object": "chat.completion",
+  "created": 1793296477,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\", \"S2\"], \"text\": \"unknown\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 372,
+    "completion_tokens": 29,
+    "total_tokens": 401
+  }
+}

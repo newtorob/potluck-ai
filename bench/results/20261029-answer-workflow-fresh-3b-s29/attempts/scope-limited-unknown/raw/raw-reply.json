@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-6050c61a-631a-4ad8-95bb-ebd7bb0c8bba",
+  "object": "chat.completion",
+  "created": 1793296962,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What is the retention period for payroll export data?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 93,
+    "completion_tokens": 15,
+    "total_tokens": 108
+  }
+}

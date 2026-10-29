@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-c32617f3-8a46-4e24-8f84-5c3f50fada29",
+  "object": "chat.completion",
+  "created": 1793295886,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"status\": \"unknown\", \"text\": \"The retry interval is either 30 seconds or 75 seconds, as stated in different records.\" , \"snippet_ids\": [\"S1\", \"S2\"]}, \"Q2\": {\"status\": \"unknown\", \"text\": \"The records do not have timestamps or approval status to determine which is current.\", \"snippet_ids\": [\"S3\"]}, \"Q3\": {\"status\": \"unknown\", \"text\": \"The records mentioned are the deployment checklist and the operations runbook.\", \"snippet_ids\": [\"S1\", \"S2\"]}, \"Q4\": {\"status\": \"unknown\", \"text\": \"The records relevant to establishing the current retry interval are the deployment checklist and the operations runbook.\", \"snippet_ids\": [\"S1\", \"S2\"]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 414,
+    "completion_tokens": 174,
+    "total_tokens": 588
+  }
+}

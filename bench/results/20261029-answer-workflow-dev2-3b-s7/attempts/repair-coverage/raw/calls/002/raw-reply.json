@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-c1576b67-97ed-4b88-9140-463d8225ca42",
+  "object": "chat.completion",
+  "created": 1793295845,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"status\": \"supported\", \"text\": \"The specific restored processing was restarting the worker at 08:11 UTC. \" ,\"snippet_ids\": [\"S2\"]}, \"Q2\": {\"status\": \"unknown\", \"text\": \"Was there a change to the database?\", \"snippet_ids\": [\"S3\"]}, \"Q3\": {\"status\": \"unknown\", \"text\": \"Who responded to the issue?\", \"snippet_ids\": [\"S4\"]}, \"Q4\": {\"status\": \"unknown\", \"text\": \"Is the underlying cause of the issue known?\", \"snippet_ids\": [\"S5\"]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 450,
+    "completion_tokens": 147,
+    "total_tokens": 597
+  }
+}

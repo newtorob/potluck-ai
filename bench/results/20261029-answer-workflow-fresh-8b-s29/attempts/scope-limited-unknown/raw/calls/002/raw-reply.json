@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-36218eed-bb3f-4d92-80d9-7ecdcf04ef88",
+  "object": "chat.completion",
+  "created": 1793297244,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\", \"S2\", \"S3\"], \"text\": \"The provided snippets do not specify the payroll export retention period.\", \"status\": \"unknown\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 405,
+    "completion_tokens": 42,
+    "total_tokens": 447
+  }
+}

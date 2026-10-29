@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "c009d2b9-b4d1-45fa-a6ca-1f79db35c4db"
+  ],
+  "query": "What restored lease processing, was the message TTL changed, who handled recovery, and is the cause established?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "c009d2b9-b4d1-45fa-a6ca-1f79db35c4db"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "c009d2b9-b4d1-45fa-a6ca-1f79db35c4db",
+        "document_id": "6e9811bf-9277-581b-99ec-79d0f212b967",
+        "revision_id": "2053853c-fd7a-5ae0-afd6-018da4a11e44",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:56:03.066790+00:00",
+        "chunk_id": "c164b689-ce50-53ab-9f75-4952e6cafad5",
+        "anchor": "lease-processing-incident",
+        "heading": "Lease processing incident",
+        "content": "Lease processing stopped at 13:18 UTC. Restarting the lease dispatcher at 13:27 UTC restored processing. The message TTL was not changed. The recovery note does not identify the operator. The cause has not been established.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:56:03.067161+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:c164b689-ce50-53ab-9f75-4952e6cafad5:2053853c-fd7a-5ae0-afd6-018da4a11e44"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

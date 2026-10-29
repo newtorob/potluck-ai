@@ -1,0 +1,185 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "9cf60274-c1e0-4878-a07c-c4c7ca6f4882",
+    "workspace": "synthetic-eval",
+    "issue": "What restored lease processing, was the message TTL changed, who handled recovery, and is the cause established?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What was restored in the lease processing?"
+        },
+        {
+          "id": "Q2",
+          "text": "Was the message TTL changed?"
+        },
+        {
+          "id": "Q3",
+          "text": "Who handled the recovery process?"
+        },
+        {
+          "id": "Q4",
+          "text": "Is the cause of the issue established?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "supported",
+          "text": "The lease processing was restored.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:cf7cb5bd-ae44-5a26-997b-3ea33c1fafd8:cb5d279a-f10e-5df2-b424-1b833d9b84c3",
+              "quote": "Restarting the lease dispatcher at 13:27 UTC restored processing. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "supported",
+          "text": "The message TTL was not changed.",
+          "snippet_ids": [
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:cf7cb5bd-ae44-5a26-997b-3ea33c1fafd8:cb5d279a-f10e-5df2-b424-1b833d9b84c3",
+              "quote": "The message TTL was not changed. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q3",
+          "status": "supported",
+          "text": "The recovery note does not identify the operator.",
+          "snippet_ids": [
+            "S4"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:cf7cb5bd-ae44-5a26-997b-3ea33c1fafd8:cb5d279a-f10e-5df2-b424-1b833d9b84c3",
+              "quote": "The recovery note does not identify the operator. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q4",
+          "status": "supported",
+          "text": "The cause of the issue has not been established.",
+          "snippet_ids": [
+            "S5"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:cf7cb5bd-ae44-5a26-997b-3ea33c1fafd8:cb5d279a-f10e-5df2-b424-1b833d9b84c3",
+              "quote": "The cause has not been established."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "8eb6ae5d-bab1-45bc-9056-7328d7b83678",
+        "document_id": "be391853-bbbf-5b20-97a1-d01a5f5be488",
+        "revision_id": "cb5d279a-f10e-5df2-b424-1b833d9b84c3",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T18:01:06.457864+00:00",
+        "chunk_id": "cf7cb5bd-ae44-5a26-997b-3ea33c1fafd8",
+        "anchor": "lease-processing-incident",
+        "heading": "Lease processing incident",
+        "content": "Lease processing stopped at 13:18 UTC. Restarting the lease dispatcher at 13:27 UTC restored processing. The message TTL was not changed. The recovery note does not identify the operator. The cause has not been established.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T18:01:06.458027+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:cf7cb5bd-ae44-5a26-997b-3ea33c1fafd8:cb5d279a-f10e-5df2-b424-1b833d9b84c3",
+        "presented_content": "Lease processing stopped at 13:18 UTC. Restarting the lease dispatcher at 13:27 UTC restored processing. The message TTL was not changed. The recovery note does not identify the operator. The cause has not been established."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T18:01:21.060301+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What restored lease processing, was the message TTL changed, who handled recovery, and is the cause established?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 29,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 14598,
+      "created_at": "2026-10-29T18:01:21.060301+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:cf7cb5bd-ae44-5a26-997b-3ea33c1fafd8:cb5d279a-f10e-5df2-b424-1b833d9b84c3",
+          "quote": "Lease processing stopped at 13:18 UTC. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:cf7cb5bd-ae44-5a26-997b-3ea33c1fafd8:cb5d279a-f10e-5df2-b424-1b833d9b84c3",
+          "quote": "Restarting the lease dispatcher at 13:27 UTC restored processing. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:cf7cb5bd-ae44-5a26-997b-3ea33c1fafd8:cb5d279a-f10e-5df2-b424-1b833d9b84c3",
+          "quote": "The message TTL was not changed. "
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:cf7cb5bd-ae44-5a26-997b-3ea33c1fafd8:cb5d279a-f10e-5df2-b424-1b833d9b84c3",
+          "quote": "The recovery note does not identify the operator. "
+        },
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:cf7cb5bd-ae44-5a26-997b-3ea33c1fafd8:cb5d279a-f10e-5df2-b424-1b833d9b84c3",
+          "quote": "The cause has not been established."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 29
+      },
+      "generation_profile": null
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "8eb6ae5d-bab1-45bc-9056-7328d7b83678"
+    ]
+  },
+  "latency_seconds": 14.60585574992001,
+  "setup_seconds": 0.013766417279839516,
+  "attempt_total_seconds": 14.61962216719985
+}

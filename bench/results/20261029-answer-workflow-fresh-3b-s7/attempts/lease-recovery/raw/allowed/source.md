@@ -1,0 +1,2 @@
+# Lease processing incident
+Lease processing stopped at 13:18 UTC. Restarting the lease dispatcher at 13:27 UTC restored processing. The message TTL was not changed. The recovery note does not identify the operator. The cause has not been established.

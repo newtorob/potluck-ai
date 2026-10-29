@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-24c83979-6123-444f-bf54-fbe9353b6075",
+  "object": "chat.completion",
+  "created": 1793296194,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What specific restored processing was performed?\", \"Was there a change to the database?\", \"Who responded to the issue?\", \"Is the underlying cause of the issue known?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 104,
+    "completion_tokens": 38,
+    "total_tokens": 142
+  }
+}

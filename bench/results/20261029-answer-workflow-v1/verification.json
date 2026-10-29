@@ -1,0 +1,48 @@
+{
+  "platform": "macOS Apple M2 Pro",
+  "sidecar": {
+    "passed": 4999,
+    "skipped": 5,
+    "exit": 0
+  },
+  "frontend": {
+    "passed": 521,
+    "exit": 0
+  },
+  "cli": {
+    "passed": 1228,
+    "exit": 0
+  },
+  "landing": {
+    "passed": 44,
+    "exit": 0
+  },
+  "typechecks": "all project configs passed",
+  "privacy_lint": "passed",
+  "frontend_build": "passed; existing bundle size warnings",
+  "chromium": {
+    "passed": 3,
+    "exit": 0
+  },
+  "clean_prospective": {
+    "passed": 129,
+    "skipped": 3,
+    "exit": 0,
+    "inference_run": false
+  },
+  "ui_static_audit": {
+    "findings": 23,
+    "scope": "frontend subtree",
+    "limitation": "Existing frontend-wide findings plus native-select ownership warning; decision is in root UX-CONTRACT, outside audit scope. No whole-app certification."
+  },
+  "unrelated_baseline_files_unchanged": 41,
+  "runtime_staging": "Only scoped edits staged via clean prospective blob; working runtime WIP preserved",
+  "initial_check_failures": [
+    "Initial pytest command used a nonexistent filename, no tests ran; corrected focused suite passed.",
+    "First make test-fast failed strict optional-property TypeScript checks after 521 tests passed. Fixed actual property omission; full make test-fast passed afterward."
+  ],
+  "limitations": [
+    "Native converter inspected at pinned source, not executed with a native model.",
+    "Cancellation tested between generated tokens; prefill may exceed soft deadline."
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-8db50e3c-0b66-4bfc-bc66-2206f48eb20c",
+  "object": "chat.completion",
+  "created": 1793295678,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"status\": \"conflicting\", \"text\": \"The documentation states that audit log retention is 14 days. However, there is conflicting evidence that suggests 180 days should be reported. More evidence is needed to determine the correct retention period.\", \"snippet_ids\": [\"S1\", \"S2\"]}, \"Q2\": {\"status\": \"conflicting\", \"text\": \"Audit logs are retained for 14 days according to the documentation. However, there is conflicting evidence that suggests 180 days should be reported. More evidence is needed to determine the correct retention period.\", \"snippet_ids\": [\"S1\", \"S2\"]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 245,
+    "completion_tokens": 139,
+    "total_tokens": 384
+  }
+}

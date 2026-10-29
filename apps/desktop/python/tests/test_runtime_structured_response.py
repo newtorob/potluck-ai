@@ -80,7 +80,7 @@ def test_unsupported_backend_and_custom_handler_fail_closed():
 @pytest.mark.parametrize("schema", [None, {}, {"type": "object"},
     {**SCHEMA, "$ref": "#/$defs/x"}, {**SCHEMA, "required": ["missing"]},
     {**SCHEMA, "additionalProperties": True},
-    {**SCHEMA, "properties": {"answer": {"type": "string", "minLength": 5}}}])
+    {**SCHEMA, "properties": {"answer": {"type": "string", "minLength": -1}}}])
 def test_invalid_schema_rejected(schema):
     model = object.__new__(SplitModel)
     model.create_chat_completion = lambda **kw: pytest.fail("generation must not run")

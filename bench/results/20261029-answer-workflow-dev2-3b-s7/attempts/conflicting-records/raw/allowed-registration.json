@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "ffef6447-f8cf-45f9-a4b6-b775ca1e5cf4",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-answer-workflow-dev2-3b-s7/attempts/conflicting-records/raw/allowed",
+  "source_sha256": "c1e2edbd090f87a46609a606a676b50b1177ef9a8e54ad8300c2b2eaa20b4cd5",
+  "scan": {
+    "collection_id": "ffef6447-f8cf-45f9-a4b6-b775ca1e5cf4",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

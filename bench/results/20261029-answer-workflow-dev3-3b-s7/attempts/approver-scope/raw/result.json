@@ -1,0 +1,113 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "c0e740b7-9a71-4270-ba53-834c77a0c064",
+    "workspace": "synthetic-eval",
+    "issue": "Who approved the schema migration?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "Who approved the schema migration?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "unknown",
+          "text": "unknown",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:3e98355f-3642-5bcc-af4a-f1205c647106:9df051db-0274-59a4-a28c-95910cfd7f8b",
+              "quote": "The migration record does not identify an approver."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "d2362c17-e3ba-49ad-8934-54a43cb46855",
+        "document_id": "52b3630c-6dd6-5c53-aad7-06594340234a",
+        "revision_id": "9df051db-0274-59a4-a28c-95910cfd7f8b",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:50:26.577950+00:00",
+        "chunk_id": "3e98355f-3642-5bcc-af4a-f1205c647106",
+        "anchor": "schema-migration",
+        "heading": "Schema migration",
+        "content": "The schema migration completed on Thursday. The migration record does not identify an approver.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:50:26.578070+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:3e98355f-3642-5bcc-af4a-f1205c647106:9df051db-0274-59a4-a28c-95910cfd7f8b",
+        "presented_content": "The schema migration completed on Thursday. The migration record does not identify an approver."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T17:50:32.397370+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "Who approved the schema migration?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 5812,
+      "created_at": "2026-10-29T17:50:32.397370+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:3e98355f-3642-5bcc-af4a-f1205c647106:9df051db-0274-59a4-a28c-95910cfd7f8b",
+          "quote": "The schema migration completed on Thursday. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:3e98355f-3642-5bcc-af4a-f1205c647106:9df051db-0274-59a4-a28c-95910cfd7f8b",
+          "quote": "The migration record does not identify an approver."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": null
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "d2362c17-e3ba-49ad-8934-54a43cb46855"
+    ]
+  },
+  "latency_seconds": 5.818385791964829,
+  "setup_seconds": 0.017608833499252796,
+  "attempt_total_seconds": 5.835994625464082
+}

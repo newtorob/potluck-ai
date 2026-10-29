@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "d9989e6e-caa0-4864-8405-584a844c3e82"
+  ],
+  "query": "Who approved the production migration?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "d9989e6e-caa0-4864-8405-584a844c3e82"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "d9989e6e-caa0-4864-8405-584a844c3e82",
+        "document_id": "4961dac4-77b0-50e3-bc55-28aa7a7795b2",
+        "revision_id": "dc65a000-8994-57f9-a69d-0dff50b2aff9",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:54:35.657373+00:00",
+        "chunk_id": "16e25ba4-60d4-507a-9c30-f5fec333c30b",
+        "anchor": "production-migration",
+        "heading": "Production migration",
+        "content": "Mira ran the production migration on Wednesday. This record identifies the operator but does not identify the approver.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:54:35.657484+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:16e25ba4-60d4-507a-9c30-f5fec333c30b:dc65a000-8994-57f9-a69d-0dff50b2aff9"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

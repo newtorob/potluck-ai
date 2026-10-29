@@ -1,0 +1,2 @@
+# Retry delay records
+The deployment checklist says the retry delay is 12 seconds. The operations handbook says the retry delay is 45 seconds. Neither record establishes precedence, approval, or a superseding decision.

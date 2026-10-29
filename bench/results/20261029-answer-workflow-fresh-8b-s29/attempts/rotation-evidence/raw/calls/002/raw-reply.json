@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-3e2a7232-e9c1-4fb1-9dfc-8498ed9df416",
+  "object": "chat.completion",
+  "created": 1793297047,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"Procedure: after rotating the signing key, update the verifier key set, reload the verifier, and check a signed test request.\", \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S2\", \"S3\"], \"text\": \"The verifier key set was updated on Monday. The log records no reload or test-request check.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 460,
+    "completion_tokens": 92,
+    "total_tokens": 552
+  }
+}

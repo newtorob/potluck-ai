@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-f642e18b-4b03-4321-ad43-e714b3f56d37",
+  "object": "chat.completion",
+  "created": 1793296289,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What restored processing?\", \"Was the database changed?\", \"Who responded?\", \"Is the underlying cause known?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 108,
+    "completion_tokens": 26,
+    "total_tokens": 134
+  }
+}

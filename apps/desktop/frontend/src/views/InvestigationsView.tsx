@@ -36,6 +36,9 @@ export function InvestigationsView() {
   const [selected, setSelected] = useState<string[]>([]);
   const [issue, setIssue] = useState('');
   const [query, setQuery] = useState('');
+  const [answerEach, setAnswerEach] = useState(false);
+  const [generationProfile, setGenerationProfile] = useState('');
+  const [questionsInput, setQuestionsInput] = useState('');
   const [model, setModel] = useState('');
   const [items, setItems] = useState<Investigation[]>([]);
   const [current, setCurrent] = useState<Investigation | null>(null);
@@ -54,6 +57,11 @@ export function InvestigationsView() {
   const [citationsOpen, setCitationsOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const scope = { workspace: loadedWorkspace, collection_ids: selected };
+  const questions = questionsInput
+    .split('\n')
+    .map((q) => q.trim())
+    .filter(Boolean);
+  const questionsError = questions.length > 8 || questions.some((q) => q.length > 500);
   const ready = loadedWorkspace !== '' && selected.length > 0;
 
   async function run(action: () => Promise<void>, preserveInvalidReview = false) {
@@ -67,7 +75,13 @@ export function InvestigationsView() {
         preserveInvalidReview &&
         e instanceof Error &&
         e.message.startsWith('[localApi] 400: invalid_review_brief:');
-      if (!invalidReview) {
+      const unavailable =
+        e instanceof Error &&
+        (/^\[localApi\] (?:401|403|404):/.test(e.message) ||
+          /investigation_unavailable|investigation unavailable|evidence unavailable|collections_unavailable/i.test(
+            e.message,
+          ));
+      if (!invalidReview && (!preserveInvalidReview || unavailable)) {
         setCurrent(null);
         setCorrected(null);
       }
@@ -185,9 +199,25 @@ export function InvestigationsView() {
     );
   }
   const effectiveBrief = current?.review?.corrected_brief ?? current?.brief;
-  const usedCitations = new Set(
-    sections.flatMap(([key]) => effectiveBrief?.[key].flatMap((item) => item.citation_ids) ?? []),
-  );
+  const usedCitations = new Set([
+    ...sections.flatMap(
+      ([key]) => effectiveBrief?.[key].flatMap((item) => item.citation_ids) ?? [],
+    ),
+    ...(effectiveBrief?.answers?.flatMap(
+      (answer) =>
+        answer.source_excerpts?.map((excerpt) => {
+          const record = current?.evidence.find(
+            (e) =>
+              e.citation_id === excerpt.citation_id ||
+              (Array.isArray(e.sources) &&
+                e.sources.some(
+                  (source: Record<string, unknown>) => source.citation_id === excerpt.citation_id,
+                )),
+          );
+          return evidenceText(record?.citation_id);
+        }) ?? [],
+    ) ?? []),
+  ]);
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col" aria-busy={busy}>
       <ViewHeader
@@ -294,6 +324,53 @@ export function InvestigationsView() {
                 onChange={(e) => setQuery(e.target.value)}
               />
             </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                disabled={busy}
+                checked={answerEach}
+                onChange={(e) => setAnswerEach(e.target.checked)}
+              />
+              Answer each question (preview)
+            </label>
+            {answerEach && (
+              <div className="space-y-3">
+                <label className="block text-sm">
+                  Questions, one per line (optional)
+                  <textarea
+                    className={`${field} resize-none`}
+                    rows={4}
+                    disabled={busy}
+                    value={questionsInput}
+                    aria-invalid={questionsError}
+                    aria-describedby="questions-help"
+                    onChange={(e) => setQuestionsInput(e.target.value)}
+                  />
+                  <span id="questions-help" className="text-xs text-muted-foreground">
+                    {questionsError
+                      ? 'Use up to 8 questions, each at most 500 characters.'
+                      : 'Leave blank to plan questions from the issue. Up to 8 questions, 500 characters each.'}
+                  </span>
+                </label>
+                <label className="block text-sm">
+                  Answer profile
+                  <select
+                    className={field}
+                    disabled={busy}
+                    value={generationProfile}
+                    aria-describedby="answer-profile-help"
+                    onChange={(e) => setGenerationProfile(e.target.value)}
+                  >
+                    <option value="">Standard</option>
+                    <option value="qwen3-non-thinking">Qwen3 non-thinking</option>
+                  </select>
+                </label>
+                <p id="answer-profile-help" className="text-xs text-muted-foreground">
+                  Qwen3 non-thinking requires a compatible loaded Qwen3 model. If it is
+                  incompatible, the request fails without switching profiles.
+                </p>
+              </div>
+            )}
             <label className="block text-sm">
               Loaded local model
               <select
@@ -314,7 +391,13 @@ export function InvestigationsView() {
             <button
               className={button}
               disabled={
-                busy || !ready || !issue.trim() || !query.trim() || !model || model !== activeModel
+                busy ||
+                !ready ||
+                !issue.trim() ||
+                !query.trim() ||
+                !model ||
+                model !== activeModel ||
+                (answerEach && questionsError)
               }
               onClick={() =>
                 void run(async () => {
@@ -323,6 +406,13 @@ export function InvestigationsView() {
                     issue,
                     query,
                     model_slug: model,
+                    ...(answerEach
+                      ? {
+                          answer_each_question: true,
+                          ...(questions.length ? { questions } : {}),
+                          ...(generationProfile ? { generation_profile: generationProfile } : {}),
+                        }
+                      : {}),
                   });
                   show(item);
                   await refresh();
@@ -371,84 +461,155 @@ export function InvestigationsView() {
                   {current.status} · {current.model_slug} · {current.created_at}
                 </p>
               </div>
-              {sections.map(([key, label]) => (
-                <div key={key}>
-                  <h3 className="font-medium">{label}</h3>
-                  {key === 'facts' && (
-                    <p className="text-xs text-muted-foreground">
-                      Exact excerpts show source text; they do not establish that a claim is
-                      supported.
-                    </p>
-                  )}
-                  {(current.review?.corrected_brief ?? current.brief)[key].length === 0 ? (
-                    <p className="text-sm text-muted-foreground">None</p>
-                  ) : (
-                    <ul className="list-disc pl-5 text-sm">
-                      {(current.review?.corrected_brief ?? current.brief)[key].map((item, i) => (
-                        <li key={i}>
-                          {item.text}{' '}
-                          {item.citation_ids.map((id) => {
-                            const index = current.evidence.findIndex((e) => e.citation_id === id);
-                            return index < 0 ? null : (
-                              <a
-                                key={id}
-                                href={`#investigation-citation-${index + 1}`}
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  openCitation(`investigation-citation-${index + 1}`);
-                                }}
-                                className="ml-1 text-primary underline underline-offset-2"
-                                aria-label={`View citation ${index + 1}`}
+              {effectiveBrief?.questions && (
+                <div className="space-y-3">
+                  <h3 className="font-medium">Questions and answers</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Draft answers need review. “Supported” is a model claim, not verified
+                    correctness. “Unknown” means the presented evidence does not establish an
+                    answer.{' '}
+                    {current.provenance?.question_origin === 'planned'
+                      ? 'Questions were planned from the issue.'
+                      : current.provenance?.question_origin === 'explicit'
+                        ? 'Questions were provided by you.'
+                        : ''}
+                  </p>
+                  {effectiveBrief.questions.map((question) => {
+                    const answer = effectiveBrief.answers?.find(
+                      (entry) => entry.question_id === question.id,
+                    );
+                    return (
+                      <div key={question.id} className="space-y-1 text-sm">
+                        <h4 className="font-medium">{question.text}</h4>
+                        {answer ? (
+                          <>
+                            <p className="text-xs font-medium">
+                              {answer.status === 'supported'
+                                ? 'Supported (model claim)'
+                                : answer.status === 'conflicting'
+                                  ? 'Conflicting'
+                                  : 'Unknown'}
+                            </p>
+                            <p className="whitespace-pre-wrap">{answer.text}</p>
+                            {(answer.source_excerpts ?? []).map((excerpt) => (
+                              <blockquote
+                                key={excerpt.snippet_id}
+                                className="border-l-2 border-border pl-3 whitespace-pre-wrap text-muted-foreground"
                               >
-                                [{index + 1}]
-                              </a>
-                            );
-                          })}
-                          {(item.source_excerpts ?? []).map((excerpt, n) => (
-                            <blockquote
-                              key={n}
-                              className="mt-1 border-l-2 border-border pl-3 whitespace-pre-wrap text-muted-foreground"
-                            >
-                              “{excerpt.quote}”{' '}
-                              <span className="text-xs">({sourceLink(excerpt.citation_id)})</span>
-                            </blockquote>
-                          ))}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                                “{excerpt.quote}”{' '}
+                                <span className="text-xs">({sourceLink(excerpt.citation_id)})</span>
+                              </blockquote>
+                            ))}
+                          </>
+                        ) : (
+                          <p>Answer unavailable</p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-              {current.review?.corrected_brief && (
-                <details>
-                  <summary className="cursor-pointer text-sm">Original brief</summary>
-                  {sections.map(([key, label]) => (
-                    <div key={key}>
-                      <strong>{label}</strong>
-                      <ul>
-                        {current.brief[key].map((item, i) => (
+              )}
+              {!effectiveBrief?.questions &&
+                sections.map(([key, label]) => (
+                  <div key={key}>
+                    <h3 className="font-medium">{label}</h3>
+                    {key === 'facts' && (
+                      <p className="text-xs text-muted-foreground">
+                        Exact excerpts show source text; they do not establish that a claim is
+                        supported.
+                      </p>
+                    )}
+                    {(current.review?.corrected_brief ?? current.brief)[key].length === 0 ? (
+                      <p className="text-sm text-muted-foreground">None</p>
+                    ) : (
+                      <ul className="list-disc pl-5 text-sm">
+                        {(current.review?.corrected_brief ?? current.brief)[key].map((item, i) => (
                           <li key={i}>
-                            {item.text} [{item.citation_ids.join(', ')}]
+                            {item.text}{' '}
+                            {item.citation_ids.map((id) => {
+                              const index = current.evidence.findIndex((e) => e.citation_id === id);
+                              return index < 0 ? null : (
+                                <a
+                                  key={id}
+                                  href={`#investigation-citation-${index + 1}`}
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    openCitation(`investigation-citation-${index + 1}`);
+                                  }}
+                                  className="ml-1 text-primary underline underline-offset-2"
+                                  aria-label={`View citation ${index + 1}`}
+                                >
+                                  [{index + 1}]
+                                </a>
+                              );
+                            })}
                             {(item.source_excerpts ?? []).map((excerpt, n) => (
                               <blockquote
                                 key={n}
-                                className="border-l-2 border-border pl-3 whitespace-pre-wrap"
+                                className="mt-1 border-l-2 border-border pl-3 whitespace-pre-wrap text-muted-foreground"
                               >
-                                “{excerpt.quote}” ({sourceLink(excerpt.citation_id)})
+                                “{excerpt.quote}”{' '}
+                                <span className="text-xs">({sourceLink(excerpt.citation_id)})</span>
                               </blockquote>
                             ))}
                           </li>
                         ))}
                       </ul>
-                    </div>
-                  ))}
+                    )}
+                  </div>
+                ))}
+              {current.review?.corrected_brief && (
+                <details>
+                  <summary className="cursor-pointer text-sm">Original brief</summary>
+                  {current.brief.questions?.map((question) => {
+                    const answer = current.brief.answers?.find(
+                      (entry) => entry.question_id === question.id,
+                    );
+                    return (
+                      <div key={question.id} className="text-sm">
+                        <strong>{question.text}</strong>
+                        <p>
+                          {answer?.status}: {answer?.text}
+                        </p>
+                        {answer?.source_excerpts?.map((excerpt) => (
+                          <blockquote
+                            key={excerpt.snippet_id}
+                            className="border-l-2 border-border pl-3 whitespace-pre-wrap"
+                          >
+                            “{excerpt.quote}” ({sourceLink(excerpt.citation_id)})
+                          </blockquote>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  {!current.brief.questions &&
+                    sections.map(([key, label]) => (
+                      <div key={key}>
+                        <strong>{label}</strong>
+                        <ul>
+                          {current.brief[key].map((item, i) => (
+                            <li key={i}>
+                              {item.text} [{item.citation_ids.join(', ')}]
+                              {(item.source_excerpts ?? []).map((excerpt, n) => (
+                                <blockquote
+                                  key={n}
+                                  className="border-l-2 border-border pl-3 whitespace-pre-wrap"
+                                >
+                                  “{excerpt.quote}” ({sourceLink(excerpt.citation_id)})
+                                </blockquote>
+                              ))}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
                   {current.brief.missing_evidence && (
                     <p>
                       Historical combined missing evidence (provenance unknown):{' '}
                       {current.brief.missing_evidence.join('; ')}
                     </p>
                   )}
-                  {current.brief.model_uncertainties && (
+                  {!!current.brief.model_uncertainties?.length && (
                     <p>
                       Model questions (unverified): {current.brief.model_uncertainties.join('; ')}
                     </p>
@@ -467,7 +628,7 @@ export function InvestigationsView() {
                   </ul>
                 </div>
               )}
-              {effectiveBrief?.model_uncertainties && (
+              {!!effectiveBrief?.model_uncertainties?.length && (
                 <div>
                   <h3 className="font-medium">Model questions (unverified)</h3>
                   <ul className="list-disc pl-5 text-sm">
@@ -577,112 +738,223 @@ export function InvestigationsView() {
                 </label>
                 {decision === 'correct' && corrected && (
                   <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      For each fact or prior fix citation, add an exact excerpt from its source. For
-                      a reviewed claim, use a source citation ID shown under its provenance. Open
-                      citations above to copy source text and IDs.
-                    </p>
-                    {sections.map(([key, label]) => (
-                      <div key={key}>
-                        <h4 className="text-sm font-medium">{label}</h4>
-                        {corrected[key].map((item, i) => (
-                          <div key={i} className="space-y-1">
-                            <label className="block text-xs">
-                              Item {i + 1}
-                              <textarea
-                                className={`${field} resize-none`}
-                                rows={2}
-                                value={item.text}
-                                onChange={(e) => changeText(key, i, e.target.value)}
-                              />
-                            </label>
-                            <fieldset>
-                              <legend className="text-xs">Citations</legend>
-                              {current.evidence.map((e, index) => {
-                                const id = evidenceText(e.citation_id);
-                                return (
+                    {corrected.questions ? (
+                      <div className="space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                          Choose source excerpts for each answer. The saved excerpts come from the
+                          source catalog.
+                        </p>
+                        {corrected.questions.map((question) => {
+                          const answers = corrected.answers;
+                          const answer = answers?.find(
+                            (entry) => entry.question_id === question.id,
+                          );
+                          if (!answer || !answers) return null;
+                          const updateAnswer = (changes: Partial<typeof answer>) =>
+                            setCorrected({
+                              ...corrected,
+                              answers: answers.map((entry) => {
+                                if (entry.question_id !== question.id) return entry;
+                                if (changes.snippet_ids) {
+                                  const { source_excerpts: _excerpts, ...withoutExcerpts } = entry;
+                                  return { ...withoutExcerpts, ...changes };
+                                }
+                                return { ...entry, ...changes };
+                              }),
+                            });
+                          return (
+                            <div
+                              key={question.id}
+                              className="space-y-2 border-t border-border pt-3"
+                            >
+                              <h4 className="text-sm font-medium">{question.text}</h4>
+                              <label className="block text-xs">
+                                Answer status
+                                <select
+                                  className={field}
+                                  disabled={busy}
+                                  value={answer.status}
+                                  onChange={(e) =>
+                                    updateAnswer({ status: e.target.value as typeof answer.status })
+                                  }
+                                >
+                                  <option value="supported">Supported (model claim)</option>
+                                  <option value="unknown">Unknown</option>
+                                  <option value="conflicting">Conflicting</option>
+                                </select>
+                              </label>
+                              <label className="block text-xs">
+                                Answer text
+                                <textarea
+                                  className={`${field} resize-none`}
+                                  rows={3}
+                                  disabled={busy}
+                                  value={answer.text}
+                                  onChange={(e) => updateAnswer({ text: e.target.value })}
+                                />
+                              </label>
+                              <fieldset className="space-y-2" disabled={busy}>
+                                <legend className="text-xs">Source excerpts</legend>
+                                {(current.provenance?.snippet_catalog ?? []).map((snippet) => (
                                   <label
-                                    key={id}
-                                    title={id}
-                                    className="mr-3 inline-flex items-start gap-1 text-xs"
+                                    key={snippet.snippet_id}
+                                    className="flex items-start gap-2 text-xs"
                                   >
                                     <input
                                       type="checkbox"
-                                      checked={item.citation_ids.includes(id)}
-                                      onChange={(event) =>
-                                        setCorrected({
-                                          ...corrected,
-                                          [key]: corrected[key].map((old, n) =>
-                                            n !== i
-                                              ? old
-                                              : {
-                                                  ...old,
-                                                  citation_ids: event.target.checked
-                                                    ? [...old.citation_ids, id]
-                                                    : old.citation_ids.filter((c) => c !== id),
-                                                },
-                                          ),
+                                      checked={answer.snippet_ids.includes(snippet.snippet_id)}
+                                      onChange={(e) =>
+                                        updateAnswer({
+                                          snippet_ids: e.target.checked
+                                            ? [...answer.snippet_ids, snippet.snippet_id]
+                                            : answer.snippet_ids.filter(
+                                                (id) => id !== snippet.snippet_id,
+                                              ),
                                         })
                                       }
                                     />
-                                    {citationLabel(e, index)}
+                                    <span>
+                                      <strong>{snippet.snippet_id}</strong> · {snippet.quote}
+                                    </span>
                                   </label>
-                                );
-                              })}
-                            </fieldset>
-                            {(item.source_excerpts ?? []).map((excerpt, n) => (
-                              <div key={n} className="space-y-1">
+                                ))}
+                              </fieldset>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-sm text-muted-foreground">
+                          For each fact or prior fix citation, add an exact excerpt from its source.
+                          For a reviewed claim, use a source citation ID shown under its provenance.
+                          Open citations above to copy source text and IDs.
+                        </p>
+                        {sections.map(([key, label]) => (
+                          <div key={key}>
+                            <h4 className="text-sm font-medium">{label}</h4>
+                            {corrected[key].map((item, i) => (
+                              <div key={i} className="space-y-1">
                                 <label className="block text-xs">
-                                  Source citation ID
-                                  <input
-                                    className={field}
-                                    value={excerpt.citation_id}
-                                    onChange={(event) =>
-                                      setCorrected({
-                                        ...corrected,
-                                        [key]: corrected[key].map((old, j) =>
-                                          j === i
-                                            ? {
-                                                ...old,
-                                                source_excerpts: (old.source_excerpts ?? []).map(
-                                                  (ex, k) =>
-                                                    k === n
-                                                      ? { ...ex, citation_id: event.target.value }
-                                                      : ex,
-                                                ),
-                                              }
-                                            : old,
-                                        ),
-                                      })
-                                    }
-                                  />
-                                </label>
-                                <label className="block text-xs">
-                                  Exact excerpt from source
+                                  Item {i + 1}
                                   <textarea
                                     className={`${field} resize-none`}
                                     rows={2}
-                                    value={excerpt.quote}
-                                    onChange={(event) =>
-                                      setCorrected({
-                                        ...corrected,
-                                        [key]: corrected[key].map((old, j) =>
-                                          j === i
-                                            ? {
-                                                ...old,
-                                                source_excerpts: (old.source_excerpts ?? []).map(
-                                                  (ex, k) =>
-                                                    k === n
-                                                      ? { ...ex, quote: event.target.value }
-                                                      : ex,
-                                                ),
-                                              }
-                                            : old,
-                                        ),
-                                      })
-                                    }
+                                    value={item.text}
+                                    onChange={(e) => changeText(key, i, e.target.value)}
                                   />
                                 </label>
+                                <fieldset>
+                                  <legend className="text-xs">Citations</legend>
+                                  {current.evidence.map((e, index) => {
+                                    const id = evidenceText(e.citation_id);
+                                    return (
+                                      <label
+                                        key={id}
+                                        title={id}
+                                        className="mr-3 inline-flex items-start gap-1 text-xs"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={item.citation_ids.includes(id)}
+                                          onChange={(event) =>
+                                            setCorrected({
+                                              ...corrected,
+                                              [key]: corrected[key].map((old, n) =>
+                                                n !== i
+                                                  ? old
+                                                  : {
+                                                      ...old,
+                                                      citation_ids: event.target.checked
+                                                        ? [...old.citation_ids, id]
+                                                        : old.citation_ids.filter((c) => c !== id),
+                                                    },
+                                              ),
+                                            })
+                                          }
+                                        />
+                                        {citationLabel(e, index)}
+                                      </label>
+                                    );
+                                  })}
+                                </fieldset>
+                                {(item.source_excerpts ?? []).map((excerpt, n) => (
+                                  <div key={n} className="space-y-1">
+                                    <label className="block text-xs">
+                                      Source citation ID
+                                      <input
+                                        className={field}
+                                        value={excerpt.citation_id}
+                                        onChange={(event) =>
+                                          setCorrected({
+                                            ...corrected,
+                                            [key]: corrected[key].map((old, j) =>
+                                              j === i
+                                                ? {
+                                                    ...old,
+                                                    source_excerpts: (
+                                                      old.source_excerpts ?? []
+                                                    ).map((ex, k) =>
+                                                      k === n
+                                                        ? { ...ex, citation_id: event.target.value }
+                                                        : ex,
+                                                    ),
+                                                  }
+                                                : old,
+                                            ),
+                                          })
+                                        }
+                                      />
+                                    </label>
+                                    <label className="block text-xs">
+                                      Exact excerpt from source
+                                      <textarea
+                                        className={`${field} resize-none`}
+                                        rows={2}
+                                        value={excerpt.quote}
+                                        onChange={(event) =>
+                                          setCorrected({
+                                            ...corrected,
+                                            [key]: corrected[key].map((old, j) =>
+                                              j === i
+                                                ? {
+                                                    ...old,
+                                                    source_excerpts: (
+                                                      old.source_excerpts ?? []
+                                                    ).map((ex, k) =>
+                                                      k === n
+                                                        ? { ...ex, quote: event.target.value }
+                                                        : ex,
+                                                    ),
+                                                  }
+                                                : old,
+                                            ),
+                                          })
+                                        }
+                                      />
+                                    </label>
+                                    <button
+                                      className={button}
+                                      onClick={() =>
+                                        setCorrected({
+                                          ...corrected,
+                                          [key]: corrected[key].map((old, j) =>
+                                            j === i
+                                              ? {
+                                                  ...old,
+                                                  source_excerpts: (
+                                                    old.source_excerpts ?? []
+                                                  ).filter((_, k) => k !== n),
+                                                }
+                                              : old,
+                                          ),
+                                        })
+                                      }
+                                    >
+                                      Remove excerpt
+                                    </button>
+                                  </div>
+                                ))}
                                 <button
                                   className={button}
                                   onClick={() =>
@@ -692,16 +964,28 @@ export function InvestigationsView() {
                                         j === i
                                           ? {
                                               ...old,
-                                              source_excerpts: (old.source_excerpts ?? []).filter(
-                                                (_, k) => k !== n,
-                                              ),
+                                              source_excerpts: [
+                                                ...(old.source_excerpts ?? []),
+                                                { citation_id: '', quote: '' },
+                                              ],
                                             }
                                           : old,
                                       ),
                                     })
                                   }
                                 >
-                                  Remove excerpt
+                                  Add source excerpt
+                                </button>
+                                <button
+                                  className={button}
+                                  onClick={() =>
+                                    setCorrected({
+                                      ...corrected,
+                                      [key]: corrected[key].filter((_, n) => n !== i),
+                                    })
+                                  }
+                                >
+                                  Remove item
                                 </button>
                               </div>
                             ))}
@@ -710,65 +994,33 @@ export function InvestigationsView() {
                               onClick={() =>
                                 setCorrected({
                                   ...corrected,
-                                  [key]: corrected[key].map((old, j) =>
-                                    j === i
-                                      ? {
-                                          ...old,
-                                          source_excerpts: [
-                                            ...(old.source_excerpts ?? []),
-                                            { citation_id: '', quote: '' },
-                                          ],
-                                        }
-                                      : old,
-                                  ),
+                                  [key]: [
+                                    ...corrected[key],
+                                    { text: '', citation_ids: [], source_excerpts: [] },
+                                  ],
                                 })
                               }
                             >
-                              Add source excerpt
-                            </button>
-                            <button
-                              className={button}
-                              onClick={() =>
-                                setCorrected({
-                                  ...corrected,
-                                  [key]: corrected[key].filter((_, n) => n !== i),
-                                })
-                              }
-                            >
-                              Remove item
+                              Add {label.toLowerCase()} item
                             </button>
                           </div>
                         ))}
-                        <button
-                          className={button}
-                          onClick={() =>
-                            setCorrected({
-                              ...corrected,
-                              [key]: [
-                                ...corrected[key],
-                                { text: '', citation_ids: [], source_excerpts: [] },
-                              ],
-                            })
-                          }
-                        >
-                          Add {label.toLowerCase()} item
-                        </button>
-                      </div>
-                    ))}
-                    <label className="block text-sm">
-                      Model questions (unverified), one per line
-                      <textarea
-                        className={`${field} resize-none`}
-                        rows={3}
-                        value={(corrected.model_uncertainties ?? []).join('\n')}
-                        onChange={(e) =>
-                          setCorrected({
-                            ...corrected,
-                            model_uncertainties: e.target.value.split('\n'),
-                          })
-                        }
-                      />
-                    </label>
+                        <label className="block text-sm">
+                          Model questions (unverified), one per line
+                          <textarea
+                            className={`${field} resize-none`}
+                            rows={3}
+                            value={(corrected.model_uncertainties ?? []).join('\n')}
+                            onChange={(e) =>
+                              setCorrected({
+                                ...corrected,
+                                model_uncertainties: e.target.value.split('\n'),
+                              })
+                            }
+                          />
+                        </label>
+                      </>
+                    )}
                   </div>
                 )}
                 <label className="block text-sm">
@@ -797,6 +1049,9 @@ export function InvestigationsView() {
                   }
                   onClick={() =>
                     void run(async () => {
+                      if (decision === 'correct' && corrected?.questions && !corrected.answers) {
+                        throw new Error('Answers are unavailable. Reload the investigation.');
+                      }
                       const item = await localApi.reviewInvestigation(current.id, {
                         ...scope,
                         decision,
@@ -805,6 +1060,19 @@ export function InvestigationsView() {
                         ...(decision === 'correct' && corrected
                           ? {
                               corrected_brief: {
+                                ...(corrected.questions
+                                  ? {
+                                      questions: corrected.questions,
+                                      answers: (corrected.answers ?? []).map(
+                                        ({ question_id, status, text, snippet_ids }) => ({
+                                          question_id,
+                                          status,
+                                          text,
+                                          snippet_ids,
+                                        }),
+                                      ),
+                                    }
+                                  : {}),
                                 facts: corrected.facts,
                                 prior_fixes: corrected.prior_fixes,
                                 hypotheses: corrected.hypotheses,

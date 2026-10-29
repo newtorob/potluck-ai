@@ -1,0 +1,2 @@
+# Credential rotation procedure
+After rotating the service credential, update the secret store, restart the connector, then verify a successful sync. This page is a procedure only; it does not record a rotation or restart being performed.

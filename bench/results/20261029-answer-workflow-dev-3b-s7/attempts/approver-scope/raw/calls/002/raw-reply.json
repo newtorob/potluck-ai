@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-816d625e-627c-4dd2-90c6-e2a005a34028",
+  "object": "chat.completion",
+  "created": 1793295694,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"status\": \"unknown\", \"text\": \"The approval process and the specific approver are not provided in the given snippets.\",\"snippet_ids\": [\"S2\"]}, \"Q2\": {\"status\": \"unknown\", \"text\": \"The approval process for the schema migration is not specified in the given snippets.\", \"snippet_ids\": []}, \"Q3\": {\"status\": \"unknown\", \"text\": \"The person who initiated the schema migration is not mentioned in the given snippets.\", \"snippet_ids\": []}, \"Q4\": {\"status\": \"unknown\", \"text\": \"The date of approval for the schema migration is not provided in the given snippets.\", \"snippet_ids\": []}, \"Q5\": {\"status\": \"unknown\", \"text\": \"The version of the schema that was approved is not mentioned in the given snippets.\", \"snippet_ids\": []}, \"Q6\": {\"status\": \"unknown\", \"text\": \"The key stakeholders involved in approving the schema migration are not specified in the given snippets.\", \"snippet_ids\": []}, \"Q7\": {\"status\": \"unknown\", \"text\": \"The criteria used to approve the schema migration are not provided in the given snippets.\", \"snippet_ids\": []}, \"Q8\": {\"status\": \"unknown\", \"text\": \"The date of the last schema migration approval is not provided in the given snippets.\", \"snippet_ids\": []}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 331,
+    "completion_tokens": 290,
+    "total_tokens": 621
+  }
+}

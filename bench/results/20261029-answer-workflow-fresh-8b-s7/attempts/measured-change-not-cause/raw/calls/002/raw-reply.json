@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-2f1f8956-feb3-456f-8701-f8d6fabe2eaa",
+  "object": "chat.completion",
+  "created": 1793296762,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S2\"], \"text\": \"Median latency changed from 180 ms to 120 ms.\", \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S4\"], \"text\": \"This record does not establish which intervention caused the change.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 469,
+    "completion_tokens": 71,
+    "total_tokens": 540
+  }
+}

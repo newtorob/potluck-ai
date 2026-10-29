@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-47d11424-9f55-4c5c-8ab4-01bd273fce71",
+  "object": "chat.completion",
+  "created": 1793295688,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"Who approved the schema migration?\", \"What was the approval process for the schema migration?\", \"Who initiated the schema migration?\", \"When was the schema migration approved?\", \"What version of the schema was approved?\", \"Who were the key stakeholders involved in approving the schema migration?\", \"What criteria were used to approve the schema migration?\", \"When was the last schema migration approved?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 66,
+    "completion_tokens": 79,
+    "total_tokens": 145
+  }
+}

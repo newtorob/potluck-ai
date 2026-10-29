@@ -1,0 +1,123 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "45904fad-e900-47af-b69f-a67b6fa27dad",
+    "workspace": "synthetic-eval",
+    "issue": "Who approved the production migration?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "Who approved the production migration?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "unknown",
+          "text": "This record identifies the operator but does not identify the approver.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:df7889b4-6947-508f-9695-fb169c5ecb96:837eda46-cce6-584e-b189-40a2dfc07687",
+              "quote": "This record identifies the operator but does not identify the approver."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "e82b53ed-1ae5-4170-abe4-c08e7a043aa5",
+        "document_id": "1372dccd-ed83-575e-8bef-9a00d4145929",
+        "revision_id": "837eda46-cce6-584e-b189-40a2dfc07687",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:58:21.391281+00:00",
+        "chunk_id": "df7889b4-6947-508f-9695-fb169c5ecb96",
+        "anchor": "production-migration",
+        "heading": "Production migration",
+        "content": "Mira ran the production migration on Wednesday. This record identifies the operator but does not identify the approver.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:58:21.391477+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:df7889b4-6947-508f-9695-fb169c5ecb96:837eda46-cce6-584e-b189-40a2dfc07687",
+        "presented_content": "Mira ran the production migration on Wednesday. This record identifies the operator but does not identify the approver."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T17:58:36.792926+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "Who approved the production migration?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 15390,
+      "created_at": "2026-10-29T17:58:36.792926+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:df7889b4-6947-508f-9695-fb169c5ecb96:837eda46-cce6-584e-b189-40a2dfc07687",
+          "quote": "Mira ran the production migration on Wednesday. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:df7889b4-6947-508f-9695-fb169c5ecb96:837eda46-cce6-584e-b189-40a2dfc07687",
+          "quote": "This record identifies the operator but does not identify the approver."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "e82b53ed-1ae5-4170-abe4-c08e7a043aa5"
+    ]
+  },
+  "latency_seconds": 15.401506000198424,
+  "setup_seconds": 0.028254125267267227,
+  "attempt_total_seconds": 15.429760125465691
+}

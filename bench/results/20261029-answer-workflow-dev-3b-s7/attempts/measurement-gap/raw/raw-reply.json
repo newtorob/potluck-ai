@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-77a357d3-714b-4c0f-a309-a507cdc06307",
+  "object": "chat.completion",
+  "created": 1793295729,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What action was taken to improve request latency?\", \"By how much did the action improve request latency?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 75,
+    "completion_tokens": 25,
+    "total_tokens": 100
+  }
+}

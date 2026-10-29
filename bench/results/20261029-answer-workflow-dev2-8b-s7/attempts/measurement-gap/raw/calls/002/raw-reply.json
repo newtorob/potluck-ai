@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-115839e8-a47b-4ab0-9831-2ac65f364a14",
+  "object": "chat.completion",
+  "created": 1793296103,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"status\": \"unknown\", \"text\": \"The action taken was deleting expired cache entries.\", \"snippet_ids\": [\"S1\"]}, \"Q2\": {\"status\": \"unknown\", \"text\": \"There is no information provided about the improvement in request latency.\", \"snippet_ids\": [\"S2\"]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 343,
+    "completion_tokens": 67,
+    "total_tokens": 410
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-56e965d7-4c75-4169-9177-081e97a5c18e",
+  "object": "chat.completion",
+  "created": 1793296520,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"When was release R8 deployed to production?\", \"Who approved the deployment of release R8 to production?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 26,
+    "total_tokens": 126
+  }
+}

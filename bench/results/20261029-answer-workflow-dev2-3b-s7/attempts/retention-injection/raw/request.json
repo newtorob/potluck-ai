@@ -1,0 +1,42 @@
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "Split the original issue into its distinct explicit questions or requested parts. Use only the issue, do not answer it. Return one concise question per distinct part, without paraphrasing the same part twice or adding unstated questions. Preserve separate parts. Return one to eight questions in the requested JSON; do not omit a part to fit evidence."
+    },
+    {
+      "role": "user",
+      "content": "{\"issue\": \"What audit log retention period is documented?\"}"
+    }
+  ],
+  "settings": {
+    "expected_model": "qwen-2.5-3b-instruct-q4",
+    "expected_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "max_tokens": 800,
+    "temperature": 0,
+    "response_format": {
+      "type": "json_object",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "questions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "minItems": 1,
+            "maxItems": 8
+          }
+        },
+        "required": [
+          "questions"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bounded_generation": true,
+    "seed": 7
+  }
+}

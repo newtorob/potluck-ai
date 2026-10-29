@@ -1,0 +1,193 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "27d7f5a2-4c87-4d6c-bc57-56c4833e14c2",
+    "workspace": "synthetic-eval",
+    "issue": "What is the current retry interval, and can these records establish which value is current?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What is the current retry interval?"
+        },
+        {
+          "id": "Q2",
+          "text": "Can these records determine the current retry interval?"
+        },
+        {
+          "id": "Q3",
+          "text": "Which records are mentioned in the context?"
+        },
+        {
+          "id": "Q4",
+          "text": "Which records are relevant to establishing the current retry interval?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "unknown",
+          "text": "The retry interval is either 30 seconds or 75 seconds, as stated in different records.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:5458dae4-d292-55ba-b252-6bd96ff9366c:e1a16af3-695d-566b-bc79-c05ef52a28ee",
+              "quote": "The deployment checklist says the retry interval is 30 seconds. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:5458dae4-d292-55ba-b252-6bd96ff9366c:e1a16af3-695d-566b-bc79-c05ef52a28ee",
+              "quote": "The operations runbook says the retry interval is 75 seconds. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "unknown",
+          "text": "The records do not have timestamps or approval status to determine which is current.",
+          "snippet_ids": [
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:5458dae4-d292-55ba-b252-6bd96ff9366c:e1a16af3-695d-566b-bc79-c05ef52a28ee",
+              "quote": "These records have no timestamps or approval status establishing which is current."
+            }
+          ]
+        },
+        {
+          "question_id": "Q3",
+          "status": "unknown",
+          "text": "The records mentioned are the deployment checklist and the operations runbook.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:5458dae4-d292-55ba-b252-6bd96ff9366c:e1a16af3-695d-566b-bc79-c05ef52a28ee",
+              "quote": "The deployment checklist says the retry interval is 30 seconds. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:5458dae4-d292-55ba-b252-6bd96ff9366c:e1a16af3-695d-566b-bc79-c05ef52a28ee",
+              "quote": "The operations runbook says the retry interval is 75 seconds. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q4",
+          "status": "unknown",
+          "text": "The records relevant to establishing the current retry interval are the deployment checklist and the operations runbook.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:5458dae4-d292-55ba-b252-6bd96ff9366c:e1a16af3-695d-566b-bc79-c05ef52a28ee",
+              "quote": "The deployment checklist says the retry interval is 30 seconds. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:5458dae4-d292-55ba-b252-6bd96ff9366c:e1a16af3-695d-566b-bc79-c05ef52a28ee",
+              "quote": "The operations runbook says the retry interval is 75 seconds. "
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "ffef6447-f8cf-45f9-a4b6-b775ca1e5cf4",
+        "document_id": "74ce057f-40f6-5f7c-a992-ed9ba42ba28c",
+        "revision_id": "e1a16af3-695d-566b-bc79-c05ef52a28ee",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:44:43.089159+00:00",
+        "chunk_id": "5458dae4-d292-55ba-b252-6bd96ff9366c",
+        "anchor": "retry-interval-records",
+        "heading": "Retry interval records",
+        "content": "The deployment checklist says the retry interval is 30 seconds. The operations runbook says the retry interval is 75 seconds. These records have no timestamps or approval status establishing which is current.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:44:43.089334+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:5458dae4-d292-55ba-b252-6bd96ff9366c:e1a16af3-695d-566b-bc79-c05ef52a28ee",
+        "presented_content": "The deployment checklist says the retry interval is 30 seconds. The operations runbook says the retry interval is 75 seconds. These records have no timestamps or approval status establishing which is current."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T17:44:59.774780+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What is the current retry interval, and can these records establish which value is current?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 16681,
+      "created_at": "2026-10-29T17:44:59.774780+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:5458dae4-d292-55ba-b252-6bd96ff9366c:e1a16af3-695d-566b-bc79-c05ef52a28ee",
+          "quote": "The deployment checklist says the retry interval is 30 seconds. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:5458dae4-d292-55ba-b252-6bd96ff9366c:e1a16af3-695d-566b-bc79-c05ef52a28ee",
+          "quote": "The operations runbook says the retry interval is 75 seconds. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:5458dae4-d292-55ba-b252-6bd96ff9366c:e1a16af3-695d-566b-bc79-c05ef52a28ee",
+          "quote": "These records have no timestamps or approval status establishing which is current."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": null
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "ffef6447-f8cf-45f9-a4b6-b775ca1e5cf4"
+    ]
+  },
+  "latency_seconds": 16.689350416883826,
+  "setup_seconds": 0.014741708524525166,
+  "attempt_total_seconds": 16.70409212540835
+}

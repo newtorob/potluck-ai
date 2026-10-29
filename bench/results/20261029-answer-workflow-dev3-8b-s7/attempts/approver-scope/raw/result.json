@@ -1,0 +1,123 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "864c9111-d8ad-4c40-922c-a159f42fd9ef",
+    "workspace": "synthetic-eval",
+    "issue": "Who approved the schema migration?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "Who approved the schema migration?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "unknown",
+          "text": "The migration record does not identify an approver.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:d87c0a06-8895-58e3-a9c5-c215aab0cd6e:ca0b04db-573a-5382-9ba4-1b486f88229f",
+              "quote": "The migration record does not identify an approver."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "34c2f817-094b-4649-a884-4fbcbcb826ac",
+        "document_id": "816bf992-3ca5-5b5f-9708-bbd6f49494ec",
+        "revision_id": "ca0b04db-573a-5382-9ba4-1b486f88229f",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:52:43.334277+00:00",
+        "chunk_id": "d87c0a06-8895-58e3-a9c5-c215aab0cd6e",
+        "anchor": "schema-migration",
+        "heading": "Schema migration",
+        "content": "The schema migration completed on Thursday. The migration record does not identify an approver.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:52:43.334458+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:d87c0a06-8895-58e3-a9c5-c215aab0cd6e:ca0b04db-573a-5382-9ba4-1b486f88229f",
+        "presented_content": "The schema migration completed on Thursday. The migration record does not identify an approver."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T17:52:55.939624+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "Who approved the schema migration?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 12595,
+      "created_at": "2026-10-29T17:52:55.939624+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:d87c0a06-8895-58e3-a9c5-c215aab0cd6e:ca0b04db-573a-5382-9ba4-1b486f88229f",
+          "quote": "The schema migration completed on Thursday. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:d87c0a06-8895-58e3-a9c5-c215aab0cd6e:ca0b04db-573a-5382-9ba4-1b486f88229f",
+          "quote": "The migration record does not identify an approver."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "34c2f817-094b-4649-a884-4fbcbcb826ac"
+    ]
+  },
+  "latency_seconds": 12.606280541978776,
+  "setup_seconds": 0.02193600032478571,
+  "attempt_total_seconds": 12.628216542303562
+}

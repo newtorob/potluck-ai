@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-fcaff259-20f8-46d9-ac28-21aab4932336",
+  "object": "chat.completion",
+  "created": 1793297100,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S2\"], \"text\": \"This record identifies the operator but does not identify the approver.\", \"status\": \"unknown\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 376,
+    "completion_tokens": 35,
+    "total_tokens": 411
+  }
+}

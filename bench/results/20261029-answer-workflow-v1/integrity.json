@@ -1,0 +1,71 @@
+{
+  "checks": [
+    "All four arms match frozen production Python source hashes, fixtures, rubric and CPU settings",
+    "Original issue only in every planner call; both model calls retained",
+    "Seed and bounded generation recorded on each call",
+    "Selected snippets exactly match presented source text and saved catalog",
+    "No excluded canary in requests, retrieval or answers"
+  ],
+  "arms": {
+    "3b-s7": {
+      "attempts": 8,
+      "saved": 8,
+      "exact_excerpts_checked": 30,
+      "elapsed_ms": [
+        14374,
+        9590,
+        7010,
+        5994,
+        10430,
+        28810,
+        8841,
+        8632
+      ]
+    },
+    "3b-s29": {
+      "attempts": 8,
+      "saved": 8,
+      "exact_excerpts_checked": 30,
+      "elapsed_ms": [
+        14598,
+        10585,
+        7768,
+        6423,
+        12131,
+        32744,
+        11100,
+        9034
+      ]
+    },
+    "8b-s7": {
+      "attempts": 8,
+      "saved": 8,
+      "exact_excerpts_checked": 21,
+      "elapsed_ms": [
+        62775,
+        49060,
+        26404,
+        15390,
+        33830,
+        39764,
+        40343,
+        30568
+      ]
+    },
+    "8b-s29": {
+      "attempts": 8,
+      "saved": 8,
+      "exact_excerpts_checked": 23,
+      "elapsed_ms": [
+        39170,
+        36126,
+        24859,
+        20970,
+        50744,
+        46275,
+        27924,
+        19857
+      ]
+    }
+  }
+}

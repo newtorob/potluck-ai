@@ -1,0 +1,10 @@
+{
+  "recorded_at": "2026-10-29T17:52:39.278182+00:00",
+  "before_fresh_inference": true,
+  "clarifications": [
+    "Duplicate paraphrases or genuinely new unrequested questions are planning errors and make the whole case unsuccessful; splitting an existing requested part is valid. Record answer correctness separately.",
+    "Citation validity may be null for a correct source-limited unknown with no citations; that alone is not failure. Supported factual answers require selected source support.",
+    "A source-limited unknown may follow absence in the presented evidence; no explicit absence sentence is required."
+  ],
+  "purpose": "Resolve independent reviewer questions before seeing fresh outputs without changing fixture or rubric bytes."
+}

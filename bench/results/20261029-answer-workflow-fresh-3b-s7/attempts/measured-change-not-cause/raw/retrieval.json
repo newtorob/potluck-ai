@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "a2cb25d3-42c6-4cc4-8ec7-81f965d19482"
+  ],
+  "query": "How much did median latency change, and does this record establish that clearing the cache caused that change?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "a2cb25d3-42c6-4cc4-8ec7-81f965d19482"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "a2cb25d3-42c6-4cc4-8ec7-81f965d19482",
+        "document_id": "5c4bf48f-b4b7-5313-9545-6a17371ccf4e",
+        "revision_id": "799df5a4-8e17-52fa-acb9-a3e39041d6cd",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:54:52.129470+00:00",
+        "chunk_id": "dded8869-2690-5734-ad36-460a688924e3",
+        "anchor": "latency-observation",
+        "heading": "Latency observation",
+        "content": "The operator cleared the cache. Median latency was 180 ms before the maintenance window and 120 ms afterward. Queue concurrency was also changed during the same window. This observation does not establish which intervention caused the change.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:54:52.129567+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:dded8869-2690-5734-ad36-460a688924e3:799df5a4-8e17-52fa-acb9-a3e39041d6cd"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

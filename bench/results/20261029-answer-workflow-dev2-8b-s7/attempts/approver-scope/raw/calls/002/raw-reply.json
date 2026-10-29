@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-b49b1ef3-f21d-4553-b8b3-dd5496a720d7",
+  "object": "chat.completion",
+  "created": 1793296069,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"status\": \"unknown\", \"text\": \"The requested value is not established by the presented evidence.\", \"snippet_ids\": [\"S2\"]}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 305,
+    "completion_tokens": 34,
+    "total_tokens": 339
+  }
+}

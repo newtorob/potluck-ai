@@ -22,6 +22,135 @@ describe('InvestigationsView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+  it('omits the standard profile and blank questions from a preview request', async () => {
+    api.sourceCollections.mockResolvedValue({
+      collections: [{ id: 'c1', name: 'Runbooks', scan_status: 'ready', last_scan_at: null }],
+    });
+    api.investigations.mockResolvedValue({ investigations: [] });
+    api.createInvestigation.mockRejectedValueOnce(new Error('Unavailable'));
+    render(<InvestigationsView />);
+    fireEvent.change(screen.getByLabelText('Workspace'), { target: { value: 'w' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Load collections' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Runbooks/ }));
+    fireEvent.change(screen.getByLabelText('Issue'), { target: { value: 'Failure' } });
+    fireEvent.change(screen.getByLabelText('Evidence query'), { target: { value: 'failure' } });
+    fireEvent.change(screen.getByLabelText('Loaded local model'), {
+      target: { value: 'local-model' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: /Answer each question/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create investigation' }));
+    await screen.findByRole('alert');
+    expect(api.createInvestigation).toHaveBeenCalledWith({
+      workspace: 'w',
+      collection_ids: ['c1'],
+      issue: 'Failure',
+      query: 'failure',
+      model_slug: 'local-model',
+      answer_each_question: true,
+    });
+  });
+  it('creates and corrects preview answers with authoritative snippet references', async () => {
+    api.sourceCollections.mockResolvedValue({
+      collections: [{ id: 'c1', name: 'Runbooks', scan_status: 'ready', last_scan_at: null }],
+    });
+    api.investigations.mockResolvedValue({ investigations: [] });
+    const snippet = { snippet_id: 'S1', citation_id: 'ref1', quote: 'Evidence text' };
+    const item = {
+      id: 'i1',
+      issue: 'Failure',
+      status: 'draft',
+      model_slug: 'local-model',
+      created_at: 'today',
+      evidence: [{ citation_id: 'ref1', kind: 'source', content: 'Evidence text' }],
+      provenance: { question_origin: 'explicit', snippet_catalog: [snippet] },
+      review: null,
+      outcome: null,
+      brief: {
+        questions: [{ id: 'Q1', text: 'Why?' }],
+        answers: [
+          {
+            question_id: 'Q1',
+            status: 'supported',
+            text: 'Initial',
+            snippet_ids: ['S1'],
+            source_excerpts: [snippet],
+          },
+        ],
+        facts: [],
+        prior_fixes: [],
+        hypotheses: [],
+        recommended_checks: [],
+        model_uncertainties: [],
+      },
+    };
+    api.createInvestigation.mockResolvedValue(item);
+    let rejectReview!: (error: Error) => void;
+    api.reviewInvestigation.mockReturnValueOnce(
+      new Promise((_, reject) => {
+        rejectReview = reject;
+      }),
+    );
+    api.reviewInvestigation.mockResolvedValue({ ...item, status: 'reviewed' });
+    render(<InvestigationsView />);
+    fireEvent.change(screen.getByLabelText('Workspace'), { target: { value: 'w' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Load collections' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Runbooks/ }));
+    fireEvent.change(screen.getByLabelText('Issue'), { target: { value: 'Failure' } });
+    fireEvent.change(screen.getByLabelText('Evidence query'), { target: { value: 'failure' } });
+    fireEvent.change(screen.getByLabelText('Loaded local model'), {
+      target: { value: 'local-model' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: /Answer each question/ }));
+    expect(screen.getByLabelText('Answer profile')).toHaveValue('');
+    expect(screen.getByText(/requires a compatible loaded Qwen3 model/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Answer profile'), {
+      target: { value: 'qwen3-non-thinking' },
+    });
+    fireEvent.change(screen.getByLabelText(/Questions, one per line/), {
+      target: { value: 'Why?\n' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create investigation' }));
+    await screen.findByText('Initial');
+    expect(api.createInvestigation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        answer_each_question: true,
+        questions: ['Why?'],
+        generation_profile: 'qwen3-non-thinking',
+      }),
+    );
+    expect(screen.getByText(/not verified correctness/)).toBeInTheDocument();
+    expect(screen.getByText(/presented evidence does not establish an answer/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Model questions (unverified)' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('“Evidence text”')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Decision'), { target: { value: 'correct' } });
+    fireEvent.change(screen.getByLabelText('Answer text'), { target: { value: 'Corrected' } });
+    fireEvent.change(screen.getByLabelText('Answer status'), { target: { value: 'unknown' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /S1/ }));
+    fireEvent.change(screen.getByLabelText('Reviewer'), { target: { value: 'Sam' } });
+    fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Fix' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save review' }));
+    expect(screen.getByLabelText('Answer text')).toBeDisabled();
+    expect(screen.getByLabelText('Answer status')).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: /S1/ })).toBeDisabled();
+    rejectReview(new Error('[localApi] 400: invalid_review_brief: invalid'));
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Answer text')).toHaveValue('Corrected');
+    fireEvent.click(screen.getByRole('button', { name: 'Save review' }));
+    await waitFor(() =>
+      expect(api.reviewInvestigation).toHaveBeenCalledWith(
+        'i1',
+        expect.objectContaining({
+          corrected_brief: expect.objectContaining({
+            questions: item.brief.questions,
+            answers: [{ question_id: 'Q1', status: 'unknown', text: 'Corrected', snippet_ids: [] }],
+            model_uncertainties: [],
+          }),
+        }),
+      ),
+    );
+  });
   it('shows the registration instructions when a workspace has no collections', async () => {
     api.sourceCollections.mockResolvedValue({ collections: [] });
     render(<InvestigationsView />);
@@ -156,7 +285,11 @@ describe('InvestigationsView', () => {
     expect(screen.getByRole('button', { name: 'Save outcome' })).toBeEnabled();
   });
 
-  it('clears a correction when the investigation becomes unavailable', async () => {
+  it.each([
+    '[localApi] 404: Investigation unavailable',
+    '[localApi] 403: Forbidden',
+    '[localApi] 401: Unauthorized',
+  ])('clears a correction on unavailable or unauthorized response %s', async (message) => {
     api.sourceCollections.mockResolvedValue({
       collections: [{ id: 'c1', name: 'Runbooks', scan_status: 'ready', last_scan_at: null }],
     });
@@ -178,9 +311,7 @@ describe('InvestigationsView', () => {
         model_uncertainties: [],
       },
     });
-    api.reviewInvestigation.mockRejectedValueOnce(
-      new Error('[localApi] 404: Investigation unavailable'),
-    );
+    api.reviewInvestigation.mockRejectedValueOnce(new Error(message));
     render(<InvestigationsView />);
     fireEvent.change(screen.getByLabelText('Workspace'), { target: { value: 'w' } });
     fireEvent.click(screen.getByRole('button', { name: 'Load collections' }));
@@ -198,7 +329,7 @@ describe('InvestigationsView', () => {
     fireEvent.change(screen.getByLabelText('Reviewer'), { target: { value: 'Sam' } });
     fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Fix' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save review' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Investigation unavailable');
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
     expect(screen.queryByLabelText('Item 1')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Failure' })).not.toBeInTheDocument();
   });
@@ -236,6 +367,12 @@ describe('InvestigationsView', () => {
     });
     expect(screen.getByRole('button', { name: 'Create investigation' })).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox', { name: /Runbooks/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Answer each question/ }));
+    fireEvent.change(screen.getByLabelText('Answer profile'), {
+      target: { value: 'qwen3-non-thinking' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: /Answer each question/ }));
+    expect(screen.queryByLabelText('Answer profile')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Create investigation' }));
     await waitFor(() =>
       expect(api.createInvestigation).toHaveBeenCalledWith({

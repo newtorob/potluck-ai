@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-ca8cb222-ae08-4c3b-b0af-9c8b48663b8f",
+  "object": "chat.completion",
+  "created": 1793296328,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What steps should follow credential rotation?\", \"Does this page document any completed fix?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 105,
+    "completion_tokens": 21,
+    "total_tokens": 126
+  }
+}

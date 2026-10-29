@@ -212,3 +212,86 @@ def test_template_selection_is_forwarded_and_invalid_fails_before_load(tmp_path,
     for item in raw['outputs'].values():
         assert item['status'] == 'success'
         assert item['result']['provenance']['template_version'] == 'investigation-v5'
+
+
+def _fixture_with_questions(tmp_path, questions):
+    fixtures = tmp_path / 'custom'
+    shutil.copytree(runner.FIXTURES, fixtures)
+    path = fixtures / 'development.json'
+    manifest = json.loads(path.read_text())
+    for case in manifest['cases']:
+        if questions is not None:
+            case['questions'] = questions
+    content = json.dumps(manifest).encode()
+    path.write_bytes(content)
+    (fixtures / 'development.sha256').write_text(runner.base.digest(content) + '\n')
+    return fixtures
+
+
+def test_v6_options_and_explicit_questions_are_recorded_and_forwarded(tmp_path, monkeypatch):
+    fixtures = _fixture_with_questions(tmp_path, ['What happened?', 'Who owns it?'])
+    model = tmp_path / 'model.gguf'
+    model.write_bytes(b'fake')
+    sha = runner.base.digest(model.read_bytes())
+    runtime = FakeRuntime(sha)
+    monkeypatch.setattr(runner, 'get_runtime', lambda: runtime)
+    calls = []
+    async def attempt(out, case, arm, runtime_arg, model_arg, **kwargs):
+        calls.append(kwargs)
+        return {'status': 'success'}
+    monkeypatch.setattr(runner.base, 'attempt', attempt)
+    out = tmp_path / 'run'
+    asyncio.run(runner.run(out, 'development', model, sha, 8192, 8, fixtures,
+        'investigation-v6', generation_profile='qwen3-non-thinking', seed=0, question_mode='explicit'))
+    assert len(calls) == 3 and all(call == {'template_version': 'investigation-v6',
+        'generation_profile': 'qwen3-non-thinking', 'seed': 0,
+        'questions': ['What happened?', 'Who owns it?']} for call in calls)
+    metadata = json.loads((out / 'run-metadata.json').read_text())
+    raw = json.loads((out / 'raw.json').read_text())
+    for result in (metadata, raw):
+        assert result['generation_profile']['name'] == 'qwen3-non-thinking'
+        assert result['seed'] == 0 and result['question_mode'] == 'explicit'
+
+
+@pytest.mark.parametrize('questions', [None, [], [''], ['Same', ' Same '], ['a' * 501], ['x'] * 9, [42]])
+def test_invalid_explicit_questions_fail_before_load(tmp_path, monkeypatch, questions):
+    fixtures = _fixture_with_questions(tmp_path, questions)
+    model = tmp_path / 'model.gguf'
+    model.write_bytes(b'fake')
+    sha = runner.base.digest(model.read_bytes())
+    runtime = FakeRuntime(sha)
+    monkeypatch.setattr(runner, 'get_runtime', lambda: runtime)
+    with pytest.raises(ValueError, match='fixture questions'):
+        asyncio.run(runner.run(tmp_path / 'run', 'development', model, sha, 8192, 8,
+            fixtures, 'investigation-v6', question_mode='explicit'))
+    assert runtime.loads == 0 and not (tmp_path / 'run').exists()
+
+
+@pytest.mark.parametrize('options', [{'generation_profile': 'unknown'}, {'seed': -1},
+    {'seed': 4294967296}, {'seed': True}, {'generation_profile': 'qwen3-non-thinking'}, {'question_mode': 'explicit'}, {'question_mode': 'invalid'}])
+def test_invalid_options_fail_before_loading(tmp_path, monkeypatch, options):
+    model = tmp_path / 'model.gguf'
+    model.write_bytes(b'fake')
+    sha = runner.base.digest(model.read_bytes())
+    runtime = FakeRuntime(sha)
+    monkeypatch.setattr(runner, 'get_runtime', lambda: runtime)
+    with pytest.raises(ValueError):
+        asyncio.run(runner.run(tmp_path / 'run', 'development', model, sha, 8192, 8, **options))
+    assert runtime.loads == 0 and not (tmp_path / 'run').exists()
+
+
+def test_auto_question_mode_never_supplies_fixture_questions(tmp_path, monkeypatch):
+    fixtures = _fixture_with_questions(tmp_path, ['Explicit fixture question'])
+    model = tmp_path / 'model.gguf'
+    model.write_bytes(b'fake')
+    sha = runner.base.digest(model.read_bytes())
+    runtime = FakeRuntime(sha)
+    monkeypatch.setattr(runner, 'get_runtime', lambda: runtime)
+    calls = []
+    async def attempt(out, case, arm, runtime_arg, model_arg, **kwargs):
+        calls.append(kwargs)
+        return {}
+    monkeypatch.setattr(runner.base, 'attempt', attempt)
+    asyncio.run(runner.run(tmp_path / 'run', 'development', model, sha, 8192, 8,
+                           fixtures, 'investigation-v6'))
+    assert calls and all(call == {'template_version': 'investigation-v6'} for call in calls)

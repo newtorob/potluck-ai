@@ -1,0 +1,11 @@
+# Run plan, frozen before inference
+
+Development: all six consumed development cases, v6 automatic question planning, seed 7; Qwen2.5 3B current greedy defaults, Qwen3 8B explicit qwen3-non-thinking profile. Both CPU-only, context 8192, eight threads, same installed GGUF hashes recorded in run metadata. Preserve every attempt and both model calls. Development may inform implementation changes, with new output directories for reruns.
+
+Fresh: after development and final source freeze, all eight fresh cases on those same two configurations, seeds 7 and 29 (32 attempts total). No retries, selection, tuning or changes after observing fresh output. Automatic question planning included in success judgment. Primary and independent Terra assessment of original issue coverage, answer correctness and citation support, injection handling, role/authority distinction, explicit uncertainty and false-premise rejection. Generation failure is failure. Repeat seeds on greedy 3B are stability checks, not independent cases. No historical paired-improvement claim because case sets differ. This diagnostic cannot establish real company acceptance.
+
+Default remains v4; v6 is an explicit preview pending quality review. Real human review time remains unmeasured.
+
+Development amendment before any fresh inference: initial 3B run (dev-3b-s7) saved all six but exposed echoed questions, expansion into unasked questions, false conflict labels and injection contamination. Revised only general planner/status/source-instruction wording, planner issue-only-v2. Next development runs use new directories dev2-3b-s7 and dev2-8b-s7; the initial prompt is not being run on 8B. This is development iteration, not a paired ablation.
+
+Final development iteration: dev2 8B handled repair, procedure, injection and approver cases, but omitted competing retry values and mislabeled a documented action unknown. V6 answer generation now selects snippet IDs, writes text, then chooses status; per-question status and conflict-preservation instructions clarified. Persisted API contract unchanged. New dev3 directories retain both configurations. One final development check, then no more tuning before the fixed 32-attempt fresh matrix.

@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "c12257e1-c628-4af0-bebf-bca9c446fee3"
+  ],
+  "query": "Which retry delay is current, and what do the two records say?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "c12257e1-c628-4af0-bebf-bca9c446fee3"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "c12257e1-c628-4af0-bebf-bca9c446fee3",
+        "document_id": "f3512bf6-966c-5922-96ea-614af9704593",
+        "revision_id": "317647a3-33b3-5e67-8560-8066521516ab",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:54:41.677235+00:00",
+        "chunk_id": "d3df9a50-cb1b-5b57-b9be-505c6166e2c0",
+        "anchor": "retry-delay-records",
+        "heading": "Retry delay records",
+        "content": "The deployment checklist says the retry delay is 12 seconds. The operations handbook says the retry delay is 45 seconds. Neither record establishes precedence, approval, or a superseding decision.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:54:41.677354+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:d3df9a50-cb1b-5b57-b9be-505c6166e2c0:317647a3-33b3-5e67-8560-8066521516ab"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

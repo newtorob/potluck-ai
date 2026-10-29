@@ -233,6 +233,30 @@ syntactically constrained response can contain unsupported statements. Generatio
 before returning. Invalid output or timeout saves no partial investigation and
 does not trigger an automatic retry, model download or broader routing.
 
+An experimental **Answer each question** preview uses `answer_each_question: true` on creation.
+The optional `questions` list supplies one to eight explicit questions; otherwise a
+separate bounded local model call plans questions from the original issue alone.
+The original issue, question list, origin and model provenance are retained. The
+planner can omit requested parts, so its output is not a completeness guarantee.
+Each question receives one answer labeled supported, unknown or conflicting.
+Unknown applies to the presented evidence; conflicting answers should preserve
+competing values. The server assigns snippet IDs and copies excerpts from the
+underlying source text actually shown to the model. Corrections retain the original
+questions and can select only those snippets. Source and scope checks still apply.
+These structural checks do not prove that an answer is entailed, that conflicting
+values are represented fairly, or that the plan covered the issue. Inspect the
+sources and answers. This preview does not replace the default brief workflow.
+Planning and answering share a 240-second soft timeout; an inference worker may
+need to drain after timeout, especially during prompt evaluation. An optional
+explicit generation profile can be supplied for supported models;
+unsupported model or backend combinations fail rather than silently falling back.
+The preview's **Answer profile** control offers Standard or Qwen3 non-thinking.
+The latter sends `generation_profile: "qwen3-non-thinking"`, verifies the active
+stock GGUF formatter, and explicitly renders its non-thinking mode. It uses
+temperature 0.7, top-p 0.8, top-k 20 and min-p 0; this does not change other chat
+requests. Template verification is deliberately strict, so a different template
+or backend can be rejected even when the model name contains Qwen3.
+
 ## Review, outcomes and reuse
 
 1. Explicitly accept, correct or reject a draft, with a reviewer and reason.

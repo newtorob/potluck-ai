@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "1453849a-7de8-4065-8c49-87ce3f4405cd"
+  ],
+  "query": "What is the payroll export retention period?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "1453849a-7de8-4065-8c49-87ce3f4405cd"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "1453849a-7de8-4065-8c49-87ce3f4405cd",
+        "document_id": "daa53e31-6ab0-5228-89d0-3561d53dd4c9",
+        "revision_id": "baf0653e-7d56-57c9-94ba-7cf372f02444",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T18:02:41.994246+00:00",
+        "chunk_id": "00041f5a-8237-5ec8-980d-e811cc50936e",
+        "anchor": "payroll-export-process",
+        "heading": "Payroll export process",
+        "content": "Payroll exports run every Friday at 18:00 UTC. The export is checked by the finance team. This procedure describes the schedule and review step.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T18:02:41.994417+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:00041f5a-8237-5ec8-980d-e811cc50936e:baf0653e-7d56-57c9-94ba-7cf372f02444"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

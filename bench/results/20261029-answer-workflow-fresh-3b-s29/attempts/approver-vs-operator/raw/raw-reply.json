@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-a86ba681-e1c1-44c6-b162-485897b5c2eb",
+  "object": "chat.completion",
+  "created": 1793296899,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"Who approved the production migration?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 91,
+    "completion_tokens": 12,
+    "total_tokens": 103
+  }
+}

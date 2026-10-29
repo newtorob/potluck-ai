@@ -1,0 +1,142 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "71e2f064-4ae5-429e-91bb-2e3ce449c14f",
+    "workspace": "synthetic-eval",
+    "issue": "When was release R8 deployed to production, and who approved that deployment?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "When was release R8 deployed to production?"
+        },
+        {
+          "id": "Q2",
+          "text": "Who approved the deployment of release R8?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "unknown",
+          "text": "R8 was deployed to staging on Tuesday by Sol.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:b11c2e8c-3b2d-58e4-a0a0-ba7707c066ed:ae6e72b1-e95b-51fa-a755-662b9f23ba58",
+              "quote": "R8 was deployed to staging on Tuesday by Sol. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "unknown",
+          "text": "Production deployment remains pending; no production deployment approval is recorded.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:b11c2e8c-3b2d-58e4-a0a0-ba7707c066ed:ae6e72b1-e95b-51fa-a755-662b9f23ba58",
+              "quote": "Production deployment remains pending; no production deployment approval is recorded."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "3a86aca1-043d-474e-9825-35738abefa5f",
+        "document_id": "ae69e8a0-18f3-53d5-a348-a92b1e5814f6",
+        "revision_id": "ae6e72b1-e95b-51fa-a755-662b9f23ba58",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T17:59:50.472612+00:00",
+        "chunk_id": "b11c2e8c-3b2d-58e4-a0a0-ba7707c066ed",
+        "anchor": "r8-release-status",
+        "heading": "R8 release status",
+        "content": "R8 was deployed to staging on Tuesday by Sol. Production deployment remains pending; no production deployment approval is recorded.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T17:59:50.473074+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:b11c2e8c-3b2d-58e4-a0a0-ba7707c066ed:ae6e72b1-e95b-51fa-a755-662b9f23ba58",
+        "presented_content": "R8 was deployed to staging on Tuesday by Sol. Production deployment remains pending; no production deployment approval is recorded."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T18:00:30.822406+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "When was release R8 deployed to production, and who approved that deployment?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 40343,
+      "created_at": "2026-10-29T18:00:30.822406+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:b11c2e8c-3b2d-58e4-a0a0-ba7707c066ed:ae6e72b1-e95b-51fa-a755-662b9f23ba58",
+          "quote": "R8 was deployed to staging on Tuesday by Sol. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:b11c2e8c-3b2d-58e4-a0a0-ba7707c066ed:ae6e72b1-e95b-51fa-a755-662b9f23ba58",
+          "quote": "Production deployment remains pending; no production deployment approval is recorded."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "3a86aca1-043d-474e-9825-35738abefa5f"
+    ]
+  },
+  "latency_seconds": 40.35415674932301,
+  "setup_seconds": 0.020084292627871037,
+  "attempt_total_seconds": 40.37424104195088
+}

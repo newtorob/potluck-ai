@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-6b9dcfeb-c667-4474-bbde-fd9869c97dfc",
+  "object": "chat.completion",
+  "created": 1793297222,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"R8 was deployed to staging on Tuesday by Sol.\", \"status\": \"unknown\"}, \"Q2\": {\"snippet_ids\": [\"S2\"], \"text\": \"Production deployment remains pending; no production deployment approval is recorded.\", \"status\": \"unknown\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 410,
+    "completion_tokens": 67,
+    "total_tokens": 477
+  }
+}

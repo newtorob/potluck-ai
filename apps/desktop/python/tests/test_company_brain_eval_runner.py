@@ -154,3 +154,41 @@ def test_base_attempt_omits_template_override_by_default(tmp_path, monkeypatch):
     case = runner.frozen_manifest()['cases'][0]
     result = asyncio.run(runner.attempt(tmp_path, case, 'baseline', FakeRuntime(), 'fixture-model'))
     assert calls == [True] and result['status'] == 'success'
+
+
+def test_capture_records_each_call_and_second_failure_preserves_first(tmp_path):
+    class TwoCalls:
+        def __init__(self):
+            self.count = 0
+        async def chat(self, messages, **kwargs):
+            self.count += 1
+            if self.count == 2:
+                raise RuntimeError('second failed')
+            return {'value': 'first reply'}
+    capture = runner.CaptureRuntime(TwoCalls(), tmp_path)
+    async def exercise():
+        assert await capture.chat(['first'], temperature=0) == {'value': 'first reply'}
+        with pytest.raises(RuntimeError, match='second failed'):
+            await capture.chat(['second'], temperature=.7)
+    asyncio.run(exercise())
+    assert json.loads((tmp_path / 'request.json').read_text()) == json.loads((tmp_path / 'calls/001/request.json').read_text())
+    assert json.loads((tmp_path / 'raw-reply.json').read_text()) == json.loads((tmp_path / 'calls/001/raw-reply.json').read_text())
+    assert json.loads((tmp_path / 'calls/002/request.json').read_text())['messages'] == ['second']
+    assert json.loads((tmp_path / 'calls/002/runtime-error.json').read_text())['message'] == 'second failed'
+    assert not (tmp_path / 'runtime-error.json').exists()
+
+
+def test_attempt_forwards_only_selected_options(tmp_path, monkeypatch):
+    calls = []
+    async def create(scope, issue, query, model, **kwargs):
+        calls.append(kwargs)
+        return {'ok': True}
+    monkeypatch.setattr(runner.investigations, 'create_investigation', create)
+    monkeypatch.setenv('POTLUCK_DATA_DIR', str(tmp_path / 'data'))
+    case = runner.frozen_manifest()['cases'][0]
+    result = asyncio.run(runner.attempt(tmp_path, case, 'baseline', FakeRuntime(), 'fixture-model',
+        template_version='investigation-v6', generation_profile='qwen3-non-thinking', seed=0,
+        questions=['What happened?']))
+    assert result['status'] == 'success'
+    assert calls == [{'template_version': 'investigation-v6', 'generation_profile': 'qwen3-non-thinking',
+                      'seed': 0, 'questions': ['What happened?']}]

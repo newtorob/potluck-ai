@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-bd224359-0c38-470e-b385-7e09253f147e",
+  "object": "chat.completion",
+  "created": 1793296366,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S2\"], \"text\": \"The migration record does not identify an approver.\", \"status\": \"unknown\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 371,
+    "completion_tokens": 32,
+    "total_tokens": 403
+  }
+}

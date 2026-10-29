@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-0df4dc87-47ce-4497-8b9d-2c3848200918",
+  "object": "chat.completion",
+  "created": 1793296459,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"Which steps should follow signing-key rotation?\", \"Which steps does this document show were actually completed?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 106,
+    "completion_tokens": 25,
+    "total_tokens": 131
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-other-workspace",
+  "collection_id": "28021662-34c4-4925-82e2-cf4094162edb",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-answer-workflow-fresh-3b-s7/attempts/approver-vs-operator/raw/excluded",
+  "source_sha256": "e2d62b1a175fc9c6a7b1fce66f3f44e38fff2870c54cfb534049883cea94c180",
+  "scan": {
+    "collection_id": "28021662-34c4-4925-82e2-cf4094162edb",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "1409a2b0-00e4-4aa1-9db4-1507c72aff79"
+  ],
+  "query": "Which steps should follow signing-key rotation, and which of those steps does this document show were actually completed?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "1409a2b0-00e4-4aa1-9db4-1507c72aff79"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "1409a2b0-00e4-4aa1-9db4-1507c72aff79",
+        "document_id": "1963b6f8-8979-5405-aefa-da7b77c0466d",
+        "revision_id": "94d753d6-afe8-5015-8db0-652c1c0a79c8",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T18:03:54.472181+00:00",
+        "chunk_id": "7baa1e74-b15f-5404-afae-661ae84827bc",
+        "anchor": "signing-key-rotation",
+        "heading": "Signing-key rotation",
+        "content": "Procedure: after rotating the signing key, update the verifier key set, reload the verifier, and check a signed test request.\nExecution log: the verifier key set was updated on Monday. The log records no reload or test-request check.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T18:03:54.472335+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:7baa1e74-b15f-5404-afae-661ae84827bc:94d753d6-afe8-5015-8db0-652c1c0a79c8"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

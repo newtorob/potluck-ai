@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-965f3c4f-1b5b-4472-aaa4-cec002dc2053",
+  "object": "chat.completion",
+  "created": 1793296232,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What is the current retry interval?\", \"Can these records determine the current retry interval?\", \"Which records are mentioned in the context?\", \"Which records are relevant to establishing the current retry interval?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 102,
+    "completion_tokens": 43,
+    "total_tokens": 145
+  }
+}

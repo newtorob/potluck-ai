@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-b282bfa4-a0dd-4a39-842d-91ce36f89e01",
+  "object": "chat.completion",
+  "created": 1793296690,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"Support logs are retained for 21 days.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 421,
+    "completion_tokens": 32,
+    "total_tokens": 453
+  }
+}
