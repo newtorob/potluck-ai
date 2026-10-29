@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-d7a6be75-7504-49af-9d45-add755c29423",
+  "object": "chat.completion",
+  "created": 1793279333,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\": [], \"prior_fixes\": [], \"hypotheses\": [{\"text\": \"The build artifact digest is SHA-BETA.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"The build artifact digest is SHA-ALPHA.\"}]}], \"recommended_checks\": [], \"model_uncertainties\": [\"The evidence is contradictory; the digest is either SHA-ALPHA or SHA-BETA.\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 295,
+    "completion_tokens": 98,
+    "total_tokens": 393
+  }
+}

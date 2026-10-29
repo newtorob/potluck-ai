@@ -1,0 +1,82 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "6cd1606c-2713-418a-b4ab-c542d14d2356",
+    "workspace": "synthetic-eval",
+    "issue": "What restored delivery, and who owned the incident?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "facts": [
+        {
+          "text": "Restarting restored delivery.",
+          "citation_ids": [
+            "source:82439920-c078-534b-9276-1bda9800743e:2bebae1f-64ef-5a0c-947e-0fa14b7ccba6"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:82439920-c078-534b-9276-1bda9800743e:2bebae1f-64ef-5a0c-947e-0fa14b7ccba6",
+              "quote": "The delivery worker was restarted at 09:10 UTC. Restarting restored delivery."
+            }
+          ]
+        }
+      ],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "00c1f174-482c-4155-a751-46127bf7cd04",
+        "document_id": "9c9c4567-c9aa-56f9-9bf2-9b3f03f36576",
+        "revision_id": "2bebae1f-64ef-5a0c-947e-0fa14b7ccba6",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:08:32.412089+00:00",
+        "chunk_id": "82439920-c078-534b-9276-1bda9800743e",
+        "anchor": "delivery-worker",
+        "heading": "Delivery worker",
+        "content": "The delivery worker was restarted at 09:10 UTC. Restarting restored delivery. The incident owner was not recorded.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:08:32.412271+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:82439920-c078-534b-9276-1bda9800743e:2bebae1f-64ef-5a0c-947e-0fa14b7ccba6",
+        "presented_content": "The delivery worker was restarted at 09:10 UTC. Restarting restored delivery. The incident owner was not recorded."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T13:08:46.761948+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v4",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What restored delivery, and who owned the incident?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240
+      },
+      "elapsed_ms": 14345,
+      "created_at": "2026-10-29T13:08:46.761948+00:00"
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "00c1f174-482c-4155-a751-46127bf7cd04"
+    ]
+  },
+  "latency_seconds": 14.353916957974434,
+  "setup_seconds": 0.019499875605106354,
+  "attempt_total_seconds": 14.37341683357954
+}

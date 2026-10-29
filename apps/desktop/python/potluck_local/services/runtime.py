@@ -50,6 +50,82 @@ def _native_model(model) -> bool:
     return bool(getattr(model, "managed_native", False) or getattr(model, "managed_split", False))
 
 
+def _structured_response_format(model, response_format: dict) -> dict:
+    """Admit only schemas and adapters whose grammar behavior is known.
+
+    This is deliberately smaller than JSON Schema: llama.cpp converters may
+    silently ignore unsupported keywords. The caller still validates the reply.
+    """
+    if not isinstance(response_format, dict) or set(response_format) != {"type", "schema"} \
+            or response_format.get("type") != "json_object":
+        raise ValueError("response_format must specify json_object and a schema")
+
+    def validate(schema, depth=0):
+        if depth > 20 or not isinstance(schema, dict):
+            raise ValueError("Invalid structured response schema")
+        kind = schema.get("type")
+        allowed = {"type"}
+        if kind == "object":
+            allowed |= {"properties", "required", "additionalProperties"}
+            props = schema.get("properties")
+            required = schema.get("required")
+            if not isinstance(props, dict) or not all(isinstance(k, str) for k in props) \
+                    or not isinstance(required, list) or not all(isinstance(k, str) for k in required) \
+                    or len(required) != len(set(required)) or not set(required) <= set(props) \
+                    or schema.get("additionalProperties") is not False:
+                raise ValueError("Invalid structured response object schema")
+            for value in props.values():
+                validate(value, depth + 1)
+        elif kind == "array":
+            allowed |= {"items", "minItems", "maxItems"}
+            validate(schema.get("items"), depth + 1)
+            for key in ("minItems", "maxItems"):
+                if key in schema and (type(schema[key]) is not int or schema[key] < 0):
+                    raise ValueError("Invalid structured response array bounds")
+            if schema.get("maxItems", float("inf")) < schema.get("minItems", 0):
+                raise ValueError("Invalid structured response array bounds")
+        elif kind in ("string", "integer", "number", "boolean", "null"):
+            allowed.add("enum")
+            if "enum" in schema:
+                types = {"string": str, "integer": int, "number": (int, float),
+                         "boolean": bool, "null": type(None)}
+                values = schema["enum"]
+                if not isinstance(values, list) or not values or any(
+                    not isinstance(v, types[kind]) or (kind in ("integer", "number") and isinstance(v, bool))
+                    for v in values
+                ):
+                    raise ValueError("Invalid structured response enum")
+        else:
+            raise ValueError("Unsupported structured response schema type")
+        if set(schema) - allowed:
+            raise ValueError("Unsupported structured response schema keyword")
+
+    schema = response_format["schema"]
+    validate(schema)
+    if schema.get("type") != "object":
+        raise ValueError("Structured response schema must describe an object")
+    try:
+        json.dumps(schema, allow_nan=False)
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise ValueError("Invalid structured response schema") from exc
+
+    from potluck_local.services.split_native import SplitModel
+    if not isinstance(model, SplitModel):
+        try:
+            import llama_cpp
+            from llama_cpp import llama_chat_format
+            if not isinstance(model, llama_cpp.Llama) or model.chat_handler is not None:
+                raise RuntimeError("Structured responses are unavailable for this backend")
+            handler = (model._chat_handlers.get(model.chat_format)
+                       or llama_chat_format.get_chat_completion_handler(model.chat_format))
+            known = llama_chat_format.chat_formatter_to_chat_completion_handler(lambda **kwargs: None)
+            if getattr(handler, "__code__", None) is not known.__code__:
+                raise RuntimeError("Structured responses are unavailable for this chat handler")
+        except (ImportError, AttributeError, KeyError) as exc:
+            raise RuntimeError("Structured responses are unavailable for this backend") from exc
+    return response_format
+
+
 # llama.cpp reports what it actually did while loading a model. These are the
 # lines that carry it. Parsing the engine's own output is the only way to say
 # where the weights ended up without guessing from installed hardware.
@@ -2036,6 +2112,7 @@ class LLMRuntime:
         tool_choice: str | dict | None = None,
         stop: list[str] | None = None,
         tool_proof: bool = False,
+        response_format: dict | None = None,
     ) -> dict:
         """Non-streaming completion. Returns raw llama result dict."""
         if self._pipeline is not None:
@@ -2050,6 +2127,10 @@ class LLMRuntime:
             self.assert_model_identity(expected_model, expected_sha256)
             loop = asyncio.get_running_loop()
             model = self._model
+            if response_format is not None:
+                if tools or tool_choice is not None:
+                    raise ValueError("Structured responses cannot be combined with tools")
+                response_format = _structured_response_format(model, response_format)
             model_id = self._model_id
             start = time.monotonic()
             managed_split = _native_model(model)
@@ -2057,8 +2138,21 @@ class LLMRuntime:
 
             def _complete():
                 # Control-token text in the request stays text (prompt_guard).
+                # The stock handler silently falls back to generic JSON on a
+                # schema compilation error. Compile ourselves and pass its
+                # grammar directly so a failure cannot weaken the contract.
+                structured = {}
+                if response_format is not None:
+                    if managed_split:
+                        structured["response_format"] = response_format
+                    else:
+                        from llama_cpp import LlamaGrammar
+                        structured["grammar"] = LlamaGrammar.from_json_schema(
+                            json.dumps(response_format["schema"], allow_nan=False),
+                            verbose=False,
+                        )
                 safe_messages, extra, ticket = prompt_guard.protect_chat(
-                    model, messages, tool_calls.completion_kwargs(tools, tool_choice))
+                    model, messages, {**tool_calls.completion_kwargs(tools, tool_choice), **structured})
                 try:
                     with tool_markers.watch(model, tool_proof and bool(extra.get("tools"))) as reader:
                         result = model.create_chat_completion(

@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "5c47ed27-e050-4a5c-b6d7-e4c0353ddc43"
+  ],
+  "query": "Who approved the billing export migration?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "5c47ed27-e050-4a5c-b6d7-e4c0353ddc43"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "5c47ed27-e050-4a5c-b6d7-e4c0353ddc43",
+        "document_id": "69dca73e-5ac9-5ae5-8012-a79288e5cea9",
+        "revision_id": "5bfb3a67-6f9e-57f7-97b3-940e8afaaae1",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:10:31.867768+00:00",
+        "chunk_id": "50004b61-7894-5a77-a796-73969b9f52c1",
+        "anchor": "billing-export",
+        "heading": "Billing export",
+        "content": "The billing export migration finished on Wednesday. This record does not name an approver.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:10:31.868020+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:50004b61-7894-5a77-a796-73969b9f52c1:5bfb3a67-6f9e-57f7-97b3-940e8afaaae1"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

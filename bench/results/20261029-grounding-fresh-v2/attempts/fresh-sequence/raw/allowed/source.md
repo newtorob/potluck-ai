@@ -1,0 +1,2 @@
+# Recovery procedure
+If an import fails, retain the previous snapshot. Disable new evidence lookup until a successful rescan. A successful rescan re-enables lookup. Previously deleted review records remain deleted after rescan.

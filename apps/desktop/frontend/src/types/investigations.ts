@@ -7,13 +7,15 @@ export interface SourceCollection {
 export interface BriefItem {
   text: string;
   citation_ids: string[];
+  source_excerpts?: Array<{ citation_id: string; quote: string }>;
 }
 export interface Brief {
   facts: BriefItem[];
   prior_fixes: BriefItem[];
   hypotheses: BriefItem[];
   recommended_checks: BriefItem[];
-  missing_evidence: string[];
+  missing_evidence?: string[];
+  model_uncertainties?: string[];
 }
 export interface Investigation {
   id: string;
@@ -24,8 +26,11 @@ export interface Investigation {
   status: 'draft' | 'reviewed' | 'invalidated';
   brief: Brief;
   evidence: Array<Record<string, unknown>>;
+  retrieval_notices?: string[];
   created_at: string;
   provenance?: {
+    schema_version?: number;
+    retrieval_notices?: string[];
     model_sha256?: string;
     template_version?: string;
     retrieval_version?: string;

@@ -183,11 +183,20 @@ registration/scanning remains a local CLI operation. Load a model in **Models**,
 reload collections to refresh model status, and explicitly select the loaded
 model. Enter an issue and a short evidence query, then create an investigation.
 
-The brief separates facts, prior fixes, hypotheses, recommended checks and missing
-evidence. Numbered citations open source text and revision metadata. Generated
-facts and prior fixes must cite retrieved records; valid citations do not establish
-that the text supports the model's assertion. The owner must inspect that support.
-Recommendations are text only; no commands, tools or fixes are executed.
+New briefs separate facts, prior fixes, unverified hypotheses, recommended checks,
+and model questions. Deterministic retrieval notices are stored separately from
+model questions and cannot be edited in a correction. Historical drafts retain
+their original combined missing-evidence list, labeled with unknown provenance.
+
+Every fact and prior fix must cite retrieved records and include a short exact
+source excerpt for each citation. Excerpts must appear in the source chunk actually
+shown to the model, within the retained context boundary. A reviewed-claim citation
+must quote one of its underlying source chunks, not just repeat the approved claim.
+Corrections use the same checks. The app and Markdown handoffs show the excerpts
+beside claims; citations open source text and revision metadata. An exact match
+makes support inspectable: it does not prove entailment, completeness, or resistance
+to injected instructions. The owner must still inspect the claim against its source.
+Recommendations remain text only; no commands, tools or fixes are executed.
 
 Saved drafts retain the original answer, selected source scope, all retrieved
 evidence bindings, model slug and SHA-256, prompt/retrieval versions, generation
@@ -200,9 +209,13 @@ budget; a model can reject context it cannot fit.
 Generation uses the selected local runtime directly, temperature 0 and at most
 1,600 output tokens. Request-local citation aliases reduce output overhead and
 are checked and mapped to full source IDs before persistence. Only a valid JSON
-brief (optionally in one enclosing JSON fence) is accepted. Missing-evidence
-entries may be strings or strictly validated text/citation objects; the latter
-normalize to text with their verified source IDs retained. Generation has a
+brief is accepted. New generation explicitly requests a restricted JSON schema;
+unsupported runtime backends, schema keywords, or schema compilation fail closed.
+The verified stock llama-cpp formatter receives an explicitly compiled grammar,
+preventing its generic-JSON fallback. The managed native adapter forwards the schema
+through normal and protected-token requests. Other handlers are unavailable for this
+workflow. Structural validation and source checks still run after generation: a
+syntactically constrained response can contain unsupported statements. Generation has a
 240-second soft timeout: the existing runtime drains a non-cancellable worker
 before returning. Invalid output or timeout saves no partial investigation and
 does not trigger an automatic retry, model download or broader routing.
@@ -210,8 +223,11 @@ does not trigger an automatic retry, model download or broader routing.
 ## Review, outcomes and reuse
 
 1. Explicitly accept, correct or reject a draft, with a reviewer and reason.
-   A correction preserves the original draft and can change text and citations.
-   The currently supported review is one-shot; it is not a collaborative editor.
+   A correction preserves the original draft and can change text, citations and
+   excerpts. Facts and prior fixes need exact excerpts even when correcting a legacy
+   draft. Historical combined missing evidence remains in the original draft; the
+   reviewer supplies new unverified questions separately. Retrieval notices remain
+   immutable. The review is one-shot; it is not a collaborative editor.
 2. Record the actual outcome separately as resolved, unresolved or inconclusive,
    with notes. Accepting a brief does not resolve the underlying issue. An outcome
    is also one-shot; create a new investigation for a later observation.

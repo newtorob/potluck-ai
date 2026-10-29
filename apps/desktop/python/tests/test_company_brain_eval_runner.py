@@ -18,7 +18,7 @@ class FakeRuntime:
 
     async def chat(self, messages, **kwargs):
         brief = {'facts': [], 'prior_fixes': [], 'hypotheses': [], 'recommended_checks': [],
-                 'missing_evidence': ['Not assessed']}
+                 'model_uncertainties': ['Not assessed']}
         return {'choices': [{'message': {'content': json.dumps(brief)}}]}
 
 

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-bd03ca94-cdd3-4ddd-aeaf-00263e21878a",
+  "object": "chat.completion",
+  "created": 1793279431,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\": [{\"text\": \"The billing export migration finished on Wednesday.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"The billing export migration finished on Wednesday. This record does not name an approver.\"}]}], \"prior_fixes\": [], \"hypotheses\": [], \"recommended_checks\": [], \"model_uncertainties\": []}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 279,
+    "completion_tokens": 86,
+    "total_tokens": 365
+  }
+}

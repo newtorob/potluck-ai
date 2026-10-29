@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { localApi } from '@/lib/localApi';
 import { useModelStore } from '@/stores/modelStore';
@@ -11,20 +11,21 @@ function evidenceText(value: unknown, fallback = ''): string {
 function citationLabel(evidence: Record<string, unknown>, index: number): string {
   const path = evidenceText(evidence.relative_path);
   const anchor = evidenceText(evidence.anchor);
-  const name = path || (evidenceText(evidence.kind) === 'claim' ? 'Reviewed claim' : 'Source');
+  const name =
+    path || (evidenceText(evidence.kind) === 'reviewed_claim' ? 'Reviewed claim' : 'Source');
   return `[${index + 1}] ${name}${anchor ? ` (${anchor})` : ''}`;
 }
 
 const sections = [
   ['facts', 'Facts'],
   ['prior_fixes', 'Prior fixes'],
-  ['hypotheses', 'Hypotheses'],
+  ['hypotheses', 'Hypotheses (unverified)'],
   ['recommended_checks', 'Recommended checks'],
 ] as const;
 const field =
   'w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground';
 const button =
-  'rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50';
+  'cursor-pointer rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50';
 
 export function InvestigationsView() {
   const activeModel = useModelStore((s) => s.activeModelSlug);
@@ -51,18 +52,32 @@ export function InvestigationsView() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [citationsOpen, setCitationsOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
   const scope = { workspace: loadedWorkspace, collection_ids: selected };
   const ready = loadedWorkspace !== '' && selected.length > 0;
 
-  async function run(action: () => Promise<void>) {
+  async function run(action: () => Promise<void>, preserveInvalidReview = false) {
     setBusy(true);
     setError('');
     setNotice('');
     try {
       await action();
     } catch (e) {
-      setCurrent(null);
-      setError(e instanceof Error ? e.message : 'Operation failed');
+      const invalidReview =
+        preserveInvalidReview &&
+        e instanceof Error &&
+        e.message.startsWith('[localApi] 400: invalid_review_brief:');
+      if (!invalidReview) {
+        setCurrent(null);
+        setCorrected(null);
+      }
+      setError(
+        invalidReview
+          ? 'Check the correction and exact source excerpts, then try again.'
+          : e instanceof Error
+            ? e.message
+            : 'Operation failed',
+      );
     } finally {
       setBusy(false);
     }
@@ -92,7 +107,17 @@ export function InvestigationsView() {
   function show(item: Investigation) {
     setCitationsOpen(false);
     setCurrent(item);
-    setCorrected(structuredClone(item.review?.corrected_brief ?? item.brief));
+    const brief = structuredClone(item.review?.corrected_brief ?? item.brief);
+    setCorrected({
+      ...brief,
+      model_uncertainties: brief.model_uncertainties ?? [],
+      ...Object.fromEntries(
+        sections.map(([key]) => [
+          key,
+          brief[key].map((entry) => ({ ...entry, source_excerpts: entry.source_excerpts ?? [] })),
+        ]),
+      ),
+    });
     setDecision('accept');
     setReason('');
     setNotes('');
@@ -113,18 +138,67 @@ export function InvestigationsView() {
         },
     );
   }
+  function excerptLink(id: string) {
+    if (!current) return null;
+    for (let i = 0; i < current.evidence.length; i++) {
+      const evidence = current.evidence[i];
+      if (!evidence) continue;
+      if (evidence.citation_id === id)
+        return { target: `investigation-citation-${i + 1}`, label: `Source ${i + 1}` };
+      const sources = Array.isArray(evidence.sources)
+        ? (evidence.sources as Array<Record<string, unknown>>)
+        : [];
+      const index = sources.findIndex((source) => source.citation_id === id);
+      if (index >= 0)
+        return {
+          target: `investigation-source-${i + 1}-${index + 1}`,
+          label: `Source ${i + 1}.${index + 1}`,
+        };
+    }
+    return null;
+  }
+  function openCitation(targetId: string) {
+    setCitationsOpen(true);
+    requestAnimationFrame(() => {
+      const target = document.getElementById(targetId);
+      const scroller = contentRef.current;
+      if (!target || !scroller) return;
+      scroller.scrollTop +=
+        target.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+      target.focus({ preventScroll: true });
+    });
+  }
+  function sourceLink(id: string) {
+    const link = excerptLink(id);
+    if (!link) return <span>Source unavailable</span>;
+    return (
+      <a
+        href={`#${link.target}`}
+        className="text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onClick={(event) => {
+          event.preventDefault();
+          openCitation(link.target);
+        }}
+      >
+        {link.label}
+      </a>
+    );
+  }
   const effectiveBrief = current?.review?.corrected_brief ?? current?.brief;
   const usedCitations = new Set(
     sections.flatMap(([key]) => effectiveBrief?.[key].flatMap((item) => item.citation_ids) ?? []),
   );
   return (
-    <div className="flex h-full flex-col" aria-busy={busy}>
+    <div className="flex h-full min-h-0 min-w-0 flex-col" aria-busy={busy}>
       <ViewHeader
         title="Investigations"
         eyebrow="Company Brain"
         description="Local evidence, a reviewable brief, and a separate recorded outcome."
       />
-      <div className="flex-1 overflow-y-auto p-6">
+      <div
+        ref={contentRef}
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-6 [overflow-wrap:anywhere]"
+      >
         <div className="mx-auto max-w-5xl space-y-6">
           <p className="text-sm text-muted-foreground">
             Runs on the selected local model. No tools are executed; review does not train a model.
@@ -142,7 +216,7 @@ export function InvestigationsView() {
           <section className="rounded-lg border border-border bg-card p-5 space-y-4">
             <h2 className="font-serif text-xl">Choose your sources</h2>
             <div className="flex flex-wrap items-end gap-3">
-              <label className="flex-1 text-sm">
+              <label className="flex-1 text-sm [min-width:min(100%,12rem)]">
                 Workspace
                 <input
                   className={field}
@@ -300,6 +374,12 @@ export function InvestigationsView() {
               {sections.map(([key, label]) => (
                 <div key={key}>
                   <h3 className="font-medium">{label}</h3>
+                  {key === 'facts' && (
+                    <p className="text-xs text-muted-foreground">
+                      Exact excerpts show source text; they do not establish that a claim is
+                      supported.
+                    </p>
+                  )}
                   {(current.review?.corrected_brief ?? current.brief)[key].length === 0 ? (
                     <p className="text-sm text-muted-foreground">None</p>
                   ) : (
@@ -315,12 +395,7 @@ export function InvestigationsView() {
                                 href={`#investigation-citation-${index + 1}`}
                                 onClick={(event) => {
                                   event.preventDefault();
-                                  setCitationsOpen(true);
-                                  requestAnimationFrame(() =>
-                                    document
-                                      .getElementById(`investigation-citation-${index + 1}`)
-                                      ?.scrollIntoView(),
-                                  );
+                                  openCitation(`investigation-citation-${index + 1}`);
                                 }}
                                 className="ml-1 text-primary underline underline-offset-2"
                                 aria-label={`View citation ${index + 1}`}
@@ -329,6 +404,15 @@ export function InvestigationsView() {
                               </a>
                             );
                           })}
+                          {(item.source_excerpts ?? []).map((excerpt, n) => (
+                            <blockquote
+                              key={n}
+                              className="mt-1 border-l-2 border-border pl-3 whitespace-pre-wrap text-muted-foreground"
+                            >
+                              “{excerpt.quote}”{' '}
+                              <span className="text-xs">({sourceLink(excerpt.citation_id)})</span>
+                            </blockquote>
+                          ))}
                         </li>
                       ))}
                     </ul>
@@ -345,24 +429,67 @@ export function InvestigationsView() {
                         {current.brief[key].map((item, i) => (
                           <li key={i}>
                             {item.text} [{item.citation_ids.join(', ')}]
+                            {(item.source_excerpts ?? []).map((excerpt, n) => (
+                              <blockquote
+                                key={n}
+                                className="border-l-2 border-border pl-3 whitespace-pre-wrap"
+                              >
+                                “{excerpt.quote}” ({sourceLink(excerpt.citation_id)})
+                              </blockquote>
+                            ))}
                           </li>
                         ))}
                       </ul>
                     </div>
                   ))}
-                  <p>Missing evidence: {current.brief.missing_evidence.join('; ')}</p>
+                  {current.brief.missing_evidence && (
+                    <p>
+                      Historical combined missing evidence (provenance unknown):{' '}
+                      {current.brief.missing_evidence.join('; ')}
+                    </p>
+                  )}
+                  {current.brief.model_uncertainties && (
+                    <p>
+                      Model questions (unverified): {current.brief.model_uncertainties.join('; ')}
+                    </p>
+                  )}
                 </details>
               )}
-              <div>
-                <h3 className="font-medium">Missing evidence</h3>
-                <ul className="list-disc pl-5 text-sm">
-                  {(current.review?.corrected_brief ?? current.brief).missing_evidence.map(
-                    (item, i) => (
+              {effectiveBrief?.missing_evidence && (
+                <div>
+                  <h3 className="font-medium">
+                    Historical combined missing evidence (provenance unknown)
+                  </h3>
+                  <ul className="list-disc pl-5 text-sm">
+                    {effectiveBrief.missing_evidence.map((item, i) => (
                       <li key={i}>{item}</li>
-                    ),
-                  )}
-                </ul>
-              </div>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {effectiveBrief?.model_uncertainties && (
+                <div>
+                  <h3 className="font-medium">Model questions (unverified)</h3>
+                  <ul className="list-disc pl-5 text-sm">
+                    {effectiveBrief.model_uncertainties.map((item, i) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {(current.retrieval_notices ?? current.provenance?.retrieval_notices ?? []).length >
+                0 && (
+                <div>
+                  <h3 className="font-medium">Retrieval notices</h3>
+                  <ul className="list-disc pl-5 text-sm">
+                    {(current.retrieval_notices ?? current.provenance?.retrieval_notices ?? []).map(
+                      (item, i) => (
+                        <li key={i}>{item}</li>
+                      ),
+                    )}
+                  </ul>
+                </div>
+              )}
               <details
                 open={citationsOpen}
                 onToggle={(e) => setCitationsOpen(e.currentTarget.open)}
@@ -375,13 +502,16 @@ export function InvestigationsView() {
                     <div
                       key={i}
                       id={`investigation-citation-${i + 1}`}
+                      tabIndex={-1}
                       className="rounded bg-muted p-3 text-sm space-y-1"
                     >
                       <strong className="break-all">
                         [{i + 1}] {evidenceText(e.citation_id, 'Evidence')} ·{' '}
                         {evidenceText(e.kind, 'source')}
                       </strong>
-                      <p className="whitespace-pre-wrap">{evidenceText(e.content)}</p>
+                      <p className="whitespace-pre-wrap">
+                        {evidenceText(e.presented_content, evidenceText(e.content))}
+                      </p>
                       <p className="break-all text-xs text-muted-foreground">
                         {evidenceText(e.relative_path)} {evidenceText(e.anchor)} · revision{' '}
                         {evidenceText(e.revision_id, 'see sources')} · {evidenceText(e.reviewer)}
@@ -389,10 +519,17 @@ export function InvestigationsView() {
                       {Array.isArray(e.sources) && (
                         <ul className="break-all text-xs">
                           {(e.sources as Array<Record<string, unknown>>).map((source, n) => (
-                            <li key={n}>
+                            <li key={n} id={`investigation-source-${i + 1}-${n + 1}`} tabIndex={-1}>
+                              {evidenceText(source.citation_id)} ·{' '}
                               {evidenceText(source.relative_path, evidenceText(source.document_id))}{' '}
                               · {evidenceText(source.anchor)} · revision{' '}
                               {evidenceText(source.revision_id)}
+                              <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">
+                                {evidenceText(
+                                  source.presented_content,
+                                  evidenceText(source.content),
+                                )}
+                              </p>
                             </li>
                           ))}
                         </ul>
@@ -440,6 +577,11 @@ export function InvestigationsView() {
                 </label>
                 {decision === 'correct' && corrected && (
                   <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      For each fact or prior fix citation, add an exact excerpt from its source. For
+                      a reviewed claim, use a source citation ID shown under its provenance. Open
+                      citations above to copy source text and IDs.
+                    </p>
                     {sections.map(([key, label]) => (
                       <div key={key}>
                         <h4 className="text-sm font-medium">{label}</h4>
@@ -488,6 +630,102 @@ export function InvestigationsView() {
                                 );
                               })}
                             </fieldset>
+                            {(item.source_excerpts ?? []).map((excerpt, n) => (
+                              <div key={n} className="space-y-1">
+                                <label className="block text-xs">
+                                  Source citation ID
+                                  <input
+                                    className={field}
+                                    value={excerpt.citation_id}
+                                    onChange={(event) =>
+                                      setCorrected({
+                                        ...corrected,
+                                        [key]: corrected[key].map((old, j) =>
+                                          j === i
+                                            ? {
+                                                ...old,
+                                                source_excerpts: (old.source_excerpts ?? []).map(
+                                                  (ex, k) =>
+                                                    k === n
+                                                      ? { ...ex, citation_id: event.target.value }
+                                                      : ex,
+                                                ),
+                                              }
+                                            : old,
+                                        ),
+                                      })
+                                    }
+                                  />
+                                </label>
+                                <label className="block text-xs">
+                                  Exact excerpt from source
+                                  <textarea
+                                    className={`${field} resize-none`}
+                                    rows={2}
+                                    value={excerpt.quote}
+                                    onChange={(event) =>
+                                      setCorrected({
+                                        ...corrected,
+                                        [key]: corrected[key].map((old, j) =>
+                                          j === i
+                                            ? {
+                                                ...old,
+                                                source_excerpts: (old.source_excerpts ?? []).map(
+                                                  (ex, k) =>
+                                                    k === n
+                                                      ? { ...ex, quote: event.target.value }
+                                                      : ex,
+                                                ),
+                                              }
+                                            : old,
+                                        ),
+                                      })
+                                    }
+                                  />
+                                </label>
+                                <button
+                                  className={button}
+                                  onClick={() =>
+                                    setCorrected({
+                                      ...corrected,
+                                      [key]: corrected[key].map((old, j) =>
+                                        j === i
+                                          ? {
+                                              ...old,
+                                              source_excerpts: (old.source_excerpts ?? []).filter(
+                                                (_, k) => k !== n,
+                                              ),
+                                            }
+                                          : old,
+                                      ),
+                                    })
+                                  }
+                                >
+                                  Remove excerpt
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              className={button}
+                              onClick={() =>
+                                setCorrected({
+                                  ...corrected,
+                                  [key]: corrected[key].map((old, j) =>
+                                    j === i
+                                      ? {
+                                          ...old,
+                                          source_excerpts: [
+                                            ...(old.source_excerpts ?? []),
+                                            { citation_id: '', quote: '' },
+                                          ],
+                                        }
+                                      : old,
+                                  ),
+                                })
+                              }
+                            >
+                              Add source excerpt
+                            </button>
                             <button
                               className={button}
                               onClick={() =>
@@ -506,7 +744,10 @@ export function InvestigationsView() {
                           onClick={() =>
                             setCorrected({
                               ...corrected,
-                              [key]: [...corrected[key], { text: '', citation_ids: [] }],
+                              [key]: [
+                                ...corrected[key],
+                                { text: '', citation_ids: [], source_excerpts: [] },
+                              ],
                             })
                           }
                         >
@@ -515,15 +756,15 @@ export function InvestigationsView() {
                       </div>
                     ))}
                     <label className="block text-sm">
-                      Missing evidence, one per line
+                      Model questions (unverified), one per line
                       <textarea
                         className={`${field} resize-none`}
                         rows={3}
-                        value={corrected.missing_evidence.join('\n')}
+                        value={(corrected.model_uncertainties ?? []).join('\n')}
                         onChange={(e) =>
                           setCorrected({
                             ...corrected,
-                            missing_evidence: e.target.value.split('\n'),
+                            model_uncertainties: e.target.value.split('\n'),
                           })
                         }
                       />
@@ -564,8 +805,11 @@ export function InvestigationsView() {
                         ...(decision === 'correct' && corrected
                           ? {
                               corrected_brief: {
-                                ...corrected,
-                                missing_evidence: corrected.missing_evidence
+                                facts: corrected.facts,
+                                prior_fixes: corrected.prior_fixes,
+                                hypotheses: corrected.hypotheses,
+                                recommended_checks: corrected.recommended_checks,
+                                model_uncertainties: (corrected.model_uncertainties ?? [])
                                   .map((v) => v.trim())
                                   .filter(Boolean),
                               },
@@ -575,7 +819,7 @@ export function InvestigationsView() {
                       show(item);
                       setNotice('Review saved.');
                       await refresh();
-                    })
+                    }, true)
                   }
                 >
                   Save review

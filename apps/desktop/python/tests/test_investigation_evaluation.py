@@ -159,9 +159,9 @@ async def test_real_review_proposal_invalidation(tmp_path, monkeypatch, remove):
         async def chat(self, messages, **kwargs):
             payload = json.loads(messages[1]['content'])
             citation = payload['evidence'][0]['citation_id']
-            brief = {'facts': [{'text': 'Release changed', 'citation_ids': [citation]}],
+            brief = {'facts': [{'text': 'Release changed', 'citation_ids': [citation], 'source_excerpts': [{'citation_id': citation, 'quote': 'Release'}]}],
                      'prior_fixes': [], 'hypotheses': [], 'recommended_checks': [],
-                     'missing_evidence': []}
+                     'model_uncertainties': []}
             return {'choices': [{'message': {'content': json.dumps(brief)}}]}
     monkeypatch.setattr(inv, 'get_runtime', Runtime)
     await init_memory_db()
@@ -245,8 +245,8 @@ async def test_scope_zero_hit_invalidation_scrubs_origin_claim(tmp_path, monkeyp
         def current_model_sha256(self): return 'a' * 64
         async def chat(self, messages, **kwargs):
             citation = json.loads(messages[1]['content'])['evidence'][0]['citation_id']
-            brief = {'facts': [{'text': 'Alpha', 'citation_ids': [citation]}], 'prior_fixes': [],
-                     'hypotheses': [], 'recommended_checks': [], 'missing_evidence': []}
+            brief = {'facts': [{'text': 'Alpha', 'citation_ids': [citation], 'source_excerpts': [{'citation_id': citation, 'quote': 'Alpha'}]}], 'prior_fixes': [],
+                     'hypotheses': [], 'recommended_checks': [], 'model_uncertainties': []}
             return {'choices': [{'message': {'content': json.dumps(brief)}}]}
     monkeypatch.setattr(inv, 'get_runtime', Runtime)
     await init_memory_db()
@@ -346,9 +346,12 @@ async def test_supersede_rejects_replacement_dependent_on_old_claim(tmp_path, mo
         def current_model_id(self): return 'model'
         def current_model_sha256(self): return 'a' * 64
         async def chat(self, messages, **kwargs):
-            brief = {'facts': [{'text': 'Alpha complete', 'citation_ids': ['E2']}],
+            claim = next(e for e in json.loads(messages[1]['content'])['evidence'] if 'sources' in e)
+            source = claim['sources'][0]
+            brief = {'facts': [{'text': 'Alpha complete', 'citation_ids': [claim['citation_id']],
+                               'source_excerpts': [{'citation_id': source['citation_id'], 'quote': 'Alpha'}]}],
                      'prior_fixes': [], 'hypotheses': [], 'recommended_checks': [],
-                     'missing_evidence': []}
+                     'model_uncertainties': []}
             return {'choices': [{'message': {'content': json.dumps(brief)}}]}
     monkeypatch.setattr(inv, 'get_runtime', Runtime)
     item = await inv.create_investigation(scope, 'Alpha', 'alpha', 'model')

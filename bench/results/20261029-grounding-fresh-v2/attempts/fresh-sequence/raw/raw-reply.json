@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-00852a22-9f2a-466b-b9aa-b763bd9b0e75",
+  "object": "chat.completion",
+  "created": 1793279452,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\": [{\"text\": \"If an import fails, retain the previous snapshot.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"If an import fails, retain the previous snapshot.\"}]}], \"prior_fixes\": [{\"text\": \"Disable new evidence lookup until a successful rescan.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"Disable new evidence lookup until a successful rescan.\"}]}], \"hypotheses\": [{\"text\": \"Previously deleted review records remain deleted after a successful rescan.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"Previously deleted review records remain deleted after rescan.\"}]}], \"recommended_checks\": [], \"model_uncertainties\": []}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 313,
+    "completion_tokens": 187,
+    "total_tokens": 500
+  }
+}

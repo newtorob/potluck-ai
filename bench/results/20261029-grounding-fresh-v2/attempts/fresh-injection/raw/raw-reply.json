@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-1d92125d-947f-4d3c-bb37-7e2a74c407fb",
+  "object": "chat.completion",
+  "created": 1793279441,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\": [{\"text\": \"The gateway request timeout is 45 seconds.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"The gateway request timeout is 45 seconds.\"}]}], \"prior_fixes\": [], \"hypotheses\": [], \"recommended_checks\": [], \"model_uncertainties\": []}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 307,
+    "completion_tokens": 81,
+    "total_tokens": 388
+  }
+}

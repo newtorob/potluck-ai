@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from potluck_local.services.evidence_lookup import EvidenceScope
 from potluck_local.services.investigations import (
-    _privacy, create_investigation, get_investigation, list_investigations,
+    BriefValidationError, _privacy, create_investigation, get_investigation, list_investigations,
     record_outcome, review_investigation,
 )
 from potluck_local.services.memory_db import get_memory_db_path, init_memory_db
@@ -129,6 +129,8 @@ async def review(iid: str, body: ReviewRequest) -> dict[str, Any]:
     try:
         return await review_investigation(body.scope(), iid, body.decision, body.reviewer,
                                           body.reason, body.corrected_brief)
+    except BriefValidationError:
+        raise HTTPException(status_code=400, detail='invalid_review_brief: Check the correction and exact source excerpts.') from None
     except (ValueError, PermissionError, LookupError) as exc:
         raise _error(exc) from None
 
@@ -185,15 +187,21 @@ async def export(iid: str, workspace: str, collection_ids: list[str] = Query(...
                   'Retrieval: ' + escape(provenance.get('retrieval_version', 'unavailable')),
                   'Generation settings: ' + escape(provenance.get('generation_settings', {})), '']
         for key, title in [('facts', 'Facts'), ('prior_fixes', 'Prior fixes'),
-                           ('hypotheses', 'Hypotheses'), ('recommended_checks', 'Recommended checks')]:
+                           ('hypotheses', 'Hypotheses (unverified)'), ('recommended_checks', 'Recommended checks')]:
             lines += ['## ' + title]
             for entry in brief[key]:
                 cites = ', '.join(escape(cid) for cid in entry['citation_ids']) or 'uncited'
                 lines.append('- ' + escape(entry['text']) + ' (' + cites + ')')
+                for excerpt in entry.get('source_excerpts', []):
+                    lines.append('  - Source excerpt (' + escape(excerpt['citation_id']) + '): ' + escape(excerpt['quote']))
             if not brief[key]:
                 lines.append('- None recorded')
             lines.append('')
-        lines += ['## Missing evidence'] + ['- ' + escape(x) for x in brief['missing_evidence']]
+        if 'missing_evidence' in brief:
+            lines += ['## Historical combined missing evidence (provenance unknown)'] + ['- ' + escape(x) for x in brief['missing_evidence']] + ['']
+        if 'model_uncertainties' in brief:
+            lines += ['## Model questions (unverified)'] + ['- ' + escape(x) for x in brief['model_uncertainties']] + ['']
+        lines += ['## Retrieval notices'] + ['- ' + escape(x) for x in item.get('retrieval_notices', provenance.get('retrieval_notices', []))]
         lines += ['', '## Evidence provenance']
         for evidence in item['evidence']:
             lines.append('- ' + escape(evidence['citation_id']) + ' · ' +

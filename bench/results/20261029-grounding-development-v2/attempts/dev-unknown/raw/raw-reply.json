@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-b07286dc-87ae-44b1-96b4-b2003adc9341",
+  "object": "chat.completion",
+  "created": 1793279326,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\": [{\"text\": \"The export service queues CSV reports.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"The export service queues CSV reports.\"}]}], \"prior_fixes\": [], \"hypotheses\": [], \"recommended_checks\": [], \"model_uncertainties\": []}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 279,
+    "completion_tokens": 75,
+    "total_tokens": 354
+  }
+}

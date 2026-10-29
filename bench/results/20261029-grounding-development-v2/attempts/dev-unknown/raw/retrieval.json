@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "5eda00f0-7b0f-4a77-9bad-ed0401e58afa"
+  ],
+  "query": "Who approved the export service release?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "5eda00f0-7b0f-4a77-9bad-ed0401e58afa"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "5eda00f0-7b0f-4a77-9bad-ed0401e58afa",
+        "document_id": "1206afd5-144c-54f3-ac15-4ec99f582498",
+        "revision_id": "196bef31-9f05-549e-9387-b3df7c4ea2f4",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:08:46.783485+00:00",
+        "chunk_id": "477f09c4-931c-5eba-99b5-aca8b1975f11",
+        "anchor": "export-service",
+        "heading": "Export service",
+        "content": "The export service queues CSV reports. This note does not record who approved the release.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:08:46.783703+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:477f09c4-931c-5eba-99b5-aca8b1975f11:196bef31-9f05-549e-9387-b3df7c4ea2f4"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

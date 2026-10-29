@@ -1,0 +1,108 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "d27bcc01-66d6-47ee-9a33-7e2e9e9ae61b",
+    "workspace": "synthetic-eval",
+    "issue": "After an import fails, what happens to lookup and deleted review records when a rescan succeeds?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "facts": [
+        {
+          "text": "If an import fails, retain the previous snapshot.",
+          "citation_ids": [
+            "source:559f98c1-498d-539f-876b-b690efcba26a:ebcdb18d-e746-5dd7-bbb2-8fb5479d2201"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:559f98c1-498d-539f-876b-b690efcba26a:ebcdb18d-e746-5dd7-bbb2-8fb5479d2201",
+              "quote": "If an import fails, retain the previous snapshot."
+            }
+          ]
+        }
+      ],
+      "prior_fixes": [
+        {
+          "text": "Disable new evidence lookup until a successful rescan.",
+          "citation_ids": [
+            "source:559f98c1-498d-539f-876b-b690efcba26a:ebcdb18d-e746-5dd7-bbb2-8fb5479d2201"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:559f98c1-498d-539f-876b-b690efcba26a:ebcdb18d-e746-5dd7-bbb2-8fb5479d2201",
+              "quote": "Disable new evidence lookup until a successful rescan."
+            }
+          ]
+        }
+      ],
+      "hypotheses": [
+        {
+          "text": "Previously deleted review records remain deleted after a successful rescan.",
+          "citation_ids": [
+            "source:559f98c1-498d-539f-876b-b690efcba26a:ebcdb18d-e746-5dd7-bbb2-8fb5479d2201"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:559f98c1-498d-539f-876b-b690efcba26a:ebcdb18d-e746-5dd7-bbb2-8fb5479d2201",
+              "quote": "Previously deleted review records remain deleted after rescan."
+            }
+          ]
+        }
+      ],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "62ab8397-e77f-47d7-8aec-986ecb591ac6",
+        "document_id": "21ea7e6a-a1fd-50e5-a5a0-1d0ad2baea4e",
+        "revision_id": "ebcdb18d-e746-5dd7-bbb2-8fb5479d2201",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:10:52.759738+00:00",
+        "chunk_id": "559f98c1-498d-539f-876b-b690efcba26a",
+        "anchor": "recovery-procedure",
+        "heading": "Recovery procedure",
+        "content": "If an import fails, retain the previous snapshot. Disable new evidence lookup until a successful rescan. A successful rescan re-enables lookup. Previously deleted review records remain deleted after rescan.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:10:52.759914+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:559f98c1-498d-539f-876b-b690efcba26a:ebcdb18d-e746-5dd7-bbb2-8fb5479d2201",
+        "presented_content": "If an import fails, retain the previous snapshot. Disable new evidence lookup until a successful rescan. A successful rescan re-enables lookup. Previously deleted review records remain deleted after rescan."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T13:11:06.637802+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v4",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "After an import fails, what happens to lookup and deleted review records when a rescan succeeds?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240
+      },
+      "elapsed_ms": 13872,
+      "created_at": "2026-10-29T13:11:06.637802+00:00"
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "62ab8397-e77f-47d7-8aec-986ecb591ac6"
+    ]
+  },
+  "latency_seconds": 13.881382416933775,
+  "setup_seconds": 0.01889429148286581,
+  "attempt_total_seconds": 13.90027670841664
+}

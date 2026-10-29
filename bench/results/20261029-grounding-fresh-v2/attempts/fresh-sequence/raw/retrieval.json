@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "62ab8397-e77f-47d7-8aec-986ecb591ac6"
+  ],
+  "query": "After an import fails, what happens to lookup and deleted review records when a rescan succeeds?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "62ab8397-e77f-47d7-8aec-986ecb591ac6"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "62ab8397-e77f-47d7-8aec-986ecb591ac6",
+        "document_id": "21ea7e6a-a1fd-50e5-a5a0-1d0ad2baea4e",
+        "revision_id": "ebcdb18d-e746-5dd7-bbb2-8fb5479d2201",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:10:52.759738+00:00",
+        "chunk_id": "559f98c1-498d-539f-876b-b690efcba26a",
+        "anchor": "recovery-procedure",
+        "heading": "Recovery procedure",
+        "content": "If an import fails, retain the previous snapshot. Disable new evidence lookup until a successful rescan. A successful rescan re-enables lookup. Previously deleted review records remain deleted after rescan.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:10:52.759914+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:559f98c1-498d-539f-876b-b690efcba26a:ebcdb18d-e746-5dd7-bbb2-8fb5479d2201"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

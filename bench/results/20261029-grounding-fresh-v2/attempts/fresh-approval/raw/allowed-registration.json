@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "5c47ed27-e050-4a5c-b6d7-e4c0353ddc43",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-grounding-fresh-v2/attempts/fresh-approval/raw/allowed",
+  "source_sha256": "3aed4eba725353196b30382457d3176de387c2eb1a6c40a9deedd0eab33c4b31",
+  "scan": {
+    "collection_id": "5c47ed27-e050-4a5c-b6d7-e4c0353ddc43",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

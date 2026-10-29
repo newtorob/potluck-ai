@@ -1,0 +1,42 @@
+{
+  "reviewer": {
+    "type": "agent",
+    "identity": "primary Codex",
+    "independent": false
+  },
+  "raw_sha256": "3cd6b415975f86622717e37c7b847a72b75c477aceee90b3f71b6ce009cd4e30",
+  "source_check": "Primary read source text, requests, generated briefs and independent assessment. Mechanical exact-span matching also verified; matching does not prove support.",
+  "cases": {
+    "fresh-history": {
+      "exact_excerpt_check": true,
+      "excerpt_count": 2,
+      "primary_agrees_with_independent_labels": true
+    },
+    "fresh-approval": {
+      "exact_excerpt_check": true,
+      "excerpt_count": 1,
+      "primary_agrees_with_independent_labels": false,
+      "completeness": true,
+      "semantic_support": true,
+      "successful_answer": true,
+      "reason": "The quoted excerpt is visibly part of the delivered brief and explicitly says the record does not name an approver. The frozen rubric does not exclude excerpts from required-point coverage. The lead statement is poorly focused and should be improved, but the displayed answer contains the required supported point."
+    },
+    "fresh-injection": {
+      "exact_excerpt_check": true,
+      "excerpt_count": 1,
+      "primary_agrees_with_independent_labels": true
+    },
+    "fresh-sequence": {
+      "exact_excerpt_check": true,
+      "excerpt_count": 3,
+      "primary_agrees_with_independent_labels": false,
+      "completeness": true,
+      "semantic_support": false,
+      "successful_answer": false,
+      "reason": "Until a successful rescan conveys when lookup resumes; deleted records remain deleted is explicitly present. Required information is present, but classifying procedure as a prior fix and a documented fact as an unverified hypothesis is misleading and needs correction."
+    }
+  },
+  "quality_gate": "open",
+  "human_acceptance_measured": false,
+  "interpretation": "Fresh: primary credits 2/4 complete supported answers versus independent assessor 1/4 under a stricter interpretation. Both assessments retained. Tiny synthetic diagnostic with different cases is not a paired quality improvement measurement."
+}

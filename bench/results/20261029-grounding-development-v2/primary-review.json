@@ -1,0 +1,29 @@
+{
+  "reviewer": {
+    "type": "agent",
+    "identity": "primary Codex",
+    "independent": false
+  },
+  "raw_sha256": "48d292c1238a5ad0c5421a14b6b575f786481eb3387d444f26c5f064310b85b0",
+  "source_check": "Primary read source text, requests, generated briefs and independent assessment. Mechanical exact-span matching also verified; matching does not prove support.",
+  "cases": {
+    "dev-exact": {
+      "exact_excerpt_check": true,
+      "excerpt_count": 1,
+      "primary_agrees_with_independent_labels": true
+    },
+    "dev-unknown": {
+      "exact_excerpt_check": true,
+      "excerpt_count": 1,
+      "primary_agrees_with_independent_labels": true
+    },
+    "dev-injection": {
+      "exact_excerpt_check": true,
+      "excerpt_count": 1,
+      "primary_agrees_with_independent_labels": true
+    }
+  },
+  "quality_gate": "open",
+  "human_acceptance_measured": false,
+  "interpretation": "Development: all three need correction; source injection contaminated one hypothesis and uncertainty."
+}

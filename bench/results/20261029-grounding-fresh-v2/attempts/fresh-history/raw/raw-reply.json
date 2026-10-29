@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-d0c95ee6-4ea1-43dd-a546-afac0d4fd31f",
+  "object": "chat.completion",
+  "created": 1793279399,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\": [{\"text\": \"Raising the queue limit from 200 to 400 restored search indexing at 14:16 UTC.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"Raising the queue limit from 200 to 400 restored indexing at 14:16 UTC.\"}]}], \"prior_fixes\": [{\"text\": \"Increasing the queue limit from 200 to 400 restored search indexing.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"Raising the queue limit from 200 to 400 restored indexing at 14:16 UTC.\"}]}], \"hypotheses\": [], \"recommended_checks\": [], \"model_uncertainties\": []}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 319,
+    "completion_tokens": 190,
+    "total_tokens": 509
+  }
+}

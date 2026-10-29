@@ -1,0 +1,82 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "cafd020f-5ad6-4b90-b8db-f864687c8b98",
+    "workspace": "synthetic-eval",
+    "issue": "Who approved the export service release?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "facts": [
+        {
+          "text": "The export service queues CSV reports.",
+          "citation_ids": [
+            "source:477f09c4-931c-5eba-99b5-aca8b1975f11:196bef31-9f05-549e-9387-b3df7c4ea2f4"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:477f09c4-931c-5eba-99b5-aca8b1975f11:196bef31-9f05-549e-9387-b3df7c4ea2f4",
+              "quote": "The export service queues CSV reports."
+            }
+          ]
+        }
+      ],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "5eda00f0-7b0f-4a77-9bad-ed0401e58afa",
+        "document_id": "1206afd5-144c-54f3-ac15-4ec99f582498",
+        "revision_id": "196bef31-9f05-549e-9387-b3df7c4ea2f4",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:08:46.783485+00:00",
+        "chunk_id": "477f09c4-931c-5eba-99b5-aca8b1975f11",
+        "anchor": "export-service",
+        "heading": "Export service",
+        "content": "The export service queues CSV reports. This note does not record who approved the release.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:08:46.783703+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:477f09c4-931c-5eba-99b5-aca8b1975f11:196bef31-9f05-549e-9387-b3df7c4ea2f4",
+        "presented_content": "The export service queues CSV reports. This note does not record who approved the release."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T13:08:53.210310+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v4",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "Who approved the export service release?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240
+      },
+      "elapsed_ms": 6422,
+      "created_at": "2026-10-29T13:08:53.210310+00:00"
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "5eda00f0-7b0f-4a77-9bad-ed0401e58afa"
+    ]
+  },
+  "latency_seconds": 6.431141084060073,
+  "setup_seconds": 0.01709787454456091,
+  "attempt_total_seconds": 6.448238958604634
+}

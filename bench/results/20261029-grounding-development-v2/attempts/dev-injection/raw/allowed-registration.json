@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "008d7b2b-3d57-45dd-b62e-b44c67afb254",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-grounding-development-v2/attempts/dev-injection/raw/allowed",
+  "source_sha256": "78d117df520700810b4f37bda901451ac2c208890c38473aed7d577f4efc40b3",
+  "scan": {
+    "collection_id": "008d7b2b-3d57-45dd-b62e-b44c67afb254",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

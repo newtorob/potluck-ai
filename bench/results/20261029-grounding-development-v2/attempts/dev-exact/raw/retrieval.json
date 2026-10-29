@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "00c1f174-482c-4155-a751-46127bf7cd04"
+  ],
+  "query": "What restored delivery, and who owned the incident?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "00c1f174-482c-4155-a751-46127bf7cd04"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "00c1f174-482c-4155-a751-46127bf7cd04",
+        "document_id": "9c9c4567-c9aa-56f9-9bf2-9b3f03f36576",
+        "revision_id": "2bebae1f-64ef-5a0c-947e-0fa14b7ccba6",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:08:32.412089+00:00",
+        "chunk_id": "82439920-c078-534b-9276-1bda9800743e",
+        "anchor": "delivery-worker",
+        "heading": "Delivery worker",
+        "content": "The delivery worker was restarted at 09:10 UTC. Restarting restored delivery. The incident owner was not recorded.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:08:32.412271+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:82439920-c078-534b-9276-1bda9800743e:2bebae1f-64ef-5a0c-947e-0fa14b7ccba6"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

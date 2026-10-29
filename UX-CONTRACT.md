@@ -65,8 +65,9 @@ validation on every read and write.
 - Choose the workspace, exact source collection set and already loaded model
   explicitly. Changing the source scope clears the previous list and selection.
 - Disable scope/model/record switching while an operation is pending. Errors use
-  an alert and clear the displayed artifact rather than leaving revoked evidence
-  visible. No operation silently retries or routes to another model.
+  an alert. Only the specific invalid-corrected-brief response preserves the
+  entered correction; unavailable sources and other failures clear the displayed
+  artifact and correction. No operation silently retries or routes to another model.
 - Review and outcome are separate one-shot actions. Corrections retain the original
   draft; outcomes have no preselected result. Reviewed does not mean resolved.
 - Numbered citation links open the matching source disclosure; full IDs, source
@@ -81,3 +82,11 @@ platform-owned select pattern. Native popup geometry and keyboard behavior are
 accepted for this workflow; this decision does not establish a global select
 owner for other views. Verify keyboard operation and the popup in the desktop
 browser review.
+
+New investigation briefs show exact source excerpts beside claims and link to the
+matching raw or reviewed-claim source. Matching text is not a semantic correctness
+guarantee. Model questions and hypotheses are labeled unverified; retrieval notices
+are separate and cannot be edited. Historical combined missing-evidence lists keep
+their unknown provenance label. Corrections preserve the original draft and must
+include valid excerpts for facts and prior fixes. The investigation content panel
+owns scrolling; citation navigation must not scroll the outer desktop shell.
