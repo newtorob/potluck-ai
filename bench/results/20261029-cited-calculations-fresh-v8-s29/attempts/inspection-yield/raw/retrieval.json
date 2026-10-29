@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "c76c8d6d-5520-4be0-a8ab-d4e054e15faf"
+  ],
+  "query": "For the Quartz inspection line, how many percentage points did the acceptance rate increase, and what was the relative percent increase?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "c76c8d6d-5520-4be0-a8ab-d4e054e15faf"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "c76c8d6d-5520-4be0-a8ab-d4e054e15faf",
+        "document_id": "a4f11ef8-ee1f-5d1b-9ba6-002ef79e7bd5",
+        "revision_id": "641ecd38-c39d-57cc-be87-b4ffd05bcfd5",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T20:23:12.504323+00:00",
+        "chunk_id": "f1c1dea3-5ba2-5dcb-93a9-e683f7e38db1",
+        "anchor": "quartz-inspection-yield",
+        "heading": "Quartz inspection yield",
+        "content": "The Quartz acceptance rate increased from 40% to 46% over the measurement period.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T20:23:12.504491+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:f1c1dea3-5ba2-5dcb-93a9-e683f7e38db1:641ecd38-c39d-57cc-be87-b4ffd05bcfd5"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-4b439076-3935-4619-a86f-60622a256db6",
+  "object": "chat.completion",
+  "created": 1793303430,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"operations\": [{\"question_id\": \"Q1\", \"request\": \"old_capacity_limit\", \"operation\": \"answer\"}, {\"question_id\": \"Q1\", \"request\": \"new_capacity_limit\", \"operation\": \"answer\"}, {\"question_id\": \"Q1\", \"request\": \"absolute_increase\", \"operation\": \"answer\"}, {\"question_id\": \"Q1\", \"request\": \"approved_by\", \"operation\": \"answer\"}, {\"question_id\": \"Q1\", \"request\": \"take_effect_date\", \"operation\": \"answer\"}]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 206,
+    "completion_tokens": 112,
+    "total_tokens": 318
+  }
+}

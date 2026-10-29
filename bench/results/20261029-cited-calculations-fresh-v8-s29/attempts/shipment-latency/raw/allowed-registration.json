@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "e4f70375-7156-4b1a-9dc6-77bfa91800d7",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-cited-calculations-fresh-v8-s29/attempts/shipment-latency/raw/allowed",
+  "source_sha256": "2bca25332a230057a52d77ae83990d75bc228677d94a7497a6c965e26f14e981",
+  "scan": {
+    "collection_id": "e4f70375-7156-4b1a-9dc6-77bfa91800d7",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-3a55f2a1-c517-42be-b269-c0fb1242dafd",
+  "object": "chat.completion",
+  "created": 1793305515,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [], \"status\": \"unknown\", \"snippet_ids\": [\"S1\", \"S2\"], \"reason\": \"The requested value is not established. The first inspection recorded 0 faults (S1), and the second inspection recorded 7 faults (S2). However, there is no quantity provided for the percentage change calculation.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 445,
+    "completion_tokens": 81,
+    "total_tokens": 526
+  }
+}

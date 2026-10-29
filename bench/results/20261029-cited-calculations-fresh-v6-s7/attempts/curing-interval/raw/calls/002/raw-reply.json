@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-4aeb9066-87f3-41ba-9a10-3c227e11f20b",
+  "object": "chat.completion",
+  "created": 1793304357,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"The Lumen curing interval was 3 minutes before the adjustment and 135 seconds after it.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 371,
+    "completion_tokens": 43,
+    "total_tokens": 414
+  }
+}

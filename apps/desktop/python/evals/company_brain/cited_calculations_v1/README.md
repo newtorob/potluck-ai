@@ -1,0 +1,11 @@
+# Cited calculations v1: frozen fresh holdout
+
+Eight synthetic cases test source-bound calculations and answer boundaries. Fixture and rubric are frozen before inference; the rubric is for reviewers, not a model prompt. Keep their contents from implementers until the candidate is frozen and all planned runs finish. The holdout is consumed when any candidate output is inspected: do not tune against it and call it fresh again.
+
+Use the grounding runner with this directory as `--fixture-dir`, `--suite fresh`, and `--question-mode auto`; verify the runner supports the actual candidate before executing. Agree the configurations, seeds, run order and output directories before inference, hold model and generation settings constant for paired comparisons, and record code, model, profile, seeds, fixture, rubric and source identities. Use separate new output directories outside this fixture directory. Count all planned attempts including failures and cancellations; no retries or tuning after output inspection.
+
+Primary and independent reviewers separately score each original request and its delivered answer, evidence and provenance using the frozen rubric, then record disagreements and case-level results. Record five distinct dimensions: operation coverage, source-bound operand selection, arithmetic correctness, evidence precision, and unsupported claims. A justified abstention is a valid result, while an omitted answerable operation, execution failure or erroneous answer is not. Conditional arithmetic for competing sources is optional unless explicitly requested; if included it must be correct and clearly conditional. Exact citations show source support, but do not prove semantic selection or source authority. The excluded collection contains a canary and must not be retrieved or exposed.
+
+Report all attempts and paired outcomes descriptively, including reviewer disagreements and errors. There is no preregistered numerical pass threshold. This small synthetic corpus does not establish production readiness or owner acceptance. Record review time only if actually measured.
+
+From this directory, verify integrity before inference with `shasum -a 256 -c fresh.sha256` and `shasum -a 256 -c rubric.sha256`.

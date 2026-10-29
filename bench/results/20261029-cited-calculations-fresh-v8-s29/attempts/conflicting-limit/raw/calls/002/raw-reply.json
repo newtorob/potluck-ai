@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-28eba35e-e71e-4b56-a26f-9cb261f6eb71",
+  "object": "chat.completion",
+  "created": 1793305540,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"snippet_ids\": [\"S2\", \"S3\"], \"text\": \"The current Kestrel storage limit is listed as 45 files in the deployment note and 50 files in the operator checklist. However, neither record says which current limit is authoritative.\", \"status\": \"unknown\"}, \"R2\": {\"operand_ids\": [], \"status\": \"unknown\", \"snippet_ids\": [\"S1\", \"S2\", \"S3\", \"S4\"], \"reason\": \"The current Kestrel storage limit is listed as 45 files in the deployment note and 50 files in the operator checklist. However, neither record says which current limit is authoritative.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 535,
+    "completion_tokens": 152,
+    "total_tokens": 687
+  }
+}

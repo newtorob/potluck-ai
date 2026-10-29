@@ -1,0 +1,129 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "b0d8fdf9-9c11-4f9d-bead-dc019e4d365b",
+    "workspace": "synthetic-eval",
+    "issue": "What percentage of Vela returns required repair last week?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What percentage of Vela returns required repair last week?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "unknown",
+          "text": "The percentage of Vela returns that required repair last week cannot be determined because the total number of Vela returns last week is not provided.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:8f1f62f6-1592-5098-bd2e-96bc0181a5e7:55b8a467-e0c7-5fec-9eac-d33b1f48f57a",
+              "quote": "Nine Vela returns required repair last week. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:8f1f62f6-1592-5098-bd2e-96bc0181a5e7:55b8a467-e0c7-5fec-9eac-d33b1f48f57a",
+              "quote": "The record does not state the total number of Vela returns last week."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "7fbd476f-8c3c-483d-a5fb-8ab93653eb8f",
+        "document_id": "3fbccd95-b297-5a3f-ab78-235f4cb33661",
+        "revision_id": "55b8a467-e0c7-5fec-9eac-d33b1f48f57a",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T20:06:09.352652+00:00",
+        "chunk_id": "8f1f62f6-1592-5098-bd2e-96bc0181a5e7",
+        "anchor": "vela-returns",
+        "heading": "Vela returns",
+        "content": "Nine Vela returns required repair last week. The record does not state the total number of Vela returns last week.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T20:06:09.352840+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:8f1f62f6-1592-5098-bd2e-96bc0181a5e7:55b8a467-e0c7-5fec-9eac-d33b1f48f57a",
+        "presented_content": "Nine Vela returns required repair last week. The record does not state the total number of Vela returns last week."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T20:06:26.766082+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What percentage of Vela returns required repair last week?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 17408,
+      "created_at": "2026-10-29T20:06:26.766082+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:8f1f62f6-1592-5098-bd2e-96bc0181a5e7:55b8a467-e0c7-5fec-9eac-d33b1f48f57a",
+          "quote": "Nine Vela returns required repair last week. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:8f1f62f6-1592-5098-bd2e-96bc0181a5e7:55b8a467-e0c7-5fec-9eac-d33b1f48f57a",
+          "quote": "The record does not state the total number of Vela returns last week."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "7fbd476f-8c3c-483d-a5fb-8ab93653eb8f"
+    ]
+  },
+  "latency_seconds": 17.417066667228937,
+  "setup_seconds": 0.023271124809980392,
+  "attempt_total_seconds": 17.440337792038918
+}

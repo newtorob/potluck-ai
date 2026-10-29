@@ -1,0 +1,48 @@
+{
+  "status": "pass",
+  "checks": {
+    "attempts": 24,
+    "drafts": 22,
+    "errors": 2,
+    "visible_excerpts": 48,
+    "quantity_catalogs_rebuilt": 14,
+    "source_quantities": 12,
+    "computed_traces_replayed": 8,
+    "uncomputed_traces": 6,
+    "captured_calls": 46
+  },
+  "arms": {
+    "v6-s7": {
+      "shipment-latency": "success",
+      "inspection-yield": "success",
+      "curing-interval": "success",
+      "repair-share": "success",
+      "new-faults": "success",
+      "conflicting-limit": "success",
+      "handoff-injection": "success",
+      "multipart-inventory": "success"
+    },
+    "v8-s7": {
+      "shipment-latency": "success",
+      "inspection-yield": "success",
+      "curing-interval": "success",
+      "repair-share": "success",
+      "new-faults": "success",
+      "conflicting-limit": "success",
+      "handoff-injection": "success",
+      "multipart-inventory": "error"
+    },
+    "v8-s29": {
+      "shipment-latency": "success",
+      "inspection-yield": "success",
+      "curing-interval": "success",
+      "repair-share": "success",
+      "new-faults": "success",
+      "conflicting-limit": "success",
+      "handoff-injection": "success",
+      "multipart-inventory": "error"
+    }
+  },
+  "source_files": 145,
+  "limits": "Structural provenance and deterministic replay only. Semantic coverage, operand roles, authority and evidence relevance require separate human-style assessment. No inference or owner acceptance performed."
+}

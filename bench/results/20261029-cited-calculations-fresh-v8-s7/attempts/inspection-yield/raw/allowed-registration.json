@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "78f5dcdd-82f4-404c-9d65-de0444c021b2",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-cited-calculations-fresh-v8-s7/attempts/inspection-yield/raw/allowed",
+  "source_sha256": "f162aadf1da14520c6c8a3b90361e16904622ff299a92475fe330bd19f8f995a",
+  "scan": {
+    "collection_id": "78f5dcdd-82f4-404c-9d65-de0444c021b2",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

@@ -1,0 +1,166 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "79b5e9c4-168a-48dd-9ef1-118a3a4d8445",
+    "workspace": "synthetic-eval",
+    "issue": "How did the Harbor dispatch latency change after the routing update, and did that update cause the change?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What was the Harbor dispatch latency before the routing update?"
+        },
+        {
+          "id": "Q2",
+          "text": "What was the Harbor dispatch latency after the routing update?"
+        },
+        {
+          "id": "Q3",
+          "text": "Did the routing update cause a change in the Harbor dispatch latency?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "supported",
+          "text": "Harbor dispatch latency was 128 seconds before the routing update.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:226bab93-4a22-5643-9ed4-722aab203e18:43c700b8-b8ce-5880-a71a-80580468687b",
+              "quote": "Harbor dispatch latency was 128 seconds before the routing update and 83 seconds afterward. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "supported",
+          "text": "Harbor dispatch latency was 83 seconds after the routing update.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:226bab93-4a22-5643-9ed4-722aab203e18:43c700b8-b8ce-5880-a71a-80580468687b",
+              "quote": "Harbor dispatch latency was 128 seconds before the routing update and 83 seconds afterward. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q3",
+          "status": "supported",
+          "text": "The record does not establish what caused the difference.",
+          "snippet_ids": [
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:226bab93-4a22-5643-9ed4-722aab203e18:43c700b8-b8ce-5880-a71a-80580468687b",
+              "quote": "The record does not establish what caused the difference."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "23e30818-f712-4945-b62d-2332a4c96e92",
+        "document_id": "72cb9de4-eedb-58fe-bf78-a1dc1987cebf",
+        "revision_id": "43c700b8-b8ce-5880-a71a-80580468687b",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T20:04:13.650402+00:00",
+        "chunk_id": "226bab93-4a22-5643-9ed4-722aab203e18",
+        "anchor": "harbor-dispatch-latency",
+        "heading": "Harbor dispatch latency",
+        "content": "Harbor dispatch latency was 128 seconds before the routing update and 83 seconds afterward. Staffing also changed during that interval. The record does not establish what caused the difference.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T20:04:13.650584+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:226bab93-4a22-5643-9ed4-722aab203e18:43c700b8-b8ce-5880-a71a-80580468687b",
+        "presented_content": "Harbor dispatch latency was 128 seconds before the routing update and 83 seconds afterward. Staffing also changed during that interval. The record does not establish what caused the difference."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T20:05:21.635007+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "How did the Harbor dispatch latency change after the routing update, and did that update cause the change?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 67979,
+      "created_at": "2026-10-29T20:05:21.635007+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:226bab93-4a22-5643-9ed4-722aab203e18:43c700b8-b8ce-5880-a71a-80580468687b",
+          "quote": "Harbor dispatch latency was 128 seconds before the routing update and 83 seconds afterward. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:226bab93-4a22-5643-9ed4-722aab203e18:43c700b8-b8ce-5880-a71a-80580468687b",
+          "quote": "Staffing also changed during that interval. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:226bab93-4a22-5643-9ed4-722aab203e18:43c700b8-b8ce-5880-a71a-80580468687b",
+          "quote": "The record does not establish what caused the difference."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "23e30818-f712-4945-b62d-2332a4c96e92"
+    ]
+  },
+  "latency_seconds": 68.01409720722586,
+  "setup_seconds": 0.01637104246765375,
+  "attempt_total_seconds": 68.03046824969351
+}

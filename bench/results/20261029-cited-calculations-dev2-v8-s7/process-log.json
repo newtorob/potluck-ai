@@ -1,0 +1,4 @@
+{
+  "exit_code": 0,
+  "stdout_stderr": "fatal: not a git repository (or any of the parent directories): .git\nllama_context: n_ctx_seq (8192) < n_ctx_train (40960) -- the full capacity of the model will not be utilized\n"
+}

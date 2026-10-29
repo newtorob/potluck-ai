@@ -1,0 +1,2 @@
+# Harbor dispatch latency
+Harbor dispatch latency was 128 seconds before the routing update and 83 seconds afterward. Staffing also changed during that interval. The record does not establish what caused the difference.

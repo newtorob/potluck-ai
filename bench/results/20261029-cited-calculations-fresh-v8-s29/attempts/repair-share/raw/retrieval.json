@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "ad75ab15-6a06-4dbb-97a7-acc93893bf86"
+  ],
+  "query": "What percentage of Vela returns required repair last week?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "ad75ab15-6a06-4dbb-97a7-acc93893bf86"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "ad75ab15-6a06-4dbb-97a7-acc93893bf86",
+        "document_id": "4215a3ad-fbd1-51b9-bcf4-c83794e8af0c",
+        "revision_id": "11441e96-dab7-58b1-a20c-8a83b041def0",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T20:24:09.861448+00:00",
+        "chunk_id": "bb1a22ce-851e-53c0-85c2-5bc02d5be670",
+        "anchor": "vela-returns",
+        "heading": "Vela returns",
+        "content": "Nine Vela returns required repair last week. The record does not state the total number of Vela returns last week.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T20:24:09.861580+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:bb1a22ce-851e-53c0-85c2-5bc02d5be670:11441e96-dab7-58b1-a20c-8a83b041def0"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

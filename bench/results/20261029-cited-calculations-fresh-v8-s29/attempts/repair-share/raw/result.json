@@ -1,0 +1,167 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "e0cac61e-0058-4d97-99c3-fbbd59f13bc7",
+    "workspace": "synthetic-eval",
+    "issue": "What percentage of Vela returns required repair last week?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "percentage"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "unknown",
+          "text": "Calculation unavailable: The total number of Vela returns last week is not provided in the source, making it impossible to calculate the percentage of returns that required repair.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:bb1a22ce-851e-53c0-85c2-5bc02d5be670:11441e96-dab7-58b1-a20c-8a83b041def0",
+              "quote": "The record does not state the total number of Vela returns last week."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "percentage",
+            "status": "unknown",
+            "text": "Calculation unavailable: The total number of Vela returns last week is not provided in the source, making it impossible to calculate the percentage of returns that required repair.",
+            "formula": null,
+            "result": null,
+            "unit": null,
+            "reason": "The total number of Vela returns last week is not provided in the source, making it impossible to calculate the percentage of returns that required repair.",
+            "inputs": [],
+            "rounding": null,
+            "caveat": "Arithmetic does not verify source selection or authority."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "ad75ab15-6a06-4dbb-97a7-acc93893bf86",
+        "document_id": "4215a3ad-fbd1-51b9-bcf4-c83794e8af0c",
+        "revision_id": "11441e96-dab7-58b1-a20c-8a83b041def0",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T20:24:09.861448+00:00",
+        "chunk_id": "bb1a22ce-851e-53c0-85c2-5bc02d5be670",
+        "anchor": "vela-returns",
+        "heading": "Vela returns",
+        "content": "Nine Vela returns required repair last week. The record does not state the total number of Vela returns last week.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T20:24:09.861580+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:bb1a22ce-851e-53c0-85c2-5bc02d5be670:11441e96-dab7-58b1-a20c-8a83b041def0",
+        "presented_content": "Nine Vela returns required repair last week. The record does not state the total number of Vela returns last week."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T20:25:08.304182+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v8",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What percentage of Vela returns required repair last week?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 29,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 58436,
+      "created_at": "2026-10-29T20:25:08.304182+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "What percentage of Vela returns required repair last week?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "percentage",
+          "operation": "percentage"
+        }
+      ],
+      "operation_plan_origin": "planned",
+      "planner_version": "issue-operations-v1",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 29
+      },
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:bb1a22ce-851e-53c0-85c2-5bc02d5be670:11441e96-dab7-58b1-a20c-8a83b041def0",
+          "quote": "Nine Vela returns required repair last week. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:bb1a22ce-851e-53c0-85c2-5bc02d5be670:11441e96-dab7-58b1-a20c-8a83b041def0",
+          "quote": "The record does not state the total number of Vela returns last week."
+        }
+      ],
+      "quantity_catalog": [],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "percentage",
+          "status": "unknown",
+          "text": "Calculation unavailable: The total number of Vela returns last week is not provided in the source, making it impossible to calculate the percentage of returns that required repair.",
+          "formula": null,
+          "result": null,
+          "unit": null,
+          "reason": "The total number of Vela returns last week is not provided in the source, making it impossible to calculate the percentage of returns that required repair.",
+          "inputs": [],
+          "rounding": null,
+          "caveat": "Arithmetic does not verify source selection or authority."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "ad75ab15-6a06-4dbb-97a7-acc93893bf86"
+    ]
+  },
+  "latency_seconds": 58.44545504078269,
+  "setup_seconds": 0.015073833987116814,
+  "attempt_total_seconds": 58.46052887476981
+}

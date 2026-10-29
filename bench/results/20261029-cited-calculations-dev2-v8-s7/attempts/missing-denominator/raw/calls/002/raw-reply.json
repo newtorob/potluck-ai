@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-e9d3a7fc-03cd-4956-943e-d7682d3ebb70",
+  "object": "chat.completion",
+  "created": 1793303385,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [], \"status\": \"unknown\", \"snippet_ids\": [\"S1\", \"S2\"], \"reason\": \"The number of Spruce jobs attempted yesterday is not provided, making it impossible to calculate the percentage of failed jobs.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 330,
+    "completion_tokens": 58,
+    "total_tokens": 388
+  }
+}

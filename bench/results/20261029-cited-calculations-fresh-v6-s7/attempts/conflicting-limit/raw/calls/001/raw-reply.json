@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-65f6f063-a4e5-410c-bcfe-c26ea7db87b4",
+  "object": "chat.completion",
+  "created": 1793304407,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What is the current Kestrel storage limit?\", \"How much did the Kestrel storage limit change from the previous limit?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 110,
+    "completion_tokens": 31,
+    "total_tokens": 141
+  }
+}

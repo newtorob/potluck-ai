@@ -1,0 +1,39 @@
+{
+  "platform": "macOS / Apple M2 Pro",
+  "sidecar": {
+    "passed": 5173,
+    "skipped": 5
+  },
+  "clean_focused": {
+    "passed": 249,
+    "production_files_match_frozen": 145
+  },
+  "fast": {
+    "frontend": 521,
+    "cli": 1228,
+    "landing": 44,
+    "typechecks": "pass",
+    "privacy_lint": "pass"
+  },
+  "first_run_failures": [
+    {
+      "suite": "sidecar",
+      "passed": 5172,
+      "skipped": 5,
+      "failed": 1,
+      "resolution": "Child grammar test now removes inherited LLAMA_CPP_LIB_PATH; production source unchanged. Full rerun passed."
+    },
+    {
+      "suite": "fast",
+      "failed": 1,
+      "resolution": "Unchanged real-timer household recovery test passed 15/15 in isolation and full fast rerun. Timing sensitivity remains; no unrelated code modified."
+    }
+  ],
+  "inference_rerun_after_test_fix": false,
+  "owner_acceptance": false,
+  "promotion": "hold",
+  "limits": [
+    "Full sidecar/fast use working tree including preserved unrelated WIP; 249 focused tests also pass in separate clean snapshot matching all frozen production hashes.",
+    "Not tested on Linux or Windows this batch."
+  ]
+}

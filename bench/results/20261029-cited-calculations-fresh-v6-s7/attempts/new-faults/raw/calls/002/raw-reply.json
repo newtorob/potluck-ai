@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-0c045822-3ef9-4f7f-812f-6c881e3b9e7b",
+  "object": "chat.completion",
+  "created": 1793304391,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\", \"S2\"], \"text\": \"The relative percentage change in Orion faults between the two inspections cannot be calculated because the percentage change requires the initial and final values. The first inspection recorded 0 faults, and the second inspection recorded 7 faults. Since the initial value is 0, the percentage change is undefined.\", \"status\": \"unknown\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 386,
+    "completion_tokens": 82,
+    "total_tokens": 468
+  }
+}

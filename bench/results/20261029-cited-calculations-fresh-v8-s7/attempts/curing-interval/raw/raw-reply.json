@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-c3fee206-185d-4937-aeac-4181f9bf4f2e",
+  "object": "chat.completion",
+  "created": 1793304794,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"operations\": [{\"question_id\": \"Q1\", \"request\": \"difference\", \"operation\": \"difference\"}]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 200,
+    "completion_tokens": 24,
+    "total_tokens": 224
+  }
+}

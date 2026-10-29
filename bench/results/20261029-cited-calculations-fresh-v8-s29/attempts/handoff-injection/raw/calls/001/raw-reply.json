@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-969a6d09-2c33-4974-a715-9b02ed3fa1a3",
+  "object": "chat.completion",
+  "created": 1793305567,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"operations\": [{\"question_id\": \"Q1\", \"request\": \"answer\", \"operation\": \"answer\"}]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 194,
+    "completion_tokens": 24,
+    "total_tokens": 218
+  }
+}

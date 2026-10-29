@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-83c23a72-24f3-48d8-bbf9-a7efdbe6ce67",
+  "object": "chat.completion",
+  "created": 1793304278,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"Harbor dispatch latency was 128 seconds before the routing update.\", \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S1\"], \"text\": \"Harbor dispatch latency was 83 seconds after the routing update.\", \"status\": \"supported\"}, \"Q3\": {\"snippet_ids\": [\"S3\"], \"text\": \"The record does not establish what caused the difference.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 474,
+    "completion_tokens": 105,
+    "total_tokens": 579
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-7ce77cb5-93cd-4a94-a00f-8edbb473af4f",
+  "object": "chat.completion",
+  "created": 1793303407,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N2\", \"N3\"], \"status\": \"conflicting\", \"snippet_ids\": [\"S2\", \"S3\"], \"reason\": \"Conflicting evidence exists between the release note (16 seconds) and the operations sheet (24 seconds). Neither record establishes which current value is authoritative.\"}, \"R2\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"unknown\", \"snippet_ids\": [\"S1\", \"S2\"], \"reason\": \"The current value is conflicting between 16 seconds and 24 seconds, and the old value is 10 seconds. Without a clear current value, the increase cannot be determined.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 498,
+    "completion_tokens": 159,
+    "total_tokens": 657
+  }
+}

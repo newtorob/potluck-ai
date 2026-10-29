@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-c7703199-9df9-4349-adfc-6b422b70035d",
+  "object": "chat.completion",
+  "created": 1793305241,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"snippet_ids\": [\"S1\"], \"text\": \"The packaging team owns the Nova handoff.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 467,
+    "completion_tokens": 35,
+    "total_tokens": 502
+  }
+}

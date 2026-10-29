@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "6ac9fd7e-6c7d-492f-8258-c77ab2dad795"
+  ],
+  "query": "For the Birch gateway, how many percentage points and what relative percentage did the error rate decrease?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "6ac9fd7e-6c7d-492f-8258-c77ab2dad795"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "6ac9fd7e-6c7d-492f-8258-c77ab2dad795",
+        "document_id": "a850358f-cda7-544b-8d83-2b0744732b95",
+        "revision_id": "a4419655-c26d-5650-899f-fafacfcb9b33",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T19:55:48.869481+00:00",
+        "chunk_id": "dcf90503-5eb5-5029-a2d6-d0c78ba84f35",
+        "anchor": "birch-gateway-error-rate",
+        "heading": "Birch gateway error rate",
+        "content": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T19:55:48.869888+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

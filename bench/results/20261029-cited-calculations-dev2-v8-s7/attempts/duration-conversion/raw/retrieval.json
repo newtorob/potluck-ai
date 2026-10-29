@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "05833042-fb89-414a-86d9-51735529be29"
+  ],
+  "query": "How much did the Maple backup duration increase, in seconds?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "05833042-fb89-414a-86d9-51735529be29"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "05833042-fb89-414a-86d9-51735529be29",
+        "document_id": "3daddbf6-a47e-5ef5-8943-1bbdb8f4392d",
+        "revision_id": "3e101b72-c19c-5c54-a757-9f97ae63874e",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T19:47:53.398312+00:00",
+        "chunk_id": "d447973e-2b9f-5abf-82ed-ee33ba0e7a29",
+        "anchor": "maple-backup-duration",
+        "heading": "Maple backup duration",
+        "content": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T19:47:53.398495+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:d447973e-2b9f-5abf-82ed-ee33ba0e7a29:3e101b72-c19c-5c54-a757-9f97ae63874e"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

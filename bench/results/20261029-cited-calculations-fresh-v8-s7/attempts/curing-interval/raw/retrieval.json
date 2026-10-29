@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "8f6b2704-d421-4751-91d1-355c81557910"
+  ],
+  "query": "How many seconds did the Lumen curing interval decrease?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "8f6b2704-d421-4751-91d1-355c81557910"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "8f6b2704-d421-4751-91d1-355c81557910",
+        "document_id": "02f61831-6e3c-51cb-a096-eb6cb4312b92",
+        "revision_id": "f2801c31-27e0-594f-9965-9c35a0e35c2c",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T20:13:14.055522+00:00",
+        "chunk_id": "2c2aa227-7a30-5e00-b9b7-85caf15c92d1",
+        "anchor": "lumen-curing-interval",
+        "heading": "Lumen curing interval",
+        "content": "The Lumen curing interval was 3 minutes before the adjustment and 135 seconds after it.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T20:13:14.055663+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:2c2aa227-7a30-5e00-b9b7-85caf15c92d1:f2801c31-27e0-594f-9965-9c35a0e35c2c"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

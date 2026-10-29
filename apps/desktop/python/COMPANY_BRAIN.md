@@ -304,3 +304,61 @@ independently label citation support and unsupported answers, and measure review
 effort/time to accepted output. Source lifecycle UI, authenticated organizational
 access, larger-corpus performance and repeatable backup/recovery remain additional
 work. This implementation belongs to the free/open core.
+
+### Internal cited-calculation diagnostic
+
+The internal `investigation-v8` diagnostic adds an operation plan and deterministic
+cited calculations. It is available through the Python service only; the default
+and answer-preview versions are unchanged. The planner sees the issue and question
+IDs, and may miss requested parts. An explicit operation plan can also be supplied
+at the Python boundary. Each planned request has a required result. The model selects
+source quantities; the server extracts their numbers and units from complete
+source spans contained in presented snippets and performs the fixed arithmetic
+using Decimal. Full source context prevents a presentation cutoff from changing a
+number or unit. Unrecognized catalog units, missing inputs, incompatible units and
+zero denominators do not produce a computed value. Model-reported conflicts or
+missing evidence remain uncomputed; detecting those conditions still requires
+semantic review. At most 100 extracted quantities are accepted; larger
+catalogs fail the diagnostic rather than silently dropping evidence. Planning and
+answering share the 240-second soft deadline, with limits of 800 and 2,000 output
+tokens respectively. String lengths are enforced after generation (500 characters
+per request and 1,000 per answer or explanation), avoiding unsupported deeply
+nested grammar expansions in the installed backend. Original inputs, arithmetic,
+rounding and provenance remain
+available separately from any reviewer correction and are included in the handoff.
+A valid calculation does not establish correct operand selection, source authority,
+comparability, question coverage or owner acceptance; inspect the evidence.
+
+
+Supported operations are signed difference, percentage-point difference, percent
+change and part/total percentage. A generic difference between two percentage
+inputs also yields percentage points; it never implies relative percent change.
+The unit catalog recognizes milliseconds,
+seconds, minutes, hours, percent signs, a bounded count-unit vocabulary and plain
+numbers. It deliberately omits ambiguous formats, currency, composite rates and
+unsupported units. Time calculations normalize to seconds. Results use at most
+six fractional digits with `ROUND_HALF_UP`; exact selected inputs, normalization
+factors, operand roles and the evaluated expression are retained. A source span
+split across snippets is omitted instead of reconstructed from a partial number.
+
+An owner-supplied plan avoids model planning, but still relies on model operand
+selection and the same source validation:
+
+```python
+item = await create_investigation(
+    scope, "How did latency change?", "latency", loaded_model_slug,
+    template_version="investigation-v8",
+    operation_plan=[{"question_id": "Q1", "request": "Latency change",
+                     "operation": "difference"}],
+)
+```
+
+This internal Python option is not exposed by the public creation route or the
+desktop preview switch. Corrections lose calculation metadata, even when the
+reviewer retains the same text; the original trace remains labelled separately
+in the handoff. Source removal, revision changes and scope restrictions continue
+to invalidate or hide the whole investigation, including its calculation traces.
+
+For shared-unit forms such as `from 100 to 200 ms` or `from 100 to 200 sessions`,
+the full expression must be in one presented snippet. Each input keeps the
+source unit text and its snippet-relative offsets in the calculation trace.

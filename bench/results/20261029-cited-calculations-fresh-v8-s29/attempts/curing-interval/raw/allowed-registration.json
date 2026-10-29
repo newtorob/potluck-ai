@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "8ee6d6d4-68db-43ef-bef2-662680ef8e62",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-cited-calculations-fresh-v8-s29/attempts/curing-interval/raw/allowed",
+  "source_sha256": "33207c051578548ed5d4a95ec102d8b13969f72062b2a6ec2362cf44479d3fcc",
+  "scan": {
+    "collection_id": "8ee6d6d4-68db-43ef-bef2-662680ef8e62",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

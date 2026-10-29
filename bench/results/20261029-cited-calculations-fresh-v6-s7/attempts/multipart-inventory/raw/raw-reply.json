@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-28046e21-05c5-4b2e-a310-74055209b83d",
+  "object": "chat.completion",
+  "created": 1793304455,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What was the previous limit for the Atlas spare-parts reserve?\", \"What is the current limit for the Atlas spare-parts reserve?\", \"What was the increase in the Atlas spare-parts reserve limit?\", \"When did the increase in the Atlas spare-parts reserve take effect?\", \"Who approved the increase in the Atlas spare-parts reserve?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 120,
+    "completion_tokens": 69,
+    "total_tokens": 189
+  }
+}

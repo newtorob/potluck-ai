@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "88d3a6de-5925-48fe-bb2b-03ccacfa4d6f",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-cited-calculations-dev2-v8-s7/attempts/error-rate-units/raw/allowed",
+  "source_sha256": "b400688aa8367bd55fee9186dd72c8b8515a12b46403404eeeeb46e12310afc1",
+  "scan": {
+    "collection_id": "88d3a6de-5925-48fe-bb2b-03ccacfa4d6f",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

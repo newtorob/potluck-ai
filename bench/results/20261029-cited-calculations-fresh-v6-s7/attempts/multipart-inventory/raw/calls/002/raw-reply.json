@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-0e21f424-44dd-4e51-a51f-e085c9e88a17",
+  "object": "chat.completion",
+  "created": 1793304465,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"The previous limit for the Atlas spare-parts reserve was 72 boxes.\", \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S1\"], \"text\": \"The current limit for the Atlas spare-parts reserve is 108 boxes.\", \"status\": \"supported\"}, \"Q3\": {\"snippet_ids\": [\"S1\"], \"text\": \"The increase in the Atlas spare-parts reserve limit was 36 boxes.\", \"status\": \"supported\"}, \"Q4\": {\"snippet_ids\": [\"S2\"], \"text\": \"The increase in the Atlas spare-parts reserve took effect on 22 June.\", \"status\": \"supported\"}, \"Q5\": {\"snippet_ids\": [\"S3\"], \"text\": \"The record does not name an approver for the increase in the Atlas spare-parts reserve.\", \"status\": \"unknown\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 540,
+    "completion_tokens": 190,
+    "total_tokens": 730
+  }
+}

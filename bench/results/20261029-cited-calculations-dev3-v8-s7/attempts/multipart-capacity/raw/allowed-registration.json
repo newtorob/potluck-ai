@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "8f848c6b-76e4-4045-b7dc-44ced0e2d1a0",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-cited-calculations-dev3-v8-s7/attempts/multipart-capacity/raw/allowed",
+  "source_sha256": "ebc7426e602e380665bddd319ea4206b5f35e2a414430a03207bd50b4c5d0b27",
+  "scan": {
+    "collection_id": "8f848c6b-76e4-4045-b7dc-44ced0e2d1a0",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

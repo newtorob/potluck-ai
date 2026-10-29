@@ -1,0 +1,2 @@
+# Kestrel storage limit
+The previous Kestrel storage limit was 30 files. The deployment note lists the current limit as 45 files. The operator checklist lists it as 50 files. Neither record says which current limit is authoritative.

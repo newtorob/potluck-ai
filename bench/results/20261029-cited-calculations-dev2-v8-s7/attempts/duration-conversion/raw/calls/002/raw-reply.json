@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-a03f1017-1994-4d9f-b5bf-48be9482cf64",
+  "object": "chat.completion",
+  "created": 1793303278,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\"], \"reason\": \"The backup duration before the update is 2 minutes (N1) and after the update is 165 seconds (N2). The difference in duration can be calculated by converting 2 minutes to seconds (120 seconds) and subtracting 165 seconds from it.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 376,
+    "completion_tokens": 98,
+    "total_tokens": 474
+  }
+}

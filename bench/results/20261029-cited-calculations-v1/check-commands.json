@@ -1,0 +1,69 @@
+[
+  {
+    "name": "artifact-verification",
+    "command": [
+      "/Users/rob/Documents/potluck/apps/desktop/python/.venv/bin/python",
+      "/Users/rob/Documents/potluck/bench/results/20261029-cited-calculations-v1/verify_artifacts.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.13,
+    "log": "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/cited-calculations/artifact-verification-final.log"
+  },
+  {
+    "name": "preservation",
+    "command": [
+      "python3",
+      "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/cited-calculations/check_preservation.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 12.78,
+    "log": "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/cited-calculations/preservation-final.log"
+  },
+  {
+    "name": "sidecar",
+    "command": [
+      "make",
+      "test-sidecar"
+    ],
+    "exit_code": 2,
+    "elapsed_seconds": 456.54,
+    "log": "/Users/rob/Documents/Codex/2026-10-27/https-www-ycombinator-com-rfs-https/work/cited-calculations/sidecar-final.log"
+  },
+  {
+    "name": "fast-initial",
+    "command": [
+      "make",
+      "test-fast"
+    ],
+    "exit_code": 2,
+    "note": "Unchanged frontend real-timer test failed; first failure retained."
+  },
+  {
+    "name": "fast-rerun",
+    "command": [
+      "make",
+      "test-fast"
+    ],
+    "exit_code": 0,
+    "note": "Full fast suite passed; no frontend changes. Timing-sensitive test remains a known limitation."
+  },
+  {
+    "name": "focused-after-test-isolation",
+    "exit_code": 0,
+    "passed": 249,
+    "source_files_equal_to_frozen": 145,
+    "note": "Only test isolation changed after evaluation; separate clean verification snapshot, not a rerun of model cases."
+  },
+  {
+    "name": "sidecar-rerun",
+    "command": [
+      "make",
+      "test-sidecar"
+    ],
+    "exit_code": 0,
+    "passed": 5173,
+    "skipped": 5,
+    "pytest_seconds": 416.99,
+    "note": "Full rerun after reviewed test-only environment isolation. Initial failure retained."
+  }
+]

@@ -1,0 +1,37 @@
+{
+  "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+  "vocab_only": true,
+  "inference": false,
+  "cases": [
+    {
+      "case": "planner",
+      "exit_code": 0,
+      "stdout": "{\"grammar_bytes\": 1231, \"sampler_nonnull\": true, \"freed\": true}\n",
+      "stderr_tail": ""
+    },
+    {
+      "case": "one",
+      "exit_code": 0,
+      "stdout": "{\"grammar_bytes\": 2864, \"sampler_nonnull\": true, \"freed\": true}\n",
+      "stderr_tail": ""
+    },
+    {
+      "case": "two",
+      "exit_code": 0,
+      "stdout": "{\"grammar_bytes\": 5604, \"sampler_nonnull\": true, \"freed\": true}\n",
+      "stderr_tail": ""
+    },
+    {
+      "case": "twelve-arithmetic",
+      "exit_code": 0,
+      "stdout": "{\"grammar_bytes\": 33103, \"sampler_nonnull\": true, \"freed\": true}\n",
+      "stderr_tail": ""
+    },
+    {
+      "case": "twelve-mixed",
+      "exit_code": 0,
+      "stdout": "{\"grammar_bytes\": 24612, \"sampler_nonnull\": true, \"freed\": true}\n",
+      "stderr_tail": ""
+    }
+  ]
+}

@@ -1,0 +1,204 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "2ed8f6a7-2903-40ea-8d5f-f3b59d157c75",
+    "workspace": "synthetic-eval",
+    "issue": "For the Atlas spare-parts reserve, what were the previous and current limits, what was the increase, when did it take effect, and who approved it?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What was the previous limit for the Atlas spare-parts reserve?"
+        },
+        {
+          "id": "Q2",
+          "text": "What is the current limit for the Atlas spare-parts reserve?"
+        },
+        {
+          "id": "Q3",
+          "text": "What was the increase in the Atlas spare-parts reserve limit?"
+        },
+        {
+          "id": "Q4",
+          "text": "When did the increase in the Atlas spare-parts reserve take effect?"
+        },
+        {
+          "id": "Q5",
+          "text": "Who approved the increase in the Atlas spare-parts reserve?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "supported",
+          "text": "The previous limit for the Atlas spare-parts reserve was 72 boxes.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:e9403526-b6fc-568b-9fe1-170ab08a1ea7:64217fd2-211c-5a8d-8db5-66d23bf60549",
+              "quote": "The Atlas reserve limit rose from 72 to 108 boxes. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "supported",
+          "text": "The current limit for the Atlas spare-parts reserve is 108 boxes.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:e9403526-b6fc-568b-9fe1-170ab08a1ea7:64217fd2-211c-5a8d-8db5-66d23bf60549",
+              "quote": "The Atlas reserve limit rose from 72 to 108 boxes. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q3",
+          "status": "supported",
+          "text": "The increase in the Atlas spare-parts reserve limit was 36 boxes.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:e9403526-b6fc-568b-9fe1-170ab08a1ea7:64217fd2-211c-5a8d-8db5-66d23bf60549",
+              "quote": "The Atlas reserve limit rose from 72 to 108 boxes. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q4",
+          "status": "supported",
+          "text": "The increase in the Atlas spare-parts reserve took effect on 22 June.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:e9403526-b6fc-568b-9fe1-170ab08a1ea7:64217fd2-211c-5a8d-8db5-66d23bf60549",
+              "quote": "The change took effect on 22 June. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q5",
+          "status": "unknown",
+          "text": "The record does not name an approver for the increase in the Atlas spare-parts reserve.",
+          "snippet_ids": [
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:e9403526-b6fc-568b-9fe1-170ab08a1ea7:64217fd2-211c-5a8d-8db5-66d23bf60549",
+              "quote": "The record names Morgan as the person who entered the change but does not name an approver."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "e9aee950-6285-42bc-8d8c-12bb749297d7",
+        "document_id": "edaeff27-0962-5a3e-827d-33d63205763d",
+        "revision_id": "64217fd2-211c-5a8d-8db5-66d23bf60549",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T20:07:35.303036+00:00",
+        "chunk_id": "e9403526-b6fc-568b-9fe1-170ab08a1ea7",
+        "anchor": "atlas-spare-parts-reserve",
+        "heading": "Atlas spare-parts reserve",
+        "content": "The Atlas reserve limit rose from 72 to 108 boxes. The change took effect on 22 June. The record names Morgan as the person who entered the change but does not name an approver.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T20:07:35.303198+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:e9403526-b6fc-568b-9fe1-170ab08a1ea7:64217fd2-211c-5a8d-8db5-66d23bf60549",
+        "presented_content": "The Atlas reserve limit rose from 72 to 108 boxes. The change took effect on 22 June. The record names Morgan as the person who entered the change but does not name an approver."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T20:08:23.843835+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "For the Atlas spare-parts reserve, what were the previous and current limits, what was the increase, when did it take effect, and who approved it?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 48531,
+      "created_at": "2026-10-29T20:08:23.843835+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:e9403526-b6fc-568b-9fe1-170ab08a1ea7:64217fd2-211c-5a8d-8db5-66d23bf60549",
+          "quote": "The Atlas reserve limit rose from 72 to 108 boxes. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:e9403526-b6fc-568b-9fe1-170ab08a1ea7:64217fd2-211c-5a8d-8db5-66d23bf60549",
+          "quote": "The change took effect on 22 June. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:e9403526-b6fc-568b-9fe1-170ab08a1ea7:64217fd2-211c-5a8d-8db5-66d23bf60549",
+          "quote": "The record names Morgan as the person who entered the change but does not name an approver."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "e9aee950-6285-42bc-8d8c-12bb749297d7"
+    ]
+  },
+  "latency_seconds": 48.541533458046615,
+  "setup_seconds": 0.01836316753178835,
+  "attempt_total_seconds": 48.5598966255784
+}

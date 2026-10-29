@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-63bacc05-46ad-4667-bb57-a7b213008d50",
+  "object": "chat.completion",
+  "created": 1793303894,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"operations\": [{\"question_id\": \"Q1\", \"request\": \"percentage\", \"operation\": \"percentage\"}]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 196,
+    "completion_tokens": 24,
+    "total_tokens": 220
+  }
+}

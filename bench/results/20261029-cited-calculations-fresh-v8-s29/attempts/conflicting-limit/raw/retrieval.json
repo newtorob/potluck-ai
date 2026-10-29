@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "67f3ec31-e600-4e9e-970c-bebdca2a20a5"
+  ],
+  "query": "What is the current Kestrel storage limit, and how much did it change from the previous limit?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "67f3ec31-e600-4e9e-970c-bebdca2a20a5"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "67f3ec31-e600-4e9e-970c-bebdca2a20a5",
+        "document_id": "da9ce533-2602-55f2-a60f-e3c5f598edc0",
+        "revision_id": "4ff16256-360f-5ad6-a612-43aa54977f13",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T20:25:32.681314+00:00",
+        "chunk_id": "3d593d3f-d297-5a52-8362-7bde3634332f",
+        "anchor": "kestrel-storage-limit",
+        "heading": "Kestrel storage limit",
+        "content": "The previous Kestrel storage limit was 30 files. The deployment note lists the current limit as 45 files. The operator checklist lists it as 50 files. Neither record says which current limit is authoritative.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T20:25:32.681472+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:3d593d3f-d297-5a52-8362-7bde3634332f:4ff16256-360f-5ad6-a612-43aa54977f13"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

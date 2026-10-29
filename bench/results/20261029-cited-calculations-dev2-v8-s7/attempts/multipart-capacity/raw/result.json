@@ -1,0 +1,258 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "b484d9ad-bb58-415f-838f-eda53e5f9a12",
+    "workspace": "synthetic-eval",
+    "issue": "For the Elm service, what were the old and new capacity limits, what was the absolute increase, who approved the increase, and when did it take effect?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "old_capacity_limit"
+        },
+        {
+          "id": "R2",
+          "text": "new_capacity_limit"
+        },
+        {
+          "id": "R3",
+          "text": "absolute_increase"
+        },
+        {
+          "id": "R4",
+          "text": "approved_by"
+        },
+        {
+          "id": "R5",
+          "text": "take_effect_date"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "unknown",
+          "text": "The Elm service capacity limit rose from 240 to 315 concurrent sessions.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:775cb2dd-0dfa-597b-904f-460d2b9223dd:46a629dc-829a-5f36-81d7-33bea297d2ea",
+              "quote": "The Elm service capacity limit rose from 240 to 315 concurrent sessions. "
+            }
+          ]
+        },
+        {
+          "question_id": "R2",
+          "status": "unknown",
+          "text": "The Elm service capacity limit rose from 240 to 315 concurrent sessions.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:775cb2dd-0dfa-597b-904f-460d2b9223dd:46a629dc-829a-5f36-81d7-33bea297d2ea",
+              "quote": "The Elm service capacity limit rose from 240 to 315 concurrent sessions. "
+            }
+          ]
+        },
+        {
+          "question_id": "R3",
+          "status": "unknown",
+          "text": "The Elm service capacity limit rose from 240 to 315 concurrent sessions.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:775cb2dd-0dfa-597b-904f-460d2b9223dd:46a629dc-829a-5f36-81d7-33bea297d2ea",
+              "quote": "The Elm service capacity limit rose from 240 to 315 concurrent sessions. "
+            }
+          ]
+        },
+        {
+          "question_id": "R4",
+          "status": "unknown",
+          "text": "The change record identifies Dana as the implementer but does not identify an approver.",
+          "snippet_ids": [
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:775cb2dd-0dfa-597b-904f-460d2b9223dd:46a629dc-829a-5f36-81d7-33bea297d2ea",
+              "quote": "The change record identifies Dana as the implementer but does not identify an approver."
+            }
+          ]
+        },
+        {
+          "question_id": "R5",
+          "status": "unknown",
+          "text": "The increase took effect on 14 March.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:775cb2dd-0dfa-597b-904f-460d2b9223dd:46a629dc-829a-5f36-81d7-33bea297d2ea",
+              "quote": "The increase took effect on 14 March. "
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "13320f66-c094-4cd2-b30a-65f19dfa7ce7",
+        "document_id": "d077bb56-f1df-53c9-aabb-bc2b8cc0303a",
+        "revision_id": "46a629dc-829a-5f36-81d7-33bea297d2ea",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T19:50:30.168327+00:00",
+        "chunk_id": "775cb2dd-0dfa-597b-904f-460d2b9223dd",
+        "anchor": "elm-service-capacity-change",
+        "heading": "Elm service capacity change",
+        "content": "The Elm service capacity limit rose from 240 to 315 concurrent sessions. The increase took effect on 14 March. The change record identifies Dana as the implementer but does not identify an approver.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T19:50:30.168477+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:775cb2dd-0dfa-597b-904f-460d2b9223dd:46a629dc-829a-5f36-81d7-33bea297d2ea",
+        "presented_content": "The Elm service capacity limit rose from 240 to 315 concurrent sessions. The increase took effect on 14 March. The change record identifies Dana as the implementer but does not identify an approver."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T19:51:23.183969+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v8",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "For the Elm service, what were the old and new capacity limits, what was the absolute increase, who approved the increase, and when did it take effect?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 53005,
+      "created_at": "2026-10-29T19:51:23.183969+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "For the Elm service, what were the old and new capacity limits, what was the absolute increase, who approved the increase, and when did it take effect?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "old_capacity_limit",
+          "operation": "answer"
+        },
+        {
+          "id": "R2",
+          "question_id": "Q1",
+          "request": "new_capacity_limit",
+          "operation": "answer"
+        },
+        {
+          "id": "R3",
+          "question_id": "Q1",
+          "request": "absolute_increase",
+          "operation": "answer"
+        },
+        {
+          "id": "R4",
+          "question_id": "Q1",
+          "request": "approved_by",
+          "operation": "answer"
+        },
+        {
+          "id": "R5",
+          "question_id": "Q1",
+          "request": "take_effect_date",
+          "operation": "answer"
+        }
+      ],
+      "operation_plan_origin": "planned",
+      "planner_version": "issue-operations-v1",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:775cb2dd-0dfa-597b-904f-460d2b9223dd:46a629dc-829a-5f36-81d7-33bea297d2ea",
+          "quote": "The Elm service capacity limit rose from 240 to 315 concurrent sessions. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:775cb2dd-0dfa-597b-904f-460d2b9223dd:46a629dc-829a-5f36-81d7-33bea297d2ea",
+          "quote": "The increase took effect on 14 March. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:775cb2dd-0dfa-597b-904f-460d2b9223dd:46a629dc-829a-5f36-81d7-33bea297d2ea",
+          "quote": "The change record identifies Dana as the implementer but does not identify an approver."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:775cb2dd-0dfa-597b-904f-460d2b9223dd:46a629dc-829a-5f36-81d7-33bea297d2ea",
+          "source_text": "240",
+          "snippet_text": "The Elm service capacity limit rose from 240 to 315 concurrent sessions. ",
+          "start": 41,
+          "end": 44,
+          "value": "240",
+          "unit": "",
+          "dimension": "dimensionless"
+        }
+      ],
+      "calculation_traces": [],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "13320f66-c094-4cd2-b30a-65f19dfa7ce7"
+    ]
+  },
+  "latency_seconds": 53.01619291584939,
+  "setup_seconds": 0.024415084160864353,
+  "attempt_total_seconds": 53.04060800001025
+}

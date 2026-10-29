@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-other-workspace",
+  "collection_id": "97bb8e87-b084-4427-80c6-cc0c8125e029",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-cited-calculations-fresh-v6-s7/attempts/multipart-inventory/raw/excluded",
+  "source_sha256": "571b55b5bdd601bd15d1ad666f6a2e5c263d15468d4e4b9a119d51a1bc01e8b1",
+  "scan": {
+    "collection_id": "97bb8e87-b084-4427-80c6-cc0c8125e029",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

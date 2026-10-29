@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-71faf386-9c8a-4c55-bf4d-dd6b511d1f1e",
+  "object": "chat.completion",
+  "created": 1793303231,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"operations\": [{\"question_id\": \"Q1\", \"request\": \"difference\", \"operation\": \"percentage_point_difference\"}, {\"question_id\": \"Q1\", \"request\": \"difference\", \"operation\": \"percent_change\"}]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 180,
+    "completion_tokens": 47,
+    "total_tokens": 227
+  }
+}

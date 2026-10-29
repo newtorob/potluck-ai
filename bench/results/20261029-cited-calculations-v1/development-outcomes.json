@@ -1,0 +1,45 @@
+{
+  "note": "Consumed development cases; results are not fresh confirmation. No repairs/retries within an attempt. Four cases unattempted after first native crash. Later snapshots changed before fresh freeze.",
+  "runs": [
+    {
+      "directory": "20261029-cited-calculations-dev-v8-s7",
+      "snapshot": "candidate-dev1",
+      "attempted": 1,
+      "saved": 0,
+      "native_process_exit": 139,
+      "remaining_unattempted": 4,
+      "finding": "Answer grammar initialization crashed after planner completed."
+    },
+    {
+      "directory": "20261029-cited-calculations-dev2-v8-s7",
+      "snapshot": "candidate-dev2",
+      "attempted": 5,
+      "saved": 5,
+      "findings": {
+        "error-rate-units": "-2 pp and -25% correct",
+        "duration-conversion": "45 s correct",
+        "missing-denominator": "Unknown with missing-total reason",
+        "conflicting-threshold": "Safe abstention but one result mentions 24 without the corresponding excerpt",
+        "multipart-capacity": "Five answer operations all unknown; requested increase omitted"
+      }
+    },
+    {
+      "directory": "20261029-cited-calculations-dev3-v8-s7",
+      "snapshot": "candidate-dev3",
+      "attempted": 5,
+      "saved": 3,
+      "findings": {
+        "error-rate-units": "Generic difference of percentages unknown under this snapshot; relative -25% correct. Final candidate corrected dimensions before fresh freeze.",
+        "duration-conversion": "45 s correct",
+        "missing-denominator": "Invalid output with empty catalog; final grammar permits only empty operand array.",
+        "conflicting-threshold": "Unknown with all competing values cited",
+        "multipart-capacity": "Invalid duplicate operation plan"
+      }
+    }
+  ],
+  "total_attempted": 11,
+  "total_saved": 8,
+  "total_native_crashes": 1,
+  "total_invalid_outputs": 2,
+  "final_candidate_development_rerun": false
+}

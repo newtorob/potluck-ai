@@ -1,0 +1,438 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "600c3374-8184-422e-bd30-df099f159939",
+    "workspace": "synthetic-eval",
+    "issue": "For the Quartz inspection line, how many percentage points did the acceptance rate increase, and what was the relative percent increase?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "difference"
+        },
+        {
+          "id": "R2",
+          "text": "relative"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Signed percentage-point difference: 6 percentage points.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:871fe6bb-c209-5f6b-8484-d6e854f3f66a:37aeb5b2-9641-585b-a0e2-c49032fea4ed",
+              "quote": "The Quartz acceptance rate increased from 40% to 46% over the measurement period."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "percentage_point_difference",
+            "status": "computed",
+            "text": "Signed percentage-point difference: 6 percentage points.",
+            "formula": "after - before",
+            "result": "6",
+            "unit": "percentage points",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:871fe6bb-c209-5f6b-8484-d6e854f3f66a:37aeb5b2-9641-585b-a0e2-c49032fea4ed",
+                "source_text": "40%",
+                "snippet_text": "The Quartz acceptance rate increased from 40% to 46% over the measurement period.",
+                "start": 42,
+                "end": 45,
+                "value": "40",
+                "unit": "%",
+                "dimension": "percent"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S1",
+                "citation_id": "source:871fe6bb-c209-5f6b-8484-d6e854f3f66a:37aeb5b2-9641-585b-a0e2-c49032fea4ed",
+                "source_text": "46%",
+                "snippet_text": "The Quartz acceptance rate increased from 40% to 46% over the measurement period.",
+                "start": 49,
+                "end": 52,
+                "value": "46",
+                "unit": "%",
+                "dimension": "percent"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v1",
+            "normalized_inputs": [
+              {
+                "id": "N1",
+                "role": "before",
+                "value": "40",
+                "unit": "%",
+                "original_value": "40",
+                "original_unit": "%",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N2",
+                "role": "after",
+                "value": "46",
+                "unit": "%",
+                "original_value": "46",
+                "original_unit": "%",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "46 % - 40 % = 6 percentage points (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+          }
+        },
+        {
+          "question_id": "R2",
+          "status": "supported",
+          "text": "Signed percent change: 15 %.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:871fe6bb-c209-5f6b-8484-d6e854f3f66a:37aeb5b2-9641-585b-a0e2-c49032fea4ed",
+              "quote": "The Quartz acceptance rate increased from 40% to 46% over the measurement period."
+            }
+          ],
+          "calculation": {
+            "request_id": "R2",
+            "operation": "percent_change",
+            "status": "computed",
+            "text": "Signed percent change: 15 %.",
+            "formula": "(after - before) / before × 100",
+            "result": "15",
+            "unit": "%",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:871fe6bb-c209-5f6b-8484-d6e854f3f66a:37aeb5b2-9641-585b-a0e2-c49032fea4ed",
+                "source_text": "40%",
+                "snippet_text": "The Quartz acceptance rate increased from 40% to 46% over the measurement period.",
+                "start": 42,
+                "end": 45,
+                "value": "40",
+                "unit": "%",
+                "dimension": "percent"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S1",
+                "citation_id": "source:871fe6bb-c209-5f6b-8484-d6e854f3f66a:37aeb5b2-9641-585b-a0e2-c49032fea4ed",
+                "source_text": "46%",
+                "snippet_text": "The Quartz acceptance rate increased from 40% to 46% over the measurement period.",
+                "start": 49,
+                "end": 52,
+                "value": "46",
+                "unit": "%",
+                "dimension": "percent"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v1",
+            "normalized_inputs": [
+              {
+                "id": "N1",
+                "role": "before",
+                "value": "40",
+                "unit": "%",
+                "original_value": "40",
+                "original_unit": "%",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N2",
+                "role": "after",
+                "value": "46",
+                "unit": "%",
+                "original_value": "46",
+                "original_unit": "%",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "(46 % - 40 %) / 40 % × 100 = 15 % (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "78f5dcdd-82f4-404c-9d65-de0444c021b2",
+        "document_id": "8c4a94c3-2bc9-552e-bef4-36fcc2be6419",
+        "revision_id": "37aeb5b2-9641-585b-a0e2-c49032fea4ed",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T20:11:07.800416+00:00",
+        "chunk_id": "871fe6bb-c209-5f6b-8484-d6e854f3f66a",
+        "anchor": "quartz-inspection-yield",
+        "heading": "Quartz inspection yield",
+        "content": "The Quartz acceptance rate increased from 40% to 46% over the measurement period.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T20:11:07.800559+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:871fe6bb-c209-5f6b-8484-d6e854f3f66a:37aeb5b2-9641-585b-a0e2-c49032fea4ed",
+        "presented_content": "The Quartz acceptance rate increased from 40% to 46% over the measurement period."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T20:13:14.033576+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v8",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "For the Quartz inspection line, how many percentage points did the acceptance rate increase, and what was the relative percent increase?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 126227,
+      "created_at": "2026-10-29T20:13:14.033576+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "For the Quartz inspection line, how many percentage points did the acceptance rate increase, and what was the relative percent increase?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "difference",
+          "operation": "percentage_point_difference"
+        },
+        {
+          "id": "R2",
+          "question_id": "Q1",
+          "request": "relative",
+          "operation": "percent_change"
+        }
+      ],
+      "operation_plan_origin": "planned",
+      "planner_version": "issue-operations-v1",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:871fe6bb-c209-5f6b-8484-d6e854f3f66a:37aeb5b2-9641-585b-a0e2-c49032fea4ed",
+          "quote": "The Quartz acceptance rate increased from 40% to 46% over the measurement period."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:871fe6bb-c209-5f6b-8484-d6e854f3f66a:37aeb5b2-9641-585b-a0e2-c49032fea4ed",
+          "source_text": "40%",
+          "snippet_text": "The Quartz acceptance rate increased from 40% to 46% over the measurement period.",
+          "start": 42,
+          "end": 45,
+          "value": "40",
+          "unit": "%",
+          "dimension": "percent"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S1",
+          "citation_id": "source:871fe6bb-c209-5f6b-8484-d6e854f3f66a:37aeb5b2-9641-585b-a0e2-c49032fea4ed",
+          "source_text": "46%",
+          "snippet_text": "The Quartz acceptance rate increased from 40% to 46% over the measurement period.",
+          "start": 49,
+          "end": 52,
+          "value": "46",
+          "unit": "%",
+          "dimension": "percent"
+        }
+      ],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "percentage_point_difference",
+          "status": "computed",
+          "text": "Signed percentage-point difference: 6 percentage points.",
+          "formula": "after - before",
+          "result": "6",
+          "unit": "percentage points",
+          "reason": null,
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:871fe6bb-c209-5f6b-8484-d6e854f3f66a:37aeb5b2-9641-585b-a0e2-c49032fea4ed",
+              "source_text": "40%",
+              "snippet_text": "The Quartz acceptance rate increased from 40% to 46% over the measurement period.",
+              "start": 42,
+              "end": 45,
+              "value": "40",
+              "unit": "%",
+              "dimension": "percent"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S1",
+              "citation_id": "source:871fe6bb-c209-5f6b-8484-d6e854f3f66a:37aeb5b2-9641-585b-a0e2-c49032fea4ed",
+              "source_text": "46%",
+              "snippet_text": "The Quartz acceptance rate increased from 40% to 46% over the measurement period.",
+              "start": 49,
+              "end": 52,
+              "value": "46",
+              "unit": "%",
+              "dimension": "percent"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v1",
+          "normalized_inputs": [
+            {
+              "id": "N1",
+              "role": "before",
+              "value": "40",
+              "unit": "%",
+              "original_value": "40",
+              "original_unit": "%",
+              "conversion_factor": "1"
+            },
+            {
+              "id": "N2",
+              "role": "after",
+              "value": "46",
+              "unit": "%",
+              "original_value": "46",
+              "original_unit": "%",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": "46 % - 40 % = 6 percentage points (rounded)",
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+        },
+        {
+          "request_id": "R2",
+          "operation": "percent_change",
+          "status": "computed",
+          "text": "Signed percent change: 15 %.",
+          "formula": "(after - before) / before × 100",
+          "result": "15",
+          "unit": "%",
+          "reason": null,
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:871fe6bb-c209-5f6b-8484-d6e854f3f66a:37aeb5b2-9641-585b-a0e2-c49032fea4ed",
+              "source_text": "40%",
+              "snippet_text": "The Quartz acceptance rate increased from 40% to 46% over the measurement period.",
+              "start": 42,
+              "end": 45,
+              "value": "40",
+              "unit": "%",
+              "dimension": "percent"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S1",
+              "citation_id": "source:871fe6bb-c209-5f6b-8484-d6e854f3f66a:37aeb5b2-9641-585b-a0e2-c49032fea4ed",
+              "source_text": "46%",
+              "snippet_text": "The Quartz acceptance rate increased from 40% to 46% over the measurement period.",
+              "start": 49,
+              "end": 52,
+              "value": "46",
+              "unit": "%",
+              "dimension": "percent"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v1",
+          "normalized_inputs": [
+            {
+              "id": "N1",
+              "role": "before",
+              "value": "40",
+              "unit": "%",
+              "original_value": "40",
+              "original_unit": "%",
+              "conversion_factor": "1"
+            },
+            {
+              "id": "N2",
+              "role": "after",
+              "value": "46",
+              "unit": "%",
+              "original_value": "46",
+              "original_unit": "%",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": "(46 % - 40 %) / 40 % × 100 = 15 % (rounded)",
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "78f5dcdd-82f4-404c-9d65-de0444c021b2"
+    ]
+  },
+  "latency_seconds": 126.23775437474251,
+  "setup_seconds": 0.013363124802708626,
+  "attempt_total_seconds": 126.25111749954522
+}

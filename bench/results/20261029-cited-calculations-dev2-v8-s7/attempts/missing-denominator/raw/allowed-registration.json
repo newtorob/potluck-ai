@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "4b65d635-9fef-4296-a910-38fb5b53c1e3",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-cited-calculations-dev2-v8-s7/attempts/missing-denominator/raw/allowed",
+  "source_sha256": "f2bfee1cb9d49acec12af88fdaf0ef4685027cd740a6efd4fbd8352cb63bbcc6",
+  "scan": {
+    "collection_id": "4b65d635-9fef-4296-a910-38fb5b53c1e3",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

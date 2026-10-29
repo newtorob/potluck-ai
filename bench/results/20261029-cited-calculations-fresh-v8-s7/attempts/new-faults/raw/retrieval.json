@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "bc98384b-58c8-4065-988a-84f49d4178bb"
+  ],
+  "query": "What was the relative percentage change in Orion faults between the two inspections?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "bc98384b-58c8-4065-988a-84f49d4178bb"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "bc98384b-58c8-4065-988a-84f49d4178bb",
+        "document_id": "776d3633-fa50-521c-a7d7-2bc9d59e6e5f",
+        "revision_id": "a375cd05-322a-519e-9bee-84c7bd7a9f55",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T20:16:26.201969+00:00",
+        "chunk_id": "0242411a-24ed-5b0c-9119-419003b2dfd2",
+        "anchor": "orion-inspection-faults",
+        "heading": "Orion inspection faults",
+        "content": "The first inspection recorded 0 faults. The second inspection recorded 7 faults.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T20:16:26.202134+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:0242411a-24ed-5b0c-9119-419003b2dfd2:a375cd05-322a-519e-9bee-84c7bd7a9f55"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

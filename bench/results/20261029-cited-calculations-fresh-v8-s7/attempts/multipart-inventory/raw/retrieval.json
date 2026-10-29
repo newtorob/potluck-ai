@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "09e4fc01-ac04-43ae-9eea-9ef51653c949"
+  ],
+  "query": "For the Atlas spare-parts reserve, what were the previous and current limits, what was the increase, when did it take effect, and who approved it?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "09e4fc01-ac04-43ae-9eea-9ef51653c949"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "09e4fc01-ac04-43ae-9eea-9ef51653c949",
+        "document_id": "821d181b-b30c-5188-8942-38c9dfe396af",
+        "revision_id": "f44a29ed-7743-5f5d-8eb9-e8b57dcf4a89",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T20:20:59.843063+00:00",
+        "chunk_id": "4ab66bba-9840-51f1-a84a-e635e3a4e0ee",
+        "anchor": "atlas-spare-parts-reserve",
+        "heading": "Atlas spare-parts reserve",
+        "content": "The Atlas reserve limit rose from 72 to 108 boxes. The change took effect on 22 June. The record names Morgan as the person who entered the change but does not name an approver.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T20:20:59.843248+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:4ab66bba-9840-51f1-a84a-e635e3a4e0ee:f44a29ed-7743-5f5d-8eb9-e8b57dcf4a89"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

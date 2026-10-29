@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "361ef1fd-6157-4153-817a-ef739c4bd602",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-cited-calculations-dev2-v8-s7/attempts/conflicting-threshold/raw/allowed",
+  "source_sha256": "9d7fbbcc6160b671ae69be855247438a4b5909a41130bc2ab1339a9049044412",
+  "scan": {
+    "collection_id": "361ef1fd-6157-4153-817a-ef739c4bd602",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

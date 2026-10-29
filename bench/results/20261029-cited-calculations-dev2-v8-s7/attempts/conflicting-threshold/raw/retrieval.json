@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "361ef1fd-6157-4153-817a-ef739c4bd602"
+  ],
+  "query": "What is the current Alder timeout, and how much did it increase from the old value?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "361ef1fd-6157-4153-817a-ef739c4bd602"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "361ef1fd-6157-4153-817a-ef739c4bd602",
+        "document_id": "bdaf27d7-e1a7-5f0b-9b6e-d16d19ca3f34",
+        "revision_id": "de1eba3d-55f5-51b5-a804-142a25a1ec1d",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T19:49:59.723329+00:00",
+        "chunk_id": "812f6aec-2c01-5776-9ca1-84be88193b21",
+        "anchor": "alder-timeout-records",
+        "heading": "Alder timeout records",
+        "content": "The old Alder timeout was 10 seconds. The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. Neither record establishes which current value is authoritative.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T19:49:59.723705+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:812f6aec-2c01-5776-9ca1-84be88193b21:de1eba3d-55f5-51b5-a804-142a25a1ec1d"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-a61d13be-85e7-428c-b6f4-b17180496d5a",
+  "object": "chat.completion",
+  "created": 1793303990,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"operations\": [{\"question_id\": \"Q1\", \"request\": \"answer\", \"operation\": \"answer\"}, {\"question_id\": \"Q1\", \"request\": \"answer\", \"operation\": \"answer\"}, {\"question_id\": \"Q1\", \"request\": \"answer\", \"operation\": \"answer\"}, {\"question_id\": \"Q1\", \"request\": \"answer\", \"operation\": \"answer\"}, {\"question_id\": \"Q1\", \"request\": \"answer\", \"operation\": \"answer\"}]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 242,
+    "completion_tokens": 104,
+    "total_tokens": 346
+  }
+}

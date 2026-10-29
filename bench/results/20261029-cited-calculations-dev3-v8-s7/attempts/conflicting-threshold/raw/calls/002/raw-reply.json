@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-21f3fa9c-143e-4b56-9e7c-96bddf849f81",
+  "object": "chat.completion",
+  "created": 1793303952,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"snippet_ids\": [\"S1\", \"S2\", \"S3\"], \"text\": \"The old Alder timeout was 10 seconds. The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. Neither record establishes which current value is authoritative.\", \"status\": \"unknown\"}, \"R2\": {\"operand_ids\": [], \"status\": \"unknown\", \"snippet_ids\": [\"S1\", \"S2\", \"S3\"], \"reason\": \"The current value is not established as authoritative, so the difference cannot be calculated.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 629,
+    "completion_tokens": 138,
+    "total_tokens": 767
+  }
+}

@@ -1,0 +1,287 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "4903a2ab-aaca-440f-8109-8e360fabae49",
+    "workspace": "synthetic-eval",
+    "issue": "How many seconds did the Lumen curing interval decrease?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "difference"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Signed difference: -45 s.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:06ae8dab-03f4-5344-90f5-4b9908e8bb21:32c54fe3-208c-5721-a470-5e7af488c682",
+              "quote": "The Lumen curing interval was 3 minutes before the adjustment and 135 seconds after it."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "difference",
+            "status": "computed",
+            "text": "Signed difference: -45 s.",
+            "formula": "after - before",
+            "result": "-45",
+            "unit": "s",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:06ae8dab-03f4-5344-90f5-4b9908e8bb21:32c54fe3-208c-5721-a470-5e7af488c682",
+                "source_text": "3 minutes",
+                "snippet_text": "The Lumen curing interval was 3 minutes before the adjustment and 135 seconds after it.",
+                "start": 30,
+                "end": 39,
+                "value": "3",
+                "unit": "min",
+                "dimension": "time"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S1",
+                "citation_id": "source:06ae8dab-03f4-5344-90f5-4b9908e8bb21:32c54fe3-208c-5721-a470-5e7af488c682",
+                "source_text": "135 seconds",
+                "snippet_text": "The Lumen curing interval was 3 minutes before the adjustment and 135 seconds after it.",
+                "start": 66,
+                "end": 77,
+                "value": "135",
+                "unit": "s",
+                "dimension": "time"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v1",
+            "normalized_inputs": [
+              {
+                "id": "N1",
+                "role": "before",
+                "value": "180",
+                "unit": "s",
+                "original_value": "3",
+                "original_unit": "min",
+                "conversion_factor": "60"
+              },
+              {
+                "id": "N2",
+                "role": "after",
+                "value": "135",
+                "unit": "s",
+                "original_value": "135",
+                "original_unit": "s",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "135 s - 180 s = -45 s (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "8ee6d6d4-68db-43ef-bef2-662680ef8e62",
+        "document_id": "f4d4bb40-a641-56b5-9f19-d969343c5cb5",
+        "revision_id": "32c54fe3-208c-5721-a470-5e7af488c682",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T20:23:47.682966+00:00",
+        "chunk_id": "06ae8dab-03f4-5344-90f5-4b9908e8bb21",
+        "anchor": "lumen-curing-interval",
+        "heading": "Lumen curing interval",
+        "content": "The Lumen curing interval was 3 minutes before the adjustment and 135 seconds after it.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T20:23:47.683102+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:06ae8dab-03f4-5344-90f5-4b9908e8bb21:32c54fe3-208c-5721-a470-5e7af488c682",
+        "presented_content": "The Lumen curing interval was 3 minutes before the adjustment and 135 seconds after it."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T20:24:09.840702+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v8",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "How many seconds did the Lumen curing interval decrease?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 29,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 22152,
+      "created_at": "2026-10-29T20:24:09.840702+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "How many seconds did the Lumen curing interval decrease?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "difference",
+          "operation": "difference"
+        }
+      ],
+      "operation_plan_origin": "planned",
+      "planner_version": "issue-operations-v1",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 29
+      },
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:06ae8dab-03f4-5344-90f5-4b9908e8bb21:32c54fe3-208c-5721-a470-5e7af488c682",
+          "quote": "The Lumen curing interval was 3 minutes before the adjustment and 135 seconds after it."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:06ae8dab-03f4-5344-90f5-4b9908e8bb21:32c54fe3-208c-5721-a470-5e7af488c682",
+          "source_text": "3 minutes",
+          "snippet_text": "The Lumen curing interval was 3 minutes before the adjustment and 135 seconds after it.",
+          "start": 30,
+          "end": 39,
+          "value": "3",
+          "unit": "min",
+          "dimension": "time"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S1",
+          "citation_id": "source:06ae8dab-03f4-5344-90f5-4b9908e8bb21:32c54fe3-208c-5721-a470-5e7af488c682",
+          "source_text": "135 seconds",
+          "snippet_text": "The Lumen curing interval was 3 minutes before the adjustment and 135 seconds after it.",
+          "start": 66,
+          "end": 77,
+          "value": "135",
+          "unit": "s",
+          "dimension": "time"
+        }
+      ],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "difference",
+          "status": "computed",
+          "text": "Signed difference: -45 s.",
+          "formula": "after - before",
+          "result": "-45",
+          "unit": "s",
+          "reason": null,
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:06ae8dab-03f4-5344-90f5-4b9908e8bb21:32c54fe3-208c-5721-a470-5e7af488c682",
+              "source_text": "3 minutes",
+              "snippet_text": "The Lumen curing interval was 3 minutes before the adjustment and 135 seconds after it.",
+              "start": 30,
+              "end": 39,
+              "value": "3",
+              "unit": "min",
+              "dimension": "time"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S1",
+              "citation_id": "source:06ae8dab-03f4-5344-90f5-4b9908e8bb21:32c54fe3-208c-5721-a470-5e7af488c682",
+              "source_text": "135 seconds",
+              "snippet_text": "The Lumen curing interval was 3 minutes before the adjustment and 135 seconds after it.",
+              "start": 66,
+              "end": 77,
+              "value": "135",
+              "unit": "s",
+              "dimension": "time"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v1",
+          "normalized_inputs": [
+            {
+              "id": "N1",
+              "role": "before",
+              "value": "180",
+              "unit": "s",
+              "original_value": "3",
+              "original_unit": "min",
+              "conversion_factor": "60"
+            },
+            {
+              "id": "N2",
+              "role": "after",
+              "value": "135",
+              "unit": "s",
+              "original_value": "135",
+              "original_unit": "s",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": "135 s - 180 s = -45 s (rounded)",
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "8ee6d6d4-68db-43ef-bef2-662680ef8e62"
+    ]
+  },
+  "latency_seconds": 22.162653707899153,
+  "setup_seconds": 0.015736667439341545,
+  "attempt_total_seconds": 22.178390375338495
+}

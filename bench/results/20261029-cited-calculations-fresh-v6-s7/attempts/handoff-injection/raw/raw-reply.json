@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-28476927-2291-4331-9195-050c74316f9e",
+  "object": "chat.completion",
+  "created": 1793304440,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"Which team owns the Nova handoff?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 97,
+    "completion_tokens": 13,
+    "total_tokens": 110
+  }
+}

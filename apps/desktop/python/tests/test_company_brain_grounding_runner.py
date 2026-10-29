@@ -229,7 +229,7 @@ def _fixture_with_questions(tmp_path, questions):
     return fixtures
 
 
-@pytest.mark.parametrize('version', ['investigation-v6', 'investigation-v7'])
+@pytest.mark.parametrize('version', ['investigation-v6', 'investigation-v7', 'investigation-v8'])
 def test_answer_options_and_explicit_questions_are_recorded_and_forwarded(tmp_path, monkeypatch, version):
     fixtures = _fixture_with_questions(tmp_path, ['What happened?', 'Who owns it?'])
     model = tmp_path / 'model.gguf'
@@ -256,7 +256,7 @@ def test_answer_options_and_explicit_questions_are_recorded_and_forwarded(tmp_pa
 
 
 @pytest.mark.parametrize('questions', [None, [], [''], ['Same', ' Same '], ['a' * 501], ['x'] * 9, [42]])
-@pytest.mark.parametrize('version', ['investigation-v6', 'investigation-v7'])
+@pytest.mark.parametrize('version', ['investigation-v6', 'investigation-v7', 'investigation-v8'])
 def test_invalid_explicit_questions_fail_before_load(tmp_path, monkeypatch, questions, version):
     fixtures = _fixture_with_questions(tmp_path, questions)
     model = tmp_path / 'model.gguf'
@@ -283,7 +283,7 @@ def test_invalid_options_fail_before_loading(tmp_path, monkeypatch, options):
     assert runtime.loads == 0 and not (tmp_path / 'run').exists()
 
 
-@pytest.mark.parametrize('version', ['investigation-v6', 'investigation-v7'])
+@pytest.mark.parametrize('version', ['investigation-v6', 'investigation-v7', 'investigation-v8'])
 def test_auto_question_mode_never_supplies_fixture_questions(tmp_path, monkeypatch, version):
     fixtures = _fixture_with_questions(tmp_path, ['Explicit fixture question'])
     model = tmp_path / 'model.gguf'
@@ -301,19 +301,20 @@ def test_auto_question_mode_never_supplies_fixture_questions(tmp_path, monkeypat
     assert calls and all(call == {'template_version': version} for call in calls)
 
 
-def test_cli_accepts_v7_and_forwards_explicit_settings(tmp_path, monkeypatch):
+@pytest.mark.parametrize('version', ['investigation-v7', 'investigation-v8'])
+def test_cli_accepts_version_and_forwards_explicit_settings(tmp_path, monkeypatch, version):
     observed = {}
     async def fake_run(*args, **kwargs):
         observed.update(args=args, kwargs=kwargs)
     monkeypatch.setattr(runner, 'run', fake_run)
     monkeypatch.setattr(sys, 'argv', ['runner', '--suite', 'fresh',
-        '--fixture-dir', str(tmp_path / 'fixtures'), '--template-version', 'investigation-v7',
+        '--fixture-dir', str(tmp_path / 'fixtures'), '--template-version', version,
         '--generation-profile', 'qwen3-non-thinking', '--seed', '0', '--question-mode', 'explicit',
         '--model-path', str(tmp_path / 'model'), '--model-sha256', 'abc',
         '--context-size', '8192', '--threads', '8', '--output-dir', str(tmp_path / 'out')])
     runner.main()
     assert observed['args'] == (tmp_path / 'out', 'fresh', tmp_path / 'model', 'abc',
-                                8192, 8, tmp_path / 'fixtures', 'investigation-v7')
+                                8192, 8, tmp_path / 'fixtures', version)
     assert observed['kwargs'] == {'generation_profile': 'qwen3-non-thinking',
                                   'seed': 0, 'question_mode': 'explicit'}
 

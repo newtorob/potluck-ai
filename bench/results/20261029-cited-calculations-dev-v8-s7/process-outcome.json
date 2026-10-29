@@ -1,0 +1,8 @@
+{
+  "exit_code": 139,
+  "stage": "answer grammar initialization",
+  "attempted_cases": 1,
+  "completed_drafts": 0,
+  "unattempted_cases": 4,
+  "details": "Native parser rejected repetition complexity in zero-minimum length reason string; process crashed. No repair within attempt. Complete calls and process log retained."
+}

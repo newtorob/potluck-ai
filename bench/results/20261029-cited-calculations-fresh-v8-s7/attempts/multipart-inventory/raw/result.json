@@ -1,0 +1,16 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "error",
+  "error": {
+    "type": "ValueError",
+    "message": "Invalid operation plan"
+  },
+  "failure_stage": "inference_or_validation",
+  "latency_seconds": 64.17896108329296,
+  "setup_seconds": 0.020331500098109245,
+  "attempt_total_seconds": 64.19929258339107
+}

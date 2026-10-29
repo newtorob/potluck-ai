@@ -1,0 +1,400 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "0d616dfb-be19-473c-b2bd-d50cc295f795",
+    "workspace": "synthetic-eval",
+    "issue": "For the Birch gateway, how many percentage points and what relative percentage did the error rate decrease?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "difference"
+        },
+        {
+          "id": "R2",
+          "text": "percent_change"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "unknown",
+          "text": "Unknown: Use percentage-point difference for percent inputs.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+              "quote": "The Birch gateway error rate fell from 8% to 6% over the measured interval."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "difference",
+            "status": "unknown",
+            "text": "Unknown: Use percentage-point difference for percent inputs.",
+            "formula": "after - before",
+            "result": null,
+            "unit": null,
+            "reason": "Use percentage-point difference for percent inputs.",
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+                "source_text": "8%",
+                "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+                "start": 39,
+                "end": 41,
+                "value": "8",
+                "unit": "%",
+                "dimension": "percent"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S1",
+                "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+                "source_text": "6%",
+                "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+                "start": 45,
+                "end": 47,
+                "value": "6",
+                "unit": "%",
+                "dimension": "percent"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v1",
+            "normalized_inputs": [],
+            "evaluated_expression": null,
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+          }
+        },
+        {
+          "question_id": "R2",
+          "status": "supported",
+          "text": "Signed percent change: -25 %.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+              "quote": "The Birch gateway error rate fell from 8% to 6% over the measured interval."
+            }
+          ],
+          "calculation": {
+            "request_id": "R2",
+            "operation": "percent_change",
+            "status": "computed",
+            "text": "Signed percent change: -25 %.",
+            "formula": "(after - before) / before × 100",
+            "result": "-25",
+            "unit": "%",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+                "source_text": "8%",
+                "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+                "start": 39,
+                "end": 41,
+                "value": "8",
+                "unit": "%",
+                "dimension": "percent"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S1",
+                "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+                "source_text": "6%",
+                "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+                "start": 45,
+                "end": 47,
+                "value": "6",
+                "unit": "%",
+                "dimension": "percent"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v1",
+            "normalized_inputs": [
+              {
+                "id": "N1",
+                "role": "before",
+                "value": "8",
+                "unit": "%",
+                "original_value": "8",
+                "original_unit": "%",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N2",
+                "role": "after",
+                "value": "6",
+                "unit": "%",
+                "original_value": "6",
+                "original_unit": "%",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "(6 % - 8 %) / 8 % × 100 = -25 % (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "6ac9fd7e-6c7d-492f-8258-c77ab2dad795",
+        "document_id": "a850358f-cda7-544b-8d83-2b0744732b95",
+        "revision_id": "a4419655-c26d-5650-899f-fafacfcb9b33",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T19:55:48.869481+00:00",
+        "chunk_id": "dcf90503-5eb5-5029-a2d6-d0c78ba84f35",
+        "anchor": "birch-gateway-error-rate",
+        "heading": "Birch gateway error rate",
+        "content": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T19:55:48.869888+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+        "presented_content": "The Birch gateway error rate fell from 8% to 6% over the measured interval."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T19:57:30.958566+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v8",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "For the Birch gateway, how many percentage points and what relative percentage did the error rate decrease?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 102083,
+      "created_at": "2026-10-29T19:57:30.958566+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "For the Birch gateway, how many percentage points and what relative percentage did the error rate decrease?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "difference",
+          "operation": "difference"
+        },
+        {
+          "id": "R2",
+          "question_id": "Q1",
+          "request": "percent_change",
+          "operation": "percent_change"
+        }
+      ],
+      "operation_plan_origin": "planned",
+      "planner_version": "issue-operations-v1",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+          "quote": "The Birch gateway error rate fell from 8% to 6% over the measured interval."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+          "source_text": "8%",
+          "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+          "start": 39,
+          "end": 41,
+          "value": "8",
+          "unit": "%",
+          "dimension": "percent"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S1",
+          "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+          "source_text": "6%",
+          "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+          "start": 45,
+          "end": 47,
+          "value": "6",
+          "unit": "%",
+          "dimension": "percent"
+        }
+      ],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "difference",
+          "status": "unknown",
+          "text": "Unknown: Use percentage-point difference for percent inputs.",
+          "formula": "after - before",
+          "result": null,
+          "unit": null,
+          "reason": "Use percentage-point difference for percent inputs.",
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+              "source_text": "8%",
+              "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+              "start": 39,
+              "end": 41,
+              "value": "8",
+              "unit": "%",
+              "dimension": "percent"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S1",
+              "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+              "source_text": "6%",
+              "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+              "start": 45,
+              "end": 47,
+              "value": "6",
+              "unit": "%",
+              "dimension": "percent"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v1",
+          "normalized_inputs": [],
+          "evaluated_expression": null,
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+        },
+        {
+          "request_id": "R2",
+          "operation": "percent_change",
+          "status": "computed",
+          "text": "Signed percent change: -25 %.",
+          "formula": "(after - before) / before × 100",
+          "result": "-25",
+          "unit": "%",
+          "reason": null,
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+              "source_text": "8%",
+              "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+              "start": 39,
+              "end": 41,
+              "value": "8",
+              "unit": "%",
+              "dimension": "percent"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S1",
+              "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+              "source_text": "6%",
+              "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+              "start": 45,
+              "end": 47,
+              "value": "6",
+              "unit": "%",
+              "dimension": "percent"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v1",
+          "normalized_inputs": [
+            {
+              "id": "N1",
+              "role": "before",
+              "value": "8",
+              "unit": "%",
+              "original_value": "8",
+              "original_unit": "%",
+              "conversion_factor": "1"
+            },
+            {
+              "id": "N2",
+              "role": "after",
+              "value": "6",
+              "unit": "%",
+              "original_value": "6",
+              "original_unit": "%",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": "(6 % - 8 %) / 8 % × 100 = -25 % (rounded)",
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "6ac9fd7e-6c7d-492f-8258-c77ab2dad795"
+    ]
+  },
+  "latency_seconds": 102.09320037439466,
+  "setup_seconds": 0.017922375351190567,
+  "attempt_total_seconds": 102.11112274974585
+}

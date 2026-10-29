@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-bcf224d5-1a25-49d6-a0f9-0dd86bf64f56",
+  "object": "chat.completion",
+  "created": 1793303902,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"S1\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\"], \"reason\": \"S1 provides the number of Spruce jobs that failed, which is 7. However, the total number of Spruce jobs attempted is not provided in the snippets, making it impossible to calculate the percentage of failed jobs.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 443,
+    "completion_tokens": 82,
+    "total_tokens": 525
+  }
+}

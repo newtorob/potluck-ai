@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "05833042-fb89-414a-86d9-51735529be29",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-cited-calculations-dev2-v8-s7/attempts/duration-conversion/raw/allowed",
+  "source_sha256": "1fa2605a1de16e12f0e075942e675792afbf8a9fbf395d1a619cbac7498c414e",
+  "scan": {
+    "collection_id": "05833042-fb89-414a-86d9-51735529be29",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

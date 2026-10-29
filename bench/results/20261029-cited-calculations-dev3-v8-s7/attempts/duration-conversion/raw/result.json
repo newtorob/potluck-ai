@@ -1,0 +1,287 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "283a03de-8615-436d-99c8-fc6b00886771",
+    "workspace": "synthetic-eval",
+    "issue": "How much did the Maple backup duration increase, in seconds?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "difference"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Signed difference: 45 s.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+              "quote": "The Maple backup took 2 minutes before the update and 165 seconds after it."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "difference",
+            "status": "computed",
+            "text": "Signed difference: 45 s.",
+            "formula": "after - before",
+            "result": "45",
+            "unit": "s",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+                "source_text": "2 minutes",
+                "snippet_text": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+                "start": 22,
+                "end": 31,
+                "value": "2",
+                "unit": "min",
+                "dimension": "time"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S1",
+                "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+                "source_text": "165 seconds",
+                "snippet_text": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+                "start": 54,
+                "end": 65,
+                "value": "165",
+                "unit": "s",
+                "dimension": "time"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v1",
+            "normalized_inputs": [
+              {
+                "id": "N1",
+                "role": "before",
+                "value": "120",
+                "unit": "s",
+                "original_value": "2",
+                "original_unit": "min",
+                "conversion_factor": "60"
+              },
+              {
+                "id": "N2",
+                "role": "after",
+                "value": "165",
+                "unit": "s",
+                "original_value": "165",
+                "original_unit": "s",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "165 s - 120 s = 45 s (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "9f476281-c58b-41b3-ab8a-c054ab749be9",
+        "document_id": "9df0de78-7b3b-5355-bdf4-eee71c022748",
+        "revision_id": "db779046-960f-556b-83e3-387dbeb4dc5c",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T19:57:30.981103+00:00",
+        "chunk_id": "1a3c4550-ff65-56c9-8c4f-01e885dfd5c6",
+        "anchor": "maple-backup-duration",
+        "heading": "Maple backup duration",
+        "content": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T19:57:30.981244+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+        "presented_content": "The Maple backup took 2 minutes before the update and 165 seconds after it."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T19:58:14.088636+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v8",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "How much did the Maple backup duration increase, in seconds?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 43102,
+      "created_at": "2026-10-29T19:58:14.088636+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "How much did the Maple backup duration increase, in seconds?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "difference",
+          "operation": "difference"
+        }
+      ],
+      "operation_plan_origin": "planned",
+      "planner_version": "issue-operations-v1",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+          "quote": "The Maple backup took 2 minutes before the update and 165 seconds after it."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+          "source_text": "2 minutes",
+          "snippet_text": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+          "start": 22,
+          "end": 31,
+          "value": "2",
+          "unit": "min",
+          "dimension": "time"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S1",
+          "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+          "source_text": "165 seconds",
+          "snippet_text": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+          "start": 54,
+          "end": 65,
+          "value": "165",
+          "unit": "s",
+          "dimension": "time"
+        }
+      ],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "difference",
+          "status": "computed",
+          "text": "Signed difference: 45 s.",
+          "formula": "after - before",
+          "result": "45",
+          "unit": "s",
+          "reason": null,
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+              "source_text": "2 minutes",
+              "snippet_text": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+              "start": 22,
+              "end": 31,
+              "value": "2",
+              "unit": "min",
+              "dimension": "time"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S1",
+              "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+              "source_text": "165 seconds",
+              "snippet_text": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+              "start": 54,
+              "end": 65,
+              "value": "165",
+              "unit": "s",
+              "dimension": "time"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v1",
+          "normalized_inputs": [
+            {
+              "id": "N1",
+              "role": "before",
+              "value": "120",
+              "unit": "s",
+              "original_value": "2",
+              "original_unit": "min",
+              "conversion_factor": "60"
+            },
+            {
+              "id": "N2",
+              "role": "after",
+              "value": "165",
+              "unit": "s",
+              "original_value": "165",
+              "original_unit": "s",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": "165 s - 120 s = 45 s (rounded)",
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "9f476281-c58b-41b3-ab8a-c054ab749be9"
+    ]
+  },
+  "latency_seconds": 43.11232654284686,
+  "setup_seconds": 0.016501332633197308,
+  "attempt_total_seconds": 43.128827875480056
+}

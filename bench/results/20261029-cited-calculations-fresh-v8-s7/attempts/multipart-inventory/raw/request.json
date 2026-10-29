@@ -1,0 +1,69 @@
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "Split the issue into ordered requested operations using only the supplied question IDs. Write each request label to describe its subject and requested operation. Preserve every distinct nonnumerical request as an answer operation. Use answer for a factual value lookup, including a current value. Use a calculation operation only when the user requests arithmetic. Separate every requested calculation from other requests. Use difference for after minus before; percentage_point_difference for after minus before when both are percentages; percent_change for (after minus before) divided by before, as a percentage; and percentage for part divided by total, as a percentage. Percentage-point difference and relative percent change are different operations. Do not answer or add requests. Return only the requested JSON."
+    },
+    {
+      "role": "user",
+      "content": "{\"issue\": \"For the Atlas spare-parts reserve, what were the previous and current limits, what was the increase, when did it take effect, and who approved it?\", \"questions\": [{\"id\": \"Q1\", \"text\": \"For the Atlas spare-parts reserve, what were the previous and current limits, what was the increase, when did it take effect, and who approved it?\"}]}"
+    }
+  ],
+  "settings": {
+    "expected_model": "qwen3-8b-q4",
+    "expected_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "max_tokens": 800,
+    "temperature": 0,
+    "response_format": {
+      "type": "json_object",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "question_id": {
+                  "type": "string",
+                  "enum": [
+                    "Q1"
+                  ]
+                },
+                "request": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "answer",
+                    "difference",
+                    "percentage_point_difference",
+                    "percent_change",
+                    "percentage"
+                  ]
+                }
+              },
+              "required": [
+                "question_id",
+                "request",
+                "operation"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 12
+          }
+        },
+        "required": [
+          "operations"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bounded_generation": true,
+    "generation_profile": "qwen3-non-thinking",
+    "seed": 7
+  }
+}

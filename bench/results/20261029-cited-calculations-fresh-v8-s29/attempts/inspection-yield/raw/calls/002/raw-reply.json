@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-325f6445-4668-4811-9d3f-0f7fc1785cdc",
+  "object": "chat.completion",
+  "created": 1793305401,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\"], \"reason\": \"The acceptance rate increased from 40% to 46%, providing the initial and final values for the percentage point difference.\"}, \"R2\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\"], \"reason\": \"The acceptance rate increased from 40% to 46%, providing the initial and final values for the relative percent increase.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 542,
+    "completion_tokens": 127,
+    "total_tokens": 669
+  }
+}

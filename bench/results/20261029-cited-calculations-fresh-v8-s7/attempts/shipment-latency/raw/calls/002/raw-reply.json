@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-c29d6ec6-f0c0-47d4-b58d-60d95f1cebef",
+  "object": "chat.completion",
+  "created": 1793304565,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\"], \"reason\": \"The difference in Harbor dispatch latency is calculated from the values provided in S1, which states the latency was 128 seconds before the routing update and 83 seconds afterward.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 561,
+    "completion_tokens": 78,
+    "total_tokens": 639
+  }
+}

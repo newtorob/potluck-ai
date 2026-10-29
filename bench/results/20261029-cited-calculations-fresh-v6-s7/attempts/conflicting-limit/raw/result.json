@@ -1,0 +1,170 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "5341796c-c05b-4985-a556-95c92a9f6846",
+    "workspace": "synthetic-eval",
+    "issue": "What is the current Kestrel storage limit, and how much did it change from the previous limit?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What is the current Kestrel storage limit?"
+        },
+        {
+          "id": "Q2",
+          "text": "How much did the Kestrel storage limit change from the previous limit?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "unknown",
+          "text": "The current Kestrel storage limit is either 45 files or 50 files.",
+          "snippet_ids": [
+            "S2",
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:023fcc02-1e8c-5779-b46b-3c835afa21c3:602789a4-77da-5244-abc0-1c434600c293",
+              "quote": "The deployment note lists the current limit as 45 files. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:023fcc02-1e8c-5779-b46b-3c835afa21c3:602789a4-77da-5244-abc0-1c434600c293",
+              "quote": "The operator checklist lists it as 50 files. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "unknown",
+          "text": "The change in the Kestrel storage limit is either 15 files (from 30 to 45) or 20 files (from 30 to 50).",
+          "snippet_ids": [
+            "S1",
+            "S2",
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:023fcc02-1e8c-5779-b46b-3c835afa21c3:602789a4-77da-5244-abc0-1c434600c293",
+              "quote": "The previous Kestrel storage limit was 30 files. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:023fcc02-1e8c-5779-b46b-3c835afa21c3:602789a4-77da-5244-abc0-1c434600c293",
+              "quote": "The deployment note lists the current limit as 45 files. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:023fcc02-1e8c-5779-b46b-3c835afa21c3:602789a4-77da-5244-abc0-1c434600c293",
+              "quote": "The operator checklist lists it as 50 files. "
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "5deb661e-d9b0-4737-9007-ebbf80284917",
+        "document_id": "a26f7e24-6579-58f0-9819-165de9f54359",
+        "revision_id": "602789a4-77da-5244-abc0-1c434600c293",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T20:06:47.650008+00:00",
+        "chunk_id": "023fcc02-1e8c-5779-b46b-3c835afa21c3",
+        "anchor": "kestrel-storage-limit",
+        "heading": "Kestrel storage limit",
+        "content": "The previous Kestrel storage limit was 30 files. The deployment note lists the current limit as 45 files. The operator checklist lists it as 50 files. Neither record says which current limit is authoritative.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T20:06:47.650162+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:023fcc02-1e8c-5779-b46b-3c835afa21c3:602789a4-77da-5244-abc0-1c434600c293",
+        "presented_content": "The previous Kestrel storage limit was 30 files. The deployment note lists the current limit as 45 files. The operator checklist lists it as 50 files. Neither record says which current limit is authoritative."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T20:07:20.660809+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What is the current Kestrel storage limit, and how much did it change from the previous limit?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 33006,
+      "created_at": "2026-10-29T20:07:20.660809+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:023fcc02-1e8c-5779-b46b-3c835afa21c3:602789a4-77da-5244-abc0-1c434600c293",
+          "quote": "The previous Kestrel storage limit was 30 files. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:023fcc02-1e8c-5779-b46b-3c835afa21c3:602789a4-77da-5244-abc0-1c434600c293",
+          "quote": "The deployment note lists the current limit as 45 files. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:023fcc02-1e8c-5779-b46b-3c835afa21c3:602789a4-77da-5244-abc0-1c434600c293",
+          "quote": "The operator checklist lists it as 50 files. "
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:023fcc02-1e8c-5779-b46b-3c835afa21c3:602789a4-77da-5244-abc0-1c434600c293",
+          "quote": "Neither record says which current limit is authoritative."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "5deb661e-d9b0-4737-9007-ebbf80284917"
+    ]
+  },
+  "latency_seconds": 33.01453566644341,
+  "setup_seconds": 0.02109604235738516,
+  "attempt_total_seconds": 33.03563170880079
+}

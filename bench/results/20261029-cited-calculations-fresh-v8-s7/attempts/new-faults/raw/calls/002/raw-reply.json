@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-a6591a89-9ef8-4fe7-bf60-183aacb07a32",
+  "object": "chat.completion",
+  "created": 1793305037,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [], \"status\": \"unknown\", \"snippet_ids\": [\"S1\", \"S2\"], \"reason\": \"The requested operation requires two numerical values for the initial and final quantities, but the provided snippets only describe the number of faults recorded in two inspections without providing the necessary numerical values for the initial and final quantities.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 445,
+    "completion_tokens": 76,
+    "total_tokens": 521
+  }
+}

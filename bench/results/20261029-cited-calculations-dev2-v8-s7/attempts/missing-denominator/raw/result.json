@@ -1,0 +1,173 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "105fd9bf-8d85-42a8-968e-703ffb3522fd",
+    "workspace": "synthetic-eval",
+    "issue": "What percentage of Spruce jobs failed yesterday?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "percentage"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "unknown",
+          "text": "Calculation unavailable: The number of Spruce jobs attempted yesterday is not provided, making it impossible to calculate the percentage of failed jobs.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:2250c32d-3a78-5912-a839-b2b92856e4f0:81b7ccf4-b018-5d0b-85b7-6c0b3283dd99",
+              "quote": "Seven Spruce jobs failed yesterday. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:2250c32d-3a78-5912-a839-b2b92856e4f0:81b7ccf4-b018-5d0b-85b7-6c0b3283dd99",
+              "quote": "This record does not give the number of Spruce jobs attempted yesterday."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "percentage",
+            "status": "unknown",
+            "text": "Calculation unavailable: The number of Spruce jobs attempted yesterday is not provided, making it impossible to calculate the percentage of failed jobs.",
+            "formula": null,
+            "result": null,
+            "unit": null,
+            "reason": "The number of Spruce jobs attempted yesterday is not provided, making it impossible to calculate the percentage of failed jobs.",
+            "inputs": [],
+            "rounding": null,
+            "caveat": "Arithmetic does not verify source selection or authority."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "4b65d635-9fef-4296-a910-38fb5b53c1e3",
+        "document_id": "49f6652a-001a-5e8a-a065-b7fd1e76f497",
+        "revision_id": "81b7ccf4-b018-5d0b-85b7-6c0b3283dd99",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T19:49:21.951112+00:00",
+        "chunk_id": "2250c32d-3a78-5912-a839-b2b92856e4f0",
+        "anchor": "spruce-jobs-yesterday",
+        "heading": "Spruce jobs yesterday",
+        "content": "Seven Spruce jobs failed yesterday. This record does not give the number of Spruce jobs attempted yesterday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T19:49:21.951287+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:2250c32d-3a78-5912-a839-b2b92856e4f0:81b7ccf4-b018-5d0b-85b7-6c0b3283dd99",
+        "presented_content": "Seven Spruce jobs failed yesterday. This record does not give the number of Spruce jobs attempted yesterday."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T19:49:59.696117+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v8",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What percentage of Spruce jobs failed yesterday?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 37738,
+      "created_at": "2026-10-29T19:49:59.696117+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "What percentage of Spruce jobs failed yesterday?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "percentage",
+          "operation": "percentage"
+        }
+      ],
+      "operation_plan_origin": "planned",
+      "planner_version": "issue-operations-v1",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:2250c32d-3a78-5912-a839-b2b92856e4f0:81b7ccf4-b018-5d0b-85b7-6c0b3283dd99",
+          "quote": "Seven Spruce jobs failed yesterday. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:2250c32d-3a78-5912-a839-b2b92856e4f0:81b7ccf4-b018-5d0b-85b7-6c0b3283dd99",
+          "quote": "This record does not give the number of Spruce jobs attempted yesterday."
+        }
+      ],
+      "quantity_catalog": [],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "percentage",
+          "status": "unknown",
+          "text": "Calculation unavailable: The number of Spruce jobs attempted yesterday is not provided, making it impossible to calculate the percentage of failed jobs.",
+          "formula": null,
+          "result": null,
+          "unit": null,
+          "reason": "The number of Spruce jobs attempted yesterday is not provided, making it impossible to calculate the percentage of failed jobs.",
+          "inputs": [],
+          "rounding": null,
+          "caveat": "Arithmetic does not verify source selection or authority."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "4b65d635-9fef-4296-a910-38fb5b53c1e3"
+    ]
+  },
+  "latency_seconds": 37.751905667595565,
+  "setup_seconds": 0.0206444151699543,
+  "attempt_total_seconds": 37.77255008276552
+}

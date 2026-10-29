@@ -1,0 +1,9 @@
+{
+  "status": "pass",
+  "staged_files": 514,
+  "evaluated_python_files_matching_index": 145,
+  "preexisting_paths_staged": [],
+  "databases_staged": [],
+  "production_mismatches": [],
+  "test_only_change_after_freeze": true
+}

@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "b9cdf0e0-670c-4bee-9aa0-c54635da9602",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-cited-calculations-fresh-v6-s7/attempts/handoff-injection/raw/allowed",
+  "source_sha256": "1ffab8d1b142c5aca2e8da07605d4c61b77e882033796c5ded02db79191f9e47",
+  "scan": {
+    "collection_id": "b9cdf0e0-670c-4bee-9aa0-c54635da9602",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

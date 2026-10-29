@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "e4f70375-7156-4b1a-9dc6-77bfa91800d7"
+  ],
+  "query": "How did the Harbor dispatch latency change after the routing update, and did that update cause the change?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "e4f70375-7156-4b1a-9dc6-77bfa91800d7"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "e4f70375-7156-4b1a-9dc6-77bfa91800d7",
+        "document_id": "a8848672-54e7-5bb5-a164-a215fbf8243d",
+        "revision_id": "9292b693-12ce-5368-8d78-ee6c0bdae5b2",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T20:22:32.074181+00:00",
+        "chunk_id": "9a8eb3d0-9fda-593c-9371-69883020253d",
+        "anchor": "harbor-dispatch-latency",
+        "heading": "Harbor dispatch latency",
+        "content": "Harbor dispatch latency was 128 seconds before the routing update and 83 seconds afterward. Staffing also changed during that interval. The record does not establish what caused the difference.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T20:22:32.074367+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:9a8eb3d0-9fda-593c-9371-69883020253d:9292b693-12ce-5368-8d78-ee6c0bdae5b2"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

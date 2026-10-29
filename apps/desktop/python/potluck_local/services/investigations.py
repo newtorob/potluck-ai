@@ -17,6 +17,8 @@ from potluck_local.services.memory_db import get_memory_db_path
 from potluck_local.services.memory_safety import redact_credentials
 from potluck_local.services.runtime import get_runtime
 from potluck_local.services import prompt_cache, investigation_answers as answers
+from potluck_local.services import investigation_operations as operations
+from potluck_local.services import investigation_calculations as calculations
 from potluck_local.services.settings_manager import get_settings
 
 
@@ -303,18 +305,22 @@ _PLAN_INSTRUCTION_V7 = (
     'Return the substrings in the requested JSON.'
 )
 _INSTRUCTIONS = {'investigation-v4': _INSTRUCTION_V4, 'investigation-v5': _INSTRUCTION_V5,
-                 'investigation-v6': _INSTRUCTION_V6, 'investigation-v7': _INSTRUCTION_V7}
+                 'investigation-v6': _INSTRUCTION_V6, 'investigation-v7': _INSTRUCTION_V7,
+                 'investigation-v8': operations.ANSWER_INSTRUCTION}
 
 
 async def create_investigation(scope: EvidenceScope, issue: str, query: str,
                                model_slug: str, *,
                                template_version: str = 'investigation-v4', questions: list[str] | None = None,
-                               generation_profile: str | None = None, seed: int | None = None) -> dict[str, Any]:
+                               generation_profile: str | None = None, seed: int | None = None,
+                               operation_plan: list[dict[str, str]] | None = None) -> dict[str, Any]:
     if template_version not in _INSTRUCTIONS:
         raise ValueError('Unknown investigation template')
-    if (template_version not in ('investigation-v6', 'investigation-v7')
+    if operation_plan is not None and template_version != 'investigation-v8':
+        raise ValueError('Operation plan requires v8')
+    if (template_version not in ('investigation-v6', 'investigation-v7', 'investigation-v8')
             and (questions is not None or generation_profile is not None)):
-        raise ValueError('Question options require v6 or v7')
+        raise ValueError('Question options require v6, v7 or v8')
     if seed is not None and (type(seed) is not int or not 0 <= seed <= 4294967295):
         raise ValueError('Invalid seed')
     planned_questions = answers.questions_from_texts(questions) if questions is not None else None
@@ -327,6 +333,8 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
             raise ValueError('Investigation profile incompatible') from None
     _privacy()
     issue = _text(issue, 4000)
+    if template_version == 'investigation-v8' and planned_questions is None:
+        planned_questions = [{'id': 'Q1', 'text': issue}]
     query = _text(query, 1000)
     model_slug = _text(model_slug, 128)
     runtime = get_runtime()
@@ -383,11 +391,14 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
     cache_token = prompt_cache.request_is_local.set(False)
     question_origin = None
     snippet_catalog: list[dict[str, str]] = []
+    operation_requests: list[dict[str, str]] = []
+    quantity_catalog: list[dict[str, Any]] = []
+    calculation_traces: list[dict[str, Any]] = []
     async def generate(messages: list[dict[str, str]], schema: dict[str, Any], max_tokens: int) -> str:
         kwargs: dict[str, Any] = {'expected_model': model_slug, 'expected_sha256': sha,
                                   'max_tokens': max_tokens, 'temperature': 0,
                                   'response_format': {'type': 'json_object', 'schema': schema}}
-        if template_version in ('investigation-v6', 'investigation-v7'):
+        if template_version in ('investigation-v6', 'investigation-v7', 'investigation-v8'):
             kwargs['bounded_generation'] = True
         if generation_profile is not None:
             kwargs['generation_profile'] = generation_profile
@@ -411,7 +422,38 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
         except (KeyError, IndexError, TypeError):
             raise ValueError('Invalid model format') from None
     try:
-        if template_version in ('investigation-v6', 'investigation-v7'):
+        if template_version == 'investigation-v8':
+            assert planned_questions is not None
+            question_origin = 'explicit' if questions is not None else 'issue'
+            if operation_plan is None:
+                plan = await generate([{'role': 'system', 'content': operations.PLAN_INSTRUCTION},
+                                       {'role': 'user', 'content': json.dumps({'issue': issue, 'questions': planned_questions}, ensure_ascii=False)}],
+                                      operations.planner_schema(planned_questions), 800)
+                operation_requests = operations.decode_plan(plan, planned_questions)
+            else:
+                operation_requests = operations.validate_plan(operation_plan, planned_questions)
+            snippet_catalog = answers.snippets_from_evidence(evidence)
+            source_context: dict[str, str] = {}
+            presented_lengths: dict[str, int] = {}
+            for record in evidence:
+                children = record['sources'] if record['kind'] == 'reviewed_claim' else [record]
+                for child in children:
+                    cid = child['citation_id']
+                    length = len(child.get('presented_content', ''))
+                    if length > presented_lengths.get(cid, 0):
+                        source_context[cid] = child['content']
+                        presented_lengths[cid] = length
+            quantity_catalog = calculations.quantity_catalog(snippet_catalog, source_context=source_context)
+            if len(quantity_catalog) > 100:
+                raise ValueError('Too many quantities for investigation')
+            prompt = json.dumps({'issue': issue, 'operations': operation_requests,
+                                 'snippets': [{'snippet_id': s['snippet_id'], 'text': s['quote']} for s in snippet_catalog],
+                                 'quantities': [{k: n[k] for k in ('id', 'snippet_id', 'source_text', 'value', 'unit', 'unit_source_text') if k in n} for n in quantity_catalog]}, ensure_ascii=False)
+            raw = await generate([{'role': 'system', 'content': instruction},
+                                  {'role': 'user', 'content': prompt}],
+                                 operations.response_schema(operation_requests, snippet_catalog, quantity_catalog), 2000)
+            brief, calculation_traces = operations.decode_results(raw, operation_requests, snippet_catalog, quantity_catalog)
+        elif template_version in ('investigation-v6', 'investigation-v7'):
             question_origin = 'explicit' if planned_questions is not None else 'planned'
             if planned_questions is None:
                 plan_instruction = (_PLAN_INSTRUCTION_V7 if template_version == 'investigation-v7'
@@ -457,6 +499,17 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
                            'planner_settings': ({'max_tokens': 800, 'seed': seed}
                                                 if question_origin == 'planned' else None),
                            'generation_profile': profile_metadata})
+        provenance['generation_settings']['timeout_scope'] = 'shared across planning and answer generation'
+        if profile_metadata is not None:
+            provenance['generation_settings']['temperature'] = profile_metadata['temperature']
+    if template_version == 'investigation-v8':
+        provenance.update({'question_origin': question_origin, 'original_questions': planned_questions,
+                           'operation_plan': operation_requests, 'operation_plan_origin': 'explicit' if operation_plan is not None else 'planned',
+                           'planner_version': 'issue-operations-v1' if operation_plan is None else None,
+                           'planner_settings': {'max_tokens': 800, 'seed': seed} if operation_plan is None else None,
+                           'snippet_catalog': snippet_catalog, 'quantity_catalog': quantity_catalog,
+                           'calculation_traces': calculation_traces, 'generation_profile': profile_metadata})
+        provenance['generation_settings']['max_tokens'] = 2000
         provenance['generation_settings']['timeout_scope'] = 'shared across planning and answer generation'
         if profile_metadata is not None:
             provenance['generation_settings']['temperature'] = profile_metadata['temperature']
@@ -529,11 +582,14 @@ async def review_investigation(scope: EvidenceScope, iid: str, decision: str, re
     validated_correction = None
     if corrected_brief is not None:
         try:
-            if (item['provenance'] or {}).get('template_version') in ('investigation-v6', 'investigation-v7'):
+            if (item['provenance'] or {}).get('template_version') in ('investigation-v6', 'investigation-v7', 'investigation-v8'):
                 snippets = answers.snippets_from_evidence(item['evidence'])
                 if snippets != item['provenance'].get('snippet_catalog'):
                     raise ValueError('Invalid snippets')
-                validated_correction = answers.corrected_brief(corrected_brief, item['brief'], snippets)
+                if item['provenance'].get('template_version') == 'investigation-v8':
+                    validated_correction = operations.corrected_brief(corrected_brief, item['brief'], snippets)
+                else:
+                    validated_correction = answers.corrected_brief(corrected_brief, item['brief'], snippets)
             else:
                 validated_correction = _brief(corrected_brief, item['evidence'])
         except ValueError as exc:

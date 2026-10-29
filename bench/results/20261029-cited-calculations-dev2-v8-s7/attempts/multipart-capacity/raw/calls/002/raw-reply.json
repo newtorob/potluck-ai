@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-0283367f-fce4-46ee-80c1-c1a40fea890c",
+  "object": "chat.completion",
+  "created": 1793303443,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"snippet_ids\": [\"S1\"], \"text\": \"The Elm service capacity limit rose from 240 to 315 concurrent sessions.\", \"status\": \"unknown\"}, \"R2\": {\"snippet_ids\": [\"S1\"], \"text\": \"The Elm service capacity limit rose from 240 to 315 concurrent sessions.\", \"status\": \"unknown\"}, \"R3\": {\"snippet_ids\": [\"S1\"], \"text\": \"The Elm service capacity limit rose from 240 to 315 concurrent sessions.\", \"status\": \"unknown\"}, \"R4\": {\"snippet_ids\": [\"S3\"], \"text\": \"The change record identifies Dana as the implementer but does not identify an approver.\", \"status\": \"unknown\"}, \"R5\": {\"snippet_ids\": [\"S2\"], \"text\": \"The increase took effect on 14 March.\", \"status\": \"unknown\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 536,
+    "completion_tokens": 204,
+    "total_tokens": 740
+  }
+}

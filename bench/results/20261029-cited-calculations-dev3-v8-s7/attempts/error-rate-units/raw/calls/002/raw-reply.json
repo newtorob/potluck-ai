@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-fee8e34c-8018-4b35-b4bc-10d9f2f855c7",
+  "object": "chat.completion",
+  "created": 1793303770,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\"], \"reason\": \"The error rate decreased from 8% to 6%, so the difference is 2 percentage points.\"}, \"R2\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\"], \"reason\": \"The error rate decreased from 8% to 6%, so the relative percentage change is (8-6)/8 * 100% = 25%.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 531,
+    "completion_tokens": 138,
+    "total_tokens": 669
+  }
+}

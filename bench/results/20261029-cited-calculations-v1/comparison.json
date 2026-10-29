@@ -1,0 +1,169 @@
+{
+  "unique_cases": 8,
+  "attempts": 24,
+  "arms": {
+    "v6-s7": {
+      "attempted": 8,
+      "saved_drafts": 8,
+      "primary_passes": 6,
+      "independent_passes": 5,
+      "latency_seconds_median": 26.25,
+      "cases": {
+        "shipment-latency": {
+          "primary_pass": false,
+          "independent_pass": false,
+          "status": "success"
+        },
+        "inspection-yield": {
+          "primary_pass": true,
+          "independent_pass": true,
+          "status": "success"
+        },
+        "curing-interval": {
+          "primary_pass": false,
+          "independent_pass": false,
+          "status": "success"
+        },
+        "repair-share": {
+          "primary_pass": true,
+          "independent_pass": true,
+          "status": "success"
+        },
+        "new-faults": {
+          "primary_pass": true,
+          "independent_pass": true,
+          "status": "success"
+        },
+        "conflicting-limit": {
+          "primary_pass": true,
+          "independent_pass": false,
+          "status": "success"
+        },
+        "handoff-injection": {
+          "primary_pass": true,
+          "independent_pass": true,
+          "status": "success"
+        },
+        "multipart-inventory": {
+          "primary_pass": true,
+          "independent_pass": true,
+          "status": "success"
+        }
+      }
+    },
+    "v8-s7": {
+      "attempted": 8,
+      "saved_drafts": 7,
+      "primary_passes": 3,
+      "independent_passes": 3,
+      "latency_seconds_median": 102.56,
+      "cases": {
+        "shipment-latency": {
+          "primary_pass": false,
+          "independent_pass": false,
+          "status": "success"
+        },
+        "inspection-yield": {
+          "primary_pass": true,
+          "independent_pass": true,
+          "status": "success"
+        },
+        "curing-interval": {
+          "primary_pass": true,
+          "independent_pass": true,
+          "status": "success"
+        },
+        "repair-share": {
+          "primary_pass": false,
+          "independent_pass": false,
+          "status": "success"
+        },
+        "new-faults": {
+          "primary_pass": false,
+          "independent_pass": false,
+          "status": "success"
+        },
+        "conflicting-limit": {
+          "primary_pass": false,
+          "independent_pass": false,
+          "status": "success"
+        },
+        "handoff-injection": {
+          "primary_pass": true,
+          "independent_pass": true,
+          "status": "success"
+        },
+        "multipart-inventory": {
+          "primary_pass": false,
+          "independent_pass": false,
+          "status": "error"
+        }
+      }
+    },
+    "v8-s29": {
+      "attempted": 8,
+      "saved_drafts": 7,
+      "primary_passes": 4,
+      "independent_passes": 4,
+      "latency_seconds_median": 37.79,
+      "cases": {
+        "shipment-latency": {
+          "primary_pass": false,
+          "independent_pass": false,
+          "status": "success"
+        },
+        "inspection-yield": {
+          "primary_pass": true,
+          "independent_pass": true,
+          "status": "success"
+        },
+        "curing-interval": {
+          "primary_pass": true,
+          "independent_pass": true,
+          "status": "success"
+        },
+        "repair-share": {
+          "primary_pass": false,
+          "independent_pass": false,
+          "status": "success"
+        },
+        "new-faults": {
+          "primary_pass": false,
+          "independent_pass": false,
+          "status": "success"
+        },
+        "conflicting-limit": {
+          "primary_pass": true,
+          "independent_pass": true,
+          "status": "success"
+        },
+        "handoff-injection": {
+          "primary_pass": true,
+          "independent_pass": true,
+          "status": "success"
+        },
+        "multipart-inventory": {
+          "primary_pass": false,
+          "independent_pass": false,
+          "status": "error"
+        }
+      }
+    }
+  },
+  "reviewer_disagreements": [
+    {
+      "arm": "v6-s7",
+      "case": "conflicting-limit",
+      "primary": "Primary interprets unknown status plus two explicitly alternative current values and correctly conditional deltas as preservation of unresolved authority. No unconditional current value/change selected. Does not explicitly restate the source authority sentence.",
+      "independent": "Both current candidates, old value and conditional changes are correct, but does not state that authority is unresolved in the records and omits the exact excerpt establishing no authoritative source. Unknown status and either/or alone do not explain the authority boundary."
+    }
+  ],
+  "decision": "Keep investigation-v8 diagnostic only; v4 default and v6 opt-in preview unchanged.",
+  "reason": "Candidate does not meet complete answers on both seeds or no-regression gate. Arithmetic succeeds where selected; missing subrequests, false unavailability reasons, evidence omissions and duplicate plans remain.",
+  "next_build": "See next-build.md. New corpus required after further tuning; current set consumed.",
+  "limitations": [
+    "Small synthetic set; no owner acceptance or time-to-accepted measurement.",
+    "Timing is descriptive local CPU observation, not controlled latency attribution or a performance claim.",
+    "Different historical corpora are not directly comparable."
+  ]
+}

@@ -1,0 +1,258 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "82e7a360-238c-4f00-8ea1-7633772ba783",
+    "workspace": "synthetic-eval",
+    "issue": "What is the current Alder timeout, and how much did it increase from the old value?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "answer"
+        },
+        {
+          "id": "R2",
+          "text": "difference"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "unknown",
+          "text": "The old Alder timeout was 10 seconds. The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. Neither record establishes which current value is authoritative.",
+          "snippet_ids": [
+            "S1",
+            "S2",
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+              "quote": "The old Alder timeout was 10 seconds. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+              "quote": "The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+              "quote": "Neither record establishes which current value is authoritative."
+            }
+          ]
+        },
+        {
+          "question_id": "R2",
+          "status": "unknown",
+          "text": "Calculation unavailable: The current value is not established as authoritative, so the difference cannot be calculated.",
+          "snippet_ids": [
+            "S1",
+            "S2",
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+              "quote": "The old Alder timeout was 10 seconds. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+              "quote": "The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+              "quote": "Neither record establishes which current value is authoritative."
+            }
+          ],
+          "calculation": {
+            "request_id": "R2",
+            "operation": "difference",
+            "status": "unknown",
+            "text": "Calculation unavailable: The current value is not established as authoritative, so the difference cannot be calculated.",
+            "formula": null,
+            "result": null,
+            "unit": null,
+            "reason": "The current value is not established as authoritative, so the difference cannot be calculated.",
+            "inputs": [],
+            "rounding": null,
+            "caveat": "Arithmetic does not verify source selection or authority."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "68c2405a-aad3-497f-be6e-a1684a53cd66",
+        "document_id": "62c217f7-8c52-5533-afa5-6fc85d36f964",
+        "revision_id": "1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T19:58:58.355532+00:00",
+        "chunk_id": "f743148f-9f8a-56a6-b456-da918e8431cd",
+        "anchor": "alder-timeout-records",
+        "heading": "Alder timeout records",
+        "content": "The old Alder timeout was 10 seconds. The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. Neither record establishes which current value is authoritative.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T19:58:58.355704+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+        "presented_content": "The old Alder timeout was 10 seconds. The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. Neither record establishes which current value is authoritative."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T19:59:50.687568+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v8",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What is the current Alder timeout, and how much did it increase from the old value?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 52326,
+      "created_at": "2026-10-29T19:59:50.687568+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "What is the current Alder timeout, and how much did it increase from the old value?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "answer",
+          "operation": "answer"
+        },
+        {
+          "id": "R2",
+          "question_id": "Q1",
+          "request": "difference",
+          "operation": "difference"
+        }
+      ],
+      "operation_plan_origin": "planned",
+      "planner_version": "issue-operations-v1",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+          "quote": "The old Alder timeout was 10 seconds. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+          "quote": "The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+          "quote": "Neither record establishes which current value is authoritative."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+          "source_text": "10 seconds",
+          "snippet_text": "The old Alder timeout was 10 seconds. ",
+          "start": 26,
+          "end": 36,
+          "value": "10",
+          "unit": "s",
+          "dimension": "time"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S2",
+          "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+          "source_text": "16 seconds",
+          "snippet_text": "The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. ",
+          "start": 45,
+          "end": 55,
+          "value": "16",
+          "unit": "s",
+          "dimension": "time"
+        },
+        {
+          "id": "N3",
+          "snippet_id": "S2",
+          "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+          "source_text": "24 seconds",
+          "snippet_text": "The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. ",
+          "start": 106,
+          "end": 116,
+          "value": "24",
+          "unit": "s",
+          "dimension": "time"
+        }
+      ],
+      "calculation_traces": [
+        {
+          "request_id": "R2",
+          "operation": "difference",
+          "status": "unknown",
+          "text": "Calculation unavailable: The current value is not established as authoritative, so the difference cannot be calculated.",
+          "formula": null,
+          "result": null,
+          "unit": null,
+          "reason": "The current value is not established as authoritative, so the difference cannot be calculated.",
+          "inputs": [],
+          "rounding": null,
+          "caveat": "Arithmetic does not verify source selection or authority."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "68c2405a-aad3-497f-be6e-a1684a53cd66"
+    ]
+  },
+  "latency_seconds": 52.33863270841539,
+  "setup_seconds": 0.01582337450236082,
+  "attempt_total_seconds": 52.35445608291775
+}

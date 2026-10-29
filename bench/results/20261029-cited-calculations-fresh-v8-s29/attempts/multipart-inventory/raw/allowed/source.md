@@ -1,0 +1,2 @@
+# Atlas spare-parts reserve
+The Atlas reserve limit rose from 72 to 108 boxes. The change took effect on 22 June. The record names Morgan as the person who entered the change but does not name an approver.

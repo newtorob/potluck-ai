@@ -209,6 +209,36 @@ async def export(iid: str, workspace: str, collection_ids: list[str] = Query(...
                 for excerpt in answer['source_excerpts']:
                     lines.append('- Source excerpt (' + escape(excerpt['citation_id']) + '): ' + escape(excerpt['quote']))
                 lines.append('')
+        traces = provenance.get('calculation_traces', [])
+        if traces:
+            lines += ['## Original machine calculations',
+                      'These calculations belong to the original draft; reviewer corrections are separate.', '']
+            requests = {r['id']: r['request'] for r in provenance.get('operation_plan', [])}
+            for trace in traces:
+                lines += ['### ' + escape(trace['request_id']) + ' · ' + escape(trace['operation']),
+                          'Original request: ' + escape(requests.get(trace['request_id'], 'unavailable')),
+                          'Status: ' + escape(trace['status']),
+                          'Algorithm: ' + escape(trace.get('algorithm_version') or 'unavailable'),
+                          'Formula: ' + escape(trace.get('formula') or 'unavailable'),
+                          'Evaluated expression: ' + escape(trace.get('evaluated_expression') or 'unavailable'),
+                          'Result: ' + (escape(trace['result']) +
+                                       (' ' + escape(trace['unit']) if trace.get('unit') else '')
+                                       if trace.get('result') is not None else 'unavailable'),
+                          'Rounding: ' + escape(trace.get('rounding') or 'unavailable'),
+                          'Reason: ' + escape(trace.get('reason') or 'none'),
+                          'Limit: ' + escape(trace.get('caveat') or 'unavailable')]
+                for operand in trace.get('inputs', []):
+                    lines.append('- Input ' + escape(operand['id']) + ' (' + escape(operand['citation_id']) +
+                                 ', ' + escape(operand['snippet_id']) + '): ' + escape(operand['source_text']))
+                    if 'unit_source_text' in operand:
+                        lines.append('  - Shared unit: ' + escape(operand['unit_source_text']) +
+                                     ' · snippet offsets ' + escape(operand['unit_source_start']) +
+                                     '–' + escape(operand['unit_source_end']))
+                for operand in trace.get('normalized_inputs', []):
+                    lines.append('- Normalized ' + escape(operand['role']) + ' (' + escape(operand['id']) +
+                                 '): ' + escape(operand['value']) + ' ' + escape(operand['unit']) +
+                                 ' · conversion factor ' + escape(operand['conversion_factor']))
+                lines.append('')
         for key, title in [('facts', 'Facts'), ('prior_fixes', 'Prior fixes'),
                            ('hypotheses', 'Hypotheses (unverified)'), ('recommended_checks', 'Recommended checks')]:
             lines += ['## ' + title]

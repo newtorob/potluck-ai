@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-a727e8fc-b729-419e-b7bc-5b7d64b0fe37",
+  "object": "chat.completion",
+  "created": 1793304353,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"How many seconds did the Lumen curing interval decrease?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 16,
+    "total_tokens": 116
+  }
+}

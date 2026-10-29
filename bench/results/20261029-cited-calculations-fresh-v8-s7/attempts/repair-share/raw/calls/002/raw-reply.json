@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-c712b583-ab03-4693-90a4-f0d77418151a",
+  "object": "chat.completion",
+  "created": 1793304968,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [], \"status\": \"unknown\", \"snippet_ids\": [\"S2\"], \"reason\": \"The total number of Vela returns last week is not provided in the source, making it impossible to calculate the percentage of returns requiring repair.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 448,
+    "completion_tokens": 59,
+    "total_tokens": 507
+  }
+}

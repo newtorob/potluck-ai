@@ -1,0 +1,1005 @@
+{
+  "corpus_id": "consumed-answer-completeness-v2-development-for-calculations",
+  "suite_sha256": "acd7613de930e5b5f2dc1b426a61a23eff49448682bfd08ec13a96e876b19016",
+  "case_ids": [
+    "error-rate-units",
+    "duration-conversion",
+    "missing-denominator",
+    "conflicting-threshold",
+    "multipart-capacity"
+  ],
+  "template_version": "investigation-v8",
+  "generation_profile": {
+    "name": "qwen3-non-thinking",
+    "temperature": 0.7,
+    "top_p": 0.8,
+    "top_k": 20,
+    "min_p": 0.0,
+    "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+    "backend": "llama-cpp-python",
+    "enable_thinking": false,
+    "repeat_penalty": 1.0
+  },
+  "seed": 7,
+  "question_mode": "auto",
+  "assessment": null,
+  "outputs": {
+    "error-rate-units": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "0d616dfb-be19-473c-b2bd-d50cc295f795",
+        "workspace": "synthetic-eval",
+        "issue": "For the Birch gateway, how many percentage points and what relative percentage did the error rate decrease?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "difference"
+            },
+            {
+              "id": "R2",
+              "text": "percent_change"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "unknown",
+              "text": "Unknown: Use percentage-point difference for percent inputs.",
+              "snippet_ids": [
+                "S1"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+                  "quote": "The Birch gateway error rate fell from 8% to 6% over the measured interval."
+                }
+              ],
+              "calculation": {
+                "request_id": "R1",
+                "operation": "difference",
+                "status": "unknown",
+                "text": "Unknown: Use percentage-point difference for percent inputs.",
+                "formula": "after - before",
+                "result": null,
+                "unit": null,
+                "reason": "Use percentage-point difference for percent inputs.",
+                "inputs": [
+                  {
+                    "id": "N1",
+                    "snippet_id": "S1",
+                    "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+                    "source_text": "8%",
+                    "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+                    "start": 39,
+                    "end": 41,
+                    "value": "8",
+                    "unit": "%",
+                    "dimension": "percent"
+                  },
+                  {
+                    "id": "N2",
+                    "snippet_id": "S1",
+                    "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+                    "source_text": "6%",
+                    "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+                    "start": 45,
+                    "end": 47,
+                    "value": "6",
+                    "unit": "%",
+                    "dimension": "percent"
+                  }
+                ],
+                "algorithm_version": "cited-calculations-v1",
+                "normalized_inputs": [],
+                "evaluated_expression": null,
+                "rounding": {
+                  "mode": "ROUND_HALF_UP",
+                  "max_fractional_digits": 6
+                },
+                "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+              }
+            },
+            {
+              "question_id": "R2",
+              "status": "supported",
+              "text": "Signed percent change: -25 %.",
+              "snippet_ids": [
+                "S1"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+                  "quote": "The Birch gateway error rate fell from 8% to 6% over the measured interval."
+                }
+              ],
+              "calculation": {
+                "request_id": "R2",
+                "operation": "percent_change",
+                "status": "computed",
+                "text": "Signed percent change: -25 %.",
+                "formula": "(after - before) / before × 100",
+                "result": "-25",
+                "unit": "%",
+                "reason": null,
+                "inputs": [
+                  {
+                    "id": "N1",
+                    "snippet_id": "S1",
+                    "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+                    "source_text": "8%",
+                    "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+                    "start": 39,
+                    "end": 41,
+                    "value": "8",
+                    "unit": "%",
+                    "dimension": "percent"
+                  },
+                  {
+                    "id": "N2",
+                    "snippet_id": "S1",
+                    "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+                    "source_text": "6%",
+                    "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+                    "start": 45,
+                    "end": 47,
+                    "value": "6",
+                    "unit": "%",
+                    "dimension": "percent"
+                  }
+                ],
+                "algorithm_version": "cited-calculations-v1",
+                "normalized_inputs": [
+                  {
+                    "id": "N1",
+                    "role": "before",
+                    "value": "8",
+                    "unit": "%",
+                    "original_value": "8",
+                    "original_unit": "%",
+                    "conversion_factor": "1"
+                  },
+                  {
+                    "id": "N2",
+                    "role": "after",
+                    "value": "6",
+                    "unit": "%",
+                    "original_value": "6",
+                    "original_unit": "%",
+                    "conversion_factor": "1"
+                  }
+                ],
+                "evaluated_expression": "(6 % - 8 %) / 8 % × 100 = -25 % (rounded)",
+                "rounding": {
+                  "mode": "ROUND_HALF_UP",
+                  "max_fractional_digits": 6
+                },
+                "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+              }
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "6ac9fd7e-6c7d-492f-8258-c77ab2dad795",
+            "document_id": "a850358f-cda7-544b-8d83-2b0744732b95",
+            "revision_id": "a4419655-c26d-5650-899f-fafacfcb9b33",
+            "relative_path": "source.md",
+            "updated_at": "2026-10-29T19:55:48.869481+00:00",
+            "chunk_id": "dcf90503-5eb5-5029-a2d6-d0c78ba84f35",
+            "anchor": "birch-gateway-error-rate",
+            "heading": "Birch gateway error rate",
+            "content": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-29T19:55:48.869888+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+            "presented_content": "The Birch gateway error rate fell from 8% to 6% over the measured interval."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-29T19:57:30.958566+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v8",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "For the Birch gateway, how many percentage points and what relative percentage did the error rate decrease?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 102083,
+          "created_at": "2026-10-29T19:57:30.958566+00:00",
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "For the Birch gateway, how many percentage points and what relative percentage did the error rate decrease?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "difference",
+              "operation": "difference"
+            },
+            {
+              "id": "R2",
+              "question_id": "Q1",
+              "request": "percent_change",
+              "operation": "percent_change"
+            }
+          ],
+          "operation_plan_origin": "planned",
+          "planner_version": "issue-operations-v1",
+          "planner_settings": {
+            "max_tokens": 800,
+            "seed": 7
+          },
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+              "quote": "The Birch gateway error rate fell from 8% to 6% over the measured interval."
+            }
+          ],
+          "quantity_catalog": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+              "source_text": "8%",
+              "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+              "start": 39,
+              "end": 41,
+              "value": "8",
+              "unit": "%",
+              "dimension": "percent"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S1",
+              "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+              "source_text": "6%",
+              "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+              "start": 45,
+              "end": 47,
+              "value": "6",
+              "unit": "%",
+              "dimension": "percent"
+            }
+          ],
+          "calculation_traces": [
+            {
+              "request_id": "R1",
+              "operation": "difference",
+              "status": "unknown",
+              "text": "Unknown: Use percentage-point difference for percent inputs.",
+              "formula": "after - before",
+              "result": null,
+              "unit": null,
+              "reason": "Use percentage-point difference for percent inputs.",
+              "inputs": [
+                {
+                  "id": "N1",
+                  "snippet_id": "S1",
+                  "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+                  "source_text": "8%",
+                  "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+                  "start": 39,
+                  "end": 41,
+                  "value": "8",
+                  "unit": "%",
+                  "dimension": "percent"
+                },
+                {
+                  "id": "N2",
+                  "snippet_id": "S1",
+                  "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+                  "source_text": "6%",
+                  "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+                  "start": 45,
+                  "end": 47,
+                  "value": "6",
+                  "unit": "%",
+                  "dimension": "percent"
+                }
+              ],
+              "algorithm_version": "cited-calculations-v1",
+              "normalized_inputs": [],
+              "evaluated_expression": null,
+              "rounding": {
+                "mode": "ROUND_HALF_UP",
+                "max_fractional_digits": 6
+              },
+              "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+            },
+            {
+              "request_id": "R2",
+              "operation": "percent_change",
+              "status": "computed",
+              "text": "Signed percent change: -25 %.",
+              "formula": "(after - before) / before × 100",
+              "result": "-25",
+              "unit": "%",
+              "reason": null,
+              "inputs": [
+                {
+                  "id": "N1",
+                  "snippet_id": "S1",
+                  "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+                  "source_text": "8%",
+                  "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+                  "start": 39,
+                  "end": 41,
+                  "value": "8",
+                  "unit": "%",
+                  "dimension": "percent"
+                },
+                {
+                  "id": "N2",
+                  "snippet_id": "S1",
+                  "citation_id": "source:dcf90503-5eb5-5029-a2d6-d0c78ba84f35:a4419655-c26d-5650-899f-fafacfcb9b33",
+                  "source_text": "6%",
+                  "snippet_text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+                  "start": 45,
+                  "end": 47,
+                  "value": "6",
+                  "unit": "%",
+                  "dimension": "percent"
+                }
+              ],
+              "algorithm_version": "cited-calculations-v1",
+              "normalized_inputs": [
+                {
+                  "id": "N1",
+                  "role": "before",
+                  "value": "8",
+                  "unit": "%",
+                  "original_value": "8",
+                  "original_unit": "%",
+                  "conversion_factor": "1"
+                },
+                {
+                  "id": "N2",
+                  "role": "after",
+                  "value": "6",
+                  "unit": "%",
+                  "original_value": "6",
+                  "original_unit": "%",
+                  "conversion_factor": "1"
+                }
+              ],
+              "evaluated_expression": "(6 % - 8 %) / 8 % × 100 = -25 % (rounded)",
+              "rounding": {
+                "mode": "ROUND_HALF_UP",
+                "max_fractional_digits": 6
+              },
+              "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+            }
+          ],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "6ac9fd7e-6c7d-492f-8258-c77ab2dad795"
+        ]
+      },
+      "latency_seconds": 102.09320037439466,
+      "setup_seconds": 0.017922375351190567,
+      "attempt_total_seconds": 102.11112274974585
+    },
+    "duration-conversion": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "283a03de-8615-436d-99c8-fc6b00886771",
+        "workspace": "synthetic-eval",
+        "issue": "How much did the Maple backup duration increase, in seconds?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "difference"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "supported",
+              "text": "Signed difference: 45 s.",
+              "snippet_ids": [
+                "S1"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+                  "quote": "The Maple backup took 2 minutes before the update and 165 seconds after it."
+                }
+              ],
+              "calculation": {
+                "request_id": "R1",
+                "operation": "difference",
+                "status": "computed",
+                "text": "Signed difference: 45 s.",
+                "formula": "after - before",
+                "result": "45",
+                "unit": "s",
+                "reason": null,
+                "inputs": [
+                  {
+                    "id": "N1",
+                    "snippet_id": "S1",
+                    "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+                    "source_text": "2 minutes",
+                    "snippet_text": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+                    "start": 22,
+                    "end": 31,
+                    "value": "2",
+                    "unit": "min",
+                    "dimension": "time"
+                  },
+                  {
+                    "id": "N2",
+                    "snippet_id": "S1",
+                    "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+                    "source_text": "165 seconds",
+                    "snippet_text": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+                    "start": 54,
+                    "end": 65,
+                    "value": "165",
+                    "unit": "s",
+                    "dimension": "time"
+                  }
+                ],
+                "algorithm_version": "cited-calculations-v1",
+                "normalized_inputs": [
+                  {
+                    "id": "N1",
+                    "role": "before",
+                    "value": "120",
+                    "unit": "s",
+                    "original_value": "2",
+                    "original_unit": "min",
+                    "conversion_factor": "60"
+                  },
+                  {
+                    "id": "N2",
+                    "role": "after",
+                    "value": "165",
+                    "unit": "s",
+                    "original_value": "165",
+                    "original_unit": "s",
+                    "conversion_factor": "1"
+                  }
+                ],
+                "evaluated_expression": "165 s - 120 s = 45 s (rounded)",
+                "rounding": {
+                  "mode": "ROUND_HALF_UP",
+                  "max_fractional_digits": 6
+                },
+                "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+              }
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "9f476281-c58b-41b3-ab8a-c054ab749be9",
+            "document_id": "9df0de78-7b3b-5355-bdf4-eee71c022748",
+            "revision_id": "db779046-960f-556b-83e3-387dbeb4dc5c",
+            "relative_path": "source.md",
+            "updated_at": "2026-10-29T19:57:30.981103+00:00",
+            "chunk_id": "1a3c4550-ff65-56c9-8c4f-01e885dfd5c6",
+            "anchor": "maple-backup-duration",
+            "heading": "Maple backup duration",
+            "content": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-29T19:57:30.981244+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+            "presented_content": "The Maple backup took 2 minutes before the update and 165 seconds after it."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-29T19:58:14.088636+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v8",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "How much did the Maple backup duration increase, in seconds?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 43102,
+          "created_at": "2026-10-29T19:58:14.088636+00:00",
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "How much did the Maple backup duration increase, in seconds?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "difference",
+              "operation": "difference"
+            }
+          ],
+          "operation_plan_origin": "planned",
+          "planner_version": "issue-operations-v1",
+          "planner_settings": {
+            "max_tokens": 800,
+            "seed": 7
+          },
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+              "quote": "The Maple backup took 2 minutes before the update and 165 seconds after it."
+            }
+          ],
+          "quantity_catalog": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+              "source_text": "2 minutes",
+              "snippet_text": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+              "start": 22,
+              "end": 31,
+              "value": "2",
+              "unit": "min",
+              "dimension": "time"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S1",
+              "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+              "source_text": "165 seconds",
+              "snippet_text": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+              "start": 54,
+              "end": 65,
+              "value": "165",
+              "unit": "s",
+              "dimension": "time"
+            }
+          ],
+          "calculation_traces": [
+            {
+              "request_id": "R1",
+              "operation": "difference",
+              "status": "computed",
+              "text": "Signed difference: 45 s.",
+              "formula": "after - before",
+              "result": "45",
+              "unit": "s",
+              "reason": null,
+              "inputs": [
+                {
+                  "id": "N1",
+                  "snippet_id": "S1",
+                  "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+                  "source_text": "2 minutes",
+                  "snippet_text": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+                  "start": 22,
+                  "end": 31,
+                  "value": "2",
+                  "unit": "min",
+                  "dimension": "time"
+                },
+                {
+                  "id": "N2",
+                  "snippet_id": "S1",
+                  "citation_id": "source:1a3c4550-ff65-56c9-8c4f-01e885dfd5c6:db779046-960f-556b-83e3-387dbeb4dc5c",
+                  "source_text": "165 seconds",
+                  "snippet_text": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+                  "start": 54,
+                  "end": 65,
+                  "value": "165",
+                  "unit": "s",
+                  "dimension": "time"
+                }
+              ],
+              "algorithm_version": "cited-calculations-v1",
+              "normalized_inputs": [
+                {
+                  "id": "N1",
+                  "role": "before",
+                  "value": "120",
+                  "unit": "s",
+                  "original_value": "2",
+                  "original_unit": "min",
+                  "conversion_factor": "60"
+                },
+                {
+                  "id": "N2",
+                  "role": "after",
+                  "value": "165",
+                  "unit": "s",
+                  "original_value": "165",
+                  "original_unit": "s",
+                  "conversion_factor": "1"
+                }
+              ],
+              "evaluated_expression": "165 s - 120 s = 45 s (rounded)",
+              "rounding": {
+                "mode": "ROUND_HALF_UP",
+                "max_fractional_digits": 6
+              },
+              "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+            }
+          ],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "9f476281-c58b-41b3-ab8a-c054ab749be9"
+        ]
+      },
+      "latency_seconds": 43.11232654284686,
+      "setup_seconds": 0.016501332633197308,
+      "attempt_total_seconds": 43.128827875480056
+    },
+    "missing-denominator": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Invalid model format"
+      },
+      "failure_stage": "inference_or_validation",
+      "latency_seconds": 44.22501095943153,
+      "setup_seconds": 0.019596749916672707,
+      "attempt_total_seconds": 44.2446077093482
+    },
+    "conflicting-threshold": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "82e7a360-238c-4f00-8ea1-7633772ba783",
+        "workspace": "synthetic-eval",
+        "issue": "What is the current Alder timeout, and how much did it increase from the old value?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "answer"
+            },
+            {
+              "id": "R2",
+              "text": "difference"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "unknown",
+              "text": "The old Alder timeout was 10 seconds. The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. Neither record establishes which current value is authoritative.",
+              "snippet_ids": [
+                "S1",
+                "S2",
+                "S3"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+                  "quote": "The old Alder timeout was 10 seconds. "
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+                  "quote": "The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. "
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+                  "quote": "Neither record establishes which current value is authoritative."
+                }
+              ]
+            },
+            {
+              "question_id": "R2",
+              "status": "unknown",
+              "text": "Calculation unavailable: The current value is not established as authoritative, so the difference cannot be calculated.",
+              "snippet_ids": [
+                "S1",
+                "S2",
+                "S3"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+                  "quote": "The old Alder timeout was 10 seconds. "
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+                  "quote": "The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. "
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+                  "quote": "Neither record establishes which current value is authoritative."
+                }
+              ],
+              "calculation": {
+                "request_id": "R2",
+                "operation": "difference",
+                "status": "unknown",
+                "text": "Calculation unavailable: The current value is not established as authoritative, so the difference cannot be calculated.",
+                "formula": null,
+                "result": null,
+                "unit": null,
+                "reason": "The current value is not established as authoritative, so the difference cannot be calculated.",
+                "inputs": [],
+                "rounding": null,
+                "caveat": "Arithmetic does not verify source selection or authority."
+              }
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "68c2405a-aad3-497f-be6e-a1684a53cd66",
+            "document_id": "62c217f7-8c52-5533-afa5-6fc85d36f964",
+            "revision_id": "1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+            "relative_path": "source.md",
+            "updated_at": "2026-10-29T19:58:58.355532+00:00",
+            "chunk_id": "f743148f-9f8a-56a6-b456-da918e8431cd",
+            "anchor": "alder-timeout-records",
+            "heading": "Alder timeout records",
+            "content": "The old Alder timeout was 10 seconds. The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. Neither record establishes which current value is authoritative.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-29T19:58:58.355704+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+            "presented_content": "The old Alder timeout was 10 seconds. The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. Neither record establishes which current value is authoritative."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-29T19:59:50.687568+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v8",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "What is the current Alder timeout, and how much did it increase from the old value?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 52326,
+          "created_at": "2026-10-29T19:59:50.687568+00:00",
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "What is the current Alder timeout, and how much did it increase from the old value?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "answer",
+              "operation": "answer"
+            },
+            {
+              "id": "R2",
+              "question_id": "Q1",
+              "request": "difference",
+              "operation": "difference"
+            }
+          ],
+          "operation_plan_origin": "planned",
+          "planner_version": "issue-operations-v1",
+          "planner_settings": {
+            "max_tokens": 800,
+            "seed": 7
+          },
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+              "quote": "The old Alder timeout was 10 seconds. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+              "quote": "The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+              "quote": "Neither record establishes which current value is authoritative."
+            }
+          ],
+          "quantity_catalog": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+              "source_text": "10 seconds",
+              "snippet_text": "The old Alder timeout was 10 seconds. ",
+              "start": 26,
+              "end": 36,
+              "value": "10",
+              "unit": "s",
+              "dimension": "time"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S2",
+              "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+              "source_text": "16 seconds",
+              "snippet_text": "The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. ",
+              "start": 45,
+              "end": 55,
+              "value": "16",
+              "unit": "s",
+              "dimension": "time"
+            },
+            {
+              "id": "N3",
+              "snippet_id": "S2",
+              "citation_id": "source:f743148f-9f8a-56a6-b456-da918e8431cd:1e4cffc9-6fe2-5cbe-8f96-f5c7578f8b52",
+              "source_text": "24 seconds",
+              "snippet_text": "The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. ",
+              "start": 106,
+              "end": 116,
+              "value": "24",
+              "unit": "s",
+              "dimension": "time"
+            }
+          ],
+          "calculation_traces": [
+            {
+              "request_id": "R2",
+              "operation": "difference",
+              "status": "unknown",
+              "text": "Calculation unavailable: The current value is not established as authoritative, so the difference cannot be calculated.",
+              "formula": null,
+              "result": null,
+              "unit": null,
+              "reason": "The current value is not established as authoritative, so the difference cannot be calculated.",
+              "inputs": [],
+              "rounding": null,
+              "caveat": "Arithmetic does not verify source selection or authority."
+            }
+          ],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "68c2405a-aad3-497f-be6e-a1684a53cd66"
+        ]
+      },
+      "latency_seconds": 52.33863270841539,
+      "setup_seconds": 0.01582337450236082,
+      "attempt_total_seconds": 52.35445608291775
+    },
+    "multipart-capacity": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Invalid operation plan"
+      },
+      "failure_stage": "inference_or_validation",
+      "latency_seconds": 89.60595529153943,
+      "setup_seconds": 0.018623041920363903,
+      "attempt_total_seconds": 89.6245783334598
+    }
+  }
+}

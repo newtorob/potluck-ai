@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "f2507791-37f7-42d9-bb5c-8d0852bb3725",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-cited-calculations-fresh-v8-s29/attempts/new-faults/raw/allowed",
+  "source_sha256": "577046a8c0bfd7638e6f07ceda1692a2c506131a721e15e41c46feafd898d7fc",
+  "scan": {
+    "collection_id": "f2507791-37f7-42d9-bb5c-8d0852bb3725",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}
