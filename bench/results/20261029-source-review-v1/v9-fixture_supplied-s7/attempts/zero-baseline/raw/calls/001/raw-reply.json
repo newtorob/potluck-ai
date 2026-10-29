@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-82497b92-6f0f-4535-9065-0e07d6c8b228",
+  "object": "chat.completion",
+  "created": 1793313592,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\", \"S2\"], \"reason\": \"The percentage change can be calculated using the number of support tickets on Monday (N1) and Tuesday (N2).\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 417,
+    "completion_tokens": 65,
+    "total_tokens": 482
+  }
+}

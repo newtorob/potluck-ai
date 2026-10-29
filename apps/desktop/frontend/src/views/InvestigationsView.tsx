@@ -4,6 +4,8 @@ import { localApi } from '@/lib/localApi';
 import { useModelStore } from '@/stores/modelStore';
 import type {
   Brief,
+  CalculationPreview,
+  CalculationReviewInput,
   Investigation,
   OperationType,
   ReviewedOperation,
@@ -65,6 +67,44 @@ export function InvestigationsView() {
   const [current, setCurrent] = useState<Investigation | null>(null);
   const [decision, setDecision] = useState<'accept' | 'correct' | 'reject'>('accept');
   const [corrected, setCorrected] = useState<Brief | null>(null);
+  const [calculationRows, setCalculationRows] = useState<CalculationReviewInput[]>([]);
+  const [calculationPreview, setCalculationPreview] = useState<CalculationPreview | null>(null);
+  const previewRevision = useRef(0);
+  function invalidateCalculationPreview() {
+    previewRevision.current++;
+    setCalculationPreview(null);
+  }
+  function updateCalculationRow(row: CalculationReviewInput) {
+    invalidateCalculationPreview();
+    setCalculationRows((old) =>
+      old.map((entry) => (entry.request_id === row.request_id ? row : entry)),
+    );
+  }
+  function calculationIssues(row: CalculationReviewInput) {
+    const operands = row.operand_ids.filter(Boolean);
+    const snippets = new Set(row.snippet_ids);
+    for (const id of operands) {
+      const quantity = current?.provenance?.quantity_catalog?.find((item) => item.id === id);
+      if (quantity) snippets.add(quantity.snippet_id);
+    }
+    const operandError =
+      operands.length === 2 && operands[0] === operands[1]
+        ? 'Choose two different quantities.'
+        : row.status === 'calculate' && operands.length !== 2
+          ? 'Choose both quantities to calculate.'
+          : '';
+    const evidenceError =
+      snippets.size > 8
+        ? 'Use at most eight excerpts, including the selected quantities.'
+        : snippets.size === 0 && (current?.provenance?.snippet_catalog?.length ?? 0) > 0
+          ? 'Choose at least one excerpt or quantity.'
+          : '';
+    return {
+      operandError,
+      evidenceError,
+      reasonError: row.reason.trim() ? '' : 'Enter an explanation.',
+    };
+  }
   const [reviewer, setReviewer] = useState('');
   const [reason, setReason] = useState('');
   const [result, setResult] = useState<'' | 'resolved' | 'unresolved' | 'inconclusive'>('');
@@ -173,6 +213,8 @@ export function InvestigationsView() {
       return;
     }
     invalidatePlanContext();
+    invalidateCalculationPreview();
+    setCalculationRows([]);
     setLoadedWorkspace('');
     setSelected([]);
     setCurrent(null);
@@ -191,6 +233,8 @@ export function InvestigationsView() {
   }
   function show(item: Investigation) {
     setCitationsOpen(false);
+    invalidateCalculationPreview();
+    setCalculationRows([]);
     setCurrent(item);
     const brief = structuredClone(item.review?.corrected_brief ?? item.brief);
     setCorrected({
@@ -360,6 +404,8 @@ export function InvestigationsView() {
                                 ? [...selected, c.id]
                                 : selected.filter((id) => id !== c.id),
                             );
+                            invalidateCalculationPreview();
+                            setCalculationRows([]);
                             setCurrent(null);
                             setItems([]);
                           }}
@@ -1023,7 +1069,11 @@ export function InvestigationsView() {
                   <select
                     className={field}
                     value={decision}
-                    onChange={(e) => setDecision(e.target.value as typeof decision)}
+                    onChange={(e) => {
+                      invalidateCalculationPreview();
+                      setCalculationRows([]);
+                      setDecision(e.target.value as typeof decision);
+                    }}
                   >
                     <option value="accept">Accept</option>
                     <option value="correct">Correct</option>
@@ -1057,17 +1107,196 @@ export function InvestigationsView() {
                                 return { ...entry, ...changes };
                               }),
                             });
+                          const plan =
+                            current.provenance?.template_version === 'investigation-v9'
+                              ? current.provenance.operation_plan?.find(
+                                  (entry) =>
+                                    entry.id === question.id && entry.operation !== 'answer',
+                                )
+                              : undefined;
+                          const row = calculationRows.find(
+                            (entry) => entry.request_id === question.id,
+                          );
+                          const quantities = current.provenance?.quantity_catalog ?? [];
+                          const issues = row ? calculationIssues(row) : null;
+                          const issueId = `calculation-${question.id}`;
                           return (
                             <div
                               key={question.id}
                               className="space-y-2 border-t border-border pt-3"
                             >
                               <h4 className="text-sm font-medium">{question.text}</h4>
+                              {plan && current.status === 'draft' && (
+                                <div className="space-y-3 rounded-md border border-border bg-muted/30 p-3">
+                                  <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                      type="checkbox"
+                                      disabled={busy}
+                                      checked={!!row}
+                                      onChange={(event) => {
+                                        invalidateCalculationPreview();
+                                        setCalculationRows((old) =>
+                                          event.target.checked
+                                            ? [
+                                                ...old,
+                                                {
+                                                  request_id: question.id,
+                                                  status: 'calculate',
+                                                  operand_ids: [],
+                                                  snippet_ids: [],
+                                                  reason: '',
+                                                },
+                                              ]
+                                            : old.filter(
+                                                (entry) => entry.request_id !== question.id,
+                                              ),
+                                        );
+                                      }}
+                                    />{' '}
+                                    Review calculation inputs · {operationLabels[plan.operation]}
+                                  </label>
+                                  {row && (
+                                    <>
+                                      <p className="text-xs text-muted-foreground">
+                                        Choose saved quantities and evidence to explain your
+                                        assessment. Selecting sources does not establish their
+                                        authority or truth.
+                                      </p>
+                                      <label className="block text-xs">
+                                        Assessment
+                                        <select
+                                          className={field}
+                                          value={row.status}
+                                          disabled={busy}
+                                          onChange={(event) =>
+                                            updateCalculationRow({
+                                              ...row,
+                                              status: event.target
+                                                .value as CalculationReviewInput['status'],
+                                            })
+                                          }
+                                        >
+                                          <option value="calculate">Calculate</option>
+                                          <option value="missing">Missing evidence</option>
+                                          <option value="unsupported">Unsupported</option>
+                                          <option value="conflicting">Conflicting evidence</option>
+                                        </select>
+                                      </label>
+                                      {(plan.operation === 'percentage'
+                                        ? ['Part', 'Total']
+                                        : ['Before', 'After']
+                                      ).map((role, index) => (
+                                        <label key={role} className="block text-xs">
+                                          {role}
+                                          <select
+                                            className={field}
+                                            disabled={busy}
+                                            aria-invalid={!!issues?.operandError}
+                                            aria-describedby={`${issueId}-operands`}
+                                            value={row.operand_ids[index] ?? ''}
+                                            onChange={(event) => {
+                                              const ids = [
+                                                row.operand_ids[0] ?? '',
+                                                row.operand_ids[1] ?? '',
+                                              ];
+                                              ids[index] = event.target.value;
+                                              updateCalculationRow({ ...row, operand_ids: ids });
+                                            }}
+                                          >
+                                            <option value="">Select a saved quantity</option>
+                                            {quantities.map((quantity) => (
+                                              <option key={quantity.id} value={quantity.id}>
+                                                {quantity.source_text} · {quantity.id} ·{' '}
+                                                {quantity.snippet_id}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </label>
+                                      ))}
+                                      <p
+                                        id={`${issueId}-operands`}
+                                        className="text-xs text-destructive"
+                                      >
+                                        {issues?.operandError}
+                                      </p>
+                                      <fieldset
+                                        className="space-y-2"
+                                        disabled={busy}
+                                        aria-describedby={`${issueId}-evidence`}
+                                      >
+                                        <legend className="text-xs">
+                                          Evidence and authority excerpts
+                                        </legend>
+                                        {(current.provenance?.snippet_catalog ?? []).map(
+                                          (snippet) => (
+                                            <label
+                                              key={snippet.snippet_id}
+                                              className="flex items-start gap-2 text-xs"
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={row.snippet_ids.includes(
+                                                  snippet.snippet_id,
+                                                )}
+                                                onChange={(event) =>
+                                                  updateCalculationRow({
+                                                    ...row,
+                                                    snippet_ids: event.target.checked
+                                                      ? [...row.snippet_ids, snippet.snippet_id]
+                                                      : row.snippet_ids.filter(
+                                                          (id) => id !== snippet.snippet_id,
+                                                        ),
+                                                  })
+                                                }
+                                              />
+                                              <span>
+                                                <strong>{snippet.snippet_id}</strong> ·{' '}
+                                                {snippet.quote}
+                                              </span>
+                                            </label>
+                                          ),
+                                        )}
+                                      </fieldset>
+                                      <p
+                                        id={`${issueId}-evidence`}
+                                        className="text-xs text-destructive"
+                                      >
+                                        {issues?.evidenceError}
+                                      </p>
+                                      <label className="block text-xs">
+                                        Explanation, including how you assessed conflicts and
+                                        authority
+                                        <textarea
+                                          className={`${field} resize-none`}
+                                          rows={3}
+                                          maxLength={1000}
+                                          disabled={busy}
+                                          value={row.reason}
+                                          onChange={(event) =>
+                                            updateCalculationRow({
+                                              ...row,
+                                              reason: event.target.value,
+                                            })
+                                          }
+                                          aria-invalid={!!issues?.reasonError}
+                                          aria-describedby={`${issueId}-reason`}
+                                        />
+                                      </label>
+                                      <p
+                                        id={`${issueId}-reason`}
+                                        className="text-xs text-destructive"
+                                      >
+                                        {issues?.reasonError}
+                                      </p>
+                                    </>
+                                  )}
+                                </div>
+                              )}
                               <label className="block text-xs">
                                 Answer status
                                 <select
                                   className={field}
-                                  disabled={busy}
+                                  disabled={busy || !!row}
                                   value={answer.status}
                                   onChange={(e) =>
                                     updateAnswer({ status: e.target.value as typeof answer.status })
@@ -1083,12 +1312,12 @@ export function InvestigationsView() {
                                 <textarea
                                   className={`${field} resize-none`}
                                   rows={3}
-                                  disabled={busy}
+                                  disabled={busy || !!row}
                                   value={answer.text}
                                   onChange={(e) => updateAnswer({ text: e.target.value })}
                                 />
                               </label>
-                              <fieldset className="space-y-2" disabled={busy}>
+                              <fieldset className="space-y-2" disabled={busy || !!row}>
                                 <legend className="text-xs">Source excerpts</legend>
                                 {(current.provenance?.snippet_catalog ?? []).map((snippet) => (
                                   <label
@@ -1117,6 +1346,96 @@ export function InvestigationsView() {
                             </div>
                           );
                         })}
+                        {calculationRows.length > 0 && (
+                          <div className="space-y-2 border-t border-border pt-3">
+                            <button
+                              className={button}
+                              disabled={
+                                busy ||
+                                calculationRows.some((row) => {
+                                  const issues = calculationIssues(row);
+                                  return !!(
+                                    issues.operandError ||
+                                    issues.evidenceError ||
+                                    issues.reasonError
+                                  );
+                                })
+                              }
+                              onClick={() => {
+                                const revision = ++previewRevision.current;
+                                const submitted = calculationRows.map((row) => ({
+                                  ...row,
+                                  operand_ids: row.operand_ids.filter(Boolean),
+                                }));
+                                setBusy(true);
+                                setError('');
+                                void localApi
+                                  .previewCalculationReview(current.id, {
+                                    ...scope,
+                                    calculation_reviews: submitted,
+                                  })
+                                  .then((preview) => {
+                                    if (revision !== previewRevision.current) return;
+                                    setCalculationPreview(preview);
+                                    setCorrected(
+                                      (old) =>
+                                        old && {
+                                          ...old,
+                                          answers: (old.answers ?? []).map(
+                                            (answer) =>
+                                              preview.answers.find(
+                                                (entry) => entry.question_id === answer.question_id,
+                                              ) ?? answer,
+                                          ),
+                                        },
+                                    );
+                                  })
+                                  .catch((error: unknown) => {
+                                    if (revision !== previewRevision.current) return;
+                                    if (
+                                      error instanceof Error &&
+                                      (/^\[localApi\] (?:401|403|404):/.test(error.message) ||
+                                        /investigation_unavailable|investigation unavailable|evidence unavailable|collections_unavailable/i.test(
+                                          error.message,
+                                        ))
+                                    ) {
+                                      invalidateCalculationPreview();
+                                      setCalculationRows([]);
+                                      setCurrent(null);
+                                      setCorrected(null);
+                                    }
+                                    setError(
+                                      error instanceof Error
+                                        ? error.message
+                                        : 'Could not preview calculation.',
+                                    );
+                                  })
+                                  .finally(() => setBusy(false));
+                              }}
+                            >
+                              Preview calculation
+                            </button>
+                            {calculationPreview ? (
+                              <div role="status" className="space-y-1 text-sm">
+                                <p>Preview applied to the correction.</p>
+                                {calculationPreview.answers.map((answer) => (
+                                  <p key={answer.question_id}>
+                                    {
+                                      corrected.questions?.find(
+                                        (question) => question.id === answer.question_id,
+                                      )?.text
+                                    }{' '}
+                                    · {answer.status}: {answer.text}
+                                  </p>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">
+                                Preview the current selections before saving the review.
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <>
@@ -1340,7 +1659,11 @@ export function InvestigationsView() {
                 <button
                   className={button}
                   disabled={
-                    busy || current.status !== 'draft' || !reviewer.trim() || !reason.trim()
+                    busy ||
+                    current.status !== 'draft' ||
+                    !reviewer.trim() ||
+                    !reason.trim() ||
+                    (decision === 'correct' && calculationRows.length > 0 && !calculationPreview)
                   }
                   onClick={() =>
                     void run(async () => {
@@ -1354,17 +1677,28 @@ export function InvestigationsView() {
                         reason,
                         ...(decision === 'correct' && corrected
                           ? {
+                              ...(calculationPreview && calculationRows.length
+                                ? {
+                                    calculation_reviews: calculationRows.map((row) => ({
+                                      ...row,
+                                      operand_ids: row.operand_ids.filter(Boolean),
+                                    })),
+                                  }
+                                : {}),
                               corrected_brief: {
                                 ...(corrected.questions
                                   ? {
                                       questions: corrected.questions,
                                       answers: (corrected.answers ?? []).map(
-                                        ({ question_id, status, text, snippet_ids }) => ({
-                                          question_id,
-                                          status,
-                                          text,
-                                          snippet_ids,
-                                        }),
+                                        (answer) =>
+                                          calculationPreview?.answers.find(
+                                            (entry) => entry.question_id === answer.question_id,
+                                          ) ?? {
+                                            question_id: answer.question_id,
+                                            status: answer.status,
+                                            text: answer.text,
+                                            snippet_ids: answer.snippet_ids,
+                                          },
                                       ),
                                     }
                                   : {}),
@@ -1387,6 +1721,34 @@ export function InvestigationsView() {
                 >
                   Save review
                 </button>
+                {!!current.review?.calculation_reviews?.length && (
+                  <section className="space-y-2" aria-label="Reviewer calculation assessments">
+                    <h4 className="text-sm font-medium">Reviewer calculation assessments</h4>
+                    {current.review.calculation_reviews.map((review) => (
+                      <div key={review.request_id} className="text-sm">
+                        <p>
+                          {
+                            effectiveBrief?.questions?.find(
+                              (question) => question.id === review.request_id,
+                            )?.text
+                          }{' '}
+                          · {review.status}
+                        </p>
+                        <p>{review.reason}</p>
+                        <p>
+                          Inputs: {review.operand_ids.join(', ') || 'None'} · Evidence:{' '}
+                          {review.snippet_ids.join(', ')}
+                        </p>
+                        {review.trace.formula && <p>Formula: {review.trace.formula}</p>}
+                        {review.trace.result != null && (
+                          <p>
+                            Result: {review.trace.result} {review.trace.unit}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </section>
+                )}
                 {current.review && (
                   <p className="text-sm">
                     Review: {current.review.decision} by {current.review.reviewer} ·{' '}

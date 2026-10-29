@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-cc02921e-7765-4e75-ba4f-48d2e5bd7d85",
+  "object": "chat.completion",
+  "created": 1793313619,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"conflicting\", \"snippet_ids\": [\"S2\", \"S3\"], \"reason\": \"Conflicting values for the number of available workshop seats are provided by different sources (42 and 48).\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 607,
+    "completion_tokens": 68,
+    "total_tokens": 675
+  }
+}

@@ -1,0 +1,313 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "bdd00bc5-e113-4827-bc1c-f638ecd0e85b",
+    "workspace": "synthetic-eval",
+    "issue": "How many more customer visits did the north studio record than the south studio?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "How many more customer visits did the north studio record than the south studio?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Signed difference: -13 customer visits.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+              "quote": "The north studio recorded 37 customer visits. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+              "quote": "The south studio recorded 24 customer visits. "
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "difference",
+            "status": "computed",
+            "text": "Signed difference: -13 customer visits.",
+            "formula": "after - before",
+            "result": "-13",
+            "unit": "customer visits",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+                "source_text": "37 customer visits",
+                "snippet_text": "The north studio recorded 37 customer visits. ",
+                "start": 26,
+                "end": 44,
+                "value": "37",
+                "unit": "customer visits",
+                "dimension": "count"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S2",
+                "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+                "source_text": "24 customer visits",
+                "snippet_text": "The south studio recorded 24 customer visits. ",
+                "start": 26,
+                "end": 44,
+                "value": "24",
+                "unit": "customer visits",
+                "dimension": "count"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v3",
+            "normalized_inputs": [
+              {
+                "id": "N1",
+                "role": "before",
+                "value": "37",
+                "unit": "customer visits",
+                "original_value": "37",
+                "original_unit": "customer visits",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N2",
+                "role": "after",
+                "value": "24",
+                "unit": "customer visits",
+                "original_value": "24",
+                "original_unit": "customer visits",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "24 customer visits - 37 customer visits = -13 customer visits (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "ef719aa5-d72e-4aab-be3a-c420b0ade493",
+        "document_id": "9a2a1a4c-c57e-5e1d-bed7-e93fb2575cf7",
+        "revision_id": "20abed5a-de17-50ad-bc32-091472095aa1",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:40:48.572019+00:00",
+        "chunk_id": "a9a92718-e380-506e-899f-bca9cbfdbf4b",
+        "anchor": "intro",
+        "heading": "",
+        "content": "The north studio recorded 37 customer visits. The south studio recorded 24 customer visits. The north studio has 5 meeting rooms.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:40:48.572143+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+        "presented_content": "The north studio recorded 37 customer visits. The south studio recorded 24 customer visits. The north studio has 5 meeting rooms."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T22:41:12.220372+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v9",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "How many more customer visits did the north studio record than the south studio?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 23639,
+      "created_at": "2026-10-29T22:41:12.220372+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "How many more customer visits did the north studio record than the south studio?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "How many more customer visits did the north studio record than the south studio?",
+          "operation": "difference"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+          "quote": "The north studio recorded 37 customer visits. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+          "quote": "The south studio recorded 24 customer visits. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+          "quote": "The north studio has 5 meeting rooms."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+          "source_text": "37 customer visits",
+          "snippet_text": "The north studio recorded 37 customer visits. ",
+          "start": 26,
+          "end": 44,
+          "value": "37",
+          "unit": "customer visits",
+          "dimension": "count"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S2",
+          "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+          "source_text": "24 customer visits",
+          "snippet_text": "The south studio recorded 24 customer visits. ",
+          "start": 26,
+          "end": 44,
+          "value": "24",
+          "unit": "customer visits",
+          "dimension": "count"
+        },
+        {
+          "id": "N3",
+          "snippet_id": "S3",
+          "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+          "source_text": "5 meeting rooms",
+          "snippet_text": "The north studio has 5 meeting rooms.",
+          "start": 21,
+          "end": 36,
+          "value": "5",
+          "unit": "meeting rooms",
+          "dimension": "count"
+        }
+      ],
+      "quantity_parser_version": "v3",
+      "extraction_notices": [],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "difference",
+          "status": "computed",
+          "text": "Signed difference: -13 customer visits.",
+          "formula": "after - before",
+          "result": "-13",
+          "unit": "customer visits",
+          "reason": null,
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+              "source_text": "37 customer visits",
+              "snippet_text": "The north studio recorded 37 customer visits. ",
+              "start": 26,
+              "end": 44,
+              "value": "37",
+              "unit": "customer visits",
+              "dimension": "count"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S2",
+              "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+              "source_text": "24 customer visits",
+              "snippet_text": "The south studio recorded 24 customer visits. ",
+              "start": 26,
+              "end": 44,
+              "value": "24",
+              "unit": "customer visits",
+              "dimension": "count"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v3",
+          "normalized_inputs": [
+            {
+              "id": "N1",
+              "role": "before",
+              "value": "37",
+              "unit": "customer visits",
+              "original_value": "37",
+              "original_unit": "customer visits",
+              "conversion_factor": "1"
+            },
+            {
+              "id": "N2",
+              "role": "after",
+              "value": "24",
+              "unit": "customer visits",
+              "original_value": "24",
+              "original_unit": "customer visits",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": "24 customer visits - 37 customer visits = -13 customer visits (rounded)",
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "ef719aa5-d72e-4aab-be3a-c420b0ade493"
+    ]
+  },
+  "latency_seconds": 23.648861750029027,
+  "setup_seconds": 0.021688874810934067,
+  "attempt_total_seconds": 23.67055062483996
+}

@@ -1,0 +1,48 @@
+[WebServer] (node:14297) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:14307) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 5 tests using 1 worker
+
+[WebServer] Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+[WebServer]   npx update-browserslist-db@latest
+[WebServer]   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+(node:14323) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/investigations.spec.ts:100:1 › reviewed plan can be edited and retained across failures before a cited calculation draft (1.7s)
+  ✘  2 [chromium] › e2e/investigations.spec.ts:169:1 › calculation review recovers preview failures, rejects stale responses and saves exact preview (30.1s)
+(node:14482) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  3 [chromium] › e2e/investigations.spec.ts:236:1 › question preview renders sources and recovers a correction (826ms)
+  ✓  4 [chromium] › e2e/investigations.spec.ts:289:1 › new brief citations, recoverable correction, review, and legacy draft (892ms)
+  ✓  5 [chromium] › e2e/investigations.spec.ts:331:1 › unavailable evidence clears the draft; loading, errors and narrow layout (679ms)
+
+
+  1) [chromium] › e2e/investigations.spec.ts:169:1 › calculation review recovers preview failures, rejects stale responses and saves exact preview 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.focus: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByLabel('Before', { exact: true })
+
+
+      181 |   await page.getByLabel(/Review calculation inputs/).check();
+      182 |   const before = page.getByLabel('Before', { exact: true });
+    > 183 |   await before.focus(); await page.keyboard.press('Space'); await page.keyboard.press('Escape');
+          |                ^
+      184 |   await expect(before).toBeFocused();
+      185 |   await before.selectOption('N1');
+      186 |   await page.getByLabel('After', { exact: true }).selectOption('N2');
+        at /Users/rob/Documents/potluck/apps/desktop/frontend/e2e/investigations.spec.ts:183:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/investigations-calculation-4ddc0-ses-and-saves-exact-preview-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/investigations-calculation-4ddc0-ses-and-saves-exact-preview-chromium/error-context.md
+
+  1 failed
+    [chromium] › e2e/investigations.spec.ts:169:1 › calculation review recovers preview failures, rejects stale responses and saves exact preview 
+  4 passed (36.1s)

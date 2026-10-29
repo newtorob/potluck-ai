@@ -1,0 +1,43 @@
+{
+  "attempts": 4,
+  "saved_drafts": 4,
+  "exact_excerpts": 7,
+  "catalogs_rebuilt": 4,
+  "computed_traces_replayed": 1,
+  "scripted_reviews": {
+    "zero-baseline": {
+      "status": "verified",
+      "choice": "calculate",
+      "answer_status": "unknown",
+      "result": null,
+      "cited_excerpts": 2,
+      "original_preserved": true
+    },
+    "conflicting-capacity": {
+      "status": "verified",
+      "choice": "conflicting",
+      "answer_status": "conflicting",
+      "result": null,
+      "cited_excerpts": 4,
+      "original_preserved": true
+    },
+    "incomplete-share": {
+      "status": "verified",
+      "choice": "missing",
+      "answer_status": "unknown",
+      "result": null,
+      "cited_excerpts": 2,
+      "original_preserved": true
+    },
+    "compound-count": {
+      "status": "verified",
+      "choice": "calculate",
+      "answer_status": "supported",
+      "result": "13",
+      "cited_excerpts": 2,
+      "original_preserved": true
+    }
+  },
+  "actual_owner_acceptance": false,
+  "model_calls_during_review": 0
+}

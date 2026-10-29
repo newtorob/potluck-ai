@@ -1,0 +1,298 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "778ad3c6-d6c7-4e16-abbd-48dee93e32d0",
+    "workspace": "synthetic-eval",
+    "issue": "What was the percentage change in support tickets from Monday to Tuesday?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What was the percentage change in support tickets from Monday to Tuesday?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "unknown",
+          "text": "Unknown: The baseline is zero.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9",
+              "quote": "On Monday the team received 0 support tickets. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9",
+              "quote": "On Tuesday the team received 6 support tickets."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "percent_change",
+            "status": "unknown",
+            "text": "Unknown: The baseline is zero.",
+            "formula": "(after - before) / before × 100",
+            "result": null,
+            "unit": null,
+            "reason": "The baseline is zero.",
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9",
+                "source_text": "0 support tickets",
+                "snippet_text": "On Monday the team received 0 support tickets. ",
+                "start": 28,
+                "end": 45,
+                "value": "0",
+                "unit": "support tickets",
+                "dimension": "count"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S2",
+                "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9",
+                "source_text": "6 support tickets",
+                "snippet_text": "On Tuesday the team received 6 support tickets.",
+                "start": 29,
+                "end": 46,
+                "value": "6",
+                "unit": "support tickets",
+                "dimension": "count"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v3",
+            "normalized_inputs": [
+              {
+                "id": "N1",
+                "role": "before",
+                "value": "0",
+                "unit": "support tickets",
+                "original_value": "0",
+                "original_unit": "support tickets",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N2",
+                "role": "after",
+                "value": "6",
+                "unit": "support tickets",
+                "original_value": "6",
+                "original_unit": "support tickets",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": null,
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+            "limitation_kind": "zero_denominator"
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "1ff17e57-c3d1-4d30-9114-185f7c03d846",
+        "document_id": "eda5ea6b-ac53-5f92-8121-df72e15ab28a",
+        "revision_id": "3a12620c-db98-534e-b037-042b83b75cb9",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:39:52.238268+00:00",
+        "chunk_id": "0a9ce8b8-c62e-56c5-a393-e39754c3b76c",
+        "anchor": "intro",
+        "heading": "",
+        "content": "On Monday the team received 0 support tickets. On Tuesday the team received 6 support tickets.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:39:52.238416+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9",
+        "presented_content": "On Monday the team received 0 support tickets. On Tuesday the team received 6 support tickets."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T22:40:19.661195+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v9",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What was the percentage change in support tickets from Monday to Tuesday?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 27417,
+      "created_at": "2026-10-29T22:40:19.661195+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "What was the percentage change in support tickets from Monday to Tuesday?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "What was the percentage change in support tickets from Monday to Tuesday?",
+          "operation": "percent_change"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9",
+          "quote": "On Monday the team received 0 support tickets. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9",
+          "quote": "On Tuesday the team received 6 support tickets."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9",
+          "source_text": "0 support tickets",
+          "snippet_text": "On Monday the team received 0 support tickets. ",
+          "start": 28,
+          "end": 45,
+          "value": "0",
+          "unit": "support tickets",
+          "dimension": "count"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S2",
+          "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9",
+          "source_text": "6 support tickets",
+          "snippet_text": "On Tuesday the team received 6 support tickets.",
+          "start": 29,
+          "end": 46,
+          "value": "6",
+          "unit": "support tickets",
+          "dimension": "count"
+        }
+      ],
+      "quantity_parser_version": "v3",
+      "extraction_notices": [],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "percent_change",
+          "status": "unknown",
+          "text": "Unknown: The baseline is zero.",
+          "formula": "(after - before) / before × 100",
+          "result": null,
+          "unit": null,
+          "reason": "The baseline is zero.",
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9",
+              "source_text": "0 support tickets",
+              "snippet_text": "On Monday the team received 0 support tickets. ",
+              "start": 28,
+              "end": 45,
+              "value": "0",
+              "unit": "support tickets",
+              "dimension": "count"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S2",
+              "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9",
+              "source_text": "6 support tickets",
+              "snippet_text": "On Tuesday the team received 6 support tickets.",
+              "start": 29,
+              "end": 46,
+              "value": "6",
+              "unit": "support tickets",
+              "dimension": "count"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v3",
+          "normalized_inputs": [
+            {
+              "id": "N1",
+              "role": "before",
+              "value": "0",
+              "unit": "support tickets",
+              "original_value": "0",
+              "original_unit": "support tickets",
+              "conversion_factor": "1"
+            },
+            {
+              "id": "N2",
+              "role": "after",
+              "value": "6",
+              "unit": "support tickets",
+              "original_value": "6",
+              "original_unit": "support tickets",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": null,
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+          "limitation_kind": "zero_denominator"
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "1ff17e57-c3d1-4d30-9114-185f7c03d846"
+    ]
+  },
+  "latency_seconds": 27.426689583808184,
+  "setup_seconds": 0.020483375526964664,
+  "attempt_total_seconds": 27.44717295933515
+}

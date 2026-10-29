@@ -1,0 +1,11 @@
+
+ RUN  v4.1.9 /Users/rob/Documents/potluck/apps/desktop/frontend
+
+(node:15558) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Start at  18:38:54
+   Duration  1.63s (transform 115ms, setup 103ms, import 110ms, tests 921ms, environment 389ms)
+

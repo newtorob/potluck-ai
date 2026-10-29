@@ -1,0 +1,1 @@
+The coordinator recorded 12 volunteers completing orientation. The total number of enrolled volunteers has not yet been recorded.

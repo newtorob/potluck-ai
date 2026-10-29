@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-d9c22e54-9242-4721-bf69-d186ce45654b",
+  "object": "chat.completion",
+  "created": 1793313639,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N1\"], \"status\": \"missing\", \"snippet_ids\": [\"S1\"], \"reason\": \"The total number of enrolled volunteers is not recorded.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 374,
+    "completion_tokens": 46,
+    "total_tokens": 420
+  }
+}

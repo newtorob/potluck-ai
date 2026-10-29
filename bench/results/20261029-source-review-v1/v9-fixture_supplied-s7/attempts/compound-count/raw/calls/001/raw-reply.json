@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-2d566df7-c0f0-4fd2-899e-084c1e360b79",
+  "object": "chat.completion",
+  "created": 1793313648,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\", \"S2\"], \"reason\": \"The difference between the number of customer visits recorded by the north studio and the south studio can be calculated using the values provided in snippets S1 and S2.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 484,
+    "completion_tokens": 73,
+    "total_tokens": 557
+  }
+}

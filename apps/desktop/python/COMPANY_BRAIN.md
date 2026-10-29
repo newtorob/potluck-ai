@@ -398,6 +398,30 @@ identify number-like text the extractor did not handle, not proof that a source 
 is absent. A lone operand has no verified before/after role and cannot establish a
 zero denominator. The model still selects evidence, operand order and conflict status.
 
+Owners can review the inputs and limitation evidence for a saved v9 draft. The
+`calculation-preview` endpoint accepts one to twelve calculation review rows, each
+containing `request_id`, `status` (`calculate`, `missing`, `unsupported`, or
+`conflicting`), ordered `operand_ids`, `snippet_ids`, and a reason. Input IDs must
+belong to the saved source-bound quantity catalog; evidence is drawn from the saved
+snippet catalog, including snippets omitted from the model's original answer. The
+server adds the selected inputs' excerpts. Two compatible, distinct inputs are
+required for calculation. Arithmetic and zero-denominator checks are deterministic;
+source choice, authority, and unavailability are reviewer assessments.
+
+Preview does not save or invoke a model. To save, submit the same rows with a
+`correct` review and a corrected brief containing the exact preview answers. The
+server rebuilds both and rejects changes to reviewed answers. The original brief and
+machine traces remain intact; reviewer choices, reasons, results, and exact excerpts
+are recorded separately and included in export. The usual scope, privacy, and source
+freshness checks apply.
+
+New v9 drafts pin `quantity_parser_version` to `v3`, which adds bounded two-word
+count units such as `support tickets`. Unsupported scales, ambiguous expressions,
+and longer phrases remain unextracted. This is lexical extraction, not a check of
+subject, authority, or comparability. Existing v9 drafts without this field replay
+their original v2 catalog; v1 and v2 extraction are unchanged. Model-generated
+unavailability reasons are labeled assessments rather than verified absence.
+
 The diagnostic runner supports `--operation-mode fixture_supplied` for v9 with a
 checksummed `confirmed_operations.json`. Those runs retain `fixture_supplied` origin,
 never owner confirmation. Automatic v9 runs retain `planned_unreviewed` origin. Compare

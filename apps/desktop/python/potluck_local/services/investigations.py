@@ -528,17 +528,17 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
                     if length > presented_lengths.get(cid, 0):
                         source_context[cid] = child['content']
                         presented_lengths[cid] = length
-            quantity_catalog = calculations.quantity_catalog(snippet_catalog, source_context=source_context, version='v2')
+            quantity_catalog = calculations.quantity_catalog(snippet_catalog, source_context=source_context, version='v3')
             if len(quantity_catalog) > 100:
                 raise ValueError('Too many quantities for investigation')
-            extraction_notices = calculations.extraction_notices(snippet_catalog, quantity_catalog, source_context=source_context)
+            extraction_notices = calculations.extraction_notices(snippet_catalog, quantity_catalog, source_context=source_context, version='v3')
             prompt = json.dumps({'issue': issue, 'operations': operation_requests,
                                  'snippets': [{'snippet_id': s['snippet_id'], 'text': s['quote']} for s in snippet_catalog],
                                  'quantities': [{k: n[k] for k in ('id', 'snippet_id', 'source_text', 'value', 'unit', 'unit_source_text') if k in n} for n in quantity_catalog],
                                  'extraction_notices': extraction_notices}, ensure_ascii=False)
             raw = await generate([{'role': 'system', 'content': instruction}, {'role': 'user', 'content': prompt}],
                                  reviewed_ops.response_schema(operation_requests, snippet_catalog, quantity_catalog), 2000)
-            brief, calculation_traces = reviewed_ops.decode_results(raw, operation_requests, snippet_catalog, quantity_catalog, extraction_notices)
+            brief, calculation_traces = reviewed_ops.decode_results(raw, operation_requests, snippet_catalog, quantity_catalog, extraction_notices, version='v3')
         elif template_version == 'investigation-v8':
             assert planned_questions is not None
             question_origin = 'explicit' if questions is not None else 'issue'
@@ -636,7 +636,7 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
                            'operation_plan_origin': (reviewed_plan_origin or 'confirmed') if reviewed_operations is not None else 'planned_unreviewed',
                            'planner_version': 'question-classification-v1' if reviewed_operations is None else None,
                            'snippet_catalog': snippet_catalog, 'quantity_catalog': quantity_catalog,
-                           'extraction_notices': extraction_notices, 'calculation_traces': calculation_traces,
+                           'quantity_parser_version': 'v3', 'extraction_notices': extraction_notices, 'calculation_traces': calculation_traces,
                            'generation_profile': profile_metadata})
         provenance['generation_settings']['max_tokens'] = 2000
         provenance['generation_settings']['timeout_scope'] = 'shared across planning and answer generation'
@@ -701,13 +701,43 @@ async def list_investigations(scope: EvidenceScope) -> list[dict[str, Any]]:
     return result
 
 
+async def calculation_preview(scope: EvidenceScope, iid: str, rows: Any) -> dict[str, Any]:
+    from potluck_local.services import investigation_calculation_review
+    item = await get_investigation(scope, iid)
+    result = investigation_calculation_review.build(item, rows)
+    # Recheck source visibility after building the preview.
+    current = await get_investigation(scope, iid)
+    if current['status'] != 'draft' or any(current[key] != item[key] for key in ('brief', 'evidence', 'provenance')):
+        raise ValueError('Investigation changed')
+    return result
+
+
 async def review_investigation(scope: EvidenceScope, iid: str, decision: str, reviewer: str,
-                               reason: str, corrected_brief: Any = None) -> dict[str, Any]:
+                               reason: str, corrected_brief: Any = None, calculation_reviews: Any = None) -> dict[str, Any]:
     item = await get_investigation(scope, iid)
     if item['status'] != 'draft' or decision not in ('accept', 'correct', 'reject'):
         raise ValueError('Invalid review')
     if (decision == 'correct') != (corrected_brief is not None):
         raise ValueError('Correction requires a corrected brief')
+    reviewed = None
+    if calculation_reviews is not None:
+        if decision != 'correct' or corrected_brief is None:
+            raise ValueError('Calculation reviews require correction')
+        from potluck_local.services import investigation_calculation_review
+        reviewed = investigation_calculation_review.build(item, calculation_reviews)
+        from copy import deepcopy
+        corrected_brief = deepcopy(corrected_brief)
+        if not isinstance(corrected_brief, dict) or not isinstance(corrected_brief.get('answers'), list):
+            raise BriefValidationError('Invalid corrected brief')
+        selected = {answer['question_id']: answer for answer in reviewed['answers']}
+        for answer in corrected_brief['answers']:
+            if not isinstance(answer, dict) or not isinstance(answer.get('question_id'), str):
+                raise BriefValidationError('Invalid corrected answer')
+            if answer['question_id'] in selected:
+                expected = selected[answer['question_id']]
+                if answer != expected:
+                    raise BriefValidationError('Reviewed calculation does not match preview')
+                del answer['calculation']
     validated_correction = None
     if corrected_brief is not None:
         try:
@@ -723,14 +753,29 @@ async def review_investigation(scope: EvidenceScope, iid: str, decision: str, re
                 validated_correction = _brief(corrected_brief, item['evidence'])
         except ValueError as exc:
             raise BriefValidationError('Invalid corrected brief') from exc
+    if reviewed is not None:
+        selected = {answer['question_id']: answer for answer in reviewed['answers']}
+        for index, answer in enumerate(validated_correction['answers']):
+            if answer['question_id'] in selected:
+                expected = selected[answer['question_id']]
+                if answer != {k: v for k, v in expected.items() if k != 'calculation'}:
+                    raise BriefValidationError('Reviewed calculation does not match correction')
+                validated_correction['answers'][index] = expected
     review = {'reviewed_at': datetime.now(timezone.utc).isoformat(), 'decision': decision, 'reviewer': _text(reviewer, 256), 'reason': _text(reason, 4000),
               'corrected_brief': validated_correction}
+    if reviewed is not None:
+        review['calculation_reviews'] = reviewed['calculation_reviews']
     async with aiosqlite.connect(get_memory_db_path(), timeout=30) as db:
         await db.execute('BEGIN IMMEDIATE')
         _privacy()
         cur = await db.execute('SELECT collection_id,document_id,revision_id,chunk_id,claim_id FROM investigation_bindings WHERE investigation_id=?', (iid,))
         if not await _bindings_valid(db, [tuple(x) for x in await cur.fetchall()], scope):
             raise LookupError('Investigation unavailable')
+        cur = await db.execute("SELECT brief,evidence,provenance FROM investigations WHERE id=? AND workspace=? AND scope=? AND status='draft'",
+                               (iid, scope.workspace, json.dumps(sorted(scope.collection_ids))))
+        current = await cur.fetchone()
+        if not current or any((json.loads(value) if value else None) != item[key] for value, key in zip(current, ('brief', 'evidence', 'provenance'))):
+            raise ValueError('Investigation changed')
         cur = await db.execute("UPDATE investigations SET review=?,status='reviewed' "
                                "WHERE id=? AND workspace=? AND scope=? AND status='draft'",
                                (json.dumps(review), iid, scope.workspace, json.dumps(sorted(scope.collection_ids))))

@@ -1,0 +1,20 @@
+[WebServer] (node:15676) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:15690) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+[WebServer]   npx update-browserslist-db@latest
+[WebServer]   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+
+Running 6 tests using 1 worker
+
+(node:15698) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/investigations.spec.ts:316:1 › reviewed plan can be edited and retained across failures before a cited calculation draft (1.7s)
+  ✓  2 [chromium] › e2e/investigations.spec.ts:417:1 › calculation review recovers preview failures, rejects stale responses and saves exact preview (1.0s)
+  ✓  3 [chromium] › e2e/investigations.spec.ts:521:1 › unavailable source during preview clears the stale investigation (626ms)
+  ✓  4 [chromium] › e2e/investigations.spec.ts:546:1 › question preview renders sources and recovers a correction (747ms)
+  ✓  5 [chromium] › e2e/investigations.spec.ts:611:1 › new brief citations, recoverable correction, review, and legacy draft (858ms)
+  ✓  6 [chromium] › e2e/investigations.spec.ts:671:1 › unavailable evidence clears the draft; loading, errors and narrow layout (681ms)
+
+  6 passed (7.3s)

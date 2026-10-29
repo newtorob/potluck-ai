@@ -1,0 +1,1 @@
+The prior count recorded 30 available workshop seats. The scheduling ledger says 42 workshop seats are currently available. The venue notice says 48 workshop seats are currently available. Neither source has been designated authoritative for current availability.

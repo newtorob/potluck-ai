@@ -1,0 +1,1 @@
+On Monday the team received 0 support tickets. On Tuesday the team received 6 support tickets.

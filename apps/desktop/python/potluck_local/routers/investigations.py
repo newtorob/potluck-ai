@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from potluck_local.services.evidence_lookup import EvidenceScope
 from potluck_local.services.investigations import (
-    BriefValidationError, _privacy, create_investigation, get_investigation, list_investigations,
+    BriefValidationError, _privacy, calculation_preview, create_investigation, get_investigation, list_investigations,
     record_outcome, review_investigation, suggest_investigation_plan,
 )
 from potluck_local.services.memory_db import get_memory_db_path, init_memory_db
@@ -50,11 +50,25 @@ class CreateRequest(ScopeRequest):
     plan_confirmed: StrictBool = False
 
 
+class CalculationReview(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    request_id: str
+    status: Literal['calculate', 'missing', 'unsupported', 'conflicting']
+    operand_ids: list[str] = Field(max_length=2)
+    snippet_ids: list[str] = Field(max_length=8)
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+class CalculationPreviewRequest(ScopeRequest):
+    calculation_reviews: list[CalculationReview] = Field(min_length=1, max_length=12)
+
+
 class ReviewRequest(ScopeRequest):
     decision: Literal['accept', 'correct', 'reject']
     reviewer: str = Field(min_length=1, max_length=256)
     reason: str = Field(min_length=1, max_length=4000)
     corrected_brief: dict[str, Any] | None = None
+    calculation_reviews: list[CalculationReview] | None = Field(default=None, min_length=1, max_length=12)
 
 
 class OutcomeRequest(ScopeRequest):
@@ -167,11 +181,20 @@ async def get(iid: str, workspace: str, collection_ids: list[str] = Query(...)) 
         raise _error(exc) from None
 
 
+@router.post('/investigations/{iid}/calculation-preview')
+async def preview_calculation(iid: str, body: CalculationPreviewRequest) -> dict[str, Any]:
+    try:
+        return await calculation_preview(body.scope(), iid, [row.model_dump() for row in body.calculation_reviews])
+    except (ValueError, PermissionError, LookupError) as exc:
+        raise _error(exc) from None
+
+
 @router.post('/investigations/{iid}/review')
 async def review(iid: str, body: ReviewRequest) -> dict[str, Any]:
     try:
         return await review_investigation(body.scope(), iid, body.decision, body.reviewer,
-                                          body.reason, body.corrected_brief)
+                                          body.reason, body.corrected_brief,
+                                          [row.model_dump() for row in body.calculation_reviews] if body.calculation_reviews is not None else None)
     except BriefValidationError:
         raise HTTPException(status_code=400, detail='invalid_review_brief: Check the correction and exact source excerpts.') from None
     except (ValueError, PermissionError, LookupError) as exc:
@@ -277,6 +300,29 @@ async def export(iid: str, workspace: str, collection_ids: list[str] = Query(...
                     lines.append('- Normalized ' + escape(operand['role']) + ' (' + escape(operand['id']) +
                                  '): ' + escape(operand['value']) + ' ' + escape(operand['unit']) +
                                  ' · conversion factor ' + escape(operand['conversion_factor']))
+                lines.append('')
+        if review and review.get('calculation_reviews'):
+            lines += ['## Reviewed calculation choices', 'Reviewer: ' + escape(review['reviewer']), '']
+            for choice in review['calculation_reviews']:
+                trace = choice['trace']
+                lines += ['### ' + escape(choice['request_id']),
+                          'Selection: ' + escape(choice['status']),
+                          'Inputs: ' + escape(', '.join(choice['operand_ids']) or 'none'),
+                          'Reason: ' + escape(choice['reason']),
+                          'Result: ' + escape(trace['text']),
+                          'Algorithm: ' + escape(trace.get('algorithm_version') or 'unavailable'),
+                          'Formula: ' + escape(trace.get('formula') or 'unavailable'),
+                          'Evaluated expression: ' + escape(trace.get('evaluated_expression') or 'unavailable'),
+                          'Rounding: ' + escape(trace.get('rounding') or 'unavailable'),
+                          'Limit: ' + escape(trace.get('caveat') or 'unavailable')]
+                for operand in trace.get('normalized_inputs', []):
+                    lines.append('- Normalized ' + escape(operand['role']) + ' (' + escape(operand['id']) +
+                                 '): ' + escape(operand['value']) + ' ' + escape(operand['unit']) +
+                                 ' · conversion factor ' + escape(operand['conversion_factor']))
+                by_snippet = {s['snippet_id']: s for s in provenance.get('snippet_catalog', [])}
+                for sid in choice['snippet_ids']:
+                    excerpt = by_snippet[sid]
+                    lines.append('- Source excerpt (' + escape(excerpt['citation_id']) + '): ' + escape(excerpt['quote']))
                 lines.append('')
         for key, title in [('facts', 'Facts'), ('prior_fixes', 'Prior fixes'),
                            ('hypotheses', 'Hypotheses (unverified)'), ('recommended_checks', 'Recommended checks')]:

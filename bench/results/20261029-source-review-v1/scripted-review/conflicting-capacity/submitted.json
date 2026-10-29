@@ -1,0 +1,86 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "7ece7f46-16da-4bac-bcfb-7e6f1c59b086"
+  ],
+  "decision": "correct",
+  "reviewer": "fixture-script (not owner acceptance)",
+  "reason": "Scripted qualification only; not actual owner review.",
+  "corrected_brief": {
+    "questions": [
+      {
+        "id": "R1",
+        "text": "How has the number of available workshop seats changed since the prior count?"
+      }
+    ],
+    "answers": [
+      {
+        "question_id": "R1",
+        "status": "conflicting",
+        "text": "Reviewer assessment (conflicting): Fixture-script assessment: prior 30 workshop seats; current sources disagree at 42 and 48. Neither is designated authoritative, so the change is unresolved.",
+        "snippet_ids": [
+          "S1",
+          "S2",
+          "S3",
+          "S4"
+        ],
+        "source_excerpts": [
+          {
+            "snippet_id": "S1",
+            "citation_id": "source:f9976f9c-f483-584a-8633-9cc0e831a6d2:fb088aad-b9a2-581a-a413-287da5572c9f",
+            "quote": "The prior count recorded 30 available workshop seats. "
+          },
+          {
+            "snippet_id": "S2",
+            "citation_id": "source:f9976f9c-f483-584a-8633-9cc0e831a6d2:fb088aad-b9a2-581a-a413-287da5572c9f",
+            "quote": "The scheduling ledger says 42 workshop seats are currently available. "
+          },
+          {
+            "snippet_id": "S3",
+            "citation_id": "source:f9976f9c-f483-584a-8633-9cc0e831a6d2:fb088aad-b9a2-581a-a413-287da5572c9f",
+            "quote": "The venue notice says 48 workshop seats are currently available. "
+          },
+          {
+            "snippet_id": "S4",
+            "citation_id": "source:f9976f9c-f483-584a-8633-9cc0e831a6d2:fb088aad-b9a2-581a-a413-287da5572c9f",
+            "quote": "Neither source has been designated authoritative for current availability."
+          }
+        ],
+        "calculation": {
+          "request_id": "R1",
+          "operation": "difference",
+          "status": "conflicting",
+          "text": "Reviewer assessment (conflicting): Fixture-script assessment: prior 30 workshop seats; current sources disagree at 42 and 48. Neither is designated authoritative, so the change is unresolved.",
+          "reason": "Fixture-script assessment: prior 30 workshop seats; current sources disagree at 42 and 48. Neither is designated authoritative, so the change is unresolved.",
+          "inputs": [],
+          "result": null,
+          "unit": null,
+          "formula": null,
+          "rounding": null,
+          "limitation_kind": "conflicting",
+          "assessment": "reviewer assessment",
+          "caveat": "This assessment does not verify source completeness or authority."
+        }
+      }
+    ],
+    "facts": [],
+    "prior_fixes": [],
+    "hypotheses": [],
+    "recommended_checks": [],
+    "model_uncertainties": []
+  },
+  "calculation_reviews": [
+    {
+      "request_id": "R1",
+      "status": "conflicting",
+      "operand_ids": [],
+      "snippet_ids": [
+        "S1",
+        "S2",
+        "S3",
+        "S4"
+      ],
+      "reason": "Fixture-script assessment: prior 30 workshop seats; current sources disagree at 42 and 48. Neither is designated authoritative, so the change is unresolved."
+    }
+  ]
+}

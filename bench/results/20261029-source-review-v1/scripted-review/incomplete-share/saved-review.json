@@ -1,0 +1,308 @@
+{
+  "id": "48ad5a93-43af-428a-b814-f103a6be7ae5",
+  "workspace": "synthetic-eval",
+  "issue": "What percentage of the enrolled volunteers completed orientation?",
+  "model_slug": "qwen3-8b-q4",
+  "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+  "status": "reviewed",
+  "brief": {
+    "questions": [
+      {
+        "id": "R1",
+        "text": "What percentage of the enrolled volunteers completed orientation?"
+      }
+    ],
+    "answers": [
+      {
+        "question_id": "R1",
+        "status": "unknown",
+        "text": "Calculation unavailable. Model assessment: The total number of enrolled volunteers is not recorded.",
+        "snippet_ids": [
+          "S1"
+        ],
+        "source_excerpts": [
+          {
+            "snippet_id": "S1",
+            "citation_id": "source:f1b07bc3-2947-52c9-9829-42bb137f4fa4:944c54c3-085b-50a6-8d8e-1aa49636e7a2",
+            "quote": "The coordinator recorded 12 volunteers completing orientation. "
+          }
+        ],
+        "calculation": {
+          "request_id": "R1",
+          "operation": "percentage",
+          "status": "unknown",
+          "text": "Calculation unavailable. Model assessment: The total number of enrolled volunteers is not recorded.",
+          "formula": null,
+          "result": null,
+          "unit": null,
+          "reason": "The total number of enrolled volunteers is not recorded.",
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:f1b07bc3-2947-52c9-9829-42bb137f4fa4:944c54c3-085b-50a6-8d8e-1aa49636e7a2",
+              "source_text": "12 volunteers",
+              "snippet_text": "The coordinator recorded 12 volunteers completing orientation. ",
+              "start": 25,
+              "end": 38,
+              "value": "12",
+              "unit": "volunteers",
+              "dimension": "count"
+            }
+          ],
+          "rounding": null,
+          "limitation_kind": "missing",
+          "algorithm_version": "cited-calculations-v3",
+          "caveat": "Arithmetic does not verify source selection or authority."
+        }
+      }
+    ],
+    "facts": [],
+    "prior_fixes": [],
+    "hypotheses": [],
+    "recommended_checks": [],
+    "model_uncertainties": []
+  },
+  "evidence": [
+    {
+      "collection_id": "aab56495-2ff6-4916-86d7-7311e0d5db79",
+      "document_id": "234bda57-64af-5d5f-af56-0100aa72ea35",
+      "revision_id": "944c54c3-085b-50a6-8d8e-1aa49636e7a2",
+      "relative_path": "source.md",
+      "updated_at": "2026-10-29T22:40:39.437533+00:00",
+      "chunk_id": "f1b07bc3-2947-52c9-9829-42bb137f4fa4",
+      "anchor": "intro",
+      "heading": "",
+      "content": "The coordinator recorded 12 volunteers completing orientation. The total number of enrolled volunteers has not yet been recorded.",
+      "kind": "source_chunk",
+      "last_scan_at": "2026-10-29T22:40:39.437678+00:00",
+      "freshness": "recent",
+      "uncertainty": "Source text has not been reviewed.",
+      "citation_id": "source:f1b07bc3-2947-52c9-9829-42bb137f4fa4:944c54c3-085b-50a6-8d8e-1aa49636e7a2",
+      "presented_content": "The coordinator recorded 12 volunteers completing orientation. The total number of enrolled volunteers has not yet been recorded."
+    }
+  ],
+  "review": {
+    "reviewed_at": "2026-10-29T22:41:29.557569+00:00",
+    "decision": "correct",
+    "reviewer": "fixture-script (not owner acceptance)",
+    "reason": "Scripted qualification only; not actual owner review.",
+    "corrected_brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What percentage of the enrolled volunteers completed orientation?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "unknown",
+          "text": "Reviewer assessment (missing): Fixture-script assessment: 12 volunteers completed orientation; enrolled total has not been recorded, so the denominator is missing.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:f1b07bc3-2947-52c9-9829-42bb137f4fa4:944c54c3-085b-50a6-8d8e-1aa49636e7a2",
+              "quote": "The coordinator recorded 12 volunteers completing orientation. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:f1b07bc3-2947-52c9-9829-42bb137f4fa4:944c54c3-085b-50a6-8d8e-1aa49636e7a2",
+              "quote": "The total number of enrolled volunteers has not yet been recorded."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "percentage",
+            "status": "unknown",
+            "text": "Reviewer assessment (missing): Fixture-script assessment: 12 volunteers completed orientation; enrolled total has not been recorded, so the denominator is missing.",
+            "reason": "Fixture-script assessment: 12 volunteers completed orientation; enrolled total has not been recorded, so the denominator is missing.",
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:f1b07bc3-2947-52c9-9829-42bb137f4fa4:944c54c3-085b-50a6-8d8e-1aa49636e7a2",
+                "source_text": "12 volunteers",
+                "snippet_text": "The coordinator recorded 12 volunteers completing orientation. ",
+                "start": 25,
+                "end": 38,
+                "value": "12",
+                "unit": "volunteers",
+                "dimension": "count"
+              }
+            ],
+            "result": null,
+            "unit": null,
+            "formula": null,
+            "rounding": null,
+            "limitation_kind": "missing",
+            "assessment": "reviewer assessment",
+            "caveat": "This assessment does not verify source completeness or authority."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "calculation_reviews": [
+      {
+        "request_id": "R1",
+        "status": "missing",
+        "operand_ids": [
+          "N1"
+        ],
+        "snippet_ids": [
+          "S1",
+          "S2"
+        ],
+        "reason": "Fixture-script assessment: 12 volunteers completed orientation; enrolled total has not been recorded, so the denominator is missing.",
+        "trace": {
+          "request_id": "R1",
+          "operation": "percentage",
+          "status": "unknown",
+          "text": "Reviewer assessment (missing): Fixture-script assessment: 12 volunteers completed orientation; enrolled total has not been recorded, so the denominator is missing.",
+          "reason": "Fixture-script assessment: 12 volunteers completed orientation; enrolled total has not been recorded, so the denominator is missing.",
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:f1b07bc3-2947-52c9-9829-42bb137f4fa4:944c54c3-085b-50a6-8d8e-1aa49636e7a2",
+              "source_text": "12 volunteers",
+              "snippet_text": "The coordinator recorded 12 volunteers completing orientation. ",
+              "start": 25,
+              "end": 38,
+              "value": "12",
+              "unit": "volunteers",
+              "dimension": "count"
+            }
+          ],
+          "result": null,
+          "unit": null,
+          "formula": null,
+          "rounding": null,
+          "limitation_kind": "missing",
+          "assessment": "reviewer assessment",
+          "caveat": "This assessment does not verify source completeness or authority."
+        }
+      }
+    ]
+  },
+  "outcome": null,
+  "created_at": "2026-10-29T22:40:48.547191+00:00",
+  "provenance": {
+    "schema_version": 2,
+    "retrieval_notices": [],
+    "template_version": "investigation-v9",
+    "citation_mapping": "request-local aliases",
+    "retrieval_query": "What percentage of the enrolled volunteers completed orientation?",
+    "retrieval_version": "unicode-word-overlap-v1",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "generation_settings": {
+      "temperature": 0.7,
+      "max_tokens": 2000,
+      "timeout_seconds": 240,
+      "seed": 7,
+      "timeout_scope": "shared across planning and answer generation"
+    },
+    "elapsed_ms": 9105,
+    "created_at": "2026-10-29T22:40:48.547191+00:00",
+    "question_origin": "issue",
+    "original_questions": [
+      {
+        "id": "Q1",
+        "text": "What percentage of the enrolled volunteers completed orientation?"
+      }
+    ],
+    "operation_plan": [
+      {
+        "id": "R1",
+        "question_id": "Q1",
+        "request": "What percentage of the enrolled volunteers completed orientation?",
+        "operation": "percentage"
+      }
+    ],
+    "operation_plan_origin": "fixture_supplied",
+    "planner_version": null,
+    "snippet_catalog": [
+      {
+        "snippet_id": "S1",
+        "citation_id": "source:f1b07bc3-2947-52c9-9829-42bb137f4fa4:944c54c3-085b-50a6-8d8e-1aa49636e7a2",
+        "quote": "The coordinator recorded 12 volunteers completing orientation. "
+      },
+      {
+        "snippet_id": "S2",
+        "citation_id": "source:f1b07bc3-2947-52c9-9829-42bb137f4fa4:944c54c3-085b-50a6-8d8e-1aa49636e7a2",
+        "quote": "The total number of enrolled volunteers has not yet been recorded."
+      }
+    ],
+    "quantity_catalog": [
+      {
+        "id": "N1",
+        "snippet_id": "S1",
+        "citation_id": "source:f1b07bc3-2947-52c9-9829-42bb137f4fa4:944c54c3-085b-50a6-8d8e-1aa49636e7a2",
+        "source_text": "12 volunteers",
+        "snippet_text": "The coordinator recorded 12 volunteers completing orientation. ",
+        "start": 25,
+        "end": 38,
+        "value": "12",
+        "unit": "volunteers",
+        "dimension": "count"
+      }
+    ],
+    "quantity_parser_version": "v3",
+    "extraction_notices": [],
+    "calculation_traces": [
+      {
+        "request_id": "R1",
+        "operation": "percentage",
+        "status": "unknown",
+        "text": "Calculation unavailable. Model assessment: The total number of enrolled volunteers is not recorded.",
+        "formula": null,
+        "result": null,
+        "unit": null,
+        "reason": "The total number of enrolled volunteers is not recorded.",
+        "inputs": [
+          {
+            "id": "N1",
+            "snippet_id": "S1",
+            "citation_id": "source:f1b07bc3-2947-52c9-9829-42bb137f4fa4:944c54c3-085b-50a6-8d8e-1aa49636e7a2",
+            "source_text": "12 volunteers",
+            "snippet_text": "The coordinator recorded 12 volunteers completing orientation. ",
+            "start": 25,
+            "end": 38,
+            "value": "12",
+            "unit": "volunteers",
+            "dimension": "count"
+          }
+        ],
+        "rounding": null,
+        "limitation_kind": "missing",
+        "algorithm_version": "cited-calculations-v3",
+        "caveat": "Arithmetic does not verify source selection or authority."
+      }
+    ],
+    "generation_profile": {
+      "name": "qwen3-non-thinking",
+      "temperature": 0.7,
+      "top_p": 0.8,
+      "top_k": 20,
+      "min_p": 0.0,
+      "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+      "backend": "llama-cpp-python",
+      "enable_thinking": false,
+      "repeat_penalty": 1.0
+    }
+  },
+  "retrieval_notices": [],
+  "collection_ids": [
+    "aab56495-2ff6-4916-86d7-7311e0d5db79"
+  ]
+}

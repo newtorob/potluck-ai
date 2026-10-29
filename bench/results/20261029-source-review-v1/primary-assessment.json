@@ -1,0 +1,40 @@
+{
+  "assessor": "primary",
+  "platform": "macOS Apple M2 Pro",
+  "model": "installed Qwen3 8B Q4 CPU-only, 8 threads, 8192 context, verified non-thinking profile, seed7",
+  "cases": {
+    "zero-baseline": {
+      "raw_pass": true,
+      "reason": "Zero baseline correctly prevents relative change; both exact counts cited.",
+      "scripted_review_pass": true
+    },
+    "conflicting-capacity": {
+      "raw_pass": false,
+      "reason": "Conflicting current counts acknowledged, but prior 30 and the explicit unresolved-authority excerpt are omitted.",
+      "scripted_review_pass": true
+    },
+    "incomplete-share": {
+      "raw_pass": false,
+      "reason": "Missing total is stated, but its supporting source sentence is not cited. Only the known numerator excerpt appears.",
+      "scripted_review_pass": true
+    },
+    "compound-count": {
+      "raw_pass": false,
+      "reason": "Correct quantities extracted; model chooses north as before and south as after, producing -13 instead of the requested +13.",
+      "scripted_review_pass": true
+    }
+  },
+  "raw_passes": 1,
+  "scripted_review_passes": 4,
+  "case_count": 4,
+  "actual_owner_acceptance": false,
+  "retries": 0,
+  "same_case_baseline": false,
+  "decision": "Keep explicit local experimental status. Source selection, direction and evidence completeness remain review responsibilities. No broader promotion.",
+  "limitations": [
+    "Four synthetic cases, one seed; no baseline comparison on these cases.",
+    "Scripted source choices are fixture-derived and must not be reported as actual owner review or model gains.",
+    "Author did not inspect production answer implementation or prior fixture prose/rubric, but did see prior fixture shapes/IDs and broad memory context.",
+    "No production tuning after this holdout; corpus now consumed."
+  ]
+}

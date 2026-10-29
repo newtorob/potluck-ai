@@ -8,6 +8,7 @@ const api = vi.hoisted(() => ({
   createInvestigation: vi.fn(),
   planInvestigation: vi.fn(),
   reviewInvestigation: vi.fn(),
+  previewCalculationReview: vi.fn(),
   recordInvestigationOutcome: vi.fn(),
 }));
 vi.mock('@/lib/localApi', () => ({ localApi: api }));
@@ -22,6 +23,127 @@ vi.mock('@/stores/modelStore', () => ({
 describe('InvestigationsView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+  it('previews selected source quantities, invalidates edits, and saves the exact calculation answer', async () => {
+    const answer = {
+      question_id: 'R1',
+      status: 'supported',
+      text: '10',
+      snippet_ids: ['S1'],
+      source_excerpts: [{ snippet_id: 'S1', citation_id: 'ref1', quote: '10 and 20' }],
+      calculation: { request_id: 'R1', operation: 'difference', status: 'computed', result: '10' },
+    };
+    const item = {
+      id: 'i1',
+      issue: 'Revenue',
+      status: 'draft',
+      model_slug: 'local-model',
+      created_at: 'today',
+      review: null,
+      outcome: null,
+      evidence: [{ citation_id: 'ref1', content: '10 and 20' }],
+      brief: {
+        questions: [{ id: 'R1', text: 'Change?' }],
+        answers: [{ question_id: 'R1', status: 'unknown', text: 'Unknown', snippet_ids: [] }],
+        facts: [],
+        prior_fixes: [],
+        hypotheses: [],
+        recommended_checks: [],
+      },
+      provenance: {
+        template_version: 'investigation-v9',
+        operation_plan: [{ id: 'R1', request: 'Change?', operation: 'difference' }],
+        quantity_catalog: [
+          { id: 'N1', snippet_id: 'S1', source_text: '10' },
+          { id: 'N2', snippet_id: 'S9', source_text: '20' },
+        ],
+        snippet_catalog: Array.from({ length: 9 }, (_, i) => ({
+          snippet_id: `S${i + 1}`,
+          citation_id: 'ref1',
+          quote: i === 0 ? '10 and 20' : `Source ${i + 1}`,
+        })),
+        calculation_traces: [{ request_id: 'R1', operation: 'difference', status: 'unknown' }],
+      },
+    };
+    api.sourceCollections.mockResolvedValue({
+      collections: [{ id: 'c1', name: 'Runbooks', scan_status: 'ready', last_scan_at: null }],
+    });
+    api.investigations.mockResolvedValue({ investigations: [] });
+    api.createInvestigation.mockResolvedValue(item);
+    api.previewCalculationReview.mockResolvedValue({ answers: [answer], calculation_reviews: [] });
+    api.reviewInvestigation.mockResolvedValue({ ...item, status: 'reviewed' });
+    render(<InvestigationsView />);
+    fireEvent.change(screen.getByLabelText('Workspace'), { target: { value: 'w' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Load collections' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Runbooks/ }));
+    fireEvent.change(screen.getByLabelText('Issue'), { target: { value: 'Revenue' } });
+    fireEvent.change(screen.getByLabelText('Evidence query'), { target: { value: 'revenue' } });
+    fireEvent.change(screen.getByLabelText('Loaded local model'), {
+      target: { value: 'local-model' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create investigation' }));
+    await screen.findByText('Original machine calculations');
+    fireEvent.change(screen.getByLabelText('Decision'), { target: { value: 'correct' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /Review calculation inputs/ }));
+    expect(screen.getByLabelText('Before')).toHaveAccessibleDescription(
+      'Choose both quantities to calculate.',
+    );
+    expect(screen.getByLabelText(/Explanation, including/)).toHaveAccessibleDescription(
+      'Enter an explanation.',
+    );
+    fireEvent.change(screen.getByLabelText('Before'), { target: { value: 'N1' } });
+    fireEvent.change(screen.getByLabelText('After'), { target: { value: 'N1' } });
+    expect(screen.getByLabelText('After')).toHaveAccessibleDescription(
+      'Choose two different quantities.',
+    );
+    fireEvent.change(screen.getByLabelText('After'), { target: { value: 'N2' } });
+    for (let i = 1; i <= 8; i++)
+      fireEvent.click(
+        screen.getAllByRole('checkbox', {
+          name: i === 1 ? /S1 · 10 and 20/ : new RegExp(`S${i} · Source ${i}`),
+        })[0]!,
+      );
+    expect(
+      screen.getByRole('group', { name: 'Evidence and authority excerpts' }),
+    ).toHaveAccessibleDescription('Use at most eight excerpts, including the selected quantities.');
+    expect(screen.getByRole('button', { name: 'Preview calculation' })).toBeDisabled();
+    for (let i = 2; i <= 8; i++)
+      fireEvent.click(
+        screen.getAllByRole('checkbox', { name: new RegExp(`S${i} · Source ${i}`) })[0]!,
+      );
+    fireEvent.change(screen.getByLabelText(/Explanation, including/), {
+      target: { value: 'Reviewed the report' },
+    });
+    fireEvent.change(screen.getByLabelText('Reviewer'), { target: { value: 'Rob' } });
+    fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Corrected' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Preview calculation' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Preview applied');
+    expect(screen.getByLabelText('Answer text')).toHaveValue('10');
+    expect(screen.getByRole('status')).toHaveTextContent('Change? · supported: 10');
+    fireEvent.change(screen.getByLabelText(/Explanation, including/), {
+      target: { value: 'Checked authority' },
+    });
+    expect(screen.getByRole('button', { name: 'Save review' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Preview calculation' }));
+    await screen.findByRole('status');
+    fireEvent.click(screen.getByRole('button', { name: 'Save review' }));
+    await waitFor(() =>
+      expect(api.reviewInvestigation).toHaveBeenCalledWith(
+        'i1',
+        expect.objectContaining({
+          calculation_reviews: [
+            {
+              request_id: 'R1',
+              status: 'calculate',
+              operand_ids: ['N1', 'N2'],
+              snippet_ids: ['S1'],
+              reason: 'Checked authority',
+            },
+          ],
+          corrected_brief: expect.objectContaining({ answers: [answer] }),
+        }),
+      ),
+    );
   });
   it('discards stale suggestions and sends only an explicitly confirmed edited plan', async () => {
     api.sourceCollections.mockResolvedValue({

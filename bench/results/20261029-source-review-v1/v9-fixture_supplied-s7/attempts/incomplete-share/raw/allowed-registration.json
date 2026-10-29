@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "aab56495-2ff6-4916-86d7-7311e0d5db79",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-source-review-v1/v9-fixture_supplied-s7/attempts/incomplete-share/raw/allowed",
+  "source_sha256": "63324cf18e78d9763d08d1d1fbc2f554b96e4c171598171456308840df35451a",
+  "scan": {
+    "collection_id": "aab56495-2ff6-4916-86d7-7311e0d5db79",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

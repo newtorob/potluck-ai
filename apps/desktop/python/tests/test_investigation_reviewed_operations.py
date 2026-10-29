@@ -35,14 +35,24 @@ def test_unknowns_preserve_known_inputs_and_conflicts_never_compute(monkeypatch)
     assert ops.decode_results(json.dumps(data), plan, snippets, qs, [])[1][0]['status'] == 'conflicting'
 
 
-def test_zero_denominator_overrides_model_reason_and_incompatible_units():
-    snippets = [{'snippet_id': 'S1', 'citation_id': 'C1', 'quote': 'Before 0 ms. After 2 requests.'}]
+def test_zero_denominator_overrides_model_reason_for_compatible_units():
+    snippets = [{'snippet_id': 'S1', 'citation_id': 'C1', 'quote': 'Before 0 ms. After 2 ms.'}]
     qs = calc.quantity_catalog(snippets, version='v2')
     plan = ops.plan_with_ids([{'request': 'Percent change?', 'operation': 'percent_change'}])
     data = {'R1': {'status': 'missing', 'operand_ids': ['N1', 'N2'], 'snippet_ids': ['S1'], 'reason': 'No baseline.'}}
     brief, traces = ops.decode_results(json.dumps(data), plan, snippets, qs, [])
     assert traces[0]['limitation_kind'] == 'zero_denominator'
     assert 'baseline is zero' in brief['answers'][0]['text'] and 'No baseline' not in brief['answers'][0]['text']
+
+
+def test_incompatible_zero_operands_do_not_assert_a_zero_baseline():
+    snippets = [{'snippet_id': 'S1', 'citation_id': 'C1', 'quote': 'Before 0 errors. After 12 seconds.'}]
+    qs = calc.quantity_catalog(snippets, version='v3')
+    plan = ops.plan_with_ids([{'request': 'Percent change?', 'operation': 'percent_change'}])
+    data = {'R1': {'status': 'ready', 'operand_ids': ['N1', 'N2'], 'snippet_ids': ['S1'], 'reason': 'Ready.'}}
+    _, traces = ops.decode_results(json.dumps(data), plan, snippets, qs, [], version='v3')
+    assert traces[0]['reason'] == 'Inputs have incompatible units.'
+    assert traces[0]['limitation_kind'] != 'zero_denominator'
 
 
 def test_single_zero_operand_does_not_identify_baseline():
@@ -53,3 +63,12 @@ def test_single_zero_operand_does_not_identify_baseline():
     brief, traces = ops.decode_results(json.dumps(data), plan, snippets, qs, [])
     assert traces[0]['limitation_kind'] == 'missing'
     assert 'baseline is zero' not in brief['answers'][0]['text']
+
+
+def test_unsupported_assessment_does_not_assert_extraction_failed():
+    snippets = [{'snippet_id': 'S1', 'citation_id': 'C1', 'quote': 'Before 0 invoice errors. After 12 invoice errors.'}]
+    qs = calc.quantity_catalog(snippets, version='v3')
+    plan = ops.plan_with_ids([{'request': 'Change?', 'operation': 'difference'}])
+    data = {'R1': {'status': 'unsupported', 'operand_ids': ['N1', 'N2'], 'snippet_ids': ['S1'], 'reason': 'I cannot assess these inputs.'}}
+    brief, _ = ops.decode_results(json.dumps(data), plan, snippets, qs, [], version='v3')
+    assert brief['answers'][0]['text'] == 'Calculation unavailable. Model assessment: I cannot assess these inputs.'

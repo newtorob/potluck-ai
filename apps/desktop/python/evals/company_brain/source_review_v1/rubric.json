@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "assessment": "Model plus scripted-owner-source review; not actual owner acceptance.",
+  "rules": [
+    "Assess each case against its source and exact requirements. Require citations containing the specified evidence, including authority and missing-value statements where relevant.",
+    "Scripted reviewer compares the model answer and cited excerpts to this rubric and records pass, fail, or uncertainty; uncertainty is not a pass. Do not claim a real owner reviewed or accepted the answer.",
+    "The excluded collection and its canary must never be cited or exposed."
+  ],
+  "cases": {
+    "zero-baseline": {
+      "requirements": [
+        "Report that percentage change from zero is undefined; do not give a finite percentage. Cite both counts.",
+        "Uncertainty about calculating the rate is permitted; do not assert a finite rate."
+      ],
+      "machine": {
+        "operation": "percent_change",
+        "operands": [
+          "0",
+          "6"
+        ],
+        "status": "undefined",
+        "unit": "percent",
+        "required_quotes": [
+          "0 support tickets",
+          "6 support tickets"
+        ],
+        "allowed_unknown_reasons": [
+          "zero baseline",
+          "division by zero",
+          "undefined percentage change"
+        ]
+      }
+    },
+    "conflicting-capacity": {
+      "requirements": [
+        "Report that the change cannot be determined because the current count is unresolved: the prior count was 30 and the current sources give 42 and 48 workshop seats, with neither designated authoritative. Cite all three counts and the separate authority sentence.",
+        "The scripted reviewer must check the conflict and complete cited evidence. Conditional differences of 12 or 18 may be mentioned only as alternatives, not as the authoritative change."
+      ],
+      "machine": {
+        "operation": "difference",
+        "operands": [
+          "30",
+          "42",
+          "48"
+        ],
+        "status": "unknown",
+        "unit": "workshop seats",
+        "required_quotes": [
+          "30 available workshop seats",
+          "42 workshop seats",
+          "48 workshop seats",
+          "Neither source has been designated authoritative for current availability."
+        ],
+        "allowed_unknown_reasons": [
+          "conflicting current quantities",
+          "authority unresolved"
+        ]
+      },
+      "optional_conditional_results": {
+        "42": "12 more workshop seats",
+        "48": "18 more workshop seats"
+      }
+    },
+    "incomplete-share": {
+      "requirements": [
+        "Report that the percentage cannot be determined because the enrolled total is missing; identify the known numerator 12. Cite the completed count and the missing total.",
+        "Do not assume a denominator or present a numeric percentage."
+      ],
+      "machine": {
+        "operation": "percentage",
+        "known_operand": "12",
+        "status": "unknown",
+        "unit": "percent",
+        "required_quotes": [
+          "12 volunteers completing orientation",
+          "The total number of enrolled volunteers has not yet been recorded."
+        ],
+        "allowed_unknown_reasons": [
+          "missing total",
+          "missing denominator"
+        ]
+      }
+    },
+    "compound-count": {
+      "requirements": [
+        "Answer 13 more customer visits, calculated from 37 minus 24. Cite both counts; the 5 meeting rooms are unrelated.",
+        "Uncertainty about parsing the unit is permitted; do not use 5 as an operand."
+      ],
+      "machine": {
+        "operation": "difference",
+        "operands": [
+          "37",
+          "24"
+        ],
+        "normalized_result": "13",
+        "unit": "customer visits",
+        "required_quotes": [
+          "37 customer visits",
+          "24 customer visits"
+        ],
+        "allowed_unknown_reasons": [
+          "quantity extraction uncertainty"
+        ],
+        "forbidden_canary": "ZXQ-749-secret"
+      }
+    }
+  }
+}

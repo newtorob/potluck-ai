@@ -27,6 +27,7 @@ export interface Brief {
     text: string;
     snippet_ids: string[];
     source_excerpts?: SourceExcerpt[];
+    calculation?: CalculationTrace;
   }>;
   facts: BriefItem[];
   prior_fixes: BriefItem[];
@@ -39,6 +40,20 @@ export interface SourceExcerpt {
   snippet_id: string;
   citation_id: string;
   quote: string;
+}
+export interface CalculationReviewInput {
+  request_id: string;
+  status: 'calculate' | 'missing' | 'unsupported' | 'conflicting';
+  operand_ids: string[];
+  snippet_ids: string[];
+  reason: string;
+}
+export type CalculationTrace = NonNullable<
+  NonNullable<Investigation['provenance']>['calculation_traces']
+>[number];
+export interface CalculationPreview {
+  answers: NonNullable<Brief['answers']>;
+  calculation_reviews: Array<CalculationReviewInput & { trace: CalculationTrace }>;
 }
 export interface Investigation {
   id: string;
@@ -55,6 +70,16 @@ export interface Investigation {
     schema_version?: number;
     question_origin?: 'explicit' | 'planned';
     snippet_catalog?: SourceExcerpt[];
+    quantity_catalog?: Array<{
+      id: string;
+      snippet_id: string;
+      citation_id: string;
+      source_text: string;
+      value: string;
+      unit: string;
+      unit_source_text?: string;
+    }>;
+    operation_plan?: Array<{ id: string; request: string; operation: OperationType }>;
     retrieval_notices?: string[];
     model_sha256?: string;
     template_version?: string;
@@ -94,7 +119,13 @@ export interface Investigation {
       }>;
     }>;
   };
-  review: null | { decision: string; reviewer: string; reason: string; corrected_brief?: Brief };
+  review: null | {
+    decision: string;
+    reviewer: string;
+    reason: string;
+    corrected_brief?: Brief;
+    calculation_reviews?: CalculationPreview['calculation_reviews'];
+  };
   outcome: null | { reviewer: string; result: string; notes: string };
 }
 export interface InvestigationScope {

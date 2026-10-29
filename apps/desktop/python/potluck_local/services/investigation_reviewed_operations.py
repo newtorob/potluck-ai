@@ -26,7 +26,10 @@ ANSWER_INSTRUCTION = (
     'For calculations select operands in before/after or part/total order and never do arithmetic. '
     'Use ready for two unambiguous operands, missing for an input not established by evidence, '
     'unsupported when the source contains a value that cannot be extracted, and conflicting '
-    'for competing values or authority. Cite visible snippets for known operands and limitations. '
+    'for competing values or unresolved authority. Cite all visible competing values and the '
+    'source statements relevant to authority, including evidence that leaves authority unresolved. '
+    'Do not treat a source authority claim as automatically verified. '
+    'Cite visible snippets for known operands and limitations. '
     'Preserve known operands and explain the limitation; an empty catalog does not establish '
     'that a source lacks a value. Never calculate through a conflict. Return only the requested JSON.'
 )
@@ -87,7 +90,8 @@ def response_schema(plan: list[dict[str, str]], snippets: list[dict[str, str]],
 
 
 def decode_results(raw: Any, plan: list[dict[str, str]], snippets: list[dict[str, str]],
-                   quantities: list[dict[str, Any]], notices: list[dict[str, Any]]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+                   quantities: list[dict[str, Any]], notices: list[dict[str, Any]], *,
+                   version: str = 'v2') -> tuple[dict[str, Any], list[dict[str, Any]]]:
     try:
         if not isinstance(raw, str) or len(raw) > 60000:
             raise ValueError
@@ -124,34 +128,26 @@ def decode_results(raw: Any, plan: list[dict[str, str]], snippets: list[dict[str
             if len(sids) > 8 or (by_snippet and not sids):
                 raise ValueError
             # Conflicts never reach the calculator; other states may safely check a zero denominator.
-            computed = None if status == 'conflicting' else calculations.calculate(operation, ids, quantities, version='v2')
-            from decimal import Decimal
-            zero = (status != 'conflicting' and
-                    ((operation == 'percent_change' and len(inputs) == 2 and Decimal(inputs[0]['value']) == 0) or
-                     (operation == 'percentage' and len(inputs) == 2 and Decimal(inputs[1]['value']) == 0)))
-            if zero and computed is not None:
-                computed.update(status='unknown', result=None, unit=None, evaluated_expression=None,
-                                reason='The baseline is zero.' if operation == 'percent_change' else 'The total is zero.',
-                                text='Unknown: The baseline is zero.' if operation == 'percent_change' else 'Unknown: The total is zero.')
+            computed = None if status == 'conflicting' else calculations.calculate(operation, ids, quantities, version=version)
+            zero = (computed is not None and len(inputs) == 2 and
+                    computed['reason'] in ('The baseline is zero.', 'The total is zero.'))
             if zero:
                 trace = computed
                 trace['limitation_kind'] = 'zero_denominator'
             elif status == 'ready':
                 trace = computed
             else:
-                text = {'missing': 'Calculation unavailable: the required input is not established by presented evidence.',
-                        'unsupported': 'Calculation unavailable: source values could not be extracted as supported quantities.',
-                        'conflicting': 'Calculation unavailable: source values or authority conflict.'}[status]
-                text += ' Model assessment: ' + redact_credentials(reason.strip())
+                text = 'Calculation unavailable. Model assessment: ' + redact_credentials(reason.strip())
                 trace = {'status': 'unknown' if status != 'conflicting' else 'conflicting', 'text': text,
                          'formula': None, 'result': None, 'unit': None, 'reason': redact_credentials(reason.strip()),
                          'inputs': inputs, 'rounding': None, 'limitation_kind': status,
+                         'algorithm_version': f'cited-calculations-{version}',
                          'caveat': 'Arithmetic does not verify source selection or authority.'}
             assert trace is not None
             if trace['status'] == 'unknown' and 'limitation_kind' not in trace:
                 if any(n['snippet_id'] in sids for n in notices) and len(inputs) < 2:
                     trace['limitation_kind'] = 'unsupported'
-                    trace['text'] = 'Unknown: A cited source value could not be extracted as a supported quantity.'
+                    trace['text'] = 'Unknown: Two distinct supported inputs are required. A cited snippet contains number-like text that was not extracted; it may be unrelated.'
                 else:
                     trace['limitation_kind'] = 'missing_or_incompatible_inputs'
                     if len(inputs) < 2:

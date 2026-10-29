@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "7ece7f46-16da-4bac-bcfb-7e6f1c59b086",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-source-review-v1/v9-fixture_supplied-s7/attempts/conflicting-capacity/raw/allowed",
+  "source_sha256": "ae49cf2a64b04241af89c34170f0a134fe495f62412278f4bf35590f5c38d773",
+  "scan": {
+    "collection_id": "7ece7f46-16da-4bac-bcfb-7e6f1c59b086",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

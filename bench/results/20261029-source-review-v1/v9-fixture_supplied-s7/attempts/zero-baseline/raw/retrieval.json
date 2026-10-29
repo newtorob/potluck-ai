@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "1ff17e57-c3d1-4d30-9114-185f7c03d846"
+  ],
+  "query": "What was the percentage change in support tickets from Monday to Tuesday?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "1ff17e57-c3d1-4d30-9114-185f7c03d846"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "1ff17e57-c3d1-4d30-9114-185f7c03d846",
+        "document_id": "eda5ea6b-ac53-5f92-8121-df72e15ab28a",
+        "revision_id": "3a12620c-db98-534e-b037-042b83b75cb9",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:39:52.238268+00:00",
+        "chunk_id": "0a9ce8b8-c62e-56c5-a393-e39754c3b76c",
+        "anchor": "intro",
+        "heading": "",
+        "content": "On Monday the team received 0 support tickets. On Tuesday the team received 6 support tickets.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:39:52.238416+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

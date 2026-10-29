@@ -109,3 +109,11 @@ neither the model's answers nor its source selections. Stale suggestions cannot
 replace edits, and planning or generation failures preserve the plan. Extraction
 notices and cited inputs remain inspectable. Calculation traces belong to the
 original draft and do not change when an answer is corrected.
+
+For v9 drafts, a correction may review each calculation using saved source
+quantities in their operation roles, plus catalog excerpts and an explanation of
+conflicts and authority. The preview is deterministic and does not establish
+source truth. Changes to selections or explanation invalidate the preview; save
+requires a fresh preview and retains its exact answer. Failed previews preserve
+edits. Reviewer assessments and their traces remain separate from the immutable
+original machine traces. Native selectors provide keyboard access to quantities.

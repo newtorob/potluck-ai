@@ -1,0 +1,40 @@
+{
+  "scope": "Independent assessment of frozen fixture-supplied operation plan model drafts and fixture-scripted correction; not owner acceptance or standalone model quality.",
+  "raw_pass_count": 1,
+  "raw_total": 4,
+  "scripted_pass_count": 4,
+  "scripted_total": 4,
+  "cases": {
+    "zero-baseline": {
+      "raw": "pass",
+      "raw_reason": "Zero baseline explicitly prevents a finite rate; both counts visibly cited. Rubric permits this uncertainty.",
+      "scripted": "pass",
+      "scripted_reason": "Monday 0 then Tuesday 6; zero denominator yields unknown, both excerpts visible."
+    },
+    "conflicting-capacity": {
+      "raw": "fail",
+      "raw_reason": "Correctly flags 42 versus 48 but visibly omits the prior 30 and the separate unresolved-authority sentence.",
+      "scripted": "pass",
+      "scripted_reason": "Explicitly explains unresolved authority and cites 30, 42, 48 and authority statement; no authoritative difference asserted."
+    },
+    "incomplete-share": {
+      "raw": "fail",
+      "raw_reason": "Correctly says total missing and cites 12, but fails to cite the explicit missing-total statement.",
+      "scripted": "pass",
+      "scripted_reason": "Identifies 12 and missing denominator, citing both relevant sentences; no invented percentage."
+    },
+    "compound-count": {
+      "raw": "fail",
+      "raw_reason": "Cites both counts but computes 24 minus 37, yielding -13 instead of north minus south = +13.",
+      "scripted": "pass",
+      "scripted_reason": "Selects south 24 as before and north 37 as after, yielding 13; cites both and excludes unrelated 5 rooms."
+    }
+  },
+  "integrity": "All four saved original briefs equal the raw drafts; handoffs retain original machine calculations separately from reviewed correction. Preview and corrected saved answer agree per case.",
+  "limitations": [
+    "All four attempts retained, no retries or post-holdout tuning per evaluation contract.",
+    "Fixture author saw prior filenames, field shapes, case IDs and broad memory; did not inspect prior prose/rubric or production answer implementation. The history was not fully blind.",
+    "No baseline run on these cases; do not compare percentages to previous different cases.",
+    "Snapshot metadata: base dadbfd073698663c7fb0e82130f4c049970bf69d plus listed overlays in evaluation-contract.json."
+  ]
+}

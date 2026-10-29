@@ -1,0 +1,1 @@
+The north studio recorded 37 customer visits. The south studio recorded 24 customer visits. The north studio has 5 meeting rooms.

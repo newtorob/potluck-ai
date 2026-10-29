@@ -1,0 +1,170 @@
+{
+  "answers": [
+    {
+      "question_id": "R1",
+      "status": "supported",
+      "text": "Signed difference: 13 customer visits.",
+      "snippet_ids": [
+        "S1",
+        "S2"
+      ],
+      "source_excerpts": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+          "quote": "The north studio recorded 37 customer visits. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+          "quote": "The south studio recorded 24 customer visits. "
+        }
+      ],
+      "calculation": {
+        "request_id": "R1",
+        "operation": "difference",
+        "status": "computed",
+        "text": "Signed difference: 13 customer visits.",
+        "formula": "after - before",
+        "result": "13",
+        "unit": "customer visits",
+        "reason": null,
+        "inputs": [
+          {
+            "id": "N2",
+            "snippet_id": "S2",
+            "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+            "source_text": "24 customer visits",
+            "snippet_text": "The south studio recorded 24 customer visits. ",
+            "start": 26,
+            "end": 44,
+            "value": "24",
+            "unit": "customer visits",
+            "dimension": "count"
+          },
+          {
+            "id": "N1",
+            "snippet_id": "S1",
+            "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+            "source_text": "37 customer visits",
+            "snippet_text": "The north studio recorded 37 customer visits. ",
+            "start": 26,
+            "end": 44,
+            "value": "37",
+            "unit": "customer visits",
+            "dimension": "count"
+          }
+        ],
+        "algorithm_version": "cited-calculations-v3",
+        "normalized_inputs": [
+          {
+            "id": "N2",
+            "role": "before",
+            "value": "24",
+            "unit": "customer visits",
+            "original_value": "24",
+            "original_unit": "customer visits",
+            "conversion_factor": "1"
+          },
+          {
+            "id": "N1",
+            "role": "after",
+            "value": "37",
+            "unit": "customer visits",
+            "original_value": "37",
+            "original_unit": "customer visits",
+            "conversion_factor": "1"
+          }
+        ],
+        "evaluated_expression": "37 customer visits - 24 customer visits = 13 customer visits (rounded)",
+        "rounding": {
+          "mode": "ROUND_HALF_UP",
+          "max_fractional_digits": 6
+        },
+        "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+        "assessment": "deterministic calculator",
+        "source_selection_assessment": "Reviewer-selected inputs and sources; authority is not verified."
+      }
+    }
+  ],
+  "calculation_reviews": [
+    {
+      "request_id": "R1",
+      "status": "calculate",
+      "operand_ids": [
+        "N2",
+        "N1"
+      ],
+      "snippet_ids": [
+        "S1",
+        "S2"
+      ],
+      "reason": "Fixture-script selection: subtract south 24 customer visits from north 37; five meeting rooms is unrelated.",
+      "trace": {
+        "request_id": "R1",
+        "operation": "difference",
+        "status": "computed",
+        "text": "Signed difference: 13 customer visits.",
+        "formula": "after - before",
+        "result": "13",
+        "unit": "customer visits",
+        "reason": null,
+        "inputs": [
+          {
+            "id": "N2",
+            "snippet_id": "S2",
+            "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+            "source_text": "24 customer visits",
+            "snippet_text": "The south studio recorded 24 customer visits. ",
+            "start": 26,
+            "end": 44,
+            "value": "24",
+            "unit": "customer visits",
+            "dimension": "count"
+          },
+          {
+            "id": "N1",
+            "snippet_id": "S1",
+            "citation_id": "source:a9a92718-e380-506e-899f-bca9cbfdbf4b:20abed5a-de17-50ad-bc32-091472095aa1",
+            "source_text": "37 customer visits",
+            "snippet_text": "The north studio recorded 37 customer visits. ",
+            "start": 26,
+            "end": 44,
+            "value": "37",
+            "unit": "customer visits",
+            "dimension": "count"
+          }
+        ],
+        "algorithm_version": "cited-calculations-v3",
+        "normalized_inputs": [
+          {
+            "id": "N2",
+            "role": "before",
+            "value": "24",
+            "unit": "customer visits",
+            "original_value": "24",
+            "original_unit": "customer visits",
+            "conversion_factor": "1"
+          },
+          {
+            "id": "N1",
+            "role": "after",
+            "value": "37",
+            "unit": "customer visits",
+            "original_value": "37",
+            "original_unit": "customer visits",
+            "conversion_factor": "1"
+          }
+        ],
+        "evaluated_expression": "37 customer visits - 24 customer visits = 13 customer visits (rounded)",
+        "rounding": {
+          "mode": "ROUND_HALF_UP",
+          "max_fractional_digits": 6
+        },
+        "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+        "assessment": "deterministic calculator",
+        "source_selection_assessment": "Reviewer-selected inputs and sources; authority is not verified."
+      }
+    }
+  ]
+}

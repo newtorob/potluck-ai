@@ -65,7 +65,7 @@ def test_v2_rejects_tampering_and_bad_version():
     with pytest.raises(ValueError):
         calculate('difference', ['N1', 'N2'], q, version='v2')
     with pytest.raises(ValueError):
-        quantity_catalog([], version='v3')
+        quantity_catalog([], version='v4')
 
 
 def test_unsupported_word_number_has_source_local_notice():
@@ -106,3 +106,43 @@ def test_ambiguous_expression_does_not_leak_through_snippet_split(source, cut):
     s = [{'snippet_id': 'S1', 'citation_id': 'C1', 'quote': source[:cut]},
          {'snippet_id': 'S2', 'citation_id': 'C1', 'quote': source[cut:]}]
     assert quantity_catalog(s, source_context={'C1': source}, version='v2') == []
+
+
+def test_compound_units_keep_exact_identity_and_evidence():
+    source = 'Before zero invoice errors. After 12 invoice errors.'
+    q = quantity_catalog(snippets(source), source_context={'C1': source}, version='v3')
+    assert [(x['value'], x['unit'], x['source_text']) for x in q] == [
+        ('0', 'invoice errors', 'zero invoice errors'), ('12', 'invoice errors', '12 invoice errors')]
+    assert all(source[x['start']:x['end']] == x['source_text'] for x in q)
+    assert calculate('difference', ['N1', 'N2'], q, version='v3')['result'] == '12'
+    assert quantity_catalog(snippets(source)) == []
+    assert quantity_catalog(snippets(source), version='v2') == []
+
+
+def test_compound_shared_unit_and_truncated_source():
+    source = 'from five to ten customer renewals'
+    q = quantity_catalog(snippets(source), source_context={'C1': source}, version='v3')
+    assert [(x['value'], x['unit']) for x in q] == [('5', 'customer renewals'), ('10', 'customer renewals')]
+    assert all(x['unit_source_text'] == 'customer renewals' for x in q)
+    assert quantity_catalog(snippets(source[:-3]), source_context={'C1': source}, version='v3') == []
+
+
+@pytest.mark.parametrize('source', ['1.5 invoice errors', '5 ± 2 invoice errors',
+    'between 5 and 10 service contracts', '$10 invoice errors', '10 invoice errors / hour'])
+def test_unsafe_compound_quantities_are_not_extracted(source):
+    assert quantity_catalog(snippets(source), version='v3') == []
+
+
+def test_compound_extraction_does_not_merge_across_common_clause_words():
+    q = quantity_catalog(snippets('10 tickets increased. 12 tickets and 3 service contracts.'), version='v3')
+    assert [(x['value'], x['unit']) for x in q] == [
+        ('10', 'tickets'), ('12', 'tickets'), ('3', 'service contracts')]
+
+
+@pytest.mark.parametrize('source', ['one hundred tickets', 'twenty million widgets',
+    '3 square meters', 'from one to two hundred tickets', '12 customer renewal tickets',
+    '12 customer renewals tickets', 'from five to ten customer renewals tickets',
+    'one trillion and five support tickets', 'one quadrillion and five support tickets',
+    'one dozen and five support tickets', '4 billing accounts\nreceivable'])
+def test_v3_does_not_extract_partial_scales_or_long_units(source):
+    assert quantity_catalog(snippets(source), version='v3') == []

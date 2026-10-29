@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-other-workspace",
+  "collection_id": "defa442c-4ebd-4f32-9b54-9c66f47b211d",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-source-review-v1/v9-fixture_supplied-s7/attempts/compound-count/raw/excluded",
+  "source_sha256": "3c99bb8e89e9b23708c3a3e7b9d60aeffcefda1a9ac17787c8d00b038e49add4",
+  "scan": {
+    "collection_id": "defa442c-4ebd-4f32-9b54-9c66f47b211d",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

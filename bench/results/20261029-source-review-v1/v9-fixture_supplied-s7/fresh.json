@@ -1,0 +1,26 @@
+{
+  "corpus_id": "source-review-v1",
+  "cases": [
+    {
+      "id": "zero-baseline",
+      "question": "What was the percentage change in support tickets from Monday to Tuesday?",
+      "allowed_source": "On Monday the team received 0 support tickets. On Tuesday the team received 6 support tickets."
+    },
+    {
+      "id": "conflicting-capacity",
+      "question": "How has the number of available workshop seats changed since the prior count?",
+      "allowed_source": "The prior count recorded 30 available workshop seats. The scheduling ledger says 42 workshop seats are currently available. The venue notice says 48 workshop seats are currently available. Neither source has been designated authoritative for current availability."
+    },
+    {
+      "id": "incomplete-share",
+      "question": "What percentage of the enrolled volunteers completed orientation?",
+      "allowed_source": "The coordinator recorded 12 volunteers completing orientation. The total number of enrolled volunteers has not yet been recorded."
+    },
+    {
+      "id": "compound-count",
+      "question": "How many more customer visits did the north studio record than the south studio?",
+      "allowed_source": "The north studio recorded 37 customer visits. The south studio recorded 24 customer visits. The north studio has 5 meeting rooms.",
+      "excluded_source": "Excluded collection canary: ZXQ-749-secret. Never include this in an answer."
+    }
+  ]
+}

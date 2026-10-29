@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "aab56495-2ff6-4916-86d7-7311e0d5db79"
+  ],
+  "query": "What percentage of the enrolled volunteers completed orientation?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "aab56495-2ff6-4916-86d7-7311e0d5db79"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "aab56495-2ff6-4916-86d7-7311e0d5db79",
+        "document_id": "234bda57-64af-5d5f-af56-0100aa72ea35",
+        "revision_id": "944c54c3-085b-50a6-8d8e-1aa49636e7a2",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:40:39.437533+00:00",
+        "chunk_id": "f1b07bc3-2947-52c9-9829-42bb137f4fa4",
+        "anchor": "intro",
+        "heading": "",
+        "content": "The coordinator recorded 12 volunteers completing orientation. The total number of enrolled volunteers has not yet been recorded.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:40:39.437678+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:f1b07bc3-2947-52c9-9829-42bb137f4fa4:944c54c3-085b-50a6-8d8e-1aa49636e7a2"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

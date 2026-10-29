@@ -1,0 +1,126 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "1ff17e57-c3d1-4d30-9114-185f7c03d846"
+  ],
+  "decision": "correct",
+  "reviewer": "fixture-script (not owner acceptance)",
+  "reason": "Scripted qualification only; not actual owner review.",
+  "corrected_brief": {
+    "questions": [
+      {
+        "id": "R1",
+        "text": "What was the percentage change in support tickets from Monday to Tuesday?"
+      }
+    ],
+    "answers": [
+      {
+        "question_id": "R1",
+        "status": "unknown",
+        "text": "Unknown: The baseline is zero.",
+        "snippet_ids": [
+          "S1",
+          "S2"
+        ],
+        "source_excerpts": [
+          {
+            "snippet_id": "S1",
+            "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9",
+            "quote": "On Monday the team received 0 support tickets. "
+          },
+          {
+            "snippet_id": "S2",
+            "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9",
+            "quote": "On Tuesday the team received 6 support tickets."
+          }
+        ],
+        "calculation": {
+          "request_id": "R1",
+          "operation": "percent_change",
+          "status": "unknown",
+          "text": "Unknown: The baseline is zero.",
+          "formula": "(after - before) / before \u00d7 100",
+          "result": null,
+          "unit": null,
+          "reason": "The baseline is zero.",
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9",
+              "source_text": "0 support tickets",
+              "snippet_text": "On Monday the team received 0 support tickets. ",
+              "start": 28,
+              "end": 45,
+              "value": "0",
+              "unit": "support tickets",
+              "dimension": "count"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S2",
+              "citation_id": "source:0a9ce8b8-c62e-56c5-a393-e39754c3b76c:3a12620c-db98-534e-b037-042b83b75cb9",
+              "source_text": "6 support tickets",
+              "snippet_text": "On Tuesday the team received 6 support tickets.",
+              "start": 29,
+              "end": 46,
+              "value": "6",
+              "unit": "support tickets",
+              "dimension": "count"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v3",
+          "normalized_inputs": [
+            {
+              "id": "N1",
+              "role": "before",
+              "value": "0",
+              "unit": "support tickets",
+              "original_value": "0",
+              "original_unit": "support tickets",
+              "conversion_factor": "1"
+            },
+            {
+              "id": "N2",
+              "role": "after",
+              "value": "6",
+              "unit": "support tickets",
+              "original_value": "6",
+              "original_unit": "support tickets",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": null,
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+          "limitation_kind": "zero_denominator",
+          "assessment": "deterministic calculator",
+          "source_selection_assessment": "Reviewer-selected inputs and sources; authority is not verified."
+        }
+      }
+    ],
+    "facts": [],
+    "prior_fixes": [],
+    "hypotheses": [],
+    "recommended_checks": [],
+    "model_uncertainties": []
+  },
+  "calculation_reviews": [
+    {
+      "request_id": "R1",
+      "status": "calculate",
+      "operand_ids": [
+        "N1",
+        "N2"
+      ],
+      "snippet_ids": [
+        "S1",
+        "S2"
+      ],
+      "reason": "Fixture-script selection: Monday zero support tickets and Tuesday six. Relative change has a zero baseline."
+    }
+  ]
+}

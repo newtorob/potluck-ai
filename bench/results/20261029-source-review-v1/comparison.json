@@ -1,0 +1,10 @@
+{
+  "raw_passes": 1,
+  "scripted_review_passes": 4,
+  "case_count": 4,
+  "reviewer_agreement": true,
+  "actual_owner_acceptance": false,
+  "same_case_baseline": false,
+  "promote": false,
+  "decision": "Keep explicit local experimental status. Source selection, direction and evidence completeness remain review responsibilities. No broader promotion."
+}

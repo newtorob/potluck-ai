@@ -184,9 +184,12 @@ def quantity_catalog(
     of its full source. Only spans wholly contained in one snippet are emitted.
     Full context is used solely for validation and is never included in output.
     """
-    if version not in ('v1', 'v2'):
+    if version not in ('v1', 'v2', 'v3'):
         raise ValueError('invalid calculation version')
-    if version == 'v2':
+    if version == 'v3':
+        from .investigation_quantities_v3 import source_matches_v3
+        source_matches = source_matches_v3
+    elif version == 'v2':
         from .investigation_quantities import source_matches_v2
         source_matches = source_matches_v2
     else:
@@ -262,7 +265,10 @@ def quantity_catalog(
 def _validate_catalog(quantities: list[dict[str, Any]], version: str = 'v1') -> dict[str, dict[str, Any]]:
     if not isinstance(quantities, list) or len(quantities) > 1000:
         raise ValueError('invalid quantity catalog')
-    if version == 'v2':
+    if version == 'v3':
+        from .investigation_quantities_v3 import source_matches_v3
+        source_matches = source_matches_v3
+    elif version == 'v2':
         from .investigation_quantities import source_matches_v2
         source_matches = source_matches_v2
     else:
@@ -303,7 +309,7 @@ def _decimal_text(value: Decimal) -> str:
 def calculate(operation: str, operand_ids: list[str], quantities: list[dict[str, Any]], *,
               version: str = 'v1') -> dict[str, Any]:
     """Compute a fixed operation, or return a reason it cannot be computed."""
-    if version not in ('v1', 'v2'):
+    if version not in ('v1', 'v2', 'v3'):
         raise ValueError('invalid calculation version')
     if operation not in _OPERATIONS or not isinstance(operand_ids, list) or len(operand_ids) > 2:
         raise ValueError('invalid operation or operand count')
@@ -318,7 +324,7 @@ def calculate(operation: str, operand_ids: list[str], quantities: list[dict[str,
                'percentage': 'part / total × 100'}[operation]
     result = {'status': 'unknown', 'text': '', 'formula': formula, 'result': None,
               'unit': None, 'reason': None, 'inputs': inputs,
-              'algorithm_version': _ALGORITHM_VERSION if version == 'v1' else 'cited-calculations-v2', 'normalized_inputs': [], 'evaluated_expression': None,
+              'algorithm_version': _ALGORITHM_VERSION if version == 'v1' else f'cited-calculations-{version}', 'normalized_inputs': [], 'evaluated_expression': None,
               'rounding': {'mode': 'ROUND_HALF_UP', 'max_fractional_digits': 6}, 'caveat': _CAVEAT}
 
     def unknown(reason: str) -> dict[str, Any]:
@@ -387,7 +393,12 @@ def calculate(operation: str, operand_ids: list[str], quantities: list[dict[str,
 
 
 def extraction_notices(snippets: list[dict[str, Any]], quantities: list[dict[str, Any]], *,
-                       source_context: dict[str, str] | None = None) -> list[dict[str, Any]]:
+                       source_context: dict[str, str] | None = None, version: str = 'v2') -> list[dict[str, Any]]:
     """Report bounded source-local number-like spans not extracted by v2."""
+    if version == 'v3':
+        from .investigation_quantities_v3 import extraction_notices_v3
+        return extraction_notices_v3(snippets, quantities, source_context=source_context)
+    if version != 'v2':
+        raise ValueError('invalid calculation version')
     from .investigation_quantities import extraction_notices_v2
     return extraction_notices_v2(snippets, quantities, source_context=source_context)

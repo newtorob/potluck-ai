@@ -1,0 +1,4 @@
+
+> potluck-ai-frontend@0.1.0 typecheck /Users/rob/Documents/potluck/apps/desktop/frontend
+> tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.node.json
+

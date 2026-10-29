@@ -1,4 +1,4 @@
-import type { Brief, Investigation, InvestigationScope, ReviewedOperation, SourceCollection } from '@/types/investigations';
+import type { Brief, CalculationPreview, CalculationReviewInput, Investigation, InvestigationScope, ReviewedOperation, SourceCollection } from '@/types/investigations';
 /**
  * HTTP client for the Python sidecar running at 127.0.0.1:8321.
  *
@@ -795,7 +795,12 @@ export const localApi = {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
     }, 360_000).then(handleResponse<Investigation>);
   },
-  reviewInvestigation(id: string, input: InvestigationScope & { decision: string; reviewer: string; reason: string; corrected_brief?: Brief }): Promise<Investigation> {
+  previewCalculationReview(id: string, input: InvestigationScope & { calculation_reviews: CalculationReviewInput[] }): Promise<CalculationPreview> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/investigations/${encodeURIComponent(id)}/calculation-preview`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }).then(handleResponse<CalculationPreview>);
+  },
+  reviewInvestigation(id: string, input: InvestigationScope & { decision: string; reviewer: string; reason: string; corrected_brief?: Brief; calculation_reviews?: CalculationReviewInput[] }): Promise<Investigation> {
     return timedFetch(`${LOCAL_BASE}/company-brain/investigations/${encodeURIComponent(id)}/review`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
     }).then(handleResponse<Investigation>);
