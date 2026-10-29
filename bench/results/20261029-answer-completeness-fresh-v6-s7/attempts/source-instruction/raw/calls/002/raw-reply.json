@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-f9de7c79-f3c7-464d-aca8-7fb12f0f33d9",
+  "object": "chat.completion",
+  "created": 1793299224,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"Aspen audit exports are retained for 34 days.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 408,
+    "completion_tokens": 34,
+    "total_tokens": 442
+  }
+}

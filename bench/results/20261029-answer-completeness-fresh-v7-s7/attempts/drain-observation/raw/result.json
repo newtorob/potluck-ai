@@ -1,0 +1,147 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "250c5218-c3bb-40e7-805b-6219fda81727",
+    "workspace": "synthetic-eval",
+    "issue": "How much did Cedar queue drain time change after maintenance, and did the index rebuild cause the change?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "How much did Cedar queue drain time change after maintenance"
+        },
+        {
+          "id": "Q2",
+          "text": "did the index rebuild cause the change"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "supported",
+          "text": "Cedar queue drain time decreased by 33 seconds after maintenance.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:68a5884d-8a6b-5a30-9d46-3d2a86106540:7f9b0f59-13d6-5191-9ddc-36da0fd20e4f",
+              "quote": "Cedar queue drain time was 94 seconds before maintenance and 61 seconds afterward. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "supported",
+          "text": "The record does not determine which change caused the observed difference.",
+          "snippet_ids": [
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:68a5884d-8a6b-5a30-9d46-3d2a86106540:7f9b0f59-13d6-5191-9ddc-36da0fd20e4f",
+              "quote": "The record does not determine which change caused the observed difference."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "18aacc2a-1138-44ae-a9a3-828499b3570f",
+        "document_id": "1bffc74e-d053-51e7-bdd7-0bfa90a32cdc",
+        "revision_id": "7f9b0f59-13d6-5191-9ddc-36da0fd20e4f",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T18:42:19.430132+00:00",
+        "chunk_id": "68a5884d-8a6b-5a30-9d46-3d2a86106540",
+        "anchor": "cedar-queue-drain-time",
+        "heading": "Cedar queue drain time",
+        "content": "Cedar queue drain time was 94 seconds before maintenance and 61 seconds afterward. The index was rebuilt and the worker count changed during the window. The record does not determine which change caused the observed difference.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T18:42:19.430319+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:68a5884d-8a6b-5a30-9d46-3d2a86106540:7f9b0f59-13d6-5191-9ddc-36da0fd20e4f",
+        "presented_content": "Cedar queue drain time was 94 seconds before maintenance and 61 seconds afterward. The index was rebuilt and the worker count changed during the window. The record does not determine which change caused the observed difference."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T18:43:09.462745+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v7",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "How much did Cedar queue drain time change after maintenance, and did the index rebuild cause the change?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 50028,
+      "created_at": "2026-10-29T18:43:09.462745+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:68a5884d-8a6b-5a30-9d46-3d2a86106540:7f9b0f59-13d6-5191-9ddc-36da0fd20e4f",
+          "quote": "Cedar queue drain time was 94 seconds before maintenance and 61 seconds afterward. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:68a5884d-8a6b-5a30-9d46-3d2a86106540:7f9b0f59-13d6-5191-9ddc-36da0fd20e4f",
+          "quote": "The index was rebuilt and the worker count changed during the window. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:68a5884d-8a6b-5a30-9d46-3d2a86106540:7f9b0f59-13d6-5191-9ddc-36da0fd20e4f",
+          "quote": "The record does not determine which change caused the observed difference."
+        }
+      ],
+      "planner_version": "issue-spans-v1",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "18aacc2a-1138-44ae-a9a3-828499b3570f"
+    ]
+  },
+  "latency_seconds": 50.045146708376706,
+  "setup_seconds": 0.019240666180849075,
+  "attempt_total_seconds": 50.064387374557555
+}

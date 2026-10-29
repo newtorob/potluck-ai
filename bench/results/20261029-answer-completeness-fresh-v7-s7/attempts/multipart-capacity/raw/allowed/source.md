@@ -1,0 +1,2 @@
+# Elm service capacity change
+The Elm service capacity limit rose from 240 to 315 concurrent sessions. The increase took effect on 14 March. The change record identifies Dana as the implementer but does not identify an approver.

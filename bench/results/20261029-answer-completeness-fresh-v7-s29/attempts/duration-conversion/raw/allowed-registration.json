@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "6db28d28-e8e2-4296-ae7f-2b817d8a1dcb",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-answer-completeness-fresh-v7-s29/attempts/duration-conversion/raw/allowed",
+  "source_sha256": "1fa2605a1de16e12f0e075942e675792afbf8a9fbf395d1a619cbac7498c414e",
+  "scan": {
+    "collection_id": "6db28d28-e8e2-4296-ae7f-2b817d8a1dcb",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

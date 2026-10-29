@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "f9f5da83-16a7-40e5-b258-222621579189",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-answer-completeness-fresh-v7-s7/attempts/conflicting-threshold/raw/allowed",
+  "source_sha256": "9d7fbbcc6160b671ae69be855247438a4b5909a41130bc2ab1339a9049044412",
+  "scan": {
+    "collection_id": "f9f5da83-16a7-40e5-b258-222621579189",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

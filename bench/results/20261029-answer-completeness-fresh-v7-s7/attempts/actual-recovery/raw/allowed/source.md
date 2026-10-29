@@ -1,0 +1,2 @@
+# Willow recovery
+Recovery procedure: stop the worker, replay the journal, then verify the queue is empty. Yesterday’s recovery log records that the worker was stopped and the journal was replayed. It does not record a queue-empty verification.

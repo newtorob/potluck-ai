@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "7a8edc2c-8cd3-4003-a583-d23ab9975191"
+  ],
+  "query": "What percentage of Spruce jobs failed yesterday?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "7a8edc2c-8cd3-4003-a583-d23ab9975191"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "7a8edc2c-8cd3-4003-a583-d23ab9975191",
+        "document_id": "e0a39c9a-4ce4-59ba-a65b-53f94c814c13",
+        "revision_id": "00df2778-f431-54d2-84fb-af5b90d7dbcc",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T18:48:49.189505+00:00",
+        "chunk_id": "eb08edb5-77e0-5557-8aaf-c7a60d0baa16",
+        "anchor": "spruce-jobs-yesterday",
+        "heading": "Spruce jobs yesterday",
+        "content": "Seven Spruce jobs failed yesterday. This record does not give the number of Spruce jobs attempted yesterday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T18:48:49.191745+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:eb08edb5-77e0-5557-8aaf-c7a60d0baa16:00df2778-f431-54d2-84fb-af5b90d7dbcc"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

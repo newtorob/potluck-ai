@@ -288,8 +288,22 @@ _PLAN_INSTRUCTION = (
     'without paraphrasing the same part twice or adding unstated questions. Preserve separate '
     'parts. Return one to eight questions in the requested JSON; do not omit a part to fit evidence.'
 )
+_INSTRUCTION_V7 = _INSTRUCTION_V6 + (
+    ' Complete requested calculations, normalize compatible units, and give results and units. '
+    'Distinguish percentage change from percentage-point difference; a missing or zero baseline '
+    'cannot establish percentage change. Do not infer causation from observed arithmetic. '
+    'Cite only snippets needed to support the answer and its operands, not irrelevant source '
+    'instructions. If an operand is missing or conflicting, use unknown or conflicting as '
+    'appropriate and explain the limitation.'
+)
+_PLAN_INSTRUCTION_V7 = (
+    'Extract one to eight distinct requested parts from the issue in order. Copy each part '
+    'exactly as a contiguous, nonoverlapping substring of the issue; do not paraphrase, '
+    'add text, answer, or omit requested parts. Keep each requested operation with its part. '
+    'Return the substrings in the requested JSON.'
+)
 _INSTRUCTIONS = {'investigation-v4': _INSTRUCTION_V4, 'investigation-v5': _INSTRUCTION_V5,
-                 'investigation-v6': _INSTRUCTION_V6}
+                 'investigation-v6': _INSTRUCTION_V6, 'investigation-v7': _INSTRUCTION_V7}
 
 
 async def create_investigation(scope: EvidenceScope, issue: str, query: str,
@@ -298,8 +312,9 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
                                generation_profile: str | None = None, seed: int | None = None) -> dict[str, Any]:
     if template_version not in _INSTRUCTIONS:
         raise ValueError('Unknown investigation template')
-    if template_version != 'investigation-v6' and (questions is not None or generation_profile is not None):
-        raise ValueError('Question options require v6')
+    if (template_version not in ('investigation-v6', 'investigation-v7')
+            and (questions is not None or generation_profile is not None)):
+        raise ValueError('Question options require v6 or v7')
     if seed is not None and (type(seed) is not int or not 0 <= seed <= 4294967295):
         raise ValueError('Invalid seed')
     planned_questions = answers.questions_from_texts(questions) if questions is not None else None
@@ -372,7 +387,7 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
         kwargs: dict[str, Any] = {'expected_model': model_slug, 'expected_sha256': sha,
                                   'max_tokens': max_tokens, 'temperature': 0,
                                   'response_format': {'type': 'json_object', 'schema': schema}}
-        if template_version == 'investigation-v6':
+        if template_version in ('investigation-v6', 'investigation-v7'):
             kwargs['bounded_generation'] = True
         if generation_profile is not None:
             kwargs['generation_profile'] = generation_profile
@@ -396,13 +411,16 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
         except (KeyError, IndexError, TypeError):
             raise ValueError('Invalid model format') from None
     try:
-        if template_version == 'investigation-v6':
+        if template_version in ('investigation-v6', 'investigation-v7'):
             question_origin = 'explicit' if planned_questions is not None else 'planned'
             if planned_questions is None:
-                plan = await generate([{'role': 'system', 'content': _PLAN_INSTRUCTION},
+                plan_instruction = (_PLAN_INSTRUCTION_V7 if template_version == 'investigation-v7'
+                                    else _PLAN_INSTRUCTION)
+                plan = await generate([{'role': 'system', 'content': plan_instruction},
                                        {'role': 'user', 'content': json.dumps({'issue': issue}, ensure_ascii=False)}],
                                       answers.planner_schema(), 800)
-                planned_questions = answers.decode_plan(plan)
+                planned_questions = (answers.decode_span_plan(plan, issue)
+                                     if template_version == 'investigation-v7' else answers.decode_plan(plan))
             snippet_catalog = answers.snippets_from_evidence(evidence)
             prompt_snippets = [{'snippet_id': s['snippet_id'], 'text': s['quote']} for s in snippet_catalog]
             prompt = json.dumps({'issue': issue, 'questions': planned_questions,
@@ -431,9 +449,11 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
                   'elapsed_ms': round((time.monotonic() - started) * 1000), 'created_at': created}
     if seed is not None:
         provenance['generation_settings']['seed'] = seed
-    if template_version == 'investigation-v6':
+    if template_version in ('investigation-v6', 'investigation-v7'):
+        planner_version = ('issue-spans-v1' if template_version == 'investigation-v7'
+                           else 'issue-only-v2') if question_origin == 'planned' else None
         provenance.update({'question_origin': question_origin, 'snippet_catalog': snippet_catalog,
-                           'planner_version': 'issue-only-v2' if question_origin == 'planned' else None,
+                           'planner_version': planner_version,
                            'planner_settings': ({'max_tokens': 800, 'seed': seed}
                                                 if question_origin == 'planned' else None),
                            'generation_profile': profile_metadata})
@@ -509,7 +529,7 @@ async def review_investigation(scope: EvidenceScope, iid: str, decision: str, re
     validated_correction = None
     if corrected_brief is not None:
         try:
-            if (item['provenance'] or {}).get('template_version') == 'investigation-v6':
+            if (item['provenance'] or {}).get('template_version') in ('investigation-v6', 'investigation-v7'):
                 snippets = answers.snippets_from_evidence(item['evidence'])
                 if snippets != item['provenance'].get('snippet_catalog'):
                     raise ValueError('Invalid snippets')

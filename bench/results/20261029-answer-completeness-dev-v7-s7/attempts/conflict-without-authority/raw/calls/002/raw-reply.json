@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-13ce60b1-95b4-49d7-82a1-aff7b85f2a75",
+  "object": "chat.completion",
+  "created": 1793298791,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\", \"S2\", \"S3\"], \"text\": \"The current retry delay is unknown because neither record establishes precedence, approval, or a superseding decision.\", \"status\": \"unknown\"}, \"Q2\": {\"snippet_ids\": [\"S1\", \"S2\"], \"text\": \"The two records say the retry delay is 12 seconds and 45 seconds respectively.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 512,
+    "completion_tokens": 101,
+    "total_tokens": 613
+  }
+}

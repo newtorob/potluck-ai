@@ -1,0 +1,118 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "c39c776a-61b9-4a80-8596-db4bd5002ec6",
+    "workspace": "synthetic-eval",
+    "issue": "For the Birch gateway, how many percentage points and what relative percentage did the error rate decrease?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "For the Birch gateway, how many percentage points and what relative percentage did the error rate decrease?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "supported",
+          "text": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:b5814e51-e746-510e-87ec-b5dd302959f1:1fb927eb-8f26-5e6c-ac77-b4a2d65fd093",
+              "quote": "The Birch gateway error rate fell from 8% to 6% over the measured interval."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "70379ddb-218a-4017-b76f-e543f0b52334",
+        "document_id": "faf3fa8a-1b48-553c-ba87-41eed68da44a",
+        "revision_id": "1fb927eb-8f26-5e6c-ac77-b4a2d65fd093",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T18:43:09.501890+00:00",
+        "chunk_id": "b5814e51-e746-510e-87ec-b5dd302959f1",
+        "anchor": "birch-gateway-error-rate",
+        "heading": "Birch gateway error rate",
+        "content": "The Birch gateway error rate fell from 8% to 6% over the measured interval.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T18:43:09.502440+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:b5814e51-e746-510e-87ec-b5dd302959f1:1fb927eb-8f26-5e6c-ac77-b4a2d65fd093",
+        "presented_content": "The Birch gateway error rate fell from 8% to 6% over the measured interval."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T18:44:53.044276+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v7",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "For the Birch gateway, how many percentage points and what relative percentage did the error rate decrease?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 103534,
+      "created_at": "2026-10-29T18:44:53.044276+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:b5814e51-e746-510e-87ec-b5dd302959f1:1fb927eb-8f26-5e6c-ac77-b4a2d65fd093",
+          "quote": "The Birch gateway error rate fell from 8% to 6% over the measured interval."
+        }
+      ],
+      "planner_version": "issue-spans-v1",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "70379ddb-218a-4017-b76f-e543f0b52334"
+    ]
+  },
+  "latency_seconds": 103.57612099964172,
+  "setup_seconds": 0.026008584536612034,
+  "attempt_total_seconds": 103.60212958417833
+}

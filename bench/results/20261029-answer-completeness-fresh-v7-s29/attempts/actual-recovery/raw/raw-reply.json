@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-bcae60b7-a2ec-40ff-aa96-b56a177fd402",
+  "object": "chat.completion",
+  "created": 1793300254,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What does the Willow recovery procedure require\", \"which steps are recorded as performed during yesterday’s recovery?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 103,
+    "completion_tokens": 26,
+    "total_tokens": 129
+  }
+}

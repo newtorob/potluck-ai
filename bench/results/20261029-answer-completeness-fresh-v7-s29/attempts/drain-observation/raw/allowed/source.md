@@ -1,0 +1,2 @@
+# Cedar queue drain time
+Cedar queue drain time was 94 seconds before maintenance and 61 seconds afterward. The index was rebuilt and the worker count changed during the window. The record does not determine which change caused the observed difference.

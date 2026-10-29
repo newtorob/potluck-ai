@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-524b462c-97af-4dab-921b-36a6063af498",
+  "object": "chat.completion",
+  "created": 1793299267,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"The old capacity limits for the Elm service were 240 concurrent sessions.\", \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S1\"], \"text\": \"The new capacity limits for the Elm service were 315 concurrent sessions.\", \"status\": \"supported\"}, \"Q3\": {\"snippet_ids\": [\"S1\"], \"text\": \"The absolute increase in capacity limits for the Elm service was 75 concurrent sessions.\", \"status\": \"supported\"}, \"Q4\": {\"snippet_ids\": [\"S3\"], \"text\": \"The change record does not identify an approver for the increase in capacity limits for the Elm service.\", \"status\": \"supported\"}, \"Q5\": {\"snippet_ids\": [\"S2\"], \"text\": \"The increase in capacity limits for the Elm service took effect on 14 March.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 543,
+    "completion_tokens": 196,
+    "total_tokens": 739
+  }
+}

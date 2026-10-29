@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-f231c096-c11d-432d-b6da-c11d7cb128b3",
+  "object": "chat.completion",
+  "created": 1793300298,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\", \"S2\", \"S3\"], \"text\": \"For the Elm service, the old capacity limit was 240 concurrent sessions, and the new capacity limit was 315 concurrent sessions. The absolute increase was 75 concurrent sessions. The change record identifies Dana as the implementer but does not identify an approver. The increase took effect on 14 March.\" , \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 545,
+    "completion_tokens": 101,
+    "total_tokens": 646
+  }
+}

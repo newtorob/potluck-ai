@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-61b4ac5c-52b0-48e5-a422-3fd9d6eea2a3",
+  "object": "chat.completion",
+  "created": 1793300258,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"The Willow recovery procedure requires stopping the worker, replaying the journal, and verifying the queue is empty.\" , \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S2\", \"S3\"], \"text\": \"The steps recorded as performed during yesterday’s recovery are stopping the worker and replaying the journal. The verification of the queue being empty is not recorded.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 530,
+    "completion_tokens": 103,
+    "total_tokens": 633
+  }
+}

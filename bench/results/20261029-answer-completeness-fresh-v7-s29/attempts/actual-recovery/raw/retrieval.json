@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "ec3cb3e7-9b6f-4733-814d-748e154b02de"
+  ],
+  "query": "What does the Willow recovery procedure require, and which steps are recorded as performed during yesterday’s recovery?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "ec3cb3e7-9b6f-4733-814d-748e154b02de"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "ec3cb3e7-9b6f-4733-814d-748e154b02de",
+        "document_id": "283fe9f2-bb32-5b75-95d1-2f27e1b0fec6",
+        "revision_id": "bc2c256e-63fb-5c59-8a98-d1dff5f28e96",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T18:57:34.140546+00:00",
+        "chunk_id": "55f51fca-54a7-5c53-9e1a-e35281a151ce",
+        "anchor": "willow-recovery",
+        "heading": "Willow recovery",
+        "content": "Recovery procedure: stop the worker, replay the journal, then verify the queue is empty. Yesterday’s recovery log records that the worker was stopped and the journal was replayed. It does not record a queue-empty verification.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T18:57:34.140715+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:55f51fca-54a7-5c53-9e1a-e35281a151ce:bc2c256e-63fb-5c59-8a98-d1dff5f28e96"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

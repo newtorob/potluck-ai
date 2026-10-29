@@ -1,0 +1,123 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "a7f0e8c5-f61c-4475-bedf-f08ffebb4e25",
+    "workspace": "synthetic-eval",
+    "issue": "What percentage of Spruce jobs failed yesterday?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What percentage of Spruce jobs failed yesterday?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "supported",
+          "text": "Seven Spruce jobs failed yesterday.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:eb08edb5-77e0-5557-8aaf-c7a60d0baa16:00df2778-f431-54d2-84fb-af5b90d7dbcc",
+              "quote": "Seven Spruce jobs failed yesterday. "
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "7a8edc2c-8cd3-4003-a583-d23ab9975191",
+        "document_id": "e0a39c9a-4ce4-59ba-a65b-53f94c814c13",
+        "revision_id": "00df2778-f431-54d2-84fb-af5b90d7dbcc",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T18:48:49.189505+00:00",
+        "chunk_id": "eb08edb5-77e0-5557-8aaf-c7a60d0baa16",
+        "anchor": "spruce-jobs-yesterday",
+        "heading": "Spruce jobs yesterday",
+        "content": "Seven Spruce jobs failed yesterday. This record does not give the number of Spruce jobs attempted yesterday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T18:48:49.191745+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:eb08edb5-77e0-5557-8aaf-c7a60d0baa16:00df2778-f431-54d2-84fb-af5b90d7dbcc",
+        "presented_content": "Seven Spruce jobs failed yesterday. This record does not give the number of Spruce jobs attempted yesterday."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T18:50:49.317342+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v7",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What percentage of Spruce jobs failed yesterday?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 120083,
+      "created_at": "2026-10-29T18:50:49.317342+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:eb08edb5-77e0-5557-8aaf-c7a60d0baa16:00df2778-f431-54d2-84fb-af5b90d7dbcc",
+          "quote": "Seven Spruce jobs failed yesterday. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:eb08edb5-77e0-5557-8aaf-c7a60d0baa16:00df2778-f431-54d2-84fb-af5b90d7dbcc",
+          "quote": "This record does not give the number of Spruce jobs attempted yesterday."
+        }
+      ],
+      "planner_version": "issue-spans-v1",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "7a8edc2c-8cd3-4003-a583-d23ab9975191"
+    ]
+  },
+  "latency_seconds": 120.13001004140824,
+  "setup_seconds": 0.04739162512123585,
+  "attempt_total_seconds": 120.17740166652948
+}

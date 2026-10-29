@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "fe0dc854-f691-4164-a3ab-ce594c74bfa4",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-answer-completeness-fresh-v6-s7/attempts/missing-denominator/raw/allowed",
+  "source_sha256": "f2bfee1cb9d49acec12af88fdaf0ef4685027cd740a6efd4fbd8352cb63bbcc6",
+  "scan": {
+    "collection_id": "fe0dc854-f691-4164-a3ab-ce594c74bfa4",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

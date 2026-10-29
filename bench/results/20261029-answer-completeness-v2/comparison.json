@@ -1,0 +1,61 @@
+{
+  "corpus": "answer-completeness-v2-fresh",
+  "model": "Qwen3 8B Q4, verified qwen3-non-thinking",
+  "arms": [
+    {
+      "arm": "v6-s7",
+      "attempts": 8,
+      "saved": 8,
+      "primary_successful": 4,
+      "independent_successful": 4
+    },
+    {
+      "arm": "v7-s7",
+      "attempts": 8,
+      "saved": 7,
+      "primary_successful": 3,
+      "independent_successful": 3
+    },
+    {
+      "arm": "v7-s29",
+      "attempts": 8,
+      "saved": 8,
+      "primary_successful": 5,
+      "independent_successful": 5
+    }
+  ],
+  "disagreements": [],
+  "paired_seed7": {
+    "improvements": [
+      "drain-observation"
+    ],
+    "regressions": [
+      "error-rate-units",
+      "multipart-capacity"
+    ],
+    "unchanged": 5
+  },
+  "v7_seed_variation": {
+    "successful_seed7": 3,
+    "successful_seed29": 5,
+    "gained_at_seed29": [
+      "duration-conversion",
+      "multipart-capacity"
+    ]
+  },
+  "attempts": 24,
+  "saved": 23,
+  "exact_excerpts": 53,
+  "promotion_gate_met": false,
+  "decision": "Keep v4 default and v6 opt-in preview. Retain v7 only as a reproducible internal diagnostic.",
+  "human_acceptance": null,
+  "human_review_time_seconds": null,
+  "limitations": [
+    "Eight unique synthetic cases, not 24 independent cases. Only seed7 is a paired v6/v7 comparison.",
+    "New calculation-focused corpus and stricter excerpt requirements differ from prior 7/8 corpus; do not compare aggregate historical percentages.",
+    "V7 combines exact-span planning and additional prompt guidance; no isolated attribution to either.",
+    "Safe unknown in conflicting-threshold fails the frozen requirement for conditional deltas; this is an omission, not fabricated authority.",
+    "The full sidecar suite ran concurrently with part of inference; elapsed times are diagnostic, not speed benchmarks.",
+    "Exact source substrings and valid JSON do not establish answer completeness or semantic support."
+  ]
+}

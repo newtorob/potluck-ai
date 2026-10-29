@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-6849b2d6-4012-42b3-8162-a9bafa6ad615",
+  "object": "chat.completion",
+  "created": 1793298787,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"Which retry delay is current\", \"what do the two records say\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 97,
+    "completion_tokens": 19,
+    "total_tokens": 116
+  }
+}

@@ -48,14 +48,14 @@ async def run(out: Path, suite: str, model_path: Path, expected_sha: str,
               template_version: str = 'investigation-v4', *,
               generation_profile: str | None = None, seed: int | None = None,
               question_mode: str = 'auto') -> None:
-    if template_version not in ('investigation-v4', 'investigation-v5', 'investigation-v6'):
+    if template_version not in ('investigation-v4', 'investigation-v5', 'investigation-v6', 'investigation-v7'):
         raise ValueError('Invalid investigation template version')
     if question_mode not in ('auto', 'explicit'):
         raise ValueError('Invalid question mode')
-    if question_mode == 'explicit' and template_version != 'investigation-v6':
-        raise ValueError('Explicit questions require investigation-v6')
-    if generation_profile is not None and template_version != 'investigation-v6':
-        raise ValueError('Generation profiles require investigation-v6')
+    if question_mode == 'explicit' and template_version not in ('investigation-v6', 'investigation-v7'):
+        raise ValueError('Explicit questions require investigation-v6 or investigation-v7')
+    if generation_profile is not None and template_version not in ('investigation-v6', 'investigation-v7'):
+        raise ValueError('Generation profiles require investigation-v6 or investigation-v7')
     profile = (investigation_profiles.resolve_profile(generation_profile).metadata()
                if generation_profile is not None else None)
     if seed is not None and (type(seed) is not int or not 0 <= seed <= 4294967295):
@@ -131,7 +131,7 @@ def main() -> None:
     parser.add_argument('--suite', choices=('development', 'fresh'), required=True)
     parser.add_argument('--fixture-dir', type=Path, default=None,
                         help='Frozen fixture directory (defaults to grounding_v2)')
-    parser.add_argument('--template-version', choices=('investigation-v4', 'investigation-v5', 'investigation-v6'),
+    parser.add_argument('--template-version', choices=('investigation-v4', 'investigation-v5', 'investigation-v6', 'investigation-v7'),
                         default='investigation-v4')
     parser.add_argument('--generation-profile', default=None)
     parser.add_argument('--seed', type=int, default=None)

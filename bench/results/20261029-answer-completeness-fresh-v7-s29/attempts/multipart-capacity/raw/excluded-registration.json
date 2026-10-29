@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-other-workspace",
+  "collection_id": "5e4cfb72-ffe8-4ac0-9c73-48fa0edc2d2e",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-answer-completeness-fresh-v7-s29/attempts/multipart-capacity/raw/excluded",
+  "source_sha256": "d844a8ef8dfb4ddec2c186ad5b1364d3db9e55953e8660d649d9a5e76a2737ad",
+  "scan": {
+    "collection_id": "5e4cfb72-ffe8-4ac0-9c73-48fa0edc2d2e",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-9ef0c9c3-b1fb-4b4f-a047-a2c04e0e29ce",
+  "object": "chat.completion",
+  "created": 1793299250,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What were the old capacity limits for the Elm service?\", \"What were the new capacity limits for the Elm service?\", \"What was the absolute increase in capacity limits for the Elm service?\", \"Who approved the increase in capacity limits for the Elm service?\", \"When did the increase in capacity limits for the Elm service take effect?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 121,
+    "completion_tokens": 70,
+    "total_tokens": 191
+  }
+}

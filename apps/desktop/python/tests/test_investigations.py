@@ -415,7 +415,8 @@ def test_template_selection_records_version_and_rejects_unknown_before_inference
     asyncio.run(run())
 
 
-def test_v6_planning_answers_correction_and_invalidation(tmp_path, monkeypatch):
+@pytest.mark.parametrize('version', ['investigation-v6', 'investigation-v7'])
+def test_question_planning_answers_correction_and_invalidation(tmp_path, monkeypatch, version):
     monkeypatch.setenv('POTLUCK_MEMORY_DB_PATH', str(tmp_path / 'db.sqlite'))
     monkeypatch.setattr(inv, 'get_settings', lambda: SimpleNamespace(
         privacy=SimpleNamespace(memory_enabled=True), memory=SimpleNamespace(enabled=True)))
@@ -430,7 +431,8 @@ def test_v6_planning_answers_correction_and_invalidation(tmp_path, monkeypatch):
             calls.append(payload)
             if 'questions' not in payload:
                 assert payload == {'issue': 'Who approved and what is the deadline?'}
-                data = {'questions': ['Who approved?', 'What is the deadline?']}
+                data = {'questions': (['Who approved?', 'What is the deadline?'] if version == 'investigation-v6'
+                                      else ['Who approved', 'what is the deadline?'])}
             else:
                 sid = payload['snippets'][0]['snippet_id']
                 data = {'Q1': {'status': 'unknown', 'text': 'Not recorded in the presented evidence.',
@@ -450,9 +452,10 @@ def test_v6_planning_answers_correction_and_invalidation(tmp_path, monkeypatch):
         await scan_collection('w', cid)
         scope = EvidenceScope('w', (cid,))
         item = await inv.create_investigation(scope, 'Who approved and what is the deadline?',
-                                              'release', 'model', template_version='investigation-v6', seed=17)
+                                              'release', 'model', template_version=version, seed=17)
         assert item['provenance']['question_origin'] == 'planned'
-        assert item['provenance']['planner_version'] == 'issue-only-v2'
+        assert item['provenance']['planner_version'] == ('issue-only-v2' if version == 'investigation-v6' else 'issue-spans-v1')
+        assert item['issue'] == 'Who approved and what is the deadline?'
         assert item['provenance']['generation_settings']['seed'] == 17
         assert len(calls) == 2 and 'evidence' not in calls[0] and 'snippets' not in calls[0]
         assert [q['id'] for q in item['brief']['questions']] == ['Q1', 'Q2']
@@ -474,10 +477,63 @@ def test_v6_planning_answers_correction_and_invalidation(tmp_path, monkeypatch):
         corrected['answers'][0].pop('source_excerpts')
         reviewed = await inv.review_investigation(scope, item['id'], 'correct', 'owner', 'checked', corrected)
         assert reviewed['review']['corrected_brief']['answers'][0]['source_excerpts'] == answer['source_excerpts']
+        from potluck_local.routers.investigations import export
+        handoff = await export(item['id'], 'w', [cid])
+        assert '## Questions and answers' in handoff['markdown']
+        assert 'Source excerpt' in handoff['markdown']
+        outcome = await inv.record_outcome(scope, item['id'], 'owner', 'unresolved', 'Still open')
+        assert outcome['outcome']['result'] == 'unresolved'
         document.unlink()
         await scan_collection('w', cid)
         with pytest.raises(LookupError):
             await inv.get_investigation(scope, item['id'])
+    asyncio.run(run())
+
+
+def test_v7_invalid_plan_fails_without_fallback_and_explicit_questions_work(tmp_path, monkeypatch):
+    monkeypatch.setenv('POTLUCK_MEMORY_DB_PATH', str(tmp_path / 'db.sqlite'))
+    monkeypatch.setattr(inv, 'get_settings', lambda: SimpleNamespace(
+        privacy=SimpleNamespace(memory_enabled=True), memory=SimpleNamespace(enabled=True)))
+    calls = []
+
+    class Runtime:
+        def current_model_id(self): return 'model'
+        def current_model_sha256(self): return 'a' * 64
+        async def chat(self, messages, **kwargs):
+            payload = json.loads(messages[1]['content'])
+            calls.append(payload)
+            if 'questions' not in payload:
+                data = {'questions': ['What was restored?']}
+            else:
+                data = {'Q1': {'status': 'unknown', 'text': 'Not established.', 'snippet_ids': []}}
+            return {'choices': [{'message': {'content': json.dumps(data)}}]}
+
+    monkeypatch.setattr(inv, 'get_runtime', Runtime)
+
+    async def run():
+        await init_memory_db()
+        folder = tmp_path / 'docs'
+        folder.mkdir()
+        (folder / 'release.md').write_text('Release notes.')
+        cid = await register_collection('w', 'docs', folder)
+        await scan_collection('w', cid)
+        scope = EvidenceScope('w', (cid,))
+        with pytest.raises(ValueError, match='Invalid model format'):
+            await inv.create_investigation(scope, 'what restored service?', 'release', 'model',
+                                           template_version='investigation-v7')
+        assert len(calls) == 1
+        item = await inv.create_investigation(scope, 'what restored service?', 'release', 'model',
+                                              template_version='investigation-v7',
+                                              questions=['What was restored?'])
+        assert len(calls) == 2
+        assert item['provenance']['question_origin'] == 'explicit'
+        assert item['brief']['questions'][0]['text'] == 'What was restored?'
+        secret = 'sk-proj-' + 'Synthetic09_' * 4
+        with pytest.raises(ValueError, match='Invalid model format'):
+            await inv.create_investigation(scope, f'what restored service? {secret}',
+                                           'release', 'model', template_version='investigation-v7')
+        assert secret not in calls[-1]['issue']
+        assert set(calls[-1]) == {'issue'}
     asyncio.run(run())
 
 

@@ -1,0 +1,2 @@
+# Alder timeout records
+The old Alder timeout was 10 seconds. The release note says the current timeout is 16 seconds; the operations sheet says the current timeout is 24 seconds. Neither record establishes which current value is authoritative.

@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "15d76826-81a2-4333-adae-077ee9a46dfd"
+  ],
+  "query": "How much did Cedar queue drain time change after maintenance, and did the index rebuild cause the change?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "15d76826-81a2-4333-adae-077ee9a46dfd"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "15d76826-81a2-4333-adae-077ee9a46dfd",
+        "document_id": "f9c3b09c-fc2b-5fac-90d6-08e75074d5ad",
+        "revision_id": "5701cfec-ad80-5234-9137-c9f24ae4d621",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T18:35:16.470930+00:00",
+        "chunk_id": "7b115d97-46bd-52b8-b6fd-5d63a60f5179",
+        "anchor": "cedar-queue-drain-time",
+        "heading": "Cedar queue drain time",
+        "content": "Cedar queue drain time was 94 seconds before maintenance and 61 seconds afterward. The index was rebuilt and the worker count changed during the window. The record does not determine which change caused the observed difference.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T18:35:16.471184+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:7b115d97-46bd-52b8-b6fd-5d63a60f5179:5701cfec-ad80-5234-9137-c9f24ae4d621"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

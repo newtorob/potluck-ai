@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-a77f0920-4df1-41f1-bcb3-7eb9e0aec0d5",
+  "object": "chat.completion",
+  "created": 1793299356,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"Cedar queue drain time decreased by 33 seconds after maintenance.\", \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S3\"], \"text\": \"The record does not determine which change caused the observed difference.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 529,
+    "completion_tokens": 73,
+    "total_tokens": 602
+  }
+}

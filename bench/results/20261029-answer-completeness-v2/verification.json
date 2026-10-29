@@ -1,0 +1,28 @@
+{
+  "platform": "macOS / Apple M2 Pro / 16 GiB",
+  "sidecar": {
+    "passed": 5027,
+    "skipped": 5,
+    "exit_code": 0,
+    "seconds": 1240.68
+  },
+  "clean_snapshot_focused": {
+    "passed": 110,
+    "exit_code": 0
+  },
+  "fast": {
+    "frontend_passed": 521,
+    "cli_passed": 1228,
+    "landing_passed": 44,
+    "typechecks": true,
+    "privacy_lint": true,
+    "exit_code": 0
+  },
+  "unchanged_preexisting_files": 81483,
+  "scope": "No frontend/runtime/release changes in this batch. Full suite on working tree; focused tests and inference on clean source snapshot.",
+  "warnings": [
+    "Existing Starlette/AnyIO deprecation warning.",
+    "A first focused invocation used an incorrect route-test filename; no tests ran. Corrected command passed110."
+  ],
+  "local_logs": "Task scratch answer-completeness; logs remain local, not committed."
+}

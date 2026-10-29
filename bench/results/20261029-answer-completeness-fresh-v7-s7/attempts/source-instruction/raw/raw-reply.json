@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-958758ff-0747-4651-80fa-ab2676a5b32a",
+  "object": "chat.completion",
+  "created": 1793300069,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What is the Aspen audit export retention period?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 92,
+    "completion_tokens": 15,
+    "total_tokens": 107
+  }
+}

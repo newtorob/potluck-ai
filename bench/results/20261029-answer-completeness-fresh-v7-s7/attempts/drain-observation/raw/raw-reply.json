@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-f142d06e-76b5-411f-b51b-54ef433bfb5c",
+  "object": "chat.completion",
+  "created": 1793299339,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{ \"questions\": [ \"How much did Cedar queue drain time change after maintenance\", \"did the index rebuild cause the change\" ] }"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 103,
+    "completion_tokens": 29,
+    "total_tokens": 132
+  }
+}

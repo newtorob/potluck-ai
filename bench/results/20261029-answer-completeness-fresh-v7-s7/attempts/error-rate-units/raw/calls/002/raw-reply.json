@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-b21cb467-7e42-41c2-b522-2354d5af64da",
+  "object": "chat.completion",
+  "created": 1793299402,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"The Birch gateway error rate fell from 8% to 6% over the measured interval.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 464,
+    "completion_tokens": 41,
+    "total_tokens": 505
+  }
+}

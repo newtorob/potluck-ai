@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-da9d2e05-fc6f-4c77-a771-3d342816b658",
+  "object": "chat.completion",
+  "created": 1793299785,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"Seven Spruce jobs failed yesterday.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 460,
+    "completion_tokens": 32,
+    "total_tokens": 492
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "observed_during_frozen_run": "v7 seed7 error-rate-units omits both requested calculations while v6 seed7 explicitly supplies them.",
+  "promotion_gate": "Not met: all eight candidate cases at both seeds were required. Finish every planned attempt, retain failures, and do not tune candidate or rubric.",
+  "next_design_hypothesis": "Represent distinct requested operations explicitly and verify calculations from cited operands; exact spans alone can keep multiple operations in one answer. This is a hypothesis to evaluate, not a demonstrated fix."
+}

@@ -1,0 +1,72 @@
+{
+  "checks": [
+    "All arms match the frozen clean Python snapshot, fixtures, rubric, model and CPU settings",
+    "Planner receives only the original issue; all generation calls are captured",
+    "Selected source excerpts exactly match the presented snippets and allowed source text",
+    "Saved v7 plans contain ordered distinct nonoverlapping original-issue spans",
+    "Paired successful cases use identical issue, snippet catalog and generation settings",
+    "Excluded canary does not appear in requests, retrieval, plan, answers or visible evidence",
+    "These checks establish artifact integrity, not semantic quality or completeness"
+  ],
+  "arms": {
+    "v6-s7": {
+      "attempts": 8,
+      "saved": 8,
+      "exact_excerpts_checked": 19,
+      "exact_issue_plans_checked": 0,
+      "failures": [],
+      "elapsed_ms": [
+        34666,
+        56292,
+        23725,
+        20485,
+        34663,
+        134269,
+        29761,
+        70109
+      ]
+    },
+    "v7-s7": {
+      "attempts": 8,
+      "saved": 7,
+      "exact_excerpts_checked": 14,
+      "exact_issue_plans_checked": 7,
+      "failures": [
+        {
+          "case_id": "multipart-capacity",
+          "error": {
+            "type": "ValueError",
+            "message": "Invalid model format"
+          }
+        }
+      ],
+      "elapsed_ms": [
+        50028,
+        103534,
+        235954,
+        120083,
+        30622,
+        189686,
+        16229
+      ]
+    },
+    "v7-s29": {
+      "attempts": 8,
+      "saved": 8,
+      "exact_excerpts_checked": 20,
+      "exact_issue_plans_checked": 8,
+      "failures": [],
+      "elapsed_ms": [
+        57336,
+        30162,
+        15777,
+        14879,
+        24115,
+        23073,
+        15327,
+        25538
+      ]
+    }
+  },
+  "paired_answer_inputs_checked": 7
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-6ea0e393-5e08-4c35-966a-4bb74ffc10f4",
+  "object": "chat.completion",
+  "created": 1793300292,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{ \"questions\": [ \"For the Elm service, what were the old and new capacity limits, what was the absolute increase, who approved the increase, and when did it take effect?\" ] }"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 115,
+    "completion_tokens": 41,
+    "total_tokens": 156
+  }
+}

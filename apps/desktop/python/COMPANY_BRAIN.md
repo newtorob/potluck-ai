@@ -177,16 +177,25 @@ generated-answer quality. See the evaluation README for the command and limits.
 
 The separate grounding diagnostic accepts an explicit frozen fixture directory and
 an investigation template version. Its default is `investigation-v4`, which is
-also the production default. `investigation-v5` is diagnostic-only and cannot be
-selected through the investigation API or UI. Running a diagnostic does not change
+also the production default. `investigation-v5` and `investigation-v7` are
+diagnostic-only and cannot be selected through the investigation API or UI.
+The opt-in answer preview continues to use `investigation-v6`. The v7 candidate
+uses exact issue spans for question planning and explicit guidance for derived
+answers. It was not promoted after the answer-completeness comparison: arithmetic
+omissions remained, and harmless punctuation changes could invalidate a plan.
+Exact-span planning cannot guarantee coverage of every requested part, and
+calculations remain model-generated and require independent checking. See
+`bench/results/20261029-answer-completeness-v2/` for the frozen runs and assessments.
+Running a diagnostic does not change
 or download a model. The v3 comparison fixtures at
 `apps/desktop/python/evals/company_brain/model_comparison_v3/` and results at
 `bench/results/20261029-model-prompt-comparison-v3/` have been consumed; they are
 not a fresh holdout. The v1 and v2 raw artifacts remain unchanged.
 
-Planned, not implemented: represent coverage for each question with cited support
-or an explicit unknown, then validate on fresh cases and obtain actual owner review.
-Neither the diagnostic nor agent assessment establishes owner acceptance.
+The question-answer preview represents each planned question with cited support,
+an unknown or conflicting evidence. Further improvements require new frozen
+evaluation and actual owner review. Neither the diagnostic nor agent assessment
+establishes owner acceptance.
 
 ## Saved investigations in the desktop app
 

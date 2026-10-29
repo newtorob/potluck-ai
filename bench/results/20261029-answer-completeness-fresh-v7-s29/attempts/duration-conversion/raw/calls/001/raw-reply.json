@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-274ac04f-58e8-4531-a066-afef277063b6",
+  "object": "chat.completion",
+  "created": 1793300199,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"How much did the Maple backup duration increase, in seconds?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 95,
+    "completion_tokens": 18,
+    "total_tokens": 113
+  }
+}

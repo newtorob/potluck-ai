@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-265defe0-08b8-492a-8e17-0d78e6c311be",
+  "object": "chat.completion",
+  "created": 1793298958,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"The percentage point decrease in the error rate for the Birch gateway was 2 percentage points.\", \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S1\"], \"text\": \"The relative percentage decrease in the error rate for the Birch gateway was 25%.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 410,
+    "completion_tokens": 80,
+    "total_tokens": 490
+  }
+}

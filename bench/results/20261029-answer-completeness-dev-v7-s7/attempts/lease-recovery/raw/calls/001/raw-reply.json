@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-e0e83bac-e122-4523-9a99-6081a14be27c",
+  "object": "chat.completion",
+  "created": 1793298690,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What restored lease processing\", \"was the message TTL changed\", \"who handled recovery\", \"and is the cause established?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 104,
+    "completion_tokens": 30,
+    "total_tokens": 134
+  }
+}

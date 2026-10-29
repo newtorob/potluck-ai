@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-26ef9f4d-048e-45a9-84e3-5fb38c312ccc",
+  "object": "chat.completion",
+  "created": 1793299849,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What is the current Alder timeout\", \"and how much did it increase from the old value?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 102,
+    "completion_tokens": 26,
+    "total_tokens": 128
+  }
+}

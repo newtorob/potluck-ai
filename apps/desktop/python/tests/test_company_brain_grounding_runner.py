@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import shutil
+import sys
 
 import pytest
 
@@ -228,7 +229,8 @@ def _fixture_with_questions(tmp_path, questions):
     return fixtures
 
 
-def test_v6_options_and_explicit_questions_are_recorded_and_forwarded(tmp_path, monkeypatch):
+@pytest.mark.parametrize('version', ['investigation-v6', 'investigation-v7'])
+def test_answer_options_and_explicit_questions_are_recorded_and_forwarded(tmp_path, monkeypatch, version):
     fixtures = _fixture_with_questions(tmp_path, ['What happened?', 'Who owns it?'])
     model = tmp_path / 'model.gguf'
     model.write_bytes(b'fake')
@@ -242,8 +244,8 @@ def test_v6_options_and_explicit_questions_are_recorded_and_forwarded(tmp_path, 
     monkeypatch.setattr(runner.base, 'attempt', attempt)
     out = tmp_path / 'run'
     asyncio.run(runner.run(out, 'development', model, sha, 8192, 8, fixtures,
-        'investigation-v6', generation_profile='qwen3-non-thinking', seed=0, question_mode='explicit'))
-    assert len(calls) == 3 and all(call == {'template_version': 'investigation-v6',
+        version, generation_profile='qwen3-non-thinking', seed=0, question_mode='explicit'))
+    assert len(calls) == 3 and all(call == {'template_version': version,
         'generation_profile': 'qwen3-non-thinking', 'seed': 0,
         'questions': ['What happened?', 'Who owns it?']} for call in calls)
     metadata = json.loads((out / 'run-metadata.json').read_text())
@@ -254,7 +256,8 @@ def test_v6_options_and_explicit_questions_are_recorded_and_forwarded(tmp_path, 
 
 
 @pytest.mark.parametrize('questions', [None, [], [''], ['Same', ' Same '], ['a' * 501], ['x'] * 9, [42]])
-def test_invalid_explicit_questions_fail_before_load(tmp_path, monkeypatch, questions):
+@pytest.mark.parametrize('version', ['investigation-v6', 'investigation-v7'])
+def test_invalid_explicit_questions_fail_before_load(tmp_path, monkeypatch, questions, version):
     fixtures = _fixture_with_questions(tmp_path, questions)
     model = tmp_path / 'model.gguf'
     model.write_bytes(b'fake')
@@ -263,7 +266,7 @@ def test_invalid_explicit_questions_fail_before_load(tmp_path, monkeypatch, ques
     monkeypatch.setattr(runner, 'get_runtime', lambda: runtime)
     with pytest.raises(ValueError, match='fixture questions'):
         asyncio.run(runner.run(tmp_path / 'run', 'development', model, sha, 8192, 8,
-            fixtures, 'investigation-v6', question_mode='explicit'))
+            fixtures, version, question_mode='explicit'))
     assert runtime.loads == 0 and not (tmp_path / 'run').exists()
 
 
@@ -280,7 +283,8 @@ def test_invalid_options_fail_before_loading(tmp_path, monkeypatch, options):
     assert runtime.loads == 0 and not (tmp_path / 'run').exists()
 
 
-def test_auto_question_mode_never_supplies_fixture_questions(tmp_path, monkeypatch):
+@pytest.mark.parametrize('version', ['investigation-v6', 'investigation-v7'])
+def test_auto_question_mode_never_supplies_fixture_questions(tmp_path, monkeypatch, version):
     fixtures = _fixture_with_questions(tmp_path, ['Explicit fixture question'])
     model = tmp_path / 'model.gguf'
     model.write_bytes(b'fake')
@@ -293,5 +297,32 @@ def test_auto_question_mode_never_supplies_fixture_questions(tmp_path, monkeypat
         return {}
     monkeypatch.setattr(runner.base, 'attempt', attempt)
     asyncio.run(runner.run(tmp_path / 'run', 'development', model, sha, 8192, 8,
-                           fixtures, 'investigation-v6'))
-    assert calls and all(call == {'template_version': 'investigation-v6'} for call in calls)
+                           fixtures, version))
+    assert calls and all(call == {'template_version': version} for call in calls)
+
+
+def test_cli_accepts_v7_and_forwards_explicit_settings(tmp_path, monkeypatch):
+    observed = {}
+    async def fake_run(*args, **kwargs):
+        observed.update(args=args, kwargs=kwargs)
+    monkeypatch.setattr(runner, 'run', fake_run)
+    monkeypatch.setattr(sys, 'argv', ['runner', '--suite', 'fresh',
+        '--fixture-dir', str(tmp_path / 'fixtures'), '--template-version', 'investigation-v7',
+        '--generation-profile', 'qwen3-non-thinking', '--seed', '0', '--question-mode', 'explicit',
+        '--model-path', str(tmp_path / 'model'), '--model-sha256', 'abc',
+        '--context-size', '8192', '--threads', '8', '--output-dir', str(tmp_path / 'out')])
+    runner.main()
+    assert observed['args'] == (tmp_path / 'out', 'fresh', tmp_path / 'model', 'abc',
+                                8192, 8, tmp_path / 'fixtures', 'investigation-v7')
+    assert observed['kwargs'] == {'generation_profile': 'qwen3-non-thinking',
+                                  'seed': 0, 'question_mode': 'explicit'}
+
+
+def test_v7_unknown_profile_fails_before_loading_or_output(tmp_path, monkeypatch):
+    runtime = FakeRuntime('unused')
+    monkeypatch.setattr(runner, 'get_runtime', lambda: runtime)
+    with pytest.raises(ValueError):
+        asyncio.run(runner.run(tmp_path / 'out', 'development', tmp_path / 'model', 'unused',
+                               8192, 8, template_version='investigation-v7',
+                               generation_profile='unknown'))
+    assert runtime.loads == 0 and not (tmp_path / 'out').exists()

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-60b375b9-bde3-4153-b737-8dfb9bd9ba90",
+  "object": "chat.completion",
+  "created": 1793298698,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S2\"], \"text\": \"Restarting the lease dispatcher at 13:27 UTC restored processing.\", \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S3\"], \"text\": \"The message TTL was not changed.\", \"status\": \"supported\"}, \"Q3\": {\"snippet_ids\": [\"S4\"], \"text\": \"The recovery note does not identify the operator.\", \"status\": \"supported\"}, \"Q4\": {\"snippet_ids\": [\"S5\"], \"text\": \"The cause has not been established.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 590,
+    "completion_tokens": 127,
+    "total_tokens": 717
+  }
+}

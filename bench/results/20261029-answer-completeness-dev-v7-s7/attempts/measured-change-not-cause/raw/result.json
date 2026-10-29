@@ -1,0 +1,152 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "5ea1fe0c-6865-4a45-a8f6-a27d33ab90dc",
+    "workspace": "synthetic-eval",
+    "issue": "How much did median latency change, and does this record establish that clearing the cache caused that change?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "How much did median latency change"
+        },
+        {
+          "id": "Q2",
+          "text": "does this record establish that clearing the cache caused that change?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "supported",
+          "text": "Median latency changed by -60 ms (from 180 ms to 120 ms).",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:8eac54d3-07b0-5ea5-aeb1-b936ddc984e9:ae151b86-4d9c-527c-96f4-f713081812d4",
+              "quote": "Median latency was 180 ms before the maintenance window and 120 ms afterward. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "supported",
+          "text": "This record does not establish that clearing the cache caused the change.",
+          "snippet_ids": [
+            "S4"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:8eac54d3-07b0-5ea5-aeb1-b936ddc984e9:ae151b86-4d9c-527c-96f4-f713081812d4",
+              "quote": "This observation does not establish which intervention caused the change."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "22e9d52d-2ba0-4b62-9535-4cd366c125b0",
+        "document_id": "3ce99aa7-8a24-5710-a225-d28a8d12a656",
+        "revision_id": "ae151b86-4d9c-527c-96f4-f713081812d4",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T18:33:31.475006+00:00",
+        "chunk_id": "8eac54d3-07b0-5ea5-aeb1-b936ddc984e9",
+        "anchor": "latency-observation",
+        "heading": "Latency observation",
+        "content": "The operator cleared the cache. Median latency was 180 ms before the maintenance window and 120 ms afterward. Queue concurrency was also changed during the same window. This observation does not establish which intervention caused the change.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T18:33:31.475176+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:8eac54d3-07b0-5ea5-aeb1-b936ddc984e9:ae151b86-4d9c-527c-96f4-f713081812d4",
+        "presented_content": "The operator cleared the cache. Median latency was 180 ms before the maintenance window and 120 ms afterward. Queue concurrency was also changed during the same window. This observation does not establish which intervention caused the change."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T18:33:56.843594+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v7",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "How much did median latency change, and does this record establish that clearing the cache caused that change?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 25364,
+      "created_at": "2026-10-29T18:33:56.843594+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:8eac54d3-07b0-5ea5-aeb1-b936ddc984e9:ae151b86-4d9c-527c-96f4-f713081812d4",
+          "quote": "The operator cleared the cache. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:8eac54d3-07b0-5ea5-aeb1-b936ddc984e9:ae151b86-4d9c-527c-96f4-f713081812d4",
+          "quote": "Median latency was 180 ms before the maintenance window and 120 ms afterward. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:8eac54d3-07b0-5ea5-aeb1-b936ddc984e9:ae151b86-4d9c-527c-96f4-f713081812d4",
+          "quote": "Queue concurrency was also changed during the same window. "
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:8eac54d3-07b0-5ea5-aeb1-b936ddc984e9:ae151b86-4d9c-527c-96f4-f713081812d4",
+          "quote": "This observation does not establish which intervention caused the change."
+        }
+      ],
+      "planner_version": "issue-spans-v1",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "22e9d52d-2ba0-4b62-9535-4cd366c125b0"
+    ]
+  },
+  "latency_seconds": 25.37537662498653,
+  "setup_seconds": 0.018179500475525856,
+  "attempt_total_seconds": 25.393556125462055
+}

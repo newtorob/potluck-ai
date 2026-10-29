@@ -47,6 +47,33 @@ def decode_plan(raw: Any) -> list[dict[str, str]]:
         raise ValueError('Invalid model format') from None
 
 
+def decode_span_plan(raw: Any, issue: str) -> list[dict[str, str]]:
+    """Validate ordered issue substrings; this does not establish complete coverage."""
+    try:
+        if not isinstance(raw, str) or len(raw) > 10000:
+            raise ValueError
+        data = json.loads(raw)
+        if not isinstance(data, dict) or set(data) != {'questions'}:
+            raise ValueError
+        spans = data['questions']
+        if not isinstance(spans, list) or not 1 <= len(spans) <= 8:
+            raise ValueError
+        seen: set[str] = set()
+        cursor = 0
+        for span in spans:
+            if (not isinstance(span, str) or not span.strip() or len(span) > 500
+                    or span in seen):
+                raise ValueError
+            start = issue.find(span, cursor)
+            if start < 0:
+                raise ValueError
+            seen.add(span)
+            cursor = start + len(span)
+        return [{'id': f'Q{i}', 'text': span} for i, span in enumerate(spans, 1)]
+    except (ValueError, TypeError):
+        raise ValueError('Invalid model format') from None
+
+
 def snippets_from_evidence(evidence: list[dict[str, Any]]) -> list[dict[str, str]]:
     snippets: list[dict[str, str]] = []
     sources: dict[str, str] = {}

@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "7a595923-e2d0-478a-9b5f-ce770e07aa79",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-answer-completeness-fresh-v7-s7/attempts/multipart-capacity/raw/allowed",
+  "source_sha256": "ebc7426e602e380665bddd319ea4206b5f35e2a414430a03207bd50b4c5d0b27",
+  "scan": {
+    "collection_id": "7a595923-e2d0-478a-9b5f-ce770e07aa79",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

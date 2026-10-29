@@ -1,0 +1,153 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "b8d5ae0d-4ce9-4753-b2d6-c03b939bce6a",
+    "workspace": "synthetic-eval",
+    "issue": "What does the Willow recovery procedure require, and which steps are recorded as performed during yesterday’s recovery?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What does the Willow recovery procedure require?"
+        },
+        {
+          "id": "Q2",
+          "text": "Which steps are recorded as performed during yesterday’s recovery?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "supported",
+          "text": "The Willow recovery procedure requires stopping the worker, replaying the journal, and verifying the queue is empty.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:56b2a4dc-7f65-583a-aa89-45cbd6cc0bc7:039a3625-dc12-57e3-845f-7bd7842bd671",
+              "quote": "Recovery procedure: stop the worker, replay the journal, then verify the queue is empty. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "supported",
+          "text": "The steps recorded as performed during yesterday’s recovery are stopping the worker and replaying the journal. The verification of the queue being empty is not recorded.",
+          "snippet_ids": [
+            "S2",
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:56b2a4dc-7f65-583a-aa89-45cbd6cc0bc7:039a3625-dc12-57e3-845f-7bd7842bd671",
+              "quote": "Yesterday’s recovery log records that the worker was stopped and the journal was replayed. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:56b2a4dc-7f65-583a-aa89-45cbd6cc0bc7:039a3625-dc12-57e3-845f-7bd7842bd671",
+              "quote": "It does not record a queue-empty verification."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "18f16ba1-6d1e-470c-9bf4-78bf15728eed",
+        "document_id": "bd964acb-da2a-560d-a590-b0492c449263",
+        "revision_id": "039a3625-dc12-57e3-845f-7bd7842bd671",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T18:38:06.467161+00:00",
+        "chunk_id": "56b2a4dc-7f65-583a-aa89-45cbd6cc0bc7",
+        "anchor": "willow-recovery",
+        "heading": "Willow recovery",
+        "content": "Recovery procedure: stop the worker, replay the journal, then verify the queue is empty. Yesterday’s recovery log records that the worker was stopped and the journal was replayed. It does not record a queue-empty verification.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T18:38:06.468176+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:56b2a4dc-7f65-583a-aa89-45cbd6cc0bc7:039a3625-dc12-57e3-845f-7bd7842bd671",
+        "presented_content": "Recovery procedure: stop the worker, replay the journal, then verify the queue is empty. Yesterday’s recovery log records that the worker was stopped and the journal was replayed. It does not record a queue-empty verification."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T18:40:20.745073+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What does the Willow recovery procedure require, and which steps are recorded as performed during yesterday’s recovery?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 134269,
+      "created_at": "2026-10-29T18:40:20.745073+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:56b2a4dc-7f65-583a-aa89-45cbd6cc0bc7:039a3625-dc12-57e3-845f-7bd7842bd671",
+          "quote": "Recovery procedure: stop the worker, replay the journal, then verify the queue is empty. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:56b2a4dc-7f65-583a-aa89-45cbd6cc0bc7:039a3625-dc12-57e3-845f-7bd7842bd671",
+          "quote": "Yesterday’s recovery log records that the worker was stopped and the journal was replayed. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:56b2a4dc-7f65-583a-aa89-45cbd6cc0bc7:039a3625-dc12-57e3-845f-7bd7842bd671",
+          "quote": "It does not record a queue-empty verification."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "18f16ba1-6d1e-470c-9bf4-78bf15728eed"
+    ]
+  },
+  "latency_seconds": 134.2816084176302,
+  "setup_seconds": 0.021607124246656895,
+  "attempt_total_seconds": 134.30321554187685
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-c34f55a5-287e-439b-a252-6f6a129dfb2d",
+  "object": "chat.completion",
+  "created": 1793299855,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S2\", \"S3\"], \"text\": \"The current Alder timeout is either 16 seconds or 24 seconds, but neither record establishes which value is authoritative.\", \"status\": \"unknown\"}, \"Q2\": {\"snippet_ids\": [\"S1\", \"S2\", \"S3\"], \"text\": \"The increase in Alder timeout cannot be determined because the current value is unknown and conflicting records exist.\", \"status\": \"unknown\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 530,
+    "completion_tokens": 102,
+    "total_tokens": 632
+  }
+}

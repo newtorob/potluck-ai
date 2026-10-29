@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-86cec57c-bb42-422d-b9f5-0716bb016681",
+  "object": "chat.completion",
+  "created": 1793300202,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"The Maple backup duration increased by 165 - 120 = 45 seconds.\" , \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 450,
+    "completion_tokens": 47,
+    "total_tokens": 497
+  }
+}

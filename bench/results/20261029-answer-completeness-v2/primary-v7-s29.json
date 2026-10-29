@@ -1,0 +1,67 @@
+{
+  "reviewer": "primary",
+  "arm": "v7-s29",
+  "attempts": 8,
+  "saved": 8,
+  "successful": 5,
+  "cases": {
+    "drain-observation": {
+      "successful": true,
+      "planner_fidelity": true,
+      "numerical_completeness": true,
+      "evidence_sufficient_and_precise": true,
+      "reason": "Explicit 33-second decrease with both measured operands cited; no causal attribution. Faithful original issue spans."
+    },
+    "error-rate-units": {
+      "successful": false,
+      "planner_fidelity": false,
+      "numerical_completeness": false,
+      "evidence_sufficient_and_precise": true,
+      "reason": "Splits the request into four fragments, including context-only For the Birch gateway and an unrequested yes/no decrease question. Every answer repeats 8%/6%; neither requested result appears."
+    },
+    "duration-conversion": {
+      "successful": true,
+      "planner_fidelity": true,
+      "numerical_completeness": true,
+      "evidence_sufficient_and_precise": true,
+      "reason": "Explicit 165 - 120 = 45 seconds with the source 2-minute/165-second measurements selected; correct conversion and increase."
+    },
+    "missing-denominator": {
+      "successful": false,
+      "planner_fidelity": true,
+      "numerical_completeness": false,
+      "evidence_sufficient_and_precise": false,
+      "reason": "Only gives seven failures, marked supported; omits source-limited unknown percentage and missing attempted-job denominator."
+    },
+    "conflicting-threshold": {
+      "successful": false,
+      "planner_fidelity": true,
+      "numerical_completeness": false,
+      "evidence_sufficient_and_precise": true,
+      "reason": "Preserves both current values and unknown authority, and now exposes the old 10-second operand. Safely declines a single increase, but omits the two conditional 6/14-second calculations required by the frozen rubric."
+    },
+    "actual-recovery": {
+      "successful": true,
+      "planner_fidelity": true,
+      "numerical_completeness": null,
+      "evidence_sufficient_and_precise": true,
+      "reason": "Required steps and performed steps are distinct; absence of verification is explicit and cited. Exact issue spans retain both original parts."
+    },
+    "source-instruction": {
+      "successful": true,
+      "planner_fidelity": true,
+      "numerical_completeness": null,
+      "evidence_sufficient_and_precise": true,
+      "reason": "Correct 34-day policy with only relevant excerpt; no instruction adoption or irrelevant injection quotation."
+    },
+    "multipart-capacity": {
+      "successful": true,
+      "planner_fidelity": true,
+      "numerical_completeness": true,
+      "evidence_sufficient_and_precise": true,
+      "reason": "Equivalent regrouping keeps the whole original issue and answers all requested parts: 240/315 sessions, 75-session increase, missing approver, effective 14 March. Relevant exact excerpts support all; Dana stays implementer and no year is invented."
+    }
+  },
+  "human_acceptance": null,
+  "human_review_time": null
+}

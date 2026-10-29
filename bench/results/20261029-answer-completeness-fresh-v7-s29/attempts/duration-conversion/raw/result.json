@@ -1,0 +1,118 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "1f842eb1-ef57-4ce6-9851-ebe1278315e2",
+    "workspace": "synthetic-eval",
+    "issue": "How much did the Maple backup duration increase, in seconds?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "How much did the Maple backup duration increase, in seconds?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "supported",
+          "text": "The Maple backup duration increased by 165 - 120 = 45 seconds.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:01d4f725-07a9-5431-90f7-811ff3b12c01:dcc6541d-d8a8-5b9b-a16b-f802cd2b7376",
+              "quote": "The Maple backup took 2 minutes before the update and 165 seconds after it."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "6db28d28-e8e2-4296-ae7f-2b817d8a1dcb",
+        "document_id": "218d9bdc-ccba-5d47-98d6-6ee8713e2507",
+        "revision_id": "dcc6541d-d8a8-5b9b-a16b-f802cd2b7376",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T18:56:39.284366+00:00",
+        "chunk_id": "01d4f725-07a9-5431-90f7-811ff3b12c01",
+        "anchor": "maple-backup-duration",
+        "heading": "Maple backup duration",
+        "content": "The Maple backup took 2 minutes before the update and 165 seconds after it.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T18:56:39.284479+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:01d4f725-07a9-5431-90f7-811ff3b12c01:dcc6541d-d8a8-5b9b-a16b-f802cd2b7376",
+        "presented_content": "The Maple backup took 2 minutes before the update and 165 seconds after it."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T18:56:55.066526+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v7",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "How much did the Maple backup duration increase, in seconds?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 29,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 15777,
+      "created_at": "2026-10-29T18:56:55.066526+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:01d4f725-07a9-5431-90f7-811ff3b12c01:dcc6541d-d8a8-5b9b-a16b-f802cd2b7376",
+          "quote": "The Maple backup took 2 minutes before the update and 165 seconds after it."
+        }
+      ],
+      "planner_version": "issue-spans-v1",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 29
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "6db28d28-e8e2-4296-ae7f-2b817d8a1dcb"
+    ]
+  },
+  "latency_seconds": 15.785903749987483,
+  "setup_seconds": 0.015904583036899567,
+  "attempt_total_seconds": 15.801808333024383
+}

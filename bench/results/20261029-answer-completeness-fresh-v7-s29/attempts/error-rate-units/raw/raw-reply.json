@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-f2084965-3bb4-4912-8664-b7516367a1ec",
+  "object": "chat.completion",
+  "created": 1793300169,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{ \"questions\": [ \"For the Birch gateway\", \"how many percentage points\", \"and what relative percentage\", \"did the error rate decrease?\" ] }"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 102,
+    "completion_tokens": 33,
+    "total_tokens": 135
+  }
+}

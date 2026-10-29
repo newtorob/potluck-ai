@@ -1,0 +1,9 @@
+{
+  "platform": "macOS / Apple M2 Pro / 16 GiB",
+  "inference_source": "Clean archive of 407099b with only the scoped candidate implementation overlaid; source hashes frozen before fresh inference.",
+  "concurrent_work": "The repository sidecar regression suite ran concurrently with part of the fresh matrix. Timings are diagnostics, not controlled speed comparisons.",
+  "model_downloads": false,
+  "remote_inference": false,
+  "automatic_repairs": false,
+  "reruns_selected_after_fresh_inspection": false
+}
