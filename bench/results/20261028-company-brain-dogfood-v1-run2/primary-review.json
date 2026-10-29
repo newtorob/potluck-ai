@@ -1,0 +1,18 @@
+[
+  {
+    "case_id": "CB-01",
+    "original_preserved": true,
+    "review_decision": "correct",
+    "outcome": "inconclusive",
+    "human_time_to_accepted_seconds": null,
+    "reviewed_artifact_sha256": "011c3002d17ec29a001a05296b71869d1907b2a95ce3fa2c95438cc1e34024de"
+  },
+  {
+    "case_id": "CB-02",
+    "original_preserved": true,
+    "review_decision": "correct",
+    "outcome": "inconclusive",
+    "human_time_to_accepted_seconds": null,
+    "reviewed_artifact_sha256": "f7fb42608cfd199517b718943e2714f21558ce5769e212e9323fa3e5f4c6d1ba"
+  }
+]

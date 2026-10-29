@@ -1,4 +1,4 @@
-"""Owner-reviewed evaluation references and deterministic comparison of human labels.
+"""Owner-reviewed evaluation references and deterministic comparison of explicit labels.
 
 No source text is copied to a new store and no model is invoked by this module.
 """
@@ -75,9 +75,17 @@ def _summarize(case_ids: set[str], run: dict[str, Any]) -> dict[str, Any]:
     }
     durations: dict[str, list[float]] = {'latency_seconds': [], 'time_to_accepted_seconds': []}
     incomplete = []
+    unsuccessful = []
     for case_id, output in outputs.items():
         if not isinstance(output, dict):
             raise ValueError('Invalid output')
+        status = output.get('status')
+        if status not in (None, 'success', 'error'):
+            raise ValueError('Invalid output status')
+        if status == 'success' and any(output.get(key) is not None for key in ('error', 'error_type')):
+            raise ValueError('Successful output contains an error')
+        if status != 'success':
+            unsuccessful.append(case_id)
         complete = True
         for key in metrics:
             value = output.get(key)
@@ -93,7 +101,14 @@ def _summarize(case_ids: set[str], run: dict[str, Any]) -> dict[str, Any]:
                 durations[key].append(duration)
         if not complete:
             incomplete.append(case_id)
-    failed = sorted(set(missing + incomplete) | {
+    assessment = run.get('assessment')
+    if assessment is not None:
+        if (not isinstance(assessment, dict) or assessment.get('type') not in ('human', 'agent')
+                or not isinstance(assessment.get('identity'), str)
+                or not assessment['identity'].strip() or assessment.get('independent') is not True):
+            raise ValueError('Invalid independent assessment')
+    unverified = sorted(outputs) if assessment is None else []
+    failed = sorted(set(missing + incomplete + unsuccessful + unverified) | {
         cid for cid, output in outputs.items()
         if output.get('citation_validity') is False or output.get('semantic_support') is False
         or output.get('unsupported_answer') is True
@@ -102,6 +117,8 @@ def _summarize(case_ids: set[str], run: dict[str, Any]) -> dict[str, Any]:
         'case_count': len(case_ids), 'missing_outputs': missing,
         'all_case_pass_rate': (len(case_ids) - len(failed)) / len(case_ids),
         'incomplete_labels': sorted(incomplete), 'failed_cases': failed,
+        'unsuccessful_outputs': sorted(unsuccessful), 'unverified_assessment': unverified,
+        'assessment': assessment, 'independent_assessment': assessment is not None,
         'rates': {key: _rate(values) for key, values in metrics.items()},
         'labeled_counts': {key: len(values) for key, values in metrics.items()},
         'mean_seconds': {key: (sum(values) / len(values) if values else None)

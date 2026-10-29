@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-097b3c64-05ab-441e-b35c-b0f3d763b44d",
+  "object": "chat.completion",
+  "created": 1793241226,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"facts\": [\n    {\n      \"text\": \"Rollout is complete.\",\n      \"citation_ids\": [\"E1\"]\n    }\n  ],\n  \"prior_fixes\": [],\n  \"hypotheses\": [],\n  \"recommended_checks\": [],\n  \"missing_evidence\": []\n}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 206,
+    "completion_tokens": 59,
+    "total_tokens": 265
+  }
+}

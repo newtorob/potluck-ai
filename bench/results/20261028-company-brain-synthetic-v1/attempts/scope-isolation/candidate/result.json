@@ -1,0 +1,88 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "b708e9eb-4289-4835-9dc3-4e6ff90cd362",
+    "workspace": "synthetic-eval",
+    "issue": "What is the private release code?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "facts": [
+        {
+          "text": "No release code is recorded.",
+          "citation_ids": [
+            "source:b38ca076-2f4d-568d-b69e-a248f8f61664:e2794994-2b3c-5fe6-9d4a-5ed9463db3cc"
+          ]
+        }
+      ],
+      "prior_fixes": [],
+      "hypotheses": [
+        {
+          "text": "The private release code might be a placeholder or not yet assigned.",
+          "citation_ids": [
+            "source:b38ca076-2f4d-568d-b69e-a248f8f61664:e2794994-2b3c-5fe6-9d4a-5ed9463db3cc"
+          ]
+        }
+      ],
+      "recommended_checks": [
+        {
+          "text": "Verify if the release code is recorded in a different system or database.",
+          "citation_ids": [
+            "source:b38ca076-2f4d-568d-b69e-a248f8f61664:e2794994-2b3c-5fe6-9d4a-5ed9463db3cc"
+          ]
+        }
+      ],
+      "missing_evidence": [
+        "The exact location or system where the release code is supposed to be recorded."
+      ]
+    },
+    "evidence": [
+      {
+        "collection_id": "4bf14c89-7530-40d7-bcf2-a92e72103fdc",
+        "document_id": "a549261c-856f-5c3a-85de-c2cecd2de8e9",
+        "revision_id": "e2794994-2b3c-5fe6-9d4a-5ed9463db3cc",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T02:33:27.148008+00:00",
+        "chunk_id": "b38ca076-2f4d-568d-b69e-a248f8f61664",
+        "anchor": "intro",
+        "heading": "",
+        "content": "No release code is recorded.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T02:33:27.148147+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:b38ca076-2f4d-568d-b69e-a248f8f61664:e2794994-2b3c-5fe6-9d4a-5ed9463db3cc"
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T02:33:33.658469+00:00",
+    "provenance": {
+      "template_version": "investigation-v3",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What is the private release code?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240
+      },
+      "elapsed_ms": 6501,
+      "created_at": "2026-10-29T02:33:33.658469+00:00"
+    },
+    "collection_ids": [
+      "4bf14c89-7530-40d7-bcf2-a92e72103fdc"
+    ]
+  },
+  "latency_seconds": 6.509941333904862,
+  "setup_seconds": 0.020437500439584255,
+  "attempt_total_seconds": 6.530378834344447
+}

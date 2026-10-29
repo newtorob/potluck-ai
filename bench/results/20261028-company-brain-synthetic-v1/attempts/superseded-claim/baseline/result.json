@@ -1,0 +1,72 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "0334949c-a07b-423d-b2bc-7b0d2b3c4abe",
+    "workspace": "synthetic-eval",
+    "issue": "What is the current rollout state?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "facts": [
+        {
+          "text": "Rollout is complete.",
+          "citation_ids": [
+            "source:c0cf8a80-7bd1-5b69-841b-240e6b779920:6ef2aead-41b7-5bb1-8243-02e80cdbf80f"
+          ]
+        }
+      ],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "missing_evidence": []
+    },
+    "evidence": [
+      {
+        "collection_id": "038cdbdf-a10b-4309-846e-3c878b1f6df1",
+        "document_id": "01a5b58c-62c3-5879-b131-65330b244ddb",
+        "revision_id": "6ef2aead-41b7-5bb1-8243-02e80cdbf80f",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T02:33:46.297602+00:00",
+        "chunk_id": "c0cf8a80-7bd1-5b69-841b-240e6b779920",
+        "anchor": "intro",
+        "heading": "",
+        "content": "Rollout is complete.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T02:33:46.297710+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:c0cf8a80-7bd1-5b69-841b-240e6b779920:6ef2aead-41b7-5bb1-8243-02e80cdbf80f"
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T02:33:48.954206+00:00",
+    "provenance": {
+      "template_version": "investigation-v3",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What is the current rollout state?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240
+      },
+      "elapsed_ms": 2652,
+      "created_at": "2026-10-29T02:33:48.954206+00:00"
+    },
+    "collection_ids": [
+      "038cdbdf-a10b-4309-846e-3c878b1f6df1"
+    ]
+  },
+  "latency_seconds": 2.660037750378251,
+  "setup_seconds": 0.017979375086724758,
+  "attempt_total_seconds": 2.678017125464976
+}

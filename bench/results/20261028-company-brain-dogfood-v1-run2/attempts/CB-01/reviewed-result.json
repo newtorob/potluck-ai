@@ -1,0 +1,274 @@
+{
+  "id": "9945b153-2f4f-4007-84b0-6c2f0b62d247",
+  "workspace": "potluck-dogfood-v1",
+  "issue": "Investigate what happens to reviewed claims when a source document changes, and whether a failed scan can leave the prior snapshot available as current evidence.",
+  "model_slug": "qwen-2.5-3b-instruct-q4",
+  "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+  "status": "reviewed",
+  "brief": {
+    "facts": [
+      {
+        "text": "A changed or removed document invalidates and scrubs all claims bound to it, including proposed and superseded payloads, in the same scan transaction.",
+        "citation_ids": [
+          "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+        ]
+      },
+      {
+        "text": "Old versions never reactivate automatically. A failed or stale scan hides an artifact until evidence is current again; a content-invalidated artifact does not revive after rescan.",
+        "citation_ids": [
+          "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+        ]
+      },
+      {
+        "text": "Claims bind between 1 and 16 distinct source references, each containing collection_id, document_id, revision_id, and chunk_id. Every reference must match the current indexed source in the caller's explicit allowlist.",
+        "citation_ids": [
+          "source:c23428de-8aa9-5cf9-ace1-33021243a6f5:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+        ]
+      },
+      {
+        "text": "The MCP is an owner action; it is deliberately not an MCP write tool.",
+        "citation_ids": [
+          "source:9ec6be25-6142-555b-9a54-65c4fe3620ce:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+        ]
+      }
+    ],
+    "prior_fixes": [],
+    "hypotheses": [
+      {
+        "text": "When a source document changes, all claims bound to it are invalidated and scrubbed in the same scan transaction.",
+        "citation_ids": [
+          "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+        ]
+      },
+      {
+        "text": "Old versions of claims do not reactivate automatically; a failed or stale scan hides an artifact until the evidence is current again.",
+        "citation_ids": [
+          "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+        ]
+      },
+      {
+        "text": "Claims bind between 1 and 16 distinct source references, each containing collection_id, document_id, revision_id, and chunk_id. Every reference must match the current indexed source in the caller's explicit allowlist.",
+        "citation_ids": [
+          "source:c23428de-8aa9-5cf9-ace1-33021243a6f5:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+        ]
+      },
+      {
+        "text": "The MCP is an owner action; it is deliberately not an MCP write tool.",
+        "citation_ids": [
+          "source:9ec6be25-6142-555b-9a54-65c4fe3620ce:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+        ]
+      }
+    ],
+    "recommended_checks": [
+      {
+        "text": "Verify that claims are invalidated and scrubbed when a source document changes, and that old versions do not reactivate automatically.",
+        "citation_ids": [
+          "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+        ]
+      },
+      {
+        "text": "Ensure that claims bind correctly between 1 and 16 distinct source references, each containing collection_id, document_id, revision_id, and chunk_id, and that every reference matches the current indexed source in the caller's explicit allowlist.",
+        "citation_ids": [
+          "source:c23428de-8aa9-5cf9-ace1-33021243a6f5:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+        ]
+      },
+      {
+        "text": "Confirm that the MCP is an owner action and not an MCP write tool.",
+        "citation_ids": [
+          "source:9ec6be25-6142-555b-9a54-65c4fe3620ce:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+        ]
+      }
+    ],
+    "missing_evidence": [
+      "No evidence is provided for the specific behavior of claims when a source document changes and the evidence is stale or failed. [Sources: source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0]",
+      "No evidence is provided for the specific behavior of claims when a source document changes and the evidence is invalidated. [Sources: source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0]",
+      "No evidence is provided for the specific behavior of claims when a source document changes and the claims bind between 1 and 16 distinct source references, each containing collection_id, document_id, revision_id, and chunk_id. [Sources: source:c23428de-8aa9-5cf9-ace1-33021243a6f5:9dfc2a42-81e9-591f-8d1e-e0f19541dde0]"
+    ]
+  },
+  "evidence": [
+    {
+      "collection_id": "52e912f9-4660-41a4-93ee-98c4e15a48f5",
+      "document_id": "af04b375-0458-5f68-90a0-0815cef2fe1d",
+      "revision_id": "9dfc2a42-81e9-591f-8d1e-e0f19541dde0",
+      "relative_path": "COMPANY_BRAIN.md",
+      "updated_at": "2026-10-29T02:34:36.823261+00:00",
+      "chunk_id": "e566b3fd-bbc2-5263-95b5-4197dee0b49d",
+      "anchor": "freshness-and-removal",
+      "heading": "Freshness and removal",
+      "content": "Evidence lookup requires a successful scan with a timestamp no more than 24 hours\nold. Failed, pending, never-scanned, unknown-age, future-dated, and older snapshots\nare excluded. This is freshness of the indexed snapshot: changes on disk become\nvisible only after an explicit scan. There is no watcher or scheduled scan.\n\n- A changed or removed document invalidates and scrubs all claims bound to it,\n  including proposed and superseded payloads, in the same scan transaction.\n- Changed selection rules immediately scrub affected claims and derived sources.\n- Removing a collection scrubs its claim payloads and removes its source records.\n  Original files are untouched. Tombstones whose collection was removed are no\n  longer listable because their original authorization bindings cannot resolve.\n- A failed scan rolls back all changes, retains the previous snapshot, and blocks\n  current retrieval until a successful rescan. Manual deletion remains possible\n  while a scan is failed. Tombstones are not automatically revived.\n\nScrubbing removes content from active logical rows. It is not a promise of forensic\nerasure from SQLite WAL files, filesystem backups, or previously returned agent\nresponses. No evidence embedding or retrieval cache is created by this feature.\nPersonal/global memories and the legacy vault importer remain separate; the\npersonal-memory wipe action does not remove registered source collections.",
+      "kind": "source_chunk",
+      "last_scan_at": "2026-10-29T02:34:36.823922+00:00",
+      "freshness": "recent",
+      "uncertainty": "Source text has not been reviewed.",
+      "citation_id": "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+    },
+    {
+      "collection_id": "52e912f9-4660-41a4-93ee-98c4e15a48f5",
+      "document_id": "af04b375-0458-5f68-90a0-0815cef2fe1d",
+      "revision_id": "9dfc2a42-81e9-591f-8d1e-e0f19541dde0",
+      "relative_path": "COMPANY_BRAIN.md",
+      "updated_at": "2026-10-29T02:34:36.823261+00:00",
+      "chunk_id": "7b47a64a-92e8-5fd2-94d2-6db41f3f8976",
+      "anchor": "review-outcomes-and-reuse-2",
+      "heading": "Review, outcomes and reuse",
+      "content": "New, changed or removed source material in any selected collection invalidates\nthe investigation, including earlier empty-result claims. Unchanged rescans keep\nit available. Invalidated payloads are scrubbed, and knowledge derived from those\ninvestigations is scrubbed recursively through dependent investigations. Review,\noutcome and knowledge writes revalidate the evidence inside their transaction.\nOld versions never reactivate automatically. A failed or stale scan hides an\nartifact until evidence is current again; a content-invalidated artifact does not\nrevive after rescan. The logical-erasure limits above also apply here.\n\nBefore a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core.",
+      "kind": "source_chunk",
+      "last_scan_at": "2026-10-29T02:34:36.823922+00:00",
+      "freshness": "recent",
+      "uncertainty": "Source text has not been reviewed.",
+      "citation_id": "source:7b47a64a-92e8-5fd2-94d2-6db41f3f8976:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+    },
+    {
+      "collection_id": "52e912f9-4660-41a4-93ee-98c4e15a48f5",
+      "document_id": "af04b375-0458-5f68-90a0-0815cef2fe1d",
+      "revision_id": "9dfc2a42-81e9-591f-8d1e-e0f19541dde0",
+      "relative_path": "COMPANY_BRAIN.md",
+      "updated_at": "2026-10-29T02:34:36.823261+00:00",
+      "chunk_id": "c23428de-8aa9-5cf9-ace1-33021243a6f5",
+      "anchor": "sources-and-authority-1",
+      "heading": "Sources and authority",
+      "content": "Register and scan selected folders with `potluck_local.services.source_collections`\nas described in the engine README. Use a disposable database for experiments:\n\n```sh\nexport POTLUCK_MEMORY_DB_PATH=/absolute/path/to/experiment/memory.db\npython -m potluck_local.services.source_collections --workspace example \\\n  register engineering /absolute/path/to/approved-docs\npython -m potluck_local.services.source_collections --workspace example scan COLLECTION_ID\n```\n\nRaw `source_chunks` are evidence, not approved instructions. `reviewed_claims`\nrecords immutable versions of a claim under a workspace-specific `claim_key`:\n\n| State | Meaning |\n| --- | --- |\n| proposed | Source-backed text awaiting an explicit owner review. |\n| approved | A reviewer and reason were recorded; eligible for current lookup only while all sources remain allowed, ready, and recent. |\n| superseded | Replaced atomically by a proposal with the same key; retained as history with a replacement link and review metadata. |\n| deleted | Content, key, and free-text review metadata are scrubbed; identifiers, timestamps, source bindings, and a fixed deletion cause remain. |\n\nAt most one version per workspace/key can be approved. Approving a second proposal\nrequires explicit supersession. Removing the replacement never reactivates its\npredecessor. Human review records responsibility; it does not automatically prove\nthat a source supports the claim.\n\nClaims bind between 1 and 16 distinct source references, each containing\n`collection_id`, `document_id`, `revision_id`, and `chunk_id`. Every reference must\nmatch the current indexed source in the caller's explicit allowlist. A claim\nrequiring multiple collections is unavailable if any one is outside the scope.",
+      "kind": "source_chunk",
+      "last_scan_at": "2026-10-29T02:34:36.823922+00:00",
+      "freshness": "recent",
+      "uncertainty": "Source text has not been reviewed.",
+      "citation_id": "source:c23428de-8aa9-5cf9-ace1-33021243a6f5:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+    },
+    {
+      "collection_id": "52e912f9-4660-41a4-93ee-98c4e15a48f5",
+      "document_id": "af04b375-0458-5f68-90a0-0815cef2fe1d",
+      "revision_id": "9dfc2a42-81e9-591f-8d1e-e0f19541dde0",
+      "relative_path": "COMPANY_BRAIN.md",
+      "updated_at": "2026-10-29T02:34:36.823261+00:00",
+      "chunk_id": "9ec6be25-6142-555b-9a54-65c4fe3620ce",
+      "anchor": "sources-and-authority-2",
+      "heading": "Sources and authority",
+      "content": "The local review CLI is an owner action; it is deliberately not an MCP write tool:\n\n```sh\npython -m potluck_local.services.reviewed_knowledge --workspace example \\\n  --collection COLLECTION_ID propose deployment-status 'Attribution is deployed.' \\\n  --citation '{\"collection_id\":\"COLLECTION_ID\",\"document_id\":\"DOCUMENT_ID\",\"revision_id\":\"REVISION_ID\",\"chunk_id\":\"CHUNK_ID\"}'\n\npython -m potluck_local.services.reviewed_knowledge --workspace example \\\n  --collection COLLECTION_ID approve CLAIM_ID --reviewer owner --reason 'Checked the cited source'\n\npython -m potluck_local.services.reviewed_knowledge --workspace example \\\n  --collection COLLECTION_ID supersede OLD_CLAIM_ID NEW_PROPOSAL_ID \\\n  --reviewer owner --reason 'Reviewed the correction'\n\npython -m potluck_local.services.reviewed_knowledge --workspace example \\\n  --collection COLLECTION_ID list --status superseded\n\npython -m potluck_local.services.reviewed_knowledge --workspace example \\\n  --collection COLLECTION_ID delete CLAIM_ID\n```\n\nRepeat `--collection` for multi-source claims. IDs come from evidence results; the\nuppercase values above are placeholders. Proposed content is limited to 16,000\ncharacters, keys/reviewer names to 256, and review reasons to 4,000. The existing\ncredential redactor applies to these persisted text fields. It is not general PII\nfiltering. `list` is a review-management view of stored states, not a freshness\nguarantee; use evidence lookup before presenting a claim as current.",
+      "kind": "source_chunk",
+      "last_scan_at": "2026-10-29T02:34:36.823922+00:00",
+      "freshness": "recent",
+      "uncertainty": "Source text has not been reviewed.",
+      "citation_id": "source:9ec6be25-6142-555b-9a54-65c4fe3620ce:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+    },
+    {
+      "collection_id": "52e912f9-4660-41a4-93ee-98c4e15a48f5",
+      "document_id": "af04b375-0458-5f68-90a0-0815cef2fe1d",
+      "revision_id": "9dfc2a42-81e9-591f-8d1e-e0f19541dde0",
+      "relative_path": "COMPANY_BRAIN.md",
+      "updated_at": "2026-10-29T02:34:36.823261+00:00",
+      "chunk_id": "15256c07-5d25-52b6-9fa9-924f48d0857f",
+      "anchor": "saved-investigations-in-the-desktop-app-1",
+      "heading": "Saved investigations in the desktop app",
+      "content": "Open **Workspace → Investigations**. Enter the workspace used to register the\nselected sources, load collections, and choose the exact collection scope. Source\nregistration/scanning remains a local CLI operation. Load a model in **Models**,\nreload collections to refresh model status, and explicitly select the loaded\nmodel. Enter an issue and a short evidence query, then create an investigation.\n\nThe brief separates facts, prior fixes, hypotheses, recommended checks and missing\nevidence. Numbered citations open source text and revision metadata. Generated\nfacts and prior fixes must cite retrieved records; valid citations do not establish\nthat the text supports the model's assertion. The owner must inspect that support.\nRecommendations are text only; no commands, tools or fixes are executed.\n\nSaved drafts retain the original answer, selected source scope, all retrieved\nevidence bindings, model slug and SHA-256, prompt/retrieval versions, generation\nsettings and elapsed time. **Load saved** uses the original exact collection set.\nCurrent limits are 100 saved records per scope and 10 lookup results total,\nwith at most 6,000 characters per evidence record and 24,000 characters total\nmodel context. Truncation is disclosed. These character bounds are not a tokenizer\nbudget; a model can reject context it cannot fit.",
+      "kind": "source_chunk",
+      "last_scan_at": "2026-10-29T02:34:36.823922+00:00",
+      "freshness": "recent",
+      "uncertainty": "Source text has not been reviewed.",
+      "citation_id": "source:15256c07-5d25-52b6-9fa9-924f48d0857f:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+    },
+    {
+      "collection_id": "52e912f9-4660-41a4-93ee-98c4e15a48f5",
+      "document_id": "af04b375-0458-5f68-90a0-0815cef2fe1d",
+      "revision_id": "9dfc2a42-81e9-591f-8d1e-e0f19541dde0",
+      "relative_path": "COMPANY_BRAIN.md",
+      "updated_at": "2026-10-29T02:34:36.823261+00:00",
+      "chunk_id": "d42f5ce3-2cdb-5fa3-97bf-78fb10b81b68",
+      "anchor": "each-result-has-a-citation_id-resolve-it-again-before-using-a-saved-citation",
+      "heading": "Each result has a citation_id. Resolve it again before using a saved citation.",
+      "content": "record = await resolve_citation(scope, \"source:CHUNK_ID:REVISION_ID\")\n```\n\nResults separate `source_chunks` from `reviewed_claims` and include scope, source\nidentifiers, relative paths, anchors, revision IDs, indexed timestamps, review\nmetadata, uncertainty, and missing-evidence/partial-result notices. A reviewed\nclaim carries its source records. Unresolvable, superseded, removed, out-of-scope,\nor stale citations return `None`; resolution never falls back to a different\nrevision or a personal memory. Citation IDs are references, not access tokens.\n\nSearch ranks Unicode case-insensitive whole-word overlap, ignoring common question\nwords. It does not generate an answer or verify semantic support. Unsupported\nqueries produce empty result lists with missing-evidence information. Related\nwords alone cannot establish that a question is answered, and conflicts in raw\nsource documents still require review.\n\nLimits: 100 collections per scope, 1,000 query characters, 20 distinct meaningful\nterms, 1–100 returned records, and at most 200 candidates per evidence kind before\nranking. Candidate truncation is explicit and can omit a more relevant result.\nSQL still scans matching source text; this is not a large-corpus search benchmark\nor an enterprise-scale performance claim. Citation resolution uses direct IDs.",
+      "kind": "source_chunk",
+      "last_scan_at": "2026-10-29T02:34:36.823922+00:00",
+      "freshness": "recent",
+      "uncertainty": "Source text has not been reviewed.",
+      "citation_id": "source:d42f5ce3-2cdb-5fa3-97bf-78fb10b81b68:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+    },
+    {
+      "collection_id": "52e912f9-4660-41a4-93ee-98c4e15a48f5",
+      "document_id": "af04b375-0458-5f68-90a0-0815cef2fe1d",
+      "revision_id": "9dfc2a42-81e9-591f-8d1e-e0f19541dde0",
+      "relative_path": "COMPANY_BRAIN.md",
+      "updated_at": "2026-10-29T02:34:36.823261+00:00",
+      "chunk_id": "881a5d2b-68e0-5227-88f9-53908ddce790",
+      "anchor": "verification-and-remaining-work",
+      "heading": "Verification and remaining work",
+      "content": "The source, review, lookup, MCP, and cross-service invariant tests use disposable\ndatabases and synthetic documents. They exercise scope isolation, atomic\nsupersession, scan rollback, deletion, freshness, citation invalidation, privacy,\nand concurrent approvals. No real vault is implicitly ingested by these tests.\n\nModel usefulness is a separate gate from these software tests. Frozen synthetic\ncases and the comparison contract are in [evals/company_brain](evals/company_brain/README.md).\nThe comparison consumes explicit independent labels; it does not run a model or\ninfer semantic support from valid citation IDs. No quality improvement is claimed.",
+      "kind": "source_chunk",
+      "last_scan_at": "2026-10-29T02:34:36.823922+00:00",
+      "freshness": "recent",
+      "uncertainty": "Source text has not been reviewed.",
+      "citation_id": "source:881a5d2b-68e0-5227-88f9-53908ddce790:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+    }
+  ],
+  "review": {
+    "reviewed_at": "2026-10-29T02:39:27.753150+00:00",
+    "decision": "correct",
+    "reviewer": "Codex internal dogfood (AI review)",
+    "reason": "Primary reviewed the independent Terra assessment against the exact cited source. Corrected factual attribution, removed repeated hypotheses, added omitted boundaries. This is AI-assisted internal review, not human or customer acceptance.",
+    "corrected_brief": {
+      "facts": [
+        {
+          "text": "A changed or removed document invalidates and scrubs all claims bound to it, including proposed and superseded payloads, in the same scan transaction.",
+          "citation_ids": [
+            "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+          ]
+        },
+        {
+          "text": "A failed scan rolls back changes, retains the previous snapshot, and blocks current retrieval until a successful rescan.",
+          "citation_ids": [
+            "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+          ]
+        },
+        {
+          "text": "Disk changes become visible only after an explicit scan; a recent snapshot does not establish that disk changes were indexed.",
+          "citation_ids": [
+            "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+          ]
+        },
+        {
+          "text": "Scrubbing removes active logical content; it does not guarantee forensic erasure from SQLite WAL, filesystem backups, or previously returned responses.",
+          "citation_ids": [
+            "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+          ]
+        }
+      ],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [
+        {
+          "text": "In a disposable test, change a bound source and rescan, then separately induce a scan failure and check retrieval and snapshot behavior.",
+          "citation_ids": [
+            "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+          ]
+        }
+      ],
+      "missing_evidence": [
+        "The retrieved documentation does not establish that these operations were executed or what happened in a specific environment."
+      ]
+    }
+  },
+  "outcome": {
+    "recorded_at": "2026-10-29T02:39:27.759118+00:00",
+    "reviewer": "Codex internal dogfood (AI review)",
+    "result": "inconclusive",
+    "notes": "inconclusive: documentation-based test only; no actual source change or failed scan was performed"
+  },
+  "created_at": "2026-10-29T02:36:02.724427+00:00",
+  "provenance": {
+    "template_version": "investigation-v3",
+    "citation_mapping": "request-local aliases",
+    "retrieval_query": "changed removed document claims failed scan current retrieval",
+    "retrieval_version": "unicode-word-overlap-v1",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "generation_settings": {
+      "temperature": 0,
+      "max_tokens": 1600,
+      "timeout_seconds": 240
+    },
+    "elapsed_ms": 78629,
+    "created_at": "2026-10-29T02:36:02.724427+00:00"
+  },
+  "collection_ids": [
+    "52e912f9-4660-41a4-93ee-98c4e15a48f5"
+  ]
+}

@@ -40,6 +40,68 @@ def test_comparison_counts_missing_and_separates_labels():
         evaluation.compare_evaluations(manifest, baseline, candidate)
 
 
+def test_comparison_requires_success_and_independent_assessment():
+    manifest = {'corpus_id': 'frozen', 'cases': [{'id': 'a'}]}
+    run = run_for(manifest)
+    run['outputs']['a'] = {'status': 'error', 'citation_validity': True,
+                           'semantic_support': True, 'unsupported_answer': False,
+                           'correction': False, 'latency_seconds': 0,
+                           'time_to_accepted_seconds': None}
+    run['assessment'] = {'type': 'agent', 'identity': 'independent-reviewer', 'independent': True}
+    report = evaluation.compare_evaluations(manifest, run, run)['baseline']
+    assert report['failed_cases'] == ['a']
+    assert report['unsuccessful_outputs'] == ['a']
+    assert report['assessment']['type'] == 'agent'
+    assert report['mean_seconds'] == {'latency_seconds': 0, 'time_to_accepted_seconds': None}
+    assert report['timed_counts'] == {'latency_seconds': 1, 'time_to_accepted_seconds': 0}
+
+    run['outputs']['a']['status'] = 'success'
+    assert evaluation.compare_evaluations(manifest, run, run)['baseline']['all_case_pass_rate'] == 1
+    run['assessment'] = None
+    report = evaluation.compare_evaluations(manifest, run, run)['baseline']
+    assert report['unverified_assessment'] == ['a']
+    assert report['all_case_pass_rate'] == 0
+    run['assessment'] = {'type': 'human', 'identity': ' ', 'independent': True}
+    with pytest.raises(ValueError, match='assessment'):
+        evaluation.compare_evaluations(manifest, run, run)
+    run['assessment'] = {'type': 'human', 'identity': 'reviewer', 'independent': False}
+    with pytest.raises(ValueError, match='assessment'):
+        evaluation.compare_evaluations(manifest, run, run)
+
+
+def test_comparison_does_not_infer_success_from_labels():
+    manifest = {'corpus_id': 'frozen', 'cases': [{'id': 'a'}]}
+    run = run_for(manifest)
+    run['assessment'] = {'type': 'human', 'identity': 'reviewer', 'independent': True}
+    run['outputs']['a'] = {'citation_validity': True, 'semantic_support': True,
+                           'unsupported_answer': False, 'correction': False}
+    report = evaluation.compare_evaluations(manifest, run, run)['baseline']
+    assert report['failed_cases'] == ['a']
+    assert report['unsuccessful_outputs'] == ['a']
+    assert report['timed_counts']['latency_seconds'] == 0
+    assert report['mean_seconds']['latency_seconds'] is None
+
+
+@pytest.mark.parametrize('error_field', ['error', 'error_type'])
+def test_comparison_rejects_success_with_error(error_field):
+    manifest = {'corpus_id': 'frozen', 'cases': [{'id': 'a'}]}
+    run = run_for(manifest)
+    run['outputs']['a'] = {'status': 'success', error_field: 'failed'}
+    with pytest.raises(ValueError, match='contains an error'):
+        evaluation.compare_evaluations(manifest, run, run)
+
+
+def test_missing_assessment_visible_for_empty_and_error_runs():
+    manifest = {'corpus_id': 'frozen', 'cases': [{'id': 'a'}]}
+    missing, failed = run_for(manifest), run_for(manifest)
+    failed['outputs']['a'] = {'status': 'error', 'error_type': 'RuntimeError'}
+    report = evaluation.compare_evaluations(manifest, missing, failed)
+    assert report['baseline']['independent_assessment'] is False
+    assert report['candidate']['independent_assessment'] is False
+    assert report['baseline']['failed_cases'] == ['a']
+    assert report['candidate']['failed_cases'] == ['a']
+
+
 @pytest.mark.asyncio
 async def test_proposal_is_reference_only_and_revalidated(monkeypatch):
     scope = EvidenceScope('work', ('collection',))

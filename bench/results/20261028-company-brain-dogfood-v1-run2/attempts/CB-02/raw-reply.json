@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-3ea9ab6a-cd27-487c-89d2-5bdb98641f18",
+  "object": "chat.completion",
+  "created": 1793241362,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"facts\": [\n    {\n      \"text\": \"The owner sets a fixed scope when starting the MCP process, which adds `evidence_search(query, max_results=10)` and `evidence_resolve(citation_id)` to the MCP process.\",\n      \"citation_ids\": [\"E1\"]\n    },\n    {\n      \"text\": \"The MCP process uses a private stdio child process or an optional loopback TCP bearer-token gate, and the configured owner grants the agent read access to the entire selected scope.\",\n      \"citation_ids\": [\"E1\"]\n    },\n    {\n      \"text\": \"The MCP process does not prevent the agent from forwarding retrieved text to its configured model provider.\",\n      \"citation_ids\": [\"E1\"]\n    }\n  ],\n  \"prior_fixes\": [],\n  \"hypotheses\": [\n    {\n      \"text\": \"The MCP process's configured scope does not prevent the agent from sending source text to a model provider.\",\n      \"citation_ids\": [\"E1\"]\n    }\n  ],\n  \"recommended_checks\": [\n    {\n      \"text\": \"Verify that the MCP process's configured scope does not prevent the agent from sending source text to a model provider.\",\n      \"citation_ids\": [\"E1\"]\n    }\n  ],\n  \"missing_evidence\": [\n    {\n      \"text\": \"The MCP process's configured scope does not prevent the agent from sending source text to a model provider.\",\n      \"citation_ids\": [\"E1\"]\n    }\n  ]\n}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 2832,
+    "completion_tokens": 305,
+    "total_tokens": 3137
+  }
+}

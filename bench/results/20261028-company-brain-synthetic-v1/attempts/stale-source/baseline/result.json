@@ -1,0 +1,16 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "error",
+  "error": {
+    "type": "ValueError",
+    "message": "All selected collections must be ready and recent"
+  },
+  "failure_stage": "pre_inference",
+  "latency_seconds": 0.0028223758563399315,
+  "setup_seconds": 0.015385916456580162,
+  "attempt_total_seconds": 0.018208292312920094
+}

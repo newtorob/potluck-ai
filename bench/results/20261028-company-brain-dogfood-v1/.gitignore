@@ -1,0 +1,6 @@
+# Disposable local evaluation stores; portable evidence is saved as JSON.
+/data/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*

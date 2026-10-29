@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-6def352d-c859-4623-b121-8d7bd40fac1d",
+  "object": "chat.completion",
+  "created": 1793241284,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"facts\": [\n    {\n      \"text\": \"A changed or removed document invalidates and scrubs all claims bound to it, including proposed and superseded payloads, in the same scan transaction.\",\n      \"citation_ids\": [\"E1\"]\n    },\n    {\n      \"text\": \"Old versions never reactivate automatically. A failed or stale scan hides an artifact until evidence is current again; a content-invalidated artifact does not revive after rescan.\",\n      \"citation_ids\": [\"E1\"]\n    },\n    {\n      \"text\": \"Claims bind between 1 and 16 distinct source references, each containing collection_id, document_id, revision_id, and chunk_id. Every reference must match the current indexed source in the caller's explicit allowlist.\",\n      \"citation_ids\": [\"E3\"]\n    },\n    {\n      \"text\": \"The MCP is an owner action; it is deliberately not an MCP write tool.\",\n      \"citation_ids\": [\"E4\"]\n    }\n  ],\n  \"prior_fixes\": [],\n  \"hypotheses\": [\n    {\n      \"text\": \"When a source document changes, all claims bound to it are invalidated and scrubbed in the same scan transaction.\",\n      \"citation_ids\": [\"E1\"]\n    },\n    {\n      \"text\": \"Old versions of claims do not reactivate automatically; a failed or stale scan hides an artifact until the evidence is current again.\",\n      \"citation_ids\": [\"E1\"]\n    },\n    {\n      \"text\": \"Claims bind between 1 and 16 distinct source references, each containing collection_id, document_id, revision_id, and chunk_id. Every reference must match the current indexed source in the caller's explicit allowlist.\",\n      \"citation_ids\": [\"E3\"]\n    },\n    {\n      \"text\": \"The MCP is an owner action; it is deliberately not an MCP write tool.\",\n      \"citation_ids\": [\"E4\"]\n    }\n  ],\n  \"recommended_checks\": [\n    {\n      \"text\": \"Verify that claims are invalidated and scrubbed when a source document changes, and that old versions do not reactivate automatically.\",\n      \"citation_ids\": [\"E1\"]\n    },\n    {\n      \"text\": \"Ensure that claims bind correctly between 1 and 16 distinct source references, each containing collection_id, document_id, revision_id, and chunk_id, and that every reference matches the current indexed source in the caller's explicit allowlist.\",\n      \"citation_ids\": [\"E3\"]\n    },\n    {\n      \"text\": \"Confirm that the MCP is an owner action and not an MCP write tool.\",\n      \"citation_ids\": [\"E4\"]\n    }\n  ],\n  \"missing_evidence\": [\n    {\n      \"text\": \"No evidence is provided for the specific behavior of claims when a source document changes and the evidence is stale or failed.\",\n      \"citation_ids\": [\"E1\"]\n    },\n    {\n      \"text\": \"No evidence is provided for the specific behavior of claims when a source document changes and the evidence is invalidated.\",\n      \"citation_ids\": [\"E1\"]\n    },\n    {\n      \"text\": \"No evidence is provided for the specific behavior of claims when a source document changes and the claims bind between 1 and 16 distinct source references, each containing collection_id, document_id, revision_id, and chunk_id.\",\n      \"citation_ids\": [\"E3\"]\n    }\n  ]\n}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 2200,
+    "completion_tokens": 699,
+    "total_tokens": 2899
+  }
+}

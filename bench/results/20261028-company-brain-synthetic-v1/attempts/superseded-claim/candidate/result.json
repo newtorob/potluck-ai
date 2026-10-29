@@ -1,0 +1,104 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "144e1387-a744-4c98-a714-83b970c0e20d",
+    "workspace": "synthetic-eval",
+    "issue": "What is the current rollout state?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "facts": [
+        {
+          "text": "Based on citation E1 and E2, the rollout is complete.",
+          "citation_ids": [
+            "source:3a337d6c-4682-5b36-aad9-5e2b227f0905:58fffa41-f72c-5b33-bacf-1803022c59c9",
+            "claim:3120cd1d-7168-49be-af5d-6aed4bc4c199"
+          ]
+        }
+      ],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "missing_evidence": []
+    },
+    "evidence": [
+      {
+        "collection_id": "6c96e63e-7961-4ab1-94d0-86342ba890e5",
+        "document_id": "a24ab130-b3b9-5cdf-865d-6ea61d8ab09f",
+        "revision_id": "58fffa41-f72c-5b33-bacf-1803022c59c9",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T02:33:48.975527+00:00",
+        "chunk_id": "3a337d6c-4682-5b36-aad9-5e2b227f0905",
+        "anchor": "intro",
+        "heading": "",
+        "content": "Rollout is complete.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T02:33:48.975690+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:3a337d6c-4682-5b36-aad9-5e2b227f0905:58fffa41-f72c-5b33-bacf-1803022c59c9"
+      },
+      {
+        "id": "3120cd1d-7168-49be-af5d-6aed4bc4c199",
+        "claim_key": "rollout",
+        "content": "Rollout is complete.",
+        "reviewer": "synthetic-reviewer",
+        "reason": "Synthetic lifecycle setup",
+        "created_at": "2026-10-29T02:33:48.981108+00:00",
+        "reviewed_at": "2026-10-29T02:33:48.983363+00:00",
+        "kind": "reviewed_claim",
+        "status": "approved",
+        "sources": [
+          {
+            "collection_id": "6c96e63e-7961-4ab1-94d0-86342ba890e5",
+            "document_id": "a24ab130-b3b9-5cdf-865d-6ea61d8ab09f",
+            "revision_id": "58fffa41-f72c-5b33-bacf-1803022c59c9",
+            "relative_path": "source.md",
+            "updated_at": "2026-10-29T02:33:48.975527+00:00",
+            "chunk_id": "3a337d6c-4682-5b36-aad9-5e2b227f0905",
+            "anchor": "intro",
+            "heading": "",
+            "content": "Rollout is complete.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-29T02:33:48.975690+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:3a337d6c-4682-5b36-aad9-5e2b227f0905:58fffa41-f72c-5b33-bacf-1803022c59c9"
+          }
+        ],
+        "citation_id": "claim:3120cd1d-7168-49be-af5d-6aed4bc4c199",
+        "uncertainty": "Human review is recorded; entailment has not been checked."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T02:33:52.202813+00:00",
+    "provenance": {
+      "template_version": "investigation-v3",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What is the current rollout state?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240
+      },
+      "elapsed_ms": 3215,
+      "created_at": "2026-10-29T02:33:52.202813+00:00"
+    },
+    "collection_ids": [
+      "6c96e63e-7961-4ab1-94d0-86342ba890e5"
+    ]
+  },
+  "latency_seconds": 3.222315000370145,
+  "setup_seconds": 0.024961666204035282,
+  "attempt_total_seconds": 3.24727666657418
+}

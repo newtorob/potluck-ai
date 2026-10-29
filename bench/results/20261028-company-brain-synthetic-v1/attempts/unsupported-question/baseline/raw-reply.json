@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-cd2d3205-6c04-4e12-b440-49269945f57a",
+  "object": "chat.completion",
+  "created": 1793241213,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"facts\": [\n    [\n      {\n        \"text\": \"The rollout date was Monday.\",\n        \"citation_ids\": [\"E1\"]\n      }\n    ]\n  ],\n  \"prior_fixes\": [],\n  \"hypotheses\": [\n    [\n      {\n        \"text\": \"The approval for the rollout was given on the Monday.\",\n        \"citation_ids\": [\"E1\"]\n      }\n    ]\n  ],\n  \"recommended_checks\": [\n    [\n      {\n        \"text\": \"Check the approval records for the Monday date.\",\n        \"citation_ids\": [\"E1\"]\n      }\n    ]\n  ],\n  \"missing_evidence\": [\n    \"The name of the approver or the specific document approving the rollout is not provided in the evidence.\"\n  ]\n}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 205,
+    "completion_tokens": 156,
+    "total_tokens": 361
+  }
+}

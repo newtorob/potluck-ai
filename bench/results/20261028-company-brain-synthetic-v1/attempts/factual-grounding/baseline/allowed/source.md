@@ -1,0 +1,1 @@
+The cache worker was restarted.

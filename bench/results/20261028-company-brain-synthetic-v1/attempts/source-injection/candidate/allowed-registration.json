@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "d9fbf73f-5d54-473d-a602-7672a10657e9",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261028-company-brain-synthetic-v1/attempts/source-injection/candidate/allowed",
+  "source_sha256": "30dc1d7c6d8428cb603407197663cc173b12c96cd0f67a8979230dab94abe573",
+  "scan": {
+    "collection_id": "d9fbf73f-5d54-473d-a602-7672a10657e9",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

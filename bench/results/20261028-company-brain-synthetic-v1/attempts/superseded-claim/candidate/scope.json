@@ -1,0 +1,7 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "6c96e63e-7961-4ab1-94d0-86342ba890e5"
+  ],
+  "condition": "older pending claim superseded"
+}

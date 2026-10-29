@@ -159,8 +159,21 @@ and concurrent approvals. No real vault is implicitly ingested by these tests.
 
 Model usefulness is a separate gate from these software tests. Frozen synthetic
 cases and the comparison contract are in [evals/company_brain](evals/company_brain/README.md).
-The comparison consumes explicit independent labels; it does not run a model or
-infer semantic support from valid citation IDs. No quality improvement is claimed.
+The comparison consumes explicit independent labels; it does not infer semantic
+support from valid citation IDs. Failed or missing execution status and absent
+assessment provenance cannot pass, even with favorable labels. Assessor metadata
+distinguishes agent from human review; it is an assertion of independence, not an
+authenticated identity or evidence of customer acceptance. Missing review timing
+remains unavailable, not zero. No quality improvement is claimed.
+
+The separate `potluck_local.services.company_brain_eval_runner` command runs the
+frozen synthetic cases through the production investigation function using an
+explicitly named, hash-checked local model on CPU. It uses fresh isolated stores,
+retains every attempt, exact retrieved evidence, model request, reply or error,
+and measured timing, and leaves assessment labels unset. The paired conditions
+are raw scoped evidence and reviewed evidence where supported by the fixture;
+other cases are controls. Stale-source rejection is reported separately from
+generated-answer quality. See the evaluation README for the command and limits.
 
 ## Saved investigations in the desktop app
 

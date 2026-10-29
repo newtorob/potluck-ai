@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-9e4b11a0-add9-4b0a-a90c-492d013edb64",
+  "object": "chat.completion",
+  "created": 1793241249,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"facts\": [\n    {\n      \"text\": \"The cache worker was restarted.\",\n      \"citation_ids\": [\"E1\", \"E2\"]\n    }\n  ],\n  \"prior_fixes\": [],\n  \"hypotheses\": [],\n  \"recommended_checks\": [],\n  \"missing_evidence\": []\n}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 224,
+    "completion_tokens": 64,
+    "total_tokens": 288
+  }
+}

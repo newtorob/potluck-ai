@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-18f1f82c-ea67-44a8-839d-f5f95e8a4105",
+  "object": "chat.completion",
+  "created": 1793241228,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"facts\": [\n    {\n      \"text\": \"Based on citation E1 and E2, the rollout is complete.\",\n      \"citation_ids\": [\"E1\", \"E2\"]\n    }\n  ],\n  \"prior_fixes\": [],\n  \"hypotheses\": [],\n  \"recommended_checks\": [],\n  \"missing_evidence\": []\n}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 224,
+    "completion_tokens": 72,
+    "total_tokens": 296
+  }
+}

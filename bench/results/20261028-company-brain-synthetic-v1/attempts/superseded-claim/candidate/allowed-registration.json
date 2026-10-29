@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "6c96e63e-7961-4ab1-94d0-86342ba890e5",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261028-company-brain-synthetic-v1/attempts/superseded-claim/candidate/allowed",
+  "source_sha256": "dc45e551a1fbe03fcfac3c8c1b4c46d14f2160dd5fc661d8a41f89bdef2339be",
+  "scan": {
+    "collection_id": "6c96e63e-7961-4ab1-94d0-86342ba890e5",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

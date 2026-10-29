@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-b93b6b11-fca8-4a27-ba0f-239ea06fe2c8",
+  "object": "chat.completion",
+  "created": 1793241242,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"facts\": [\n    {\n      \"text\": \"The cache worker was restarted.\",\n      \"citation_ids\": [\"E1\"]\n    }\n  ],\n  \"prior_fixes\": [],\n  \"hypotheses\": [\n    {\n      \"text\": \"The restart of the cache worker was a prior fix for the issue.\",\n      \"citation_ids\": [\"E1\"]\n    }\n  ],\n  \"recommended_checks\": [\n    {\n      \"text\": \"Verify if the cache worker is functioning correctly post-restart.\",\n      \"citation_ids\": [\"E1\"]\n    }\n  ],\n  \"missing_evidence\": [\n    \"The exact component that was restarted (cache worker) and its impact on the system.\"\n  ]\n}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 205,
+    "completion_tokens": 147,
+    "total_tokens": 352
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "workspace": "potluck-dogfood-v1",
+  "collection_id": "52e912f9-4660-41a4-93ee-98c4e15a48f5",
+  "documents": [
+    {
+      "document_id": "af04b375-0458-5f68-90a0-0815cef2fe1d",
+      "relative_path": "COMPANY_BRAIN.md",
+      "revision_id": "9dfc2a42-81e9-591f-8d1e-e0f19541dde0",
+      "content_sha": "a01b9eccec5f22a0986cda6568ae3454b957522cec37908fd3dd2f2e75ea8e79"
+    }
+  ]
+}

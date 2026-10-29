@@ -1,0 +1,37 @@
+{
+  "name": "Company Brain selected internal engineering dogfood v1",
+  "status": "frozen before v1 model runs",
+  "purpose": "two bounded real repository investigation cases; not an untouched external holdout",
+  "source": {
+    "repository": "/Users/rob/Documents/potluck",
+    "repository_head": "ceb24b3901dc163174ace75139f3201c00fcf141",
+    "source_path": "apps/desktop/python/COMPANY_BRAIN.md",
+    "source_last_commit": "ceb24b3901dc163174ace75139f3201c00fcf141",
+    "working_tree": "source unmodified relative to HEAD; other unrelated modifications present",
+    "copied_path": "inputs/sources/COMPANY_BRAIN.md",
+    "sha256": "a01b9eccec5f22a0986cda6568ae3454b957522cec37908fd3dd2f2e75ea8e79",
+    "note": "Same repository document was used in earlier smoke at a different content hash; selected internal source, not a holdout."
+  },
+  "input_cases": "inputs/cases.json",
+  "reference_labels": "labels/rubric.md (do not expose to model or ingest into source collection)",
+  "runtime_reference": {
+    "prior_setup": "../company-brain-smoke/server.py and run_once.py",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "n_ctx": 8192,
+    "n_gpu_layers": 0,
+    "n_threads": 8,
+    "cpu_only": true,
+    "note": "Reference configuration only; verify current model bytes and runtime settings before any run. 8192 context is not proof input will fit. No model run is authorized by this preparation alone."
+  },
+  "isolation": "Use a fresh disposable database and separate collection containing only inputs/sources; never ingest inputs/cases.json, manifest or labels. Resolve IDs from actual scan; record them separately without changing this manifest.",
+  "exclusions": [
+    "vault and personal memories",
+    "secrets or credentials",
+    "other repository files and uncommitted edits",
+    "live user database and existing smoke database",
+    "model runs, prompt tuning, product edits, git commits, pushes",
+    "claims of external holdout, general quality, production readiness, or semantic support inferred from citation validity"
+  ],
+  "evaluation": "Freeze before any v1 runs; retain every failure and output; independently assess references separately; compare only under pinned configurations and report observed limits."
+}

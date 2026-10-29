@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-other-workspace",
+  "collection_id": "e934d440-59ba-4e86-b7fd-8508a28b30f8",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261028-company-brain-synthetic-v1/attempts/scope-isolation/candidate/excluded",
+  "source_sha256": "4295a219e8d7d22299f03b29add302d343e0e9332695686f8b6fa0bc1d6fe105",
+  "scan": {
+    "collection_id": "e934d440-59ba-4e86-b7fd-8508a28b30f8",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

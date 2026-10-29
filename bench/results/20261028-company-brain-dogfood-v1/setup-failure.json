@@ -1,0 +1,6 @@
+{
+  "stage": "before model load",
+  "error": "ModuleNotFoundError: potluck_local",
+  "model_invoked": false,
+  "resolution": "Explicit repository import path; second attempt uses a new directory."
+}

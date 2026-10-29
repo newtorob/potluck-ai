@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "24b489d2-25d3-4179-ab8b-3871f66d9ddc"
+  ],
+  "query": "What is the private release code?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "24b489d2-25d3-4179-ab8b-3871f66d9ddc"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "24b489d2-25d3-4179-ab8b-3871f66d9ddc",
+        "document_id": "cdf0e038-54b1-5df4-8f3e-85cf3e0be530",
+        "revision_id": "db806164-2517-588b-b3c4-eb1265d2a103",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T02:33:18.306819+00:00",
+        "chunk_id": "9f109a43-33de-5365-84b5-ee2c214a1b9b",
+        "anchor": "intro",
+        "heading": "",
+        "content": "No release code is recorded.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T02:33:18.306969+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:9f109a43-33de-5365-84b5-ee2c214a1b9b:db806164-2517-588b-b3c4-eb1265d2a103"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

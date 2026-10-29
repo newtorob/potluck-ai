@@ -1,0 +1,7 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "0250b997-4933-45d2-9378-f80e7bd35c41"
+  ],
+  "condition": "indexed snapshot stale"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-2126dbbc-910b-4cc8-a52e-fdb8b6ea8442",
+  "object": "chat.completion",
+  "created": 1793241198,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\n  \"facts\": [\n    {\n      \"text\": \"No release code is recorded.\",\n      \"citation_ids\": [\"E1\"]\n    }\n  ],\n  \"prior_fixes\": [],\n  \"hypotheses\": [\n    {\n      \"text\": \"The private release code might be a placeholder or not yet assigned.\",\n      \"citation_ids\": [\"E1\"]\n    }\n  ],\n  \"recommended_checks\": [\n    {\n      \"text\": \"Verify if the release code is recorded in a different system or database.\",\n      \"citation_ids\": [\"E1\"]\n    }\n  ],\n  \"missing_evidence\": [\n    \"The exact location or system where the release code is supposed to be recorded.\"\n  ]\n}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 207,
+    "completion_tokens": 146,
+    "total_tokens": 353
+  }
+}

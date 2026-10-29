@@ -1,0 +1,16 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "error",
+  "error": {
+    "type": "ValueError",
+    "message": "Invalid model format"
+  },
+  "failure_stage": "inference_or_validation",
+  "latency_seconds": 6.873558083549142,
+  "setup_seconds": 0.014343375340104103,
+  "attempt_total_seconds": 6.887901458889246
+}

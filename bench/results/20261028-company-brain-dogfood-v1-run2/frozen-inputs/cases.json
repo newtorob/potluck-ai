@@ -1,0 +1,16 @@
+{
+  "version": "1.0-frozen",
+  "workspace": "potluck-dogfood-v1",
+  "cases": [
+    {
+      "id": "CB-01",
+      "issue": "Investigate what happens to reviewed claims when a source document changes, and whether a failed scan can leave the prior snapshot available as current evidence.",
+      "query": "changed removed document claims failed scan current retrieval"
+    },
+    {
+      "id": "CB-02",
+      "issue": "Investigate the security boundary of opt-in MCP evidence access: what access does its configured scope grant, and does it prevent an agent from sending source text to a model provider?",
+      "query": "MCP fixed scope agent source text model provider"
+    }
+  ]
+}

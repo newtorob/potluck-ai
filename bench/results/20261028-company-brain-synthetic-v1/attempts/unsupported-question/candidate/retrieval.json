@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "37d24735-75cb-4409-b51d-7fec2c698080"
+  ],
+  "query": "Who approved the rollout?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "37d24735-75cb-4409-b51d-7fec2c698080"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "37d24735-75cb-4409-b51d-7fec2c698080",
+        "document_id": "8e67514c-9150-52e9-8e59-bc9bb4d79f7f",
+        "revision_id": "d9fafab8-d5d3-5b22-859d-9c299dc08975",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T02:33:40.570084+00:00",
+        "chunk_id": "a04f9743-c3b5-5a5e-8755-fc41b0c86a83",
+        "anchor": "intro",
+        "heading": "",
+        "content": "The rollout date was Monday.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T02:33:40.570265+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:a04f9743-c3b5-5a5e-8755-fc41b0c86a83:d9fafab8-d5d3-5b22-859d-9c299dc08975"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "b2a4870c-ad44-4ba8-bc43-9958d690f9c5"
+  ],
+  "query": "Which component was restarted?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "b2a4870c-ad44-4ba8-bc43-9958d690f9c5"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "b2a4870c-ad44-4ba8-bc43-9958d690f9c5",
+        "document_id": "2fe3ec92-5ce4-517a-ad66-6968d41a1829",
+        "revision_id": "7173b03b-748a-55a8-9bd1-c811be707e4b",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T02:34:02.683608+00:00",
+        "chunk_id": "adfc8fbb-a9e1-5bd4-a90b-5b8bee53f46f",
+        "anchor": "intro",
+        "heading": "",
+        "content": "The cache worker was restarted.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T02:34:02.683729+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:adfc8fbb-a9e1-5bd4-a90b-5b8bee53f46f:7173b03b-748a-55a8-9bd1-c811be707e4b"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

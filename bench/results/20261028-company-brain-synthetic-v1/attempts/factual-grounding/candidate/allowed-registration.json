@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "2613774c-b199-4a04-bfd4-cfb89c40b0c2",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261028-company-brain-synthetic-v1/attempts/factual-grounding/candidate/allowed",
+  "source_sha256": "122b8a4a9b8fb955ae076b6718ccb760eca50d3abda6fe1946d5603574f8824a",
+  "scan": {
+    "collection_id": "2613774c-b199-4a04-bfd4-cfb89c40b0c2",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

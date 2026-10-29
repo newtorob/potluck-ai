@@ -1,0 +1,194 @@
+{
+  "review_type": "independent agent review of selected internal dogfood, not human acceptance",
+  "reviewer": "Codex subagent /root/dogfood_manifest",
+  "human_time_to_accepted_seconds": null,
+  "cases": [
+    {
+      "case_id": "CB-01",
+      "reviewer": "Codex subagent /root/dogfood_manifest",
+      "review_started_at_utc": "2026-10-29T02:36:26+00:00",
+      "review_ended_at_utc": "2026-10-29T02:36:42.903972+00:00",
+      "agent_review_wall_seconds": 16.903972,
+      "human_time_to_accepted_seconds": null,
+      "human_accepted": false,
+      "assessment": "fail",
+      "suggested_review": "correct",
+      "suggested_actual_outcome": "inconclusive: documentation-based test only; no actual source change or failed scan was performed",
+      "assertions": [
+        {
+          "location": "facts[0]",
+          "classification": "supported",
+          "detail": "Citation expressly describes changed or removed document claim invalidation and scrubbing in same scan transaction."
+        },
+        {
+          "location": "facts[1]",
+          "classification": "unsupported by cited passage",
+          "detail": "Claim about investigation artifacts and revival is in retrieved review-outcomes-and-reuse-2, but the cited freshness-and-removal passage does not establish this full assertion."
+        },
+        {
+          "location": "facts[2]",
+          "classification": "supported but tangential",
+          "detail": "Correct binding and scope limits in cited sources-and-authority-1."
+        },
+        {
+          "location": "facts[3]",
+          "classification": "contradicted",
+          "detail": "Cited source says the local review CLI is an owner action and not an MCP write tool; the draft mistakenly substitutes MCP for the CLI."
+        },
+        {
+          "location": "hypotheses[0..3]",
+          "classification": "repetitive and partly unsupported",
+          "detail": "Repeat facts 0\u20133, including the misattributed artifact citation and false MCP assertion, without identifying real uncertainty."
+        },
+        {
+          "location": "recommended_checks[0..2]",
+          "classification": "mixed",
+          "detail": "The first two propose checks; the third repeats the incorrect MCP claim."
+        },
+        {
+          "location": "missing_evidence[0..2]",
+          "classification": "misleading/contradicted",
+          "detail": "Says no evidence for invalidation and bindings despite retrieved cited passages explicitly providing it; actual execution-state evidence remains unavailable."
+        }
+      ],
+      "required_omissions": [
+        "Failed scan rolls back changes, retains previous snapshot, and blocks current retrieval until successful rescan.",
+        "Disk changes require an explicit scan; freshness is of the indexed snapshot.",
+        "Logical scrubbing does not guarantee forensic erasure from WAL, backups, or prior responses."
+      ],
+      "proposed_corrected_brief": {
+        "facts": [
+          {
+            "text": "A changed or removed document invalidates and scrubs all claims bound to it, including proposed and superseded payloads, in the same scan transaction.",
+            "citation_ids": [
+              "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+            ]
+          },
+          {
+            "text": "A failed scan rolls back changes, retains the previous snapshot, and blocks current retrieval until a successful rescan.",
+            "citation_ids": [
+              "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+            ]
+          },
+          {
+            "text": "Disk changes become visible only after an explicit scan; a recent snapshot does not establish that disk changes were indexed.",
+            "citation_ids": [
+              "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+            ]
+          },
+          {
+            "text": "Scrubbing removes active logical content; it does not guarantee forensic erasure from SQLite WAL, filesystem backups, or previously returned responses.",
+            "citation_ids": [
+              "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+            ]
+          }
+        ],
+        "prior_fixes": [],
+        "hypotheses": [],
+        "recommended_checks": [
+          {
+            "text": "In a disposable test, change a bound source and rescan, then separately induce a scan failure and check retrieval and snapshot behavior.",
+            "citation_ids": [
+              "source:e566b3fd-bbc2-5263-95b5-4197dee0b49d:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+            ]
+          }
+        ],
+        "missing_evidence": [
+          "The retrieved documentation does not establish that these operations were executed or what happened in a specific environment."
+        ]
+      }
+    },
+    {
+      "case_id": "CB-02",
+      "reviewer": "Codex subagent /root/dogfood_manifest",
+      "review_started_at_utc": "2026-10-29T02:37:38+00:00",
+      "review_ended_at_utc": "2026-10-29T02:37:49.545096+00:00",
+      "agent_review_wall_seconds": 11.545096,
+      "human_time_to_accepted_seconds": null,
+      "human_accepted": false,
+      "assessment": "fail",
+      "suggested_review": "correct",
+      "suggested_actual_outcome": "inconclusive: documentation-based test only; no real agent/provider forwarding or enforcement was tested",
+      "assertions": [
+        {
+          "location": "facts[0]",
+          "classification": "supported",
+          "detail": "Fixed owner scope and added tools are stated by the cited MCP passage."
+        },
+        {
+          "location": "facts[1]",
+          "classification": "supported",
+          "detail": "Private stdio or bearer-token loopback boundary and full selected-scope read access are in the cited MCP passage."
+        },
+        {
+          "location": "facts[2]",
+          "classification": "supported",
+          "detail": "The cited MCP passage directly says configured scope does not prevent forwarding to the agent model provider."
+        },
+        {
+          "location": "hypotheses[0]",
+          "classification": "supported but redundant",
+          "detail": "Restates a documented fact as a hypothesis."
+        },
+        {
+          "location": "recommended_checks[0]",
+          "classification": "supported but vague",
+          "detail": "Proposes checking a documented limitation without identifying a specific environment or provider."
+        },
+        {
+          "location": "missing_evidence[0]",
+          "classification": "misclassified",
+          "detail": "States the supported provider-forwarding limitation rather than naming missing evidence; it omits whether forwarding actually happened in a specific environment."
+        }
+      ],
+      "required_omissions": [
+        "Scope captured at startup; evidence tool calls cannot set workspace/collection, and environment changes require process restart.",
+        "This is not authenticated per-user organizational access enforcement.",
+        "Both memory privacy switches must be enabled and unavailable settings fail closed.",
+        "The allowlist applies to evidence tools, not the separate personal-memory tools."
+      ],
+      "unsupported_extra_claims": [],
+      "proposed_corrected_brief": {
+        "facts": [
+          {
+            "text": "The owner sets a fixed workspace and collection scope at MCP startup; neither evidence tool accepts scope arguments, and changing configuration requires restarting the process.",
+            "citation_ids": [
+              "source:cfbb969a-e843-5644-883a-26828a0b476f:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+            ]
+          },
+          {
+            "text": "The agent receives read access to the entire selected scope. The scope does not prevent it from forwarding retrieved text to its configured model provider.",
+            "citation_ids": [
+              "source:cfbb969a-e843-5644-883a-26828a0b476f:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+            ]
+          },
+          {
+            "text": "The local trust boundary is private stdio or the existing bearer-token gate for optional loopback TCP; this does not supply authenticated per-user organizational access enforcement.",
+            "citation_ids": [
+              "source:cfbb969a-e843-5644-883a-26828a0b476f:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+            ]
+          },
+          {
+            "text": "Both memory privacy switches must be enabled and unavailable settings fail closed. The evidence allowlist does not govern separate personal-memory tools.",
+            "citation_ids": [
+              "source:cfbb969a-e843-5644-883a-26828a0b476f:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+            ]
+          }
+        ],
+        "prior_fixes": [],
+        "hypotheses": [],
+        "recommended_checks": [
+          {
+            "text": "Inspect the actual agent and provider configuration before granting access to private sources, and test any required organizational authorization separately.",
+            "citation_ids": [
+              "source:cfbb969a-e843-5644-883a-26828a0b476f:9dfc2a42-81e9-591f-8d1e-e0f19541dde0"
+            ]
+          }
+        ],
+        "missing_evidence": [
+          "The retrieved documentation does not establish the configured provider or whether source text was transmitted in any particular execution."
+        ]
+      }
+    }
+  ]
+}

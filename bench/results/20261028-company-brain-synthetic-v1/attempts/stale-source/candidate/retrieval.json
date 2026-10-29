@@ -1,0 +1,35 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "0250b997-4933-45d2-9378-f80e7bd35c41"
+  ],
+  "query": "Is the service healthy now?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "0250b997-4933-45d2-9378-f80e7bd35c41"
+      ]
+    },
+    "source_chunks": [],
+    "reviewed_claims": [],
+    "missing_evidence": [
+      "Some requested snapshots are stale or have unknown age and need a rescan.",
+      "No matching evidence terms were found; this does not establish an answer."
+    ],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 0,
+      "unavailable": 0,
+      "needs_rescan": 1
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}
