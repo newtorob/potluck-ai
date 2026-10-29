@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "750b2c63-941e-421a-b7b7-bf2adfd0795c"
+  ],
+  "query": "What is the current retry interval, and can these records establish which value is current?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "750b2c63-941e-421a-b7b7-bf2adfd0795c"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "750b2c63-941e-421a-b7b7-bf2adfd0795c",
+        "document_id": "84de3366-d791-5f03-b82c-da69bc580785",
+        "revision_id": "80502bac-c3a8-5272-b520-490e2ea2ad6d",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:47:22.076875+00:00",
+        "chunk_id": "f9f1deb9-5438-59e8-bd1d-6f39cbb4082c",
+        "anchor": "retry-interval-records",
+        "heading": "Retry interval records",
+        "content": "The deployment checklist says the retry interval is 30 seconds. The operations runbook says the retry interval is 75 seconds. These records have no timestamps or approval status establishing which is current.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:47:22.077060+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:f9f1deb9-5438-59e8-bd1d-6f39cbb4082c:80502bac-c3a8-5272-b520-490e2ea2ad6d"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

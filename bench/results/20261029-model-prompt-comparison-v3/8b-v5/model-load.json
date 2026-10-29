@@ -1,0 +1,17 @@
+{
+  "model_path": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "model_id": "qwen3-8b-q4",
+  "load_time_seconds": 16.65,
+  "n_ctx": 8192,
+  "n_gpu_layers": 0,
+  "n_threads": 8,
+  "rpc_servers": null,
+  "inference": {
+    "schema_version": 1,
+    "model_id": "qwen3-8b-q4",
+    "execution_verified": true,
+    "device_kind": "cpu",
+    "device_name": "Apple M2 Pro",
+    "backend": "cpu"
+  }
+}

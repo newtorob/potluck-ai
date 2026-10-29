@@ -1,0 +1,98 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "9d983b70-456e-45b9-beaf-98a01a201d9a",
+    "workspace": "synthetic-eval",
+    "issue": "What is the current retry interval, and can these records establish which value is current?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "facts": [
+        {
+          "text": "The deployment checklist states the retry interval is 30 seconds.",
+          "citation_ids": [
+            "source:f9f1deb9-5438-59e8-bd1d-6f39cbb4082c:80502bac-c3a8-5272-b520-490e2ea2ad6d"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:f9f1deb9-5438-59e8-bd1d-6f39cbb4082c:80502bac-c3a8-5272-b520-490e2ea2ad6d",
+              "quote": "The deployment checklist says the retry interval is 30 seconds."
+            }
+          ]
+        }
+      ],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [
+        {
+          "text": "Check if there are timestamps or approval statuses in the records to determine the current value.",
+          "citation_ids": [
+            "source:f9f1deb9-5438-59e8-bd1d-6f39cbb4082c:80502bac-c3a8-5272-b520-490e2ea2ad6d"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:f9f1deb9-5438-59e8-bd1d-6f39cbb4082c:80502bac-c3a8-5272-b520-490e2ea2ad6d",
+              "quote": "These records have no timestamps or approval status establishing which is current."
+            }
+          ]
+        }
+      ],
+      "model_uncertainties": [
+        "uncertainty_in_timestamps",
+        "uncertainty_in_approval_status"
+      ]
+    },
+    "evidence": [
+      {
+        "collection_id": "750b2c63-941e-421a-b7b7-bf2adfd0795c",
+        "document_id": "84de3366-d791-5f03-b82c-da69bc580785",
+        "revision_id": "80502bac-c3a8-5272-b520-490e2ea2ad6d",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:47:22.076875+00:00",
+        "chunk_id": "f9f1deb9-5438-59e8-bd1d-6f39cbb4082c",
+        "anchor": "retry-interval-records",
+        "heading": "Retry interval records",
+        "content": "The deployment checklist says the retry interval is 30 seconds. The operations runbook says the retry interval is 75 seconds. These records have no timestamps or approval status establishing which is current.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:47:22.077060+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:f9f1deb9-5438-59e8-bd1d-6f39cbb4082c:80502bac-c3a8-5272-b520-490e2ea2ad6d",
+        "presented_content": "The deployment checklist says the retry interval is 30 seconds. The operations runbook says the retry interval is 75 seconds. These records have no timestamps or approval status establishing which is current."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T13:47:37.376773+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v4",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What is the current retry interval, and can these records establish which value is current?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240
+      },
+      "elapsed_ms": 15294,
+      "created_at": "2026-10-29T13:47:37.376773+00:00"
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "750b2c63-941e-421a-b7b7-bf2adfd0795c"
+    ]
+  },
+  "latency_seconds": 15.304589208215475,
+  "setup_seconds": 0.017421291209757328,
+  "attempt_total_seconds": 15.322010499425232
+}

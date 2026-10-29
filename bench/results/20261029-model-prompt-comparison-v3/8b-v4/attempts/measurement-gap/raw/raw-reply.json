@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-a2b09c24-ec69-46b2-bd1a-b9f26b6d204c",
+  "object": "chat.completion",
+  "created": 1793281657,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\":[{\"text\":\"The operator deleted expired cache entries on Friday.\",\"citation_ids\":[\"E1\"],\"source_excerpts\":[{\"citation_id\":\"E1\",\"quote\":\"On Friday the operator deleted expired cache entries.\"}]}],\"prior_fixes\":[],\"hypotheses\":[],\"recommended_checks\":[],\"model_uncertainties\":[\"No before-and-after latency measurements are available to assess the impact of the cache entry deletion on request latency.\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 296,
+    "completion_tokens": 86,
+    "total_tokens": 382
+  }
+}

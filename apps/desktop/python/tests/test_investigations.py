@@ -367,3 +367,49 @@ def test_correction_cannot_quote_beyond_presented_context(tmp_path, monkeypatch)
         with pytest.raises(inv.BriefValidationError, match='Invalid corrected brief'):
             await inv.review_investigation(scope, item['id'], 'correct', 'owner', 'reviewed', corrected)
     asyncio.run(run())
+
+
+def test_template_selection_records_version_and_rejects_unknown_before_inference(tmp_path, monkeypatch):
+    monkeypatch.setenv('POTLUCK_MEMORY_DB_PATH', str(tmp_path / 'db.sqlite'))
+    monkeypatch.setattr(inv, 'get_settings', lambda: SimpleNamespace(
+        privacy=SimpleNamespace(memory_enabled=True), memory=SimpleNamespace(enabled=True)))
+    calls = []
+
+    class Runtime:
+        def current_model_id(self): return 'model'
+        def current_model_sha256(self): return 'a' * 64
+        async def chat(self, messages, **kwargs):
+            calls.append((messages, kwargs))
+            brief = {'facts': [], 'prior_fixes': [], 'hypotheses': [],
+                     'recommended_checks': [], 'model_uncertainties': ['Not recorded']}
+            return {'choices': [{'message': {'content': json.dumps(brief)}}]}
+
+    monkeypatch.setattr(inv, 'get_runtime', Runtime)
+
+    async def run():
+        await init_memory_db()
+        folder = tmp_path / 'docs'
+        folder.mkdir()
+        (folder / 'release.md').write_text('# Release\nThe approver was not recorded.')
+        cid = await register_collection('w', 'docs', folder)
+        await scan_collection('w', cid)
+        scope = EvidenceScope('w', (cid,))
+        default = await inv.create_investigation(scope, 'Who approved?', 'release', 'model')
+        v4 = await inv.create_investigation(scope, 'Who approved?', 'release', 'model',
+                                            template_version='investigation-v4')
+        v5 = await inv.create_investigation(scope, 'Who approved?', 'release', 'model',
+                                            template_version='investigation-v5')
+        assert [default['provenance']['template_version'], v4['provenance']['template_version'],
+                v5['provenance']['template_version']] == [
+                    'investigation-v4', 'investigation-v4', 'investigation-v5']
+        assert (await inv.get_investigation(scope, v5['id']))['provenance']['template_version'] == 'investigation-v5'
+        assert calls[0][0] == calls[1][0]
+        assert calls[1][0][0]['content'] != calls[2][0][0]['content']
+        assert calls[1][0][1] == calls[2][0][1]
+        assert calls[1][1] == calls[2][1]
+        assert calls[2][1]['response_format'] == {'type': 'json_object', 'schema': inv._model_schema()}
+        with pytest.raises(ValueError, match='Unknown investigation template'):
+            await inv.create_investigation(scope, 'Who approved?', 'release', 'model',
+                                           template_version='investigation-v9')
+        assert len(calls) == 3
+    asyncio.run(run())

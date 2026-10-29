@@ -1,0 +1,85 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "25bfa5c0-5782-4b56-8340-f426504b30a1",
+    "workspace": "synthetic-eval",
+    "issue": "What restored processing, was the database changed, who responded, and is the underlying cause known?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "facts": [
+        {
+          "text": "Processing was stopped at 08:04 UTC and restarted at 08:11 UTC.",
+          "citation_ids": [
+            "source:731aa9f9-0fb6-5881-993d-4512c18b2da3:f37d2cbb-0917-58f1-afe4-f4df1252b97b"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:731aa9f9-0fb6-5881-993d-4512c18b2da3:f37d2cbb-0917-58f1-afe4-f4df1252b97b",
+              "quote": "The parcel worker stopped processing at 08:04 UTC. Restarting the worker at 08:11 UTC restored processing."
+            }
+          ]
+        }
+      ],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": [
+        "The underlying cause remains unconfirmed.",
+        "The incident record does not name the responder."
+      ]
+    },
+    "evidence": [
+      {
+        "collection_id": "8b0e92ff-418f-4669-957f-33ad235a2767",
+        "document_id": "152b5d2c-ae01-55ea-b3b5-b532e3851010",
+        "revision_id": "f37d2cbb-0917-58f1-afe4-f4df1252b97b",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:48:07.859585+00:00",
+        "chunk_id": "731aa9f9-0fb6-5881-993d-4512c18b2da3",
+        "anchor": "parcel-worker-incident",
+        "heading": "Parcel worker incident",
+        "content": "The parcel worker stopped processing at 08:04 UTC. Restarting the worker at 08:11 UTC restored processing. No database change was made. The incident record does not name the responder. The underlying cause remains unconfirmed.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:48:07.859977+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:731aa9f9-0fb6-5881-993d-4512c18b2da3:f37d2cbb-0917-58f1-afe4-f4df1252b97b",
+        "presented_content": "The parcel worker stopped processing at 08:04 UTC. Restarting the worker at 08:11 UTC restored processing. No database change was made. The incident record does not name the responder. The underlying cause remains unconfirmed."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T13:49:36.134558+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v5",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What restored processing, was the database changed, who responded, and is the underlying cause known?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240
+      },
+      "elapsed_ms": 51558,
+      "created_at": "2026-10-29T13:49:36.134558+00:00"
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "8b0e92ff-418f-4669-957f-33ad235a2767"
+    ]
+  },
+  "latency_seconds": 51.56628116592765,
+  "setup_seconds": 0.01999854203313589,
+  "attempt_total_seconds": 51.586279707960784
+}

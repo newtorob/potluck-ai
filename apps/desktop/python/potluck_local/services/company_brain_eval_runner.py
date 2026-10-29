@@ -153,7 +153,8 @@ async def setup_case(root: Path, case: dict[str, Any], arm: str) -> EvidenceScop
     return scope
 
 
-async def attempt(out: Path, case: dict[str, Any], arm: str, runtime: Any, model: str) -> dict[str, Any]:
+async def attempt(out: Path, case: dict[str, Any], arm: str, runtime: Any, model: str,
+                  *, template_version: str | None = None) -> dict[str, Any]:
     folder = out / 'attempts' / case['id'] / arm
     folder.mkdir(parents=True)
     write_new(folder / 'started.json', {'case_id': case['id'], 'arm': arm,
@@ -185,7 +186,9 @@ async def attempt(out: Path, case: dict[str, Any], arm: str, runtime: Any, model
             investigations.lookup_evidence = capture_lookup
             try:
                 investigation_started = time.monotonic()
-                item = await investigations.create_investigation(scope, case['question'], case['question'], model)
+                kwargs = {} if template_version is None else {'template_version': template_version}
+                item = await investigations.create_investigation(
+                    scope, case['question'], case['question'], model, **kwargs)
             finally:
                 investigations.get_runtime = original_runtime
                 investigations.lookup_evidence = original_lookup

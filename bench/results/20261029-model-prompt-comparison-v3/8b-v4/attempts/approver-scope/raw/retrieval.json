@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "4284a5c7-0481-4de9-80e7-39737a870b70"
+  ],
+  "query": "Who approved the schema migration?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "4284a5c7-0481-4de9-80e7-39737a870b70"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "4284a5c7-0481-4de9-80e7-39737a870b70",
+        "document_id": "6e2e7f19-84d4-5f0c-ac1b-d8243c709669",
+        "revision_id": "3bd1205f-b732-5f3b-ac1a-c8c294b41c7a",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:47:12.338704+00:00",
+        "chunk_id": "cc1c88a2-ebe1-5af4-b512-3c371db14f2c",
+        "anchor": "schema-migration",
+        "heading": "Schema migration",
+        "content": "The schema migration completed on Thursday. The migration record does not identify an approver.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:47:12.338866+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:cc1c88a2-ebe1-5af4-b512-3c371db14f2c:3bd1205f-b732-5f3b-ac1a-c8c294b41c7a"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

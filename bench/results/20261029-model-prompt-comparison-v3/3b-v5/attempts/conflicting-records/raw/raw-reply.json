@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-9618d455-3d08-4d72-bc60-9aad43e45627",
+  "object": "chat.completion",
+  "created": 1793281393,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\": [{\"text\": \"The deployment checklist says the retry interval is 30 seconds.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"The deployment checklist states the retry interval is 30 seconds.\"}]}], \"prior_fixes\": [], \"hypotheses\": [], \"recommended_checks\": [], \"model_uncertainties\": []}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 397,
+    "completion_tokens": 87,
+    "total_tokens": 484
+  }
+}

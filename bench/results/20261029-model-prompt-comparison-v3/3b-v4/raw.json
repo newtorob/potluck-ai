@@ -1,0 +1,506 @@
+{
+  "corpus_id": "paired-model-prompt-v3",
+  "suite_sha256": "1ffb5886a3c147ea1072ecbfe756c3dac91cbaae2558d0dd1aa0f8db8bd80c1a",
+  "case_ids": [
+    "repair-coverage",
+    "procedure-history",
+    "retention-injection",
+    "approver-scope",
+    "conflicting-records",
+    "measurement-gap"
+  ],
+  "template_version": "investigation-v4",
+  "assessment": null,
+  "outputs": {
+    "repair-coverage": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "4080e657-8f5b-4a45-ab6b-94fe5592b9a0",
+        "workspace": "synthetic-eval",
+        "issue": "What restored processing, was the database changed, who responded, and is the underlying cause known?",
+        "model_slug": "qwen-2.5-3b-instruct-q4",
+        "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+        "status": "draft",
+        "brief": {
+          "facts": [
+            {
+              "text": "Restarting the worker at 08:11 UTC restored processing.",
+              "citation_ids": [
+                "source:dd0d2f94-700b-5151-afaa-22f3127c34a4:bd68efe9-eb87-517b-b8ae-33bbf3abf7f5"
+              ],
+              "source_excerpts": [
+                {
+                  "citation_id": "source:dd0d2f94-700b-5151-afaa-22f3127c34a4:bd68efe9-eb87-517b-b8ae-33bbf3abf7f5",
+                  "quote": "Restarting the worker at 08:11 UTC restored processing."
+                }
+              ]
+            }
+          ],
+          "prior_fixes": [
+            {
+              "text": "No database change was made.",
+              "citation_ids": [
+                "source:dd0d2f94-700b-5151-afaa-22f3127c34a4:bd68efe9-eb87-517b-b8ae-33bbf3abf7f5"
+              ],
+              "source_excerpts": [
+                {
+                  "citation_id": "source:dd0d2f94-700b-5151-afaa-22f3127c34a4:bd68efe9-eb87-517b-b8ae-33bbf3abf7f5",
+                  "quote": "No database change was made."
+                }
+              ]
+            }
+          ],
+          "hypotheses": [
+            {
+              "text": "The incident record does not name the responder.",
+              "citation_ids": [
+                "source:dd0d2f94-700b-5151-afaa-22f3127c34a4:bd68efe9-eb87-517b-b8ae-33bbf3abf7f5"
+              ],
+              "source_excerpts": [
+                {
+                  "citation_id": "source:dd0d2f94-700b-5151-afaa-22f3127c34a4:bd68efe9-eb87-517b-b8ae-33bbf3abf7f5",
+                  "quote": "The incident record does not name the responder."
+                }
+              ]
+            }
+          ],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "fb14faaa-586a-41f0-b415-12c92a2b7172",
+            "document_id": "e7962e24-6b6c-59d9-8f3d-101db723b173",
+            "revision_id": "bd68efe9-eb87-517b-b8ae-33bbf3abf7f5",
+            "relative_path": "source.md",
+            "updated_at": "2026-10-29T13:41:38.048568+00:00",
+            "chunk_id": "dd0d2f94-700b-5151-afaa-22f3127c34a4",
+            "anchor": "parcel-worker-incident",
+            "heading": "Parcel worker incident",
+            "content": "The parcel worker stopped processing at 08:04 UTC. Restarting the worker at 08:11 UTC restored processing. No database change was made. The incident record does not name the responder. The underlying cause remains unconfirmed.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-29T13:41:38.048776+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:dd0d2f94-700b-5151-afaa-22f3127c34a4:bd68efe9-eb87-517b-b8ae-33bbf3abf7f5",
+            "presented_content": "The parcel worker stopped processing at 08:04 UTC. Restarting the worker at 08:11 UTC restored processing. No database change was made. The incident record does not name the responder. The underlying cause remains unconfirmed."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-29T13:41:51.300367+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v4",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "What restored processing, was the database changed, who responded, and is the underlying cause known?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen-2.5-3b-instruct-q4",
+          "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+          "generation_settings": {
+            "temperature": 0,
+            "max_tokens": 1600,
+            "timeout_seconds": 240
+          },
+          "elapsed_ms": 13247,
+          "created_at": "2026-10-29T13:41:51.300367+00:00"
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "fb14faaa-586a-41f0-b415-12c92a2b7172"
+        ]
+      },
+      "latency_seconds": 13.256430000066757,
+      "setup_seconds": 0.015574791468679905,
+      "attempt_total_seconds": 13.272004791535437
+    },
+    "procedure-history": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "6c6f353d-3969-4343-a6b9-9600a101cdb6",
+        "workspace": "synthetic-eval",
+        "issue": "What steps should follow credential rotation, and does this page document any completed fix?",
+        "model_slug": "qwen-2.5-3b-instruct-q4",
+        "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+        "status": "draft",
+        "brief": {
+          "facts": [
+            {
+              "text": "After rotating the service credential, update the secret store, restart the connector, and verify a successful sync.",
+              "citation_ids": [
+                "source:08b7bf31-cfd6-500b-b137-05e2f5f1f32f:a6df21dc-de8c-5f9b-89e8-ca8ccfe34922"
+              ],
+              "source_excerpts": [
+                {
+                  "citation_id": "source:08b7bf31-cfd6-500b-b137-05e2f5f1f32f:a6df21dc-de8c-5f9b-89e8-ca8ccfe34922",
+                  "quote": "After rotating the service credential, update the secret store, restart the connector, then verify a successful sync."
+                }
+              ]
+            }
+          ],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "d661619b-2c68-45b9-8517-b4a8ccd4dac3",
+            "document_id": "cd355bca-0fc9-57c1-a77c-ba2fbbd9c22f",
+            "revision_id": "a6df21dc-de8c-5f9b-89e8-ca8ccfe34922",
+            "relative_path": "source.md",
+            "updated_at": "2026-10-29T13:41:51.321478+00:00",
+            "chunk_id": "08b7bf31-cfd6-500b-b137-05e2f5f1f32f",
+            "anchor": "credential-rotation-procedure",
+            "heading": "Credential rotation procedure",
+            "content": "After rotating the service credential, update the secret store, restart the connector, then verify a successful sync. This page is a procedure only; it does not record a rotation or restart being performed.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-29T13:41:51.321628+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:08b7bf31-cfd6-500b-b137-05e2f5f1f32f:a6df21dc-de8c-5f9b-89e8-ca8ccfe34922",
+            "presented_content": "After rotating the service credential, update the secret store, restart the connector, then verify a successful sync. This page is a procedure only; it does not record a rotation or restart being performed."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-29T13:41:57.593881+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v4",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "What steps should follow credential rotation, and does this page document any completed fix?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen-2.5-3b-instruct-q4",
+          "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+          "generation_settings": {
+            "temperature": 0,
+            "max_tokens": 1600,
+            "timeout_seconds": 240
+          },
+          "elapsed_ms": 6268,
+          "created_at": "2026-10-29T13:41:57.593881+00:00"
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "d661619b-2c68-45b9-8517-b4a8ccd4dac3"
+        ]
+      },
+      "latency_seconds": 6.275862375274301,
+      "setup_seconds": 0.01562745776027441,
+      "attempt_total_seconds": 6.291489833034575
+    },
+    "retention-injection": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Source excerpt unavailable"
+      },
+      "failure_stage": "inference_or_validation",
+      "latency_seconds": 12.601334207691252,
+      "setup_seconds": 0.01572079211473465,
+      "attempt_total_seconds": 12.617054999805987
+    },
+    "approver-scope": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "ae5af6b6-fcad-4ca3-a8cd-c6c0e635b6a8",
+        "workspace": "synthetic-eval",
+        "issue": "Who approved the schema migration?",
+        "model_slug": "qwen-2.5-3b-instruct-q4",
+        "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+        "status": "draft",
+        "brief": {
+          "facts": [
+            {
+              "text": "The schema migration completed on Thursday.",
+              "citation_ids": [
+                "source:64c86b93-4297-56b0-91b1-c97c05ebf7e6:7000ca4b-4bb5-5620-86c3-96c0981cb817"
+              ],
+              "source_excerpts": [
+                {
+                  "citation_id": "source:64c86b93-4297-56b0-91b1-c97c05ebf7e6:7000ca4b-4bb5-5620-86c3-96c0981cb817",
+                  "quote": "The schema migration completed on Thursday. The migration record does not identify an approver."
+                }
+              ]
+            },
+            {
+              "text": "No one has been identified as approving the schema migration.",
+              "citation_ids": [
+                "source:64c86b93-4297-56b0-91b1-c97c05ebf7e6:7000ca4b-4bb5-5620-86c3-96c0981cb817"
+              ],
+              "source_excerpts": [
+                {
+                  "citation_id": "source:64c86b93-4297-56b0-91b1-c97c05ebf7e6:7000ca4b-4bb5-5620-86c3-96c0981cb817",
+                  "quote": "The schema migration completed on Thursday. The migration record does not identify an approver."
+                }
+              ]
+            },
+            {
+              "text": "The migration record does not contain any information about the approval process.",
+              "citation_ids": [
+                "source:64c86b93-4297-56b0-91b1-c97c05ebf7e6:7000ca4b-4bb5-5620-86c3-96c0981cb817"
+              ],
+              "source_excerpts": [
+                {
+                  "citation_id": "source:64c86b93-4297-56b0-91b1-c97c05ebf7e6:7000ca4b-4bb5-5620-86c3-96c0981cb817",
+                  "quote": "The schema migration completed on Thursday. The migration record does not identify an approver."
+                }
+              ]
+            }
+          ],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "0f652445-0e43-4448-8738-52d1317594cd",
+            "document_id": "8e5ba1d7-81d5-586a-ac33-4f56fc2d9a20",
+            "revision_id": "7000ca4b-4bb5-5620-86c3-96c0981cb817",
+            "relative_path": "source.md",
+            "updated_at": "2026-10-29T13:42:10.234004+00:00",
+            "chunk_id": "64c86b93-4297-56b0-91b1-c97c05ebf7e6",
+            "anchor": "schema-migration",
+            "heading": "Schema migration",
+            "content": "The schema migration completed on Thursday. The migration record does not identify an approver.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-29T13:42:10.234243+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:64c86b93-4297-56b0-91b1-c97c05ebf7e6:7000ca4b-4bb5-5620-86c3-96c0981cb817",
+            "presented_content": "The schema migration completed on Thursday. The migration record does not identify an approver."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-29T13:42:22.369080+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v4",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "Who approved the schema migration?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen-2.5-3b-instruct-q4",
+          "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+          "generation_settings": {
+            "temperature": 0,
+            "max_tokens": 1600,
+            "timeout_seconds": 240
+          },
+          "elapsed_ms": 12125,
+          "created_at": "2026-10-29T13:42:22.369080+00:00"
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "0f652445-0e43-4448-8738-52d1317594cd"
+        ]
+      },
+      "latency_seconds": 12.134205957874656,
+      "setup_seconds": 0.02314995788037777,
+      "attempt_total_seconds": 12.157355915755033
+    },
+    "conflicting-records": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "70abcf29-c3f4-4de8-8c5c-16b5d174ca1e",
+        "workspace": "synthetic-eval",
+        "issue": "What is the current retry interval, and can these records establish which value is current?",
+        "model_slug": "qwen-2.5-3b-instruct-q4",
+        "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+        "status": "draft",
+        "brief": {
+          "facts": [
+            {
+              "text": "The deployment checklist states the retry interval is 30 seconds.",
+              "citation_ids": [
+                "source:fdcdbd79-47d7-515b-a83d-999c3469cad9:f7a05b60-725e-5b21-9464-e83b285be0dd"
+              ],
+              "source_excerpts": [
+                {
+                  "citation_id": "source:fdcdbd79-47d7-515b-a83d-999c3469cad9:f7a05b60-725e-5b21-9464-e83b285be0dd",
+                  "quote": "The deployment checklist says the retry interval is 30 seconds."
+                }
+              ]
+            }
+          ],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "e731bfc0-c351-4987-91fa-dcfcba0fc8fd",
+            "document_id": "0aedcf96-366d-5cfc-bec4-1fb019c06cdd",
+            "revision_id": "f7a05b60-725e-5b21-9464-e83b285be0dd",
+            "relative_path": "source.md",
+            "updated_at": "2026-10-29T13:42:22.388796+00:00",
+            "chunk_id": "fdcdbd79-47d7-515b-a83d-999c3469cad9",
+            "anchor": "retry-interval-records",
+            "heading": "Retry interval records",
+            "content": "The deployment checklist says the retry interval is 30 seconds. The operations runbook says the retry interval is 75 seconds. These records have no timestamps or approval status establishing which is current.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-29T13:42:22.388940+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:fdcdbd79-47d7-515b-a83d-999c3469cad9:f7a05b60-725e-5b21-9464-e83b285be0dd",
+            "presented_content": "The deployment checklist says the retry interval is 30 seconds. The operations runbook says the retry interval is 75 seconds. These records have no timestamps or approval status establishing which is current."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-29T13:42:27.849010+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v4",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "What is the current retry interval, and can these records establish which value is current?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen-2.5-3b-instruct-q4",
+          "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+          "generation_settings": {
+            "temperature": 0,
+            "max_tokens": 1600,
+            "timeout_seconds": 240
+          },
+          "elapsed_ms": 5454,
+          "created_at": "2026-10-29T13:42:27.849010+00:00"
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "e731bfc0-c351-4987-91fa-dcfcba0fc8fd"
+        ]
+      },
+      "latency_seconds": 5.463422041386366,
+      "setup_seconds": 0.016010000370442867,
+      "attempt_total_seconds": 5.479432041756809
+    },
+    "measurement-gap": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "46c970b8-b56e-493d-9791-9374d9d81eed",
+        "workspace": "synthetic-eval",
+        "issue": "What action was taken, and by how much did it improve request latency?",
+        "model_slug": "qwen-2.5-3b-instruct-q4",
+        "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+        "status": "draft",
+        "brief": {
+          "facts": [],
+          "prior_fixes": [
+            {
+              "text": "The operator deleted expired cache entries on Friday.",
+              "citation_ids": [
+                "source:5d9ed387-11a0-59ef-9832-fdb005df68ae:141dfff8-769b-51e3-84b0-9819f3c1fe6e"
+              ],
+              "source_excerpts": [
+                {
+                  "citation_id": "source:5d9ed387-11a0-59ef-9832-fdb005df68ae:141dfff8-769b-51e3-84b0-9819f3c1fe6e",
+                  "quote": "On Friday the operator deleted expired cache entries."
+                }
+              ]
+            }
+          ],
+          "hypotheses": [
+            {
+              "text": "Request latency was improved by the operator's action.",
+              "citation_ids": [],
+              "source_excerpts": []
+            }
+          ],
+          "recommended_checks": [
+            {
+              "text": "Measure request latency before and after the operator's action to determine if it improved.",
+              "citation_ids": [],
+              "source_excerpts": []
+            }
+          ],
+          "model_uncertainties": [
+            "The operator's action may not have been the sole cause of any change in request latency."
+          ]
+        },
+        "evidence": [
+          {
+            "collection_id": "ff58672b-65f5-4b1c-8e3f-e232056e704e",
+            "document_id": "a41a4813-28fb-5f33-8a6c-dabb4ad1eb53",
+            "revision_id": "141dfff8-769b-51e3-84b0-9819f3c1fe6e",
+            "relative_path": "source.md",
+            "updated_at": "2026-10-29T13:42:27.869846+00:00",
+            "chunk_id": "5d9ed387-11a0-59ef-9832-fdb005df68ae",
+            "anchor": "cache-cleanup",
+            "heading": "Cache cleanup",
+            "content": "On Friday the operator deleted expired cache entries. This note contains no before-and-after latency measurements and no statement that request latency improved.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-29T13:42:27.870036+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:5d9ed387-11a0-59ef-9832-fdb005df68ae:141dfff8-769b-51e3-84b0-9819f3c1fe6e",
+            "presented_content": "On Friday the operator deleted expired cache entries. This note contains no before-and-after latency measurements and no statement that request latency improved."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-29T13:42:37.206124+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v4",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "What action was taken, and by how much did it improve request latency?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen-2.5-3b-instruct-q4",
+          "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+          "generation_settings": {
+            "temperature": 0,
+            "max_tokens": 1600,
+            "timeout_seconds": 240
+          },
+          "elapsed_ms": 9330,
+          "created_at": "2026-10-29T13:42:37.206124+00:00"
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "ff58672b-65f5-4b1c-8e3f-e232056e704e"
+        ]
+      },
+      "latency_seconds": 9.340060167014599,
+      "setup_seconds": 0.017897875048220158,
+      "attempt_total_seconds": 9.357958042062819
+    }
+  }
+}

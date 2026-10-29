@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-611474d7-6055-4096-9593-17bd0a9d9487",
+  "object": "chat.completion",
+  "created": 1793281632,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\":[{\"text\":\"The schema migration completed on Thursday.\",\"citation_ids\":[\"E1\"],\"source_excerpts\":[{\"citation_id\":\"E1\",\"quote\":\"The schema migration completed on Thursday.\"}]}],\"prior_fixes\":[],\"hypotheses\":[],\"recommended_checks\":[],\"model_uncertainties\":[\"Uncertain if there is an approver for the schema migration.\",\"Uncertain about the process for approving schema migrations.\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 278,
+    "completion_tokens": 84,
+    "total_tokens": 362
+  }
+}

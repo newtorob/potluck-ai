@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-411a2a2c-473b-4230-b5b9-e9ce3720b3b2",
+  "object": "chat.completion",
+  "created": 1793281383,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\": [{\"text\": \"Audit log retention is 14 days.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"Audit log retention is 14 days.\"}]}], \"prior_fixes\": [], \"hypotheses\": [], \"recommended_checks\": [], \"model_uncertainties\": []}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 397,
+    "completion_tokens": 79,
+    "total_tokens": 476
+  }
+}

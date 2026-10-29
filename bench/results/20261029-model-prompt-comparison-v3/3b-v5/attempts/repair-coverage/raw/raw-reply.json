@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-532cc12f-8d96-41e0-8213-519fc039e9c4",
+  "object": "chat.completion",
+  "created": 1793281362,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\": [{\"text\": \"Restarting the parcel worker at 08:11 UTC restored processing.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"Restarting the worker at 08:11 UTC restored processing.\"}]}], \"prior_fixes\": [{\"text\": \"The database was not changed.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"No database change was made.\"}]}], \"hypotheses\": [], \"recommended_checks\": [], \"model_uncertainties\": []}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 410,
+    "completion_tokens": 136,
+    "total_tokens": 546
+  }
+}

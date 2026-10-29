@@ -1,0 +1,39 @@
+{
+  "platform": "macOS / Apple M2 Pro / 16 GiB",
+  "working_tree_checks": [
+    {
+      "command": "PYTHONPATH=/Users/rob/Documents/potluck/apps/desktop/python make test-sidecar",
+      "exit_code": 0,
+      "passed": 4963,
+      "skipped": 5
+    },
+    {
+      "command": "make test-fast",
+      "exit_code": 0,
+      "frontend_passed": 517,
+      "cli_passed": 1228,
+      "landing_passed": 44,
+      "typechecks": "passed",
+      "privacy_lint": "passed"
+    }
+  ],
+  "clean_scoped_check": {
+    "base_commit": "31ad73dacfe55eca4fc5264a484e69bba51b9fba",
+    "overlay": "only the six changed implementation and test files",
+    "command": "python -m pytest tests/test_investigations.py tests/test_company_brain_grounding_runner.py tests/test_company_brain_eval_runner.py -q",
+    "passed": 25,
+    "exit_code": 0
+  },
+  "implementation_sha256": {
+    "potluck_local/services/investigations.py": "8b1d1b9e48a200ec4d949c571f9b3c8372f779dfd7f65605352df85db3c8c2e8",
+    "potluck_local/services/company_brain_eval_runner.py": "e1c7ef6f10c16a1921bcc5cacff728be8a6a5f7089dfc2d83c039ac4d15d0904",
+    "potluck_local/services/company_brain_grounding_runner.py": "362ee20c64c1deff370820eb3d9b5d93a51d431201bac89231e9d207748be0b0"
+  },
+  "preservation": {
+    "preexisting_snapshot_files": 81489,
+    "unchanged": 81488,
+    "changed": 0,
+    "moved_generated_audit": "apps/desktop/frontend/premium-audit.json moved to task work/model-comparison/prior-premium-audit.json"
+  },
+  "release": "Local commit only; no push, deployment, model download, remote inference or paid CI."
+}

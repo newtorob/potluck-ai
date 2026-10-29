@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-other-workspace",
+  "collection_id": "80284d2c-74a4-4785-8c7c-b7b43a324eff",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-model-prompt-comparison-v3/3b-v5/attempts/approver-scope/raw/excluded",
+  "source_sha256": "639737c5c1741f816894453871f93c1507e9fbc782bc747dbf6f56e3a6eccff0",
+  "scan": {
+    "collection_id": "80284d2c-74a4-4785-8c7c-b7b43a324eff",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

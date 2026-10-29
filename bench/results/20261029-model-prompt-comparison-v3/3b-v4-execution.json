@@ -1,0 +1,25 @@
+{
+  "arm": "3b-v4",
+  "returncode": 0,
+  "command": [
+    "/Users/rob/Documents/potluck/apps/desktop/python/.venv/bin/python",
+    "-m",
+    "potluck_local.services.company_brain_grounding_runner",
+    "--suite",
+    "fresh",
+    "--fixture-dir",
+    "/Users/rob/Documents/potluck/apps/desktop/python/evals/company_brain/model_comparison_v3",
+    "--template-version",
+    "investigation-v4",
+    "--model-path",
+    "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+    "--model-sha256",
+    "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "--context-size",
+    "8192",
+    "--threads",
+    "8",
+    "--output-dir",
+    "/Users/rob/Documents/potluck/bench/results/20261029-model-prompt-comparison-v3/3b-v4"
+  ]
+}

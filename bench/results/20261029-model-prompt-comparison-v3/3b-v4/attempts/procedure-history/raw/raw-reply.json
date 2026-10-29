@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-3c35d68a-6d72-4065-ab24-5d47c9e783fa",
+  "object": "chat.completion",
+  "created": 1793281311,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\": [{\"text\": \"After rotating the service credential, update the secret store, restart the connector, and verify a successful sync.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"After rotating the service credential, update the secret store, restart the connector, then verify a successful sync.\"}]}], \"prior_fixes\": [], \"hypotheses\": [], \"recommended_checks\": [], \"model_uncertainties\": []}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 310,
+    "completion_tokens": 103,
+    "total_tokens": 413
+  }
+}

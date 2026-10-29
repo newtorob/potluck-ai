@@ -1,0 +1,108 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "4080e657-8f5b-4a45-ab6b-94fe5592b9a0",
+    "workspace": "synthetic-eval",
+    "issue": "What restored processing, was the database changed, who responded, and is the underlying cause known?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "facts": [
+        {
+          "text": "Restarting the worker at 08:11 UTC restored processing.",
+          "citation_ids": [
+            "source:dd0d2f94-700b-5151-afaa-22f3127c34a4:bd68efe9-eb87-517b-b8ae-33bbf3abf7f5"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:dd0d2f94-700b-5151-afaa-22f3127c34a4:bd68efe9-eb87-517b-b8ae-33bbf3abf7f5",
+              "quote": "Restarting the worker at 08:11 UTC restored processing."
+            }
+          ]
+        }
+      ],
+      "prior_fixes": [
+        {
+          "text": "No database change was made.",
+          "citation_ids": [
+            "source:dd0d2f94-700b-5151-afaa-22f3127c34a4:bd68efe9-eb87-517b-b8ae-33bbf3abf7f5"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:dd0d2f94-700b-5151-afaa-22f3127c34a4:bd68efe9-eb87-517b-b8ae-33bbf3abf7f5",
+              "quote": "No database change was made."
+            }
+          ]
+        }
+      ],
+      "hypotheses": [
+        {
+          "text": "The incident record does not name the responder.",
+          "citation_ids": [
+            "source:dd0d2f94-700b-5151-afaa-22f3127c34a4:bd68efe9-eb87-517b-b8ae-33bbf3abf7f5"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:dd0d2f94-700b-5151-afaa-22f3127c34a4:bd68efe9-eb87-517b-b8ae-33bbf3abf7f5",
+              "quote": "The incident record does not name the responder."
+            }
+          ]
+        }
+      ],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "fb14faaa-586a-41f0-b415-12c92a2b7172",
+        "document_id": "e7962e24-6b6c-59d9-8f3d-101db723b173",
+        "revision_id": "bd68efe9-eb87-517b-b8ae-33bbf3abf7f5",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:41:38.048568+00:00",
+        "chunk_id": "dd0d2f94-700b-5151-afaa-22f3127c34a4",
+        "anchor": "parcel-worker-incident",
+        "heading": "Parcel worker incident",
+        "content": "The parcel worker stopped processing at 08:04 UTC. Restarting the worker at 08:11 UTC restored processing. No database change was made. The incident record does not name the responder. The underlying cause remains unconfirmed.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:41:38.048776+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:dd0d2f94-700b-5151-afaa-22f3127c34a4:bd68efe9-eb87-517b-b8ae-33bbf3abf7f5",
+        "presented_content": "The parcel worker stopped processing at 08:04 UTC. Restarting the worker at 08:11 UTC restored processing. No database change was made. The incident record does not name the responder. The underlying cause remains unconfirmed."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T13:41:51.300367+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v4",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What restored processing, was the database changed, who responded, and is the underlying cause known?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240
+      },
+      "elapsed_ms": 13247,
+      "created_at": "2026-10-29T13:41:51.300367+00:00"
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "fb14faaa-586a-41f0-b415-12c92a2b7172"
+    ]
+  },
+  "latency_seconds": 13.256430000066757,
+  "setup_seconds": 0.015574791468679905,
+  "attempt_total_seconds": 13.272004791535437
+}

@@ -15,17 +15,19 @@ from potluck_local.services.runtime import get_runtime
 FIXTURES = base.FIXTURES / 'grounding_v2'
 
 
-def read_suite(suite: str) -> tuple[dict[str, Any], dict[str, Any], dict[str, bytes]]:
+def read_suite(suite: str, fixture_dir: Path | None = None) -> tuple[dict[str, Any], dict[str, Any], dict[str, bytes]]:
     if suite not in ('development', 'fresh'):
         raise ValueError('Invalid suite')
+    fixture_dir = fixture_dir if fixture_dir is not None else FIXTURES
     files = {}
     for name in (suite, 'rubric'):
-        data = (FIXTURES / f'{name}.json').read_bytes()
-        expected = (FIXTURES / f'{name}.sha256').read_text().split()[0]
+        data = (fixture_dir / f'{name}.json').read_bytes()
+        checksum = (fixture_dir / f'{name}.sha256').read_bytes()
+        expected = checksum.decode('utf-8').split()[0]
         if base.digest(data) != expected:
             raise ValueError(f'Frozen fixture hash mismatch: {name}')
         files[f'{name}.json'] = data
-        files[f'{name}.sha256'] = (FIXTURES / f'{name}.sha256').read_bytes()
+        files[f'{name}.sha256'] = checksum
     manifest = json.loads(files[f'{suite}.json'])
     rubric = json.loads(files['rubric.json'])
     ids = [case['id'] for case in manifest['cases']]
@@ -41,8 +43,11 @@ def read_suite(suite: str) -> tuple[dict[str, Any], dict[str, Any], dict[str, by
 
 
 async def run(out: Path, suite: str, model_path: Path, expected_sha: str,
-              n_ctx: int, threads: int) -> None:
-    manifest, _, files = read_suite(suite)
+              n_ctx: int, threads: int, fixture_dir: Path | None = None,
+              template_version: str = 'investigation-v4') -> None:
+    if template_version not in ('investigation-v4', 'investigation-v5'):
+        raise ValueError('Invalid investigation template version')
+    manifest, _, files = read_suite(suite, fixture_dir)
     if n_ctx != 8192 or threads != 8:
         raise ValueError('Grounding runs require context size 8192 and 8 threads')
     if not model_path.is_file() or model_path.is_symlink():
@@ -54,6 +59,7 @@ async def run(out: Path, suite: str, model_path: Path, expected_sha: str,
     out = out.expanduser().absolute()
     out = out.parent.resolve(strict=True) / out.name
     out.mkdir(mode=0o700, parents=False, exist_ok=False)
+    (out / '.gitignore').write_text('/data/\n**/*.sqlite*\n', encoding='utf-8')
     (out / 'data').mkdir(mode=0o700)
     for name, data in files.items():
         with (out / name).open('xb') as stream:
@@ -62,6 +68,7 @@ async def run(out: Path, suite: str, model_path: Path, expected_sha: str,
                 'cpu_only': True, 'rpc_servers': None}
     base.write_new(out / 'run-metadata.json', {
         'suite': suite, 'corpus_id': manifest['corpus_id'],
+        'template_version': template_version,
         'suite_sha256': base.digest(files[f'{suite}.json']),
         'rubric_sha256': base.digest(files['rubric.json']),
         'model_path': str(model_path), 'model_sha256': model_sha,
@@ -78,11 +85,12 @@ async def run(out: Path, suite: str, model_path: Path, expected_sha: str,
             model = runtime.current_model_id()
             outputs = {}
             for case in manifest['cases']:
-                outputs[case['id']] = await base.attempt(out, case, 'raw', runtime, model)
+                outputs[case['id']] = await base.attempt(
+                    out, case, 'raw', runtime, model, template_version=template_version)
             base.write_new(out / 'raw.json', {'corpus_id': manifest['corpus_id'],
                 'suite_sha256': base.digest(files[f'{suite}.json']),
                 'case_ids': [case['id'] for case in manifest['cases']],
-                'assessment': None, 'outputs': outputs})
+                'template_version': template_version, 'assessment': None, 'outputs': outputs})
         except Exception as exc:
             base.write_new(out / 'run-error.json', {'type': type(exc).__name__, 'message': str(exc)})
             raise
@@ -93,6 +101,10 @@ async def run(out: Path, suite: str, model_path: Path, expected_sha: str,
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--suite', choices=('development', 'fresh'), required=True)
+    parser.add_argument('--fixture-dir', type=Path, default=None,
+                        help='Frozen fixture directory (defaults to grounding_v2)')
+    parser.add_argument('--template-version', choices=('investigation-v4', 'investigation-v5'),
+                        default='investigation-v4')
     parser.add_argument('--model-path', type=Path, required=True)
     parser.add_argument('--model-sha256', required=True)
     parser.add_argument('--context-size', type=int, required=True)
@@ -100,7 +112,9 @@ def main() -> None:
     parser.add_argument('--output-dir', type=Path, required=True)
     args = parser.parse_args()
     asyncio.run(run(args.output_dir, args.suite, args.model_path.expanduser().absolute(),
-                    args.model_sha256, args.context_size, args.threads))
+                    args.model_sha256, args.context_size, args.threads,
+                    args.fixture_dir.expanduser().absolute() if args.fixture_dir else None,
+                    args.template_version))
 
 
 if __name__ == '__main__':

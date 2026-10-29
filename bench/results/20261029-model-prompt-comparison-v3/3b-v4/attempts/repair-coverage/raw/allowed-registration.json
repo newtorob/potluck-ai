@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "fb14faaa-586a-41f0-b415-12c92a2b7172",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-model-prompt-comparison-v3/3b-v4/attempts/repair-coverage/raw/allowed",
+  "source_sha256": "3d9de34402103400ddae0d360d9d235b268594b11d25cf531f7dcdc39b27ba99",
+  "scan": {
+    "collection_id": "fb14faaa-586a-41f0-b415-12c92a2b7172",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

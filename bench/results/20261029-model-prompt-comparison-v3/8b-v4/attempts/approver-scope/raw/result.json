@@ -1,0 +1,85 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "485f209c-d567-44a3-b9f9-7fd1a8872131",
+    "workspace": "synthetic-eval",
+    "issue": "Who approved the schema migration?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "facts": [
+        {
+          "text": "The schema migration completed on Thursday.",
+          "citation_ids": [
+            "source:cc1c88a2-ebe1-5af4-b512-3c371db14f2c:3bd1205f-b732-5f3b-ac1a-c8c294b41c7a"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:cc1c88a2-ebe1-5af4-b512-3c371db14f2c:3bd1205f-b732-5f3b-ac1a-c8c294b41c7a",
+              "quote": "The schema migration completed on Thursday."
+            }
+          ]
+        }
+      ],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": [
+        "Uncertain if there is an approver for the schema migration.",
+        "Uncertain about the process for approving schema migrations."
+      ]
+    },
+    "evidence": [
+      {
+        "collection_id": "4284a5c7-0481-4de9-80e7-39737a870b70",
+        "document_id": "6e2e7f19-84d4-5f0c-ac1b-d8243c709669",
+        "revision_id": "3bd1205f-b732-5f3b-ac1a-c8c294b41c7a",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:47:12.338704+00:00",
+        "chunk_id": "cc1c88a2-ebe1-5af4-b512-3c371db14f2c",
+        "anchor": "schema-migration",
+        "heading": "Schema migration",
+        "content": "The schema migration completed on Thursday. The migration record does not identify an approver.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:47:12.338866+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:cc1c88a2-ebe1-5af4-b512-3c371db14f2c:3bd1205f-b732-5f3b-ac1a-c8c294b41c7a",
+        "presented_content": "The schema migration completed on Thursday. The migration record does not identify an approver."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T13:47:22.054335+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v4",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "Who approved the schema migration?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240
+      },
+      "elapsed_ms": 9705,
+      "created_at": "2026-10-29T13:47:22.054335+00:00"
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "4284a5c7-0481-4de9-80e7-39737a870b70"
+    ]
+  },
+  "latency_seconds": 9.714653708040714,
+  "setup_seconds": 0.020736499689519405,
+  "attempt_total_seconds": 9.735390207730234
+}

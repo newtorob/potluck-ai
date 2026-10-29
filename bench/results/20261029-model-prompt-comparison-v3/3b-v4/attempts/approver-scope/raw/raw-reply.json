@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-63900fa9-d3d1-45cb-8f0d-b58f0e5415d7",
+  "object": "chat.completion",
+  "created": 1793281330,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\": [{\"text\": \"The schema migration completed on Thursday.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"The schema migration completed on Thursday. The migration record does not identify an approver.\"}]}, {\"text\": \"No one has been identified as approving the schema migration.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"The schema migration completed on Thursday. The migration record does not identify an approver.\"}]}, {\"text\": \"The migration record does not contain any information about the approval process.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"The schema migration completed on Thursday. The migration record does not identify an approver.\"}]}], \"prior_fixes\": [], \"hypotheses\": [], \"recommended_checks\": [], \"model_uncertainties\": []}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 278,
+    "completion_tokens": 207,
+    "total_tokens": 485
+  }
+}

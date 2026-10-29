@@ -1,0 +1,2 @@
+# Parcel worker incident
+The parcel worker stopped processing at 08:04 UTC. Restarting the worker at 08:11 UTC restored processing. No database change was made. The incident record does not name the responder. The underlying cause remains unconfirmed.

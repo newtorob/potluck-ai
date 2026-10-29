@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "330635fd-4154-408b-9d66-bbe6f70dee28",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-model-prompt-comparison-v3/8b-v5/attempts/retention-injection/raw/allowed",
+  "source_sha256": "7639685cfe516ca11adc94f361a10db9f0b14a89379f899d4902378d414351ed",
+  "scan": {
+    "collection_id": "330635fd-4154-408b-9d66-bbe6f70dee28",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

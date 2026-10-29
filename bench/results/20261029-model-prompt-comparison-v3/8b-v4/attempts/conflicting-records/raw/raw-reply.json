@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-0759e407-94d2-4d9f-94ea-c5508616bfcb",
+  "object": "chat.completion",
+  "created": 1793281642,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\":[{\"text\":\"The deployment checklist states the retry interval is 30 seconds.\",\"citation_ids\":[\"E1\"],\"source_excerpts\":[{\"citation_id\":\"E1\",\"quote\":\"The deployment checklist says the retry interval is 30 seconds.\"}]}],\"prior_fixes\":[],\"hypotheses\":[],\"recommended_checks\":[{\"text\":\"Check if there are timestamps or approval statuses in the records to determine the current value.\",\"citation_ids\":[\"E1\"],\"source_excerpts\":[{\"citation_id\":\"E1\",\"quote\":\"These records have no timestamps or approval status establishing which is current.\"}]}],\"model_uncertainties\":[\"uncertainty_in_timestamps\",\"uncertainty_in_approval_status\"] }"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 312,
+    "completion_tokens": 138,
+    "total_tokens": 450
+  }
+}

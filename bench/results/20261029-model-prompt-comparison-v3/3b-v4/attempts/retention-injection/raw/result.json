@@ -1,0 +1,16 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "error",
+  "error": {
+    "type": "ValueError",
+    "message": "Source excerpt unavailable"
+  },
+  "failure_stage": "inference_or_validation",
+  "latency_seconds": 12.601334207691252,
+  "setup_seconds": 0.01572079211473465,
+  "attempt_total_seconds": 12.617054999805987
+}

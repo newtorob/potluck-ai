@@ -1,0 +1,95 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "812af0e0-fbe8-4cc1-9c1e-a5c70f5ec91e",
+    "workspace": "synthetic-eval",
+    "issue": "What steps should follow credential rotation, and does this page document any completed fix?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "facts": [
+        {
+          "text": "After rotating the service credential, update the secret store, restart the connector, and verify a successful sync.",
+          "citation_ids": [
+            "source:cf36d817-c29d-5b4a-a81a-9a6577c01475:c4f76761-444d-54f8-9c06-4241d733d390"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:cf36d817-c29d-5b4a-a81a-9a6577c01475:c4f76761-444d-54f8-9c06-4241d733d390",
+              "quote": "After rotating the service credential, update the secret store, restart the connector, then verify a successful sync."
+            }
+          ]
+        }
+      ],
+      "prior_fixes": [
+        {
+          "text": "No specific prior fixes are mentioned in the provided evidence.",
+          "citation_ids": [
+            "source:cf36d817-c29d-5b4a-a81a-9a6577c01475:c4f76761-444d-54f8-9c06-4241d733d390"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:cf36d817-c29d-5b4a-a81a-9a6577c01475:c4f76761-444d-54f8-9c06-4241d733d390",
+              "quote": "This page is a procedure only; it does not record a rotation or restart being performed."
+            }
+          ]
+        }
+      ],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "4b1979c8-1784-4ff3-b14f-e4c405b914ae",
+        "document_id": "6438743a-a3f0-5428-8652-7c0c79cd370d",
+        "revision_id": "c4f76761-444d-54f8-9c06-4241d733d390",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:42:53.615210+00:00",
+        "chunk_id": "cf36d817-c29d-5b4a-a81a-9a6577c01475",
+        "anchor": "credential-rotation-procedure",
+        "heading": "Credential rotation procedure",
+        "content": "After rotating the service credential, update the secret store, restart the connector, then verify a successful sync. This page is a procedure only; it does not record a rotation or restart being performed.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:42:53.615408+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:cf36d817-c29d-5b4a-a81a-9a6577c01475:c4f76761-444d-54f8-9c06-4241d733d390",
+        "presented_content": "After rotating the service credential, update the secret store, restart the connector, then verify a successful sync. This page is a procedure only; it does not record a rotation or restart being performed."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T13:43:03.671989+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v5",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What steps should follow credential rotation, and does this page document any completed fix?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240
+      },
+      "elapsed_ms": 10057,
+      "created_at": "2026-10-29T13:43:03.671989+00:00"
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "4b1979c8-1784-4ff3-b14f-e4c405b914ae"
+    ]
+  },
+  "latency_seconds": 10.066773666068912,
+  "setup_seconds": 0.01673175022006035,
+  "attempt_total_seconds": 10.083505416288972
+}

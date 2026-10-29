@@ -119,3 +119,40 @@ a missing status fails, and a success paired with a non-null `error` or
 and `independent: true`. This is self-reported provenance, not authenticated
 proof of independence. Agent assessment is not human acceptance. Leave
 `time_to_accepted_seconds` null unless human acceptance was actually measured.
+
+
+## Grounding and model diagnostics
+
+The separate grounding runner uses a single raw-evidence arm. It verifies the
+selected suite and rubric hashes before creating output or loading the explicitly
+named local model. It records source snapshots, requests, replies, failures,
+timings, model and code identity, and null assessments. Its output directory
+contains private data and should be handled accordingly; its local `.gitignore`
+excludes `data/` and SQLite files. No model is downloaded, switched automatically,
+or selected for the app by running this diagnostic. Each invocation loads one
+model and unloads it on completion; run comparisons sequentially in separate new
+directories.
+
+```sh
+cd apps/desktop/python
+.venv/bin/python -m potluck_local.services.company_brain_grounding_runner \
+  --fixture-dir /absolute/path/to/frozen-fixtures --suite fresh \
+  --template-version investigation-v4 \
+  --model-path /absolute/path/to/existing/model.gguf --model-sha256 MODEL_SHA256 \
+  --context-size 8192 --threads 8 --output-dir /absolute/path/to/new-output-directory
+```
+
+Omit `--fixture-dir` to use `grounding_v2/`; the selected directory must contain
+`development.json` or `fresh.json` and its matching SHA-256 file, plus
+`rubric.json` and `rubric.sha256`. `--template-version` accepts
+`investigation-v4` or `investigation-v5` and defaults to v4. Production
+investigations also default to v4; v5 is diagnostic-only and is not selectable
+through the API or UI. The v3 fixtures in `model_comparison_v3/` and the results
+in `bench/results/20261029-model-prompt-comparison-v3/` have been consumed and
+must not be presented as fresh validation. Earlier v1 and v2 raw artifacts remain
+unchanged. A valid excerpt is not proof of semantic support or owner acceptance.
+
+Next planned work, not yet implemented, is explicit per-question answer coverage
+with cited support or an unknown, followed by validation on fresh cases and actual
+owner review. Diagnostic model or agent assessments do not substitute for that
+review.

@@ -1,0 +1,84 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "26c3418b-b2d9-4b59-b9d6-a8f3ebff0324",
+    "workspace": "synthetic-eval",
+    "issue": "What action was taken, and by how much did it improve request latency?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "facts": [
+        {
+          "text": "The operator deleted expired cache entries on Friday.",
+          "citation_ids": [
+            "source:db4daa3a-4417-5994-98b2-7fff30e71ef1:9a89f098-4ce3-5f06-b178-e94bab291d04"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:db4daa3a-4417-5994-98b2-7fff30e71ef1:9a89f098-4ce3-5f06-b178-e94bab291d04",
+              "quote": "On Friday the operator deleted expired cache entries."
+            }
+          ]
+        }
+      ],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": [
+        "No before-and-after latency measurements are available to assess the impact of the cache entry deletion on request latency."
+      ]
+    },
+    "evidence": [
+      {
+        "collection_id": "e2a4f224-0d44-4793-983b-da8da9d23617",
+        "document_id": "d2a91db7-93a5-5054-91fc-5b36a2deaf11",
+        "revision_id": "9a89f098-4ce3-5f06-b178-e94bab291d04",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:47:37.397632+00:00",
+        "chunk_id": "db4daa3a-4417-5994-98b2-7fff30e71ef1",
+        "anchor": "cache-cleanup",
+        "heading": "Cache cleanup",
+        "content": "On Friday the operator deleted expired cache entries. This note contains no before-and-after latency measurements and no statement that request latency improved.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:47:37.397802+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:db4daa3a-4417-5994-98b2-7fff30e71ef1:9a89f098-4ce3-5f06-b178-e94bab291d04",
+        "presented_content": "On Friday the operator deleted expired cache entries. This note contains no before-and-after latency measurements and no statement that request latency improved."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T13:47:47.792718+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v4",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What action was taken, and by how much did it improve request latency?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240
+      },
+      "elapsed_ms": 10390,
+      "created_at": "2026-10-29T13:47:47.792718+00:00"
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "e2a4f224-0d44-4793-983b-da8da9d23617"
+    ]
+  },
+  "latency_seconds": 10.398885582573712,
+  "setup_seconds": 0.01565650012344122,
+  "attempt_total_seconds": 10.414542082697153
+}

@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "8b0e92ff-418f-4669-957f-33ad235a2767"
+  ],
+  "query": "What restored processing, was the database changed, who responded, and is the underlying cause known?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "8b0e92ff-418f-4669-957f-33ad235a2767"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "8b0e92ff-418f-4669-957f-33ad235a2767",
+        "document_id": "152b5d2c-ae01-55ea-b3b5-b532e3851010",
+        "revision_id": "f37d2cbb-0917-58f1-afe4-f4df1252b97b",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:48:07.859585+00:00",
+        "chunk_id": "731aa9f9-0fb6-5881-993d-4512c18b2da3",
+        "anchor": "parcel-worker-incident",
+        "heading": "Parcel worker incident",
+        "content": "The parcel worker stopped processing at 08:04 UTC. Restarting the worker at 08:11 UTC restored processing. No database change was made. The incident record does not name the responder. The underlying cause remains unconfirmed.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:48:07.859977+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:731aa9f9-0fb6-5881-993d-4512c18b2da3:f37d2cbb-0917-58f1-afe4-f4df1252b97b"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

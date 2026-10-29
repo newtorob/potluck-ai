@@ -175,6 +175,19 @@ are raw scoped evidence and reviewed evidence where supported by the fixture;
 other cases are controls. Stale-source rejection is reported separately from
 generated-answer quality. See the evaluation README for the command and limits.
 
+The separate grounding diagnostic accepts an explicit frozen fixture directory and
+an investigation template version. Its default is `investigation-v4`, which is
+also the production default. `investigation-v5` is diagnostic-only and cannot be
+selected through the investigation API or UI. Running a diagnostic does not change
+or download a model. The v3 comparison fixtures at
+`apps/desktop/python/evals/company_brain/model_comparison_v3/` and results at
+`bench/results/20261029-model-prompt-comparison-v3/` have been consumed; they are
+not a fresh holdout. The v1 and v2 raw artifacts remain unchanged.
+
+Planned, not implemented: represent coverage for each question with cited support
+or an explicit unknown, then validate on fresh cases and obtain actual owner review.
+Neither the diagnostic nor agent assessment establishes owner acceptance.
+
 ## Saved investigations in the desktop app
 
 Open **Workspace → Investigations**. Enter the workspace used to register the

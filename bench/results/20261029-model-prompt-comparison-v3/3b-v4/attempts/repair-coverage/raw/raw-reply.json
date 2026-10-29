@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-5d73c778-0c76-40eb-b59d-a6e43dfb56a2",
+  "object": "chat.completion",
+  "created": 1793281298,
+  "model": "/Users/rob/.potluck/models/qwen-2.5-3b-instruct-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\": [{\"text\": \"Restarting the worker at 08:11 UTC restored processing.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"Restarting the worker at 08:11 UTC restored processing.\"}]}], \"prior_fixes\": [{\"text\": \"No database change was made.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"No database change was made.\"}]}], \"hypotheses\": [{\"text\": \"The incident record does not name the responder.\", \"citation_ids\": [\"E1\"], \"source_excerpts\": [{\"citation_id\": \"E1\", \"quote\": \"The incident record does not name the responder.\"}]}], \"recommended_checks\": [], \"model_uncertainties\": []}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 325,
+    "completion_tokens": 185,
+    "total_tokens": 510
+  }
+}

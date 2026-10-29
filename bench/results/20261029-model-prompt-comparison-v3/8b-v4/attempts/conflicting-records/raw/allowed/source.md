@@ -1,0 +1,2 @@
+# Retry interval records
+The deployment checklist says the retry interval is 30 seconds. The operations runbook says the retry interval is 75 seconds. These records have no timestamps or approval status establishing which is current.

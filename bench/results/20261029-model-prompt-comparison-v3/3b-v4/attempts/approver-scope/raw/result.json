@@ -1,0 +1,106 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "ae5af6b6-fcad-4ca3-a8cd-c6c0e635b6a8",
+    "workspace": "synthetic-eval",
+    "issue": "Who approved the schema migration?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "facts": [
+        {
+          "text": "The schema migration completed on Thursday.",
+          "citation_ids": [
+            "source:64c86b93-4297-56b0-91b1-c97c05ebf7e6:7000ca4b-4bb5-5620-86c3-96c0981cb817"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:64c86b93-4297-56b0-91b1-c97c05ebf7e6:7000ca4b-4bb5-5620-86c3-96c0981cb817",
+              "quote": "The schema migration completed on Thursday. The migration record does not identify an approver."
+            }
+          ]
+        },
+        {
+          "text": "No one has been identified as approving the schema migration.",
+          "citation_ids": [
+            "source:64c86b93-4297-56b0-91b1-c97c05ebf7e6:7000ca4b-4bb5-5620-86c3-96c0981cb817"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:64c86b93-4297-56b0-91b1-c97c05ebf7e6:7000ca4b-4bb5-5620-86c3-96c0981cb817",
+              "quote": "The schema migration completed on Thursday. The migration record does not identify an approver."
+            }
+          ]
+        },
+        {
+          "text": "The migration record does not contain any information about the approval process.",
+          "citation_ids": [
+            "source:64c86b93-4297-56b0-91b1-c97c05ebf7e6:7000ca4b-4bb5-5620-86c3-96c0981cb817"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:64c86b93-4297-56b0-91b1-c97c05ebf7e6:7000ca4b-4bb5-5620-86c3-96c0981cb817",
+              "quote": "The schema migration completed on Thursday. The migration record does not identify an approver."
+            }
+          ]
+        }
+      ],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "0f652445-0e43-4448-8738-52d1317594cd",
+        "document_id": "8e5ba1d7-81d5-586a-ac33-4f56fc2d9a20",
+        "revision_id": "7000ca4b-4bb5-5620-86c3-96c0981cb817",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:42:10.234004+00:00",
+        "chunk_id": "64c86b93-4297-56b0-91b1-c97c05ebf7e6",
+        "anchor": "schema-migration",
+        "heading": "Schema migration",
+        "content": "The schema migration completed on Thursday. The migration record does not identify an approver.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:42:10.234243+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:64c86b93-4297-56b0-91b1-c97c05ebf7e6:7000ca4b-4bb5-5620-86c3-96c0981cb817",
+        "presented_content": "The schema migration completed on Thursday. The migration record does not identify an approver."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T13:42:22.369080+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v4",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "Who approved the schema migration?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240
+      },
+      "elapsed_ms": 12125,
+      "created_at": "2026-10-29T13:42:22.369080+00:00"
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "0f652445-0e43-4448-8738-52d1317594cd"
+    ]
+  },
+  "latency_seconds": 12.134205957874656,
+  "setup_seconds": 0.02314995788037777,
+  "attempt_total_seconds": 12.157355915755033
+}

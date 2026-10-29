@@ -1,0 +1,93 @@
+{
+  "assessment_type": "agent",
+  "primary_review": "Root source review with independent Terra assessments retained separately",
+  "human_time_to_accepted_seconds": null,
+  "decision": "Keep production investigation-v4 and current model selection unchanged. Candidate v5 remains diagnostic only. No pilot acceptance or general model-quality claim.",
+  "conditions": "Apple M2 Pro, 16 GiB RAM, macOS, local CPU, 8 threads, 8192 context, temperature 0, 1600 output tokens, 240-second soft timeout. Sequential, fixed order, one attempt per case/arm; no retries. Model family, template and quantization details differ as well as parameter count.",
+  "integrity": {
+    "identical_python_source_hashes": true,
+    "identical_question_and_presented_evidence_bytes": true,
+    "identical_response_schema_and_generation_settings": true,
+    "same_system_prompt_within_each_template": true,
+    "excluded_canary_absent_from_all_requests_retrievals_and_results": true
+  },
+  "limitations": [
+    "Six synthetic questions, single attempt per arm; consumed after this comparison. No statistical or broader workload claim.",
+    "Fixed order and uncontrolled desktop load. Recorded generation/validation durations exclude model load, setup, post-attempt cleanup and human review; not user-perceived or end-to-end latency.",
+    "The 240-second timeout is soft: the 8B/v5 conflict attempt recorded about 283 seconds. Worker cleanup and later wall-clock progression may take longer; no hard-stop guarantee.",
+    "Both models use the stock installed GGUF template with explicit JSON grammar; this is not a comparison of all supported runtime configurations or a model reasoning benchmark.",
+    "Tests and inference ran against the recorded working tree, which includes unrelated existing WIP. The final scoped commit is additionally checked separately."
+  ],
+  "arms": {
+    "3b-v4": {
+      "attempts": 6,
+      "saved_briefs": 5,
+      "independent_successful_answers": 0,
+      "primary_successful_answers": 1,
+      "sum_generation_validation_seconds": 59.07131474930793,
+      "errors": {
+        "retention-injection": {
+          "type": "ValueError",
+          "message": "Source excerpt unavailable"
+        }
+      },
+      "successful_cases_primary": [
+        "approver-scope"
+      ],
+      "raw_sha256": "810ab42b18527e8972c41366c94d0467dd98c29efb83d5cb28704db4f910bce2"
+    },
+    "3b-v5": {
+      "attempts": 6,
+      "saved_briefs": 4,
+      "independent_successful_answers": 3,
+      "primary_successful_answers": 3,
+      "sum_generation_validation_seconds": 131.736264789477,
+      "errors": {
+        "conflicting-records": {
+          "type": "ValueError",
+          "message": "Source excerpt unavailable"
+        },
+        "measurement-gap": {
+          "type": "ValueError",
+          "message": "Investigation output limit reached"
+        }
+      },
+      "successful_cases_primary": [
+        "procedure-history",
+        "retention-injection",
+        "approver-scope"
+      ],
+      "raw_sha256": "999232d3c213d0cc3addf1308f2539627224c787b7c4832a7cae88da996bcbf1"
+    },
+    "8b-v4": {
+      "attempts": 6,
+      "saved_briefs": 6,
+      "independent_successful_answers": 1,
+      "primary_successful_answers": 2,
+      "sum_generation_validation_seconds": 145.30826533120126,
+      "errors": {},
+      "successful_cases_primary": [
+        "approver-scope",
+        "measurement-gap"
+      ],
+      "raw_sha256": "b38e8b6882b2701a5e9b1722af1774dd7c40bd2ac9899af656ffc1139cf5ddd9"
+    },
+    "8b-v5": {
+      "attempts": 6,
+      "saved_briefs": 5,
+      "independent_successful_answers": 1,
+      "primary_successful_answers": 1,
+      "sum_generation_validation_seconds": 476.4580900417641,
+      "errors": {
+        "conflicting-records": {
+          "type": "ValueError",
+          "message": "Investigation generation timed out"
+        }
+      },
+      "successful_cases_primary": [
+        "approver-scope"
+      ],
+      "raw_sha256": "d9d78f9bc03d93dccfb693282945a5a0e2939b357300ccac98e219046b91b8e9"
+    }
+  }
+}

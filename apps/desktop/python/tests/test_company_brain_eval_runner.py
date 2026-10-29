@@ -141,3 +141,16 @@ def test_full_run_is_isolated_and_refuses_existing_output(tmp_path, monkeypatch)
     link.symlink_to(model)
     with pytest.raises(ValueError, match='existing local model'):
         asyncio.run(runner.run(tmp_path / 'other-run', link, sha, 4096, 2))
+
+
+def test_base_attempt_omits_template_override_by_default(tmp_path, monkeypatch):
+    original = runner.investigations.create_investigation
+    calls = []
+    async def old_signature(scope, issue, query, model):
+        calls.append(True)
+        return await original(scope, issue, query, model)
+    monkeypatch.setattr(runner.investigations, 'create_investigation', old_signature)
+    monkeypatch.setenv('POTLUCK_DATA_DIR', str(tmp_path / 'data'))
+    case = runner.frozen_manifest()['cases'][0]
+    result = asyncio.run(runner.attempt(tmp_path, case, 'baseline', FakeRuntime(), 'fixture-model'))
+    assert calls == [True] and result['status'] == 'success'

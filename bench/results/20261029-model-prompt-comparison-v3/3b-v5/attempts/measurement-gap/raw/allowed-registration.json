@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "8f714a70-cfb5-4bc4-bce6-3e31e87527fe",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-model-prompt-comparison-v3/3b-v5/attempts/measurement-gap/raw/allowed",
+  "source_sha256": "110e6fea3ead04eb78f414c7b4685901d06b8adb222c52fc7b20fd687ee69d1a",
+  "scan": {
+    "collection_id": "8f714a70-cfb5-4bc4-bce6-3e31e87527fe",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

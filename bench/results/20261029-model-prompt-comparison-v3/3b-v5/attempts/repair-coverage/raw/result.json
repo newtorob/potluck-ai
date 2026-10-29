@@ -1,0 +1,95 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "ea631be9-109d-44b3-a92f-a71f112907be",
+    "workspace": "synthetic-eval",
+    "issue": "What restored processing, was the database changed, who responded, and is the underlying cause known?",
+    "model_slug": "qwen-2.5-3b-instruct-q4",
+    "model_sha": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+    "status": "draft",
+    "brief": {
+      "facts": [
+        {
+          "text": "Restarting the parcel worker at 08:11 UTC restored processing.",
+          "citation_ids": [
+            "source:f38644d0-c545-5494-b002-72c4803a6a9b:abed3f27-2572-53eb-a2f3-b466d629f5f7"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:f38644d0-c545-5494-b002-72c4803a6a9b:abed3f27-2572-53eb-a2f3-b466d629f5f7",
+              "quote": "Restarting the worker at 08:11 UTC restored processing."
+            }
+          ]
+        }
+      ],
+      "prior_fixes": [
+        {
+          "text": "The database was not changed.",
+          "citation_ids": [
+            "source:f38644d0-c545-5494-b002-72c4803a6a9b:abed3f27-2572-53eb-a2f3-b466d629f5f7"
+          ],
+          "source_excerpts": [
+            {
+              "citation_id": "source:f38644d0-c545-5494-b002-72c4803a6a9b:abed3f27-2572-53eb-a2f3-b466d629f5f7",
+              "quote": "No database change was made."
+            }
+          ]
+        }
+      ],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "08d0187d-954b-43ed-af7f-08fd47d61e33",
+        "document_id": "eb12a2f7-a067-54b3-94c0-697b8dfee66e",
+        "revision_id": "abed3f27-2572-53eb-a2f3-b466d629f5f7",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T13:42:42.477669+00:00",
+        "chunk_id": "f38644d0-c545-5494-b002-72c4803a6a9b",
+        "anchor": "parcel-worker-incident",
+        "heading": "Parcel worker incident",
+        "content": "The parcel worker stopped processing at 08:04 UTC. Restarting the worker at 08:11 UTC restored processing. No database change was made. The incident record does not name the responder. The underlying cause remains unconfirmed.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T13:42:42.477846+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:f38644d0-c545-5494-b002-72c4803a6a9b:abed3f27-2572-53eb-a2f3-b466d629f5f7",
+        "presented_content": "The parcel worker stopped processing at 08:04 UTC. Restarting the worker at 08:11 UTC restored processing. No database change was made. The incident record does not name the responder. The underlying cause remains unconfirmed."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T13:42:53.593312+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v5",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What restored processing, was the database changed, who responded, and is the underlying cause known?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen-2.5-3b-instruct-q4",
+      "model_sha256": "9c9f56a391a3abbd5b89d0245bf6106081bcc3173119d4229235dd9d23253f94",
+      "generation_settings": {
+        "temperature": 0,
+        "max_tokens": 1600,
+        "timeout_seconds": 240
+      },
+      "elapsed_ms": 11117,
+      "created_at": "2026-10-29T13:42:53.593312+00:00"
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "08d0187d-954b-43ed-af7f-08fd47d61e33"
+    ]
+  },
+  "latency_seconds": 11.126892374828458,
+  "setup_seconds": 0.014748500660061836,
+  "attempt_total_seconds": 11.14164087548852
+}

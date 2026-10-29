@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-c4ee7682-f272-43aa-afba-e68f15f4922b",
+  "object": "chat.completion",
+  "created": 1793281714,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\":[{\"text\":\"Processing was stopped at 08:04 UTC and restarted at 08:11 UTC.\",\"citation_ids\":[\"E1\"],\"source_excerpts\":[{\"citation_id\":\"E1\",\"quote\":\"The parcel worker stopped processing at 08:04 UTC. Restarting the worker at 08:11 UTC restored processing.\"}]}],\"prior_fixes\":[],\"hypotheses\":[],\"recommended_checks\":[],\"model_uncertainties\":[\"The underlying cause remains unconfirmed.\",\"The incident record does not name the responder.\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 410,
+    "completion_tokens": 114,
+    "total_tokens": 524
+  }
+}

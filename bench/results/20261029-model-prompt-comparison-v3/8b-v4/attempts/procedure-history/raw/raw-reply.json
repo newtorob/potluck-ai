@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-10bc7605-e891-4b07-99fa-0b1aa950f8eb",
+  "object": "chat.completion",
+  "created": 1793281584,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\":[{\"text\":\"The procedure after rotating the service credential includes updating the secret store, restarting the connector, and verifying a successful sync.\",\"citation_ids\":[\"E1\"],\"source_excerpts\":[{\"citation_id\":\"E1\",\"quote\":\"After rotating the service credential, update the secret store, restart the connector, then verify a successful sync.\"}]}],\"prior_fixes\":[],\"hypotheses\":[],\"recommended_checks\":[],\"model_uncertainties\":[\"Uncertain if the page documents any completed fix as it states it is a procedure only and does not record a rotation or restart being performed.\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 310,
+    "completion_tokens": 119,
+    "total_tokens": 429
+  }
+}

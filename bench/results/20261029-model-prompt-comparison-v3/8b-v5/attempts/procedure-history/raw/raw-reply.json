@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-e7cad160-00c6-4351-b5af-c99d5244efce",
+  "object": "chat.completion",
+  "created": 1793281776,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"facts\":[{\"text\":\"After rotating the service credential, update the secret store, restart the connector, then verify a successful sync.\",\"citation_ids\":[\"E1\"],\"source_excerpts\":[{\"citation_id\":\"E1\",\"quote\":\"After rotating the service credential, update the secret store, restart the connector, then verify a successful sync.\"}]}],\"prior_fixes\":[],\"hypotheses\":[],\"recommended_checks\":[],\"model_uncertainties\":[]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 395,
+    "completion_tokens": 90,
+    "total_tokens": 485
+  }
+}
