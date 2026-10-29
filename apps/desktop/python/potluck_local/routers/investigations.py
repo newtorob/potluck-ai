@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool
 from potluck_local.services.evidence_lookup import EvidenceScope
 from potluck_local.services.investigations import (
     BriefValidationError, _privacy, create_investigation, get_investigation, list_investigations,
-    record_outcome, review_investigation,
+    record_outcome, review_investigation, suggest_investigation_plan,
 )
 from potluck_local.services.memory_db import get_memory_db_path, init_memory_db
 
@@ -27,6 +27,18 @@ class ScopeRequest(BaseModel):
         return EvidenceScope(self.workspace, tuple(self.collection_ids))
 
 
+class ReviewedOperation(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    request: str = Field(min_length=1, max_length=500)
+    operation: Literal['answer', 'difference', 'percentage_point_difference', 'percent_change', 'percentage']
+
+
+class PlanRequest(ScopeRequest):
+    issue: str = Field(min_length=1, max_length=4000)
+    model_slug: str = Field(min_length=1, max_length=128)
+    generation_profile: str | None = Field(default=None, min_length=1, max_length=128)
+
+
 class CreateRequest(ScopeRequest):
     issue: str = Field(min_length=1, max_length=4000)
     query: str = Field(min_length=1, max_length=1000)
@@ -34,6 +46,8 @@ class CreateRequest(ScopeRequest):
     answer_each_question: StrictBool = False
     questions: list[str] | None = Field(default=None, min_length=1, max_length=8)
     generation_profile: str | None = Field(default=None, min_length=1, max_length=128)
+    reviewed_operations: list[ReviewedOperation] | None = Field(default=None, min_length=1, max_length=12)
+    plan_confirmed: StrictBool = False
 
 
 class ReviewRequest(ScopeRequest):
@@ -116,6 +130,15 @@ async def list_items(workspace: str, collection_ids: list[str] = Query(...)) -> 
 @router.post('/investigations')
 async def create(body: CreateRequest) -> dict[str, Any]:
     try:
+        if body.reviewed_operations is not None:
+            if not body.plan_confirmed or body.answer_each_question or body.questions is not None:
+                raise ValueError('A confirmed plan cannot be combined with question options')
+            return await create_investigation(body.scope(), body.issue, body.query, body.model_slug,
+                                              template_version='investigation-v9',
+                                              reviewed_operations=[r.model_dump() for r in body.reviewed_operations],
+                                              generation_profile=body.generation_profile)
+        if body.plan_confirmed:
+            raise ValueError('Confirmation requires an operation plan')
         if not body.answer_each_question and (body.questions is not None or body.generation_profile is not None):
             raise ValueError('Question options require v6')
         if body.answer_each_question:
@@ -123,6 +146,15 @@ async def create(body: CreateRequest) -> dict[str, Any]:
                                               template_version='investigation-v6', questions=body.questions,
                                               generation_profile=body.generation_profile)
         return await create_investigation(body.scope(), body.issue, body.query, body.model_slug)
+    except (ValueError, PermissionError, LookupError) as exc:
+        raise _error(exc) from None
+
+
+@router.post('/investigations/plan')
+async def plan(body: PlanRequest) -> dict[str, Any]:
+    try:
+        return await suggest_investigation_plan(body.scope(), body.issue, body.model_slug,
+                                                generation_profile=body.generation_profile)
     except (ValueError, PermissionError, LookupError) as exc:
         raise _error(exc) from None
 
@@ -209,6 +241,13 @@ async def export(iid: str, workspace: str, collection_ids: list[str] = Query(...
                 for excerpt in answer['source_excerpts']:
                     lines.append('- Source excerpt (' + escape(excerpt['citation_id']) + '): ' + escape(excerpt['quote']))
                 lines.append('')
+        if provenance.get('template_version') == 'investigation-v9':
+            lines += ['## Plan acknowledgement', escape(provenance.get('operation_plan_origin', 'unavailable')),
+                      'Plan confirmation is not approval of the answers.', '', '## Quantity extraction notices']
+            for notice in provenance.get('extraction_notices', []):
+                lines.append('- ' + escape(notice['snippet_id']) + ' (' + escape(notice['citation_id']) +
+                             '): ' + escape(notice['source_text']) + ' · ' + escape(notice['reason']))
+            lines.append('')
         traces = provenance.get('calculation_traces', [])
         if traces:
             lines += ['## Original machine calculations',

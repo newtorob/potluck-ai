@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "fcffce68-a95f-437a-91f3-9384f9b2c452",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-reviewed-operations-v1/v9-fixture_supplied-s7/attempts/outlet-reserve/raw/allowed",
+  "source_sha256": "25959a756a933953feeac85536605afbf444ca9b765281a6789abfa6ca11e099",
+  "scan": {
+    "collection_id": "fcffce68-a95f-437a-91f3-9384f9b2c452",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

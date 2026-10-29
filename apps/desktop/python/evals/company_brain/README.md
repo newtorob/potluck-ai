@@ -145,14 +145,25 @@ cd apps/desktop/python
 Omit `--fixture-dir` to use `grounding_v2/`; the selected directory must contain
 `development.json` or `fresh.json` and its matching SHA-256 file, plus
 `rubric.json` and `rubric.sha256`. `--template-version` accepts
-`investigation-v4` or `investigation-v5` and defaults to v4. Production
+`investigation-v4` through `investigation-v9` and defaults to v4. Production
 investigations also default to v4; v5 is diagnostic-only and is not selectable
 through the API or UI. The v3 fixtures in `model_comparison_v3/` and the results
 in `bench/results/20261029-model-prompt-comparison-v3/` have been consumed and
 must not be presented as fresh validation. Earlier v1 and v2 raw artifacts remain
 unchanged. A valid excerpt is not proof of semantic support or owner acceptance.
 
-Next planned work, not yet implemented, is explicit per-question answer coverage
-with cited support or an unknown, followed by validation on fresh cases and actual
-owner review. Diagnostic model or agent assessments do not substitute for that
-review.
+The v6 question preview and v9 reviewed-operation mode provide per-request answers;
+v7 and v8 remain internal diagnostic candidates. V9 fixture-supplied plans require
+`--operation-mode fixture_supplied` and a matching checksummed
+`confirmed_operations.json`. The runner verifies the exact case set, original Q1
+mapping and rows before loading a model. It records `fixture_supplied` origin in
+request, run and result provenance. Automatic v9 runs record `planned_unreviewed`.
+Compare these separately; neither is a measurement of actual owner review.
+
+The frozen `reviewed_operations_v1/` corpus has now been consumed by the preregistered
+three-arm comparison in `bench/results/20261029-reviewed-operations-v1/`. All attempts
+remain, including quality failures; do not present subsequent runs on these cases as
+fresh validation. The author did not inspect v9 implementation before freezing but
+had seen the prior consumed corpus. Unchanged fixture hashes preserve that boundary.
+See `evaluation-contract.json` and the primary and independent assessments in the
+results directory. Actual owner acceptance and review effort remain unmeasured.

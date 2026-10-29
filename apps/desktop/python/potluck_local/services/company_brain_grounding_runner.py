@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from potluck_local.services import company_brain_eval_runner as base
-from potluck_local.services import investigation_answers, investigation_profiles
+from potluck_local.services import investigation_answers, investigation_profiles, investigation_reviewed_operations
 from potluck_local.services.runtime import get_runtime
 
 FIXTURES = base.FIXTURES / 'grounding_v2'
@@ -47,20 +47,52 @@ async def run(out: Path, suite: str, model_path: Path, expected_sha: str,
               n_ctx: int, threads: int, fixture_dir: Path | None = None,
               template_version: str = 'investigation-v4', *,
               generation_profile: str | None = None, seed: int | None = None,
-              question_mode: str = 'auto') -> None:
-    if template_version not in ('investigation-v4', 'investigation-v5', 'investigation-v6', 'investigation-v7', 'investigation-v8'):
+              question_mode: str = 'auto', operation_mode: str = 'auto') -> None:
+    if template_version not in ('investigation-v4', 'investigation-v5', 'investigation-v6', 'investigation-v7', 'investigation-v8', 'investigation-v9'):
         raise ValueError('Invalid investigation template version')
     if question_mode not in ('auto', 'explicit'):
         raise ValueError('Invalid question mode')
-    if question_mode == 'explicit' and template_version not in ('investigation-v6', 'investigation-v7', 'investigation-v8'):
+    if operation_mode not in ('auto', 'fixture_supplied'):
+        raise ValueError('Invalid operation mode')
+    if operation_mode != 'auto' and (template_version != 'investigation-v9' or question_mode != 'auto'):
+        raise ValueError('Fixture operations require v9 and automatic question mode')
+    if template_version == 'investigation-v9' and question_mode != 'auto':
+        raise ValueError('Explicit questions are incompatible with v9')
+    if question_mode == 'explicit' and template_version not in ('investigation-v6', 'investigation-v7', 'investigation-v8', 'investigation-v9'):
         raise ValueError('Explicit questions require investigation-v6, investigation-v7 or investigation-v8')
-    if generation_profile is not None and template_version not in ('investigation-v6', 'investigation-v7', 'investigation-v8'):
+    if generation_profile is not None and template_version not in ('investigation-v6', 'investigation-v7', 'investigation-v8', 'investigation-v9'):
         raise ValueError('Generation profiles require investigation-v6, investigation-v7 or investigation-v8')
     profile = (investigation_profiles.resolve_profile(generation_profile).metadata()
                if generation_profile is not None else None)
     if seed is not None and (type(seed) is not int or not 0 <= seed <= 4294967295):
         raise ValueError('Seed must be an integer between 0 and 4294967295')
     manifest, _, files = read_suite(suite, fixture_dir)
+    operation_cases: dict[str, list[dict[str, str]]] = {}
+    if operation_mode == 'fixture_supplied':
+        directory = fixture_dir if fixture_dir is not None else FIXTURES
+        try:
+            data = (directory / 'confirmed_operations.json').read_bytes()
+            checksum = (directory / 'confirmed_operations.sha256').read_bytes()
+            expected = checksum.decode('utf-8').split()[0]
+            if base.digest(data) != expected:
+                raise ValueError('Confirmed operation fixture hash mismatch')
+            document = json.loads(data)
+            if (not isinstance(document, dict) or set(document) != {'provenance', 'description', 'cases'}
+                    or not isinstance(document['provenance'], str) or not isinstance(document['description'], str)
+                    or not isinstance(document['cases'], dict)
+                    or set(document['cases']) != {case['id'] for case in manifest['cases']}):
+                raise ValueError('Invalid confirmed operation fixture')
+            for cid, rows in document['cases'].items():
+                if (not isinstance(rows, list) or any(not isinstance(row, dict) or
+                        set(row) != {'question_id', 'request', 'operation'} or row['question_id'] != 'Q1'
+                        for row in rows)):
+                    raise ValueError('Invalid confirmed operation fixture')
+                operation_cases[cid] = investigation_reviewed_operations.validate_rows(
+                    [{'request': row['request'], 'operation': row['operation']} for row in rows])
+            files['confirmed_operations.json'] = data
+            files['confirmed_operations.sha256'] = checksum
+        except (OSError, UnicodeError, IndexError, TypeError, ValueError) as exc:
+            raise ValueError('Invalid confirmed operation fixture or hash mismatch') from exc
     if question_mode == 'explicit':
         for case in manifest['cases']:
             try:
@@ -89,6 +121,9 @@ async def run(out: Path, suite: str, model_path: Path, expected_sha: str,
         'suite': suite, 'corpus_id': manifest['corpus_id'],
         'template_version': template_version,
         'generation_profile': profile, 'seed': seed, 'question_mode': question_mode,
+        'operation_mode': operation_mode,
+        'plan_origin': ('fixture_supplied' if operation_mode == 'fixture_supplied' else 'planned_unreviewed') if template_version == 'investigation-v9' else None,
+        'confirmed_operations_sha256': base.digest(files['confirmed_operations.json']) if operation_cases else None,
         'suite_sha256': base.digest(files[f'{suite}.json']),
         'rubric_sha256': base.digest(files['rubric.json']),
         'model_path': str(model_path), 'model_sha256': model_sha,
@@ -112,13 +147,19 @@ async def run(out: Path, suite: str, model_path: Path, expected_sha: str,
                     options['seed'] = seed
                 if question_mode == 'explicit':
                     options['questions'] = case['questions']
+                if template_version == 'investigation-v9':
+                    options['operation_mode'] = operation_mode
+                    if operation_mode == 'fixture_supplied':
+                        options['reviewed_operations'] = operation_cases[case['id']]
                 outputs[case['id']] = await base.attempt(
                     out, case, 'raw', runtime, model, **options)
             base.write_new(out / 'raw.json', {'corpus_id': manifest['corpus_id'],
                 'suite_sha256': base.digest(files[f'{suite}.json']),
                 'case_ids': [case['id'] for case in manifest['cases']],
                 'template_version': template_version, 'generation_profile': profile,
-                'seed': seed, 'question_mode': question_mode, 'assessment': None, 'outputs': outputs})
+                'seed': seed, 'question_mode': question_mode, 'operation_mode': operation_mode,
+                'plan_origin': ('fixture_supplied' if operation_mode == 'fixture_supplied' else 'planned_unreviewed') if template_version == 'investigation-v9' else None,
+                'assessment': None, 'outputs': outputs})
         except Exception as exc:
             base.write_new(out / 'run-error.json', {'type': type(exc).__name__, 'message': str(exc)})
             raise
@@ -131,11 +172,12 @@ def main() -> None:
     parser.add_argument('--suite', choices=('development', 'fresh'), required=True)
     parser.add_argument('--fixture-dir', type=Path, default=None,
                         help='Frozen fixture directory (defaults to grounding_v2)')
-    parser.add_argument('--template-version', choices=('investigation-v4', 'investigation-v5', 'investigation-v6', 'investigation-v7', 'investigation-v8'),
+    parser.add_argument('--template-version', choices=('investigation-v4', 'investigation-v5', 'investigation-v6', 'investigation-v7', 'investigation-v8', 'investigation-v9'),
                         default='investigation-v4')
     parser.add_argument('--generation-profile', default=None)
     parser.add_argument('--seed', type=int, default=None)
     parser.add_argument('--question-mode', choices=('auto', 'explicit'), default='auto')
+    parser.add_argument('--operation-mode', choices=('auto', 'fixture_supplied'), default='auto')
     parser.add_argument('--model-path', type=Path, required=True)
     parser.add_argument('--model-sha256', required=True)
     parser.add_argument('--context-size', type=int, required=True)
@@ -146,7 +188,7 @@ def main() -> None:
                     args.model_sha256, args.context_size, args.threads,
                     args.fixture_dir.expanduser().absolute() if args.fixture_dir else None,
                     args.template_version, generation_profile=args.generation_profile,
-                    seed=args.seed, question_mode=args.question_mode))
+                    seed=args.seed, question_mode=args.question_mode, operation_mode=args.operation_mode))
 
 
 if __name__ == '__main__':

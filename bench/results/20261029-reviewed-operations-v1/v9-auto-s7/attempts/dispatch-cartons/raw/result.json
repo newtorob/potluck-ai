@@ -1,0 +1,314 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "f4cae3a4-db54-41ff-bdd3-0548cea3e915",
+    "workspace": "synthetic-eval",
+    "issue": "How many cartons did daily dispatch volume increase by?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "How many cartons did the daily dispatch volume increase by?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Signed difference: 24 cartons.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+              "quote": "Daily dispatch volume rose from 35 to 59 cartons."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "difference",
+            "status": "computed",
+            "text": "Signed difference: 24 cartons.",
+            "formula": "after - before",
+            "result": "24",
+            "unit": "cartons",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+                "source_text": "35",
+                "snippet_text": "Daily dispatch volume rose from 35 to 59 cartons.",
+                "unit": "cartons",
+                "dimension": "count",
+                "unit_source_text": "cartons",
+                "unit_source_start": 41,
+                "unit_source_end": 48,
+                "expression_start": 27,
+                "expression_end": 48,
+                "start": 32,
+                "end": 34,
+                "value": "35"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S1",
+                "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+                "source_text": "59 cartons",
+                "snippet_text": "Daily dispatch volume rose from 35 to 59 cartons.",
+                "unit": "cartons",
+                "dimension": "count",
+                "unit_source_text": "cartons",
+                "unit_source_start": 41,
+                "unit_source_end": 48,
+                "expression_start": 27,
+                "expression_end": 48,
+                "start": 38,
+                "end": 48,
+                "value": "59"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v2",
+            "normalized_inputs": [
+              {
+                "id": "N1",
+                "role": "before",
+                "value": "35",
+                "unit": "cartons",
+                "original_value": "35",
+                "original_unit": "cartons",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N2",
+                "role": "after",
+                "value": "59",
+                "unit": "cartons",
+                "original_value": "59",
+                "original_unit": "cartons",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "59 cartons - 35 cartons = 24 cartons (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "f3699311-c80e-4b5c-9963-ceae39ae4bba",
+        "document_id": "83c4d56d-1647-514d-97a6-9c77afc79cde",
+        "revision_id": "7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:11:21.237182+00:00",
+        "chunk_id": "99f6c4d9-3a9a-50d7-8210-ba54b58ba44e",
+        "anchor": "dispatch-volume-record",
+        "heading": "Dispatch volume record",
+        "content": "Daily dispatch volume rose from 35 to 59 cartons.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:11:21.237327+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+        "presented_content": "Daily dispatch volume rose from 35 to 59 cartons."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T22:11:50.444708+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v9",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "How many cartons did daily dispatch volume increase by?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 29202,
+      "created_at": "2026-10-29T22:11:50.444708+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "How many cartons did daily dispatch volume increase by?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "How many cartons did the daily dispatch volume increase by?",
+          "operation": "difference"
+        }
+      ],
+      "operation_plan_origin": "planned_unreviewed",
+      "planner_version": "question-classification-v1",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+          "quote": "Daily dispatch volume rose from 35 to 59 cartons."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+          "source_text": "35",
+          "snippet_text": "Daily dispatch volume rose from 35 to 59 cartons.",
+          "unit": "cartons",
+          "dimension": "count",
+          "unit_source_text": "cartons",
+          "unit_source_start": 41,
+          "unit_source_end": 48,
+          "expression_start": 27,
+          "expression_end": 48,
+          "start": 32,
+          "end": 34,
+          "value": "35"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S1",
+          "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+          "source_text": "59 cartons",
+          "snippet_text": "Daily dispatch volume rose from 35 to 59 cartons.",
+          "unit": "cartons",
+          "dimension": "count",
+          "unit_source_text": "cartons",
+          "unit_source_start": 41,
+          "unit_source_end": 48,
+          "expression_start": 27,
+          "expression_end": 48,
+          "start": 38,
+          "end": 48,
+          "value": "59"
+        }
+      ],
+      "extraction_notices": [],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "difference",
+          "status": "computed",
+          "text": "Signed difference: 24 cartons.",
+          "formula": "after - before",
+          "result": "24",
+          "unit": "cartons",
+          "reason": null,
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+              "source_text": "35",
+              "snippet_text": "Daily dispatch volume rose from 35 to 59 cartons.",
+              "unit": "cartons",
+              "dimension": "count",
+              "unit_source_text": "cartons",
+              "unit_source_start": 41,
+              "unit_source_end": 48,
+              "expression_start": 27,
+              "expression_end": 48,
+              "start": 32,
+              "end": 34,
+              "value": "35"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S1",
+              "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+              "source_text": "59 cartons",
+              "snippet_text": "Daily dispatch volume rose from 35 to 59 cartons.",
+              "unit": "cartons",
+              "dimension": "count",
+              "unit_source_text": "cartons",
+              "unit_source_start": 41,
+              "unit_source_end": 48,
+              "expression_start": 27,
+              "expression_end": 48,
+              "start": 38,
+              "end": 48,
+              "value": "59"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v2",
+          "normalized_inputs": [
+            {
+              "id": "N1",
+              "role": "before",
+              "value": "35",
+              "unit": "cartons",
+              "original_value": "35",
+              "original_unit": "cartons",
+              "conversion_factor": "1"
+            },
+            {
+              "id": "N2",
+              "role": "after",
+              "value": "59",
+              "unit": "cartons",
+              "original_value": "59",
+              "original_unit": "cartons",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": "59 cartons - 35 cartons = 24 cartons (rounded)",
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "f3699311-c80e-4b5c-9963-ceae39ae4bba"
+    ]
+  },
+  "latency_seconds": 29.21204570773989,
+  "setup_seconds": 0.016473917290568352,
+  "attempt_total_seconds": 29.228519625030458
+}

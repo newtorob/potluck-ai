@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-f4222ba5-2abf-4e63-9532-790ab5a42d90",
+  "object": "chat.completion",
+  "created": 1793311910,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What was the previous quantity for the outlet reserve?\", \"What is the current quantity for the outlet reserve?\", \"What was the increase in the outlet reserve quantity?\", \"Who approved the increase in the outlet reserve quantity?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 112,
+    "completion_tokens": 48,
+    "total_tokens": 160
+  }
+}

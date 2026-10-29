@@ -9,6 +9,16 @@ export interface BriefItem {
   citation_ids: string[];
   source_excerpts?: Array<{ citation_id: string; quote: string }>;
 }
+export type OperationType =
+  | 'answer'
+  | 'difference'
+  | 'percentage_point_difference'
+  | 'percent_change'
+  | 'percentage';
+export interface ReviewedOperation {
+  request: string;
+  operation: OperationType;
+}
 export interface Brief {
   questions?: Array<{ id: string; text: string }>;
   answers?: Array<{
@@ -50,6 +60,39 @@ export interface Investigation {
     template_version?: string;
     retrieval_version?: string;
     elapsed_ms?: number;
+    extraction_notices?: Array<{
+      snippet_id: string;
+      citation_id: string;
+      source_text: string;
+      reason: string;
+    }>;
+    calculation_traces?: Array<{
+      request_id: string;
+      operation: OperationType;
+      status: string;
+      formula?: string | null;
+      evaluated_expression?: string | null;
+      result?: string | null;
+      unit?: string | null;
+      reason?: string | null;
+      caveat?: string | null;
+      algorithm_version?: string | null;
+      rounding?: { mode: string; max_fractional_digits: number } | null;
+      inputs?: Array<{
+        id: string;
+        citation_id: string;
+        source_text: string;
+        unit_source_text?: string;
+        unit_source_start?: number;
+        unit_source_end?: number;
+      }>;
+      normalized_inputs?: Array<{
+        role: string;
+        value: string;
+        unit: string;
+        conversion_factor: string;
+      }>;
+    }>;
   };
   review: null | { decision: string; reviewer: string; reason: string; corrected_brief?: Brief };
   outcome: null | { reviewer: string; result: string; notes: string };

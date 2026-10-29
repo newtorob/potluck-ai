@@ -1,4 +1,4 @@
-import type { Brief, Investigation, InvestigationScope, SourceCollection } from '@/types/investigations';
+import type { Brief, Investigation, InvestigationScope, ReviewedOperation, SourceCollection } from '@/types/investigations';
 /**
  * HTTP client for the Python sidecar running at 127.0.0.1:8321.
  *
@@ -785,7 +785,12 @@ export const localApi = {
     return timedFetch(`${LOCAL_BASE}/company-brain/investigations/${encodeURIComponent(id)}?${investigationQuery(scope)}`)
       .then(handleResponse<Investigation>);
   },
-  createInvestigation(input: InvestigationScope & { issue: string; query: string; model_slug: string; answer_each_question?: boolean; questions?: string[]; generation_profile?: string }): Promise<Investigation> {
+  planInvestigation(input: InvestigationScope & { issue: string; model_slug: string; generation_profile?: string }): Promise<{ operations: ReviewedOperation[]; model_slug: string; model_sha256: string; generation_profile: Record<string, unknown> | null; notices: string[] }> {
+    return timedFetch(`${LOCAL_BASE}/company-brain/investigations/plan`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    }, 360_000).then(handleResponse<{ operations: ReviewedOperation[]; model_slug: string; model_sha256: string; generation_profile: Record<string, unknown> | null; notices: string[] }>);
+  },
+  createInvestigation(input: InvestigationScope & { issue: string; query: string; model_slug: string; answer_each_question?: boolean; questions?: string[]; generation_profile?: string; reviewed_operations?: ReviewedOperation[]; plan_confirmed?: boolean }): Promise<Investigation> {
     return timedFetch(`${LOCAL_BASE}/company-brain/investigations`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
     }, 360_000).then(handleResponse<Investigation>);

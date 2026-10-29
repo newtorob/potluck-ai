@@ -362,3 +362,43 @@ to invalidate or hide the whole investigation, including its calculation traces.
 For shared-unit forms such as `from 100 to 200 ms` or `from 100 to 200 sessions`,
 the full expression must be in one presented snippet. Each input keeps the
 source unit text and its snippet-relative offsets in the calculation trace.
+
+The experimental reviewed-operation mode suggests an evidence-blind plan in two
+bounded local model calls, then lets the owner edit and explicitly confirm each
+request and operation before generating a v9 draft. Confirmation acknowledges the
+plan, not the factual answers. The plan endpoint does not save a draft. Generated
+results keep each operation separately, include known cited operands and source
+extraction notices, and distinguish unavailable, unsupported, zero-denominator and
+conflicting evidence. The owner must inspect the plan, source excerpts, notices and
+answers; valid arithmetic does not establish authority, selection or completeness.
+Source invalidation and correction rules apply, and exports keep the original
+machine calculation separate from the reviewer's correction.
+
+Use **Reviewed calculations (experimental)** in Investigations. Write one to twelve
+distinct requests or choose **Suggest a plan**, edit the request text and calculation
+type, then select **Confirm plan and draft**. Suggesting replaces the current plan;
+edits made while suggestions are pending take precedence. Recoverable failures retain
+the entered plan. This local opt-in does not replace the default brief or answer preview.
+
+`POST /company-brain/investigations/plan` accepts `workspace`, `collection_ids`,
+`issue`, `model_slug` and an optional `generation_profile`. It returns editable
+`operations` rows with `request` and `operation`, model identity and review notices.
+Creation accepts the same rows as `reviewed_operations` with `plan_confirmed: true`;
+these cannot be combined with `answer_each_question` or `questions`. The five operation
+types are `answer`, `difference`, `percentage_point_difference`, `percent_change` and
+`percentage`. Confirmation is explicit on each creation; suggestions alone save nothing.
+
+V9 uses the versioned quantity extractor and calculator v2; v8 retains v1 behavior.
+V2 supports bounded spelled integers through ninety-nine and additional plural count
+tokens with exact lexical identity. It does not establish nounhood or comparability,
+infer general singular/plural equivalents, or support arbitrary compound noun phrases.
+Spelled decimals, fractions, uncertainty bounds and ambiguous ranges are excluded;
+complete shared-unit forms such as `from five to ten widgets` are supported. Notices
+identify number-like text the extractor did not handle, not proof that a source value
+is absent. A lone operand has no verified before/after role and cannot establish a
+zero denominator. The model still selects evidence, operand order and conflict status.
+
+The diagnostic runner supports `--operation-mode fixture_supplied` for v9 with a
+checksummed `confirmed_operations.json`. Those runs retain `fixture_supplied` origin,
+never owner confirmation. Automatic v9 runs retain `planned_unreviewed` origin. Compare
+them separately; synthetic plans do not measure owner effort or factual acceptance.

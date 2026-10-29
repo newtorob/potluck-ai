@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-fd3599db-c575-4a1c-b3b2-a05e33d7335f",
+  "object": "chat.completion",
+  "created": 1793311807,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": \"percentage\"}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 151,
+    "completion_tokens": 7,
+    "total_tokens": 158
+  }
+}

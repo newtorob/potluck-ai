@@ -1,0 +1,2 @@
+# Service contract records
+The previous count was 60 contracts. The finance register lists the current count as 74 contracts. The account team report lists the current count as 81 contracts. Neither record establishes which current count is authoritative.

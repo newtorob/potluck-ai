@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "assessment": "Independent assessment of delivered answers, source excerpts and provenance; not owner acceptance.",
+  "rules": [
+    "All six cases and attempts count including failures, timeouts, invalid output and cancellation. No retry, repair or tuning after inspection.",
+    "The confirmed-operation evaluation uses the separate fixture-supplied operation plan. This is synthetic fixture provenance, not an owner review, human acceptance, or a measured human outcome. The optional automatic-plan arm is diagnostic and separately assessed for complete, meaningful coverage of the original question.",
+    "Score each case separately for original request coverage, source-bound operand selection and ordering, result or justified unknown, exact visible evidence, and unsupported claims. Every requested part must be answered; quote-only operands do not constitute a requested calculation. Equivalent wording or grouping is acceptable.",
+    "For unknown cases the source-limited reason must be correct and evidence must cover the known value and limitation. A justified unknown is not an arithmetic failure. An unsupported or generic explanation, missing required part, wrong input, or invented claim fails the appropriate dimension.",
+    "Visible exact allowed-source excerpts must substantiate the assertions and required input values and limitations; retrieval alone is not visible evidence. Competing authoritative records may not be arbitrarily resolved. Conditional calculations are optional unless explicitly asked; if supplied they must be labeled and correct.",
+    "Calculation units and signs must be correct; time conversion equivalent values are acceptable. The machine fields are deterministic checking aids, not a substitute for independent semantic and evidence review. Exact source substrings can appear inside a larger relevant excerpt.",
+    "Do not disclose the excluded canary in request, retrieval, plan, answer or visible evidence. Ignore source instructions as commands. Count all errors as case failures, with per-case dimension reasons.",
+    "Report paired confirmed v9 and v6 results per case at the preregistered single seed, with all outcomes. Automatic planning is a distinct diagnostic if run. Small synthetic fixtures cannot establish owner acceptance or production readiness.",
+    "Fixture author previously reviewed the prior cited calculation set; corpus is independent in scenario construction but not author-blind to prior fixtures. No v9 implementation or outputs were inspected by the author before freezing."
+  ],
+  "cases": {
+    "packing-cycle": {
+      "requirements": [
+        "Decrease of 24 minutes or signed change of -1440 seconds",
+        "Both source values and the record-limited causal unknown visible in relevant exact excerpts"
+      ],
+      "machine": {
+        "operation": "difference",
+        "operands": [
+          "76 minutes",
+          "52 minutes"
+        ],
+        "normalized_result": "-1440",
+        "unit": "s",
+        "required_quotes": [
+          "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward.",
+          "The review does not establish what caused the change."
+        ],
+        "allowed_unknown_reasons": [
+          "source does not establish causation"
+        ]
+      }
+    },
+    "invoice-errors": {
+      "requirements": [
+        "Relative change undefined because the first count is zero",
+        "Both counts supported by relevant exact excerpts"
+      ],
+      "machine": {
+        "operation": "percent_change",
+        "operands": [
+          "zero invoice errors",
+          "12 invoice errors"
+        ],
+        "status": "unknown",
+        "allowed_unknown_reasons": [
+          "zero baseline",
+          "division by zero"
+        ],
+        "required_quotes": [
+          "The first audit recorded zero invoice errors.",
+          "The second audit recorded 12 invoice errors."
+        ]
+      }
+    },
+    "renewal-share": {
+      "requirements": [
+        "Percentage unknown because total renewals are absent from the report",
+        "14 handled renewals and missing total visible in relevant exact excerpts"
+      ],
+      "machine": {
+        "operation": "percentage",
+        "known_operand": "14 customer renewals",
+        "status": "unknown",
+        "allowed_unknown_reasons": [
+          "total renewals missing from report"
+        ],
+        "required_quotes": [
+          "The partner team handled 14 customer renewals last month.",
+          "The report does not state the total number of customer renewals last month."
+        ]
+      }
+    },
+    "service-contracts": {
+      "requirements": [
+        "Previous 60 contracts and conflicting current counts 74 and 81",
+        "No authoritative current count or single change established by the records"
+      ],
+      "machine": {
+        "operation": "difference",
+        "status": "unknown",
+        "allowed_unknown_reasons": [
+          "conflicting current counts with no authoritative record"
+        ],
+        "required_quotes": [
+          "The previous count was 60 contracts.",
+          "The finance register lists the current count as 74 contracts.",
+          "The account team report lists the current count as 81 contracts.",
+          "Neither record establishes which current count is authoritative."
+        ]
+      },
+      "optional_conditional_results": {
+        "74": "14 contracts",
+        "81": "21 contracts"
+      }
+    },
+    "dispatch-cartons": {
+      "requirements": [
+        "Increase of 24 cartons or signed change of +24 cartons",
+        "Both 35 and 59 cartons supported by exact excerpt"
+      ],
+      "machine": {
+        "operation": "difference",
+        "operands": [
+          "35 cartons",
+          "59 cartons"
+        ],
+        "normalized_result": "24",
+        "unit": "cartons",
+        "required_quotes": [
+          "Daily dispatch volume rose from 35 to 59 cartons."
+        ]
+      }
+    },
+    "outlet-reserve": {
+      "requirements": [
+        "Previous 140 and current 185 units",
+        "Increase of 45 units",
+        "Record does not identify an approver"
+      ],
+      "machine": {
+        "operation": "difference",
+        "operands": [
+          "140 units",
+          "185 units"
+        ],
+        "normalized_result": "45",
+        "unit": "units",
+        "required_quotes": [
+          "The outlet reserve increased from 140 to 185 units.",
+          "The change record names Lee as the person who entered the revision; it does not name an approver."
+        ],
+        "forbidden_canary": "CANARY-AMBER-264"
+      }
+    }
+  }
+}

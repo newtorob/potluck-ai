@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "c084077c-1f9e-46f5-abce-3fdedd079d15"
+  ],
+  "query": "How many cartons did daily dispatch volume increase by?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "c084077c-1f9e-46f5-abce-3fdedd079d15"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "c084077c-1f9e-46f5-abce-3fdedd079d15",
+        "document_id": "c953fc59-baa9-576f-9fb9-1bc21ae792c3",
+        "revision_id": "70b346e6-41e1-5314-8206-13323eed879a",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:06:12.954235+00:00",
+        "chunk_id": "1a7a65ae-7cad-5e73-be9b-28fa0ac4e225",
+        "anchor": "dispatch-volume-record",
+        "heading": "Dispatch volume record",
+        "content": "Daily dispatch volume rose from 35 to 59 cartons.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:06:12.954366+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:1a7a65ae-7cad-5e73-be9b-28fa0ac4e225:70b346e6-41e1-5314-8206-13323eed879a"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

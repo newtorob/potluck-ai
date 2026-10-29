@@ -1,0 +1,34 @@
+{
+  "corpus": "reviewed_operations_v1",
+  "seed": 7,
+  "primary_independent_agree": true,
+  "arms": {
+    "v6-auto-s7": {
+      "passed": 3,
+      "cases": 6,
+      "saved_drafts": 6,
+      "all_attempts_retained": true
+    },
+    "v9-fixture_supplied-s7": {
+      "passed": 4,
+      "cases": 6,
+      "saved_drafts": 6,
+      "all_attempts_retained": true
+    },
+    "v9-auto-s7": {
+      "passed": 4,
+      "cases": 6,
+      "saved_drafts": 6,
+      "all_attempts_retained": true
+    }
+  },
+  "promotion": "Local explicit experimental reviewed-plan mode only; v4 default/v6 question preview unchanged. No production or autonomous quality promotion.",
+  "human_acceptance": false,
+  "human_review_seconds": null,
+  "limitations": [
+    "Six synthetic cases at one seed; fixture author saw prior consumed corpus but not v9 implementation.",
+    "Supplied plans are fixture data, not actual human review.",
+    "Invoice zero-baseline explanation and conflict-authority evidence fail in both v9 arms.",
+    "No post-holdout tuning or retries; corpus consumed."
+  ]
+}

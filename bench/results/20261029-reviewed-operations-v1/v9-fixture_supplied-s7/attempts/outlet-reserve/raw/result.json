@@ -1,0 +1,369 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "17736f1f-021b-4c1a-89f1-17764be35e0e",
+    "workspace": "synthetic-eval",
+    "issue": "For the outlet reserve, what were the previous and current quantities, what was the increase, and who approved it?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What were the previous and current reserve quantities?"
+        },
+        {
+          "id": "R2",
+          "text": "What was the increase in reserve quantity?"
+        },
+        {
+          "id": "R3",
+          "text": "Who approved the reserve change?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "The outlet reserve increased from 140 to 185 units.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:f984385e-c87e-5fa6-aa75-1e9c7c74ccf5:b931a589-43a2-54aa-83d7-3121307262fc",
+              "quote": "The outlet reserve increased from 140 to 185 units. "
+            }
+          ]
+        },
+        {
+          "question_id": "R2",
+          "status": "supported",
+          "text": "Signed difference: 45 units.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:f984385e-c87e-5fa6-aa75-1e9c7c74ccf5:b931a589-43a2-54aa-83d7-3121307262fc",
+              "quote": "The outlet reserve increased from 140 to 185 units. "
+            }
+          ],
+          "calculation": {
+            "request_id": "R2",
+            "operation": "difference",
+            "status": "computed",
+            "text": "Signed difference: 45 units.",
+            "formula": "after - before",
+            "result": "45",
+            "unit": "units",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:f984385e-c87e-5fa6-aa75-1e9c7c74ccf5:b931a589-43a2-54aa-83d7-3121307262fc",
+                "source_text": "140",
+                "snippet_text": "The outlet reserve increased from 140 to 185 units. ",
+                "unit": "units",
+                "dimension": "count",
+                "unit_source_text": "units",
+                "unit_source_start": 45,
+                "unit_source_end": 50,
+                "expression_start": 29,
+                "expression_end": 50,
+                "start": 34,
+                "end": 37,
+                "value": "140"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S1",
+                "citation_id": "source:f984385e-c87e-5fa6-aa75-1e9c7c74ccf5:b931a589-43a2-54aa-83d7-3121307262fc",
+                "source_text": "185 units",
+                "snippet_text": "The outlet reserve increased from 140 to 185 units. ",
+                "unit": "units",
+                "dimension": "count",
+                "unit_source_text": "units",
+                "unit_source_start": 45,
+                "unit_source_end": 50,
+                "expression_start": 29,
+                "expression_end": 50,
+                "start": 41,
+                "end": 50,
+                "value": "185"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v2",
+            "normalized_inputs": [
+              {
+                "id": "N1",
+                "role": "before",
+                "value": "140",
+                "unit": "units",
+                "original_value": "140",
+                "original_unit": "units",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N2",
+                "role": "after",
+                "value": "185",
+                "unit": "units",
+                "original_value": "185",
+                "original_unit": "units",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "185 units - 140 units = 45 units (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+          }
+        },
+        {
+          "question_id": "R3",
+          "status": "supported",
+          "text": "The change record names Lee as the person who entered the revision; it does not name an approver.",
+          "snippet_ids": [
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:f984385e-c87e-5fa6-aa75-1e9c7c74ccf5:b931a589-43a2-54aa-83d7-3121307262fc",
+              "quote": "The change record names Lee as the person who entered the revision; it does not name an approver."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "fcffce68-a95f-437a-91f3-9384f9b2c452",
+        "document_id": "abcc9b96-7dd0-568d-91e8-782a1e5706e2",
+        "revision_id": "b931a589-43a2-54aa-83d7-3121307262fc",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:06:38.458259+00:00",
+        "chunk_id": "f984385e-c87e-5fa6-aa75-1e9c7c74ccf5",
+        "anchor": "outlet-reserve-change",
+        "heading": "Outlet reserve change",
+        "content": "The outlet reserve increased from 140 to 185 units. The change record names Lee as the person who entered the revision; it does not name an approver.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:06:38.458388+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:f984385e-c87e-5fa6-aa75-1e9c7c74ccf5:b931a589-43a2-54aa-83d7-3121307262fc",
+        "presented_content": "The outlet reserve increased from 140 to 185 units. The change record names Lee as the person who entered the revision; it does not name an approver."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T22:07:41.380378+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v9",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "For the outlet reserve, what were the previous and current quantities, what was the increase, and who approved it?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 62912,
+      "created_at": "2026-10-29T22:07:41.380378+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "For the outlet reserve, what were the previous and current quantities, what was the increase, and who approved it?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "What were the previous and current reserve quantities?",
+          "operation": "answer"
+        },
+        {
+          "id": "R2",
+          "question_id": "Q1",
+          "request": "What was the increase in reserve quantity?",
+          "operation": "difference"
+        },
+        {
+          "id": "R3",
+          "question_id": "Q1",
+          "request": "Who approved the reserve change?",
+          "operation": "answer"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:f984385e-c87e-5fa6-aa75-1e9c7c74ccf5:b931a589-43a2-54aa-83d7-3121307262fc",
+          "quote": "The outlet reserve increased from 140 to 185 units. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:f984385e-c87e-5fa6-aa75-1e9c7c74ccf5:b931a589-43a2-54aa-83d7-3121307262fc",
+          "quote": "The change record names Lee as the person who entered the revision; it does not name an approver."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:f984385e-c87e-5fa6-aa75-1e9c7c74ccf5:b931a589-43a2-54aa-83d7-3121307262fc",
+          "source_text": "140",
+          "snippet_text": "The outlet reserve increased from 140 to 185 units. ",
+          "unit": "units",
+          "dimension": "count",
+          "unit_source_text": "units",
+          "unit_source_start": 45,
+          "unit_source_end": 50,
+          "expression_start": 29,
+          "expression_end": 50,
+          "start": 34,
+          "end": 37,
+          "value": "140"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S1",
+          "citation_id": "source:f984385e-c87e-5fa6-aa75-1e9c7c74ccf5:b931a589-43a2-54aa-83d7-3121307262fc",
+          "source_text": "185 units",
+          "snippet_text": "The outlet reserve increased from 140 to 185 units. ",
+          "unit": "units",
+          "dimension": "count",
+          "unit_source_text": "units",
+          "unit_source_start": 45,
+          "unit_source_end": 50,
+          "expression_start": 29,
+          "expression_end": 50,
+          "start": 41,
+          "end": 50,
+          "value": "185"
+        }
+      ],
+      "extraction_notices": [],
+      "calculation_traces": [
+        {
+          "request_id": "R2",
+          "operation": "difference",
+          "status": "computed",
+          "text": "Signed difference: 45 units.",
+          "formula": "after - before",
+          "result": "45",
+          "unit": "units",
+          "reason": null,
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:f984385e-c87e-5fa6-aa75-1e9c7c74ccf5:b931a589-43a2-54aa-83d7-3121307262fc",
+              "source_text": "140",
+              "snippet_text": "The outlet reserve increased from 140 to 185 units. ",
+              "unit": "units",
+              "dimension": "count",
+              "unit_source_text": "units",
+              "unit_source_start": 45,
+              "unit_source_end": 50,
+              "expression_start": 29,
+              "expression_end": 50,
+              "start": 34,
+              "end": 37,
+              "value": "140"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S1",
+              "citation_id": "source:f984385e-c87e-5fa6-aa75-1e9c7c74ccf5:b931a589-43a2-54aa-83d7-3121307262fc",
+              "source_text": "185 units",
+              "snippet_text": "The outlet reserve increased from 140 to 185 units. ",
+              "unit": "units",
+              "dimension": "count",
+              "unit_source_text": "units",
+              "unit_source_start": 45,
+              "unit_source_end": 50,
+              "expression_start": 29,
+              "expression_end": 50,
+              "start": 41,
+              "end": 50,
+              "value": "185"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v2",
+          "normalized_inputs": [
+            {
+              "id": "N1",
+              "role": "before",
+              "value": "140",
+              "unit": "units",
+              "original_value": "140",
+              "original_unit": "units",
+              "conversion_factor": "1"
+            },
+            {
+              "id": "N2",
+              "role": "after",
+              "value": "185",
+              "unit": "units",
+              "original_value": "185",
+              "original_unit": "units",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": "185 units - 140 units = 45 units (rounded)",
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "fcffce68-a95f-437a-91f3-9384f9b2c452"
+    ]
+  },
+  "latency_seconds": 62.92321608308703,
+  "setup_seconds": 0.018516208045184612,
+  "attempt_total_seconds": 62.94173229113221
+}

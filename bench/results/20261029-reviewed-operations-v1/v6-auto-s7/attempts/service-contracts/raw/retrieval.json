@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "9d6a29e5-ca8d-4873-b149-19abfc839c64"
+  ],
+  "query": "What is the current number of service contracts, and how much did it change from the previous count?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "9d6a29e5-ca8d-4873-b149-19abfc839c64"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "9d6a29e5-ca8d-4873-b149-19abfc839c64",
+        "document_id": "2ff5d83e-aae9-5f42-8d12-7109204700f3",
+        "revision_id": "1f395c83-0acf-5639-a86c-97c606c13f83",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:01:21.003948+00:00",
+        "chunk_id": "aa7fb945-e715-580c-b4e5-135ffbc8f5ac",
+        "anchor": "service-contract-records",
+        "heading": "Service contract records",
+        "content": "The previous count was 60 contracts. The finance register lists the current count as 74 contracts. The account team report lists the current count as 81 contracts. Neither record establishes which current count is authoritative.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:01:21.004129+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:aa7fb945-e715-580c-b4e5-135ffbc8f5ac:1f395c83-0acf-5639-a86c-97c606c13f83"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

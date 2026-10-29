@@ -101,3 +101,11 @@ errors preserve edits, while an unavailable source clears the displayed artifact
 The preview defaults to the standard answer profile. Qwen3 non-thinking is an
 explicit selection requiring a compatible loaded Qwen3 model; incompatibility
 fails the request without falling back to another profile.
+
+Reviewed calculations are an opt-in experimental path. The owner may author or
+edit a plan of 1–12 distinct requests, or ask the loaded model to suggest one;
+only **Confirm plan and draft** sends it for generation. Confirmation approves
+neither the model's answers nor its source selections. Stale suggestions cannot
+replace edits, and planning or generation failures preserve the plan. Extraction
+notices and cited inputs remain inspectable. Calculation traces belong to the
+original draft and do not change when an answer is corrected.

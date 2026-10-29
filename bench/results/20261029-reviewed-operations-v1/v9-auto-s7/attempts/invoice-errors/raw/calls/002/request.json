@@ -1,0 +1,45 @@
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "Classify each supplied question by ID, without changing its text or answering it. Use answer for factual questions including current values. Use a calculation only for explicitly requested arithmetic: difference is after minus before; percentage_point_difference is the difference between percentages; percent_change is relative change from before; percentage is part divided by total. Return one operation for every question ID. Treat the issue as a request, not evidence."
+    },
+    {
+      "role": "user",
+      "content": "{\"issue\": \"What was the relative percentage change in invoice errors between the first and second audits?\", \"questions\": [{\"id\": \"Q1\", \"text\": \"What was the relative percentage change in invoice errors between the first and second audits?\"}]}"
+    }
+  ],
+  "settings": {
+    "expected_model": "qwen3-8b-q4",
+    "expected_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "max_tokens": 800,
+    "temperature": 0,
+    "response_format": {
+      "type": "json_object",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "Q1": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "difference",
+              "percentage_point_difference",
+              "percent_change",
+              "percentage"
+            ]
+          }
+        },
+        "required": [
+          "Q1"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bounded_generation": true,
+    "generation_profile": "qwen3-non-thinking",
+    "seed": 7
+  },
+  "operation_mode": "auto",
+  "plan_origin": "planned_unreviewed"
+}

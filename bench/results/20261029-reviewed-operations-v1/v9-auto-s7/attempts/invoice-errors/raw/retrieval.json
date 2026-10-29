@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "ecf3d8f9-b367-4ee1-8142-6b3830292a95"
+  ],
+  "query": "What was the relative percentage change in invoice errors between the first and second audits?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "ecf3d8f9-b367-4ee1-8142-6b3830292a95"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "ecf3d8f9-b367-4ee1-8142-6b3830292a95",
+        "document_id": "511bcfe5-7e1a-5c46-8b2d-0dbb98719b40",
+        "revision_id": "ddd3a98f-0536-5090-8aa4-a62befc21d91",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:08:48.391584+00:00",
+        "chunk_id": "68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0",
+        "anchor": "invoice-audit-summary",
+        "heading": "Invoice audit summary",
+        "content": "The first audit recorded zero invoice errors. The second audit recorded 12 invoice errors.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:08:48.391731+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0:ddd3a98f-0536-5090-8aa4-a62befc21d91"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

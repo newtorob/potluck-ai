@@ -2,7 +2,13 @@ import { useRef, useState } from 'react';
 import { ViewHeader } from '@/components/layout/ViewHeader';
 import { localApi } from '@/lib/localApi';
 import { useModelStore } from '@/stores/modelStore';
-import type { Brief, Investigation, SourceCollection } from '@/types/investigations';
+import type {
+  Brief,
+  Investigation,
+  OperationType,
+  ReviewedOperation,
+  SourceCollection,
+} from '@/types/investigations';
 
 function evidenceText(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
@@ -26,6 +32,13 @@ const field =
   'w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground';
 const button =
   'cursor-pointer rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50';
+const operationLabels: Record<OperationType, string> = {
+  answer: 'Answer a question',
+  difference: 'Difference (after − before)',
+  percentage_point_difference: 'Percentage-point difference',
+  percent_change: 'Percent change from before',
+  percentage: 'Percentage (part of total)',
+};
 
 export function InvestigationsView() {
   const activeModel = useModelStore((s) => s.activeModelSlug);
@@ -37,6 +50,14 @@ export function InvestigationsView() {
   const [issue, setIssue] = useState('');
   const [query, setQuery] = useState('');
   const [answerEach, setAnswerEach] = useState(false);
+  const [reviewedPlan, setReviewedPlan] = useState(false);
+  const [operations, setOperations] = useState<ReviewedOperation[]>([
+    { request: '', operation: 'answer' },
+  ]);
+  const [planning, setPlanning] = useState(false);
+  const [planNotices, setPlanNotices] = useState<string[]>([]);
+  const planRevision = useRef(0);
+  const suggestedPlan = useRef(false);
   const [generationProfile, setGenerationProfile] = useState('');
   const [questionsInput, setQuestionsInput] = useState('');
   const [model, setModel] = useState('');
@@ -63,6 +84,55 @@ export function InvestigationsView() {
     .filter(Boolean);
   const questionsError = questions.length > 8 || questions.some((q) => q.length > 500);
   const ready = loadedWorkspace !== '' && selected.length > 0;
+  const requestErrors = operations.map((row, index) => {
+    const request = row.request.trim();
+    if (!request) return 'Enter a request.';
+    if (request.length > 500) return 'Use at most 500 characters.';
+    if (
+      operations.some(
+        (other, i) => i !== index && other.request.trim().toLowerCase() === request.toLowerCase(),
+      )
+    )
+      return 'Use a distinct request.';
+    return '';
+  });
+  const planValid =
+    operations.length > 0 && operations.length <= 12 && requestErrors.every((error) => !error);
+  function invalidatePlan() {
+    planRevision.current++;
+    setPlanNotices([]);
+  }
+  function invalidatePlanContext() {
+    invalidatePlan();
+    if (suggestedPlan.current) {
+      setOperations([{ request: '', operation: 'answer' }]);
+      suggestedPlan.current = false;
+    }
+  }
+  async function suggestPlan() {
+    const revision = planRevision.current;
+    setPlanning(true);
+    setError('');
+    setPlanNotices([]);
+    try {
+      const plan = await localApi.planInvestigation({
+        ...scope,
+        issue,
+        model_slug: model,
+        ...(generationProfile ? { generation_profile: generationProfile } : {}),
+      });
+      if (revision === planRevision.current) {
+        setOperations(plan.operations);
+        suggestedPlan.current = true;
+        setPlanNotices(plan.notices);
+      }
+    } catch (e) {
+      if (revision === planRevision.current)
+        setError(e instanceof Error ? e.message : 'Could not suggest a plan.');
+    } finally {
+      setPlanning(false);
+    }
+  }
 
   async function run(action: () => Promise<void>, preserveInvalidReview = false) {
     setBusy(true);
@@ -102,6 +172,7 @@ export function InvestigationsView() {
       setError('Enter a workspace.');
       return;
     }
+    invalidatePlanContext();
     setLoadedWorkspace('');
     setSelected([]);
     setCurrent(null);
@@ -252,7 +323,10 @@ export function InvestigationsView() {
                   className={field}
                   disabled={busy}
                   value={workspace}
-                  onChange={(e) => setWorkspace(e.target.value)}
+                  onChange={(e) => {
+                    invalidatePlanContext();
+                    setWorkspace(e.target.value);
+                  }}
                 />
               </label>
               <button className={button} disabled={busy} onClick={() => void loadWorkspace()}>
@@ -280,6 +354,7 @@ export function InvestigationsView() {
                           type="checkbox"
                           checked={selected.includes(c.id)}
                           onChange={(e) => {
+                            invalidatePlanContext();
                             setSelected(
                               e.target.checked
                                 ? [...selected, c.id]
@@ -312,7 +387,10 @@ export function InvestigationsView() {
                 rows={3}
                 maxLength={4000}
                 value={issue}
-                onChange={(e) => setIssue(e.target.value)}
+                onChange={(e) => {
+                  invalidatePlanContext();
+                  setIssue(e.target.value);
+                }}
               />
             </label>
             <label className="block text-sm">
@@ -329,29 +407,160 @@ export function InvestigationsView() {
                 type="checkbox"
                 disabled={busy}
                 checked={answerEach}
-                onChange={(e) => setAnswerEach(e.target.checked)}
+                onChange={(e) => {
+                  invalidatePlan();
+                  setAnswerEach(e.target.checked);
+                  if (e.target.checked) setReviewedPlan(false);
+                }}
               />
               Answer each question (preview)
             </label>
-            {answerEach && (
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                disabled={busy}
+                checked={reviewedPlan}
+                onChange={(e) => {
+                  invalidatePlan();
+                  setReviewedPlan(e.target.checked);
+                  if (e.target.checked) setAnswerEach(false);
+                }}
+              />
+              Reviewed calculations (experimental)
+            </label>
+            {reviewedPlan && (
               <div className="space-y-3">
-                <label className="block text-sm">
-                  Questions, one per line (optional)
-                  <textarea
-                    className={`${field} resize-none`}
-                    rows={4}
-                    disabled={busy}
-                    value={questionsInput}
-                    aria-invalid={questionsError}
-                    aria-describedby="questions-help"
-                    onChange={(e) => setQuestionsInput(e.target.value)}
-                  />
-                  <span id="questions-help" className="text-xs text-muted-foreground">
-                    {questionsError
-                      ? 'Use up to 8 questions, each at most 500 characters.'
-                      : 'Leave blank to plan questions from the issue. Up to 8 questions, 500 characters each.'}
-                  </span>
-                </label>
+                <p className="text-sm text-muted-foreground">
+                  Review each request and calculation type before drafting. You can write your own
+                  plan or ask the model for suggestions, which replace the current plan. Confirming
+                  the plan does not approve the resulting answers.
+                </p>
+                <button
+                  className={`${button} w-full sm:w-auto sm:min-w-[13rem]`}
+                  disabled={
+                    busy || planning || !ready || !issue.trim() || !model || model !== activeModel
+                  }
+                  onClick={() => void suggestPlan()}
+                >
+                  {planning ? 'Suggesting…' : 'Suggest a plan'}
+                </button>
+                {planNotices.map((item, i) => (
+                  <p key={i} className="text-sm text-muted-foreground">
+                    {item}
+                  </p>
+                ))}
+                {operations.map((row, index) => (
+                  <div key={index} className="space-y-2 rounded-md border border-border p-3">
+                    <label className="block text-sm">
+                      Request {index + 1}
+                      <textarea
+                        className={`${field} resize-none`}
+                        rows={2}
+                        maxLength={500}
+                        disabled={busy}
+                        value={row.request}
+                        aria-invalid={!!requestErrors[index]}
+                        aria-describedby={
+                          requestErrors[index] ? `plan-request-error-${index}` : undefined
+                        }
+                        onChange={(e) => {
+                          invalidatePlan();
+                          suggestedPlan.current = false;
+                          setOperations(
+                            operations.map((old, i) =>
+                              i === index ? { ...old, request: e.target.value } : old,
+                            ),
+                          );
+                        }}
+                      />
+                    </label>
+                    {requestErrors[index] && (
+                      <p id={`plan-request-error-${index}`} className="text-xs text-destructive">
+                        {requestErrors[index]}
+                      </p>
+                    )}
+                    <label className="block text-sm">
+                      Calculation type {index + 1}
+                      <select
+                        className={field}
+                        disabled={busy}
+                        value={row.operation}
+                        onChange={(e) => {
+                          invalidatePlan();
+                          suggestedPlan.current = false;
+                          setOperations(
+                            operations.map((old, i) =>
+                              i === index
+                                ? { ...old, operation: e.target.value as OperationType }
+                                : old,
+                            ),
+                          );
+                        }}
+                      >
+                        {(Object.keys(operationLabels) as OperationType[]).map((op) => (
+                          <option key={op} value={op}>
+                            {operationLabels[op]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <p className="text-xs text-muted-foreground sm:hidden">
+                      Selected: {operationLabels[row.operation]}
+                    </p>
+                    <button
+                      className={button}
+                      disabled={busy || operations.length <= 1}
+                      onClick={() => {
+                        invalidatePlan();
+                        suggestedPlan.current = false;
+                        setOperations(operations.filter((_, i) => i !== index));
+                      }}
+                    >
+                      Remove request {index + 1}
+                    </button>
+                  </div>
+                ))}
+                <button
+                  className={button}
+                  disabled={busy || operations.length >= 12}
+                  onClick={() => {
+                    invalidatePlan();
+                    suggestedPlan.current = false;
+                    setOperations([...operations, { request: '', operation: 'answer' }]);
+                  }}
+                >
+                  Add request
+                </button>
+                {!planValid && (
+                  <p className="text-sm text-muted-foreground">
+                    Enter 1–12 distinct requests, each up to 500 characters.
+                  </p>
+                )}
+              </div>
+            )}
+            {(answerEach || reviewedPlan) && (
+              <div className="space-y-3">
+                {answerEach && (
+                  <>
+                    <label className="block text-sm">
+                      Questions, one per line (optional)
+                      <textarea
+                        className={`${field} resize-none`}
+                        rows={4}
+                        disabled={busy}
+                        value={questionsInput}
+                        aria-invalid={questionsError}
+                        aria-describedby="questions-help"
+                        onChange={(e) => setQuestionsInput(e.target.value)}
+                      />
+                      <span id="questions-help" className="text-xs text-muted-foreground">
+                        {questionsError
+                          ? 'Use up to 8 questions, each at most 500 characters.'
+                          : 'Leave blank to plan questions from the issue. Up to 8 questions, 500 characters each.'}
+                      </span>
+                    </label>
+                  </>
+                )}
                 <label className="block text-sm">
                   Answer profile
                   <select
@@ -359,7 +568,10 @@ export function InvestigationsView() {
                     disabled={busy}
                     value={generationProfile}
                     aria-describedby="answer-profile-help"
-                    onChange={(e) => setGenerationProfile(e.target.value)}
+                    onChange={(e) => {
+                      invalidatePlanContext();
+                      setGenerationProfile(e.target.value);
+                    }}
                   >
                     <option value="">Standard</option>
                     <option value="qwen3-non-thinking">Qwen3 non-thinking</option>
@@ -377,7 +589,10 @@ export function InvestigationsView() {
                 className={field}
                 disabled={busy}
                 value={model}
-                onChange={(e) => setModel(e.target.value)}
+                onChange={(e) => {
+                  invalidatePlanContext();
+                  setModel(e.target.value);
+                }}
               >
                 <option value="">Choose the loaded model</option>
                 {activeModel && <option value={activeModel}>{activeModel}</option>}
@@ -389,7 +604,7 @@ export function InvestigationsView() {
               </p>
             )}
             <button
-              className={button}
+              className={`${button} ${reviewedPlan ? 'w-full sm:w-auto sm:min-w-[13rem]' : ''}`}
               disabled={
                 busy ||
                 !ready ||
@@ -397,7 +612,8 @@ export function InvestigationsView() {
                 !query.trim() ||
                 !model ||
                 model !== activeModel ||
-                (answerEach && questionsError)
+                (answerEach && questionsError) ||
+                (reviewedPlan && (!planValid || planning))
               }
               onClick={() =>
                 void run(async () => {
@@ -406,6 +622,16 @@ export function InvestigationsView() {
                     issue,
                     query,
                     model_slug: model,
+                    ...(reviewedPlan
+                      ? {
+                          reviewed_operations: operations.map((row) => ({
+                            ...row,
+                            request: row.request.trim(),
+                          })),
+                          plan_confirmed: true,
+                          ...(generationProfile ? { generation_profile: generationProfile } : {}),
+                        }
+                      : {}),
                     ...(answerEach
                       ? {
                           answer_each_question: true,
@@ -419,7 +645,7 @@ export function InvestigationsView() {
                 })
               }
             >
-              {busy ? 'Working…' : 'Create investigation'}
+              {busy ? 'Working…' : reviewedPlan ? 'Confirm plan and draft' : 'Create investigation'}
             </button>
           </section>
           <section className="rounded-lg border border-border bg-card p-5 space-y-3">
@@ -651,6 +877,74 @@ export function InvestigationsView() {
                   </ul>
                 </div>
               )}
+              {!!current.provenance?.extraction_notices?.length && (
+                <div className="space-y-2">
+                  <h3 className="font-medium">Calculation extraction notices</h3>
+                  {current.provenance.extraction_notices.map((item, i) => (
+                    <p key={i} className="text-sm">
+                      {item.source_text} · {item.reason} ({sourceLink(item.citation_id)})
+                    </p>
+                  ))}
+                </div>
+              )}
+              {!!current.provenance?.calculation_traces?.length && (
+                <div className="space-y-3">
+                  <h3 className="font-medium">Original machine calculations</h3>
+                  <p className="text-xs text-muted-foreground">
+                    These traces belong to the original draft. Corrections do not change the
+                    calculation or verify source selection.
+                  </p>
+                  {current.provenance.calculation_traces.map((trace) => (
+                    <div key={trace.request_id} className="space-y-1 text-sm">
+                      <h4 className="font-medium">
+                        {effectiveBrief?.questions?.find((q) => q.id === trace.request_id)?.text ??
+                          trace.request_id}{' '}
+                        · {operationLabels[trace.operation]}
+                      </h4>
+                      <p>
+                        Status: {trace.status} · Formula: {trace.formula ?? 'unavailable'}
+                      </p>
+                      {trace.evaluated_expression && <p>Evaluated: {trace.evaluated_expression}</p>}
+                      {trace.result != null && (
+                        <p>
+                          Result: {trace.result} {trace.unit ?? ''}
+                        </p>
+                      )}
+                      {trace.reason && <p>{trace.reason}</p>}
+                      {trace.caveat && <p className="text-muted-foreground">{trace.caveat}</p>}
+                      {trace.inputs?.map((input) => (
+                        <p key={input.id}>
+                          Input {input.id}: {input.source_text} ({sourceLink(input.citation_id)})
+                        </p>
+                      ))}
+                      <details className="text-xs text-muted-foreground">
+                        <summary className="cursor-pointer">Calculation details</summary>
+                        {trace.algorithm_version && <p>Algorithm: {trace.algorithm_version}</p>}
+                        {trace.rounding && (
+                          <p>
+                            Rounding: {trace.rounding.mode}, up to{' '}
+                            {trace.rounding.max_fractional_digits} decimal places
+                          </p>
+                        )}
+                        {trace.inputs
+                          ?.filter((input) => input.unit_source_text)
+                          .map((input) => (
+                            <p key={input.id}>
+                              Input {input.id} shared unit: {input.unit_source_text} · source
+                              offsets {input.unit_source_start}–{input.unit_source_end}
+                            </p>
+                          ))}
+                        {trace.normalized_inputs?.map((input, i) => (
+                          <p key={i}>
+                            Normalized {input.role}: {input.value} {input.unit} · conversion factor{' '}
+                            {input.conversion_factor}
+                          </p>
+                        ))}
+                      </details>
+                    </div>
+                  ))}
+                </div>
+              )}
               <details
                 open={citationsOpen}
                 onToggle={(e) => setCitationsOpen(e.currentTarget.open)}
@@ -742,7 +1036,7 @@ export function InvestigationsView() {
                       <div className="space-y-4">
                         <p className="text-sm text-muted-foreground">
                           Choose source excerpts for each answer. The saved excerpts come from the
-                          source catalog.
+                          source catalog. Editing an answer does not recalculate the original trace.
                         </p>
                         {corrected.questions.map((question) => {
                           const answers = corrected.answers;
@@ -756,7 +1050,8 @@ export function InvestigationsView() {
                               answers: answers.map((entry) => {
                                 if (entry.question_id !== question.id) return entry;
                                 if (changes.snippet_ids) {
-                                  const { source_excerpts: _excerpts, ...withoutExcerpts } = entry;
+                                  const withoutExcerpts = { ...entry };
+                                  delete withoutExcerpts.source_excerpts;
                                   return { ...withoutExcerpts, ...changes };
                                 }
                                 return { ...entry, ...changes };

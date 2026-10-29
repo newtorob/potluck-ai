@@ -1,0 +1,66 @@
+[
+  {
+    "name": "sidecar",
+    "command": [
+      "make",
+      "test-sidecar"
+    ],
+    "exit_code": 2
+  },
+  {
+    "name": "fast",
+    "command": [
+      "make",
+      "test-fast"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "frontend-build",
+    "command": [
+      "pnpm",
+      "run",
+      "build"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "frontend-format",
+    "command": [
+      "pnpm",
+      "exec",
+      "prettier",
+      "--check",
+      "src/views/InvestigationsView.tsx",
+      "src/views/InvestigationsView.test.tsx",
+      "src/types/investigations.ts"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "frontend-lint",
+    "command": [
+      "pnpm",
+      "exec",
+      "eslint",
+      "src/views/InvestigationsView.tsx",
+      "src/views/InvestigationsView.test.tsx",
+      "src/types/investigations.ts",
+      "src/lib/localApi.ts"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "sidecar_explicit_path",
+    "command": [
+      "env",
+      "PYTHONPATH=/Users/rob/Documents/potluck/apps/desktop/python",
+      "make",
+      "test-sidecar"
+    ],
+    "exit_code": 0,
+    "passed": 5232,
+    "skipped": 5,
+    "note": "Initial plain make invocation failed package discovery at collection; no product code change for rerun."
+  }
+]

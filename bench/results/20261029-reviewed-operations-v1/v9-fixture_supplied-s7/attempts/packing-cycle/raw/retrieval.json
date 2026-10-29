@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "fc9f7011-665e-43f9-8397-e4dacfbd2415"
+  ],
+  "query": "How much did the packing cycle change after the scheduling update, and did that update cause the change?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "fc9f7011-665e-43f9-8397-e4dacfbd2415"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "fc9f7011-665e-43f9-8397-e4dacfbd2415",
+        "document_id": "3521ffaf-ff04-574a-8aa5-295aacea49d3",
+        "revision_id": "0f645751-b391-5c93-9cd0-4d8cfb6589d6",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:04:52.091477+00:00",
+        "chunk_id": "d06814f8-2318-5223-84dd-ef4ccdd11fe7",
+        "anchor": "packing-cycle-review",
+        "heading": "Packing cycle review",
+        "content": "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. A staffing change happened during the same period. The review does not establish what caused the change.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:04:52.091919+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:d06814f8-2318-5223-84dd-ef4ccdd11fe7:0f645751-b391-5c93-9cd0-4d8cfb6589d6"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

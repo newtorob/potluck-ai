@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "c084077c-1f9e-46f5-abce-3fdedd079d15",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-reviewed-operations-v1/v9-fixture_supplied-s7/attempts/dispatch-cartons/raw/allowed",
+  "source_sha256": "3c285404707f5a841e52fc522cd5c7243ac7d82daee226baaae22a02ddf23e4e",
+  "scan": {
+    "collection_id": "c084077c-1f9e-46f5-abce-3fdedd079d15",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

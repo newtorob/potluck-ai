@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-903abf12-ee37-4f27-a426-e40001eb3c84",
+  "object": "chat.completion",
+  "created": 1793311598,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"snippet_ids\": [\"S1\"], \"text\": \"The outlet reserve increased from 140 to 185 units.\", \"status\": \"supported\"}, \"R2\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\"], \"reason\": \"The increase is calculated from the previous quantity (140) to the current quantity (185).\"}, \"R3\": {\"snippet_ids\": [\"S2\"], \"text\": \"The change record names Lee as the person who entered the revision; it does not name an approver.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 489,
+    "completion_tokens": 139,
+    "total_tokens": 628
+  }
+}

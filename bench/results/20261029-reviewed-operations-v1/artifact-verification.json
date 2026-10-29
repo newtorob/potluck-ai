@@ -1,0 +1,47 @@
+{
+  "attempts": 18,
+  "saved_drafts": 18,
+  "exact_excerpts": 45,
+  "reconstructed_catalogs": 12,
+  "replayed_calculations": 6,
+  "source_hashes_match": true,
+  "canary_leaks": [],
+  "arms": {
+    "v6-auto-s7": {
+      "saved_drafts": 6,
+      "errors": [],
+      "latencies_seconds": [
+        52.449325249530375,
+        25.068418375216424,
+        30.10232195816934,
+        67.13609241694212,
+        27.671260916627944,
+        84.63614829163998
+      ]
+    },
+    "v9-fixture_supplied-s7": {
+      "saved_drafts": 6,
+      "errors": [],
+      "latencies_seconds": [
+        24.276787834241986,
+        16.303425500169396,
+        15.394723292440176,
+        24.824357625097036,
+        25.48936912510544,
+        62.92321608308703
+      ]
+    },
+    "v9-auto-s7": {
+      "saved_drafts": 6,
+      "errors": [],
+      "latencies_seconds": [
+        41.86995866615325,
+        49.22412395849824,
+        63.64873812533915,
+        39.91977404151112,
+        29.21204570773989,
+        67.61138137523085
+      ]
+    }
+  }
+}

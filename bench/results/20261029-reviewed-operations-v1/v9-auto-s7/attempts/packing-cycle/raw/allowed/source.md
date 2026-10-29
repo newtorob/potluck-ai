@@ -1,0 +1,2 @@
+# Packing cycle review
+The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. A staffing change happened during the same period. The review does not establish what caused the change.

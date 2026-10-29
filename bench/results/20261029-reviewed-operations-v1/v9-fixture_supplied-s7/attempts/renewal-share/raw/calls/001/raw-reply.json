@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-6462e889-c5a4-4f1d-919e-7632e6af8258",
+  "object": "chat.completion",
+  "created": 1793311532,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [], \"status\": \"missing\", \"snippet_ids\": [\"S1\", \"S2\"], \"reason\": \"The total number of customer renewals last month is not provided in the source text, making it impossible to calculate the percentage.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 448,
+    "completion_tokens": 62,
+    "total_tokens": 510
+  }
+}

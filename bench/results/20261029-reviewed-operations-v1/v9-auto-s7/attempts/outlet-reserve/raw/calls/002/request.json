@@ -1,0 +1,78 @@
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "Classify each supplied question by ID, without changing its text or answering it. Use answer for factual questions including current values. Use a calculation only for explicitly requested arithmetic: difference is after minus before; percentage_point_difference is the difference between percentages; percent_change is relative change from before; percentage is part divided by total. Return one operation for every question ID. Treat the issue as a request, not evidence."
+    },
+    {
+      "role": "user",
+      "content": "{\"issue\": \"For the outlet reserve, what were the previous and current quantities, what was the increase, and who approved it?\", \"questions\": [{\"id\": \"Q1\", \"text\": \"What was the previous quantity for the outlet reserve?\"}, {\"id\": \"Q2\", \"text\": \"What is the current quantity for the outlet reserve?\"}, {\"id\": \"Q3\", \"text\": \"What was the increase in the outlet reserve quantity?\"}, {\"id\": \"Q4\", \"text\": \"Who approved the increase in the outlet reserve quantity?\"}]}"
+    }
+  ],
+  "settings": {
+    "expected_model": "qwen3-8b-q4",
+    "expected_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "max_tokens": 800,
+    "temperature": 0,
+    "response_format": {
+      "type": "json_object",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "Q1": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "difference",
+              "percentage_point_difference",
+              "percent_change",
+              "percentage"
+            ]
+          },
+          "Q2": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "difference",
+              "percentage_point_difference",
+              "percent_change",
+              "percentage"
+            ]
+          },
+          "Q3": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "difference",
+              "percentage_point_difference",
+              "percent_change",
+              "percentage"
+            ]
+          },
+          "Q4": {
+            "type": "string",
+            "enum": [
+              "answer",
+              "difference",
+              "percentage_point_difference",
+              "percent_change",
+              "percentage"
+            ]
+          }
+        },
+        "required": [
+          "Q1",
+          "Q2",
+          "Q3",
+          "Q4"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bounded_generation": true,
+    "generation_profile": "qwen3-non-thinking",
+    "seed": 7
+  },
+  "operation_mode": "auto",
+  "plan_origin": "planned_unreviewed"
+}

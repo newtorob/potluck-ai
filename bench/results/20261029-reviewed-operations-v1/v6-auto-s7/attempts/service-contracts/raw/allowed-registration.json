@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "9d6a29e5-ca8d-4873-b149-19abfc839c64",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-reviewed-operations-v1/v6-auto-s7/attempts/service-contracts/raw/allowed",
+  "source_sha256": "c4fcc9e2726eac56d1f269810f5e9b7116eecff10e4ad8ec974fe8bbe201667e",
+  "scan": {
+    "collection_id": "9d6a29e5-ca8d-4873-b149-19abfc839c64",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-b48475bf-8bb5-4cbf-978d-c1d904c1e916",
+  "object": "chat.completion",
+  "created": 1793311949,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"snippet_ids\": [\"S1\"], \"text\": \"The outlet reserve increased from 140 to 185 units.\", \"status\": \"supported\"}, \"R2\": {\"snippet_ids\": [\"S1\"], \"text\": \"The outlet reserve increased from 140 to 185 units.\", \"status\": \"supported\"}, \"R3\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\"], \"reason\": \"The previous quantity was 140 units and the current quantity is 185 units.\"}, \"R4\": {\"snippet_ids\": [\"S2\"], \"text\": \"The change record names Lee as the person who entered the revision; it does not name an approver.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 531,
+    "completion_tokens": 178,
+    "total_tokens": 709
+  }
+}

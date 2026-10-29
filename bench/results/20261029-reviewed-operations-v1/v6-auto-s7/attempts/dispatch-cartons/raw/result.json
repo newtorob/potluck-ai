@@ -1,0 +1,118 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "ba822ca5-656c-46b6-9175-69f2a4f5273b",
+    "workspace": "synthetic-eval",
+    "issue": "How many cartons did daily dispatch volume increase by?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "How many cartons did the daily dispatch volume increase by?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "supported",
+          "text": "Daily dispatch volume rose from 35 to 59 cartons.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:321dcc7a-809c-53f2-8209-291e547b8bd9:3893321f-96dc-5718-b234-56c1e7c22020",
+              "quote": "Daily dispatch volume rose from 35 to 59 cartons."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "7177cf13-cd4d-4f9f-a286-d6bd1223da55",
+        "document_id": "4a10772f-46f2-5565-943b-be8349d8cf56",
+        "revision_id": "3893321f-96dc-5718-b234-56c1e7c22020",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:02:28.164082+00:00",
+        "chunk_id": "321dcc7a-809c-53f2-8209-291e547b8bd9",
+        "anchor": "dispatch-volume-record",
+        "heading": "Dispatch volume record",
+        "content": "Daily dispatch volume rose from 35 to 59 cartons.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:02:28.164359+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:321dcc7a-809c-53f2-8209-291e547b8bd9:3893321f-96dc-5718-b234-56c1e7c22020",
+        "presented_content": "Daily dispatch volume rose from 35 to 59 cartons."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T22:02:55.832252+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "How many cartons did daily dispatch volume increase by?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 27661,
+      "created_at": "2026-10-29T22:02:55.832252+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:321dcc7a-809c-53f2-8209-291e547b8bd9:3893321f-96dc-5718-b234-56c1e7c22020",
+          "quote": "Daily dispatch volume rose from 35 to 59 cartons."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "7177cf13-cd4d-4f9f-a286-d6bd1223da55"
+    ]
+  },
+  "latency_seconds": 27.671260916627944,
+  "setup_seconds": 0.02338479273021221,
+  "attempt_total_seconds": 27.694645709358156
+}

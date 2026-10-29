@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-5f4bab67-a6a5-4129-b9ec-a174b921c7c9",
+  "object": "chat.completion",
+  "created": 1793311492,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\"], \"reason\": \"The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward.\"}, \"R2\": {\"snippet_ids\": [\"S3\"], \"text\": \"The review does not establish what caused the change.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 451,
+    "completion_tokens": 90,
+    "total_tokens": 541
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "50c643fc-ae1c-4aa7-b42c-35fc4c92a187",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-reviewed-operations-v1/v9-auto-s7/attempts/renewal-share/raw/allowed",
+  "source_sha256": "d43427ce0e735f5bd80ddb7d81d036800780bd9478a0b97bef52b8f2414cdd5c",
+  "scan": {
+    "collection_id": "50c643fc-ae1c-4aa7-b42c-35fc4c92a187",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

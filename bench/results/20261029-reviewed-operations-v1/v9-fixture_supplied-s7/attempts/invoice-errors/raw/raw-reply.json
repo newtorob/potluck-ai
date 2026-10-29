@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-101d626d-923a-449f-97f1-aa0a388a2a3f",
+  "object": "chat.completion",
+  "created": 1793311516,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [], \"status\": \"unsupported\", \"snippet_ids\": [\"S1\", \"S2\"], \"reason\": \"The source text contains number-like text, but it was not extracted due to format or unit issues.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 561,
+    "completion_tokens": 54,
+    "total_tokens": 615
+  }
+}

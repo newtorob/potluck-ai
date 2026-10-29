@@ -316,7 +316,7 @@ def test_cli_accepts_version_and_forwards_explicit_settings(tmp_path, monkeypatc
     assert observed['args'] == (tmp_path / 'out', 'fresh', tmp_path / 'model', 'abc',
                                 8192, 8, tmp_path / 'fixtures', version)
     assert observed['kwargs'] == {'generation_profile': 'qwen3-non-thinking',
-                                  'seed': 0, 'question_mode': 'explicit'}
+                                  'seed': 0, 'question_mode': 'explicit', 'operation_mode': 'auto'}
 
 
 def test_v7_unknown_profile_fails_before_loading_or_output(tmp_path, monkeypatch):
@@ -327,3 +327,93 @@ def test_v7_unknown_profile_fails_before_loading_or_output(tmp_path, monkeypatch
                                8192, 8, template_version='investigation-v7',
                                generation_profile='unknown'))
     assert runtime.loads == 0 and not (tmp_path / 'out').exists()
+
+
+def _operation_fixture(tmp_path):
+    fixtures = tmp_path / 'operation-fixtures'
+    shutil.copytree(runner.FIXTURES, fixtures)
+    suite = json.loads((fixtures / 'development.json').read_text())
+    rows = [{'question_id': 'Q1', 'request': 'What changed?', 'operation': 'difference'}]
+    document = {'provenance': 'fixture-generated', 'description': 'Diagnostic plan, not owner review',
+                'cases': {case['id']: rows for case in suite['cases']}}
+    data = json.dumps(document).encode()
+    (fixtures / 'confirmed_operations.json').write_bytes(data)
+    (fixtures / 'confirmed_operations.sha256').write_text(runner.base.digest(data) + '\n')
+    return fixtures, document
+
+
+def test_fixture_operations_are_validated_forwarded_and_recorded(tmp_path, monkeypatch):
+    fixtures, document = _operation_fixture(tmp_path)
+    model = tmp_path / 'model.gguf'
+    model.write_bytes(b'fake')
+    sha = runner.base.digest(model.read_bytes())
+    runtime = FakeRuntime(sha)
+    monkeypatch.setattr(runner, 'get_runtime', lambda: runtime)
+    calls = []
+    async def attempt(out, case, arm, runtime, model, **kwargs):
+        calls.append((case['id'], kwargs))
+        return {'status': 'stub'}
+    monkeypatch.setattr(runner.base, 'attempt', attempt)
+    out = tmp_path / 'run'
+    asyncio.run(runner.run(out, 'development', model, sha, 8192, 8, fixtures,
+                           template_version='investigation-v9', operation_mode='fixture_supplied'))
+    assert len(calls) == len(document['cases'])
+    for cid, kwargs in calls:
+        assert kwargs == {'template_version': 'investigation-v9', 'operation_mode': 'fixture_supplied',
+                          'reviewed_operations': [{'request': r['request'], 'operation': r['operation']} for r in document['cases'][cid]]}
+    metadata = json.loads((out / 'run-metadata.json').read_text())
+    raw = json.loads((out / 'raw.json').read_text())
+    assert metadata['plan_origin'] == raw['plan_origin'] == 'fixture_supplied'
+    assert metadata['operation_mode'] == raw['operation_mode'] == 'fixture_supplied'
+    assert metadata['confirmed_operations_sha256'] == runner.base.digest((out / 'confirmed_operations.json').read_bytes())
+    assert (out / 'confirmed_operations.sha256').read_bytes() == (fixtures / 'confirmed_operations.sha256').read_bytes()
+
+
+@pytest.mark.parametrize('kind', ['missing', 'missing_checksum', 'tampered', 'missing_case', 'bad_rows', 'wrong_question', 'mixed', 'wrong_version'])
+def test_bad_operation_fixture_and_mode_fail_before_load_or_output(tmp_path, monkeypatch, kind):
+    fixtures, document = _operation_fixture(tmp_path)
+    data_path = fixtures / 'confirmed_operations.json'
+    if kind == 'missing':
+        data_path.unlink()
+    elif kind == 'missing_checksum':
+        (fixtures / 'confirmed_operations.sha256').unlink()
+    elif kind == 'tampered':
+        data_path.write_bytes(data_path.read_bytes() + b' ')
+    elif kind in ('missing_case', 'bad_rows', 'wrong_question'):
+        key = next(iter(document['cases']))
+        if kind == 'missing_case':
+            del document['cases'][key]
+        elif kind == 'wrong_question':
+            document['cases'][key][0]['question_id'] = 'Q2'
+        else:
+            document['cases'][key] = [{'question_id': 'Q1', 'request': ' ', 'operation': 'answer'}]
+        data = json.dumps(document).encode()
+        data_path.write_bytes(data)
+        (fixtures / 'confirmed_operations.sha256').write_text(runner.base.digest(data) + '\n')
+    model = tmp_path / 'model.gguf'
+    model.write_bytes(b'fake')
+    sha = runner.base.digest(model.read_bytes())
+    runtime = FakeRuntime(sha)
+    monkeypatch.setattr(runner, 'get_runtime', lambda: runtime)
+    with pytest.raises(ValueError):
+        asyncio.run(runner.run(tmp_path / 'run', 'development', model, sha, 8192, 8, fixtures,
+                    template_version='investigation-v8' if kind == 'wrong_version' else 'investigation-v9',
+                    question_mode='explicit' if kind == 'mixed' else 'auto', operation_mode='fixture_supplied'))
+    assert runtime.loads == 0 and not (tmp_path / 'run').exists()
+
+
+def test_v9_auto_plan_origin_is_recorded(tmp_path, monkeypatch):
+    model = tmp_path / 'model.gguf'
+    model.write_bytes(b'fake')
+    sha = runner.base.digest(model.read_bytes())
+    runtime = FakeRuntime(sha)
+    monkeypatch.setattr(runner, 'get_runtime', lambda: runtime)
+    calls = []
+    async def attempt(out, case, arm, runtime, model, **kwargs):
+        calls.append(kwargs)
+        return {'status': 'stub'}
+    monkeypatch.setattr(runner.base, 'attempt', attempt)
+    out = tmp_path / 'run'
+    asyncio.run(runner.run(out, 'development', model, sha, 8192, 8, template_version='investigation-v9'))
+    assert calls and all(c == {'template_version': 'investigation-v9', 'operation_mode': 'auto'} for c in calls)
+    assert json.loads((out / 'raw.json').read_text())['plan_origin'] == 'planned_unreviewed'

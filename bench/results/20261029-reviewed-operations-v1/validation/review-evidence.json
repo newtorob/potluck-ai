@@ -1,0 +1,30 @@
+{
+  "ui_static_audit": {
+    "scope": "desktop views plus maintained root contracts",
+    "new_view_findings": 0,
+    "existing_findings": 4,
+    "status": "existing sibling findings remain",
+    "detail": "MemoryView native date ownership; two CirclesView forms and one TaskStateView form lack explicit validation owner. Broad initial scan was interrupted because it traversed archived benchmark worktrees; scoped audit completed."
+  },
+  "browser": {
+    "runner": "Chromium Playwright",
+    "cases_passed": 4,
+    "api": "simulated",
+    "root_visual_review": [
+      "reviewed-plan-desktop.png",
+      "reviewed-calculation-desktop.png",
+      "reviewed-calculation-narrow.png"
+    ],
+    "limitations": [
+      "Existing sidebar crowds 480px layout; controls remain reachable.",
+      "No native Electron or Windows/Linux verification."
+    ]
+  },
+  "code_review_fixes": [
+    "Reject ambiguous number fragments in decimals, fractions, ranges and uncertainty bounds.",
+    "Require two ordered operands before server asserts zero denominator.",
+    "Scope-race test now reaches revalidation instead of passing on unrelated malformed classification.",
+    "Associate request errors with fields; protect edits from stale suggestions.",
+    "Remove preexisting unused correction destructuring variable in touched view."
+  ]
+}

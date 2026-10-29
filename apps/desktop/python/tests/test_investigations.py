@@ -410,7 +410,7 @@ def test_template_selection_records_version_and_rejects_unknown_before_inference
         assert calls[2][1]['response_format'] == {'type': 'json_object', 'schema': inv._model_schema()}
         with pytest.raises(ValueError, match='Unknown investigation template'):
             await inv.create_investigation(scope, 'Who approved?', 'release', 'model',
-                                           template_version='investigation-v9')
+                                           template_version='investigation-v10')
         assert len(calls) == 3
     asyncio.run(run())
 

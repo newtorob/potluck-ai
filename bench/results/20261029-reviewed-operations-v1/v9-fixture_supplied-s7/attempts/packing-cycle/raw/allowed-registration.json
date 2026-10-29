@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "fc9f7011-665e-43f9-8397-e4dacfbd2415",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-reviewed-operations-v1/v9-fixture_supplied-s7/attempts/packing-cycle/raw/allowed",
+  "source_sha256": "15b68240b7cdc21ae2b1ccfba0adc8c8affcd51c42aeedd45916548047247027",
+  "scan": {
+    "collection_id": "fc9f7011-665e-43f9-8397-e4dacfbd2415",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-c779c01f-2c84-46a8-b4a6-9bf895966bfb",
+  "object": "chat.completion",
+  "created": 1793311407,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\"], \"text\": \"The previous quantity for the outlet reserve was 140 units.\", \"status\": \"supported\"}, \"Q2\": {\"snippet_ids\": [\"S1\"], \"text\": \"The current quantity for the outlet reserve is 185 units.\", \"status\": \"supported\"}, \"Q3\": {\"snippet_ids\": [\"S1\"], \"text\": \"The increase in the outlet reserve quantity was 45 units.\", \"status\": \"supported\"}, \"Q4\": {\"snippet_ids\": [\"S2\"], \"text\": \"The approval information is not provided in the record.\", \"status\": \"unknown\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 478,
+    "completion_tokens": 139,
+    "total_tokens": 617
+  }
+}

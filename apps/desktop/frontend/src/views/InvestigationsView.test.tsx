@@ -6,6 +6,7 @@ const api = vi.hoisted(() => ({
   sourceCollections: vi.fn(),
   investigations: vi.fn(),
   createInvestigation: vi.fn(),
+  planInvestigation: vi.fn(),
   reviewInvestigation: vi.fn(),
   recordInvestigationOutcome: vi.fn(),
 }));
@@ -21,6 +22,163 @@ vi.mock('@/stores/modelStore', () => ({
 describe('InvestigationsView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+  it('discards stale suggestions and sends only an explicitly confirmed edited plan', async () => {
+    api.sourceCollections.mockResolvedValue({
+      collections: [{ id: 'c1', name: 'Runbooks', scan_status: 'ready', last_scan_at: null }],
+    });
+    api.investigations.mockResolvedValue({ investigations: [] });
+    let resolvePlan!: (value: unknown) => void;
+    api.planInvestigation.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolvePlan = resolve;
+      }),
+    );
+    api.createInvestigation.mockRejectedValueOnce(new Error('Generation failed'));
+    render(<InvestigationsView />);
+    fireEvent.change(screen.getByLabelText('Workspace'), { target: { value: 'w' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Load collections' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Runbooks/ }));
+    fireEvent.change(screen.getByLabelText('Issue'), { target: { value: 'First issue' } });
+    fireEvent.change(screen.getByLabelText('Evidence query'), { target: { value: 'revenue' } });
+    fireEvent.change(screen.getByLabelText('Loaded local model'), {
+      target: { value: 'local-model' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: /Reviewed calculations/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest a plan' }));
+    expect(api.planInvestigation).toHaveBeenCalledWith({
+      workspace: 'w',
+      collection_ids: ['c1'],
+      issue: 'First issue',
+      model_slug: 'local-model',
+    });
+    fireEvent.change(screen.getByLabelText('Issue'), { target: { value: 'Revised issue' } });
+    fireEvent.change(screen.getByLabelText('Request 1'), { target: { value: 'Revenue change' } });
+    resolvePlan({
+      operations: [{ request: 'Stale suggestion', operation: 'answer' }],
+      notices: [],
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Suggest a plan' })).toBeEnabled(),
+    );
+    expect(screen.getByLabelText('Request 1')).toHaveValue('Revenue change');
+    api.planInvestigation.mockRejectedValueOnce(new Error('Suggestion failed'));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest a plan' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Suggestion failed');
+    expect(screen.getByLabelText('Request 1')).toHaveValue('Revenue change');
+    fireEvent.change(screen.getByLabelText('Calculation type 1'), {
+      target: { value: 'percent_change' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm plan and draft' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Generation failed');
+    expect(screen.getByLabelText('Request 1')).toHaveValue('Revenue change');
+    expect(api.createInvestigation).toHaveBeenCalledWith({
+      workspace: 'w',
+      collection_ids: ['c1'],
+      issue: 'Revised issue',
+      query: 'revenue',
+      model_slug: 'local-model',
+      reviewed_operations: [{ request: 'Revenue change', operation: 'percent_change' }],
+      plan_confirmed: true,
+    });
+  });
+  it('shows suggested operations, calculation trace and cited extraction notice', async () => {
+    api.sourceCollections.mockResolvedValue({
+      collections: [{ id: 'c1', name: 'Runbooks', scan_status: 'ready', last_scan_at: null }],
+    });
+    api.investigations.mockResolvedValue({ investigations: [] });
+    api.planInvestigation.mockResolvedValue({
+      operations: [{ request: 'What changed?', operation: 'difference' }],
+      notices: ['Review this plan.'],
+    });
+    api.createInvestigation.mockResolvedValue({
+      id: 'i1',
+      issue: 'Revenue',
+      status: 'draft',
+      model_slug: 'local-model',
+      created_at: 'today',
+      review: null,
+      outcome: null,
+      evidence: [{ citation_id: 'ref1', content: '$10' }],
+      brief: {
+        questions: [{ id: 'R1', text: 'What changed?' }],
+        answers: [
+          {
+            question_id: 'R1',
+            status: 'supported',
+            text: 'Increased',
+            snippet_ids: ['S1'],
+            source_excerpts: [{ snippet_id: 'S1', citation_id: 'ref1', quote: '$10' }],
+          },
+        ],
+        facts: [],
+        prior_fixes: [],
+        hypotheses: [],
+        recommended_checks: [],
+        model_uncertainties: [],
+      },
+      provenance: {
+        snippet_catalog: [{ snippet_id: 'S1', citation_id: 'ref1', quote: '$10' }],
+        extraction_notices: [
+          { snippet_id: 'S1', citation_id: 'ref1', source_text: '$10', reason: 'Check value' },
+        ],
+        calculation_traces: [
+          {
+            request_id: 'R1',
+            operation: 'difference',
+            status: 'computed',
+            formula: 'after - before',
+            result: '5',
+            unit: 'USD',
+            inputs: [{ id: 'N1', citation_id: 'ref1', source_text: '$10' }],
+          },
+        ],
+      },
+    });
+    render(<InvestigationsView />);
+    fireEvent.change(screen.getByLabelText('Workspace'), { target: { value: 'w' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Load collections' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Runbooks/ }));
+    fireEvent.change(screen.getByLabelText('Issue'), { target: { value: 'Revenue' } });
+    fireEvent.change(screen.getByLabelText('Evidence query'), { target: { value: 'revenue' } });
+    fireEvent.change(screen.getByLabelText('Loaded local model'), {
+      target: { value: 'local-model' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: /Reviewed calculations/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest a plan' }));
+    expect(await screen.findByText('Review this plan.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Request 1')).toHaveValue('What changed?');
+    expect(screen.getByLabelText('Calculation type 1')).toHaveValue('difference');
+    fireEvent.change(screen.getByLabelText('Issue'), { target: { value: 'Revised revenue' } });
+    expect(screen.getByLabelText('Request 1')).toHaveValue('');
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest a plan' }));
+    await waitFor(() => expect(screen.getByLabelText('Request 1')).toHaveValue('What changed?'));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm plan and draft' }));
+    expect(await screen.findByText(/Formula: after - before/)).toBeInTheDocument();
+    expect(screen.getByText(/Check value/)).toBeInTheDocument();
+    expect(screen.getByText(/Input N1/)).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Source 1' }).length).toBeGreaterThan(1);
+    api.reviewInvestigation.mockRejectedValueOnce(
+      new Error('[localApi] 400: invalid_review_brief: invalid'),
+    );
+    fireEvent.change(screen.getByLabelText('Decision'), { target: { value: 'correct' } });
+    fireEvent.change(screen.getByLabelText('Answer text'), { target: { value: 'Correction' } });
+    fireEvent.change(screen.getByLabelText('Reviewer'), { target: { value: 'Sam' } });
+    fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'Review' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save review' }));
+    await screen.findByRole('alert');
+    expect(screen.getByLabelText('Answer text')).toHaveValue('Correction');
+    expect(screen.getByText(/Formula: after - before/)).toBeInTheDocument();
+    expect(api.reviewInvestigation).toHaveBeenCalledWith(
+      'i1',
+      expect.objectContaining({
+        corrected_brief: expect.objectContaining({
+          answers: [
+            { question_id: 'R1', status: 'supported', text: 'Correction', snippet_ids: ['S1'] },
+          ],
+        }),
+      }),
+    );
   });
   it('omits the standard profile and blank questions from a preview request', async () => {
     api.sourceCollections.mockResolvedValue({

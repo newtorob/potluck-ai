@@ -1,0 +1,13 @@
+{
+  "profile": "product-admin",
+  "sourceRoots": [
+    "apps/desktop/frontend/src/views"
+  ],
+  "canonicalMap": "UX-CONTRACT.md",
+  "requiredCapabilities": [
+    "Form"
+  ],
+  "ownership": {
+    "Select/Listbox": "native"
+  }
+}

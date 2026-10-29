@@ -1,0 +1,14 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_id": "4b555e0c-7180-45f4-8829-28b047811ba7",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-reviewed-operations-v1/v9-auto-s7/attempts/outlet-reserve/raw/allowed",
+  "source_sha256": "25959a756a933953feeac85536605afbf444ca9b765281a6789abfa6ca11e099",
+  "scan": {
+    "collection_id": "4b555e0c-7180-45f4-8829-28b047811ba7",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

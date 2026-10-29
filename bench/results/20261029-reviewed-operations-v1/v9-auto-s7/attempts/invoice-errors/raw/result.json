@@ -1,0 +1,189 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "b48ba05f-0016-4952-b27c-b49abef2f0e3",
+    "workspace": "synthetic-eval",
+    "issue": "What was the relative percentage change in invoice errors between the first and second audits?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What was the relative percentage change in invoice errors between the first and second audits?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "unknown",
+          "text": "Calculation unavailable: source values could not be extracted as supported quantities. Model assessment: The source text contains number-like text, but it was not extracted due to potential unsupported format or unit.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0:ddd3a98f-0536-5090-8aa4-a62befc21d91",
+              "quote": "The first audit recorded zero invoice errors. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0:ddd3a98f-0536-5090-8aa4-a62befc21d91",
+              "quote": "The second audit recorded 12 invoice errors."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "percent_change",
+            "status": "unknown",
+            "text": "Calculation unavailable: source values could not be extracted as supported quantities. Model assessment: The source text contains number-like text, but it was not extracted due to potential unsupported format or unit.",
+            "formula": null,
+            "result": null,
+            "unit": null,
+            "reason": "The source text contains number-like text, but it was not extracted due to potential unsupported format or unit.",
+            "inputs": [],
+            "rounding": null,
+            "limitation_kind": "unsupported",
+            "caveat": "Arithmetic does not verify source selection or authority."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "ecf3d8f9-b367-4ee1-8142-6b3830292a95",
+        "document_id": "511bcfe5-7e1a-5c46-8b2d-0dbb98719b40",
+        "revision_id": "ddd3a98f-0536-5090-8aa4-a62befc21d91",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:08:48.391584+00:00",
+        "chunk_id": "68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0",
+        "anchor": "invoice-audit-summary",
+        "heading": "Invoice audit summary",
+        "content": "The first audit recorded zero invoice errors. The second audit recorded 12 invoice errors.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:08:48.391731+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0:ddd3a98f-0536-5090-8aa4-a62befc21d91",
+        "presented_content": "The first audit recorded zero invoice errors. The second audit recorded 12 invoice errors."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T22:09:37.611958+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v9",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What was the relative percentage change in invoice errors between the first and second audits?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 49215,
+      "created_at": "2026-10-29T22:09:37.611958+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "What was the relative percentage change in invoice errors between the first and second audits?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "What was the relative percentage change in invoice errors between the first and second audits?",
+          "operation": "percent_change"
+        }
+      ],
+      "operation_plan_origin": "planned_unreviewed",
+      "planner_version": "question-classification-v1",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0:ddd3a98f-0536-5090-8aa4-a62befc21d91",
+          "quote": "The first audit recorded zero invoice errors. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0:ddd3a98f-0536-5090-8aa4-a62befc21d91",
+          "quote": "The second audit recorded 12 invoice errors."
+        }
+      ],
+      "quantity_catalog": [],
+      "extraction_notices": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0:ddd3a98f-0536-5090-8aa4-a62befc21d91",
+          "source_text": "zero invoice errors. ",
+          "start": 25,
+          "end": 46,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0:ddd3a98f-0536-5090-8aa4-a62befc21d91",
+          "source_text": "12 invoice errors.",
+          "start": 26,
+          "end": 44,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        }
+      ],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "percent_change",
+          "status": "unknown",
+          "text": "Calculation unavailable: source values could not be extracted as supported quantities. Model assessment: The source text contains number-like text, but it was not extracted due to potential unsupported format or unit.",
+          "formula": null,
+          "result": null,
+          "unit": null,
+          "reason": "The source text contains number-like text, but it was not extracted due to potential unsupported format or unit.",
+          "inputs": [],
+          "rounding": null,
+          "limitation_kind": "unsupported",
+          "caveat": "Arithmetic does not verify source selection or authority."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "ecf3d8f9-b367-4ee1-8142-6b3830292a95"
+    ]
+  },
+  "latency_seconds": 49.22412395849824,
+  "setup_seconds": 0.015543665736913681,
+  "attempt_total_seconds": 49.23966762423515
+}

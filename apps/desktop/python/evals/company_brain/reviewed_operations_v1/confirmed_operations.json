@@ -1,0 +1,68 @@
+{
+  "provenance": "fixture_supplied",
+  "description": "Synthetic owner-confirmed-operation analogue; not a real human outcome or review. Each operation addresses the single original issue Q1.",
+  "cases": {
+    "packing-cycle": [
+      {
+        "question_id": "Q1",
+        "request": "How much did the packing cycle change?",
+        "operation": "difference"
+      },
+      {
+        "question_id": "Q1",
+        "request": "Did the scheduling update cause the change?",
+        "operation": "answer"
+      }
+    ],
+    "invoice-errors": [
+      {
+        "question_id": "Q1",
+        "request": "What was the relative percentage change in invoice errors?",
+        "operation": "percent_change"
+      }
+    ],
+    "renewal-share": [
+      {
+        "question_id": "Q1",
+        "request": "What percentage of customer renewals were handled by the partner team?",
+        "operation": "percentage"
+      }
+    ],
+    "service-contracts": [
+      {
+        "question_id": "Q1",
+        "request": "What is the current service contract count?",
+        "operation": "answer"
+      },
+      {
+        "question_id": "Q1",
+        "request": "How much did the service contract count change?",
+        "operation": "difference"
+      }
+    ],
+    "dispatch-cartons": [
+      {
+        "question_id": "Q1",
+        "request": "How much did daily dispatch volume increase?",
+        "operation": "difference"
+      }
+    ],
+    "outlet-reserve": [
+      {
+        "question_id": "Q1",
+        "request": "What were the previous and current reserve quantities?",
+        "operation": "answer"
+      },
+      {
+        "question_id": "Q1",
+        "request": "What was the increase in reserve quantity?",
+        "operation": "difference"
+      },
+      {
+        "question_id": "Q1",
+        "request": "Who approved the reserve change?",
+        "operation": "answer"
+      }
+    ]
+  }
+}

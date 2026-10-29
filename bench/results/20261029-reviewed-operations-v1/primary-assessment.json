@@ -1,0 +1,89 @@
+{
+  "rubric": "frozen reviewed_operations_v1",
+  "arms": {
+    "v6-auto-s7": {
+      "packing-cycle": {
+        "pass": false,
+        "reason": "States 76 to 52 minutes but omits requested -24 minute difference. Causal limitation and both inputs are correctly cited."
+      },
+      "invoice-errors": {
+        "pass": true,
+        "reason": "Explains division by original zero is undefined and visibly cites both audit counts."
+      },
+      "renewal-share": {
+        "pass": true,
+        "reason": "Correct unknown percentage with known 14 and missing total explicitly cited."
+      },
+      "service-contracts": {
+        "pass": false,
+        "reason": "Keeps both competing counts and correct conditional differences, but omits the required authority-limitation source excerpt."
+      },
+      "dispatch-cartons": {
+        "pass": false,
+        "reason": "Quotes 35 to 59 cartons without calculating the requested +24 cartons."
+      },
+      "outlet-reserve": {
+        "pass": true,
+        "reason": "Covers previous/current counts, +45 units and unknown approver with relevant exact excerpts; does not adopt excluded instruction."
+      }
+    },
+    "v9-fixture_supplied-s7": {
+      "packing-cycle": {
+        "pass": true,
+        "reason": "Computes -1440 seconds (-24 minutes) and separately answers source-limited causation with exact supporting excerpts."
+      },
+      "invoice-errors": {
+        "pass": false,
+        "reason": "Both counts visibly cited, but unsupported-extraction explanation replaces the required zero-baseline/undefined-relative-change reason."
+      },
+      "renewal-share": {
+        "pass": true,
+        "reason": "Correct missing-total explanation; both known 14 renewals and missing-total statement visibly cited even though compound count is not catalogued."
+      },
+      "service-contracts": {
+        "pass": false,
+        "reason": "Current counts conflict visibly, but arithmetic answer falsely classifies available values as unsupported extraction, omits one competing value in that answer and omits required authority statement throughout."
+      },
+      "dispatch-cartons": {
+        "pass": true,
+        "reason": "Computes +24 cartons with exact shared-unit input evidence."
+      },
+      "outlet-reserve": {
+        "pass": true,
+        "reason": "Covers both counts, computed +45 units and documented lack of approver; exact evidence; excluded instruction not followed."
+      }
+    },
+    "v9-auto-s7": {
+      "packing-cycle": {
+        "pass": true,
+        "reason": "Meaningful complete plan; computes -1440 seconds and preserves independently cited causal limitation."
+      },
+      "invoice-errors": {
+        "pass": false,
+        "reason": "Cites both counts but explains extraction limitation instead of undefined relative change from zero."
+      },
+      "renewal-share": {
+        "pass": true,
+        "reason": "Both known 14 and missing total visibly cited; model assessment correctly states total absence, alongside a true extraction limitation for compound count phrasing."
+      },
+      "service-contracts": {
+        "pass": false,
+        "reason": "Same unsupported-extraction misclassification despite available quantities, and required authority statement absent from visible evidence."
+      },
+      "dispatch-cartons": {
+        "pass": true,
+        "reason": "Meaningful requested increase operation; computes and cites +24 cartons."
+      },
+      "outlet-reserve": {
+        "pass": true,
+        "reason": "Meaningful four-request plan covers prior/current counts, computed +45 units and documented unknown approver, with exact allowed excerpts."
+      }
+    }
+  },
+  "complete": true,
+  "totals": {
+    "v6-auto-s7": 3,
+    "v9-fixture_supplied-s7": 4,
+    "v9-auto-s7": 4
+  }
+}

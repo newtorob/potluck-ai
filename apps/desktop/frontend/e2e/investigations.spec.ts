@@ -25,8 +25,13 @@ const answerDraft = { ...draft, brief: { questions: [{ id: 'Q1', text: 'What hap
   answers: [{ question_id: 'Q1', status: 'supported', text: 'The worker restarted.', snippet_ids: ['S1'], source_excerpts: [snippet] }],
   facts: [], prior_fixes: [], hypotheses: [], recommended_checks: [], model_uncertainties: [] },
   provenance: { ...draft.provenance, template_version: 'investigation-v6', question_origin: 'explicit', snippet_catalog: [snippet] } };
+const calculationDraft = { ...answerDraft, brief: { ...answerDraft.brief, questions: [{ id: 'R1', text: 'How much changed?' }],
+  answers: [{ question_id: 'R1', status: 'unknown', text: 'Unknown: source value could not be extracted.', snippet_ids: ['S1'], source_excerpts: [snippet] }] },
+  provenance: { ...answerDraft.provenance, template_version: 'investigation-v9',
+    extraction_notices: [{ snippet_id: 'S1', citation_id: sourceId, source_text: '20–30%', reason: 'Range is unsupported' }],
+    calculation_traces: [{ request_id: 'R1', operation: 'difference', status: 'unknown', formula: 'after - before', reason: 'Missing input', caveat: 'Arithmetic does not verify source selection or authority.', inputs: [{ id: 'N1', citation_id: sourceId, source_text: '20%' }], algorithm_version: 'cited-calculations-v2', normalized_inputs: [], rounding: { mode: 'ROUND_HALF_UP', max_fractional_digits: 6 } }] } };
 
-type Controls = { unavailable: boolean; empty: boolean; failCreate: boolean; createGate?: Promise<void> };
+type Controls = { unavailable: boolean; empty: boolean; failCreate: boolean; createGate?: Promise<void>; planGate?: Promise<void>; failPlan?: boolean };
 async function setup(page: Page, controls: Controls) {
   const appOrigin = new URL(test.info().project.use.baseURL as string).origin;
   await page.route('**/*', (route) => {
@@ -46,10 +51,16 @@ async function setup(page: Page, controls: Controls) {
     if (path === '/health') return fulfill({ status: 'ok', model_loaded: true, active_model_id: 'local-model' });
     if (path === '/company-brain/collections') return fulfill({ collections: controls.empty ? [] : [
       { id: 'docs', name: 'Incident docs', scan_status: 'ready', last_scan_at: '2026-10-29T12:00:00Z' }] });
+    if (path === '/company-brain/investigations/plan') {
+      if (controls.planGate) await controls.planGate;
+      if (controls.failPlan) return fulfill({ detail: 'Planning failed' }, 400);
+      return fulfill({ operations: [{ request: 'How much changed?', operation: 'difference' }], model_slug: 'local-model', model_sha256: 'abc', generation_profile: null, notices: [] });
+    }
     if (path === '/company-brain/investigations' && request.method() === 'POST') {
       if (controls.createGate) await controls.createGate;
       if (controls.failCreate) return fulfill({ detail: 'generation_failed: unavailable' }, 400);
       if (request.postDataJSON().answer_each_question) current = structuredClone(answerDraft);
+      if (request.postDataJSON().reviewed_operations) current = structuredClone(calculationDraft);
       return fulfill(current);
     }
     if (path === '/company-brain/investigations') return fulfill({ investigations: [current, legacy] });
@@ -76,6 +87,75 @@ async function setup(page: Page, controls: Controls) {
   await mkdir(output, { recursive: true });
   await page.goto('/#/investigations');
 }
+
+test('reviewed plan can be edited and retained across failures before a cited calculation draft', async ({ page }) => {
+  let release!: () => void;
+  const controls: Controls = { unavailable: false, empty: false, failCreate: false, planGate: new Promise<void>((resolve) => { release = resolve; }) };
+  await setup(page, controls);
+  await page.setViewportSize({ width: 480, height: 740 });
+  await scope(page);
+  await page.getByLabel('Issue', { exact: true }).fill('Worker incident');
+  await page.getByLabel('Evidence query').fill('worker');
+  await page.getByLabel('Loaded local model').selectOption('local-model');
+  await page.getByLabel('Reviewed calculations (experimental)').check();
+  const requestField = page.getByLabel('Request 1');
+  await expect(requestField).toHaveAttribute('aria-invalid', 'true');
+  const suggest = page.getByRole('button', { name: 'Suggest a plan' });
+  const suggestWidth = (await suggest.boundingBox())!.width;
+  await suggest.click();
+  const busySuggest = page.getByRole('button', { name: 'Suggesting…' });
+  await expect(busySuggest).toBeDisabled();
+  expect((await busySuggest.boundingBox())!.width).toBe(suggestWidth);
+  release();
+  await expect(requestField).toHaveValue('How much changed?');
+  const select = page.getByLabel('Calculation type 1');
+  await select.focus(); await page.keyboard.press('Space'); await page.keyboard.press('Escape');
+  await expect(select).toBeFocused();
+  await page.getByRole('button', { name: 'Add request' }).click();
+  await page.getByLabel('Request 2').fill('How much changed?');
+  await expect(requestField).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByLabel('Request 2')).toHaveAccessibleDescription('Use a distinct request.');
+  await page.getByRole('button', { name: 'Remove request 2' }).click();
+  await requestField.fill('Edited change request');
+  await page.setViewportSize({ width: 1152, height: 768 });
+  await requestField.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await page.screenshot({ path: `${output}/reviewed-plan-desktop.png`, animations: 'disabled' });
+  await page.setViewportSize({ width: 480, height: 740 });
+  await requestField.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await page.screenshot({ path: `${output}/reviewed-plan-narrow.png`, animations: 'disabled' });
+  controls.failPlan = true;
+  await suggest.click();
+  await expect(page.getByRole('alert')).toContainText('Planning failed');
+  await expect(requestField).toHaveValue('Edited change request');
+  controls.failCreate = true;
+  let releaseCreate!: () => void;
+  controls.createGate = new Promise<void>((resolve) => { releaseCreate = resolve; });
+  const confirm = page.getByRole('button', { name: 'Confirm plan and draft' });
+  const confirmWidth = (await confirm.boundingBox())!.width;
+  await confirm.click();
+  const working = page.getByRole('button', { name: 'Working…' });
+  await expect(working).toBeDisabled();
+  expect((await working.boundingBox())!.width).toBe(confirmWidth);
+  releaseCreate();
+  await expect(page.getByRole('alert')).toContainText('generation_failed');
+  await expect(requestField).toHaveValue('Edited change request');
+  controls.failCreate = false;
+  const createRequest = page.waitForRequest((r) => r.url().endsWith('/company-brain/investigations') && r.method() === 'POST');
+  await page.getByRole('button', { name: 'Confirm plan and draft' }).click();
+  expect((await createRequest).postDataJSON()).toMatchObject({ plan_confirmed: true, reviewed_operations: [{ request: 'Edited change request', operation: 'difference' }] });
+  await expect(page.getByText('Range is unsupported', { exact: false })).toBeVisible();
+  await expect(page.getByText(/Status: unknown · Formula: after - before/)).toBeVisible();
+  await expect(page.getByText(/Input N1: 20%/)).toBeVisible();
+  await page.setViewportSize({ width: 1152, height: 768 });
+  await page.getByRole('heading', { name: 'Original machine calculations' }).evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await page.screenshot({ path: `${output}/reviewed-calculation-desktop.png`, animations: 'disabled' });
+  await page.getByText('Calculation details').click();
+  await expect(page.getByText('Algorithm: cited-calculations-v2')).toBeVisible();
+  await page.setViewportSize({ width: 480, height: 740 });
+  await page.getByRole('heading', { name: 'Original machine calculations' }).evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await page.screenshot({ path: `${output}/reviewed-calculation-narrow.png`, animations: 'disabled' });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
 
 test('question preview renders sources and recovers a correction', async ({ page }) => {
   await setup(page, { unavailable: false, empty: false, failCreate: false });

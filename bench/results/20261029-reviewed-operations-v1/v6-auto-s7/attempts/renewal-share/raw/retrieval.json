@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "7d8b46f3-7314-45f3-b68f-a098647009a4"
+  ],
+  "query": "What percentage of last month’s customer renewals were handled by the partner team?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "7d8b46f3-7314-45f3-b68f-a098647009a4"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "7d8b46f3-7314-45f3-b68f-a098647009a4",
+        "document_id": "fea038c9-22f4-52d8-b0fe-ca7d4eb4151d",
+        "revision_id": "f14fab74-b83b-59b5-ba0d-007a300c42dc",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:00:50.885161+00:00",
+        "chunk_id": "e1889d73-09ee-5adf-98c0-2abad654831a",
+        "anchor": "partner-renewal-report",
+        "heading": "Partner renewal report",
+        "content": "The partner team handled 14 customer renewals last month. The report does not state the total number of customer renewals last month.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:00:50.885468+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:e1889d73-09ee-5adf-98c0-2abad654831a:f14fab74-b83b-59b5-ba0d-007a300c42dc"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

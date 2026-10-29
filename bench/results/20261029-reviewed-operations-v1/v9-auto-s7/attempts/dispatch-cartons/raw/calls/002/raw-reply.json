@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-2395443d-8c03-4e67-8d16-9b9c95fe0394",
+  "object": "chat.completion",
+  "created": 1793311886,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": \"difference\"}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 142,
+    "completion_tokens": 7,
+    "total_tokens": 149
+  }
+}

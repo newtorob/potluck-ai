@@ -1,0 +1,129 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "6b95ae63-e75f-4625-90b0-2b8eb2065279",
+    "workspace": "synthetic-eval",
+    "issue": "What was the relative percentage change in invoice errors between the first and second audits?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What was the relative percentage change in invoice errors between the first and second audits?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "unknown",
+          "text": "The relative percentage change in invoice errors between the first and second audits cannot be determined because the percentage change requires the absolute change divided by the original value, and the original value (zero) would make the calculation undefined.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:df86bda5-15d0-51f8-9eaf-c46c3d6080ca:c4cdd2f7-b290-516e-9fe6-59c0a68e427f",
+              "quote": "The first audit recorded zero invoice errors. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:df86bda5-15d0-51f8-9eaf-c46c3d6080ca:c4cdd2f7-b290-516e-9fe6-59c0a68e427f",
+              "quote": "The second audit recorded 12 invoice errors."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "0e170dc1-6742-4d4d-9ed4-d046c243801a",
+        "document_id": "48bd20c8-e6f7-559f-a8ef-44ce39a1d0d9",
+        "revision_id": "c4cdd2f7-b290-516e-9fe6-59c0a68e427f",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:00:25.799461+00:00",
+        "chunk_id": "df86bda5-15d0-51f8-9eaf-c46c3d6080ca",
+        "anchor": "invoice-audit-summary",
+        "heading": "Invoice audit summary",
+        "content": "The first audit recorded zero invoice errors. The second audit recorded 12 invoice errors.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:00:25.799619+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:df86bda5-15d0-51f8-9eaf-c46c3d6080ca:c4cdd2f7-b290-516e-9fe6-59c0a68e427f",
+        "presented_content": "The first audit recorded zero invoice errors. The second audit recorded 12 invoice errors."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T22:00:50.864094+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What was the relative percentage change in invoice errors between the first and second audits?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 25060,
+      "created_at": "2026-10-29T22:00:50.864094+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:df86bda5-15d0-51f8-9eaf-c46c3d6080ca:c4cdd2f7-b290-516e-9fe6-59c0a68e427f",
+          "quote": "The first audit recorded zero invoice errors. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:df86bda5-15d0-51f8-9eaf-c46c3d6080ca:c4cdd2f7-b290-516e-9fe6-59c0a68e427f",
+          "quote": "The second audit recorded 12 invoice errors."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "0e170dc1-6742-4d4d-9ed4-d046c243801a"
+    ]
+  },
+  "latency_seconds": 25.068418375216424,
+  "setup_seconds": 0.013338499702513218,
+  "attempt_total_seconds": 25.081756874918938
+}

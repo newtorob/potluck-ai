@@ -1,0 +1,181 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "c6927860-f590-4c5f-8cef-7395df880696",
+    "workspace": "synthetic-eval",
+    "issue": "What percentage of last month’s customer renewals were handled by the partner team?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What percentage of customer renewals were handled by the partner team?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "unknown",
+          "text": "Calculation unavailable: the required input is not established by presented evidence. Model assessment: The total number of customer renewals last month is not provided in the source text, making it impossible to calculate the percentage.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:d6de945e-ad71-539a-bd9c-3748b7bf3df0:f9d13a6a-4c5f-5f36-ba32-5dc182787cc1",
+              "quote": "The partner team handled 14 customer renewals last month. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:d6de945e-ad71-539a-bd9c-3748b7bf3df0:f9d13a6a-4c5f-5f36-ba32-5dc182787cc1",
+              "quote": "The report does not state the total number of customer renewals last month."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "percentage",
+            "status": "unknown",
+            "text": "Calculation unavailable: the required input is not established by presented evidence. Model assessment: The total number of customer renewals last month is not provided in the source text, making it impossible to calculate the percentage.",
+            "formula": null,
+            "result": null,
+            "unit": null,
+            "reason": "The total number of customer renewals last month is not provided in the source text, making it impossible to calculate the percentage.",
+            "inputs": [],
+            "rounding": null,
+            "limitation_kind": "missing",
+            "caveat": "Arithmetic does not verify source selection or authority."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "9d1fcb0f-44ce-486d-a954-dca8e0fe131e",
+        "document_id": "e622799a-6226-5575-9ebb-117cd35d533e",
+        "revision_id": "f9d13a6a-4c5f-5f36-ba32-5dc182787cc1",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:05:32.700960+00:00",
+        "chunk_id": "d6de945e-ad71-539a-bd9c-3748b7bf3df0",
+        "anchor": "partner-renewal-report",
+        "heading": "Partner renewal report",
+        "content": "The partner team handled 14 customer renewals last month. The report does not state the total number of customer renewals last month.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:05:32.701135+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:d6de945e-ad71-539a-bd9c-3748b7bf3df0:f9d13a6a-4c5f-5f36-ba32-5dc182787cc1",
+        "presented_content": "The partner team handled 14 customer renewals last month. The report does not state the total number of customer renewals last month."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T22:05:48.087676+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v9",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What percentage of last month’s customer renewals were handled by the partner team?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 15383,
+      "created_at": "2026-10-29T22:05:48.087676+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "What percentage of last month’s customer renewals were handled by the partner team?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "What percentage of customer renewals were handled by the partner team?",
+          "operation": "percentage"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:d6de945e-ad71-539a-bd9c-3748b7bf3df0:f9d13a6a-4c5f-5f36-ba32-5dc182787cc1",
+          "quote": "The partner team handled 14 customer renewals last month. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:d6de945e-ad71-539a-bd9c-3748b7bf3df0:f9d13a6a-4c5f-5f36-ba32-5dc182787cc1",
+          "quote": "The report does not state the total number of customer renewals last month."
+        }
+      ],
+      "quantity_catalog": [],
+      "extraction_notices": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:d6de945e-ad71-539a-bd9c-3748b7bf3df0:f9d13a6a-4c5f-5f36-ba32-5dc182787cc1",
+          "source_text": "14 customer renewals last month. ",
+          "start": 25,
+          "end": 58,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        }
+      ],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "percentage",
+          "status": "unknown",
+          "text": "Calculation unavailable: the required input is not established by presented evidence. Model assessment: The total number of customer renewals last month is not provided in the source text, making it impossible to calculate the percentage.",
+          "formula": null,
+          "result": null,
+          "unit": null,
+          "reason": "The total number of customer renewals last month is not provided in the source text, making it impossible to calculate the percentage.",
+          "inputs": [],
+          "rounding": null,
+          "limitation_kind": "missing",
+          "caveat": "Arithmetic does not verify source selection or authority."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "9d1fcb0f-44ce-486d-a954-dca8e0fe131e"
+    ]
+  },
+  "latency_seconds": 15.394723292440176,
+  "setup_seconds": 0.021411207504570484,
+  "attempt_total_seconds": 15.416134499944746
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-542b1d02-0831-403c-816b-d83737232fe1",
+  "object": "chat.completion",
+  "created": 1793311686,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"How much did the packing cycle change after the scheduling update?\", \"Did the scheduling update cause the change in the packing cycle?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 109,
+    "completion_tokens": 30,
+    "total_tokens": 139
+  }
+}

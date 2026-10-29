@@ -1,0 +1,129 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "f5132333-6c43-4e45-bcce-eefb71547e6b",
+    "workspace": "synthetic-eval",
+    "issue": "What percentage of last month’s customer renewals were handled by the partner team?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "What percentage of last month’s customer renewals were handled by the partner team?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "unknown",
+          "text": "The partner team handled 14 customer renewals last month. The report does not state the total number of customer renewals last month.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:e1889d73-09ee-5adf-98c0-2abad654831a:f14fab74-b83b-59b5-ba0d-007a300c42dc",
+              "quote": "The partner team handled 14 customer renewals last month. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:e1889d73-09ee-5adf-98c0-2abad654831a:f14fab74-b83b-59b5-ba0d-007a300c42dc",
+              "quote": "The report does not state the total number of customer renewals last month."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "7d8b46f3-7314-45f3-b68f-a098647009a4",
+        "document_id": "fea038c9-22f4-52d8-b0fe-ca7d4eb4151d",
+        "revision_id": "f14fab74-b83b-59b5-ba0d-007a300c42dc",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:00:50.885161+00:00",
+        "chunk_id": "e1889d73-09ee-5adf-98c0-2abad654831a",
+        "anchor": "partner-renewal-report",
+        "heading": "Partner renewal report",
+        "content": "The partner team handled 14 customer renewals last month. The report does not state the total number of customer renewals last month.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:00:50.885468+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:e1889d73-09ee-5adf-98c0-2abad654831a:f14fab74-b83b-59b5-ba0d-007a300c42dc",
+        "presented_content": "The partner team handled 14 customer renewals last month. The report does not state the total number of customer renewals last month."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T22:01:20.982134+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What percentage of last month’s customer renewals were handled by the partner team?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 30091,
+      "created_at": "2026-10-29T22:01:20.982134+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:e1889d73-09ee-5adf-98c0-2abad654831a:f14fab74-b83b-59b5-ba0d-007a300c42dc",
+          "quote": "The partner team handled 14 customer renewals last month. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:e1889d73-09ee-5adf-98c0-2abad654831a:f14fab74-b83b-59b5-ba0d-007a300c42dc",
+          "quote": "The report does not state the total number of customer renewals last month."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "7d8b46f3-7314-45f3-b68f-a098647009a4"
+    ]
+  },
+  "latency_seconds": 30.10232195816934,
+  "setup_seconds": 0.016773208044469357,
+  "attempt_total_seconds": 30.11909516621381
+}

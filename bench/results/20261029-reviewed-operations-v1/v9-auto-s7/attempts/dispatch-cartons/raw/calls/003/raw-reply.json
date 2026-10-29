@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-9910a2a6-61a9-48bd-89ab-e710e1eec3fe",
+  "object": "chat.completion",
+  "created": 1793311890,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\"], \"reason\": \"The daily dispatch volume increased from 35 to 59 cartons.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 381,
+    "completion_tokens": 53,
+    "total_tokens": 434
+  }
+}

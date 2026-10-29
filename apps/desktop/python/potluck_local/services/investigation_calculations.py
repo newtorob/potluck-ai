@@ -175,7 +175,8 @@ def _source_matches(source: str, prefix_length: int) -> list[dict[str, Any]]:
 
 
 def quantity_catalog(
-    snippets: list[dict[str, Any]], *, source_context: dict[str, str] | None = None
+    snippets: list[dict[str, Any]], *, source_context: dict[str, str] | None = None,
+    version: str = 'v1'
 ) -> list[dict[str, Any]]:
     """Extract quantities; context prevents truncated presentation from changing tokens.
 
@@ -183,6 +184,13 @@ def quantity_catalog(
     of its full source. Only spans wholly contained in one snippet are emitted.
     Full context is used solely for validation and is never included in output.
     """
+    if version not in ('v1', 'v2'):
+        raise ValueError('invalid calculation version')
+    if version == 'v2':
+        from .investigation_quantities import source_matches_v2
+        source_matches = source_matches_v2
+    else:
+        source_matches = _source_matches
     if not isinstance(snippets, list) or len(snippets) > 1000:
         raise ValueError('invalid snippets')
     if source_context is not None and (not isinstance(source_context, dict) or len(source_context) > 1000):
@@ -220,7 +228,7 @@ def quantity_catalog(
                 spans[snippet['snippet_id']] = []
                 position = next_position
             span_index = 0
-            for entry in _source_matches(source, len(prefix)):
+            for entry in source_matches(source, len(prefix)):
                 start, end = entry['start'], entry['end']
                 while span_index < len(offsets) and start >= offsets[span_index][1]:
                     span_index += 1
@@ -241,7 +249,7 @@ def quantity_catalog(
     catalog: list[dict[str, Any]] = []
     for snippet in snippets:
         sid, cid, quote = snippet['snippet_id'], snippet['citation_id'], snippet['quote']
-        matches = spans[sid] if source_context is not None else _source_matches(quote, len(quote))
+        matches = spans[sid] if source_context is not None else source_matches(quote, len(quote))
         for entry in matches:
             if len(catalog) >= 1000:
                 raise ValueError('too many quantities')
@@ -251,9 +259,14 @@ def quantity_catalog(
     return catalog
 
 
-def _validate_catalog(quantities: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+def _validate_catalog(quantities: list[dict[str, Any]], version: str = 'v1') -> dict[str, dict[str, Any]]:
     if not isinstance(quantities, list) or len(quantities) > 1000:
         raise ValueError('invalid quantity catalog')
+    if version == 'v2':
+        from .investigation_quantities import source_matches_v2
+        source_matches = source_matches_v2
+    else:
+        source_matches = _source_matches
     by_id = {}
     seen_spans = set()
     snippets = {}
@@ -272,7 +285,7 @@ def _validate_catalog(quantities: list[dict[str, Any]]) -> dict[str, dict[str, A
             raise ValueError('quantity does not match source')
         expected = {key: entry.get(key) for key in ('start', 'end', 'value', 'unit', 'dimension')}
         expected.update({key: entry[key] for key in _SHARED_FIELDS if key in entry})
-        if expected not in _source_matches(quote, len(quote)):
+        if expected not in source_matches(quote, len(quote)):
             raise ValueError('quantity does not match source')
         if (sid, start, end) in seen_spans or (sid in snippets and snippets[sid] != (cid, quote)):
             raise ValueError('duplicate or inconsistent source span')
@@ -287,11 +300,14 @@ def _decimal_text(value: Decimal) -> str:
     return rendered.rstrip('0').rstrip('.') if '.' in rendered else rendered
 
 
-def calculate(operation: str, operand_ids: list[str], quantities: list[dict[str, Any]]) -> dict[str, Any]:
+def calculate(operation: str, operand_ids: list[str], quantities: list[dict[str, Any]], *,
+              version: str = 'v1') -> dict[str, Any]:
     """Compute a fixed operation, or return a reason it cannot be computed."""
+    if version not in ('v1', 'v2'):
+        raise ValueError('invalid calculation version')
     if operation not in _OPERATIONS or not isinstance(operand_ids, list) or len(operand_ids) > 2:
         raise ValueError('invalid operation or operand count')
-    by_id = _validate_catalog(quantities)
+    by_id = _validate_catalog(quantities, version)
     if any(not isinstance(qid, str) or qid not in by_id for qid in operand_ids):
         raise ValueError('invalid operand ID')
     if len(set(operand_ids)) != len(operand_ids):
@@ -302,7 +318,7 @@ def calculate(operation: str, operand_ids: list[str], quantities: list[dict[str,
                'percentage': 'part / total × 100'}[operation]
     result = {'status': 'unknown', 'text': '', 'formula': formula, 'result': None,
               'unit': None, 'reason': None, 'inputs': inputs,
-              'algorithm_version': _ALGORITHM_VERSION, 'normalized_inputs': [], 'evaluated_expression': None,
+              'algorithm_version': _ALGORITHM_VERSION if version == 'v1' else 'cited-calculations-v2', 'normalized_inputs': [], 'evaluated_expression': None,
               'rounding': {'mode': 'ROUND_HALF_UP', 'max_fractional_digits': 6}, 'caveat': _CAVEAT}
 
     def unknown(reason: str) -> dict[str, Any]:
@@ -368,3 +384,10 @@ def calculate(operation: str, operand_ids: list[str], quantities: list[dict[str,
             label = 'Signed percentage-point difference'
         result['text'] = f'{label}: {rendered}' + (f' {unit}' if unit else '') + '.'
         return result
+
+
+def extraction_notices(snippets: list[dict[str, Any]], quantities: list[dict[str, Any]], *,
+                       source_context: dict[str, str] | None = None) -> list[dict[str, Any]]:
+    """Report bounded source-local number-like spans not extracted by v2."""
+    from .investigation_quantities import extraction_notices_v2
+    return extraction_notices_v2(snippets, quantities, source_context=source_context)

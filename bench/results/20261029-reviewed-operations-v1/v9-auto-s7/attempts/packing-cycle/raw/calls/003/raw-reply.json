@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-ca6d2795-3c97-47e4-afd3-415c4de0820a",
+  "object": "chat.completion",
+  "created": 1793311704,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\"], \"reason\": \"The difference in the packing cycle is calculated from the values provided in S1: 76 minutes before and 52 minutes after the scheduling update.\"}, \"R2\": {\"snippet_ids\": [\"S3\"], \"text\": \"The review does not establish what caused the change.\", \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 459,
+    "completion_tokens": 101,
+    "total_tokens": 560
+  }
+}

@@ -1,0 +1,1728 @@
+{
+  "corpus_id": "reviewed-operations-v1-fresh",
+  "suite_sha256": "a106cf07f84fc400044020f0d6f8ff528f753ee41039eb31d2f938cde1fd4ea5",
+  "case_ids": [
+    "packing-cycle",
+    "invoice-errors",
+    "renewal-share",
+    "service-contracts",
+    "dispatch-cartons",
+    "outlet-reserve"
+  ],
+  "template_version": "investigation-v9",
+  "generation_profile": {
+    "name": "qwen3-non-thinking",
+    "temperature": 0.7,
+    "top_p": 0.8,
+    "top_k": 20,
+    "min_p": 0.0,
+    "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+    "backend": "llama-cpp-python",
+    "enable_thinking": false,
+    "repeat_penalty": 1.0
+  },
+  "seed": 7,
+  "question_mode": "auto",
+  "operation_mode": "auto",
+  "plan_origin": "planned_unreviewed",
+  "assessment": null,
+  "outputs": {
+    "packing-cycle": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "98fa91ee-fd57-46d6-8711-91fba88c3bd7",
+        "workspace": "synthetic-eval",
+        "issue": "How much did the packing cycle change after the scheduling update, and did that update cause the change?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "How much did the packing cycle change after the scheduling update?"
+            },
+            {
+              "id": "R2",
+              "text": "Did the scheduling update cause the change in the packing cycle?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "supported",
+              "text": "Signed difference: -1440 s.",
+              "snippet_ids": [
+                "S1"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:143225b3-f868-50c7-9a4a-011cb23202f2:1d7a4f2b-20ad-5712-a843-10a07ab46240",
+                  "quote": "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. "
+                }
+              ],
+              "calculation": {
+                "request_id": "R1",
+                "operation": "difference",
+                "status": "computed",
+                "text": "Signed difference: -1440 s.",
+                "formula": "after - before",
+                "result": "-1440",
+                "unit": "s",
+                "reason": null,
+                "inputs": [
+                  {
+                    "id": "N1",
+                    "snippet_id": "S1",
+                    "citation_id": "source:143225b3-f868-50c7-9a4a-011cb23202f2:1d7a4f2b-20ad-5712-a843-10a07ab46240",
+                    "source_text": "76 minutes",
+                    "snippet_text": "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. ",
+                    "start": 30,
+                    "end": 40,
+                    "value": "76",
+                    "unit": "min",
+                    "dimension": "time"
+                  },
+                  {
+                    "id": "N2",
+                    "snippet_id": "S1",
+                    "citation_id": "source:143225b3-f868-50c7-9a4a-011cb23202f2:1d7a4f2b-20ad-5712-a843-10a07ab46240",
+                    "source_text": "52 minutes",
+                    "snippet_text": "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. ",
+                    "start": 74,
+                    "end": 84,
+                    "value": "52",
+                    "unit": "min",
+                    "dimension": "time"
+                  }
+                ],
+                "algorithm_version": "cited-calculations-v2",
+                "normalized_inputs": [
+                  {
+                    "id": "N1",
+                    "role": "before",
+                    "value": "4560",
+                    "unit": "s",
+                    "original_value": "76",
+                    "original_unit": "min",
+                    "conversion_factor": "60"
+                  },
+                  {
+                    "id": "N2",
+                    "role": "after",
+                    "value": "3120",
+                    "unit": "s",
+                    "original_value": "52",
+                    "original_unit": "min",
+                    "conversion_factor": "60"
+                  }
+                ],
+                "evaluated_expression": "3120 s - 4560 s = -1440 s (rounded)",
+                "rounding": {
+                  "mode": "ROUND_HALF_UP",
+                  "max_fractional_digits": 6
+                },
+                "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+              }
+            },
+            {
+              "question_id": "R2",
+              "status": "supported",
+              "text": "The review does not establish what caused the change.",
+              "snippet_ids": [
+                "S3"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:143225b3-f868-50c7-9a4a-011cb23202f2:1d7a4f2b-20ad-5712-a843-10a07ab46240",
+                  "quote": "The review does not establish what caused the change."
+                }
+              ]
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "77db6b05-6e28-4d76-b5cf-02238e89743c",
+            "document_id": "6bbd63e9-ce04-5261-9f61-7a29f8003307",
+            "revision_id": "1d7a4f2b-20ad-5712-a843-10a07ab46240",
+            "relative_path": "source.md",
+            "updated_at": "2026-10-29T22:08:06.504992+00:00",
+            "chunk_id": "143225b3-f868-50c7-9a4a-011cb23202f2",
+            "anchor": "packing-cycle-review",
+            "heading": "Packing cycle review",
+            "content": "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. A staffing change happened during the same period. The review does not establish what caused the change.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-29T22:08:06.505372+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:143225b3-f868-50c7-9a4a-011cb23202f2:1d7a4f2b-20ad-5712-a843-10a07ab46240",
+            "presented_content": "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. A staffing change happened during the same period. The review does not establish what caused the change."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-29T22:08:48.370954+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v9",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "How much did the packing cycle change after the scheduling update, and did that update cause the change?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 41861,
+          "created_at": "2026-10-29T22:08:48.370954+00:00",
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "How much did the packing cycle change after the scheduling update, and did that update cause the change?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "How much did the packing cycle change after the scheduling update?",
+              "operation": "difference"
+            },
+            {
+              "id": "R2",
+              "question_id": "Q1",
+              "request": "Did the scheduling update cause the change in the packing cycle?",
+              "operation": "answer"
+            }
+          ],
+          "operation_plan_origin": "planned_unreviewed",
+          "planner_version": "question-classification-v1",
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:143225b3-f868-50c7-9a4a-011cb23202f2:1d7a4f2b-20ad-5712-a843-10a07ab46240",
+              "quote": "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:143225b3-f868-50c7-9a4a-011cb23202f2:1d7a4f2b-20ad-5712-a843-10a07ab46240",
+              "quote": "A staffing change happened during the same period. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:143225b3-f868-50c7-9a4a-011cb23202f2:1d7a4f2b-20ad-5712-a843-10a07ab46240",
+              "quote": "The review does not establish what caused the change."
+            }
+          ],
+          "quantity_catalog": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:143225b3-f868-50c7-9a4a-011cb23202f2:1d7a4f2b-20ad-5712-a843-10a07ab46240",
+              "source_text": "76 minutes",
+              "snippet_text": "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. ",
+              "start": 30,
+              "end": 40,
+              "value": "76",
+              "unit": "min",
+              "dimension": "time"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S1",
+              "citation_id": "source:143225b3-f868-50c7-9a4a-011cb23202f2:1d7a4f2b-20ad-5712-a843-10a07ab46240",
+              "source_text": "52 minutes",
+              "snippet_text": "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. ",
+              "start": 74,
+              "end": 84,
+              "value": "52",
+              "unit": "min",
+              "dimension": "time"
+            }
+          ],
+          "extraction_notices": [],
+          "calculation_traces": [
+            {
+              "request_id": "R1",
+              "operation": "difference",
+              "status": "computed",
+              "text": "Signed difference: -1440 s.",
+              "formula": "after - before",
+              "result": "-1440",
+              "unit": "s",
+              "reason": null,
+              "inputs": [
+                {
+                  "id": "N1",
+                  "snippet_id": "S1",
+                  "citation_id": "source:143225b3-f868-50c7-9a4a-011cb23202f2:1d7a4f2b-20ad-5712-a843-10a07ab46240",
+                  "source_text": "76 minutes",
+                  "snippet_text": "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. ",
+                  "start": 30,
+                  "end": 40,
+                  "value": "76",
+                  "unit": "min",
+                  "dimension": "time"
+                },
+                {
+                  "id": "N2",
+                  "snippet_id": "S1",
+                  "citation_id": "source:143225b3-f868-50c7-9a4a-011cb23202f2:1d7a4f2b-20ad-5712-a843-10a07ab46240",
+                  "source_text": "52 minutes",
+                  "snippet_text": "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. ",
+                  "start": 74,
+                  "end": 84,
+                  "value": "52",
+                  "unit": "min",
+                  "dimension": "time"
+                }
+              ],
+              "algorithm_version": "cited-calculations-v2",
+              "normalized_inputs": [
+                {
+                  "id": "N1",
+                  "role": "before",
+                  "value": "4560",
+                  "unit": "s",
+                  "original_value": "76",
+                  "original_unit": "min",
+                  "conversion_factor": "60"
+                },
+                {
+                  "id": "N2",
+                  "role": "after",
+                  "value": "3120",
+                  "unit": "s",
+                  "original_value": "52",
+                  "original_unit": "min",
+                  "conversion_factor": "60"
+                }
+              ],
+              "evaluated_expression": "3120 s - 4560 s = -1440 s (rounded)",
+              "rounding": {
+                "mode": "ROUND_HALF_UP",
+                "max_fractional_digits": 6
+              },
+              "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+            }
+          ],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "77db6b05-6e28-4d76-b5cf-02238e89743c"
+        ]
+      },
+      "latency_seconds": 41.86995866615325,
+      "setup_seconds": 0.0169686246663332,
+      "attempt_total_seconds": 41.886927290819585
+    },
+    "invoice-errors": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "b48ba05f-0016-4952-b27c-b49abef2f0e3",
+        "workspace": "synthetic-eval",
+        "issue": "What was the relative percentage change in invoice errors between the first and second audits?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "What was the relative percentage change in invoice errors between the first and second audits?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "unknown",
+              "text": "Calculation unavailable: source values could not be extracted as supported quantities. Model assessment: The source text contains number-like text, but it was not extracted due to potential unsupported format or unit.",
+              "snippet_ids": [
+                "S1",
+                "S2"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0:ddd3a98f-0536-5090-8aa4-a62befc21d91",
+                  "quote": "The first audit recorded zero invoice errors. "
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0:ddd3a98f-0536-5090-8aa4-a62befc21d91",
+                  "quote": "The second audit recorded 12 invoice errors."
+                }
+              ],
+              "calculation": {
+                "request_id": "R1",
+                "operation": "percent_change",
+                "status": "unknown",
+                "text": "Calculation unavailable: source values could not be extracted as supported quantities. Model assessment: The source text contains number-like text, but it was not extracted due to potential unsupported format or unit.",
+                "formula": null,
+                "result": null,
+                "unit": null,
+                "reason": "The source text contains number-like text, but it was not extracted due to potential unsupported format or unit.",
+                "inputs": [],
+                "rounding": null,
+                "limitation_kind": "unsupported",
+                "caveat": "Arithmetic does not verify source selection or authority."
+              }
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "ecf3d8f9-b367-4ee1-8142-6b3830292a95",
+            "document_id": "511bcfe5-7e1a-5c46-8b2d-0dbb98719b40",
+            "revision_id": "ddd3a98f-0536-5090-8aa4-a62befc21d91",
+            "relative_path": "source.md",
+            "updated_at": "2026-10-29T22:08:48.391584+00:00",
+            "chunk_id": "68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0",
+            "anchor": "invoice-audit-summary",
+            "heading": "Invoice audit summary",
+            "content": "The first audit recorded zero invoice errors. The second audit recorded 12 invoice errors.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-29T22:08:48.391731+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0:ddd3a98f-0536-5090-8aa4-a62befc21d91",
+            "presented_content": "The first audit recorded zero invoice errors. The second audit recorded 12 invoice errors."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-29T22:09:37.611958+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v9",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "What was the relative percentage change in invoice errors between the first and second audits?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 49215,
+          "created_at": "2026-10-29T22:09:37.611958+00:00",
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "What was the relative percentage change in invoice errors between the first and second audits?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "What was the relative percentage change in invoice errors between the first and second audits?",
+              "operation": "percent_change"
+            }
+          ],
+          "operation_plan_origin": "planned_unreviewed",
+          "planner_version": "question-classification-v1",
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0:ddd3a98f-0536-5090-8aa4-a62befc21d91",
+              "quote": "The first audit recorded zero invoice errors. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0:ddd3a98f-0536-5090-8aa4-a62befc21d91",
+              "quote": "The second audit recorded 12 invoice errors."
+            }
+          ],
+          "quantity_catalog": [],
+          "extraction_notices": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0:ddd3a98f-0536-5090-8aa4-a62befc21d91",
+              "source_text": "zero invoice errors. ",
+              "start": 25,
+              "end": 46,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:68ed6fd4-1b63-5d32-9bdc-3b4fb7f5a9d0:ddd3a98f-0536-5090-8aa4-a62befc21d91",
+              "source_text": "12 invoice errors.",
+              "start": 26,
+              "end": 44,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            }
+          ],
+          "calculation_traces": [
+            {
+              "request_id": "R1",
+              "operation": "percent_change",
+              "status": "unknown",
+              "text": "Calculation unavailable: source values could not be extracted as supported quantities. Model assessment: The source text contains number-like text, but it was not extracted due to potential unsupported format or unit.",
+              "formula": null,
+              "result": null,
+              "unit": null,
+              "reason": "The source text contains number-like text, but it was not extracted due to potential unsupported format or unit.",
+              "inputs": [],
+              "rounding": null,
+              "limitation_kind": "unsupported",
+              "caveat": "Arithmetic does not verify source selection or authority."
+            }
+          ],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "ecf3d8f9-b367-4ee1-8142-6b3830292a95"
+        ]
+      },
+      "latency_seconds": 49.22412395849824,
+      "setup_seconds": 0.015543665736913681,
+      "attempt_total_seconds": 49.23966762423515
+    },
+    "renewal-share": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "0d4d7637-71ea-47d4-a00c-2fe1b980a590",
+        "workspace": "synthetic-eval",
+        "issue": "What percentage of last month’s customer renewals were handled by the partner team?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "What percentage of last month’s customer renewals were handled by the partner team?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "unknown",
+              "text": "Calculation unavailable: source values could not be extracted as supported quantities. Model assessment: The source text does not provide the total number of customer renewals last month, which is required to calculate the percentage.",
+              "snippet_ids": [
+                "S1",
+                "S2"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:f1fb0444-26f5-512f-bc9a-f27b199849f5:45908ed1-6e53-5c3a-9cc3-34c75e987f3c",
+                  "quote": "The partner team handled 14 customer renewals last month. "
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:f1fb0444-26f5-512f-bc9a-f27b199849f5:45908ed1-6e53-5c3a-9cc3-34c75e987f3c",
+                  "quote": "The report does not state the total number of customer renewals last month."
+                }
+              ],
+              "calculation": {
+                "request_id": "R1",
+                "operation": "percentage",
+                "status": "unknown",
+                "text": "Calculation unavailable: source values could not be extracted as supported quantities. Model assessment: The source text does not provide the total number of customer renewals last month, which is required to calculate the percentage.",
+                "formula": null,
+                "result": null,
+                "unit": null,
+                "reason": "The source text does not provide the total number of customer renewals last month, which is required to calculate the percentage.",
+                "inputs": [],
+                "rounding": null,
+                "limitation_kind": "unsupported",
+                "caveat": "Arithmetic does not verify source selection or authority."
+              }
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "50c643fc-ae1c-4aa7-b42c-35fc4c92a187",
+            "document_id": "526dd1e4-adc1-59fb-8fc2-f9e21c3709ae",
+            "revision_id": "45908ed1-6e53-5c3a-9cc3-34c75e987f3c",
+            "relative_path": "source.md",
+            "updated_at": "2026-10-29T22:09:37.632024+00:00",
+            "chunk_id": "f1fb0444-26f5-512f-bc9a-f27b199849f5",
+            "anchor": "partner-renewal-report",
+            "heading": "Partner renewal report",
+            "content": "The partner team handled 14 customer renewals last month. The report does not state the total number of customer renewals last month.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-29T22:09:37.632213+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:f1fb0444-26f5-512f-bc9a-f27b199849f5:45908ed1-6e53-5c3a-9cc3-34c75e987f3c",
+            "presented_content": "The partner team handled 14 customer renewals last month. The report does not state the total number of customer renewals last month."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-29T22:10:41.276677+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v9",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "What percentage of last month’s customer renewals were handled by the partner team?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 63639,
+          "created_at": "2026-10-29T22:10:41.276677+00:00",
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "What percentage of last month’s customer renewals were handled by the partner team?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "What percentage of last month’s customer renewals were handled by the partner team?",
+              "operation": "percentage"
+            }
+          ],
+          "operation_plan_origin": "planned_unreviewed",
+          "planner_version": "question-classification-v1",
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:f1fb0444-26f5-512f-bc9a-f27b199849f5:45908ed1-6e53-5c3a-9cc3-34c75e987f3c",
+              "quote": "The partner team handled 14 customer renewals last month. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:f1fb0444-26f5-512f-bc9a-f27b199849f5:45908ed1-6e53-5c3a-9cc3-34c75e987f3c",
+              "quote": "The report does not state the total number of customer renewals last month."
+            }
+          ],
+          "quantity_catalog": [],
+          "extraction_notices": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:f1fb0444-26f5-512f-bc9a-f27b199849f5:45908ed1-6e53-5c3a-9cc3-34c75e987f3c",
+              "source_text": "14 customer renewals last month. ",
+              "start": 25,
+              "end": 58,
+              "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+            }
+          ],
+          "calculation_traces": [
+            {
+              "request_id": "R1",
+              "operation": "percentage",
+              "status": "unknown",
+              "text": "Calculation unavailable: source values could not be extracted as supported quantities. Model assessment: The source text does not provide the total number of customer renewals last month, which is required to calculate the percentage.",
+              "formula": null,
+              "result": null,
+              "unit": null,
+              "reason": "The source text does not provide the total number of customer renewals last month, which is required to calculate the percentage.",
+              "inputs": [],
+              "rounding": null,
+              "limitation_kind": "unsupported",
+              "caveat": "Arithmetic does not verify source selection or authority."
+            }
+          ],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "50c643fc-ae1c-4aa7-b42c-35fc4c92a187"
+        ]
+      },
+      "latency_seconds": 63.64873812533915,
+      "setup_seconds": 0.015593917109072208,
+      "attempt_total_seconds": 63.66433204244822
+    },
+    "service-contracts": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "41b64ef7-1286-40fc-a7d7-82c0f89ccf0f",
+        "workspace": "synthetic-eval",
+        "issue": "What is the current number of service contracts, and how much did it change from the previous count?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "What is the current number of service contracts?"
+            },
+            {
+              "id": "R2",
+              "text": "How much did the number of service contracts change from the previous count?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "conflicting",
+              "text": "The finance register lists the current count as 74 contracts. The account team report lists the current count as 81 contracts.",
+              "snippet_ids": [
+                "S2",
+                "S3"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+                  "quote": "The finance register lists the current count as 74 contracts. "
+                },
+                {
+                  "snippet_id": "S3",
+                  "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+                  "quote": "The account team report lists the current count as 81 contracts. "
+                }
+              ]
+            },
+            {
+              "question_id": "R2",
+              "status": "unknown",
+              "text": "Calculation unavailable: source values could not be extracted as supported quantities. Model assessment: Conflicting current counts prevent determining the change.",
+              "snippet_ids": [
+                "S1",
+                "S2"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+                  "quote": "The previous count was 60 contracts. "
+                },
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+                  "quote": "The finance register lists the current count as 74 contracts. "
+                }
+              ],
+              "calculation": {
+                "request_id": "R2",
+                "operation": "difference",
+                "status": "unknown",
+                "text": "Calculation unavailable: source values could not be extracted as supported quantities. Model assessment: Conflicting current counts prevent determining the change.",
+                "formula": null,
+                "result": null,
+                "unit": null,
+                "reason": "Conflicting current counts prevent determining the change.",
+                "inputs": [
+                  {
+                    "id": "N1",
+                    "snippet_id": "S1",
+                    "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+                    "source_text": "60 contracts",
+                    "snippet_text": "The previous count was 60 contracts. ",
+                    "start": 23,
+                    "end": 35,
+                    "value": "60",
+                    "unit": "contracts",
+                    "dimension": "count"
+                  },
+                  {
+                    "id": "N2",
+                    "snippet_id": "S2",
+                    "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+                    "source_text": "74 contracts",
+                    "snippet_text": "The finance register lists the current count as 74 contracts. ",
+                    "start": 48,
+                    "end": 60,
+                    "value": "74",
+                    "unit": "contracts",
+                    "dimension": "count"
+                  }
+                ],
+                "rounding": null,
+                "limitation_kind": "unsupported",
+                "caveat": "Arithmetic does not verify source selection or authority."
+              }
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "e3a61fb0-4881-49db-b9be-e84805da7285",
+            "document_id": "2e9eed2d-2af7-5c29-9b27-f07ff54b0df0",
+            "revision_id": "a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+            "relative_path": "source.md",
+            "updated_at": "2026-10-29T22:10:41.299764+00:00",
+            "chunk_id": "6058fed2-955a-5834-a094-be9e64652e19",
+            "anchor": "service-contract-records",
+            "heading": "Service contract records",
+            "content": "The previous count was 60 contracts. The finance register lists the current count as 74 contracts. The account team report lists the current count as 81 contracts. Neither record establishes which current count is authoritative.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-29T22:10:41.299951+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+            "presented_content": "The previous count was 60 contracts. The finance register lists the current count as 74 contracts. The account team report lists the current count as 81 contracts. Neither record establishes which current count is authoritative."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-29T22:11:21.216127+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v9",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "What is the current number of service contracts, and how much did it change from the previous count?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 39911,
+          "created_at": "2026-10-29T22:11:21.216127+00:00",
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "What is the current number of service contracts, and how much did it change from the previous count?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "What is the current number of service contracts?",
+              "operation": "answer"
+            },
+            {
+              "id": "R2",
+              "question_id": "Q1",
+              "request": "How much did the number of service contracts change from the previous count?",
+              "operation": "difference"
+            }
+          ],
+          "operation_plan_origin": "planned_unreviewed",
+          "planner_version": "question-classification-v1",
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+              "quote": "The previous count was 60 contracts. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+              "quote": "The finance register lists the current count as 74 contracts. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+              "quote": "The account team report lists the current count as 81 contracts. "
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+              "quote": "Neither record establishes which current count is authoritative."
+            }
+          ],
+          "quantity_catalog": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+              "source_text": "60 contracts",
+              "snippet_text": "The previous count was 60 contracts. ",
+              "start": 23,
+              "end": 35,
+              "value": "60",
+              "unit": "contracts",
+              "dimension": "count"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S2",
+              "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+              "source_text": "74 contracts",
+              "snippet_text": "The finance register lists the current count as 74 contracts. ",
+              "start": 48,
+              "end": 60,
+              "value": "74",
+              "unit": "contracts",
+              "dimension": "count"
+            },
+            {
+              "id": "N3",
+              "snippet_id": "S3",
+              "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+              "source_text": "81 contracts",
+              "snippet_text": "The account team report lists the current count as 81 contracts. ",
+              "start": 51,
+              "end": 63,
+              "value": "81",
+              "unit": "contracts",
+              "dimension": "count"
+            }
+          ],
+          "extraction_notices": [],
+          "calculation_traces": [
+            {
+              "request_id": "R2",
+              "operation": "difference",
+              "status": "unknown",
+              "text": "Calculation unavailable: source values could not be extracted as supported quantities. Model assessment: Conflicting current counts prevent determining the change.",
+              "formula": null,
+              "result": null,
+              "unit": null,
+              "reason": "Conflicting current counts prevent determining the change.",
+              "inputs": [
+                {
+                  "id": "N1",
+                  "snippet_id": "S1",
+                  "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+                  "source_text": "60 contracts",
+                  "snippet_text": "The previous count was 60 contracts. ",
+                  "start": 23,
+                  "end": 35,
+                  "value": "60",
+                  "unit": "contracts",
+                  "dimension": "count"
+                },
+                {
+                  "id": "N2",
+                  "snippet_id": "S2",
+                  "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+                  "source_text": "74 contracts",
+                  "snippet_text": "The finance register lists the current count as 74 contracts. ",
+                  "start": 48,
+                  "end": 60,
+                  "value": "74",
+                  "unit": "contracts",
+                  "dimension": "count"
+                }
+              ],
+              "rounding": null,
+              "limitation_kind": "unsupported",
+              "caveat": "Arithmetic does not verify source selection or authority."
+            }
+          ],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "e3a61fb0-4881-49db-b9be-e84805da7285"
+        ]
+      },
+      "latency_seconds": 39.91977404151112,
+      "setup_seconds": 0.01840166747570038,
+      "attempt_total_seconds": 39.93817570898682
+    },
+    "dispatch-cartons": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "f4cae3a4-db54-41ff-bdd3-0548cea3e915",
+        "workspace": "synthetic-eval",
+        "issue": "How many cartons did daily dispatch volume increase by?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "How many cartons did the daily dispatch volume increase by?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "supported",
+              "text": "Signed difference: 24 cartons.",
+              "snippet_ids": [
+                "S1"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+                  "quote": "Daily dispatch volume rose from 35 to 59 cartons."
+                }
+              ],
+              "calculation": {
+                "request_id": "R1",
+                "operation": "difference",
+                "status": "computed",
+                "text": "Signed difference: 24 cartons.",
+                "formula": "after - before",
+                "result": "24",
+                "unit": "cartons",
+                "reason": null,
+                "inputs": [
+                  {
+                    "id": "N1",
+                    "snippet_id": "S1",
+                    "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+                    "source_text": "35",
+                    "snippet_text": "Daily dispatch volume rose from 35 to 59 cartons.",
+                    "unit": "cartons",
+                    "dimension": "count",
+                    "unit_source_text": "cartons",
+                    "unit_source_start": 41,
+                    "unit_source_end": 48,
+                    "expression_start": 27,
+                    "expression_end": 48,
+                    "start": 32,
+                    "end": 34,
+                    "value": "35"
+                  },
+                  {
+                    "id": "N2",
+                    "snippet_id": "S1",
+                    "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+                    "source_text": "59 cartons",
+                    "snippet_text": "Daily dispatch volume rose from 35 to 59 cartons.",
+                    "unit": "cartons",
+                    "dimension": "count",
+                    "unit_source_text": "cartons",
+                    "unit_source_start": 41,
+                    "unit_source_end": 48,
+                    "expression_start": 27,
+                    "expression_end": 48,
+                    "start": 38,
+                    "end": 48,
+                    "value": "59"
+                  }
+                ],
+                "algorithm_version": "cited-calculations-v2",
+                "normalized_inputs": [
+                  {
+                    "id": "N1",
+                    "role": "before",
+                    "value": "35",
+                    "unit": "cartons",
+                    "original_value": "35",
+                    "original_unit": "cartons",
+                    "conversion_factor": "1"
+                  },
+                  {
+                    "id": "N2",
+                    "role": "after",
+                    "value": "59",
+                    "unit": "cartons",
+                    "original_value": "59",
+                    "original_unit": "cartons",
+                    "conversion_factor": "1"
+                  }
+                ],
+                "evaluated_expression": "59 cartons - 35 cartons = 24 cartons (rounded)",
+                "rounding": {
+                  "mode": "ROUND_HALF_UP",
+                  "max_fractional_digits": 6
+                },
+                "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+              }
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "f3699311-c80e-4b5c-9963-ceae39ae4bba",
+            "document_id": "83c4d56d-1647-514d-97a6-9c77afc79cde",
+            "revision_id": "7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+            "relative_path": "source.md",
+            "updated_at": "2026-10-29T22:11:21.237182+00:00",
+            "chunk_id": "99f6c4d9-3a9a-50d7-8210-ba54b58ba44e",
+            "anchor": "dispatch-volume-record",
+            "heading": "Dispatch volume record",
+            "content": "Daily dispatch volume rose from 35 to 59 cartons.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-29T22:11:21.237327+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+            "presented_content": "Daily dispatch volume rose from 35 to 59 cartons."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-29T22:11:50.444708+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v9",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "How many cartons did daily dispatch volume increase by?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 29202,
+          "created_at": "2026-10-29T22:11:50.444708+00:00",
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "How many cartons did daily dispatch volume increase by?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "How many cartons did the daily dispatch volume increase by?",
+              "operation": "difference"
+            }
+          ],
+          "operation_plan_origin": "planned_unreviewed",
+          "planner_version": "question-classification-v1",
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+              "quote": "Daily dispatch volume rose from 35 to 59 cartons."
+            }
+          ],
+          "quantity_catalog": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+              "source_text": "35",
+              "snippet_text": "Daily dispatch volume rose from 35 to 59 cartons.",
+              "unit": "cartons",
+              "dimension": "count",
+              "unit_source_text": "cartons",
+              "unit_source_start": 41,
+              "unit_source_end": 48,
+              "expression_start": 27,
+              "expression_end": 48,
+              "start": 32,
+              "end": 34,
+              "value": "35"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S1",
+              "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+              "source_text": "59 cartons",
+              "snippet_text": "Daily dispatch volume rose from 35 to 59 cartons.",
+              "unit": "cartons",
+              "dimension": "count",
+              "unit_source_text": "cartons",
+              "unit_source_start": 41,
+              "unit_source_end": 48,
+              "expression_start": 27,
+              "expression_end": 48,
+              "start": 38,
+              "end": 48,
+              "value": "59"
+            }
+          ],
+          "extraction_notices": [],
+          "calculation_traces": [
+            {
+              "request_id": "R1",
+              "operation": "difference",
+              "status": "computed",
+              "text": "Signed difference: 24 cartons.",
+              "formula": "after - before",
+              "result": "24",
+              "unit": "cartons",
+              "reason": null,
+              "inputs": [
+                {
+                  "id": "N1",
+                  "snippet_id": "S1",
+                  "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+                  "source_text": "35",
+                  "snippet_text": "Daily dispatch volume rose from 35 to 59 cartons.",
+                  "unit": "cartons",
+                  "dimension": "count",
+                  "unit_source_text": "cartons",
+                  "unit_source_start": 41,
+                  "unit_source_end": 48,
+                  "expression_start": 27,
+                  "expression_end": 48,
+                  "start": 32,
+                  "end": 34,
+                  "value": "35"
+                },
+                {
+                  "id": "N2",
+                  "snippet_id": "S1",
+                  "citation_id": "source:99f6c4d9-3a9a-50d7-8210-ba54b58ba44e:7d56280b-46c7-5cd2-b16c-34f33e69eb99",
+                  "source_text": "59 cartons",
+                  "snippet_text": "Daily dispatch volume rose from 35 to 59 cartons.",
+                  "unit": "cartons",
+                  "dimension": "count",
+                  "unit_source_text": "cartons",
+                  "unit_source_start": 41,
+                  "unit_source_end": 48,
+                  "expression_start": 27,
+                  "expression_end": 48,
+                  "start": 38,
+                  "end": 48,
+                  "value": "59"
+                }
+              ],
+              "algorithm_version": "cited-calculations-v2",
+              "normalized_inputs": [
+                {
+                  "id": "N1",
+                  "role": "before",
+                  "value": "35",
+                  "unit": "cartons",
+                  "original_value": "35",
+                  "original_unit": "cartons",
+                  "conversion_factor": "1"
+                },
+                {
+                  "id": "N2",
+                  "role": "after",
+                  "value": "59",
+                  "unit": "cartons",
+                  "original_value": "59",
+                  "original_unit": "cartons",
+                  "conversion_factor": "1"
+                }
+              ],
+              "evaluated_expression": "59 cartons - 35 cartons = 24 cartons (rounded)",
+              "rounding": {
+                "mode": "ROUND_HALF_UP",
+                "max_fractional_digits": 6
+              },
+              "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+            }
+          ],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "f3699311-c80e-4b5c-9963-ceae39ae4bba"
+        ]
+      },
+      "latency_seconds": 29.21204570773989,
+      "setup_seconds": 0.016473917290568352,
+      "attempt_total_seconds": 29.228519625030458
+    },
+    "outlet-reserve": {
+      "citation_validity": null,
+      "semantic_support": null,
+      "unsupported_answer": null,
+      "correction": null,
+      "time_to_accepted_seconds": null,
+      "status": "success",
+      "result": {
+        "id": "cdf37203-a60e-489a-ba97-b54f0726aa16",
+        "workspace": "synthetic-eval",
+        "issue": "For the outlet reserve, what were the previous and current quantities, what was the increase, and who approved it?",
+        "model_slug": "qwen3-8b-q4",
+        "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        "status": "draft",
+        "brief": {
+          "questions": [
+            {
+              "id": "R1",
+              "text": "What was the previous quantity for the outlet reserve?"
+            },
+            {
+              "id": "R2",
+              "text": "What is the current quantity for the outlet reserve?"
+            },
+            {
+              "id": "R3",
+              "text": "What was the increase in the outlet reserve quantity?"
+            },
+            {
+              "id": "R4",
+              "text": "Who approved the increase in the outlet reserve quantity?"
+            }
+          ],
+          "answers": [
+            {
+              "question_id": "R1",
+              "status": "supported",
+              "text": "The outlet reserve increased from 140 to 185 units.",
+              "snippet_ids": [
+                "S1"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:a6243b40-7c0c-5857-a364-1f083bcc46bd:6c4563ed-f973-5c84-aaae-c95024584c2b",
+                  "quote": "The outlet reserve increased from 140 to 185 units. "
+                }
+              ]
+            },
+            {
+              "question_id": "R2",
+              "status": "supported",
+              "text": "The outlet reserve increased from 140 to 185 units.",
+              "snippet_ids": [
+                "S1"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:a6243b40-7c0c-5857-a364-1f083bcc46bd:6c4563ed-f973-5c84-aaae-c95024584c2b",
+                  "quote": "The outlet reserve increased from 140 to 185 units. "
+                }
+              ]
+            },
+            {
+              "question_id": "R3",
+              "status": "supported",
+              "text": "Signed difference: 45 units.",
+              "snippet_ids": [
+                "S1"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S1",
+                  "citation_id": "source:a6243b40-7c0c-5857-a364-1f083bcc46bd:6c4563ed-f973-5c84-aaae-c95024584c2b",
+                  "quote": "The outlet reserve increased from 140 to 185 units. "
+                }
+              ],
+              "calculation": {
+                "request_id": "R3",
+                "operation": "difference",
+                "status": "computed",
+                "text": "Signed difference: 45 units.",
+                "formula": "after - before",
+                "result": "45",
+                "unit": "units",
+                "reason": null,
+                "inputs": [
+                  {
+                    "id": "N1",
+                    "snippet_id": "S1",
+                    "citation_id": "source:a6243b40-7c0c-5857-a364-1f083bcc46bd:6c4563ed-f973-5c84-aaae-c95024584c2b",
+                    "source_text": "140",
+                    "snippet_text": "The outlet reserve increased from 140 to 185 units. ",
+                    "unit": "units",
+                    "dimension": "count",
+                    "unit_source_text": "units",
+                    "unit_source_start": 45,
+                    "unit_source_end": 50,
+                    "expression_start": 29,
+                    "expression_end": 50,
+                    "start": 34,
+                    "end": 37,
+                    "value": "140"
+                  },
+                  {
+                    "id": "N2",
+                    "snippet_id": "S1",
+                    "citation_id": "source:a6243b40-7c0c-5857-a364-1f083bcc46bd:6c4563ed-f973-5c84-aaae-c95024584c2b",
+                    "source_text": "185 units",
+                    "snippet_text": "The outlet reserve increased from 140 to 185 units. ",
+                    "unit": "units",
+                    "dimension": "count",
+                    "unit_source_text": "units",
+                    "unit_source_start": 45,
+                    "unit_source_end": 50,
+                    "expression_start": 29,
+                    "expression_end": 50,
+                    "start": 41,
+                    "end": 50,
+                    "value": "185"
+                  }
+                ],
+                "algorithm_version": "cited-calculations-v2",
+                "normalized_inputs": [
+                  {
+                    "id": "N1",
+                    "role": "before",
+                    "value": "140",
+                    "unit": "units",
+                    "original_value": "140",
+                    "original_unit": "units",
+                    "conversion_factor": "1"
+                  },
+                  {
+                    "id": "N2",
+                    "role": "after",
+                    "value": "185",
+                    "unit": "units",
+                    "original_value": "185",
+                    "original_unit": "units",
+                    "conversion_factor": "1"
+                  }
+                ],
+                "evaluated_expression": "185 units - 140 units = 45 units (rounded)",
+                "rounding": {
+                  "mode": "ROUND_HALF_UP",
+                  "max_fractional_digits": 6
+                },
+                "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+              }
+            },
+            {
+              "question_id": "R4",
+              "status": "supported",
+              "text": "The change record names Lee as the person who entered the revision; it does not name an approver.",
+              "snippet_ids": [
+                "S2"
+              ],
+              "source_excerpts": [
+                {
+                  "snippet_id": "S2",
+                  "citation_id": "source:a6243b40-7c0c-5857-a364-1f083bcc46bd:6c4563ed-f973-5c84-aaae-c95024584c2b",
+                  "quote": "The change record names Lee as the person who entered the revision; it does not name an approver."
+                }
+              ]
+            }
+          ],
+          "facts": [],
+          "prior_fixes": [],
+          "hypotheses": [],
+          "recommended_checks": [],
+          "model_uncertainties": []
+        },
+        "evidence": [
+          {
+            "collection_id": "4b555e0c-7180-45f4-8829-28b047811ba7",
+            "document_id": "0d705542-fb51-5bc3-8014-14bf307ad221",
+            "revision_id": "6c4563ed-f973-5c84-aaae-c95024584c2b",
+            "relative_path": "source.md",
+            "updated_at": "2026-10-29T22:11:50.468482+00:00",
+            "chunk_id": "a6243b40-7c0c-5857-a364-1f083bcc46bd",
+            "anchor": "outlet-reserve-change",
+            "heading": "Outlet reserve change",
+            "content": "The outlet reserve increased from 140 to 185 units. The change record names Lee as the person who entered the revision; it does not name an approver.",
+            "kind": "source_chunk",
+            "last_scan_at": "2026-10-29T22:11:50.468636+00:00",
+            "freshness": "recent",
+            "uncertainty": "Source text has not been reviewed.",
+            "citation_id": "source:a6243b40-7c0c-5857-a364-1f083bcc46bd:6c4563ed-f973-5c84-aaae-c95024584c2b",
+            "presented_content": "The outlet reserve increased from 140 to 185 units. The change record names Lee as the person who entered the revision; it does not name an approver."
+          }
+        ],
+        "review": null,
+        "outcome": null,
+        "created_at": "2026-10-29T22:12:58.081175+00:00",
+        "provenance": {
+          "schema_version": 2,
+          "retrieval_notices": [],
+          "template_version": "investigation-v9",
+          "citation_mapping": "request-local aliases",
+          "retrieval_query": "For the outlet reserve, what were the previous and current quantities, what was the increase, and who approved it?",
+          "retrieval_version": "unicode-word-overlap-v1",
+          "model_slug": "qwen3-8b-q4",
+          "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+          "generation_settings": {
+            "temperature": 0.7,
+            "max_tokens": 2000,
+            "timeout_seconds": 240,
+            "seed": 7,
+            "timeout_scope": "shared across planning and answer generation"
+          },
+          "elapsed_ms": 67601,
+          "created_at": "2026-10-29T22:12:58.081175+00:00",
+          "question_origin": "issue",
+          "original_questions": [
+            {
+              "id": "Q1",
+              "text": "For the outlet reserve, what were the previous and current quantities, what was the increase, and who approved it?"
+            }
+          ],
+          "operation_plan": [
+            {
+              "id": "R1",
+              "question_id": "Q1",
+              "request": "What was the previous quantity for the outlet reserve?",
+              "operation": "answer"
+            },
+            {
+              "id": "R2",
+              "question_id": "Q1",
+              "request": "What is the current quantity for the outlet reserve?",
+              "operation": "answer"
+            },
+            {
+              "id": "R3",
+              "question_id": "Q1",
+              "request": "What was the increase in the outlet reserve quantity?",
+              "operation": "difference"
+            },
+            {
+              "id": "R4",
+              "question_id": "Q1",
+              "request": "Who approved the increase in the outlet reserve quantity?",
+              "operation": "answer"
+            }
+          ],
+          "operation_plan_origin": "planned_unreviewed",
+          "planner_version": "question-classification-v1",
+          "snippet_catalog": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:a6243b40-7c0c-5857-a364-1f083bcc46bd:6c4563ed-f973-5c84-aaae-c95024584c2b",
+              "quote": "The outlet reserve increased from 140 to 185 units. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:a6243b40-7c0c-5857-a364-1f083bcc46bd:6c4563ed-f973-5c84-aaae-c95024584c2b",
+              "quote": "The change record names Lee as the person who entered the revision; it does not name an approver."
+            }
+          ],
+          "quantity_catalog": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:a6243b40-7c0c-5857-a364-1f083bcc46bd:6c4563ed-f973-5c84-aaae-c95024584c2b",
+              "source_text": "140",
+              "snippet_text": "The outlet reserve increased from 140 to 185 units. ",
+              "unit": "units",
+              "dimension": "count",
+              "unit_source_text": "units",
+              "unit_source_start": 45,
+              "unit_source_end": 50,
+              "expression_start": 29,
+              "expression_end": 50,
+              "start": 34,
+              "end": 37,
+              "value": "140"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S1",
+              "citation_id": "source:a6243b40-7c0c-5857-a364-1f083bcc46bd:6c4563ed-f973-5c84-aaae-c95024584c2b",
+              "source_text": "185 units",
+              "snippet_text": "The outlet reserve increased from 140 to 185 units. ",
+              "unit": "units",
+              "dimension": "count",
+              "unit_source_text": "units",
+              "unit_source_start": 45,
+              "unit_source_end": 50,
+              "expression_start": 29,
+              "expression_end": 50,
+              "start": 41,
+              "end": 50,
+              "value": "185"
+            }
+          ],
+          "extraction_notices": [],
+          "calculation_traces": [
+            {
+              "request_id": "R3",
+              "operation": "difference",
+              "status": "computed",
+              "text": "Signed difference: 45 units.",
+              "formula": "after - before",
+              "result": "45",
+              "unit": "units",
+              "reason": null,
+              "inputs": [
+                {
+                  "id": "N1",
+                  "snippet_id": "S1",
+                  "citation_id": "source:a6243b40-7c0c-5857-a364-1f083bcc46bd:6c4563ed-f973-5c84-aaae-c95024584c2b",
+                  "source_text": "140",
+                  "snippet_text": "The outlet reserve increased from 140 to 185 units. ",
+                  "unit": "units",
+                  "dimension": "count",
+                  "unit_source_text": "units",
+                  "unit_source_start": 45,
+                  "unit_source_end": 50,
+                  "expression_start": 29,
+                  "expression_end": 50,
+                  "start": 34,
+                  "end": 37,
+                  "value": "140"
+                },
+                {
+                  "id": "N2",
+                  "snippet_id": "S1",
+                  "citation_id": "source:a6243b40-7c0c-5857-a364-1f083bcc46bd:6c4563ed-f973-5c84-aaae-c95024584c2b",
+                  "source_text": "185 units",
+                  "snippet_text": "The outlet reserve increased from 140 to 185 units. ",
+                  "unit": "units",
+                  "dimension": "count",
+                  "unit_source_text": "units",
+                  "unit_source_start": 45,
+                  "unit_source_end": 50,
+                  "expression_start": 29,
+                  "expression_end": 50,
+                  "start": 41,
+                  "end": 50,
+                  "value": "185"
+                }
+              ],
+              "algorithm_version": "cited-calculations-v2",
+              "normalized_inputs": [
+                {
+                  "id": "N1",
+                  "role": "before",
+                  "value": "140",
+                  "unit": "units",
+                  "original_value": "140",
+                  "original_unit": "units",
+                  "conversion_factor": "1"
+                },
+                {
+                  "id": "N2",
+                  "role": "after",
+                  "value": "185",
+                  "unit": "units",
+                  "original_value": "185",
+                  "original_unit": "units",
+                  "conversion_factor": "1"
+                }
+              ],
+              "evaluated_expression": "185 units - 140 units = 45 units (rounded)",
+              "rounding": {
+                "mode": "ROUND_HALF_UP",
+                "max_fractional_digits": 6
+              },
+              "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+            }
+          ],
+          "generation_profile": {
+            "name": "qwen3-non-thinking",
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 20,
+            "min_p": 0.0,
+            "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+            "backend": "llama-cpp-python",
+            "enable_thinking": false,
+            "repeat_penalty": 1.0
+          }
+        },
+        "retrieval_notices": [],
+        "collection_ids": [
+          "4b555e0c-7180-45f4-8829-28b047811ba7"
+        ]
+      },
+      "latency_seconds": 67.61138137523085,
+      "setup_seconds": 0.02300299983471632,
+      "attempt_total_seconds": 67.63438437506557
+    }
+  }
+}

@@ -1,0 +1,147 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "aeebb66a-25e1-4bc9-9ac0-a6946a49b2c4",
+    "workspace": "synthetic-eval",
+    "issue": "How much did the packing cycle change after the scheduling update, and did that update cause the change?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "Q1",
+          "text": "How much did the packing cycle change after the scheduling update?"
+        },
+        {
+          "id": "Q2",
+          "text": "Did the scheduling update cause the change in the packing cycle?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "Q1",
+          "status": "supported",
+          "text": "The packing cycle changed from 76 minutes to 52 minutes.",
+          "snippet_ids": [
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:be01c7b9-9f0f-5af7-984e-79bd0e599de4:5a8e9491-adc6-5818-87fa-e5c62e1ccd48",
+              "quote": "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. "
+            }
+          ]
+        },
+        {
+          "question_id": "Q2",
+          "status": "supported",
+          "text": "The review does not establish what caused the change.",
+          "snippet_ids": [
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:be01c7b9-9f0f-5af7-984e-79bd0e599de4:5a8e9491-adc6-5818-87fa-e5c62e1ccd48",
+              "quote": "The review does not establish what caused the change."
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "9c27cd2b-f10b-4c80-ac16-42c37bcee09c",
+        "document_id": "d9ddf381-2702-5495-b55f-a1171e42428c",
+        "revision_id": "5a8e9491-adc6-5818-87fa-e5c62e1ccd48",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T21:59:33.335608+00:00",
+        "chunk_id": "be01c7b9-9f0f-5af7-984e-79bd0e599de4",
+        "anchor": "packing-cycle-review",
+        "heading": "Packing cycle review",
+        "content": "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. A staffing change happened during the same period. The review does not establish what caused the change.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T21:59:33.335816+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:be01c7b9-9f0f-5af7-984e-79bd0e599de4:5a8e9491-adc6-5818-87fa-e5c62e1ccd48",
+        "presented_content": "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. A staffing change happened during the same period. The review does not establish what caused the change."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T22:00:25.781586+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v6",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "How much did the packing cycle change after the scheduling update, and did that update cause the change?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 1600,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 52440,
+      "created_at": "2026-10-29T22:00:25.781586+00:00",
+      "question_origin": "planned",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:be01c7b9-9f0f-5af7-984e-79bd0e599de4:5a8e9491-adc6-5818-87fa-e5c62e1ccd48",
+          "quote": "The average packing cycle was 76 minutes before the scheduling update and 52 minutes afterward. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:be01c7b9-9f0f-5af7-984e-79bd0e599de4:5a8e9491-adc6-5818-87fa-e5c62e1ccd48",
+          "quote": "A staffing change happened during the same period. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:be01c7b9-9f0f-5af7-984e-79bd0e599de4:5a8e9491-adc6-5818-87fa-e5c62e1ccd48",
+          "quote": "The review does not establish what caused the change."
+        }
+      ],
+      "planner_version": "issue-only-v2",
+      "planner_settings": {
+        "max_tokens": 800,
+        "seed": 7
+      },
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "9c27cd2b-f10b-4c80-ac16-42c37bcee09c"
+    ]
+  },
+  "latency_seconds": 52.449325249530375,
+  "setup_seconds": 0.016448959708213806,
+  "attempt_total_seconds": 52.46577420923859
+}

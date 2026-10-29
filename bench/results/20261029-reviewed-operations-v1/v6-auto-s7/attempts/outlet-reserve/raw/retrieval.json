@@ -1,0 +1,49 @@
+{
+  "workspace": "synthetic-eval",
+  "collection_ids": [
+    "36b469d9-8ed5-4b75-8c64-518c18b2c021"
+  ],
+  "query": "For the outlet reserve, what were the previous and current quantities, what was the increase, and who approved it?",
+  "limit": 10,
+  "result": {
+    "workspace": "synthetic-eval",
+    "scope": {
+      "collection_ids": [
+        "36b469d9-8ed5-4b75-8c64-518c18b2c021"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "36b469d9-8ed5-4b75-8c64-518c18b2c021",
+        "document_id": "ef787ce0-c542-5d5e-adb8-650cd73d4453",
+        "revision_id": "a7de9c43-f8ec-546b-8589-62812acd8e48",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:02:55.853900+00:00",
+        "chunk_id": "efde1f85-1a0b-5c2f-a56b-7d51cdd178f9",
+        "anchor": "outlet-reserve-change",
+        "heading": "Outlet reserve change",
+        "content": "The outlet reserve increased from 140 to 185 units. The change record names Lee as the person who entered the revision; it does not name an approver.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:02:55.854057+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:efde1f85-1a0b-5c2f-a56b-7d51cdd178f9:a7de9c43-f8ec-546b-8589-62812acd8e48"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-aae95c7b-edc3-443a-9cbc-e43aa9ff3b1a",
+  "object": "chat.completion",
+  "created": 1793311572,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\"], \"reason\": \"The daily dispatch volume increased from 35 to 59 cartons, so the difference is 59 - 35 = 24 cartons.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 377,
+    "completion_tokens": 74,
+    "total_tokens": 451
+  }
+}

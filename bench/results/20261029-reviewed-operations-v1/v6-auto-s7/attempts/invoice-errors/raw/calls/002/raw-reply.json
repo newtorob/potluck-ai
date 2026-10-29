@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-1d4a6a01-ebfe-4f12-8117-57af4fbd7d30",
+  "object": "chat.completion",
+  "created": 1793311230,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\", \"S2\"], \"text\": \"The relative percentage change in invoice errors between the first and second audits cannot be determined because the percentage change requires the absolute change divided by the original value, and the original value (zero) would make the calculation undefined.\", \"status\": \"unknown\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 392,
+    "completion_tokens": 69,
+    "total_tokens": 461
+  }
+}

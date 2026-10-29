@@ -1,0 +1,300 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "41b64ef7-1286-40fc-a7d7-82c0f89ccf0f",
+    "workspace": "synthetic-eval",
+    "issue": "What is the current number of service contracts, and how much did it change from the previous count?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What is the current number of service contracts?"
+        },
+        {
+          "id": "R2",
+          "text": "How much did the number of service contracts change from the previous count?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "conflicting",
+          "text": "The finance register lists the current count as 74 contracts. The account team report lists the current count as 81 contracts.",
+          "snippet_ids": [
+            "S2",
+            "S3"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+              "quote": "The finance register lists the current count as 74 contracts. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+              "quote": "The account team report lists the current count as 81 contracts. "
+            }
+          ]
+        },
+        {
+          "question_id": "R2",
+          "status": "unknown",
+          "text": "Calculation unavailable: source values could not be extracted as supported quantities. Model assessment: Conflicting current counts prevent determining the change.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+              "quote": "The previous count was 60 contracts. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+              "quote": "The finance register lists the current count as 74 contracts. "
+            }
+          ],
+          "calculation": {
+            "request_id": "R2",
+            "operation": "difference",
+            "status": "unknown",
+            "text": "Calculation unavailable: source values could not be extracted as supported quantities. Model assessment: Conflicting current counts prevent determining the change.",
+            "formula": null,
+            "result": null,
+            "unit": null,
+            "reason": "Conflicting current counts prevent determining the change.",
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+                "source_text": "60 contracts",
+                "snippet_text": "The previous count was 60 contracts. ",
+                "start": 23,
+                "end": 35,
+                "value": "60",
+                "unit": "contracts",
+                "dimension": "count"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S2",
+                "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+                "source_text": "74 contracts",
+                "snippet_text": "The finance register lists the current count as 74 contracts. ",
+                "start": 48,
+                "end": 60,
+                "value": "74",
+                "unit": "contracts",
+                "dimension": "count"
+              }
+            ],
+            "rounding": null,
+            "limitation_kind": "unsupported",
+            "caveat": "Arithmetic does not verify source selection or authority."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "e3a61fb0-4881-49db-b9be-e84805da7285",
+        "document_id": "2e9eed2d-2af7-5c29-9b27-f07ff54b0df0",
+        "revision_id": "a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+        "relative_path": "source.md",
+        "updated_at": "2026-10-29T22:10:41.299764+00:00",
+        "chunk_id": "6058fed2-955a-5834-a094-be9e64652e19",
+        "anchor": "service-contract-records",
+        "heading": "Service contract records",
+        "content": "The previous count was 60 contracts. The finance register lists the current count as 74 contracts. The account team report lists the current count as 81 contracts. Neither record establishes which current count is authoritative.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-29T22:10:41.299951+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+        "presented_content": "The previous count was 60 contracts. The finance register lists the current count as 74 contracts. The account team report lists the current count as 81 contracts. Neither record establishes which current count is authoritative."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-29T22:11:21.216127+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v9",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What is the current number of service contracts, and how much did it change from the previous count?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 39911,
+      "created_at": "2026-10-29T22:11:21.216127+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "What is the current number of service contracts, and how much did it change from the previous count?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "What is the current number of service contracts?",
+          "operation": "answer"
+        },
+        {
+          "id": "R2",
+          "question_id": "Q1",
+          "request": "How much did the number of service contracts change from the previous count?",
+          "operation": "difference"
+        }
+      ],
+      "operation_plan_origin": "planned_unreviewed",
+      "planner_version": "question-classification-v1",
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+          "quote": "The previous count was 60 contracts. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+          "quote": "The finance register lists the current count as 74 contracts. "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+          "quote": "The account team report lists the current count as 81 contracts. "
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+          "quote": "Neither record establishes which current count is authoritative."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+          "source_text": "60 contracts",
+          "snippet_text": "The previous count was 60 contracts. ",
+          "start": 23,
+          "end": 35,
+          "value": "60",
+          "unit": "contracts",
+          "dimension": "count"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S2",
+          "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+          "source_text": "74 contracts",
+          "snippet_text": "The finance register lists the current count as 74 contracts. ",
+          "start": 48,
+          "end": 60,
+          "value": "74",
+          "unit": "contracts",
+          "dimension": "count"
+        },
+        {
+          "id": "N3",
+          "snippet_id": "S3",
+          "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+          "source_text": "81 contracts",
+          "snippet_text": "The account team report lists the current count as 81 contracts. ",
+          "start": 51,
+          "end": 63,
+          "value": "81",
+          "unit": "contracts",
+          "dimension": "count"
+        }
+      ],
+      "extraction_notices": [],
+      "calculation_traces": [
+        {
+          "request_id": "R2",
+          "operation": "difference",
+          "status": "unknown",
+          "text": "Calculation unavailable: source values could not be extracted as supported quantities. Model assessment: Conflicting current counts prevent determining the change.",
+          "formula": null,
+          "result": null,
+          "unit": null,
+          "reason": "Conflicting current counts prevent determining the change.",
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+              "source_text": "60 contracts",
+              "snippet_text": "The previous count was 60 contracts. ",
+              "start": 23,
+              "end": 35,
+              "value": "60",
+              "unit": "contracts",
+              "dimension": "count"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S2",
+              "citation_id": "source:6058fed2-955a-5834-a094-be9e64652e19:a5045bcc-9005-5b09-8fd7-62b56ca66be0",
+              "source_text": "74 contracts",
+              "snippet_text": "The finance register lists the current count as 74 contracts. ",
+              "start": 48,
+              "end": 60,
+              "value": "74",
+              "unit": "contracts",
+              "dimension": "count"
+            }
+          ],
+          "rounding": null,
+          "limitation_kind": "unsupported",
+          "caveat": "Arithmetic does not verify source selection or authority."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "e3a61fb0-4881-49db-b9be-e84805da7285"
+    ]
+  },
+  "latency_seconds": 39.91977404151112,
+  "setup_seconds": 0.01840166747570038,
+  "attempt_total_seconds": 39.93817570898682
+}

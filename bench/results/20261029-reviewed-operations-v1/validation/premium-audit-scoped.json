@@ -1,0 +1,50 @@
+{
+  "findings": [
+    {
+      "category": "unresolved",
+      "file": "apps/desktop/frontend/src/views/MemoryView.tsx",
+      "line": 626,
+      "message": "Native date/time input is used without an explicit ownership decision.",
+      "remediation": "Record Date as native or reuse the typed/authored canonical owner.",
+      "ruleId": "ownership.native-date-undecided",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "apps/desktop/frontend/src/views/CirclesView.tsx",
+      "line": 373,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "apps/desktop/frontend/src/views/CirclesView.tsx",
+      "line": 501,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    },
+    {
+      "category": "violation",
+      "file": "apps/desktop/frontend/src/views/TaskStateView.tsx",
+      "line": 99,
+      "message": "Application-owned form does not declare its validation owner.",
+      "remediation": "Add noValidate/novalidate and implement the canonical validation contract.",
+      "ruleId": "form.novalidate-missing",
+      "severity": "error"
+    }
+  ],
+  "mode": "strict",
+  "projectRoot": "/Users/rob/Documents/potluck",
+  "schemaVersion": 1,
+  "summary": {
+    "errors": 4,
+    "total": 4,
+    "unresolved": 1,
+    "violations": 3,
+    "warnings": 0
+  }
+}

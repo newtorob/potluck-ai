@@ -192,3 +192,22 @@ def test_attempt_forwards_only_selected_options(tmp_path, monkeypatch):
     assert result['status'] == 'success'
     assert calls == [{'template_version': 'investigation-v6', 'generation_profile': 'qwen3-non-thinking',
                       'seed': 0, 'questions': ['What happened?']}]
+
+
+def test_fixture_operation_attempt_forwards_origin_and_records_request(tmp_path, monkeypatch):
+    calls = []
+    async def create(scope, issue, query, model, **kwargs):
+        calls.append(kwargs)
+        await runner.investigations.get_runtime().chat([], response_format={'type': 'json_object'})
+        return {'ok': True}
+    monkeypatch.setattr(runner.investigations, 'create_investigation', create)
+    monkeypatch.setenv('POTLUCK_DATA_DIR', str(tmp_path / 'data'))
+    case = runner.frozen_manifest()['cases'][0]
+    rows = [{'request': 'What changed?', 'operation': 'difference'}]
+    result = asyncio.run(runner.attempt(tmp_path, case, 'baseline', FakeRuntime(), 'fixture-model',
+        template_version='investigation-v9', operation_mode='fixture_supplied', reviewed_operations=rows))
+    assert result['status'] == 'success'
+    assert calls == [{'template_version': 'investigation-v9', 'reviewed_operations': rows,
+                      'reviewed_plan_origin': 'fixture_supplied'}]
+    request = json.loads((tmp_path / 'attempts' / case['id'] / 'baseline' / 'request.json').read_text())
+    assert request['operation_mode'] == 'fixture_supplied' and request['plan_origin'] == 'fixture_supplied'

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-a1bf5d3e-aef4-416c-8a3a-6e08ff71ffac",
+  "object": "chat.completion",
+  "created": 1793311256,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"Q1\": {\"snippet_ids\": [\"S1\", \"S2\"], \"text\": \"The partner team handled 14 customer renewals last month. The report does not state the total number of customer renewals last month.\", \"status\": \"unknown\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 402,
+    "completion_tokens": 54,
+    "total_tokens": 456
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-606c1b2c-7538-4d4d-956c-3656604b7d15",
+  "object": "chat.completion",
+  "created": 1793311728,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What was the relative percentage change in invoice errors between the first and second audits?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 105,
+    "completion_tokens": 21,
+    "total_tokens": 126
+  }
+}

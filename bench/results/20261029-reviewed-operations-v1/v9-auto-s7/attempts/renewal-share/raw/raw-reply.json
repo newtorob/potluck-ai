@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-40d98f56-a6ff-42fa-9062-95c39a2df478",
+  "object": "chat.completion",
+  "created": 1793311777,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What percentage of last month’s customer renewals were handled by the partner team?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 105,
+    "completion_tokens": 21,
+    "total_tokens": 126
+  }
+}

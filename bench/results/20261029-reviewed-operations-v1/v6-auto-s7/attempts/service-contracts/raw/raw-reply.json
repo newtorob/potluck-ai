@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-6522dd0f-e66c-4789-b275-a0041d44bbfd",
+  "object": "chat.completion",
+  "created": 1793311281,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"questions\": [\"What is the current number of service contracts?\", \"How much did the number of service contracts change from the previous count?\"]}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 109,
+    "completion_tokens": 29,
+    "total_tokens": 138
+  }
+}

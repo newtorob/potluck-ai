@@ -72,8 +72,9 @@ def identity() -> dict[str, Any]:
 
 
 class CaptureRuntime:
-    def __init__(self, runtime: Any, attempt_dir: Path):
+    def __init__(self, runtime: Any, attempt_dir: Path, request_metadata: dict[str, Any] | None = None):
         self.runtime, self.attempt_dir = runtime, attempt_dir
+        self.request_metadata = request_metadata
         self.call_count = 0
 
     def __getattr__(self, name: str) -> Any:
@@ -85,6 +86,8 @@ class CaptureRuntime:
         call_dir = self.attempt_dir / 'calls' / f'{call_number:03d}'
         call_dir.mkdir(parents=True)
         request = {'messages': messages, 'settings': kwargs}
+        if self.request_metadata is not None:
+            request.update(self.request_metadata)
         write_new(call_dir / 'request.json', request)
         if call_number == 1:
             write_new(self.attempt_dir / 'request.json', request)
@@ -168,7 +171,9 @@ async def setup_case(root: Path, case: dict[str, Any], arm: str) -> EvidenceScop
 async def attempt(out: Path, case: dict[str, Any], arm: str, runtime: Any, model: str,
                   *, template_version: str | None = None,
                   generation_profile: str | None = None, seed: int | None = None,
-                  questions: list[str] | None = None) -> dict[str, Any]:
+                  questions: list[str] | None = None,
+                  reviewed_operations: list[dict[str, str]] | None = None,
+                  operation_mode: str | None = None) -> dict[str, Any]:
     folder = out / 'attempts' / case['id'] / arm
     folder.mkdir(parents=True)
     write_new(folder / 'started.json', {'case_id': case['id'], 'arm': arm,
@@ -196,7 +201,10 @@ async def attempt(out: Path, case: dict[str, Any], arm: str, runtime: Any, model
                     'limit': limit, 'result': result})
                 return result
 
-            investigations.get_runtime = lambda: CaptureRuntime(runtime, folder)
+            request_metadata = ({'operation_mode': operation_mode,
+                                 'plan_origin': 'fixture_supplied' if reviewed_operations is not None else 'planned_unreviewed'}
+                                if operation_mode is not None else None)
+            investigations.get_runtime = lambda: CaptureRuntime(runtime, folder, request_metadata)
             investigations.lookup_evidence = capture_lookup
             try:
                 investigation_started = time.monotonic()
@@ -207,6 +215,9 @@ async def attempt(out: Path, case: dict[str, Any], arm: str, runtime: Any, model
                     kwargs['seed'] = seed
                 if questions is not None:
                     kwargs['questions'] = questions
+                if reviewed_operations is not None:
+                    kwargs['reviewed_operations'] = reviewed_operations
+                    kwargs['reviewed_plan_origin'] = 'fixture_supplied'
                 item = await investigations.create_investigation(
                     scope, case['question'], case['question'], model, **kwargs)
             finally:
