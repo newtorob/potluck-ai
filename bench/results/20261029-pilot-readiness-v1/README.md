@@ -45,7 +45,7 @@ All 12 source registrations match frozen hashes. All 10 saved quantity catalogs 
 
 Validation status is in `validation/summary.json`. The initial full sidecar run retained one stale negative-template failure; it is not hidden. Other checks passed: 527 frontend, 1,228 CLI and 44 landing tests; typechecks and privacy lint; frontend build; formatting and targeted lint; six mocked Chromium workflow tests. The scoped configured static audit reports zero findings. Desktop review labels are clear; the existing sidebar leaves the 480 px viewport cramped. This is macOS/Chromium UI validation, not Windows/Linux UI qualification.
 
-The standalone owner packet preserves the original saved draft and provenance, starts timing only on an explicit Start action, and downloads a local JSON review record. It does not upload or save acceptance to Potluck. Packet behavior was checked with synthetic test data; **Rob has not reviewed it yet, so correction effort and time to accepted output are unknown.**
+The standalone owner packet preserves the original saved draft and provenance, starts timing only on an explicit Start action, and downloads a local JSON review record. It does not upload or save acceptance to Potluck. Packet behavior was checked with synthetic test data. Rob subsequently accepted this draft unchanged in **62.215 seconds of active visible review**, with no final text changes. See `owner-review/` for the verified original record and timing limits. Independent completeness still fails; this single acceptance does not establish company pilot readiness.
 
 ## Next work
 

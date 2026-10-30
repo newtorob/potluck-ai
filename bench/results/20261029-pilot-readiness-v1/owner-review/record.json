@@ -1,0 +1,1253 @@
+{
+  "case_id": "pilot-readiness",
+  "run_raw_sha256": "5824825cd6685b27f2ed314aac23a3efef45f4b7de2bc25b92205b1576af562e",
+  "original_result_sha256_canonical_json": "b03a66485ae6b1e445be7de0de7cd9dd21fb49f0132c921344b62ba5fa12f222",
+  "original_result": {
+    "id": "54cc8192-3689-4689-a9ab-c7d02f26d37c",
+    "workspace": "pilot-eval",
+    "issue": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   \nA correction preserves the original draft and can change text, citations and\n   \nexcorts. \n\nFacts and prior fixes need exact excerpts even when correcting a legacy\n   \ndraft. \n\nHistorical combined missing evidence remains in the original draft; the\n   \nreviewer supplies new unverified questions separately. \n\nRetrieval notices remain\n   \nimmutable. \n\nThe review is one-shot; it is not a collaborative editor.",
+          "snippet_ids": [
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5",
+            "S6",
+            "S7",
+            "S8"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "1. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "A correction preserves the original draft and can change text, citations and\n   "
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "excerpts. "
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "Facts and prior fixes need exact excerpts even when correcting a legacy\n   "
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "draft. "
+            },
+            {
+              "snippet_id": "S7",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "Historical combined missing evidence remains in the original draft; the\n   "
+            },
+            {
+              "snippet_id": "S8",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "reviewer supplies new unverified questions separately. "
+            }
+          ]
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "64f11c6c-c2b7-4acf-8af2-61c3dab427ed",
+        "document_id": "7b546e18-cc77-5057-921d-5ff710b32445",
+        "revision_id": "93a58a26-87b0-5752-8195-dc201567e334",
+        "relative_path": "guide-review.md",
+        "updated_at": "2026-10-30T01:20:03.103467+00:00",
+        "chunk_id": "b6a2999e-cbfd-59b6-abc0-68729d40ce71",
+        "anchor": "review-outcomes-and-reuse",
+        "heading": "Review, outcomes and reuse",
+        "content": "1. Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   A correction preserves the original draft and can change text, citations and\n   excerpts. Facts and prior fixes need exact excerpts even when correcting a legacy\n   draft. Historical combined missing evidence remains in the original draft; the\n   reviewer supplies new unverified questions separately. Retrieval notices remain\n   immutable. The review is one-shot; it is not a collaborative editor.\n2. Record the actual outcome separately as resolved, unresolved or inconclusive,\n   with notes. Accepting a brief does not resolve the underlying issue. An outcome\n   is also one-shot; create a new investigation for a later observation.\n3. Export a Markdown handoff, or after review and outcome explicitly download an\n   evaluation-case proposal. The proposal contains references and review/outcome\n   categories rather than source text or an automatically accepted test answer.\n4. An accepted/corrected investigation with an outcome can propose knowledge using\n   citations from the reviewed brief. The claim remains **proposed**; approval\n   still uses the separate owner review CLI. This does not train a model.\n\nThe HTTP endpoints are under `/company-brain` and use the sidecar's existing\nloopback/token middleware. They are unavailable through peer/remote routes.\nWorkspace strings and reviewer names are organizational labels, not authenticated\ncompany identities. Both memory privacy switches are required. Exports already",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:20:03.106331+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+        "presented_content": "1. Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   A correction preserves the original draft and can change text, citations and\n   excerpts. Facts and prior fixes need exact excerpts even when correcting a legacy\n   draft. Historical combined missing evidence remains in the original draft; the\n   reviewer supplies new unverified questions separately. Retrieval notices remain\n   immutable. The review is one-shot; it is not a collaborative editor.\n2. Record the actual outcome separately as resolved, unresolved or inconclusive,\n   with notes. Accepting a brief does not resolve the underlying issue. An outcome\n   is also one-shot; create a new investigation for a later observation.\n3. Export a Markdown handoff, or after review and outcome explicitly download an\n   evaluation-case proposal. The proposal contains references and review/outcome\n   categories rather than source text or an automatically accepted test answer.\n4. An accepted/corrected investigation with an outcome can propose knowledge using\n   citations from the reviewed brief. The claim remains **proposed**; approval\n   still uses the separate owner review CLI. This does not train a model.\n\nThe HTTP endpoints are under `/company-brain` and use the sidecar's existing\nloopback/token middleware. They are unavailable through peer/remote routes.\nWorkspace strings and reviewer names are organizational labels, not authenticated\ncompany identities. Both memory privacy switches are required. Exports already"
+      },
+      {
+        "collection_id": "64f11c6c-c2b7-4acf-8af2-61c3dab427ed",
+        "document_id": "1d3d120a-379c-5659-b190-45abea68f794",
+        "revision_id": "4bbb422f-65eb-514b-b3ad-ddffc9264604",
+        "relative_path": "guide-intro.md",
+        "updated_at": "2026-10-30T01:20:03.102800+00:00",
+        "chunk_id": "8a0fbcb0-b258-52e1-ad40-74e413b83c42",
+        "anchor": "local-company-brain-evidence-and-review",
+        "heading": "Local Company Brain evidence and review",
+        "content": "This local-owner developer feature connects scoped Markdown source collections,\nreviewed knowledge and cited lookup to a saved investigation in the desktop app.\nThe investigation explicitly uses an already loaded local model. Source/review\ncommands do not invoke a model. No tool execution, training, remote inference or\nautomatic knowledge approval is part of this workflow. Shared company deployment\nstill requires authenticated server-side authorization and operational work.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:20:03.106331+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604",
+        "presented_content": "This local-owner developer feature connects scoped Markdown source collections,\nreviewed knowledge and cited lookup to a saved investigation in the desktop app.\nThe investigation explicitly uses an already loaded local model. Source/review\ncommands do not invoke a model. No tool execution, training, remote inference or\nautomatic knowledge approval is part of this workflow. Shared company deployment\nstill requires authenticated server-side authorization and operational work."
+      },
+      {
+        "collection_id": "64f11c6c-c2b7-4acf-8af2-61c3dab427ed",
+        "document_id": "b02fd5d2-c31b-517a-8445-9a258775affb",
+        "revision_id": "e6b54937-3538-5fe4-ad21-2e8d994772e6",
+        "relative_path": "progress.md",
+        "updated_at": "2026-10-30T01:20:03.105311+00:00",
+        "chunk_id": "3e9de7a3-1d35-573b-9d8b-6752b4300afd",
+        "anchor": "intro",
+        "heading": "",
+        "content": "---\ncreated: 2026-10-28\nupdated: 2026-10-29\nstatus: in-progress\ntags:\n  - potluck\n  - company-brain\n  - implementation\n---",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:20:03.106331+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+        "presented_content": "---\ncreated: 2026-10-28\nupdated: 2026-10-29\nstatus: in-progress\ntags:\n  - potluck\n  - company-brain\n  - implementation\n---"
+      },
+      {
+        "collection_id": "64f11c6c-c2b7-4acf-8af2-61c3dab427ed",
+        "document_id": "cf162ea6-da10-54f0-9ea1-f5344b4aeda9",
+        "revision_id": "5f5c1d46-c609-5320-b45a-78db29437d87",
+        "relative_path": "guide-workflow.md",
+        "updated_at": "2026-10-30T01:20:03.104171+00:00",
+        "chunk_id": "dcd9fe1d-4305-5741-98c2-c44014d222e4",
+        "anchor": "intro",
+        "heading": "",
+        "content": "reload collections to refresh model status, and explicitly select the loaded\nmodel. Enter an issue and a short evidence query, then create an investigation.\n\nNew briefs separate facts, prior fixes, unverified hypotheses, recommended checks,\nand model questions. Deterministic retrieval notices are stored separately from\nmodel questions and cannot be edited in a correction. Historical drafts retain\ntheir original combined missing-evidence list, labeled with unknown provenance.\n\nEvery fact and prior fix must cite retrieved records and include a short exact\nsource excerpt for each citation. Excerpts must appear in the source chunk actually\nshown to the model, within the retained context boundary. A reviewed-claim citation\nmust quote one of its underlying source chunks, not just repeat the approved claim.\nCorrections use the same checks. The app and Markdown handoffs show the excerpts\nbeside claims; citations open source text and revision metadata. An exact match\nmakes support inspectable: it does not prove entailment, completeness, or resistance\nto injected instructions. The owner must still inspect the claim against its source.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:20:03.106331+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+        "presented_content": "reload collections to refresh model status, and explicitly select the loaded\nmodel. Enter an issue and a short evidence query, then create an investigation.\n\nNew briefs separate facts, prior fixes, unverified hypotheses, recommended checks,\nand model questions. Deterministic retrieval notices are stored separately from\nmodel questions and cannot be edited in a correction. Historical drafts retain\ntheir original combined missing-evidence list, labeled with unknown provenance.\n\nEvery fact and prior fix must cite retrieved records and include a short exact\nsource excerpt for each citation. Excerpts must appear in the source chunk actually\nshown to the model, within the retained context boundary. A reviewed-claim citation\nmust quote one of its underlying source chunks, not just repeat the approved claim.\nCorrections use the same checks. The app and Markdown handoffs show the excerpts\nbeside claims; citations open source text and revision metadata. An exact match\nmakes support inspectable: it does not prove entailment, completeness, or resistance\nto injected instructions. The owner must still inspect the claim against its source."
+      },
+      {
+        "collection_id": "64f11c6c-c2b7-4acf-8af2-61c3dab427ed",
+        "document_id": "b02fd5d2-c31b-517a-8445-9a258775affb",
+        "revision_id": "e6b54937-3538-5fe4-ad21-2e8d994772e6",
+        "relative_path": "progress.md",
+        "updated_at": "2026-10-30T01:20:03.105311+00:00",
+        "chunk_id": "4763c540-62a5-5ac0-9d5f-8422e9614975",
+        "anchor": "october-29-checkpoint-source-input-review-local-experimental-mode-1",
+        "heading": "October 29 checkpoint — source input review, local experimental mode",
+        "content": "Local checkpoint **`e86c158`** adds reviewable source inputs and calculation limitations to the explicit experimental v9 investigation workflow. Terra agents implemented backend, parser and UI; the primary reviewed their code, fixed malformed correction handling and partial-number extraction, and inspected the browser evidence. Default v4 and v6 preview remain unchanged.\n\nThe owner can select exact saved quantities in operation order, include omitted authority or missing-value excerpts, state a reason, preview the result, and save a correction. Preview invokes no model. The server validates and recalculates the submitted selection, rejects altered results or stale sources, and preserves the original brief and machine trace. Reviewed choices and exact excerpts remain in the handoff. Model and reviewer assessments are explicitly labeled; selecting evidence does not verify its authority.\n\nNew drafts use a pinned v3 quantity parser for bounded two-word units such as `support tickets`. Older v9 drafts replay their unchanged v2 catalog. Unsupported scales, ranges, ambiguous expressions, longer phrases and incomplete source spans remain conservative abstentions. A zero denominator is diagnosed only after input compatibility is checked.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:20:03.106331+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+        "presented_content": "Local checkpoint **`e86c158`** adds reviewable source inputs and calculation limitations to the explicit experimental v9 investigation workflow. Terra agents implemented backend, parser and UI; the primary reviewed their code, fixed malformed correction handling and partial-number extraction, and inspected the browser evidence. Default v4 and v6 preview remain unchanged.\n\nThe owner can select exact saved quantities in operation order, include omitted authority or missing-value excerpts, state a reason, preview the result, and save a correction. Preview invokes no model. The server validates and recalculates the submitted selection, rejects altered results or stale sources, and preserves the original brief and machine trace. Reviewed choices and exact excerpts remain in the handoff. Model and reviewer assessments are explicitly labeled; selecting evidence does not verify its authority.\n\nNew drafts use a pinned v3 quantity parser for bounded two-word units such as `support tickets`. Older v9 drafts replay their unchanged v2 catalog. Unsupported scales, ranges, ambiguous expressions, longer phrases and incomplete source spans remain conservative abstentions. A zero denominator is diagnosed only after input compatibility is checked."
+      },
+      {
+        "collection_id": "64f11c6c-c2b7-4acf-8af2-61c3dab427ed",
+        "document_id": "6dc04f4a-110f-5bf1-bfc5-d98c8aa0a74a",
+        "revision_id": "dc963475-0aea-5152-83fe-65db56f67ae6",
+        "relative_path": "guide-gates.md",
+        "updated_at": "2026-10-30T01:20:03.102011+00:00",
+        "chunk_id": "f78e0df8-0a47-5110-b38f-49a554feb558",
+        "anchor": "intro",
+        "heading": "",
+        "content": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:20:03.106331+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:f78e0df8-0a47-5110-b38f-49a554feb558:dc963475-0aea-5152-83fe-65db56f67ae6",
+        "presented_content": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T01:23:00.738100+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v10",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 177633,
+      "created_at": "2026-10-30T01:23:00.738100+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?",
+          "operation": "answer"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "1. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   "
+        },
+        {
+          "snippet_id": "S3",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "A correction preserves the original draft and can change text, citations and\n   "
+        },
+        {
+          "snippet_id": "S4",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "excerpts. "
+        },
+        {
+          "snippet_id": "S5",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "Facts and prior fixes need exact excerpts even when correcting a legacy\n   "
+        },
+        {
+          "snippet_id": "S6",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "draft. "
+        },
+        {
+          "snippet_id": "S7",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "Historical combined missing evidence remains in the original draft; the\n   "
+        },
+        {
+          "snippet_id": "S8",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "reviewer supplies new unverified questions separately. "
+        },
+        {
+          "snippet_id": "S9",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "Retrieval notices remain\n   "
+        },
+        {
+          "snippet_id": "S10",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "immutable. "
+        },
+        {
+          "snippet_id": "S11",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "The review is one-shot; it is not a collaborative editor.\n"
+        },
+        {
+          "snippet_id": "S12",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "2. "
+        },
+        {
+          "snippet_id": "S13",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "Record the actual outcome separately as resolved, unresolved or inconclusive,\n   "
+        },
+        {
+          "snippet_id": "S14",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "with notes. "
+        },
+        {
+          "snippet_id": "S15",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "Accepting a brief does not resolve the underlying issue. "
+        },
+        {
+          "snippet_id": "S16",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "An outcome\n   "
+        },
+        {
+          "snippet_id": "S17",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "is also one-shot; create a new investigation for a later observation.\n"
+        },
+        {
+          "snippet_id": "S18",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "3. "
+        },
+        {
+          "snippet_id": "S19",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "Export a Markdown handoff, or after review and outcome explicitly download an\n   "
+        },
+        {
+          "snippet_id": "S20",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "evaluation-case proposal. "
+        },
+        {
+          "snippet_id": "S21",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "The proposal contains references and review/outcome\n   "
+        },
+        {
+          "snippet_id": "S22",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "categories rather than source text or an automatically accepted test answer.\n"
+        },
+        {
+          "snippet_id": "S23",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "4. "
+        },
+        {
+          "snippet_id": "S24",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "An accepted/corrected investigation with an outcome can propose knowledge using\n   "
+        },
+        {
+          "snippet_id": "S25",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "citations from the reviewed brief. "
+        },
+        {
+          "snippet_id": "S26",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "The claim remains **proposed**; approval\n   "
+        },
+        {
+          "snippet_id": "S27",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "still uses the separate owner review CLI. "
+        },
+        {
+          "snippet_id": "S28",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "This does not train a model.\n\n"
+        },
+        {
+          "snippet_id": "S29",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "The HTTP endpoints are under `/company-brain` and use the sidecar's existing\n"
+        },
+        {
+          "snippet_id": "S30",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "loopback/token middleware. "
+        },
+        {
+          "snippet_id": "S31",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "They are unavailable through peer/remote routes.\n"
+        },
+        {
+          "snippet_id": "S32",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "Workspace strings and reviewer names are organizational labels, not authenticated\n"
+        },
+        {
+          "snippet_id": "S33",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "company identities. "
+        },
+        {
+          "snippet_id": "S34",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "Both memory privacy switches are required. "
+        },
+        {
+          "snippet_id": "S35",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "quote": "Exports already"
+        },
+        {
+          "snippet_id": "S36",
+          "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604",
+          "quote": "This local-owner developer feature connects scoped Markdown source collections,\n"
+        },
+        {
+          "snippet_id": "S37",
+          "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604",
+          "quote": "reviewed knowledge and cited lookup to a saved investigation in the desktop app.\n"
+        },
+        {
+          "snippet_id": "S38",
+          "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604",
+          "quote": "The investigation explicitly uses an already loaded local model. "
+        },
+        {
+          "snippet_id": "S39",
+          "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604",
+          "quote": "Source/review\n"
+        },
+        {
+          "snippet_id": "S40",
+          "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604",
+          "quote": "commands do not invoke a model. "
+        },
+        {
+          "snippet_id": "S41",
+          "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604",
+          "quote": "No tool execution, training, remote inference or\n"
+        },
+        {
+          "snippet_id": "S42",
+          "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604",
+          "quote": "automatic knowledge approval is part of this workflow. "
+        },
+        {
+          "snippet_id": "S43",
+          "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604",
+          "quote": "Shared company deployment\n"
+        },
+        {
+          "snippet_id": "S44",
+          "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604",
+          "quote": "still requires authenticated server-side authorization and operational work."
+        },
+        {
+          "snippet_id": "S45",
+          "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "---\n"
+        },
+        {
+          "snippet_id": "S46",
+          "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "created: 2026-10-28\n"
+        },
+        {
+          "snippet_id": "S47",
+          "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "updated: 2026-10-29\n"
+        },
+        {
+          "snippet_id": "S48",
+          "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "status: in-progress\n"
+        },
+        {
+          "snippet_id": "S49",
+          "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "tags:\n  "
+        },
+        {
+          "snippet_id": "S50",
+          "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "- potluck\n  "
+        },
+        {
+          "snippet_id": "S51",
+          "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "- company-brain\n  "
+        },
+        {
+          "snippet_id": "S52",
+          "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "- implementation\n"
+        },
+        {
+          "snippet_id": "S53",
+          "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "---"
+        },
+        {
+          "snippet_id": "S54",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "reload collections to refresh model status, and explicitly select the loaded\n"
+        },
+        {
+          "snippet_id": "S55",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "model. "
+        },
+        {
+          "snippet_id": "S56",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "Enter an issue and a short evidence query, then create an investigation.\n\n"
+        },
+        {
+          "snippet_id": "S57",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "New briefs separate facts, prior fixes, unverified hypotheses, recommended checks,\n"
+        },
+        {
+          "snippet_id": "S58",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "and model questions. "
+        },
+        {
+          "snippet_id": "S59",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "Deterministic retrieval notices are stored separately from\n"
+        },
+        {
+          "snippet_id": "S60",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "model questions and cannot be edited in a correction. "
+        },
+        {
+          "snippet_id": "S61",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "Historical drafts retain\n"
+        },
+        {
+          "snippet_id": "S62",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "their original combined missing-evidence list, labeled with unknown provenance.\n\n"
+        },
+        {
+          "snippet_id": "S63",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "Every fact and prior fix must cite retrieved records and include a short exact\n"
+        },
+        {
+          "snippet_id": "S64",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "source excerpt for each citation. "
+        },
+        {
+          "snippet_id": "S65",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "Excerpts must appear in the source chunk actually\n"
+        },
+        {
+          "snippet_id": "S66",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "shown to the model, within the retained context boundary. "
+        },
+        {
+          "snippet_id": "S67",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "A reviewed-claim citation\n"
+        },
+        {
+          "snippet_id": "S68",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "must quote one of its underlying source chunks, not just repeat the approved claim.\n"
+        },
+        {
+          "snippet_id": "S69",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "Corrections use the same checks. "
+        },
+        {
+          "snippet_id": "S70",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "The app and Markdown handoffs show the excerpts\n"
+        },
+        {
+          "snippet_id": "S71",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "beside claims; citations open source text and revision metadata. "
+        },
+        {
+          "snippet_id": "S72",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "An exact match\n"
+        },
+        {
+          "snippet_id": "S73",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "makes support inspectable: it does not prove entailment, completeness, or resistance\n"
+        },
+        {
+          "snippet_id": "S74",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "to injected instructions. "
+        },
+        {
+          "snippet_id": "S75",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "quote": "The owner must still inspect the claim against its source."
+        },
+        {
+          "snippet_id": "S76",
+          "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "Local checkpoint **`e86c158`** adds reviewable source inputs and calculation limitations to the explicit experimental v9 investigation workflow. "
+        },
+        {
+          "snippet_id": "S77",
+          "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "Terra agents implemented backend, parser and UI; the primary reviewed their code, fixed malformed correction handling and partial-number extraction, and inspected the browser evidence. "
+        },
+        {
+          "snippet_id": "S78",
+          "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "Default v4 and v6 preview remain unchanged.\n\n"
+        },
+        {
+          "snippet_id": "S79",
+          "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "The owner can select exact saved quantities in operation order, include omitted authority or missing-value excerpts, state a reason, preview the result, and save a correction. "
+        },
+        {
+          "snippet_id": "S80",
+          "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "Preview invokes no model. "
+        },
+        {
+          "snippet_id": "S81",
+          "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "The server validates and recalculates the submitted selection, rejects altered results or stale sources, and preserves the original brief and machine trace. "
+        },
+        {
+          "snippet_id": "S82",
+          "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "Reviewed choices and exact excerpts remain in the handoff. "
+        },
+        {
+          "snippet_id": "S83",
+          "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "Model and reviewer assessments are explicitly labeled; selecting evidence does not verify its authority.\n\n"
+        },
+        {
+          "snippet_id": "S84",
+          "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "New drafts use a pinned v3 quantity parser for bounded two-word units such as `support tickets`. "
+        },
+        {
+          "snippet_id": "S85",
+          "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "Older v9 drafts replay their unchanged v2 catalog. "
+        },
+        {
+          "snippet_id": "S86",
+          "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "Unsupported scales, ranges, ambiguous expressions, longer phrases and incomplete source spans remain conservative abstentions. "
+        },
+        {
+          "snippet_id": "S87",
+          "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "quote": "A zero denominator is diagnosed only after input compatibility is checked."
+        },
+        {
+          "snippet_id": "S88",
+          "citation_id": "source:f78e0df8-0a47-5110-b38f-49a554feb558:dc963475-0aea-5152-83fe-65db56f67ae6",
+          "quote": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\n"
+        },
+        {
+          "snippet_id": "S89",
+          "citation_id": "source:f78e0df8-0a47-5110-b38f-49a554feb558:dc963475-0aea-5152-83fe-65db56f67ae6",
+          "quote": "independently label citation support and unsupported answers, and measure review\n"
+        },
+        {
+          "snippet_id": "S90",
+          "citation_id": "source:f78e0df8-0a47-5110-b38f-49a554feb558:dc963475-0aea-5152-83fe-65db56f67ae6",
+          "quote": "effort/time to accepted output. "
+        },
+        {
+          "snippet_id": "S91",
+          "citation_id": "source:f78e0df8-0a47-5110-b38f-49a554feb558:dc963475-0aea-5152-83fe-65db56f67ae6",
+          "quote": "Source lifecycle UI, authenticated organizational\n"
+        },
+        {
+          "snippet_id": "S92",
+          "citation_id": "source:f78e0df8-0a47-5110-b38f-49a554feb558:dc963475-0aea-5152-83fe-65db56f67ae6",
+          "quote": "access, larger-corpus performance and repeatable backup/recovery remain additional\n"
+        },
+        {
+          "snippet_id": "S93",
+          "citation_id": "source:f78e0df8-0a47-5110-b38f-49a554feb558:dc963475-0aea-5152-83fe-65db56f67ae6",
+          "quote": "work. "
+        },
+        {
+          "snippet_id": "S94",
+          "citation_id": "source:f78e0df8-0a47-5110-b38f-49a554feb558:dc963475-0aea-5152-83fe-65db56f67ae6",
+          "quote": "This implementation belongs to the free/open core."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "source_text": "1",
+          "snippet_text": "1. ",
+          "start": 0,
+          "end": 1,
+          "value": "1",
+          "unit": "",
+          "dimension": "dimensionless"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S12",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "source_text": "2",
+          "snippet_text": "2. ",
+          "start": 0,
+          "end": 1,
+          "value": "2",
+          "unit": "",
+          "dimension": "dimensionless"
+        },
+        {
+          "id": "N3",
+          "snippet_id": "S18",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "source_text": "3",
+          "snippet_text": "3. ",
+          "start": 0,
+          "end": 1,
+          "value": "3",
+          "unit": "",
+          "dimension": "dimensionless"
+        },
+        {
+          "id": "N4",
+          "snippet_id": "S23",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "source_text": "4",
+          "snippet_text": "4. ",
+          "start": 0,
+          "end": 1,
+          "value": "4",
+          "unit": "",
+          "dimension": "dimensionless"
+        }
+      ],
+      "quantity_parser_version": "v3",
+      "extraction_notices": [
+        {
+          "snippet_id": "S11",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "source_text": "one-shot; it is not a collaborative editor.",
+          "start": 14,
+          "end": 57,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S17",
+          "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+          "source_text": "one-shot; create a new investigation for a ",
+          "start": 8,
+          "end": 51,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S46",
+          "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "source_text": "2026-10-28\n",
+          "start": 9,
+          "end": 20,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S46",
+          "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "source_text": "10-28\n",
+          "start": 14,
+          "end": 20,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S46",
+          "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "source_text": "28\n",
+          "start": 17,
+          "end": 20,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S47",
+          "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "source_text": "2026-10-29\n",
+          "start": 9,
+          "end": 20,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S47",
+          "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "source_text": "10-29\n",
+          "start": 14,
+          "end": 20,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S47",
+          "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "source_text": "29\n",
+          "start": 17,
+          "end": 20,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S68",
+          "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87",
+          "source_text": "one of its underlying source chunks, not ju",
+          "start": 11,
+          "end": 54,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S84",
+          "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "source_text": "two-word units such as `support tickets`. ",
+          "start": 55,
+          "end": 97,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        },
+        {
+          "snippet_id": "S87",
+          "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6",
+          "source_text": "zero denominator is diagnosed only after inp",
+          "start": 2,
+          "end": 46,
+          "reason": "Number-like source text was not extracted; its format or unit may be unsupported or incomplete."
+        }
+      ],
+      "calculation_traces": [],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "64f11c6c-c2b7-4acf-8af2-61c3dab427ed"
+    ]
+  },
+  "model": "qwen3-8b-q4",
+  "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+  "template_version": "investigation-v10",
+  "source_ids": [
+    {
+      "snippet_id": "S1",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S2",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S3",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S4",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S5",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S6",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S7",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S8",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S9",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S10",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S11",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S12",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S13",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S14",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S15",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S16",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S17",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S18",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S19",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S20",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S21",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S22",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S23",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S24",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S25",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S26",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S27",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S28",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S29",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S30",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S31",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S32",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S33",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S34",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S35",
+      "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334"
+    },
+    {
+      "snippet_id": "S36",
+      "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604"
+    },
+    {
+      "snippet_id": "S37",
+      "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604"
+    },
+    {
+      "snippet_id": "S38",
+      "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604"
+    },
+    {
+      "snippet_id": "S39",
+      "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604"
+    },
+    {
+      "snippet_id": "S40",
+      "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604"
+    },
+    {
+      "snippet_id": "S41",
+      "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604"
+    },
+    {
+      "snippet_id": "S42",
+      "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604"
+    },
+    {
+      "snippet_id": "S43",
+      "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604"
+    },
+    {
+      "snippet_id": "S44",
+      "citation_id": "source:8a0fbcb0-b258-52e1-ad40-74e413b83c42:4bbb422f-65eb-514b-b3ad-ddffc9264604"
+    },
+    {
+      "snippet_id": "S45",
+      "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S46",
+      "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S47",
+      "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S48",
+      "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S49",
+      "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S50",
+      "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S51",
+      "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S52",
+      "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S53",
+      "citation_id": "source:3e9de7a3-1d35-573b-9d8b-6752b4300afd:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S54",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S55",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S56",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S57",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S58",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S59",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S60",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S61",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S62",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S63",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S64",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S65",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S66",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S67",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S68",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S69",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S70",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S71",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S72",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S73",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S74",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S75",
+      "citation_id": "source:dcd9fe1d-4305-5741-98c2-c44014d222e4:5f5c1d46-c609-5320-b45a-78db29437d87"
+    },
+    {
+      "snippet_id": "S76",
+      "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S77",
+      "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S78",
+      "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S79",
+      "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S80",
+      "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S81",
+      "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S82",
+      "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S83",
+      "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S84",
+      "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S85",
+      "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S86",
+      "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S87",
+      "citation_id": "source:4763c540-62a5-5ac0-9d5f-8422e9614975:e6b54937-3538-5fe4-ad21-2e8d994772e6"
+    },
+    {
+      "snippet_id": "S88",
+      "citation_id": "source:f78e0df8-0a47-5110-b38f-49a554feb558:dc963475-0aea-5152-83fe-65db56f67ae6"
+    },
+    {
+      "snippet_id": "S89",
+      "citation_id": "source:f78e0df8-0a47-5110-b38f-49a554feb558:dc963475-0aea-5152-83fe-65db56f67ae6"
+    },
+    {
+      "snippet_id": "S90",
+      "citation_id": "source:f78e0df8-0a47-5110-b38f-49a554feb558:dc963475-0aea-5152-83fe-65db56f67ae6"
+    },
+    {
+      "snippet_id": "S91",
+      "citation_id": "source:f78e0df8-0a47-5110-b38f-49a554feb558:dc963475-0aea-5152-83fe-65db56f67ae6"
+    },
+    {
+      "snippet_id": "S92",
+      "citation_id": "source:f78e0df8-0a47-5110-b38f-49a554feb558:dc963475-0aea-5152-83fe-65db56f67ae6"
+    },
+    {
+      "snippet_id": "S93",
+      "citation_id": "source:f78e0df8-0a47-5110-b38f-49a554feb558:dc963475-0aea-5152-83fe-65db56f67ae6"
+    },
+    {
+      "snippet_id": "S94",
+      "citation_id": "source:f78e0df8-0a47-5110-b38f-49a554feb558:dc963475-0aea-5152-83fe-65db56f67ae6"
+    }
+  ],
+  "review": {
+    "reviewer": "Rob",
+    "decision": "accept_unchanged",
+    "proposed_answers": [
+      {
+        "question_id": "R1",
+        "text": "Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   \nA correction preserves the original draft and can change text, citations and\n   \nexcorts. \n\nFacts and prior fixes need exact excerpts even when correcting a legacy\n   \ndraft. \n\nHistorical combined missing evidence remains in the original draft; the\n   \nreviewer supplies new unverified questions separately. \n\nRetrieval notices remain\n   \nimmutable. \n\nThe review is one-shot; it is not a collaborative editor."
+      }
+    ],
+    "notes": "Looks to be correct.",
+    "started_at": "2026-10-30T02:02:26.683Z",
+    "finished_at": "2026-10-30T02:03:28.902Z",
+    "active_review_milliseconds": 62215,
+    "timing_scope": "Visible and explicitly active time only; hidden and paused time excluded."
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "case_id": "pilot-readiness",
+  "reviewer": "Rob",
+  "decision": "accept_unchanged",
+  "notes": "Looks to be correct.",
+  "active_review_milliseconds": 62215,
+  "active_review_seconds": 62.215,
+  "started_to_finished_milliseconds": 62219,
+  "started_at": "2026-10-30T02:02:26.683Z",
+  "finished_at": "2026-10-30T02:03:28.902Z",
+  "answers_with_final_text_changes": 0,
+  "timing_scope": "Visible and explicitly active time only; hidden and paused time excluded.",
+  "record_sha256": "8e67598e48df36574a71463230887d6847468b29b8308ddf68873c227e9062c3",
+  "original_result_sha256_canonical_json": "b03a66485ae6b1e445be7de0de7cd9dd21fb49f0132c921344b62ba5fa12f222",
+  "run_raw_sha256": "5824825cd6685b27f2ed314aac23a3efef45f4b7de2bc25b92205b1576af562e",
+  "validation": "Original result, run hash, canonical result hash, model identity, template and all source IDs match the retained v10 run. Proposed answers exactly match originals. Timer is positive and no greater than start-to-finish duration.",
+  "evidence_of_user_completion": "User reported done; existing browser page showed Review finished and 01:02; matching JSON was found in Downloads.",
+  "independent_completeness_result": "Fail, unchanged: draft describes review mechanics but omits readiness, blocked gates and qualification context.",
+  "interpretation": "One real owner accepted one draft unchanged in 62.215 seconds of visible active review. This records owner acceptance, not company pilot acceptance or a passing completeness evaluation.",
+  "limits": [
+    "No keystroke history; zero final changes does not prove zero editing actions.",
+    "Time excludes pauses and hidden-page time; not total investigation latency or a general review-effort estimate.",
+    "Single case with curated excerpts and a supplied plan; no general quality or demand claim."
+  ],
+  "next_priority": "Preserve paragraph context, make tied retrieval deterministic, and ensure answers cover every requested part before a fresh frozen evaluation."
+}
