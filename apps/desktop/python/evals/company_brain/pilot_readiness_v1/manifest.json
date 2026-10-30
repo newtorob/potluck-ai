@@ -1,0 +1,98 @@
+{
+  "schema_version": "pilot_readiness_v1",
+  "curation": "Query-specific exact excerpts from selected sources; not a complete vault or repository retrieval evaluation. Paths are relative to this directory. Source metadata and hashes are in sources.json. Plans are fixture_supplied, author-scripted and not owner confirmed.",
+  "cases": [
+    {
+      "id": "pilot-readiness",
+      "question": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?",
+      "sources": [
+        "sources/guide-intro.md",
+        "sources/guide-workflow.md",
+        "sources/guide-review.md",
+        "sources/guide-gates.md",
+        "sources/qualification.md",
+        "sources/progress.md"
+      ],
+      "plan": [
+        {
+          "question_id": "Q1",
+          "request": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?",
+          "operation": "answer"
+        }
+      ]
+    },
+    {
+      "id": "core-company",
+      "question": "What is available in the free core versus the paid company offering, and what is still planned?",
+      "sources": [
+        "sources/guide-intro.md",
+        "sources/guide-gates.md",
+        "sources/packaging.md",
+        "sources/progress.md"
+      ],
+      "plan": [
+        {
+          "question_id": "Q1",
+          "request": "What is available in the free core versus the paid company offering, and what is still planned?",
+          "operation": "answer"
+        }
+      ]
+    },
+    {
+      "id": "telescope-direction",
+      "question": "How many more images did the west telescope record than the east telescope?",
+      "sources": [
+        "sources/direction.md"
+      ],
+      "plan": [
+        {
+          "question_id": "Q1",
+          "request": "How many more images did the west telescope record than the east telescope?",
+          "operation": "difference"
+        }
+      ]
+    },
+    {
+      "id": "battery-change",
+      "question": "What was the percentage change in batteries processed from April to May?",
+      "sources": [
+        "sources/temporal.md"
+      ],
+      "plan": [
+        {
+          "question_id": "Q1",
+          "request": "What was the percentage change in batteries processed from April to May?",
+          "operation": "percent_change"
+        }
+      ]
+    },
+    {
+      "id": "lamp-authority",
+      "question": "How has the number of lamps changed since the earlier inventory?",
+      "sources": [
+        "sources/authority.md"
+      ],
+      "plan": [
+        {
+          "question_id": "Q1",
+          "request": "How has the number of lamps changed since the earlier inventory?",
+          "operation": "difference"
+        }
+      ]
+    },
+    {
+      "id": "garden-share",
+      "question": "What percentage of surveyed gardens had rain barrels?",
+      "sources": [
+        "sources/missing.md"
+      ],
+      "plan": [
+        {
+          "question_id": "Q1",
+          "request": "What percentage of surveyed gardens had rain barrels?",
+          "operation": "percentage"
+        }
+      ]
+    }
+  ]
+}

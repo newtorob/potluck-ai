@@ -1,0 +1,9 @@
+{
+  "status": "error",
+  "error": {
+    "type": "RuntimeError",
+    "message": "Failed to load shared library '/home/rob/Documents/potluckai/apps/desktop/python/.venv/lib/python3.11/site-packages/llama_cpp/lib/libllama.so': libcudart.so.13: cannot open shared object file: No such file or directory"
+  },
+  "finished_at": "2026-10-30T01:13:26.928184+00:00",
+  "elapsed_seconds": 0.022799016998760635
+}

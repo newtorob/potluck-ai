@@ -1,0 +1,16 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "03fc2004-ca9f-4e60-920e-c6c59caf3f45",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-pilot-readiness-v1/8b-v10/attempts/lamp-authority/raw/allowed",
+  "files": {
+    "authority.md": "6eb5dd7567d68bc98b7c3f265298b54ec7d50bb744255df23c431cac004f6b05"
+  },
+  "scan": {
+    "collection_id": "03fc2004-ca9f-4e60-920e-c6c59caf3f45",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

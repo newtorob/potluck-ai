@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-a9eb5442-bf31-4d2d-bebe-99800625602c",
+  "object": "chat.completion",
+  "created": 1793323684,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"status\": \"ready\", \"reason\": \"The percentage change can be calculated using the values from the quantities N1 and N2.\", \"baseline_id\": \"N1\", \"current_id\": \"N2\", \"known_input_snippet_ids\": [\"S1\", \"S2\"], \"competing_snippet_ids\": [], \"limitation_snippet_ids\": [], \"limitation_basis\": \"none\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 529,
+    "completion_tokens": 88,
+    "total_tokens": 617
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-96640c12-78f0-4838-99d6-ad3f2aea613e",
+  "object": "chat.completion",
+  "created": 1793322639,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"snippet_ids\": [\"S1\", \"S2\", \"S3\", \"S4\", \"S5\", \"S6\", \"S7\", \"S8\"], \"text\": \"1. Explicitly accept, correct or reject a draft, with a reviewer and reason.\\n   A correction preserves the original draft and can change text, citations and\\n   excerpts. Facts and prior fixes need exact excerpts even when correcting a legacy\\n   draft. Historical combined missing evidence remains in the original draft; the\\n   reviewer supplies new unverified questions separately. Retrieval notices remain\\n   immutable. The review is one-shot; it is not a collaborative editor.\" , \"status\": \"supported\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 4204,
+    "completion_tokens": 146,
+    "total_tokens": 4350
+  }
+}

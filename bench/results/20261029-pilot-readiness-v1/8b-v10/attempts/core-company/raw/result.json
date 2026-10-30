@@ -1,0 +1,17 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "error",
+  "error": {
+    "type": "ValueError",
+    "message": "Investigation generation timed out"
+  },
+  "failure_stage": "inference_or_validation",
+  "latency_seconds": 288.7617212077603,
+  "setup_seconds": 0.030264667235314846,
+  "attempt_total_seconds": 288.7919858749956,
+  "finished_at": "2026-10-30T01:27:49.538260+00:00"
+}

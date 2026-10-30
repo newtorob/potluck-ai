@@ -1,0 +1,49 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "5ccef58a-a8dd-455b-9eb1-cc397b1401c6"
+  ],
+  "query": "How has the number of lamps changed since the earlier inventory?",
+  "limit": 10,
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "5ccef58a-a8dd-455b-9eb1-cc397b1401c6"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "5ccef58a-a8dd-455b-9eb1-cc397b1401c6",
+        "document_id": "93d32e5b-b296-5fd6-8a30-d923a7f96cae",
+        "revision_id": "bbec144f-fbd8-57f7-82d7-24c0235d2ef4",
+        "relative_path": "authority.md",
+        "updated_at": "2026-10-30T01:19:06.574706+00:00",
+        "chunk_id": "9147fa2b-f7d7-57e3-b2da-4e0073c7fd67",
+        "anchor": "inventory-reports",
+        "heading": "Inventory reports",
+        "content": "The earlier inventory recorded 70 lamps. The purchasing sheet reports 92 lamps currently. The warehouse sheet reports 86 lamps currently. The owner has not determined which current sheet is authoritative.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:19:06.574861+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:9147fa2b-f7d7-57e3-b2da-4e0073c7fd67:bbec144f-fbd8-57f7-82d7-24c0235d2ef4"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

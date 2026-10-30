@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-bdacf2ba-c0d3-431b-9dbd-24879826db13",
+  "object": "chat.completion",
+  "created": 1793323146,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"unsupported\", \"snippet_ids\": [\"S1\", \"S2\"], \"reason\": \"Conflicting current values: 92 lamps (S2) and 86 lamps (S3). The owner has not determined which current sheet is authoritative (S4).\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 502,
+    "completion_tokens": 80,
+    "total_tokens": 582
+  }
+}

@@ -1,0 +1,193 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "4fab4613-a73f-4000-bd03-4bc5f55b9766"
+  ],
+  "query": "What is available in the free core versus the paid company offering, and what is still planned?",
+  "limit": 10,
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "4fab4613-a73f-4000-bd03-4bc5f55b9766"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "4fab4613-a73f-4000-bd03-4bc5f55b9766",
+        "document_id": "e717ebaf-33ed-5b86-a388-7435c22c4689",
+        "revision_id": "eb1cae69-4e27-5149-97ab-ff5b47fd9482",
+        "relative_path": "packaging.md",
+        "updated_at": "2026-10-30T01:23:00.774478+00:00",
+        "chunk_id": "569ce01b-0c3a-5178-a18a-d34811d6ca61",
+        "anchor": "commitments-to-preserve",
+        "heading": "Commitments to preserve",
+        "content": "1. Preserve the existing MIT core and already-open functionality. Do not move existing open features behind a proprietary paywall to create a paid tier.\n2. Keep local inference, owned-machine execution, and the complete first Company Brain workflow useful without a subscription or mandatory hosted account for local use.\n3. Keep basic authentication, authorization enforcement, source restrictions, deletion, security fixes, provenance, and data export in the core. A free deployment must not be unsafe by design.\n4. Do not impose artificial seat, document, token, source, or owned-machine caps on the self-hosted core. Technical capacity and safety limits still apply. Managed services may have transparent resource limits tied to actual operating costs.\n5. Keep customer-created knowledge, evaluation datasets, run artifacts, and exportable configurations portable. Customers retain their rights to their data and created artifacts; underlying model and third-party license conditions still apply.\n6. No implicit upload of private sources, traces, or training examples. Customer content is not pooled for Potluck training without separate explicit authorization. Access for support is explicit and scoped.\n7. Core functionality does not depend on a paid control service remaining available. Permission checks remain enforced during a management outage or subscription lapse; inability to verify authorization fails closed.\n8. Describe the product accurately: an open-source core with commercial organizational software/services. Identify any future proprietary component clearly; source-visible proprietary software is not described as open source.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:23:00.776141+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:569ce01b-0c3a-5178-a18a-d34811d6ca61:eb1cae69-4e27-5149-97ab-ff5b47fd9482"
+      },
+      {
+        "collection_id": "4fab4613-a73f-4000-bd03-4bc5f55b9766",
+        "document_id": "e717ebaf-33ed-5b86-a388-7435c22c4689",
+        "revision_id": "eb1cae69-4e27-5149-97ab-ff5b47fd9482",
+        "relative_path": "packaging.md",
+        "updated_at": "2026-10-30T01:23:00.774478+00:00",
+        "chunk_id": "75e63899-40f5-5641-b5b7-44a03c5ba3a5",
+        "anchor": "decision-and-status",
+        "heading": "Decision and status",
+        "content": "**Rob's decision, October 28, 2026: keep Potluck's core open source while pursuing funding.** Rob requested this detailed free-versus-paid map as the working direction for subsequent builds.\n\nThis note translates that decision into a product boundary. It is an internal build policy, not a published price list, signed customer commitment, or claim that every listed capability exists. The core decision is explicit; package names, charging unit, commercial module structure, and pilot gates below are implementation recommendations to validate through use and purchasing evidence.\n\n**Free core:** run useful AI on infrastructure you control, complete a cited investigation, review the outcome, retain reusable knowledge, and evaluate improvements yourself.\n\n**Paid company offering:** deploy, administer, monitor, govern, and improve that system across an organization with less operational work and a defined support relationship.\n\nCompany size does not determine whether the core is free. An enterprise may self-host the open core for commercial use. Payment buys additional software or services, not permission to use the existing MIT code at work. Free software does not include free hardware, electricity, third-party APIs, cloud hosting, or other people's computing capacity.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:23:00.776141+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:75e63899-40f5-5641-b5b7-44a03c5ba3a5:eb1cae69-4e27-5149-97ab-ff5b47fd9482"
+      },
+      {
+        "collection_id": "4fab4613-a73f-4000-bd03-4bc5f55b9766",
+        "document_id": "e717ebaf-33ed-5b86-a388-7435c22c4689",
+        "revision_id": "eb1cae69-4e27-5149-97ab-ff5b47fd9482",
+        "relative_path": "packaging.md",
+        "updated_at": "2026-10-30T01:23:00.774478+00:00",
+        "chunk_id": "48d501a1-b938-5e38-b34e-788f0fbccb6b",
+        "anchor": "first-offer-to-validate-1",
+        "heading": "First offer to validate",
+        "content": "**A bounded, supported private engineering-investigation pilot.** Buyer hypothesis: an engineering/platform leader responsible for an expensive recurring investigation and the system that supports it. A department inside a large enterprise is a valid starting customer.\n\n- One organization, one agreed workflow and supported deployment configuration, one approved model configuration, and one useful source integration or import path.\n- Deliver the cited brief → reviewer correction → recorded outcome → reusable knowledge/evaluation loop from the open core.\n- Add the minimum repeatable company operations: source/job health view, freshness/failure alerts, controlled configuration rollout and a defined support route. Implement these before promising them as available.\n- Include a documented install/upgrade/restore process and a short operating report. Authentication, workspace authorization, source lifecycle and export are prerequisites, including in the free core.\n- Agree baseline, success measures, scope, term and fee before a paid pilot begins. A paid pilot fee is a validation offer, not evidence of willingness to pay until a buyer accepts it.\n\nThe economic hypothesis is fewer hours gathering context and keeping the system working, with reviewable evidence and customer-controlled execution. The pilot must test both workflow usefulness and the reason to pay for company operations. Initial setup services can be scoped separately, but the business should converge on repeatable software and recurring operations rather than unlimited custom implementation.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:23:00.776141+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:48d501a1-b938-5e38-b34e-788f0fbccb6b:eb1cae69-4e27-5149-97ab-ff5b47fd9482"
+      },
+      {
+        "collection_id": "4fab4613-a73f-4000-bd03-4bc5f55b9766",
+        "document_id": "e717ebaf-33ed-5b86-a388-7435c22c4689",
+        "revision_id": "eb1cae69-4e27-5149-97ab-ff5b47fd9482",
+        "relative_path": "packaging.md",
+        "updated_at": "2026-10-30T01:23:00.774478+00:00",
+        "chunk_id": "a2199da9-08db-514e-95d9-93030f03f1b1",
+        "anchor": "packages-and-charging-approach-1",
+        "heading": "Packages and charging approach",
+        "content": "Rob subsequently approved using these package names in the website preview, with **Core $0 and company plans by discussion**. Company and Enterprise remain marked planned/in development. Rob subsequently approved publication; website commit `20434d3` is live, including [pricing](https://trypotluck.ai/pricing). No numeric paid prices or checkout are authorized by this note.\n\n| Package | Offer | Packaging direction |\n| --- | --- | --- |\n| **Potluck Core** | Complete self-managed foundation and useful workflows, including the free column above. | $0 software license fee for the core. Individual and commercial organizational use permitted under its license. Customer supplies resources and operates it. |\n| **Potluck Company** | Commercial management software plus a bounded supported private deployment: source/job health, approved model/configuration rollout, organizational oversight and support as those capabilities are delivered. | Recurring subscription. Initial pricing hypothesis: base fee per managed deployment/organization with included managed capacity and explicit extra service/resource costs. Do not meter locally generated tokens or tax every reader of company knowledge. Price and unit must be tested against value and support cost. |\n| **Enterprise deployment options** | Directory automation, multi-site administration, offline management, advanced audit integrations and broader support requirements. | Expansion of the same company product, with a scoped commercial agreement. Build only when a credible deployment requires it. No automatic 24/7 SLA, compliance certification or custom infrastructure promise. |",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:23:00.776141+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:a2199da9-08db-514e-95d9-93030f03f1b1:eb1cae69-4e27-5149-97ab-ff5b47fd9482"
+      },
+      {
+        "collection_id": "4fab4613-a73f-4000-bd03-4bc5f55b9766",
+        "document_id": "e717ebaf-33ed-5b86-a388-7435c22c4689",
+        "revision_id": "eb1cae69-4e27-5149-97ab-ff5b47fd9482",
+        "relative_path": "packaging.md",
+        "updated_at": "2026-10-30T01:23:00.774478+00:00",
+        "chunk_id": "de360a03-921f-559c-854b-47eef197c7e5",
+        "anchor": "exact-feature-boundary-2",
+        "heading": "Exact feature boundary",
+        "content": "| Area | Free and open core | Paid company offering | Reason a company might pay |\n| --- | --- | --- | --- |\n| Models and local clients | Desktop, CLI, local API, MCP, compatible local models, manual model selection and configuration. | Central approved-model catalog, organization rollout controls and fleet configuration. | Keep deployments consistent without manually configuring each machine. |\n| Owned compute and mesh | Pair approved machines; execute on selected owned infrastructure; core scheduling, queues and model-splitting implementations as they mature. No commercial-use fee or artificial owned-node cap. | Fleet enrollment campaigns, inventory, health monitoring, capacity reporting, coordinated upgrades and staged rollbacks. | Reduce ongoing administration across machines and sites. |\n| Sources and ingestion | Local collections, connector interfaces and connector implementations we release, manual configuration, updates/deletions, source versions, visible errors. | Managed connector configuration, centrally stored secret references, monitored sync schedules, failure alerts and supported connector operation. | Keep sources current without someone tending each deployment. |\n| Knowledge lifecycle | Raw evidence, proposed claims, human approval/correction, supersession, ownership metadata and history. | Organization-wide review queues, reviewer assignment, escalation rules and oversight reports. | Make shared maintenance accountable across departments. |\n| Investigations and handoffs | Cited briefs, uncertainty, source inspection, saved handoffs, accept/correct/reject, recorded outcomes and reuse. | Administer shared workflow templates and organizational rollout; operational reporting across workspaces. | Standardize a repeated workflow and see where it succeeds or needs attention. |\n| Workspace collaboration | Basic shared-workspace operation when implemented, manual member/role management, server-side scope enforcement and permission-preserving derived artifacts. | Directory-driven provisioning, group synchronization, delegated administration and centrally managed policy inheritance. | Avoid manual access administration as teams change. |\n| Identity and security | Local/device authentication, sessions and revocation, basic roles, supported transport protection, credential handling and security fixes. A basic standards-based login adapter belongs here when implemented. | SCIM/directory lifecycle automation, multi-directory configuration, organization-wide access review and policy administration. | Coordinate joiners, role changes, departures and oversight. SSO alone is not the business model. |\n| Access and action policies | Enforcement engine; source permissions; explicit routing scope; action allowlists; local human confirmation and denial of unauthorized work. | Central policy distribution, managed exceptions, multi-stage approval configuration and delegated policy ownership. | Apply and review consistent rules across deployments. Enforcement itself stays free. |\n| Audit and provenance | Local actor/action/source/model records, review history, security-relevant events and ordinary export. | Cross-deployment audit search, scheduled evidence reports, managed retention policies and external audit-log integrations. | Answer organization-wide oversight questions without assembling records by hand. |\n| Evaluation | Create/export cases, freeze holdouts, run local comparisons, inspect failures and record quality/cost/latency. | Scheduled fleet/workflow evaluations, regression alerts, approval-gated promotion and centralized comparisons. | Catch regressions routinely and coordinate releases. A user may automate the open CLI independently. |\n| Model improvement | Open evaluation formats and local improvement tools we build; manual candidate testing and loading, including adaptation only where justified. | Managed improvement jobs, versioned organizational approvals, monitored deployment and rollback. | Operate a repeatable improvement process rather than maintain scripts. No quality improvement is guaranteed. |\n| Backup, retention and portability | Export/import, documented backup/restore, local retention and deletion controls, customer-accessible data formats. | Managed backup scheduling, restore checks, retention administration and supported recovery procedures. | Reduce operational work and establish tested recovery practices. |\n| Hosting and deployment | Self-managed installation on supported customer hardware or infrastructure. | Supported private deployment and, later, optional managed infrastructure. Commercial management can run in the customer's environment. | Purchase deployment and operating convenience without requiring private data to move to Potluck's cloud. |\n| Support | Documentation, public issue reporting, community help and public security fixes. No response-time promise. | A defined supported configuration, onboarding scope, support hours and response commitments we can meet. | Have an accountable vendor for an operational dependency. |\n| External capacity | Open routing/client components retain their license; using one's own machines stays free. | Third-party capacity, hosted services or public-pool consumption may have separately disclosed charges under a future approved offer. | Buy actual resources. Tokens, rewards and public-pool pricing are separate unresolved work. |",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:23:00.776141+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:de360a03-921f-559c-854b-47eef197c7e5:eb1cae69-4e27-5149-97ab-ff5b47fd9482"
+      },
+      {
+        "collection_id": "4fab4613-a73f-4000-bd03-4bc5f55b9766",
+        "document_id": "e717ebaf-33ed-5b86-a388-7435c22c4689",
+        "revision_id": "eb1cae69-4e27-5149-97ab-ff5b47fd9482",
+        "relative_path": "packaging.md",
+        "updated_at": "2026-10-30T01:23:00.774478+00:00",
+        "chunk_id": "33bf7885-9277-5c41-8a1a-21e0fb9588fb",
+        "anchor": "how-this-changes-the-build-plan-1",
+        "heading": "How this changes the build plan",
+        "content": "| Stage | Work and packaging | Gate |\n| --- | --- | --- |\n| Now: complete the first batch | All five deliverables in [[Potluck First Company Brain Build Batch]] are free core: source collections, reviewed knowledge/supersession, cited evidence lookup, investigation/handoff, review/evaluation. | Complete workflow and independent quality/scope checks. No billing or entitlement service dependency. |\n| Next: safe private pilot foundation | Authentication/authorization, source lifecycle, export/restore, reproducible deployment and one source integration belong in core where they provide baseline functionality. | Safe, repeatable operation; no customer multi-user rollout before authorization is enforced. |\n| First commercial increment | Company operations for that same supported configuration: monitored sources/jobs, centrally managed model/configuration changes and defined support. Keep additional admin workflows separate from core enforcement. | Independent repeat users and an accepted paid scope; demonstrate value and record support cost. |\n| Expansion | Directory lifecycle, policy administration, larger fleets, scheduled evaluation promotion and advanced audit integrations. | Buyer-backed operational need and evidence that the deployment can be supported sustainably. |\n| Later specialization | Managed adaptation and more ambitious model improvement, public-pool capacity or broader deployment options. | Measured task improvement or capacity need, viable cost, appropriate data rights and separate operational readiness. |",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:23:00.776141+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:33bf7885-9277-5c41-8a1a-21e0fb9588fb:eb1cae69-4e27-5149-97ab-ff5b47fd9482"
+      },
+      {
+        "collection_id": "4fab4613-a73f-4000-bd03-4bc5f55b9766",
+        "document_id": "e717ebaf-33ed-5b86-a388-7435c22c4689",
+        "revision_id": "eb1cae69-4e27-5149-97ab-ff5b47fd9482",
+        "relative_path": "packaging.md",
+        "updated_at": "2026-10-30T01:23:00.774478+00:00",
+        "chunk_id": "02a0b1e0-db1e-598f-b72c-24521149da39",
+        "anchor": "how-this-changes-the-build-plan-2",
+        "heading": "How this changes the build plan",
+        "content": "Current recorded implementation: source collections, reviewed knowledge/supersession and cited lookup are locally verified through `6d404dc`; the investigation/handoff and review/evaluation deliverables remain in progress. See [[Potluck Company Brain Build Progress]] for the current source of truth. Commercial management, enterprise readiness and paid adoption are not established by this policy.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:23:00.776141+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:02a0b1e0-db1e-598f-b72c-24521149da39:eb1cae69-4e27-5149-97ab-ff5b47fd9482"
+      },
+      {
+        "collection_id": "4fab4613-a73f-4000-bd03-4bc5f55b9766",
+        "document_id": "1dc8242c-bbb2-5fab-89f3-2bc847953eee",
+        "revision_id": "bd0d9377-9933-5ca3-a601-154df05e6da5",
+        "relative_path": "guide-gates.md",
+        "updated_at": "2026-10-30T01:23:00.770909+00:00",
+        "chunk_id": "4197d774-b364-5310-92eb-c0a96d7b06a1",
+        "anchor": "intro",
+        "heading": "",
+        "content": "Before a pilot, run the frozen cases on pinned baseline/candidate configurations,\nindependently label citation support and unsupported answers, and measure review\neffort/time to accepted output. Source lifecycle UI, authenticated organizational\naccess, larger-corpus performance and repeatable backup/recovery remain additional\nwork. This implementation belongs to the free/open core.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:23:00.776141+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:4197d774-b364-5310-92eb-c0a96d7b06a1:bd0d9377-9933-5ca3-a601-154df05e6da5"
+      },
+      {
+        "collection_id": "4fab4613-a73f-4000-bd03-4bc5f55b9766",
+        "document_id": "995a26ce-822b-5146-b1bb-d9b630a24a65",
+        "revision_id": "413e5aa6-8c6d-5dfe-a630-f2e8116c0815",
+        "relative_path": "guide-intro.md",
+        "updated_at": "2026-10-30T01:23:00.771614+00:00",
+        "chunk_id": "6a83878b-16d1-5d05-b937-f84fb8590ab8",
+        "anchor": "local-company-brain-evidence-and-review",
+        "heading": "Local Company Brain evidence and review",
+        "content": "This local-owner developer feature connects scoped Markdown source collections,\nreviewed knowledge and cited lookup to a saved investigation in the desktop app.\nThe investigation explicitly uses an already loaded local model. Source/review\ncommands do not invoke a model. No tool execution, training, remote inference or\nautomatic knowledge approval is part of this workflow. Shared company deployment\nstill requires authenticated server-side authorization and operational work.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:23:00.776141+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:6a83878b-16d1-5d05-b937-f84fb8590ab8:413e5aa6-8c6d-5dfe-a630-f2e8116c0815"
+      },
+      {
+        "collection_id": "4fab4613-a73f-4000-bd03-4bc5f55b9766",
+        "document_id": "e717ebaf-33ed-5b86-a388-7435c22c4689",
+        "revision_id": "eb1cae69-4e27-5149-97ab-ff5b47fd9482",
+        "relative_path": "packaging.md",
+        "updated_at": "2026-10-30T01:23:00.774478+00:00",
+        "chunk_id": "6acd1616-44a7-52f9-a44a-d92670ecb9f8",
+        "anchor": "exact-feature-boundary-3",
+        "heading": "Exact feature boundary",
+        "content": "The boundary is additional administration and service responsibility. Shared knowledge, basic collaboration, model splitting, citations, human review, and useful local evaluations are not automatically paid just because a company uses them.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:23:00.776141+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:6acd1616-44a7-52f9-a44a-d92670ecb9f8:eb1cae69-4e27-5149-97ab-ff5b47fd9482"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": true
+  }
+}

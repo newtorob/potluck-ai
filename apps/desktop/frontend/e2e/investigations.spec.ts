@@ -434,13 +434,13 @@ test('calculation review recovers preview failures, rejects stale responses and 
   await page.getByRole('button', { name: 'Confirm plan and draft' }).click();
   await page.getByLabel('Decision').selectOption('correct');
   await page.getByLabel(/Review calculation inputs/).check();
-  const before = page.getByLabel(/^Before/);
+  const before = page.getByLabel('Amount to subtract', { exact: true });
   await before.focus();
   await page.keyboard.press('Space');
   await page.keyboard.press('Escape');
   await expect(before).toBeFocused();
   await before.selectOption('N1');
-  await page.getByLabel(/^After/).selectOption('N2');
+  await page.getByLabel('Amount to subtract from').selectOption('N2');
   await page
     .getByRole('group', { name: 'Evidence and authority excerpts' })
     .getByRole('checkbox')
@@ -481,7 +481,7 @@ test('calculation review recovers preview failures, rejects stale responses and 
   );
   await page.getByLabel(/Review calculation inputs/).check();
   await before.selectOption('N1');
-  await page.getByLabel(/^After/).selectOption('N2');
+  await page.getByLabel('Amount to subtract from').selectOption('N2');
   await page
     .getByRole('group', { name: 'Evidence and authority excerpts' })
     .getByRole('checkbox')
@@ -535,8 +535,8 @@ test('unavailable source during preview clears the stale investigation', async (
   await page.getByRole('button', { name: 'Confirm plan and draft' }).click();
   await page.getByLabel('Decision').selectOption('correct');
   await page.getByLabel(/Review calculation inputs/).check();
-  await page.getByLabel(/^Before/).selectOption('N1');
-  await page.getByLabel(/^After/).selectOption('N2');
+  await page.getByLabel('Amount to subtract', { exact: true }).selectOption('N1');
+  await page.getByLabel('Amount to subtract from').selectOption('N2');
   await page.getByLabel(/Explanation, including/).fill('Checked the report');
   await page.getByRole('button', { name: 'Preview calculation' }).click();
   await expect(page.getByRole('alert')).toContainText('investigation_unavailable');

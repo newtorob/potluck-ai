@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-1460fb5c-3dbc-4719-8117-17c92f5b95da",
+  "object": "chat.completion",
+  "created": 1793323094,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N2\", \"N1\"], \"status\": \"ready\", \"snippet_ids\": [\"S2\", \"S1\"], \"reason\": \"The west telescope recorded 68 images and the east telescope recorded 43 images. The difference is 68 - 43 = 25 images.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 416,
+    "completion_tokens": 77,
+    "total_tokens": 493
+  }
+}

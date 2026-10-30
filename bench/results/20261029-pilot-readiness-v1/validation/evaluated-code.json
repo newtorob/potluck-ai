@@ -1,0 +1,8 @@
+{
+  "evaluated_production_files": 150,
+  "index_mismatches": [],
+  "staged_paths": 273,
+  "unrelated_paths_staged": [],
+  "production_files_unchanged_since_evaluation": true,
+  "whitespace": "Changed production/tests/docs pass default diff check. Nine copies of an exact frozen excerpt retain its original final blank line; whole diff passes with blank-at-eof disabled per command, no repository configuration changed."
+}

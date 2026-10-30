@@ -1,0 +1,30 @@
+{
+  "report": {
+    "model_id": "qwen3.8-27b-iq4-xs",
+    "model_path": "/home/rob/.potluck/models/qwen3.8-27b-iq4-xs/model.gguf",
+    "load_time_seconds": 10.59,
+    "n_ctx": 8192,
+    "n_threads": 8,
+    "backend": "llama-server",
+    "engine_commit": "d80619397c2ba5cf1366c29f7d43699ca3a159b9",
+    "native_cache_mib": 0,
+    "inference": {
+      "schema_version": 1,
+      "model_id": "qwen3.8-27b-iq4-xs",
+      "execution_verified": false,
+      "device_kind": "unknown",
+      "device_name": "unknown",
+      "backend": "unknown"
+    },
+    "answers_verified": false
+  },
+  "inference_summary": {
+    "schema_version": 1,
+    "model_id": "qwen3.8-27b-iq4-xs",
+    "execution_verified": false,
+    "device_kind": "unknown",
+    "device_name": "unknown",
+    "backend": "unknown"
+  },
+  "actual_placement_note": "Native process discards engine logs; effective GPU placement is not independently observable here."
+}

@@ -1,0 +1,16 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "e67041ff-b82d-45ca-9b4f-ef502772ccde",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-pilot-readiness-v1/8b-v9/attempts/battery-change/raw/allowed",
+  "files": {
+    "temporal.md": "0664cbe0e7df34e6cc01f922ec5ba311e64d0fe0996876c06e2b817a1e9a84b1"
+  },
+  "scan": {
+    "collection_id": "e67041ff-b82d-45ca-9b4f-ef502772ccde",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

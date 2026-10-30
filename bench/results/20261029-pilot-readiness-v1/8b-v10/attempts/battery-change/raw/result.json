@@ -1,0 +1,321 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "4f639ca5-24d5-4668-8e40-4b09d3a0a34c",
+    "workspace": "pilot-eval",
+    "issue": "What was the percentage change in batteries processed from April to May?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What was the percentage change in batteries processed from April to May?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Signed percent change: 25 %.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:48c48339-8ad7-50ad-888b-56533ce0575c:26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+              "quote": "In April the depot processed 80 batteries. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:48c48339-8ad7-50ad-888b-56533ce0575c:26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+              "quote": "In May the depot processed 100 batteries."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "percent_change",
+            "status": "computed",
+            "text": "Signed percent change: 25 %.",
+            "formula": "(after - before) / before × 100",
+            "result": "25",
+            "unit": "%",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:48c48339-8ad7-50ad-888b-56533ce0575c:26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+                "source_text": "80 batteries",
+                "snippet_text": "In April the depot processed 80 batteries. ",
+                "start": 29,
+                "end": 41,
+                "value": "80",
+                "unit": "batteries",
+                "dimension": "count"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S2",
+                "citation_id": "source:48c48339-8ad7-50ad-888b-56533ce0575c:26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+                "source_text": "100 batteries",
+                "snippet_text": "In May the depot processed 100 batteries.",
+                "start": 27,
+                "end": 40,
+                "value": "100",
+                "unit": "batteries",
+                "dimension": "count"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v3",
+            "normalized_inputs": [
+              {
+                "id": "N1",
+                "role": "before",
+                "value": "80",
+                "unit": "batteries",
+                "original_value": "80",
+                "original_unit": "batteries",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N2",
+                "role": "after",
+                "value": "100",
+                "unit": "batteries",
+                "original_value": "100",
+                "original_unit": "batteries",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "(100 batteries - 80 batteries) / 80 batteries × 100 = 25 % (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+            "operand_roles": {
+              "baseline_id": "N1",
+              "current_id": "N2"
+            },
+            "known_input_snippet_ids": [
+              "S1",
+              "S2"
+            ],
+            "competing_snippet_ids": [],
+            "limitation_snippet_ids": [],
+            "limitation_basis": null,
+            "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "beb3e752-fdde-43e4-9677-3d061af7646a",
+        "document_id": "1d853af0-eccc-5200-8282-4045bd7c7b43",
+        "revision_id": "26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+        "relative_path": "temporal.md",
+        "updated_at": "2026-10-30T01:28:04.123851+00:00",
+        "chunk_id": "48c48339-8ad7-50ad-888b-56533ce0575c",
+        "anchor": "recycling-collection",
+        "heading": "Recycling collection",
+        "content": "In April the depot processed 80 batteries. In May the depot processed 100 batteries.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:28:04.124018+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:48c48339-8ad7-50ad-888b-56533ce0575c:26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+        "presented_content": "In April the depot processed 80 batteries. In May the depot processed 100 batteries."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T01:28:33.100499+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v10",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What was the percentage change in batteries processed from April to May?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 28971,
+      "created_at": "2026-10-30T01:28:33.100499+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "What was the percentage change in batteries processed from April to May?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "What was the percentage change in batteries processed from April to May?",
+          "operation": "percent_change"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:48c48339-8ad7-50ad-888b-56533ce0575c:26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+          "quote": "In April the depot processed 80 batteries. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:48c48339-8ad7-50ad-888b-56533ce0575c:26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+          "quote": "In May the depot processed 100 batteries."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:48c48339-8ad7-50ad-888b-56533ce0575c:26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+          "source_text": "80 batteries",
+          "snippet_text": "In April the depot processed 80 batteries. ",
+          "start": 29,
+          "end": 41,
+          "value": "80",
+          "unit": "batteries",
+          "dimension": "count"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S2",
+          "citation_id": "source:48c48339-8ad7-50ad-888b-56533ce0575c:26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+          "source_text": "100 batteries",
+          "snippet_text": "In May the depot processed 100 batteries.",
+          "start": 27,
+          "end": 40,
+          "value": "100",
+          "unit": "batteries",
+          "dimension": "count"
+        }
+      ],
+      "quantity_parser_version": "v3",
+      "extraction_notices": [],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "percent_change",
+          "status": "computed",
+          "text": "Signed percent change: 25 %.",
+          "formula": "(after - before) / before × 100",
+          "result": "25",
+          "unit": "%",
+          "reason": null,
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:48c48339-8ad7-50ad-888b-56533ce0575c:26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+              "source_text": "80 batteries",
+              "snippet_text": "In April the depot processed 80 batteries. ",
+              "start": 29,
+              "end": 41,
+              "value": "80",
+              "unit": "batteries",
+              "dimension": "count"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S2",
+              "citation_id": "source:48c48339-8ad7-50ad-888b-56533ce0575c:26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+              "source_text": "100 batteries",
+              "snippet_text": "In May the depot processed 100 batteries.",
+              "start": 27,
+              "end": 40,
+              "value": "100",
+              "unit": "batteries",
+              "dimension": "count"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v3",
+          "normalized_inputs": [
+            {
+              "id": "N1",
+              "role": "before",
+              "value": "80",
+              "unit": "batteries",
+              "original_value": "80",
+              "original_unit": "batteries",
+              "conversion_factor": "1"
+            },
+            {
+              "id": "N2",
+              "role": "after",
+              "value": "100",
+              "unit": "batteries",
+              "original_value": "100",
+              "original_unit": "batteries",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": "(100 batteries - 80 batteries) / 80 batteries × 100 = 25 % (rounded)",
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+          "operand_roles": {
+            "baseline_id": "N1",
+            "current_id": "N2"
+          },
+          "known_input_snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "competing_snippet_ids": [],
+          "limitation_snippet_ids": [],
+          "limitation_basis": null,
+          "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "beb3e752-fdde-43e4-9677-3d061af7646a"
+    ]
+  },
+  "latency_seconds": 28.985442374832928,
+  "setup_seconds": 0.018568958155810833,
+  "attempt_total_seconds": 29.00401133298874,
+  "finished_at": "2026-10-30T01:28:33.110561+00:00"
+}

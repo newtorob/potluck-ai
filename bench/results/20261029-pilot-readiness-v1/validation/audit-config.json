@@ -1,0 +1,9 @@
+{
+  "sourceRoots": [
+    "apps/desktop/frontend/src/views"
+  ],
+  "ownership": {
+    "Select/Listbox": "native"
+  },
+  "rationale": "Scoped Investigations view static audit; native selection is explicitly documented in UX-CONTRACT.md Local investigations. Does not certify the entire app."
+}

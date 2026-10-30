@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-9edda138-7e5f-414b-870b-27e537be2362",
+  "object": "chat.completion",
+  "created": 1793323737,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"status\": \"unsupported\", \"reason\": \"The total number of surveyed gardens is not recorded, making it impossible to calculate the percentage.\", \"part_id\": \"N1\", \"total_id\": \"unavailable\", \"known_input_snippet_ids\": [\"S1\"], \"competing_snippet_ids\": [\"S2\"], \"limitation_snippet_ids\": [\"S2\"], \"limitation_basis\": \"not_established\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 478,
+    "completion_tokens": 92,
+    "total_tokens": 570
+  }
+}

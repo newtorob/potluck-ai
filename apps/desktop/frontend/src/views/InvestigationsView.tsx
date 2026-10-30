@@ -36,9 +36,9 @@ const button =
   'cursor-pointer rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50';
 const operationLabels: Record<OperationType, string> = {
   answer: 'Answer a question',
-  difference: 'Difference (after − before)',
+  difference: 'Difference',
   percentage_point_difference: 'Percentage-point difference',
-  percent_change: 'Percent change from before',
+  percent_change: 'Percent change',
   percentage: 'Percentage (part of total)',
 };
 
@@ -1184,13 +1184,16 @@ export function InvestigationsView() {
                                       </label>
                                       {(plan.operation === 'percentage'
                                         ? ['Part', 'Total']
-                                        : ['Before', 'After']
+                                        : plan.operation === 'percent_change'
+                                          ? ['Baseline', 'Current']
+                                          : ['Amount to subtract', 'Amount to subtract from']
                                       ).map((role, index) => (
                                         <label key={role} className="block text-xs">
                                           {role}
                                           <select
                                             className={field}
                                             disabled={busy}
+                                            aria-label={role}
                                             aria-invalid={!!issues?.operandError}
                                             aria-describedby={`${issueId}-operands`}
                                             value={row.operand_ids[index] ?? ''}
@@ -1213,6 +1216,23 @@ export function InvestigationsView() {
                                           </select>
                                         </label>
                                       ))}
+                                      <p className="text-xs text-muted-foreground">
+                                        {(() => {
+                                          const selected = (index: number, fallback: string) => {
+                                            const quantity = quantities.find(
+                                              (entry) => entry.id === row.operand_ids[index],
+                                            );
+                                            return quantity
+                                              ? `${quantity.source_text} (${quantity.id})`
+                                              : fallback;
+                                          };
+                                          if (plan.operation === 'percentage')
+                                            return `Expression: ${selected(0, 'Part')} ÷ ${selected(1, 'Total')} × 100`;
+                                          if (plan.operation === 'percent_change')
+                                            return `Expression: (${selected(1, 'Current')} − ${selected(0, 'Baseline')}) ÷ ${selected(0, 'Baseline')} × 100`;
+                                          return `Expression: ${selected(1, 'Amount to subtract from')} − ${selected(0, 'Amount to subtract')}`;
+                                        })()}
+                                      </p>
                                       <p
                                         id={`${issueId}-operands`}
                                         className="text-xs text-destructive"

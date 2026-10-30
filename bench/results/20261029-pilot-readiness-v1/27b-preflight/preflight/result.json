@@ -1,0 +1,9 @@
+{
+  "status": "error",
+  "error": {
+    "type": "ValueError",
+    "message": "Unsupported structured response schema type"
+  },
+  "finished_at": "2026-10-30T01:11:03.530476+00:00",
+  "elapsed_seconds": 0.020345826000266243
+}

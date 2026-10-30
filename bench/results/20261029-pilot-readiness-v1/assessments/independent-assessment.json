@@ -1,0 +1,73 @@
+{
+  "scope": "Independent semantic assessment of 2 runs x 6 frozen cases, 2 curated real and 4 synthetic per run. Fixture-supplied single-answer plans; not whole-vault retrieval or owner-confirmed cases. Timeouts fail. Excerpts attached to answers count as evidence; validity alone does not establish correctness.",
+  "runs": {
+    "8b-v9": {
+      "real_pass": "0/2",
+      "synthetic_pass": "2/4",
+      "total_pass": "2/6",
+      "cases": {
+        "pilot-readiness": {
+          "pass": false,
+          "reason": "Answer only describes review/correction; omits local workflow, outcome, 1/4 and 4/4 qualification, gates, and evidence limitations. Only guide-review excerpts cited."
+        },
+        "core-company": {
+          "pass": false,
+          "reason": "Generation timed out; no answer."
+        },
+        "telescope-direction": {
+          "pass": false,
+          "reason": "-25 images reverses requested west minus east; both quantities cited."
+        },
+        "battery-change": {
+          "pass": true,
+          "reason": "25% increase; cites 80 and 100 and uses April 80 as denominator."
+        },
+        "lamp-authority": {
+          "pass": false,
+          "reason": "Abstains and mentions conflicting values and authority, but attached excerpts omit 86 and unresolved authority; earlier 70 appears only in excerpt, not answer text."
+        },
+        "garden-share": {
+          "pass": true,
+          "reason": "Abstains and cites both 18 and explicitly unrecorded total."
+        }
+      }
+    },
+    "8b-v10": {
+      "real_pass": "0/2",
+      "synthetic_pass": "4/4",
+      "total_pass": "4/6",
+      "cases": {
+        "pilot-readiness": {
+          "pass": false,
+          "reason": "Answer only describes review/correction; omits local workflow, outcome, 1/4 and 4/4 qualification, gates, and evidence limitations. Only guide-review excerpts cited."
+        },
+        "core-company": {
+          "pass": false,
+          "reason": "Generation timed out; no answer."
+        },
+        "telescope-direction": {
+          "pass": true,
+          "reason": "25 images, 68 minus 43, both quantities cited."
+        },
+        "battery-change": {
+          "pass": true,
+          "reason": "25% increase; cites 80 and 100 and uses April 80 as denominator."
+        },
+        "lamp-authority": {
+          "pass": true,
+          "reason": "Abstains from unique change; attached exact excerpts preserve 70, 92, 86 and unresolved authority. Answer text itself only states conflict and unresolved authority, so numeric detail depends on excerpts."
+        },
+        "garden-share": {
+          "pass": true,
+          "reason": "Abstains and cites 18 and explicitly unrecorded total."
+        }
+      }
+    }
+  },
+  "retrieval": [
+    "Both pilot-readiness runs indexed qualification.md and progress.md but did not retrieve or present the qualification 1/4 and 4/4 passages. The experimental-v9 checkpoint, introduction, review, workflow, and pilot-gates passages were presented; the answers did not use them.",
+    "Both core-company runs retrieved packaging policy, pricing and intro passages and presented relevant snippets; both timed out, so no answer exists to evaluate.",
+    "Synthetic cases presented full short source passages. These are small curated cases and do not establish whole-vault retrieval performance."
+  ],
+  "recommendation": "Do not promote for pilot readiness on this evidence. Evaluate retrieval coverage and complete grounded synthesis, reliability and latency, and fresh independent cases before any promotion; do not infer owner acceptance or review time."
+}

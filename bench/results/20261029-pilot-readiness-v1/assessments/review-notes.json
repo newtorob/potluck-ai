@@ -1,0 +1,25 @@
+{
+  "primary_review": {
+    "critical_found_and_fixed_before_candidate_inference": "Nullable/anyOf schema incompatible with strict runtime gate; changed to typed string sentinels. Original snapshot and preflight retained. Runtime validator plus grammar preflight regression added.",
+    "independent_findings_disposition": [
+      {
+        "concern": "Conflict limitation_basis ambiguity",
+        "disposition": "Not a blocker for internal candidate: documented conflict may cite the same competing excerpt in limitation group; unresolved authoritative input may be not_established. Semantic completeness remains evaluator-owned."
+      },
+      {
+        "concern": "Zero denominator supersedes model missing/unsupported",
+        "disposition": "Inherited intentional v9 behavior, only after two compatible extracted inputs; arithmetic is undefined independently of other uncertainty. Model evidence annotations remain distinct; not a claim of source authority."
+      },
+      {
+        "concern": "Schema looser than decoder",
+        "disposition": "Intentional fail-closed runtime validation for constraints unavailable in supported grammar subset. May increase rejected model outputs; retained as experiment limitation, all failed attempts count."
+      }
+    ]
+  },
+  "remote_preflight": {
+    "owned_model_sha256": "96457164fd300e37e8cc4c611ad5f8f849db51e2d3b29bbede98012c724b90e3",
+    "initial_failure": "Probe schema had unsupported nullable type union; failed before generation.",
+    "supported_probe_failure": "Python llama_cpp import needs unavailable libcudart.so.13. Code inspection also shows registered profile validates only specific stock Qwen3 8B formatter.",
+    "outcome": "No 27B task generation or model quality score. Separate native process unloaded; ordinary app PID2409 stayed running with6086MiB."
+  }
+}

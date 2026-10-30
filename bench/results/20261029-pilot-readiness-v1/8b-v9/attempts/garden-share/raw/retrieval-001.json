@@ -1,0 +1,49 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "d945bfc9-af60-48cb-a626-b4307a52a072"
+  ],
+  "query": "What percentage of surveyed gardens had rain barrels?",
+  "limit": 10,
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "d945bfc9-af60-48cb-a626-b4307a52a072"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "d945bfc9-af60-48cb-a626-b4307a52a072",
+        "document_id": "2a0d8636-d01e-5562-b047-b013f3e4badc",
+        "revision_id": "0f80a406-de9b-5445-a08e-e356cf6f86b6",
+        "relative_path": "missing.md",
+        "updated_at": "2026-10-30T01:19:26.488071+00:00",
+        "chunk_id": "c0a96f4b-1d60-5d85-ad6f-4bb8f17a227a",
+        "anchor": "garden-survey",
+        "heading": "Garden survey",
+        "content": "The survey recorded 18 gardens with rain barrels. The total number of surveyed gardens was not recorded.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:19:26.488238+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:c0a96f4b-1d60-5d85-ad6f-4bb8f17a227a:0f80a406-de9b-5445-a08e-e356cf6f86b6"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

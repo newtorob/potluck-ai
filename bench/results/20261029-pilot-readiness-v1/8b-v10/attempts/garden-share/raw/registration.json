@@ -1,0 +1,16 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "7a3b0f3d-0159-4589-b0db-bfc73604a0c0",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-pilot-readiness-v1/8b-v10/attempts/garden-share/raw/allowed",
+  "files": {
+    "missing.md": "e14223954cb66261cec3f3ce7b2eae9da5303ceeb2306a489aa7f2b7d943128e"
+  },
+  "scan": {
+    "collection_id": "7a3b0f3d-0159-4589-b0db-bfc73604a0c0",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

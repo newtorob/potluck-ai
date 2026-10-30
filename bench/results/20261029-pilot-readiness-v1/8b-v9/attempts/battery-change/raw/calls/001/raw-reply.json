@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-44b94b01-ab00-4f6f-a6d1-1126c9893a71",
+  "object": "chat.completion",
+  "created": 1793323114,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"operand_ids\": [\"N1\", \"N2\"], \"status\": \"ready\", \"snippet_ids\": [\"S1\", \"S2\"], \"reason\": \"The percentage change in batteries processed from April to May can be calculated using the values from N1 and N2.\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 424,
+    "completion_tokens": 66,
+    "total_tokens": 490
+  }
+}

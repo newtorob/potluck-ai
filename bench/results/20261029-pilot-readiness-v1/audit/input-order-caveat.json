@@ -1,0 +1,14 @@
+{
+  "pilot-readiness": {
+    "exact_payload_equal": false,
+    "snippet_text_multiset_equal": true,
+    "snippet_order_equal": false,
+    "notes": "Same source text set, but retrieval tie order and source IDs differ between isolated registrations. Real cases are not a strict identical-prompt comparison. Four synthetic cases have exact equal user payloads."
+  },
+  "core-company": {
+    "exact_payload_equal": false,
+    "snippet_text_multiset_equal": false,
+    "snippet_order_equal": false,
+    "notes": "Same indexed file inputs, but tied retrieval results vary in order and selected excerpts. Presented snippet text differs (181 snippets each). This real case is not an identical-prompt comparison; both attempts timed out. Four synthetic cases have exact equal user payloads."
+  }
+}

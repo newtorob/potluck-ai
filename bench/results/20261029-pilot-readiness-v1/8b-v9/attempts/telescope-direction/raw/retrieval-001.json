@@ -1,0 +1,49 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "a0e3f6da-6d45-4d1a-9df0-0cc3d9960236"
+  ],
+  "query": "How many more images did the west telescope record than the east telescope?",
+  "limit": 10,
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "a0e3f6da-6d45-4d1a-9df0-0cc3d9960236"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "a0e3f6da-6d45-4d1a-9df0-0cc3d9960236",
+        "document_id": "03b12710-d5bd-5832-a5ba-4083fac58897",
+        "revision_id": "ad6d2103-cc15-51f3-8efb-8d503bdb236b",
+        "relative_path": "direction.md",
+        "updated_at": "2026-10-30T01:18:14.853759+00:00",
+        "chunk_id": "4c4461a2-8cf9-55c4-9d24-1e586c9dce88",
+        "anchor": "observatory-logs",
+        "heading": "Observatory logs",
+        "content": "The east telescope recorded 43 images. The west telescope recorded 68 images.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:18:14.854275+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:4c4461a2-8cf9-55c4-9d24-1e586c9dce88:ad6d2103-cc15-51f3-8efb-8d503bdb236b"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

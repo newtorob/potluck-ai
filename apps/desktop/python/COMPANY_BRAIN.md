@@ -426,3 +426,19 @@ The diagnostic runner supports `--operation-mode fixture_supplied` for v9 with a
 checksummed `confirmed_operations.json`. Those runs retain `fixture_supplied` origin,
 never owner confirmation. Automatic v9 runs retain `planned_unreviewed` origin. Compare
 them separately; synthetic plans do not measure owner effort or factual acceptance.
+
+The `investigation-v10` candidate is available only through the Python service for
+internal evaluation; it does not change the default brief, answer preview, or v9
+reviewed-calculation UI. Calculation preview is unavailable for v10 drafts. V10
+asks the model for named operand roles and separate known-input, competing, and
+limitation excerpt IDs. It requires cited limitation evidence for a `documented`
+basis; `not_established` means the presented evidence did not establish the input,
+not that the document globally lacks it. The service validates the structure and
+citations, not whether the model's assessment or rationale is semantically correct.
+The existing deterministic v3 calculator performs the arithmetic, and traces retain
+roles and evidence groups for audit.
+
+The v9 correction form labels subtraction inputs as the amount to subtract and
+the amount to subtract from, percentage change as baseline/current, and a
+percentage as part/total. It displays the selected expression before preview;
+the server remains the authority for unit conversion and calculated results.

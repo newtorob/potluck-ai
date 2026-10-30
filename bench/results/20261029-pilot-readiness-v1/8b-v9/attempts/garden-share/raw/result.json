@@ -1,0 +1,215 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "c0e27dd4-1f70-4fa2-a3fb-3299a7eb7130",
+    "workspace": "pilot-eval",
+    "issue": "What percentage of surveyed gardens had rain barrels?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What percentage of surveyed gardens had rain barrels?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "unknown",
+          "text": "Calculation unavailable. Model assessment: The total number of surveyed gardens was not recorded.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:c0a96f4b-1d60-5d85-ad6f-4bb8f17a227a:0f80a406-de9b-5445-a08e-e356cf6f86b6",
+              "quote": "The survey recorded 18 gardens with rain barrels. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:c0a96f4b-1d60-5d85-ad6f-4bb8f17a227a:0f80a406-de9b-5445-a08e-e356cf6f86b6",
+              "quote": "The total number of surveyed gardens was not recorded."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "percentage",
+            "status": "unknown",
+            "text": "Calculation unavailable. Model assessment: The total number of surveyed gardens was not recorded.",
+            "formula": null,
+            "result": null,
+            "unit": null,
+            "reason": "The total number of surveyed gardens was not recorded.",
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:c0a96f4b-1d60-5d85-ad6f-4bb8f17a227a:0f80a406-de9b-5445-a08e-e356cf6f86b6",
+                "source_text": "18 gardens",
+                "snippet_text": "The survey recorded 18 gardens with rain barrels. ",
+                "start": 20,
+                "end": 30,
+                "value": "18",
+                "unit": "gardens",
+                "dimension": "count"
+              }
+            ],
+            "rounding": null,
+            "limitation_kind": "missing",
+            "algorithm_version": "cited-calculations-v3",
+            "caveat": "Arithmetic does not verify source selection or authority."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "d945bfc9-af60-48cb-a626-b4307a52a072",
+        "document_id": "2a0d8636-d01e-5562-b047-b013f3e4badc",
+        "revision_id": "0f80a406-de9b-5445-a08e-e356cf6f86b6",
+        "relative_path": "missing.md",
+        "updated_at": "2026-10-30T01:19:26.488071+00:00",
+        "chunk_id": "c0a96f4b-1d60-5d85-ad6f-4bb8f17a227a",
+        "anchor": "garden-survey",
+        "heading": "Garden survey",
+        "content": "The survey recorded 18 gardens with rain barrels. The total number of surveyed gardens was not recorded.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:19:26.488238+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:c0a96f4b-1d60-5d85-ad6f-4bb8f17a227a:0f80a406-de9b-5445-a08e-e356cf6f86b6",
+        "presented_content": "The survey recorded 18 gardens with rain barrels. The total number of surveyed gardens was not recorded."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T01:19:40.344015+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v9",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "What percentage of surveyed gardens had rain barrels?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 13851,
+      "created_at": "2026-10-30T01:19:40.344015+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "What percentage of surveyed gardens had rain barrels?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "What percentage of surveyed gardens had rain barrels?",
+          "operation": "percentage"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:c0a96f4b-1d60-5d85-ad6f-4bb8f17a227a:0f80a406-de9b-5445-a08e-e356cf6f86b6",
+          "quote": "The survey recorded 18 gardens with rain barrels. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:c0a96f4b-1d60-5d85-ad6f-4bb8f17a227a:0f80a406-de9b-5445-a08e-e356cf6f86b6",
+          "quote": "The total number of surveyed gardens was not recorded."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:c0a96f4b-1d60-5d85-ad6f-4bb8f17a227a:0f80a406-de9b-5445-a08e-e356cf6f86b6",
+          "source_text": "18 gardens",
+          "snippet_text": "The survey recorded 18 gardens with rain barrels. ",
+          "start": 20,
+          "end": 30,
+          "value": "18",
+          "unit": "gardens",
+          "dimension": "count"
+        }
+      ],
+      "quantity_parser_version": "v3",
+      "extraction_notices": [],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "percentage",
+          "status": "unknown",
+          "text": "Calculation unavailable. Model assessment: The total number of surveyed gardens was not recorded.",
+          "formula": null,
+          "result": null,
+          "unit": null,
+          "reason": "The total number of surveyed gardens was not recorded.",
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:c0a96f4b-1d60-5d85-ad6f-4bb8f17a227a:0f80a406-de9b-5445-a08e-e356cf6f86b6",
+              "source_text": "18 gardens",
+              "snippet_text": "The survey recorded 18 gardens with rain barrels. ",
+              "start": 20,
+              "end": 30,
+              "value": "18",
+              "unit": "gardens",
+              "dimension": "count"
+            }
+          ],
+          "rounding": null,
+          "limitation_kind": "missing",
+          "algorithm_version": "cited-calculations-v3",
+          "caveat": "Arithmetic does not verify source selection or authority."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "d945bfc9-af60-48cb-a626-b4307a52a072"
+    ]
+  },
+  "latency_seconds": 13.86235583294183,
+  "setup_seconds": 0.016011041589081287,
+  "attempt_total_seconds": 13.878366874530911,
+  "finished_at": "2026-10-30T01:19:40.351646+00:00"
+}

@@ -1,0 +1,16 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "92b92e21-81b0-4063-b850-ebb2906fadcc",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-pilot-readiness-v1/8b-v10/attempts/telescope-direction/raw/allowed",
+  "files": {
+    "direction.md": "9b9498254a0717c714a150fc980e6488d65d0c52f5460a3bfd9497c8da54edce"
+  },
+  "scan": {
+    "collection_id": "92b92e21-81b0-4063-b850-ebb2906fadcc",
+    "files_scanned": 1,
+    "files_added": 1,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 1
+  }
+}

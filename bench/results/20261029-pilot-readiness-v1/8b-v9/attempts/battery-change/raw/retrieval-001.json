@@ -1,0 +1,49 @@
+{
+  "workspace": "pilot-eval",
+  "collection_ids": [
+    "e67041ff-b82d-45ca-9b4f-ef502772ccde"
+  ],
+  "query": "What was the percentage change in batteries processed from April to May?",
+  "limit": 10,
+  "result": {
+    "workspace": "pilot-eval",
+    "scope": {
+      "collection_ids": [
+        "e67041ff-b82d-45ca-9b4f-ef502772ccde"
+      ]
+    },
+    "source_chunks": [
+      {
+        "collection_id": "e67041ff-b82d-45ca-9b4f-ef502772ccde",
+        "document_id": "8e837cb7-13ae-557c-bd71-294f3a529d63",
+        "revision_id": "0786dabe-f83d-5ddb-90e2-f6a5978b64d5",
+        "relative_path": "temporal.md",
+        "updated_at": "2026-10-30T01:18:34.573837+00:00",
+        "chunk_id": "522e980c-ec6a-5428-8fd2-5eaf4f82037b",
+        "anchor": "recycling-collection",
+        "heading": "Recycling collection",
+        "content": "In April the depot processed 80 batteries. In May the depot processed 100 batteries.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:18:34.573979+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:522e980c-ec6a-5428-8fd2-5eaf4f82037b:0786dabe-f83d-5ddb-90e2-f6a5978b64d5"
+      }
+    ],
+    "reviewed_claims": [],
+    "missing_evidence": [],
+    "limitations": [
+      "Results reflect indexed snapshots; disk changes need a rescan.",
+      "Word overlap does not establish relevance or entailment.",
+      "At most 200 candidates per evidence kind are examined."
+    ],
+    "scope_status": {
+      "requested": 1,
+      "ready": 1,
+      "unavailable": 0,
+      "needs_rescan": 0
+    },
+    "matching": "case-insensitive whole-word overlap ranked by distinct shared terms",
+    "truncated": false
+  }
+}

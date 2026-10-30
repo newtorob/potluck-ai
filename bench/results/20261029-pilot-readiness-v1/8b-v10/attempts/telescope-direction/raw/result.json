@@ -1,0 +1,321 @@
+{
+  "citation_validity": null,
+  "semantic_support": null,
+  "unsupported_answer": null,
+  "correction": null,
+  "time_to_accepted_seconds": null,
+  "status": "success",
+  "result": {
+    "id": "43d611a1-a18d-4e37-a893-2c15b86df222",
+    "workspace": "pilot-eval",
+    "issue": "How many more images did the west telescope record than the east telescope?",
+    "model_slug": "qwen3-8b-q4",
+    "model_sha": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+    "status": "draft",
+    "brief": {
+      "questions": [
+        {
+          "id": "R1",
+          "text": "How many more images did the west telescope record than the east telescope?"
+        }
+      ],
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Signed difference: 25 images.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:0b625eb4-7a79-5a41-98ce-294cb2a915dd:a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+              "quote": "The east telescope recorded 43 images. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:0b625eb4-7a79-5a41-98ce-294cb2a915dd:a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+              "quote": "The west telescope recorded 68 images."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "difference",
+            "status": "computed",
+            "text": "Signed difference: 25 images.",
+            "formula": "after - before",
+            "result": "25",
+            "unit": "images",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:0b625eb4-7a79-5a41-98ce-294cb2a915dd:a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+                "source_text": "43 images",
+                "snippet_text": "The east telescope recorded 43 images. ",
+                "start": 28,
+                "end": 37,
+                "value": "43",
+                "unit": "images",
+                "dimension": "count"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S2",
+                "citation_id": "source:0b625eb4-7a79-5a41-98ce-294cb2a915dd:a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+                "source_text": "68 images",
+                "snippet_text": "The west telescope recorded 68 images.",
+                "start": 28,
+                "end": 37,
+                "value": "68",
+                "unit": "images",
+                "dimension": "count"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v3",
+            "normalized_inputs": [
+              {
+                "id": "N1",
+                "role": "before",
+                "value": "43",
+                "unit": "images",
+                "original_value": "43",
+                "original_unit": "images",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N2",
+                "role": "after",
+                "value": "68",
+                "unit": "images",
+                "original_value": "68",
+                "original_unit": "images",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "68 images - 43 images = 25 images (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+            "operand_roles": {
+              "minuend_id": "N2",
+              "subtrahend_id": "N1"
+            },
+            "known_input_snippet_ids": [
+              "S1",
+              "S2"
+            ],
+            "competing_snippet_ids": [],
+            "limitation_snippet_ids": [],
+            "limitation_basis": null,
+            "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+          }
+        }
+      ],
+      "facts": [],
+      "prior_fixes": [],
+      "hypotheses": [],
+      "recommended_checks": [],
+      "model_uncertainties": []
+    },
+    "evidence": [
+      {
+        "collection_id": "92b92e21-81b0-4063-b850-ebb2906fadcc",
+        "document_id": "b8ad94e6-b36e-5dc9-8e4b-4b6509c56096",
+        "revision_id": "a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+        "relative_path": "direction.md",
+        "updated_at": "2026-10-30T01:27:49.571325+00:00",
+        "chunk_id": "0b625eb4-7a79-5a41-98ce-294cb2a915dd",
+        "anchor": "observatory-logs",
+        "heading": "Observatory logs",
+        "content": "The east telescope recorded 43 images. The west telescope recorded 68 images.",
+        "kind": "source_chunk",
+        "last_scan_at": "2026-10-30T01:27:49.571731+00:00",
+        "freshness": "recent",
+        "uncertainty": "Source text has not been reviewed.",
+        "citation_id": "source:0b625eb4-7a79-5a41-98ce-294cb2a915dd:a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+        "presented_content": "The east telescope recorded 43 images. The west telescope recorded 68 images."
+      }
+    ],
+    "review": null,
+    "outcome": null,
+    "created_at": "2026-10-30T01:28:04.097734+00:00",
+    "provenance": {
+      "schema_version": 2,
+      "retrieval_notices": [],
+      "template_version": "investigation-v10",
+      "citation_mapping": "request-local aliases",
+      "retrieval_query": "How many more images did the west telescope record than the east telescope?",
+      "retrieval_version": "unicode-word-overlap-v1",
+      "model_slug": "qwen3-8b-q4",
+      "model_sha256": "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+      "generation_settings": {
+        "temperature": 0.7,
+        "max_tokens": 2000,
+        "timeout_seconds": 240,
+        "seed": 7,
+        "timeout_scope": "shared across planning and answer generation"
+      },
+      "elapsed_ms": 14516,
+      "created_at": "2026-10-30T01:28:04.097734+00:00",
+      "question_origin": "issue",
+      "original_questions": [
+        {
+          "id": "Q1",
+          "text": "How many more images did the west telescope record than the east telescope?"
+        }
+      ],
+      "operation_plan": [
+        {
+          "id": "R1",
+          "question_id": "Q1",
+          "request": "How many more images did the west telescope record than the east telescope?",
+          "operation": "difference"
+        }
+      ],
+      "operation_plan_origin": "fixture_supplied",
+      "planner_version": null,
+      "snippet_catalog": [
+        {
+          "snippet_id": "S1",
+          "citation_id": "source:0b625eb4-7a79-5a41-98ce-294cb2a915dd:a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+          "quote": "The east telescope recorded 43 images. "
+        },
+        {
+          "snippet_id": "S2",
+          "citation_id": "source:0b625eb4-7a79-5a41-98ce-294cb2a915dd:a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+          "quote": "The west telescope recorded 68 images."
+        }
+      ],
+      "quantity_catalog": [
+        {
+          "id": "N1",
+          "snippet_id": "S1",
+          "citation_id": "source:0b625eb4-7a79-5a41-98ce-294cb2a915dd:a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+          "source_text": "43 images",
+          "snippet_text": "The east telescope recorded 43 images. ",
+          "start": 28,
+          "end": 37,
+          "value": "43",
+          "unit": "images",
+          "dimension": "count"
+        },
+        {
+          "id": "N2",
+          "snippet_id": "S2",
+          "citation_id": "source:0b625eb4-7a79-5a41-98ce-294cb2a915dd:a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+          "source_text": "68 images",
+          "snippet_text": "The west telescope recorded 68 images.",
+          "start": 28,
+          "end": 37,
+          "value": "68",
+          "unit": "images",
+          "dimension": "count"
+        }
+      ],
+      "quantity_parser_version": "v3",
+      "extraction_notices": [],
+      "calculation_traces": [
+        {
+          "request_id": "R1",
+          "operation": "difference",
+          "status": "computed",
+          "text": "Signed difference: 25 images.",
+          "formula": "after - before",
+          "result": "25",
+          "unit": "images",
+          "reason": null,
+          "inputs": [
+            {
+              "id": "N1",
+              "snippet_id": "S1",
+              "citation_id": "source:0b625eb4-7a79-5a41-98ce-294cb2a915dd:a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+              "source_text": "43 images",
+              "snippet_text": "The east telescope recorded 43 images. ",
+              "start": 28,
+              "end": 37,
+              "value": "43",
+              "unit": "images",
+              "dimension": "count"
+            },
+            {
+              "id": "N2",
+              "snippet_id": "S2",
+              "citation_id": "source:0b625eb4-7a79-5a41-98ce-294cb2a915dd:a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+              "source_text": "68 images",
+              "snippet_text": "The west telescope recorded 68 images.",
+              "start": 28,
+              "end": 37,
+              "value": "68",
+              "unit": "images",
+              "dimension": "count"
+            }
+          ],
+          "algorithm_version": "cited-calculations-v3",
+          "normalized_inputs": [
+            {
+              "id": "N1",
+              "role": "before",
+              "value": "43",
+              "unit": "images",
+              "original_value": "43",
+              "original_unit": "images",
+              "conversion_factor": "1"
+            },
+            {
+              "id": "N2",
+              "role": "after",
+              "value": "68",
+              "unit": "images",
+              "original_value": "68",
+              "original_unit": "images",
+              "conversion_factor": "1"
+            }
+          ],
+          "evaluated_expression": "68 images - 43 images = 25 images (rounded)",
+          "rounding": {
+            "mode": "ROUND_HALF_UP",
+            "max_fractional_digits": 6
+          },
+          "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+          "operand_roles": {
+            "minuend_id": "N2",
+            "subtrahend_id": "N1"
+          },
+          "known_input_snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "competing_snippet_ids": [],
+          "limitation_snippet_ids": [],
+          "limitation_basis": null,
+          "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+        }
+      ],
+      "generation_profile": {
+        "name": "qwen3-non-thinking",
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "template_sha256": "57f1fd00f0013a2be96aa79b857391f27e23df5b5f847072b524c897e24d0361",
+        "backend": "llama-cpp-python",
+        "enable_thinking": false,
+        "repeat_penalty": 1.0
+      }
+    },
+    "retrieval_notices": [],
+    "collection_ids": [
+      "92b92e21-81b0-4063-b850-ebb2906fadcc"
+    ]
+  },
+  "latency_seconds": 14.532458459027112,
+  "setup_seconds": 0.03243554104119539,
+  "attempt_total_seconds": 14.564894000068307,
+  "finished_at": "2026-10-30T01:28:04.105655+00:00"
+}

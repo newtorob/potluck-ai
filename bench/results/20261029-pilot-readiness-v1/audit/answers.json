@@ -1,0 +1,908 @@
+{
+  "pilot-readiness": {
+    "question": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?",
+    "source_set": [
+      "sources/guide-intro.md",
+      "sources/guide-workflow.md",
+      "sources/guide-review.md",
+      "sources/guide-gates.md",
+      "sources/qualification.md",
+      "sources/progress.md"
+    ],
+    "arm_a": {
+      "status": "success",
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "1. Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   A correction preserves the original draft and can change text, citations and\n   excerpts. Facts and prior fixes need exact excerpts even when correcting a legacy\n   draft. Historical combined missing evidence remains in the original draft; the\n   reviewer supplies new unverified questions separately. Retrieval notices remain\n   immutable. The review is one-shot; it is not a collaborative editor.",
+          "snippet_ids": [
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5",
+            "S6",
+            "S7",
+            "S8"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:40acc37d-4374-54fd-940d-c9e3ca782a74:2f05a927-f3ef-5c28-9e64-9bf3ea280938",
+              "quote": "1. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:40acc37d-4374-54fd-940d-c9e3ca782a74:2f05a927-f3ef-5c28-9e64-9bf3ea280938",
+              "quote": "Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:40acc37d-4374-54fd-940d-c9e3ca782a74:2f05a927-f3ef-5c28-9e64-9bf3ea280938",
+              "quote": "A correction preserves the original draft and can change text, citations and\n   "
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:40acc37d-4374-54fd-940d-c9e3ca782a74:2f05a927-f3ef-5c28-9e64-9bf3ea280938",
+              "quote": "excerpts. "
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:40acc37d-4374-54fd-940d-c9e3ca782a74:2f05a927-f3ef-5c28-9e64-9bf3ea280938",
+              "quote": "Facts and prior fixes need exact excerpts even when correcting a legacy\n   "
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:40acc37d-4374-54fd-940d-c9e3ca782a74:2f05a927-f3ef-5c28-9e64-9bf3ea280938",
+              "quote": "draft. "
+            },
+            {
+              "snippet_id": "S7",
+              "citation_id": "source:40acc37d-4374-54fd-940d-c9e3ca782a74:2f05a927-f3ef-5c28-9e64-9bf3ea280938",
+              "quote": "Historical combined missing evidence remains in the original draft; the\n   "
+            },
+            {
+              "snippet_id": "S8",
+              "citation_id": "source:40acc37d-4374-54fd-940d-c9e3ca782a74:2f05a927-f3ef-5c28-9e64-9bf3ea280938",
+              "quote": "reviewer supplies new unverified questions separately. "
+            }
+          ]
+        }
+      ],
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?"
+        }
+      ]
+    },
+    "arm_b": {
+      "status": "success",
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   \nA correction preserves the original draft and can change text, citations and\n   \nexcorts. \n\nFacts and prior fixes need exact excerpts even when correcting a legacy\n   \ndraft. \n\nHistorical combined missing evidence remains in the original draft; the\n   \nreviewer supplies new unverified questions separately. \n\nRetrieval notices remain\n   \nimmutable. \n\nThe review is one-shot; it is not a collaborative editor.",
+          "snippet_ids": [
+            "S1",
+            "S2",
+            "S3",
+            "S4",
+            "S5",
+            "S6",
+            "S7",
+            "S8"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "1. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "Explicitly accept, correct or reject a draft, with a reviewer and reason.\n   "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "A correction preserves the original draft and can change text, citations and\n   "
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "excerpts. "
+            },
+            {
+              "snippet_id": "S5",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "Facts and prior fixes need exact excerpts even when correcting a legacy\n   "
+            },
+            {
+              "snippet_id": "S6",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "draft. "
+            },
+            {
+              "snippet_id": "S7",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "Historical combined missing evidence remains in the original draft; the\n   "
+            },
+            {
+              "snippet_id": "S8",
+              "citation_id": "source:b6a2999e-cbfd-59b6-abc0-68729d40ce71:93a58a26-87b0-5752-8195-dc201567e334",
+              "quote": "reviewer supplies new unverified questions separately. "
+            }
+          ]
+        }
+      ],
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What is actually ready for a Company Brain pilot, what remains blocked, and what evidence supports that?"
+        }
+      ]
+    }
+  },
+  "core-company": {
+    "question": "What is available in the free core versus the paid company offering, and what is still planned?",
+    "source_set": [
+      "sources/guide-intro.md",
+      "sources/guide-gates.md",
+      "sources/packaging.md",
+      "sources/progress.md"
+    ],
+    "arm_a": {
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Investigation generation timed out"
+      }
+    },
+    "arm_b": {
+      "status": "error",
+      "error": {
+        "type": "ValueError",
+        "message": "Investigation generation timed out"
+      }
+    }
+  },
+  "telescope-direction": {
+    "question": "How many more images did the west telescope record than the east telescope?",
+    "source_set": [
+      "sources/direction.md"
+    ],
+    "arm_a": {
+      "status": "success",
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Signed difference: -25 images.",
+          "snippet_ids": [
+            "S2",
+            "S1"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:4c4461a2-8cf9-55c4-9d24-1e586c9dce88:ad6d2103-cc15-51f3-8efb-8d503bdb236b",
+              "quote": "The west telescope recorded 68 images."
+            },
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:4c4461a2-8cf9-55c4-9d24-1e586c9dce88:ad6d2103-cc15-51f3-8efb-8d503bdb236b",
+              "quote": "The east telescope recorded 43 images. "
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "difference",
+            "status": "computed",
+            "text": "Signed difference: -25 images.",
+            "formula": "after - before",
+            "result": "-25",
+            "unit": "images",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N2",
+                "snippet_id": "S2",
+                "citation_id": "source:4c4461a2-8cf9-55c4-9d24-1e586c9dce88:ad6d2103-cc15-51f3-8efb-8d503bdb236b",
+                "source_text": "68 images",
+                "snippet_text": "The west telescope recorded 68 images.",
+                "start": 28,
+                "end": 37,
+                "value": "68",
+                "unit": "images",
+                "dimension": "count"
+              },
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:4c4461a2-8cf9-55c4-9d24-1e586c9dce88:ad6d2103-cc15-51f3-8efb-8d503bdb236b",
+                "source_text": "43 images",
+                "snippet_text": "The east telescope recorded 43 images. ",
+                "start": 28,
+                "end": 37,
+                "value": "43",
+                "unit": "images",
+                "dimension": "count"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v3",
+            "normalized_inputs": [
+              {
+                "id": "N2",
+                "role": "before",
+                "value": "68",
+                "unit": "images",
+                "original_value": "68",
+                "original_unit": "images",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N1",
+                "role": "after",
+                "value": "43",
+                "unit": "images",
+                "original_value": "43",
+                "original_unit": "images",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "43 images - 68 images = -25 images (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+          }
+        }
+      ],
+      "questions": [
+        {
+          "id": "R1",
+          "text": "How many more images did the west telescope record than the east telescope?"
+        }
+      ]
+    },
+    "arm_b": {
+      "status": "success",
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Signed difference: 25 images.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:0b625eb4-7a79-5a41-98ce-294cb2a915dd:a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+              "quote": "The east telescope recorded 43 images. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:0b625eb4-7a79-5a41-98ce-294cb2a915dd:a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+              "quote": "The west telescope recorded 68 images."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "difference",
+            "status": "computed",
+            "text": "Signed difference: 25 images.",
+            "formula": "after - before",
+            "result": "25",
+            "unit": "images",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:0b625eb4-7a79-5a41-98ce-294cb2a915dd:a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+                "source_text": "43 images",
+                "snippet_text": "The east telescope recorded 43 images. ",
+                "start": 28,
+                "end": 37,
+                "value": "43",
+                "unit": "images",
+                "dimension": "count"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S2",
+                "citation_id": "source:0b625eb4-7a79-5a41-98ce-294cb2a915dd:a28d6cf3-8e17-5fc5-8e10-d20e8e1f767f",
+                "source_text": "68 images",
+                "snippet_text": "The west telescope recorded 68 images.",
+                "start": 28,
+                "end": 37,
+                "value": "68",
+                "unit": "images",
+                "dimension": "count"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v3",
+            "normalized_inputs": [
+              {
+                "id": "N1",
+                "role": "before",
+                "value": "43",
+                "unit": "images",
+                "original_value": "43",
+                "original_unit": "images",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N2",
+                "role": "after",
+                "value": "68",
+                "unit": "images",
+                "original_value": "68",
+                "original_unit": "images",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "68 images - 43 images = 25 images (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+            "operand_roles": {
+              "minuend_id": "N2",
+              "subtrahend_id": "N1"
+            },
+            "known_input_snippet_ids": [
+              "S1",
+              "S2"
+            ],
+            "competing_snippet_ids": [],
+            "limitation_snippet_ids": [],
+            "limitation_basis": null,
+            "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+          }
+        }
+      ],
+      "questions": [
+        {
+          "id": "R1",
+          "text": "How many more images did the west telescope record than the east telescope?"
+        }
+      ]
+    }
+  },
+  "battery-change": {
+    "question": "What was the percentage change in batteries processed from April to May?",
+    "source_set": [
+      "sources/temporal.md"
+    ],
+    "arm_a": {
+      "status": "success",
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Signed percent change: 25 %.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:522e980c-ec6a-5428-8fd2-5eaf4f82037b:0786dabe-f83d-5ddb-90e2-f6a5978b64d5",
+              "quote": "In April the depot processed 80 batteries. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:522e980c-ec6a-5428-8fd2-5eaf4f82037b:0786dabe-f83d-5ddb-90e2-f6a5978b64d5",
+              "quote": "In May the depot processed 100 batteries."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "percent_change",
+            "status": "computed",
+            "text": "Signed percent change: 25 %.",
+            "formula": "(after - before) / before × 100",
+            "result": "25",
+            "unit": "%",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:522e980c-ec6a-5428-8fd2-5eaf4f82037b:0786dabe-f83d-5ddb-90e2-f6a5978b64d5",
+                "source_text": "80 batteries",
+                "snippet_text": "In April the depot processed 80 batteries. ",
+                "start": 29,
+                "end": 41,
+                "value": "80",
+                "unit": "batteries",
+                "dimension": "count"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S2",
+                "citation_id": "source:522e980c-ec6a-5428-8fd2-5eaf4f82037b:0786dabe-f83d-5ddb-90e2-f6a5978b64d5",
+                "source_text": "100 batteries",
+                "snippet_text": "In May the depot processed 100 batteries.",
+                "start": 27,
+                "end": 40,
+                "value": "100",
+                "unit": "batteries",
+                "dimension": "count"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v3",
+            "normalized_inputs": [
+              {
+                "id": "N1",
+                "role": "before",
+                "value": "80",
+                "unit": "batteries",
+                "original_value": "80",
+                "original_unit": "batteries",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N2",
+                "role": "after",
+                "value": "100",
+                "unit": "batteries",
+                "original_value": "100",
+                "original_unit": "batteries",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "(100 batteries - 80 batteries) / 80 batteries × 100 = 25 % (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified."
+          }
+        }
+      ],
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What was the percentage change in batteries processed from April to May?"
+        }
+      ]
+    },
+    "arm_b": {
+      "status": "success",
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "supported",
+          "text": "Signed percent change: 25 %.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:48c48339-8ad7-50ad-888b-56533ce0575c:26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+              "quote": "In April the depot processed 80 batteries. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:48c48339-8ad7-50ad-888b-56533ce0575c:26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+              "quote": "In May the depot processed 100 batteries."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "percent_change",
+            "status": "computed",
+            "text": "Signed percent change: 25 %.",
+            "formula": "(after - before) / before × 100",
+            "result": "25",
+            "unit": "%",
+            "reason": null,
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:48c48339-8ad7-50ad-888b-56533ce0575c:26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+                "source_text": "80 batteries",
+                "snippet_text": "In April the depot processed 80 batteries. ",
+                "start": 29,
+                "end": 41,
+                "value": "80",
+                "unit": "batteries",
+                "dimension": "count"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S2",
+                "citation_id": "source:48c48339-8ad7-50ad-888b-56533ce0575c:26dc5dcf-493d-576b-aaec-0b56fffa4cad",
+                "source_text": "100 batteries",
+                "snippet_text": "In May the depot processed 100 batteries.",
+                "start": 27,
+                "end": 40,
+                "value": "100",
+                "unit": "batteries",
+                "dimension": "count"
+              }
+            ],
+            "algorithm_version": "cited-calculations-v3",
+            "normalized_inputs": [
+              {
+                "id": "N1",
+                "role": "before",
+                "value": "80",
+                "unit": "batteries",
+                "original_value": "80",
+                "original_unit": "batteries",
+                "conversion_factor": "1"
+              },
+              {
+                "id": "N2",
+                "role": "after",
+                "value": "100",
+                "unit": "batteries",
+                "original_value": "100",
+                "original_unit": "batteries",
+                "conversion_factor": "1"
+              }
+            ],
+            "evaluated_expression": "(100 batteries - 80 batteries) / 80 batteries × 100 = 25 % (rounded)",
+            "rounding": {
+              "mode": "ROUND_HALF_UP",
+              "max_fractional_digits": 6
+            },
+            "caveat": "Arithmetic only; source selection, authority, completeness and comparability are not verified.",
+            "operand_roles": {
+              "baseline_id": "N1",
+              "current_id": "N2"
+            },
+            "known_input_snippet_ids": [
+              "S1",
+              "S2"
+            ],
+            "competing_snippet_ids": [],
+            "limitation_snippet_ids": [],
+            "limitation_basis": null,
+            "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+          }
+        }
+      ],
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What was the percentage change in batteries processed from April to May?"
+        }
+      ]
+    }
+  },
+  "lamp-authority": {
+    "question": "How has the number of lamps changed since the earlier inventory?",
+    "source_set": [
+      "sources/authority.md"
+    ],
+    "arm_a": {
+      "status": "success",
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "unknown",
+          "text": "Calculation unavailable. Model assessment: Conflicting current values: 92 lamps (S2) and 86 lamps (S3). The owner has not determined which current sheet is authoritative (S4).",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:9147fa2b-f7d7-57e3-b2da-4e0073c7fd67:bbec144f-fbd8-57f7-82d7-24c0235d2ef4",
+              "quote": "The earlier inventory recorded 70 lamps. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:9147fa2b-f7d7-57e3-b2da-4e0073c7fd67:bbec144f-fbd8-57f7-82d7-24c0235d2ef4",
+              "quote": "The purchasing sheet reports 92 lamps currently. "
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "difference",
+            "status": "unknown",
+            "text": "Calculation unavailable. Model assessment: Conflicting current values: 92 lamps (S2) and 86 lamps (S3). The owner has not determined which current sheet is authoritative (S4).",
+            "formula": null,
+            "result": null,
+            "unit": null,
+            "reason": "Conflicting current values: 92 lamps (S2) and 86 lamps (S3). The owner has not determined which current sheet is authoritative (S4).",
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:9147fa2b-f7d7-57e3-b2da-4e0073c7fd67:bbec144f-fbd8-57f7-82d7-24c0235d2ef4",
+                "source_text": "70 lamps",
+                "snippet_text": "The earlier inventory recorded 70 lamps. ",
+                "start": 31,
+                "end": 39,
+                "value": "70",
+                "unit": "lamps",
+                "dimension": "count"
+              },
+              {
+                "id": "N2",
+                "snippet_id": "S2",
+                "citation_id": "source:9147fa2b-f7d7-57e3-b2da-4e0073c7fd67:bbec144f-fbd8-57f7-82d7-24c0235d2ef4",
+                "source_text": "92 lamps",
+                "snippet_text": "The purchasing sheet reports 92 lamps currently. ",
+                "start": 29,
+                "end": 37,
+                "value": "92",
+                "unit": "lamps",
+                "dimension": "count"
+              }
+            ],
+            "rounding": null,
+            "limitation_kind": "unsupported",
+            "algorithm_version": "cited-calculations-v3",
+            "caveat": "Arithmetic does not verify source selection or authority."
+          }
+        }
+      ],
+      "questions": [
+        {
+          "id": "R1",
+          "text": "How has the number of lamps changed since the earlier inventory?"
+        }
+      ]
+    },
+    "arm_b": {
+      "status": "success",
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "unknown",
+          "text": "Calculation unavailable. Model assessment: Conflicting current values with unresolved authority",
+          "snippet_ids": [
+            "S1",
+            "S3",
+            "S2",
+            "S4"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:0eba92af-4072-5005-8498-465f221e07a0:f65827f4-a357-5ff3-9f4c-0fa4e59e4085",
+              "quote": "The earlier inventory recorded 70 lamps. "
+            },
+            {
+              "snippet_id": "S3",
+              "citation_id": "source:0eba92af-4072-5005-8498-465f221e07a0:f65827f4-a357-5ff3-9f4c-0fa4e59e4085",
+              "quote": "The warehouse sheet reports 86 lamps currently. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:0eba92af-4072-5005-8498-465f221e07a0:f65827f4-a357-5ff3-9f4c-0fa4e59e4085",
+              "quote": "The purchasing sheet reports 92 lamps currently. "
+            },
+            {
+              "snippet_id": "S4",
+              "citation_id": "source:0eba92af-4072-5005-8498-465f221e07a0:f65827f4-a357-5ff3-9f4c-0fa4e59e4085",
+              "quote": "The owner has not determined which current sheet is authoritative."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "difference",
+            "status": "unknown",
+            "text": "Calculation unavailable. Model assessment: Conflicting current values with unresolved authority",
+            "formula": null,
+            "result": null,
+            "unit": null,
+            "reason": "Conflicting current values with unresolved authority",
+            "inputs": [
+              {
+                "id": "N3",
+                "snippet_id": "S3",
+                "citation_id": "source:0eba92af-4072-5005-8498-465f221e07a0:f65827f4-a357-5ff3-9f4c-0fa4e59e4085",
+                "source_text": "86 lamps",
+                "snippet_text": "The warehouse sheet reports 86 lamps currently. ",
+                "start": 28,
+                "end": 36,
+                "value": "86",
+                "unit": "lamps",
+                "dimension": "count"
+              },
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:0eba92af-4072-5005-8498-465f221e07a0:f65827f4-a357-5ff3-9f4c-0fa4e59e4085",
+                "source_text": "70 lamps",
+                "snippet_text": "The earlier inventory recorded 70 lamps. ",
+                "start": 31,
+                "end": 39,
+                "value": "70",
+                "unit": "lamps",
+                "dimension": "count"
+              }
+            ],
+            "rounding": null,
+            "limitation_kind": "unsupported",
+            "algorithm_version": "cited-calculations-v3",
+            "caveat": "Arithmetic does not verify source selection or authority.",
+            "operand_roles": {
+              "minuend_id": "N1",
+              "subtrahend_id": "N3"
+            },
+            "known_input_snippet_ids": [
+              "S1",
+              "S3"
+            ],
+            "competing_snippet_ids": [
+              "S2",
+              "S4"
+            ],
+            "limitation_snippet_ids": [
+              "S4"
+            ],
+            "limitation_basis": "not_established",
+            "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+          }
+        }
+      ],
+      "questions": [
+        {
+          "id": "R1",
+          "text": "How has the number of lamps changed since the earlier inventory?"
+        }
+      ]
+    }
+  },
+  "garden-share": {
+    "question": "What percentage of surveyed gardens had rain barrels?",
+    "source_set": [
+      "sources/missing.md"
+    ],
+    "arm_a": {
+      "status": "success",
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "unknown",
+          "text": "Calculation unavailable. Model assessment: The total number of surveyed gardens was not recorded.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:c0a96f4b-1d60-5d85-ad6f-4bb8f17a227a:0f80a406-de9b-5445-a08e-e356cf6f86b6",
+              "quote": "The survey recorded 18 gardens with rain barrels. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:c0a96f4b-1d60-5d85-ad6f-4bb8f17a227a:0f80a406-de9b-5445-a08e-e356cf6f86b6",
+              "quote": "The total number of surveyed gardens was not recorded."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "percentage",
+            "status": "unknown",
+            "text": "Calculation unavailable. Model assessment: The total number of surveyed gardens was not recorded.",
+            "formula": null,
+            "result": null,
+            "unit": null,
+            "reason": "The total number of surveyed gardens was not recorded.",
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:c0a96f4b-1d60-5d85-ad6f-4bb8f17a227a:0f80a406-de9b-5445-a08e-e356cf6f86b6",
+                "source_text": "18 gardens",
+                "snippet_text": "The survey recorded 18 gardens with rain barrels. ",
+                "start": 20,
+                "end": 30,
+                "value": "18",
+                "unit": "gardens",
+                "dimension": "count"
+              }
+            ],
+            "rounding": null,
+            "limitation_kind": "missing",
+            "algorithm_version": "cited-calculations-v3",
+            "caveat": "Arithmetic does not verify source selection or authority."
+          }
+        }
+      ],
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What percentage of surveyed gardens had rain barrels?"
+        }
+      ]
+    },
+    "arm_b": {
+      "status": "success",
+      "answers": [
+        {
+          "question_id": "R1",
+          "status": "unknown",
+          "text": "Calculation unavailable. Model assessment: The total number of surveyed gardens is not recorded, making it impossible to calculate the percentage.",
+          "snippet_ids": [
+            "S1",
+            "S2"
+          ],
+          "source_excerpts": [
+            {
+              "snippet_id": "S1",
+              "citation_id": "source:e7a76ba0-09d9-504a-9af0-1de249dfae87:5d0879d4-9950-58f0-816d-7c69e299889e",
+              "quote": "The survey recorded 18 gardens with rain barrels. "
+            },
+            {
+              "snippet_id": "S2",
+              "citation_id": "source:e7a76ba0-09d9-504a-9af0-1de249dfae87:5d0879d4-9950-58f0-816d-7c69e299889e",
+              "quote": "The total number of surveyed gardens was not recorded."
+            }
+          ],
+          "calculation": {
+            "request_id": "R1",
+            "operation": "percentage",
+            "status": "unknown",
+            "text": "Calculation unavailable. Model assessment: The total number of surveyed gardens is not recorded, making it impossible to calculate the percentage.",
+            "formula": null,
+            "result": null,
+            "unit": null,
+            "reason": "The total number of surveyed gardens is not recorded, making it impossible to calculate the percentage.",
+            "inputs": [
+              {
+                "id": "N1",
+                "snippet_id": "S1",
+                "citation_id": "source:e7a76ba0-09d9-504a-9af0-1de249dfae87:5d0879d4-9950-58f0-816d-7c69e299889e",
+                "source_text": "18 gardens",
+                "snippet_text": "The survey recorded 18 gardens with rain barrels. ",
+                "start": 20,
+                "end": 30,
+                "value": "18",
+                "unit": "gardens",
+                "dimension": "count"
+              }
+            ],
+            "rounding": null,
+            "limitation_kind": "unsupported",
+            "algorithm_version": "cited-calculations-v3",
+            "caveat": "Arithmetic does not verify source selection or authority.",
+            "operand_roles": {
+              "part_id": "N1",
+              "total_id": null
+            },
+            "known_input_snippet_ids": [
+              "S1"
+            ],
+            "competing_snippet_ids": [
+              "S2"
+            ],
+            "limitation_snippet_ids": [
+              "S2"
+            ],
+            "limitation_basis": "not_established",
+            "evidence_assessment": "Model assessment; source authority and completeness are not verified."
+          }
+        }
+      ],
+      "questions": [
+        {
+          "id": "R1",
+          "text": "What percentage of surveyed gardens had rain barrels?"
+        }
+      ]
+    }
+  }
+}

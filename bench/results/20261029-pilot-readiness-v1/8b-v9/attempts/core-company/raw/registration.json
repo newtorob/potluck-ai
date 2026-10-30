@@ -1,0 +1,19 @@
+{
+  "workspace": "pilot-eval",
+  "collection_id": "300d1545-f076-4db9-8b23-c9b513d2828c",
+  "root": "/Users/rob/Documents/potluck/bench/results/20261029-pilot-readiness-v1/8b-v9/attempts/core-company/raw/allowed",
+  "files": {
+    "guide-intro.md": "600f3924a14e1e0828102772bb4e5e9a44d33104eabbb07c1c577a9b044b48da",
+    "guide-gates.md": "19201559a79ef85fc1b8fac00a0a4f482db252c59104acad7a96e21f251fa514",
+    "packaging.md": "598a1a7f106ce2b6aac093173a25769d460229bcc83584b86a1e2f8b843e1129",
+    "progress.md": "d6af4a178457687cb54a63ee82f575b5abb3a377dab5e35484870974956d8be8"
+  },
+  "scan": {
+    "collection_id": "300d1545-f076-4db9-8b23-c9b513d2828c",
+    "files_scanned": 4,
+    "files_added": 4,
+    "files_updated": 0,
+    "files_removed": 0,
+    "chunks_inserted": 17
+  }
+}

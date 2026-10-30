@@ -1,0 +1,44 @@
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "Return the requested JSON."
+    },
+    {
+      "role": "user",
+      "content": "Set status to READY and note to null."
+    }
+  ],
+  "settings": {
+    "expected_model": "qwen3.8-27b-iq4-xs",
+    "expected_sha256": "96457164fd300e37e8cc4c611ad5f8f849db51e2d3b29bbede98012c724b90e3",
+    "max_tokens": 128,
+    "temperature": 0,
+    "response_format": {
+      "type": "json_object",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "READY"
+            ]
+          },
+          "note": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "status",
+          "note"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bounded_generation": true,
+    "generation_profile": "qwen3-non-thinking",
+    "seed": 7
+  },
+  "purpose": "non-task schema/profile capability check"
+}

@@ -20,6 +20,7 @@ from potluck_local.services import prompt_cache, investigation_answers as answer
 from potluck_local.services import investigation_operations as operations
 from potluck_local.services import investigation_calculations as calculations
 from potluck_local.services import investigation_reviewed_operations as reviewed_ops
+from potluck_local.services import investigation_explicit_operations as explicit_ops
 from potluck_local.services.settings_manager import get_settings
 
 
@@ -308,7 +309,8 @@ _PLAN_INSTRUCTION_V7 = (
 _INSTRUCTIONS = {'investigation-v4': _INSTRUCTION_V4, 'investigation-v5': _INSTRUCTION_V5,
                  'investigation-v6': _INSTRUCTION_V6, 'investigation-v7': _INSTRUCTION_V7,
                  'investigation-v8': operations.ANSWER_INSTRUCTION,
-                 'investigation-v9': reviewed_ops.ANSWER_INSTRUCTION}
+                 'investigation-v9': reviewed_ops.ANSWER_INSTRUCTION,
+                 'investigation-v10': explicit_ops.ANSWER_INSTRUCTION}
 
 
 async def _suggest_reviewed_operations(issue: str, generate: Any) -> list[dict[str, str]]:
@@ -398,15 +400,15 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
     if template_version not in _INSTRUCTIONS:
         raise ValueError('Unknown investigation template')
     if reviewed_plan_origin is not None and (reviewed_plan_origin != 'fixture_supplied'
-            or template_version != 'investigation-v9' or reviewed_operations is None):
+            or template_version not in ('investigation-v9', 'investigation-v10') or reviewed_operations is None):
         raise ValueError('Invalid reviewed plan origin')
-    if reviewed_operations is not None and template_version != 'investigation-v9':
+    if reviewed_operations is not None and template_version not in ('investigation-v9', 'investigation-v10'):
         raise ValueError('Reviewed operations require v9')
-    if template_version == 'investigation-v9' and questions is not None:
+    if template_version in ('investigation-v9', 'investigation-v10') and questions is not None:
         raise ValueError('Questions cannot be combined with v9')
     if operation_plan is not None and template_version != 'investigation-v8':
         raise ValueError('Operation plan requires v8')
-    if (template_version not in ('investigation-v6', 'investigation-v7', 'investigation-v8', 'investigation-v9')
+    if (template_version not in ('investigation-v6', 'investigation-v7', 'investigation-v8', 'investigation-v9', 'investigation-v10')
             and (questions is not None or generation_profile is not None)):
         raise ValueError('Question options require v6, v7 or v8')
     if seed is not None and (type(seed) is not int or not 0 <= seed <= 4294967295):
@@ -421,7 +423,7 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
             raise ValueError('Investigation profile incompatible') from None
     _privacy()
     issue = _text(issue, 4000)
-    if template_version in ('investigation-v8', 'investigation-v9') and planned_questions is None:
+    if template_version in ('investigation-v8', 'investigation-v9', 'investigation-v10') and planned_questions is None:
         planned_questions = [{'id': 'Q1', 'text': issue}]
     query = _text(query, 1000)
     model_slug = _text(model_slug, 128)
@@ -487,7 +489,7 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
         kwargs: dict[str, Any] = {'expected_model': model_slug, 'expected_sha256': sha,
                                   'max_tokens': max_tokens, 'temperature': 0,
                                   'response_format': {'type': 'json_object', 'schema': schema}}
-        if template_version in ('investigation-v6', 'investigation-v7', 'investigation-v8', 'investigation-v9'):
+        if template_version in ('investigation-v6', 'investigation-v7', 'investigation-v8', 'investigation-v9', 'investigation-v10'):
             kwargs['bounded_generation'] = True
         if generation_profile is not None:
             kwargs['generation_profile'] = generation_profile
@@ -511,7 +513,7 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
         except (KeyError, IndexError, TypeError):
             raise ValueError('Invalid model format') from None
     try:
-        if template_version == 'investigation-v9':
+        if template_version in ('investigation-v9', 'investigation-v10'):
             if reviewed_operations is None:
                 rows = await _suggest_reviewed_operations(issue, generate)
             else:
@@ -537,8 +539,9 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
                                  'quantities': [{k: n[k] for k in ('id', 'snippet_id', 'source_text', 'value', 'unit', 'unit_source_text') if k in n} for n in quantity_catalog],
                                  'extraction_notices': extraction_notices}, ensure_ascii=False)
             raw = await generate([{'role': 'system', 'content': instruction}, {'role': 'user', 'content': prompt}],
-                                 reviewed_ops.response_schema(operation_requests, snippet_catalog, quantity_catalog), 2000)
-            brief, calculation_traces = reviewed_ops.decode_results(raw, operation_requests, snippet_catalog, quantity_catalog, extraction_notices, version='v3')
+                                 (explicit_ops if template_version == 'investigation-v10' else reviewed_ops).response_schema(operation_requests, snippet_catalog, quantity_catalog), 2000)
+            decoder = explicit_ops if template_version == 'investigation-v10' else reviewed_ops
+            brief, calculation_traces = decoder.decode_results(raw, operation_requests, snippet_catalog, quantity_catalog, extraction_notices, version='v3')
         elif template_version == 'investigation-v8':
             assert planned_questions is not None
             question_origin = 'explicit' if questions is not None else 'issue'
@@ -630,7 +633,7 @@ async def create_investigation(scope: EvidenceScope, issue: str, query: str,
         provenance['generation_settings']['timeout_scope'] = 'shared across planning and answer generation'
         if profile_metadata is not None:
             provenance['generation_settings']['temperature'] = profile_metadata['temperature']
-    if template_version == 'investigation-v9':
+    if template_version in ('investigation-v9', 'investigation-v10'):
         provenance.update({'question_origin': 'issue', 'original_questions': planned_questions,
                            'operation_plan': operation_requests,
                            'operation_plan_origin': (reviewed_plan_origin or 'confirmed') if reviewed_operations is not None else 'planned_unreviewed',
@@ -741,11 +744,11 @@ async def review_investigation(scope: EvidenceScope, iid: str, decision: str, re
     validated_correction = None
     if corrected_brief is not None:
         try:
-            if (item['provenance'] or {}).get('template_version') in ('investigation-v6', 'investigation-v7', 'investigation-v8', 'investigation-v9'):
+            if (item['provenance'] or {}).get('template_version') in ('investigation-v6', 'investigation-v7', 'investigation-v8', 'investigation-v9', 'investigation-v10'):
                 snippets = answers.snippets_from_evidence(item['evidence'])
                 if snippets != item['provenance'].get('snippet_catalog'):
                     raise ValueError('Invalid snippets')
-                if item['provenance'].get('template_version') in ('investigation-v8', 'investigation-v9'):
+                if item['provenance'].get('template_version') in ('investigation-v8', 'investigation-v9', 'investigation-v10'):
                     validated_correction = operations.corrected_brief(corrected_brief, item['brief'], snippets)
                 else:
                     validated_correction = answers.corrected_brief(corrected_brief, item['brief'], snippets)

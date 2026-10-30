@@ -1,0 +1,17 @@
+{
+  "root": "/home/rob/potluck-engine/current/apps/desktop/python/native/split",
+  "manifest": {
+    "schemaVersion": 1,
+    "protocol": 1,
+    "rpcProtocol": "8.0.0",
+    "repository": "https://github.com/ggml-org/llama.cpp.git",
+    "commit": "d80619397c2ba5cf1366c29f7d43699ca3a159b9",
+    "backend": "cuda"
+  },
+  "files_sha256": {
+    "LICENSE": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d",
+    "llama-server": "977ee218a37a113eb9e910f0991bc13bdefc7ecd7c90984961415b1a738194bd",
+    "manifest.json": "daa830dea1b14f7b4d1de0aac7e485dc3b9a3a17c19e868c79274efee2189afb",
+    "rpc-server": "afec9388ff9f1bcfa849ab9e0529dd7ea55247fbe7c66e71a4ebbe3768427242"
+  }
+}

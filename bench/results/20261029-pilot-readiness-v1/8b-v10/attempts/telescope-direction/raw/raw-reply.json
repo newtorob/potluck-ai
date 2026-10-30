@@ -1,0 +1,22 @@
+{
+  "id": "chatcmpl-56311122-4ce2-45f5-a3b2-93d145284914",
+  "object": "chat.completion",
+  "created": 1793323669,
+  "model": "/Users/rob/.potluck/models/qwen3-8b-q4/model.gguf",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"R1\": {\"status\": \"ready\", \"reason\": \"The quantities for the number of images recorded by the west and east telescopes are provided.\", \"minuend_id\": \"N2\", \"subtrahend_id\": \"N1\", \"known_input_snippet_ids\": [\"S1\", \"S2\"], \"competing_snippet_ids\": [], \"limitation_snippet_ids\": [], \"limitation_basis\": \"none\"}}"
+      },
+      "logprobs": null,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 521,
+    "completion_tokens": 92,
+    "total_tokens": 613
+  }
+}

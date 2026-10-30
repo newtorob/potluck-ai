@@ -1,0 +1,62 @@
+{
+  "reviewer": "primary",
+  "rubric": "frozen required answer and citation criteria",
+  "cases": {
+    "pilot-readiness": {
+      "v9": false,
+      "v10": false,
+      "reason": "Both copy narrow review instructions and omit readiness, blocked gates, experimental qualification and the curation limit. The qualification report was indexed but not retrieved; other relevant gate excerpts were presented and ignored."
+    },
+    "core-company": {
+      "v9": false,
+      "v10": false,
+      "reason": "Both time out without a saved draft: 266.97s and 288.76s, including cancellation drain."
+    },
+    "telescope-direction": {
+      "v9": false,
+      "v10": true,
+      "reason": "Baseline computes -25. Candidate correctly calculates west 68 minus east 43 = 25 and cites both sources."
+    },
+    "battery-change": {
+      "v9": true,
+      "v10": true,
+      "reason": "Both correctly calculate 25% change from April 80 to May 100 and cite both inputs."
+    },
+    "lamp-authority": {
+      "v9": false,
+      "v10": true,
+      "reason": "Baseline mentions the competing 86 value and unresolved authority, but cites only 70 and 92. Candidate abstains and retains exact 70, 92, 86 and authority excerpts. Required answer/citation criteria pass; unsupported classification and reversed unused roles remain semantically wrong."
+    },
+    "garden-share": {
+      "v9": true,
+      "v10": true,
+      "reason": "Both correctly abstain and cite the known 18 count and the sentence documenting the missing total. Candidate incorrectly calls the limitation unsupported, places the missing statement in the competing group, and uses not_established instead of documented."
+    }
+  },
+  "totals": {
+    "v9": {
+      "real": 0,
+      "synthetic": 2,
+      "all": 2
+    },
+    "v10": {
+      "real": 0,
+      "synthetic": 4,
+      "all": 4
+    }
+  },
+  "denominators": {
+    "real": 2,
+    "synthetic": 4,
+    "all": 6
+  },
+  "promotion": "Do not promote. Keep v10 internal. The narrow same-case gain does not establish broad quality or pilot readiness.",
+  "actual_owner_acceptance": null,
+  "actual_review_time": null,
+  "limitations": [
+    "One seed and four synthetic cases; two curated-source questions, not whole-vault retrieval or autonomous planning.",
+    "Candidate annotation taxonomy is still wrong for nonready cases despite correct abstention and citations.",
+    "The real-source arms have differing tied retrieval payloads; only the four synthetic user payloads match exactly.",
+    "The larger 27B model did not generate; runtime preflight was blocked."
+  ]
+}
